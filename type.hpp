@@ -49,13 +49,13 @@ struct TypeInfo {
   size_t size;
 
   // int ** has a ptr depth of 2;
-  const int ptr_depth = 0;
+  int ptr_depth = 0;
 
   // the length of this vector is the amount of array modifiers this has,
   // and the integer value (if > 0) is the fixed length.
   // int v[10][20]; would make this = { 10, 20 };
   // int *v = new int[100]; would make this { -1 } indicating a dynamic array
-  const jstl::Vector<int> array_dims = {};
+  jstl::Vector<int> array_dims = {};
 
   inline bool equals(const std::string &name, int ptr_depth,
               jstl::Vector<int> &array_dims) const {
@@ -107,7 +107,7 @@ static int create_type(TypeKind kind, TypeFlags flags, TypeInfo &&info) {
   info.owner_id = type->id;
 
   if (type->id > MAX_NUM_TYPES) {
-    throw_error(Error{
+    throw_error({
         .message = "Max types exceeded",
     });
   }
@@ -193,6 +193,11 @@ static void init_type_system() {
               TypeInfo{.name = "string", .size = sizeof(const char *)});
   create_type(TYPE_SCALAR, TYPE_FLAGS_NONE,
               TypeInfo{.name = "bool", .size = sizeof(bool)});
+    
+  create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo {
+    .name = "void",
+    .size = 0,
+  });
 }
 
 // used as a marker for the type visitor that we need to resolve this type at

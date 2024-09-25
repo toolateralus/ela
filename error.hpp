@@ -24,12 +24,16 @@ enum ErrorSeverity {
 };
 
 struct Error {
-  const char *message;
+  std::string message;
   const ErrorSeverity severity;
 };
 
 static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
 
+
+// marked noreturn for now to avoid warnings.
+// todo; fix this
+[[noreturn]]
 static void throw_error(Error &&err) {
   if (num_errors >= MAX_ERRORS) {
     throw std::runtime_error("Maximum number of errors exceeded");

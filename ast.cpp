@@ -2,25 +2,87 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
+#include <format>
 
-ASTNode *Parser::parse() {
+ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
   while (tok) {
-    program->statements.push(parse_expr());
+    program->statements.push(parse_statement());
     if (semicolon()) {
       eat();
     }
   }
   return program;
 }
+ASTStatement *Parser::parse_statement() {
+  auto tok = peek();
 
+  if (tok.type == TType::LCurly) {
+    return parse_block();
+  }
 
+  if (find_type_id(tok.value) != -1) {
+    auto decl = parse_declaration();
+    expect(TType::Semi);
+    return decl;
+  }
+
+  eat(); // we cannot go back after this.
+  if (peek().type == TType::DoubleColon) {
+    eat();
+    if (peek().type == TType::LParen) {
+      return parse_function_declaration(tok);
+    }
+  } 
+
+  throw_error(Error{
+      .message =
+          std::format("Unexpected token when parsing statement: {}", tok.value),
+      .severity = ERROR_CRITICAL,
+  });
+}
+ASTDecl *Parser::parse_declaration() {
+  ASTDecl *decl = ast_alloc<ASTDecl>();
+  decl->type = parse_type();
+  auto iden = eat();
+  decl->name = iden;
+
+  if (peek().type == TType::Assign) {
+    eat();
+    auto expr = parse_expr();
+    decl->value = expr;
+  }
+
+  return decl;
+}
+ASTFuncDecl *Parser::parse_function_declaration(Token name) {
+  auto function = ast_alloc<ASTFuncDecl>();
+  function->params = parse_parameters();
+  
+  if (peek().type != TType::Arrow) {
+    function->return_type = ASTType::get_void();
+  } else {
+    expect(TType::Arrow); 
+  }
+  function->return_type = parse_type();
+  function->block = parse_block();
+  return function;
+}
+ASTBlock *Parser::parse_block() {
+  expect(TType::LCurly);
+  ASTBlock *block = ast_alloc<ASTBlock>();
+  while (not_eof() && peek().type != TType::RCurly) {
+    block->statements.push(parse_statement());
+  }
+  expect(TType::RCurly);
+  return block;
+}
 ASTExpr *Parser::parse_expr() {
   auto left = parse_primary();
 
   while (!semicolon() && not_eof() && peek().family == TFamily::Operator) {
     auto op = eat();
-    
+
     auto right = parse_primary();
     auto binexpr = ast_alloc<ASTBinExpr>();
     binexpr->left = left;
@@ -163,7 +225,8 @@ ASTExpr *Parser::parse_additive() {
 }
 ASTExpr *Parser::parse_multiplicative() {
   auto left = parse_unary();
-  while (peek().type == TType::Mul || peek().type == TType::Div || peek().type == TType::Modulo) {
+  while (peek().type == TType::Mul || peek().type == TType::Div ||
+         peek().type == TType::Modulo) {
     auto op = eat();
     auto right = parse_unary();
     auto binexpr = ast_alloc<ASTBinExpr>();
@@ -175,7 +238,8 @@ ASTExpr *Parser::parse_multiplicative() {
   return left;
 }
 ASTExpr *Parser::parse_unary() {
-  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::Not || peek().type == TType::BitwiseNot) {
+  if (peek().type == TType::Add || peek().type == TType::Sub ||
+      peek().type == TType::Not || peek().type == TType::BitwiseNot) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
@@ -189,53 +253,126 @@ ASTExpr *Parser::parse_primary() {
   auto tok = peek();
 
   switch (tok.type) {
-    case TType::Identifier: {
-      eat();
-      auto iden = ast_alloc<ASTIden>();
-      iden->value = tok.value;
-      iden->type_id = get_type_unresolved();
-      return iden;
+  case TType::Identifier: {
+    eat();
+    auto iden = ast_alloc<ASTIden>();
+    iden->value = tok.value;
+    iden->type = ASTType::unresolved();
+    return iden;
+  }
+  case TType::Integer: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Integer;
+    literal->value = tok.value;
+    auto t = ast_alloc<ASTType>();
+    t->type_info = get_type_info(find_type_id("i32"));
+    t->type_info_complete = true;
+    literal->type = t;
+    return literal;
+  }
+  case TType::Float: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Float;
+    literal->value = tok.value;
+    auto t = ast_alloc<ASTType>();
+    t->type_info = get_type_info(find_type_id("f32"));
+    t->type_info_complete = true;
+    literal->type = t;
+    return literal;
+  }
+  case TType::String: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::String;
+    literal->value = tok.value;
+    auto t = ast_alloc<ASTType>();
+    t->type_info = get_type_info(find_type_id("string"));
+    t->type_info_complete = true;
+    literal->type = t;
+    return literal;
+  }
+  case TType::LParen: {
+    eat(); // consume '('
+    auto expr = parse_expr();
+    if (peek().type != TType::RParen) {
+      throw_error({.message = "Expected ')'", .severity = ERROR_FAILURE});
     }
-    case TType::Integer: {
-      eat();
-      auto literal = ast_alloc<ASTLiteral>();
-      literal->tag = ASTLiteral::Integer;
-      literal->value = tok.value;
-      literal->type_id = find_type_id("i32");
-      return literal;
-    }
-    case TType::Float: {
-      eat();
-      auto literal = ast_alloc<ASTLiteral>();
-      literal->tag = ASTLiteral::Float;
-      literal->value = tok.value;
-      literal->type_id = find_type_id("f32");
-      return literal;
-    }
-    case TType::String: {
-      eat();
-      auto literal = ast_alloc<ASTLiteral>();
-      literal->tag = ASTLiteral::String;
-      literal->value = tok.value;
-      literal->type_id = find_type_id("string");
-      return literal;
-    }
-    case TType::LParen: {
-      eat(); // consume '('
-      auto expr = parse_expr();
-      if (peek().type != TType::RParen) {
-        throw_error({.message = "Expected ')'", .severity = ERROR_FAILURE});
+    eat(); // consume ')'
+    return expr;
+  }
+  default: {
+    throw_error({.message = std::format(
+                     "Invalid primary expression. Token: {}, Type: {}",
+                     tok.value, TTypeToString(tok.type)),
+                 .severity = ERROR_FAILURE});
+    return nullptr;
+  }
+  }
+}
+ASTType *Parser::parse_type() {
+  auto base = tok.value;
+  jstl::Vector<int> array_dims;
+  int ptr_depth = 0;
+  
+  while (true) {
+    if (peek().type == TType::LBrace) {
+      expect(TType::LBrace);
+      if (peek().type == TType::Integer) {
+        array_dims.push(std::stoi(eat().value));
+      } else {
+        array_dims.push(-1); // dynamic array
       }
-      eat(); // consume ')'
-      return expr;
-    }
-    default: {
-      char buffer[1024];
-      snprintf(buffer, sizeof(buffer),
-               "Invalid primary expression. Token: %s, Type: %s",
-               tok.value.c_str(), TTypeToString(tok.type).c_str());
-      throw_error({.message = buffer, .severity = ERROR_FAILURE});
-      return nullptr;
+      if (peek().type != TType::RBrace) {
+        throw_error({.message = "Expected ']'", .severity = ERROR_FAILURE});
+      }
+      expect(TType::RBrace);
+    } else if (peek().type == TType::Mul) {
+      expect(TType::Mul);
+      ptr_depth++;
+    } else {
+      break;
     }
   }
+  
+  auto node = ast_alloc<ASTType>();
+  auto typeinfo = ast_alloc<TypeInfo>();
+  
+  typeinfo->name = base;
+  typeinfo->array_dims = array_dims;
+  typeinfo->ptr_depth = ptr_depth;
+  typeinfo->size = -1;
+  
+  node->type_info = typeinfo;
+  node->type_info_complete = false;
+  
+  return node;
+}
+ASTParamsDecl *Parser::parse_parameters() {
+    ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
+  expect(TType::LParen);
+  
+  while (peek().type != TType::RParen) {
+    auto type = parse_type();
+    auto name = expect(TType::Identifier).value;
+    
+    auto param = ast_alloc<ASTParamDecl>();
+    param->type = type;
+    param->name = name;
+    
+    if (peek().type == TType::Assign) {
+      eat();
+      param->default_value = parse_expr();
+    }
+    
+    params->params.push(param);
+    
+    if (peek().type != TType::RParen) {
+      expect(TType::Comma);
+    } else break;
+  }
+  
+  expect(TType::RParen);
+  return params;
 }

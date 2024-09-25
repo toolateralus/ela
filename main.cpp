@@ -17,8 +17,9 @@ int main(int argc, char *argv[]) {
   
   Context context;
   Parser parser(str, "dummy.ela", context);
-  auto root = parser.parse();
+  ASTProgram* root = parser.parse();
   
+  printf("%p\n", root);
   
   
   // auto state = Lexer::State::from_file(str, "dummy.ela");
