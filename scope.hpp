@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core.hpp"
 #include <jstl/memory/arena.hpp>
 #include <string>
 #include <unordered_map>
@@ -10,7 +9,7 @@
 // TODO(cont.) executing would be an executing body like if, func, declaring
 // would be things like struct declarations, etc.
 
-static jstl::Arena scope_arena = {GB(1)};
+extern jstl::Arena scope_arena;
 
 struct Symbol {
   std::string name;

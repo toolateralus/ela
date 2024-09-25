@@ -1,6 +1,5 @@
 #pragma once
 
-#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -9,8 +8,7 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 
-// TODO: remove this. Just for easy printing for debugging.
-static jstl::Arena ast_arena{GB(1)};
+extern jstl::Arena ast_arena;
 
 template <class T> T *ast_alloc(size_t n = 1) {
   return (T *)ast_arena.allocate(sizeof(T) * n);
@@ -32,15 +30,14 @@ struct ASTProgram : ASTNode {
 struct ASTType : ASTNode {
   // tells us whether this is an existing type info registered within the type
   // system, or if this was mocked up to be resolved.
-  bool type_info_complete = false;
+  bool complete = false;
   TypeInfo *type_info;
   static ASTType *unresolved() {
     static ASTType *type = [] {
       auto type = ast_alloc<ASTType>();
       type->type_info = type_alloc<TypeInfo>();
       type->type_info->name = "__unresolved__";
-      type->type_info->size = -1;
-      type->type_info_complete = false;
+      type->complete = false;
       return type;
     }();
     return type;
@@ -51,7 +48,7 @@ struct ASTType : ASTNode {
       auto info = get_type_info(find_type_id("void"));
       ASTType *type = ast_alloc<ASTType>();
       type->type_info = info;
-      type->type_info_complete = true;
+      type->complete = true;
       return type;
     }();
     return type;
@@ -60,6 +57,10 @@ struct ASTType : ASTNode {
 
 struct ASTExpr : ASTNode {
   ASTType *type;
+};
+
+struct ASTExprStatement : ASTStatement {
+  ASTExpr *expression;
 };
 
 struct ASTDecl : ASTStatement {
@@ -153,7 +154,7 @@ struct Parser {
   ASTBlock *parse_block();
 
   ASTExpr *parse_expr();
-  ASTExpr *parse_assignment();
+  ASTExpr *parse_assignment(Token *);
   ASTExpr *parse_logical_or();
   ASTExpr *parse_logical_and();
   ASTExpr *parse_bitwise_or();

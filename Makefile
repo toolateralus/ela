@@ -1,5 +1,5 @@
 COMPILER := clang++
-COMPILER_FLAGS := -std=c++23 -g
+COMPILER_FLAGS := -std=c++23 -g -DMAX_NUM_TYPES=10000
 LD_FLAGS := 
 OBJ_DIR := objs
 BIN_DIR := bin

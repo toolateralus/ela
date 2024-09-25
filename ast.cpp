@@ -19,21 +19,28 @@ ASTStatement *Parser::parse_statement() {
 
   if (tok.type == TType::LCurly) {
     return parse_block();
-  }
+  }  
 
   if (find_type_id(tok.value) != -1) {
     auto decl = parse_declaration();
-    expect(TType::Semi);
+    
+    if (peek().type == TType::Semi) eat();
+    
     return decl;
   }
 
-  eat(); // we cannot go back after this.
+  eat();
   if (peek().type == TType::DoubleColon) {
     eat();
     if (peek().type == TType::LParen) {
       return parse_function_declaration(tok);
     }
-  } 
+  } else if (peek().type == TType::Assign) {
+    auto statement = ast_alloc<ASTExprStatement>();
+    statement->expression = parse_assignment(&tok);
+    if (semicolon()) eat();
+    return statement;
+  }
 
   throw_error(Error{
       .message =
@@ -63,8 +70,9 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
     function->return_type = ASTType::get_void();
   } else {
     expect(TType::Arrow); 
+    function->return_type = parse_type();
   }
-  function->return_type = parse_type();
+  
   function->block = parse_block();
   return function;
 }
@@ -78,22 +86,20 @@ ASTBlock *Parser::parse_block() {
   return block;
 }
 ASTExpr *Parser::parse_expr() {
-  auto left = parse_primary();
-
-  while (!semicolon() && not_eof() && peek().family == TFamily::Operator) {
-    auto op = eat();
-
-    auto right = parse_primary();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  return left;
+  return parse_logical_or();
 }
-ASTExpr *Parser::parse_assignment() {
-  auto left = parse_logical_or();
+ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
+  ASTExpr *left;
+  
+  if (iden != nullptr)  {
+    auto iden = ast_alloc<ASTIden>();
+    iden->value = iden->value;
+    iden->type = ASTType::unresolved();
+    left = iden;
+  } else {
+     left = parse_logical_or();  
+  }
+  
   if (peek().type == TType::Assign) {
     auto op = eat();
     auto right = parse_assignment();
@@ -267,7 +273,7 @@ ASTExpr *Parser::parse_primary() {
     literal->value = tok.value;
     auto t = ast_alloc<ASTType>();
     t->type_info = get_type_info(find_type_id("i32"));
-    t->type_info_complete = true;
+    t->complete = true;
     literal->type = t;
     return literal;
   }
@@ -278,7 +284,7 @@ ASTExpr *Parser::parse_primary() {
     literal->value = tok.value;
     auto t = ast_alloc<ASTType>();
     t->type_info = get_type_info(find_type_id("f32"));
-    t->type_info_complete = true;
+    t->complete = true;
     literal->type = t;
     return literal;
   }
@@ -289,7 +295,7 @@ ASTExpr *Parser::parse_primary() {
     literal->value = tok.value;
     auto t = ast_alloc<ASTType>();
     t->type_info = get_type_info(find_type_id("string"));
-    t->type_info_complete = true;
+    t->complete = true;
     literal->type = t;
     return literal;
   }
@@ -312,7 +318,7 @@ ASTExpr *Parser::parse_primary() {
   }
 }
 ASTType *Parser::parse_type() {
-  auto base = tok.value;
+  auto base = eat().value;
   jstl::Vector<int> array_dims;
   int ptr_depth = 0;
   
@@ -337,15 +343,23 @@ ASTType *Parser::parse_type() {
   }
   
   auto node = ast_alloc<ASTType>();
-  auto typeinfo = ast_alloc<TypeInfo>();
   
+  auto id = find_type_id(base, ptr_depth, array_dims);
+  
+  if (id != -1) {
+    auto typeinfo = get_type_info(id);
+    node->type_info = typeinfo;
+    node->complete = true;
+    return node;
+  }
+  
+  auto typeinfo = ast_alloc<TypeInfo>();
   typeinfo->name = base;
   typeinfo->array_dims = array_dims;
   typeinfo->ptr_depth = ptr_depth;
-  typeinfo->size = -1;
   
   node->type_info = typeinfo;
-  node->type_info_complete = false;
+  node->complete = false;
   
   return node;
 }
