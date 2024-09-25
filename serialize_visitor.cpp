@@ -48,8 +48,13 @@ std::any SerializeVisitor::visit(ASTParamDecl *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTDeclaration *node) {
-  ss << getIndent() << "Declaration " << node->name.value << " : "
-     << node->type->base << "\n";
+  ss << getIndent() << "Declaration " << node->name.value << " : ";
+  node->type->accept(this);
+  if (node->value.is_not_null()) {
+    ss << " = ";  
+    node->value.get()->accept(this);
+  }
+  ss << '\n';
   return {};
 }
 std::any SerializeVisitor::visit(ASTExprStatement *node) {
@@ -83,6 +88,14 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 }
 std::any SerializeVisitor::visit(ASTType *node) {
   ss << node->base;
+  ss << std::string(node->ptr_depth, '*');
+  for (int i = 0; i < node->array_dims.size(); ++i) {
+    if (node->array_dims[i] == -1) {
+      ss << "[]";
+    } else {
+      ss << "[" << node->array_dims[i] << "]";
+    }
+  }
   return {};
 }
 std::any SerializeVisitor::visit(ASTArguments *node) {
