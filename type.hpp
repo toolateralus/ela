@@ -52,10 +52,10 @@ struct TypeInfo {
   // and the integer value (if > 0) is the fixed length.
   // int v[10][20]; would make this = { 10, 20 };
   // int *v = new int[100]; would make this { -1 } indicating a dynamic array
-  std::vector<int> array_dims = {};
+  jstl::Vector<int> array_dims = {};
 
   inline bool equals(const std::string &name, int ptr_depth,
-                     std::vector<int> &array_dims) const {
+                     jstl::Vector<int> &array_dims) const {
     if (name != this->name) {
       return false;
     }
@@ -141,7 +141,7 @@ static ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
 // Returns -1 if not found.
 static int find_type_id(const std::string &name, int ptr_depth = 0,
-                        std::vector<int> array_dims = {}) {
+                        jstl::Vector<int> array_dims = {}) {
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_info_table[i];
     if (tinfo->equals(name, ptr_depth, array_dims))

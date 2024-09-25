@@ -5,18 +5,7 @@
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
-  virtual std ::any visit(ASTProgram *node) = 0;
-  virtual std ::any visit(ASTBlock *node) = 0;
-  virtual std ::any visit(ASTFuncDecl *node) = 0;
-  virtual std ::any visit(ASTParamsDecl *node) = 0;
-  virtual std ::any visit(ASTParamDecl *node) = 0;
-  virtual std ::any visit(ASTDeclaration *node) = 0;
-  virtual std ::any visit(ASTExprStatement *node) = 0;
-  virtual std ::any visit(ASTBinExpr *node) = 0;
-  virtual std ::any visit(ASTUnaryExpr *node) = 0;
-  virtual std ::any visit(ASTIdentifier *node) = 0;
-  virtual std ::any visit(ASTLiteral *node) = 0;
-  virtual std ::any visit(ASTType *node) = 0;
+  DECLARE_VISIT_BASE_METHODS()
 };
 
 
@@ -37,4 +26,6 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTIdentifier *node) override;
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
+  std::any visit(ASTCall *node) override;
+  std::any visit(ASTArguments *node) override;
 };

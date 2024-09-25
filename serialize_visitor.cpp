@@ -54,16 +54,17 @@ std::any SerializeVisitor::visit(ASTDeclaration *node) {
 }
 std::any SerializeVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
-  ss << ";\n";
+  ss << "\n";
   return {};
 }
 std::any SerializeVisitor::visit(ASTBinExpr *node) {
+  ss << "(";
   node->left->accept(this);
   ss << " " << node->op.value << " ";
   node->right->accept(this);
+  ss << ")";
   return {};
 }
-
 std::any SerializeVisitor::visit(ASTUnaryExpr *node) {
   ss << node->op.value;
   node->operand->accept(this);
@@ -74,11 +75,35 @@ std::any SerializeVisitor::visit(ASTIdentifier *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTLiteral *node) {
-  ss << node->value;
+  if (node->tag == ASTLiteral::String) {
+    ss << '\"' << node->value << '\"';
+  } else
+    ss << node->value;
   return {};
 }
 std::any SerializeVisitor::visit(ASTType *node) {
   ss << node->base;
+  return {};
+}
+std::any SerializeVisitor::visit(ASTArguments *node) {
+  ss << getIndent() << "Arguments {";
+  indentLevel++;
+  bool first = true;
+  for (auto arg : node->arguments) {
+    if (!first) ss << ", ";
+    first = false;
+    arg->accept(this);
+  }
+  indentLevel--;
+  ss << "}\n";
+  return {};
+}
+std::any SerializeVisitor::visit(ASTCall *node) {
+  ss << getIndent() << "Call " << node->name.value << " {\n";
+  indentLevel++;
+  visit(node->arguments);
+  indentLevel--;
+  ss << getIndent() << "}\n";
   return {};
 }
 std::string SerializeVisitor::getIndent() {

@@ -7,6 +7,7 @@
 #include <any>
 #include <format>
 #include <jstl/memory/arena.hpp>
+#include <jstl/containers/vector.hpp>
 
 extern jstl::Arena ast_arena;
 
@@ -25,19 +26,19 @@ struct ASTStatement : ASTNode {};
 
 struct ASTBlock : ASTStatement {
   Scope *scope;
-  std::vector<ASTNode *> statements;
+  jstl::Vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTProgram : ASTNode {
-  std::vector<ASTStatement *> statements;
+  jstl::Vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTType : ASTNode {
   std::string base;
   int ptr_depth;
-  std::vector<int> array_dims;
+  jstl::Vector<int> array_dims;
 
   static ASTType *get_void() {
     static ASTType *type = [] {
@@ -101,7 +102,7 @@ struct ASTParamDecl : ASTNode {
 };
 
 struct ASTParamsDecl : ASTStatement {
-  std::vector<ASTParamDecl *> params;
+  jstl::Vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -110,6 +111,19 @@ struct ASTFuncDecl : ASTStatement {
   ASTBlock *block;
   Token name;
   ASTType *return_type;
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTArguments: ASTNode {
+  jstl::Vector<ASTExpr*> arguments;
+
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTCall : ASTExpr {
+  Token name;
+  ASTArguments* arguments;
+
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -127,7 +141,12 @@ struct ASTFuncDecl : ASTStatement {
   std::any visit(ASTUnaryExpr *node) override {}                               \
   std::any visit(ASTIdentifier *node) override {}                              \
   std::any visit(ASTLiteral *node) override {}                                 \
-  std::any visit(ASTType *node) override {}
+  std::any visit(ASTType *node) override {}                                    \
+  std::any visit(ASTCall *node) override {}                                    \
+  std::any visit(ASTArguments *node) override {}                               \
+  
+  
+  
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -142,6 +161,8 @@ struct ASTFuncDecl : ASTStatement {
   virtual std::any visit(ASTIdentifier *node) = 0;                             \
   virtual std::any visit(ASTLiteral *node) = 0;                                \
   virtual std::any visit(ASTType *node) = 0;                                   \
+  virtual std::any visit(ASTCall *node) = 0;                                   \
+  virtual std::any visit(ASTArguments *node) = 0;                               \
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
@@ -184,6 +205,8 @@ struct Parser {
   ASTProgram *parse();
 
   ASTStatement *parse_statement();
+  ASTStatement *parse_call_statement(Token);
+  ASTArguments *parse_arguments();
 
   ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
