@@ -20,6 +20,7 @@ struct ASTNode {
 
 struct ASTStatement : ASTNode {};
 struct ASTBlock : ASTStatement {
+  Scope *scope;
   // TODO: make this statements only, just using expressions atm.
   jstl::Vector<ASTNode *> statements;
 };

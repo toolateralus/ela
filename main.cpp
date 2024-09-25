@@ -17,8 +17,8 @@ int num_types;
 
 jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES) +
                        (sizeof(TypeInfo) * MAX_NUM_TYPES)};
-jstl::Arena scope_arena = {GB(1)};
-jstl::Arena ast_arena{GB(1)};
+jstl::Arena scope_arena = {MB(10)};
+jstl::Arena ast_arena{MB(10)};
 /* 
   #########################
   ### PROVIDING EXTERNS ###

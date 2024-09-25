@@ -59,7 +59,9 @@ ASTDecl *Parser::parse_declaration() {
     auto expr = parse_expr();
     decl->value = expr;
   }
-
+  
+  context.current_scope->insert(iden.value, decl->type->type_info->owner_id);
+  
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
@@ -79,10 +81,12 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
 ASTBlock *Parser::parse_block() {
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
+  context.enter_scope();
   while (not_eof() && peek().type != TType::RCurly) {
     block->statements.push(parse_statement());
   }
   expect(TType::RCurly);
+  block->scope = context.exit_scope();
   return block;
 }
 ASTExpr *Parser::parse_expr() {

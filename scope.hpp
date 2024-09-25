@@ -17,9 +17,11 @@ struct Symbol {
 };
 
 struct Scope {
+  
   std::unordered_map<std::string, Symbol> symbols;
   Scope *parent = nullptr;
-  Scope(Scope *parent = nullptr) : parent(parent) {}
+  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
+  }
   inline void insert(const std::string &name, int type_id) {
     symbols[name] = Symbol{name, type_id};
   }
@@ -34,13 +36,13 @@ struct Scope {
 };
 
 static Scope *create_child(Scope *parent) {
-  auto scope = (Scope *)scope_arena.allocate(sizeof(Scope));
+  auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   scope->parent = parent;
   return scope;
 }
 
 struct Context {
-  Scope *current_scope = nullptr;
+  Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   inline void enter_scope(Scope *scope = nullptr) {
     if (!scope) {
       scope = create_child(current_scope);
