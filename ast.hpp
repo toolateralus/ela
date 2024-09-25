@@ -3,10 +3,10 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
-#include "type.hpp"
 #include <format>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
+#include "nullable.hpp"
 
 extern jstl::Arena ast_arena;
 
@@ -21,7 +21,6 @@ struct ASTNode {
 struct ASTStatement : ASTNode {};
 struct ASTBlock : ASTStatement {
   Scope *scope;
-  // TODO: make this statements only, just using expressions atm.
   jstl::Vector<ASTNode *> statements;
 };
 struct ASTProgram : ASTNode {
@@ -29,45 +28,30 @@ struct ASTProgram : ASTNode {
 };
 
 struct ASTType : ASTNode {
-  // tells us whether this is an existing type info registered within the type
-  // system, or if this was mocked up to be resolved.
-  bool complete = false;
-  TypeInfo *type_info;
-  static ASTType *unresolved() {
-    static ASTType *type = [] {
-      auto type = ast_alloc<ASTType>();
-      type->type_info = type_alloc<TypeInfo>();
-      type->type_info->name = "__unresolved__";
-      type->complete = false;
-      return type;
-    }();
-    return type;
-  }
-  
+  std::string base;
+  int ptr_depth;
+  jstl::Vector<int> array_dims;
+
   static ASTType *get_void() {
     static ASTType *type = [] {
-      auto info = get_type_info(find_type_id("void"));
       ASTType *type = ast_alloc<ASTType>();
-      type->type_info = info;
-      type->complete = true;
+      type->base = "void";
       return type;
     }();
     return type;
   }
 };
 
-struct ASTExpr : ASTNode {
-  
-};
+struct ASTExpr : ASTNode {};
 
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
 };
 
-struct ASTDecl : ASTStatement {
+struct ASTDeclaration : ASTStatement {
   Token name;
   ASTType *type;
-  ASTExpr *value;
+  Nullable<ASTExpr> value;
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -79,7 +63,7 @@ struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
 };
-struct ASTIden : ASTExpr {
+struct ASTIdentifier : ASTExpr {
   std::string value;
 };
 struct ASTLiteral : ASTExpr {
@@ -94,7 +78,7 @@ struct ASTLiteral : ASTExpr {
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   // nullable
-  ASTExpr *default_value;
+  Nullable<ASTExpr> default_value;
   std::string name;
 };
 struct ASTParamsDecl : ASTStatement {
@@ -149,7 +133,7 @@ struct Parser {
 
   ASTStatement *parse_statement();
 
-  ASTDecl *parse_declaration();
+  ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();

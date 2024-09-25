@@ -15,9 +15,13 @@ Type *type_table[MAX_NUM_TYPES];
 TypeInfo *type_info_table[MAX_NUM_TYPES];
 int num_types;
 
+// this is just an approximation. 
+// It may be too little since this arena is used a lot.
 jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES) +
-                       (sizeof(TypeInfo) * MAX_NUM_TYPES)};
+                       (sizeof(TypeInfo) * MAX_NUM_TYPES) * 2};
+// the same for this
 jstl::Arena scope_arena = {MB(10)};
+// the same for this
 jstl::Arena ast_arena{MB(10)};
 /* 
   #########################
@@ -34,6 +38,7 @@ int main(int argc, char *argv[]) {
   ss << stream.rdbuf();
   auto str = ss.str();
 
+  // initialize the basic scalar types etc.
   init_type_system();
 
   Context context;

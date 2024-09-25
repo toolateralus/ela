@@ -48,8 +48,8 @@ ASTStatement *Parser::parse_statement() {
       .severity = ERROR_CRITICAL,
   });
 }
-ASTDecl *Parser::parse_declaration() {
-  ASTDecl *decl = ast_alloc<ASTDecl>();
+ASTDeclaration *Parser::parse_declaration() {
+  ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
   decl->type = parse_type();
   auto iden = eat();
   decl->name = iden;
@@ -60,7 +60,7 @@ ASTDecl *Parser::parse_declaration() {
     decl->value = expr;
   }
   
-  context.current_scope->insert(iden.value, decl->type->type_info->owner_id);
+  context.current_scope->insert(iden.value, -1);
   
   return decl;
 }
@@ -96,7 +96,7 @@ ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   ASTExpr *left;
   
   if (iden != nullptr)  {
-    auto iden = ast_alloc<ASTIden>();
+    auto iden = ast_alloc<ASTIdentifier>();
     iden->value = iden->value;
     left = iden;
   } else {
@@ -264,7 +264,7 @@ ASTExpr *Parser::parse_primary() {
   switch (tok.type) {
   case TType::Identifier: {
     eat();
-    auto iden = ast_alloc<ASTIden>();
+    auto iden = ast_alloc<ASTIdentifier>();
     iden->value = tok.value;
     return iden;
   }
@@ -333,24 +333,9 @@ ASTType *Parser::parse_type() {
   }
   
   auto node = ast_alloc<ASTType>();
-  
-  auto id = find_type_id(base, ptr_depth, array_dims);
-  
-  if (id != -1) {
-    auto typeinfo = get_type_info(id);
-    node->type_info = typeinfo;
-    node->complete = true;
-    return node;
-  }
-  
-  auto typeinfo = ast_alloc<TypeInfo>();
-  typeinfo->name = base;
-  typeinfo->array_dims = array_dims;
-  typeinfo->ptr_depth = ptr_depth;
-  
-  node->type_info = typeinfo;
-  node->complete = false;
-  
+  node->base = base;
+  node->array_dims = array_dims;
+  node->ptr_depth = ptr_depth;
   return node;
 }
 ASTParamsDecl *Parser::parse_parameters() {
