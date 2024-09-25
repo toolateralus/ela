@@ -1,0 +1,58 @@
+#pragma once
+
+#include "core.hpp"
+#include <jstl/memory/arena.hpp>
+#include <string>
+#include <unordered_map>
+
+// TODO(Josh) Add scope flags? so we can tell stuff like executing, declaring,
+// possibly returns, breaks, continues, etc.
+// TODO(cont.) executing would be an executing body like if, func, declaring
+// would be things like struct declarations, etc.
+
+static jstl::Arena scope_arena = {GB(1)};
+
+struct Symbol {
+  std::string name;
+  int type_id;
+};
+
+struct Scope {
+  std::unordered_map<std::string, Symbol> symbols;
+  Scope *parent = nullptr;
+  Scope(Scope *parent = nullptr) : parent(parent) {}
+  inline void insert(const std::string &name, int type_id) {
+    symbols[name] = Symbol{name, type_id};
+  }
+  inline Symbol *lookup(const std::string &name) {
+    if (symbols.find(name) != symbols.end()) {
+      return &symbols[name];
+    } else if (parent) {
+      return parent->lookup(name);
+    }
+    return nullptr;
+  }
+};
+
+static Scope *create_child(Scope *parent) {
+  auto scope = (Scope *)scope_arena.allocate(sizeof(Scope));
+  scope->parent = parent;
+  return scope;
+}
+
+struct Context {
+  Scope *current_scope = nullptr;
+  inline void enter_scope(Scope *scope = nullptr) {
+    if (!scope) {
+      scope = create_child(current_scope);
+    }
+    current_scope = scope;
+  }
+  inline Scope *exit_scope() {
+    auto scope = current_scope;
+    if (current_scope) {
+      current_scope = current_scope->parent;
+    }
+    return scope;
+  }
+};

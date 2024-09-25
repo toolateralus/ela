@@ -1,0 +1,31 @@
+
+vec2 :: struct {
+	f32 x;
+	f32 y;
+}
+
+main :: () {
+
+	// zero initialized.
+	vec2[] vectors = make vec2[25];
+
+	f32 accum = 0;
+
+	for vec, idx in vectors {
+		accum += dot(vec, vectors[max(idx - 1, 0)]);
+	}
+
+	f32 avg = accum / vectors.count;
+
+	vec2* world_dot = make vec2*;
+	
+	world_dot.x = avg;
+	world_dot.y = avg;
+
+	// gets memcpy'd into it's own ownership.
+	set_world_dot(world_dot);
+	
+	delete world_dot;
+	delete vectors;
+
+}
