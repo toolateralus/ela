@@ -57,7 +57,7 @@ struct ASTType : ASTNode {
 };
 
 struct ASTExpr : ASTNode {
-  ASTType *type;
+  
 };
 
 struct ASTExprStatement : ASTStatement {

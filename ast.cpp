@@ -98,7 +98,6 @@ ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   if (iden != nullptr)  {
     auto iden = ast_alloc<ASTIden>();
     iden->value = iden->value;
-    iden->type = ASTType::unresolved();
     left = iden;
   } else {
      left = parse_logical_or();  
@@ -267,7 +266,6 @@ ASTExpr *Parser::parse_primary() {
     eat();
     auto iden = ast_alloc<ASTIden>();
     iden->value = tok.value;
-    iden->type = ASTType::unresolved();
     return iden;
   }
   case TType::Integer: {
@@ -275,10 +273,6 @@ ASTExpr *Parser::parse_primary() {
     auto literal = ast_alloc<ASTLiteral>();
     literal->tag = ASTLiteral::Integer;
     literal->value = tok.value;
-    auto t = ast_alloc<ASTType>();
-    t->type_info = get_type_info(find_type_id("i32"));
-    t->complete = true;
-    literal->type = t;
     return literal;
   }
   case TType::Float: {
@@ -286,10 +280,6 @@ ASTExpr *Parser::parse_primary() {
     auto literal = ast_alloc<ASTLiteral>();
     literal->tag = ASTLiteral::Float;
     literal->value = tok.value;
-    auto t = ast_alloc<ASTType>();
-    t->type_info = get_type_info(find_type_id("f32"));
-    t->complete = true;
-    literal->type = t;
     return literal;
   }
   case TType::String: {
@@ -297,10 +287,6 @@ ASTExpr *Parser::parse_primary() {
     auto literal = ast_alloc<ASTLiteral>();
     literal->tag = ASTLiteral::String;
     literal->value = tok.value;
-    auto t = ast_alloc<ASTType>();
-    t->type_info = get_type_info(find_type_id("string"));
-    t->complete = true;
-    literal->type = t;
     return literal;
   }
   case TType::LParen: {
