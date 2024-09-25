@@ -6,8 +6,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-#include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
+#include <vector>
 
 enum TypeFlags {
   TYPE_FLAGS_NONE = 0 << 0,
@@ -52,10 +52,10 @@ struct TypeInfo {
   // and the integer value (if > 0) is the fixed length.
   // int v[10][20]; would make this = { 10, 20 };
   // int *v = new int[100]; would make this { -1 } indicating a dynamic array
-  jstl::Vector<int> array_dims = {};
+  std::vector<int> array_dims = {};
 
   inline bool equals(const std::string &name, int ptr_depth,
-                     jstl::Vector<int> &array_dims) const {
+                     std::vector<int> &array_dims) const {
     if (name != this->name) {
       return false;
     }
@@ -75,10 +75,10 @@ struct TypeInfo {
 };
 
 struct Type {
-  const int id;
-  const int flags;
-  const int kind;
-
+  const int id = -1;
+  const int flags = -1;
+  const int kind = -1;
+  Type() {};
   Type(const int id, const int kind, const int flags)
       : id(id), kind(kind), flags(flags) {}
 
@@ -93,7 +93,8 @@ struct Type {
 };
 
 template <class T> T *type_alloc(size_t n = 1) {
-  return (T *)type_arena.allocate(sizeof(T) * n);
+  auto mem = type_arena.allocate(sizeof(T) * n);
+  return new (mem) T();
 }
 
 static int create_type(TypeKind kind, TypeFlags flags, TypeInfo &&info) {
@@ -140,7 +141,7 @@ static ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
 // Returns -1 if not found.
 static int find_type_id(const std::string &name, int ptr_depth = 0,
-                        jstl::Vector<int> array_dims = {}) {
+                        std::vector<int> array_dims = {}) {
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_info_table[i];
     if (tinfo->equals(name, ptr_depth, array_dims))

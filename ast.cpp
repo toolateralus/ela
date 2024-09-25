@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "visitor.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
@@ -7,7 +8,7 @@
 ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
   while (tok) {
-    program->statements.push(parse_statement());
+    program->statements.push_back(parse_statement());
     if (semicolon()) {
       eat();
     }
@@ -83,7 +84,7 @@ ASTBlock *Parser::parse_block() {
   ASTBlock *block = ast_alloc<ASTBlock>();
   context.enter_scope();
   while (not_eof() && peek().type != TType::RCurly) {
-    block->statements.push(parse_statement());
+    block->statements.push_back(parse_statement());
   }
   expect(TType::RCurly);
   block->scope = context.exit_scope();
@@ -309,16 +310,16 @@ ASTExpr *Parser::parse_primary() {
 }
 ASTType *Parser::parse_type() {
   auto base = eat().value;
-  jstl::Vector<int> array_dims;
+  std::vector<int> array_dims;
   int ptr_depth = 0;
   
   while (true) {
     if (peek().type == TType::LBrace) {
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
-        array_dims.push(std::stoi(eat().value));
+        array_dims.push_back(std::stoi(eat().value));
       } else {
-        array_dims.push(-1); // dynamic array
+        array_dims.push_back(-1); // dynamic array
       }
       if (peek().type != TType::RBrace) {
         throw_error({.message = "Expected ']'", .severity = ERROR_FAILURE});
@@ -355,7 +356,7 @@ ASTParamsDecl *Parser::parse_parameters() {
       param->default_value = parse_expr();
     }
     
-    params->params.push(param);
+    params->params.push_back(param);
     
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
@@ -365,3 +366,26 @@ ASTParamsDecl *Parser::parse_parameters() {
   expect(TType::RParen);
   return params;
 }
+
+/*
+  ###########################################
+  ##### DECLARE VISITOR ACCEPT METHODS ######
+  ###########################################
+*/
+std::any ASTProgram::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTBlock::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTType::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTExprStatement::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTBinExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTUnaryExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTIdentifier::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTFuncDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+/*
+  ###########################################
+  ##### DECLARE VISITOR ACCEPT METHODS ######
+  ###########################################
+*/

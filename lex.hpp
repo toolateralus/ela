@@ -102,10 +102,12 @@ enum struct TFamily {
 };
 
 struct SourceLocation {
+  SourceLocation() {}
   SourceLocation(size_t line, size_t column, std::size_t file)
       : line(line), column(column), file(file) {}
   size_t line = 0, column = 0;
   size_t file = 0;
+  
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
     return files;
@@ -117,6 +119,7 @@ struct SourceLocation {
 };
 
 struct Token {
+  Token () {}
   Token(SourceLocation location, std::string value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family),
         location(location) {}

@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "visitor.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -46,6 +47,12 @@ int main(int argc, char *argv[]) {
   ASTProgram *root = parser.parse();
 
   printf("%p\n", root);
+  
+  SerializeVisitor visitor;
+  
+  auto serialized_view = std::any_cast<std::string>(visitor.visit(root));
+  
+  printf("%s\n", serialized_view.c_str());
 
   return 0;
 }

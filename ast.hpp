@@ -2,35 +2,42 @@
 
 #include "error.hpp"
 #include "lex.hpp"
-#include "scope.hpp"
-#include <format>
-#include <jstl/containers/vector.hpp>
-#include <jstl/memory/arena.hpp>
 #include "nullable.hpp"
+#include "scope.hpp"
+#include <any>
+#include <format>
+#include <jstl/memory/arena.hpp>
 
 extern jstl::Arena ast_arena;
 
 template <class T> T *ast_alloc(size_t n = 1) {
-  return (T *)ast_arena.allocate(sizeof(T) * n);
+  return new (ast_arena.allocate(sizeof(T) * n)) T();
 }
+
+struct VisitorBase;
 
 struct ASTNode {
   virtual ~ASTNode() = default;
+  virtual std::any accept(VisitorBase *visitor) = 0;
 };
 
 struct ASTStatement : ASTNode {};
+
 struct ASTBlock : ASTStatement {
   Scope *scope;
-  jstl::Vector<ASTNode *> statements;
+  std::vector<ASTNode *> statements;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTProgram : ASTNode {
-  jstl::Vector<ASTStatement *> statements;
+  std::vector<ASTStatement *> statements;
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTType : ASTNode {
   std::string base;
   int ptr_depth;
-  jstl::Vector<int> array_dims;
+  std::vector<int> array_dims;
 
   static ASTType *get_void() {
     static ASTType *type = [] {
@@ -40,32 +47,42 @@ struct ASTType : ASTNode {
     }();
     return type;
   }
+
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTExpr : ASTNode {};
 
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTDeclaration : ASTStatement {
   Token name;
   ASTType *type;
   Nullable<ASTExpr> value;
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   Token op;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTIdentifier : ASTExpr {
   std::string value;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
@@ -73,23 +90,58 @@ struct ASTLiteral : ASTExpr {
     String,
   } tag;
   std::string value;
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTParamDecl : ASTNode {
   ASTType *type;
-  // nullable
   Nullable<ASTExpr> default_value;
   std::string name;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTParamsDecl : ASTStatement {
-  jstl::Vector<ASTParamDecl *> params;
+  std::vector<ASTParamDecl *> params;
+  std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTFuncDecl : ASTStatement {
   ASTParamsDecl *params;
   ASTBlock *block;
   Token name;
   ASTType *return_type;
+  std::any accept(VisitorBase *visitor) override;
 };
+
+// Use this only for implementing the methods, so you can use the IDE to expand
+// it.
+#define DECLARE_VISIT_METHODS()                                                \
+  std::any visit(ASTProgram *node) override {}                                 \
+  std::any visit(ASTBlock *node) override {}                                   \
+  std::any visit(ASTFuncDecl *node) override {}                                \
+  std::any visit(ASTParamsDecl *node) override {}                              \
+  std::any visit(ASTParamDecl *node) override {}                               \
+  std::any visit(ASTDeclaration *node) override {}                             \
+  std::any visit(ASTExprStatement *node) override {}                           \
+  std::any visit(ASTBinExpr *node) override {}                                 \
+  std::any visit(ASTUnaryExpr *node) override {}                               \
+  std::any visit(ASTIdentifier *node) override {}                              \
+  std::any visit(ASTLiteral *node) override {}                                 \
+  std::any visit(ASTType *node) override {}
+
+#define DECLARE_VISIT_BASE_METHODS()                                           \
+  virtual std::any visit(ASTProgram *node) = 0;                                \
+  virtual std::any visit(ASTBlock *node) = 0;                                  \
+  virtual std::any visit(ASTFuncDecl *node) = 0;                               \
+  virtual std::any visit(ASTParamsDecl *node) = 0;                             \
+  virtual std::any visit(ASTParamDecl *node) = 0;                              \
+  virtual std::any visit(ASTDeclaration *node) = 0;                            \
+  virtual std::any visit(ASTExprStatement *node) = 0;                          \
+  virtual std::any visit(ASTBinExpr *node) = 0;                                \
+  virtual std::any visit(ASTUnaryExpr *node) = 0;                              \
+  virtual std::any visit(ASTIdentifier *node) = 0;                             \
+  virtual std::any visit(ASTLiteral *node) = 0;                                \
+  virtual std::any visit(ASTType *node) = 0;                                   \
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
