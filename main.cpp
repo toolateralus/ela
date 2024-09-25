@@ -13,15 +13,13 @@
   #########################
 */
 Type *type_table[MAX_NUM_TYPES];
-TypeInfo *type_info_table[MAX_NUM_TYPES];
 int num_types;
 
 // this is just an approximation. 
 // It may be too little since this arena is used a lot.
-jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES) +
-                       (sizeof(TypeInfo) * MAX_NUM_TYPES) * 2};
+jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
 // the same for this
-jstl::Arena scope_arena = {MB(10)};
+jstl::Arena scope_arena{MB(10)};
 // the same for this
 jstl::Arena ast_arena{MB(10)};
 /* 
@@ -34,7 +32,7 @@ jstl::Arena ast_arena{MB(10)};
 int main(int argc, char *argv[]) {
   Lexer lexer;
 
-  std::ifstream stream("dummy.ela");
+  std::ifstream stream(argc > 1 ? argv[1] : "dummy.ela");
   std::stringstream ss;
   ss << stream.rdbuf();
   auto str = ss.str();

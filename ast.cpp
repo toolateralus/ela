@@ -22,7 +22,7 @@ ASTStatement *Parser::parse_statement() {
     return parse_block();
   }  
 
-  if (find_type_id(tok.value) != -1) {
+  if (find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     
     if (peek().type == TType::Semi) eat();
@@ -261,8 +261,14 @@ ASTExpr *Parser::parse_unary() {
     unaryexpr->operand = expr;
     return unaryexpr;
   }
+  return parse_postfix();
+}
+
+ASTExpr *Parser::parse_postfix() {
+  // TODO: implement me
   return parse_primary();
 }
+
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
 

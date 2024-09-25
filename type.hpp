@@ -7,7 +7,7 @@
 #include <string.h>
 
 #include <jstl/memory/arena.hpp>
-#include <vector>
+#include <jstl/containers/vector.hpp>
 
 enum TypeFlags {
   TYPE_FLAGS_NONE = 0 << 0,
@@ -30,54 +30,62 @@ enum TypeKind {
 #endif
 
 struct Type;
-struct TypeInfo;
 
 // static storage is zero init I guess? so these are all nullptr
 
 extern Type *type_table[MAX_NUM_TYPES];
-extern TypeInfo *type_info_table[MAX_NUM_TYPES];
+
 extern int num_types;
 extern jstl::Arena type_arena;
 
-struct TypeInfo {
-  // TODO: add more flags as needed.
-  // TODO: perhaps we'll even inherit from this for more complex type info.
-  // functions, structs, etc.
-  int owner_id;
-  std::string name;
-  // int ** has a ptr depth of 2;
-  int ptr_depth = 0;
 
-  // the length of this vector is the amount of array modifiers this has,
-  // and the integer value (if > 0) is the fixed length.
-  // int v[10][20]; would make this = { 10, 20 };
-  // int *v = new int[100]; would make this { -1 } indicating a dynamic array
-  jstl::Vector<int> array_dims = {};
+enum  TypeExtensionEnum {
+  TYPE_EXT_POINTER,
+  TYPE_EXT_ARRAY,
+};
 
-  inline bool equals(const std::string &name, int ptr_depth,
-                     jstl::Vector<int> &array_dims) const {
-    if (name != this->name) {
-      return false;
-    }
-    if (ptr_depth != this->ptr_depth) {
-      return false;
-    }
-    if (array_dims.size() != this->array_dims.size()) {
-      return false;
-    }
-    for (int i = 0; i < array_dims.size(); ++i) {
-      if (array_dims[i] != this->array_dims[i]) {
+struct TypeExtensions {
+  // this stores things like * and [], [20] etc.
+  jstl::Vector<TypeExtensionEnum> extensions{};
+  // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed array size.
+  jstl::Vector<int> array_sizes{};
+  
+  inline bool operator ==(const TypeExtensions &other) const {
+    return equals(other);
+  }
+  
+  inline bool equals(const TypeExtensions &other) const {
+    if (extensions.size() != other.extensions.size()) return false; 
+    if (array_sizes.size() != other.array_sizes.size()) return false;
+    for (int i = 0; i < extensions.size(); ++i) 
+      if (extensions[i] != other.extensions[i]) 
         return false;
-      }
-    }
+    for (int i = 0; i < array_sizes.size(); ++i) 
+      if (array_sizes[i] != other.array_sizes[i]) return false;
     return true;
   }
+  
+  inline bool has_no_extensions() const {
+    return extensions.size() == 0 && array_sizes.size() == 0;
+  }
 };
+
 
 struct Type {
   const int id = -1;
   const int flags = -1;
   const int kind = -1;
+  
+  // nameof(T)
+  std::string name;
+  
+  TypeExtensions type_extensions;
+
+  inline bool equals(const std::string &name, const TypeExtensions &type_extensions) const {
+    if (name != this->name)  return false;
+    return type_extensions == this->type_extensions;
+  }
+  
   Type() {};
   Type(const int id, const int kind, const int flags)
       : id(id), kind(kind), flags(flags) {}
@@ -97,28 +105,29 @@ template <class T> T *type_alloc(size_t n = 1) {
   return new (mem) T();
 }
 
-static int create_type(TypeKind kind, TypeFlags flags, TypeInfo &&info) {
+static int create_type(TypeKind kind, TypeFlags flags, const std::string &name, const TypeExtensions &extensions = {}) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind, flags);
-  info.owner_id = type->id;
+
+  type->type_extensions = extensions;
+  
+  type->name = name;
 
   if (type->id > MAX_NUM_TYPES) {
     throw_error({
         .message = "Max types exceeded",
     });
   }
-  if (type_info_table[type->id] || type_table[type->id]) {
+  if (type_table[type->id]) {
     printf("type system created a type with the same ID twice\n");
     exit(1);
   }
-  type_info_table[type->id] = new (type_alloc<TypeInfo>()) TypeInfo(info);
+  
   type_table[type->id] = type;
   num_types += 1;
   return type->id;
 }
 
 static Type *get_type(int id) { return type_table[id]; }
-
-static TypeInfo *get_type_info(int id) { return type_info_table[id]; }
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -140,68 +149,57 @@ static ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 }
 
 // Returns -1 if not found.
-static int find_type_id(const std::string &name, int ptr_depth = 0,
-                        jstl::Vector<int> array_dims = {}) {
+static int find_type_id(const std::string &name, const TypeExtensions &type_extensions) {
   for (int i = 0; i < num_types; ++i) {
-    auto tinfo = type_info_table[i];
-    if (tinfo->equals(name, ptr_depth, array_dims))
-      return tinfo->owner_id;
+    auto tinfo = type_table[i];
+    if (tinfo->equals(name, type_extensions))
+      return tinfo->id;
   }
-
   int base_id = -1;
+  
   for (int i = 0; i < num_types; ++i) {
-    auto tinfo = type_info_table[i];
-    if (tinfo->name == name && tinfo->ptr_depth == 0 &&
-        tinfo->array_dims.empty()) {
-      base_id = tinfo->owner_id;
+    auto tinfo = type_table[i];
+    if (tinfo->name == name && tinfo->type_extensions.has_no_extensions()) {
+      base_id = tinfo->id;
       break;
     }
   }
-
   if (base_id != -1) {
     auto t = get_type(base_id);
-    return create_type((TypeKind)t->kind, (TypeFlags)t->flags,
-                       TypeInfo{
-                           .name = name,
-                           .ptr_depth = ptr_depth,
-                           .array_dims = array_dims,
-                       });
+    return create_type((TypeKind)t->kind, (TypeFlags)t->flags, name, type_extensions);
   }
-
   return -1;
 }
 static void init_type_system() {
-
   // Signed integers
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "i64"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "i32"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "i16"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "i8"});
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i64");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i32");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i16");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i8");
   }
 
   // Unsigned integers
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "u64"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "u32"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "u16"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "u8"});
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u64");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u32");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u16");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u8");
   }
 
   // Floats
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "f32"});
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "f64"});
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f32");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f64");
   }
-
+  
   // Other
-  create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "string"});
-  create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, TypeInfo{.name = "bool"});
-
-  create_type(TYPE_SCALAR, TYPE_FLAGS_NONE,
-              TypeInfo{
-                  .name = "void",
-              });
+  {
+    // Other
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "string");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "bool");
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "void");
+  }
 }
 
 // used as a marker for the type visitor that we need to resolve this type at

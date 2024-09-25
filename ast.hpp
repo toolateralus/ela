@@ -226,5 +226,6 @@ struct Parser {
   ASTExpr *parse_additive();
   ASTExpr *parse_multiplicative();
   ASTExpr *parse_unary();
+  ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
 };
