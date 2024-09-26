@@ -82,8 +82,23 @@ struct TypeVisitor : VisitorBase {
 struct EmitVisitor : VisitorBase {
   EmitVisitor(Context &context) : context(context) {}
   
+  inline void indented(const std::string &s) {
+    ss << indent() << s;
+  }
+  inline void indentedln(const std::string &s) {
+    ss << indent() << s << '\n';
+  }
+  inline void newline() {
+    ss << '\n';
+  }
+  inline void newline_indented() {
+    ss << '\n' << indent();
+  }
   inline void semicolon() {
-    ss << ";\n";
+    ss << ";";
+  }
+  inline void space() {
+    ss << ' ';
   }
   
   std::stringstream ss {};
