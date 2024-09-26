@@ -141,22 +141,50 @@ struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-// struct ASTFor : ASTStatement {
-//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
-// };
+struct ASTFor : ASTStatement {
+  enum ForType {
+    RangeBased,
+    CStyle,
+  } tag;
 
-// struct ASTElse;
-// struct ASTIf : ASTStatement {
-//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
-// };
+  union {
+    struct {
+      // TODO: add a way to use 'for v, idx in collection'
+      // the identifier
+      ASTExpr *target;
+      ASTExpr *collection;
+    } range_based;
+    struct {
+      ASTDeclaration *decl;
+      ASTExpr *condition;
+      ASTExpr *increment;
+    } c_style;
+  } value;
 
-// struct ASTElse : ASTStatement {
-//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
-// };
+  ASTBlock *block;
 
-// struct ASTWhile : ASTStatement {
-//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
-// };
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTElse;
+struct ASTIf : ASTStatement {
+  ASTExpr *condition;
+  ASTBlock *block;
+  Nullable<ASTElse> _else; // just an else.
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTElse : ASTStatement {
+  Nullable<ASTIf> _if; // conditional else.
+  Nullable<ASTBlock> block;
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTWhile : ASTStatement {
+  Nullable<ASTExpr> condition;
+  ASTBlock *block;
+  std::any accept(VisitorBase *visitor) override;
+};
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
@@ -177,7 +205,11 @@ struct ASTContinue : ASTStatement {
   std::any visit(ASTArguments *node) override {}                               \
   std::any visit(ASTReturn *node) override {}                                  \
   std::any visit(ASTContinue *node) override {}                                \
-  std::any visit(ASTBreak *node) override {}
+  std::any visit(ASTBreak *node) override {}                                   \
+  std::any visit(ASTFor *node) override {}                                     \
+  std::any visit(ASTIf *node) override {}                             \
+  std::any visit(ASTElse *node) override {}                           \
+  std::any visit(ASTWhile *node) override {}
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -196,7 +228,11 @@ struct ASTContinue : ASTStatement {
   virtual std::any visit(ASTArguments *node) = 0;                              \
   virtual std::any visit(ASTReturn *node) = 0;                                 \
   virtual std::any visit(ASTContinue *node) = 0;                               \
-  virtual std::any visit(ASTBreak *node) = 0;
+  virtual std::any visit(ASTBreak *node) = 0;                                  \
+  virtual std::any visit(ASTFor *node) = 0;                                    \
+  virtual std::any visit(ASTIf *node) = 0;                                     \
+  virtual std::any visit(ASTElse *node) = 0;                                   \
+  virtual std::any visit(ASTWhile *node) = 0;
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,

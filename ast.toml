@@ -1,0 +1,109 @@
+Program {
+  Function  {
+    Parameters {
+      Parameter argv : type: 14, string[]
+    }
+    Block {
+      Declaration deref : type: 8, f32
+      Declaration xaryus_brother : type: 8, f32 = (0.1 * deref)
+      For {
+        CStyle:        Declaration i : type: 1, i32
+        condition: (i < 10)        
+increment: (i = (i + 1))
+        Block {
+          Return: 0          
+        }
+      }
+      Declaration arr : type: 15, i32[]
+      For {
+        RangeBased:
+
+target: v -> arr
+        Block {
+          Return: 0          
+        }
+      }
+    }
+    returns: type: 1, i32
+  }
+  Function  {
+    Parameters {
+    }
+    Block {
+      Declaration v : type: 1, i32 = 1
+      If {
+        condition: v
+        Block {
+          Return: 1          
+        }
+      }
+      Return: 0      
+    }
+    returns: type: 13, void
+  }
+  Function  {
+    Parameters {
+    }
+    Block {
+      Declaration v : type: 1, i32 = 1
+      If {
+        condition: v
+        Block {
+          Return: 1          
+        }
+        Else {
+          Block {
+            Return: 0            
+          }
+        }
+      }
+    }
+    returns: type: 13, void
+  }
+  Function  {
+    Parameters {
+    }
+    Block {
+      Declaration v : type: 1, i32 = 1
+      If {
+        condition: !v
+        Block {
+          Return: 0          
+        }
+        Else {
+          If {
+            condition: v
+            Block {
+              Return: 1              
+            }
+            Else {
+              Block {
+                Return: 0                
+              }
+            }
+          }
+        }
+      }
+    }
+    returns: type: 13, void
+  }
+  Function  {
+    Parameters {
+    }
+    Block {
+      Call test_if_1 {
+        Arguments {}
+      }
+
+      Call test_if_2 {
+        Arguments {}
+      }
+
+      Call test_if_3 {
+        Arguments {}
+      }
+
+    }
+    returns: type: 13, void
+  }
+}

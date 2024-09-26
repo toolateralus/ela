@@ -168,8 +168,8 @@ static ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   // TODO: have more thorough type conversion rules defined in the typeinfo or
   // something.
-  if (from->is_kind(TYPE_SCALAR) && to->is_kind(TYPE_SCALAR))
-    return CONVERT_EXPLICIT;
+  // if (from->is_kind(TYPE_SCALAR) && to->is_kind(TYPE_SCALAR))
+  //   return CONVERT_EXPLICIT;
 
   return CONVERT_PROHIBITED;
 }

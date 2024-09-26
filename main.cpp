@@ -46,13 +46,17 @@ int main(int argc, char *argv[]) {
 
   printf("%p\n", root);
   
-
-  
   TypeVisitor typer {context};
   typer.visit(root);
   
   SerializeVisitor serializer;
   auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
   printf("%s\n", serialized_view.c_str());
+  
+  FILE *ast = fopen("ast.toml", "w");
+  fprintf(ast, "%s", serialized_view.c_str());
+  fflush(ast);
+  fclose(ast);
+  
   return 0;
 }

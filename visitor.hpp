@@ -31,6 +31,10 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTReturn *node) override;
   std::any visit(ASTContinue *node) override;
   std::any visit(ASTBreak *node) override;
+  std::any visit(ASTFor *node) override;
+  std::any visit(ASTIf *node) override;
+  std::any visit(ASTElse *node) override;
+  std::any visit(ASTWhile *node) override;
 };
 
 
@@ -56,4 +60,9 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTReturn *node) override;
   std::any visit(ASTContinue *node) override;
   std::any visit(ASTBreak *node) override;
+
+  std::any visit(ASTFor *node) override;
+  std::any visit(ASTIf *node) override;
+  std::any visit(ASTElse *node) override;
+  std::any visit(ASTWhile *node) override;
 };

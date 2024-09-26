@@ -1,17 +1,71 @@
 
+
 main :: (string[] argv) -> i32 {
-	i32 xaryu = 0;
-	f32 xaryus_brother = 0.1;
-	return xaryu;
+	f32 deref;	
+	f32 xaryus_brother = 0.1 * deref;
+	for i32 i; i < 10; i = i + 1 {
+		return 0;
+	}
+	
+	i32[] arr;
+	for v; arr {
+		return 0;
+	}
+	
+	// while {
+	// 	continue;
+	// }
+	
+	// s32 v = 1;
+	
+	// while v {
+	// 	continue;
+	// }
+
 }
 
+test_if_1 :: () {
+	i32 v = 1;
+	if v {
+		return 1;
+	}
+	return 0;
+}
+
+test_if_2 :: () {
+	i32 v = 1;
+	if v {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+test_if_3 :: () {
+	i32 v = 1;
+	if !v {
+		return 0;
+	} else if v {
+		return 1;
+	} else {
+		return 0;
+	}
+}
+
+test_if :: () {
+	test_if_1();
+	test_if_2();
+	test_if_3();
+}
+
+
 // FIRST TASK // TODO: Control flow. Break, Return, Continue, If, For, While
+// SECOND // TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
 
 
 // Thursday
 // TODO: [0] Dot expressions, call expressions,  postfix expressions. dont use -> to dereference.
 
-// TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
 // TODO(cont.) better typing in expressions  (||, != return bool) etc.
 
 // If we get time.

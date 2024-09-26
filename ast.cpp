@@ -3,33 +3,101 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
+#include <cassert>
 #include <format>
 
 ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
   while (tok) {
     program->statements.push(parse_statement());
-    if (semicolon()) {
-      eat();
-    }
+    if (semicolon()) eat();
   }
   return program;
 }
+
+// TODO: Cleanup this horrific function before it gets too out of control.
 ASTStatement *Parser::parse_statement() {
   auto tok = peek();
 
   if (tok.type == TType::LCurly) {
     return parse_block();
-  }  
-
+  } else if (tok.type == TType::Return) {
+    expect(TType::Return);
+    auto return_node = ast_alloc<ASTReturn>();
+    if (peek().type != TType::Semi) {
+      return_node->expression = parse_expr();
+    }
+    return return_node;
+  } else if (tok.type == TType::Break) {
+    eat();
+    return ast_alloc<ASTBreak>();
+  } else if (tok.type == TType::Continue) {
+    eat();
+    return ast_alloc<ASTContinue>();
+  }
+  
+  if (tok.type == TType::For) {
+    eat();
+    auto node = ast_alloc<ASTFor>();
+    tok = peek();
+    
+    if (find_type_id(tok.value, {}) != -1) {
+      node->tag = ASTFor::CStyle;
+      node->value.c_style.decl = parse_declaration();
+      expect(TType::Semi);
+      node->value.c_style.condition = parse_expr();
+      expect(TType::Semi);
+      node->value.c_style.increment = parse_expr();
+    } else {
+      node->tag = ASTFor::RangeBased;
+      node->value.range_based.target = parse_expr();
+      // TODO: add 'in' keyword
+      expect(TType::Semi);
+      node->value.range_based.collection = parse_expr();
+    }
+    
+    node->block = parse_block();
+    
+    return node;
+  }
+  
+  if (tok.type == TType::While) {
+    eat();
+    auto node = ast_alloc<ASTWhile>();
+    if (peek().type != TType::LCurly) {
+      node->condition = parse_expr();
+    }
+    node->block = parse_block();
+    return node;
+  }
+  
+  if (tok.type == TType::If) {
+    eat();
+    auto node = ast_alloc<ASTIf>();
+    node->condition = parse_expr();
+    node->block = parse_block();
+    
+    if (peek().type == TType::Else) {
+      eat();
+      auto node_else = ast_alloc<ASTElse>();
+      if (peek().type == TType::If) {
+        auto inner_if = dynamic_cast<ASTIf*>(parse_statement());
+        assert(inner_if != NULL);
+        node_else->_if = inner_if;
+      } else {
+        node_else->block = parse_block();
+      }
+      node->_else = node_else;
+    }
+    return node;
+  }
+  
+  
   if (find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
-    
-    if (peek().type == TType::Semi) eat();
-    
     return decl;
   }
-
+  
   eat();
   if (peek().type == TType::DoubleColon) {
     eat();
@@ -39,11 +107,9 @@ ASTStatement *Parser::parse_statement() {
   } else if (peek().type == TType::Assign) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_assignment(&tok);
-    if (semicolon()) eat();
     return statement;
   } else if (tok.type == TType::Identifier && peek().type == TType::LParen) {
     auto statement =  parse_call_statement(tok);
-    if (semicolon()) eat();
     return statement;
   }
 
@@ -89,13 +155,14 @@ ASTBlock *Parser::parse_block() {
   context.enter_scope();
   while (not_eof() && peek().type != TType::RCurly) {
     block->statements.push(parse_statement());
+    if (semicolon()) eat();
   }
   expect(TType::RCurly);
   block->scope = context.exit_scope();
   return block;
 }
 ASTExpr *Parser::parse_expr() {
-  return parse_logical_or();
+  return parse_assignment(nullptr);
 }
 ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   ASTExpr *left;
@@ -374,6 +441,12 @@ ASTParamsDecl *Parser::parse_parameters() {
 ASTArguments *Parser::parse_arguments() {
   auto args = ast_alloc<ASTArguments>();
   expect(TType::LParen);
+  
+  if (peek().type == TType::RParen) {
+    expect(TType::RParen);
+    return args;
+  }
+  
   while (peek().type != TType::RParen) {
     args->arguments.push(parse_expr());
     if (peek().type != TType::RParen) {
@@ -414,6 +487,14 @@ std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTArguments::accept(VisitorBase *visitor) {
   return visitor->visit(this);
 }
+std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTBreak::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTContinue::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
+
 
 /*
   ###########################################
@@ -421,12 +502,3 @@ std::any ASTArguments::accept(VisitorBase *visitor) {
   ###########################################
 */
 
-std::any ASTReturn::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-};
-std::any ASTBreak::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-};
-std::any ASTContinue::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-};

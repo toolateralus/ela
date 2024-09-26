@@ -143,6 +143,80 @@ std::any SerializeVisitor::visit(ASTBreak *node) {
   ss << indent() << "Break\n";
   return {};
 }
+std::any SerializeVisitor::visit(ASTFor *node) {
+  ss << indent() << "For {\n";
+  indentLevel++;
+  
+  switch (node->tag) {
+    case ASTFor::RangeBased: {
+      auto v = node->value.range_based;
+      ss << indent() << "RangeBased:\n";
+      ss << "\ntarget: ";
+      v.target->accept(this);
+      ss << " -> ";
+      v.collection->accept(this);
+      ss << '\n';
+    } break;
+    case ASTFor::CStyle: {
+      auto v = node->value.c_style;
+      ss << indent() << "CStyle:";
+      v.decl->accept(this);
+      ss << indent() << "condition: ";
+      v.condition->accept(this);
+      ss << indent() <<  "\nincrement: ";
+      v.increment->accept(this);
+      ss << '\n';
+    } break;
+  }
+  
+  node->block->accept(this);
+  
+  indentLevel--;
+  ss << indent() << "}\n";
+  return {};
+}
+std::any SerializeVisitor::visit(ASTIf *node) {
+  ss << indent() << "If {\n";
+  indentLevel++;
+  ss << indent() << "condition: ";
+  node->condition->accept(this);
+  ss << '\n';
+  node->block->accept(this);
+  if (node->_else.is_not_null()) {
+    node->_else.get()->accept(this);
+  }
+  indentLevel--;
+  ss << indent() << "}\n";
+  
+  return {};
+}
+
+std::any SerializeVisitor::visit(ASTElse *node) {
+  ss << indent() << "Else {\n";
+  indentLevel++;
+  if (node->block.is_not_null()) {
+    node->block.get()->accept(this);
+  } else if (node->_if.is_not_null()) {
+    node->_if.get()->accept(this);
+  }
+  indentLevel--;
+  ss << indent() << "}\n";
+  return {};
+}
+
+std::any SerializeVisitor::visit(ASTWhile *node) {
+  ss << indent() << "While {\n";
+  indentLevel++;
+  ss << indent() << "condition: ";
+  if (node->condition.is_not_null())
+    node->condition.get()->accept(this);
+  ss << '\n';
+  
+  node->block->accept(this);
+  indentLevel--;
+  ss << indent() << "}\n";
+  return {};
+}
 
 /*
   ######################
@@ -226,7 +300,7 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 }
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
-  auto right = int_from_any(node->left->accept(this));
+  auto right = int_from_any(node->right->accept(this));
   // TODO: type check in accordance to which operators are permitted to be used on this type;
   // TODO: type convert certain operations where neccesary, like == returns a boolean regardless of it's operands types.  
   auto tleft = get_type(left), tright = get_type(right);
@@ -239,7 +313,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   }
   
   // for now we just return the lhs.
-  return tleft;
+  return left;
 }
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   // TODO: type convert certain operations where neccesary, like ! returns a boolean regardless of it's operands types.
@@ -247,7 +321,9 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = context.current_scope->lookup(node->value);
-  return symbol->type_id;
+  if (symbol) 
+    return symbol->type_id;
+  else return -1;
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
@@ -283,3 +359,29 @@ std::any TypeVisitor::visit(ASTBreak *node) {
   return {};
 }
 
+
+std::any TypeVisitor::visit(ASTFor *node) {
+  switch (node->tag) {
+    case ASTFor::RangeBased: {
+      auto v = node->value.range_based;
+      v.collection->accept(this);
+      v.target->accept(this);
+    } break;
+    case ASTFor::CStyle: {
+      auto v = node->value.c_style;
+      v.decl->accept(this);
+      v.condition->accept(this);
+      v.increment->accept(this);
+    } break;
+  }
+  return {};
+}
+std::any TypeVisitor::visit(ASTIf *node) {
+  return {};
+}
+std::any TypeVisitor::visit(ASTElse *node) {
+  return {};
+}
+std::any TypeVisitor::visit(ASTWhile *node) {
+  return {};
+}
