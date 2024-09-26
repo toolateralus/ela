@@ -1,20 +1,20 @@
 Program {
   Function main {
     Parameters {
-      Parameter argv : type: 14, string[]
+      Parameter argv : type: 16, string[]
     }
     Block {
-      Declaration deref : type: 8, f32
-      Declaration xaryus_brother : type: 8, f32 = (0.1 * deref)
+      Declaration deref : type: 10, float
+      Declaration xaryus_brother : type: 10, float = deref
       For {
-        CStyle:        Declaration i : type: 1, i32
+        CStyle:        Declaration i : type: 1, s32
         condition: (i < 10)
         increment: (i = (i + 1))
         Block {
           Return: 0          
         }
       }
-      Declaration arr : type: 15, i32[]
+      Declaration arr : type: 17, s32[]
       For {
         RangeBased:
         target: v -> arr
@@ -35,13 +35,13 @@ Program {
         }
       }
     }
-    returns: type: 1, i32
+    returns: type: 1, s32
   }
   Function test_if_1 {
     Parameters {
     }
     Block {
-      Declaration v : type: 1, i32 = 1
+      Declaration v : type: 1, s32 = 1
       If {
         condition: v
         Block {
@@ -50,13 +50,13 @@ Program {
       }
       Return: 0      
     }
-    returns: type: 13, void
+    returns: type: 15, void
   }
   Function test_if_2 {
     Parameters {
     }
     Block {
-      Declaration v : type: 1, i32 = 1
+      Declaration v : type: 1, s32 = 1
       If {
         condition: v
         Block {
@@ -69,13 +69,13 @@ Program {
         }
       }
     }
-    returns: type: 13, void
+    returns: type: 15, void
   }
   Function test_if_3 {
     Parameters {
     }
     Block {
-      Declaration v : type: 1, i32 = 1
+      Declaration v : type: 1, s32 = 1
       If {
         condition: !v
         Block {
@@ -96,7 +96,7 @@ Program {
         }
       }
     }
-    returns: type: 13, void
+    returns: type: 15, void
   }
   Function test_if {
     Parameters {
@@ -115,6 +115,6 @@ Program {
       }
 
     }
-    returns: type: 13, void
+    returns: type: 15, void
   }
 }

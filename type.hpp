@@ -10,12 +10,6 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 
-enum TypeFlags {
-  TYPE_FLAGS_NONE = 0 << 0,
-  TYPE_FLAGS_IS_POINTER = 1 << 0,
-  TYPE_FLAGS_IS_ARRAY = 1 << 1,
-};
-
 enum TypeKind {
   TYPE_SCALAR,
   TYPE_FUNCTION,
@@ -96,7 +90,6 @@ struct TypeExtensionInfo {
 
 struct Type {
   const int id = -1;
-  const int flags = -1;
   const int kind = -1;
 
   // nameof(T)
@@ -112,15 +105,14 @@ struct Type {
   }
 
   Type(){};
-  Type(const int id, const int kind, const int flags)
-      : id(id), kind(kind), flags(flags) {}
+  Type(const int id, const int kind)
+      : id(id), kind(kind) {}
 
   Type(const Type &) = delete;
   Type &operator=(const Type &) = delete;
   Type(Type &&) = delete;
   Type &operator=(Type &&) = delete;
 
-  bool has_flag(const TypeFlags flag) const { return (flags & flag) != 0; }
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   constexpr static int invalid_id = -1;
 };
@@ -130,9 +122,9 @@ template <class T> T *type_alloc(size_t n = 1) {
   return new (mem) T();
 }
 
-static int create_type(TypeKind kind, TypeFlags flags, const std::string &name,
+static int create_type(TypeKind kind, const std::string &name,
                        const TypeExtensionInfo &extensions = {}) {
-  Type *type = new (type_alloc<Type>()) Type(num_types, kind, flags);
+  Type *type = new (type_alloc<Type>()) Type(num_types, kind);
 
   type->type_extensions = extensions;
 
@@ -203,7 +195,7 @@ static int find_type_id(const std::string &name,
   if (base_id != -1) {
     auto t = get_type(base_id);
     printf("creating type: %s\n", t->name.c_str());
-    return create_type((TypeKind)t->kind, (TypeFlags)t->flags, name,
+    return create_type((TypeKind)t->kind, name,
                        type_extensions);
   }
   
@@ -212,33 +204,35 @@ static int find_type_id(const std::string &name,
 static void init_type_system() {
   // Signed integers
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i64");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i32");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i16");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "i8");
+    create_type(TYPE_SCALAR, "s64");
+    create_type(TYPE_SCALAR, "s32");
+    create_type(TYPE_SCALAR, "s16");
+    create_type(TYPE_SCALAR, "s8");
   }
 
   // Unsigned integers
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u64");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u32");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u16");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "u8");
+    create_type(TYPE_SCALAR, "u64");
+    create_type(TYPE_SCALAR, "u32");
+    create_type(TYPE_SCALAR, "u16");
+    create_type(TYPE_SCALAR, "u8");
   }
 
   // Floats
   {
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f32");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f64");
+    create_type(TYPE_SCALAR, "f32");
+    create_type(TYPE_SCALAR, "f64");
   }
 
   // Other
   {
     // Other
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "char");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "string");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "bool");
-    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "void");
+    create_type(TYPE_SCALAR, "float");
+    create_type(TYPE_SCALAR, "int");
+    create_type(TYPE_SCALAR, "char");
+    create_type(TYPE_SCALAR, "string");
+    create_type(TYPE_SCALAR, "bool");
+    create_type(TYPE_SCALAR, "void");
   }
 }
 

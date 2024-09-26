@@ -1,13 +1,12 @@
 
-
-main :: (string[] argv) -> i32 {
-	f32 deref;	
-	f32 xaryus_brother = 0.1 * deref;
-	for i32 i; i < 10; i = i + 1 {
+main :: (string[] argv) -> s32 {
+	float deref;	
+	float xaryus_brother = deref;
+	for s32 i; i < 10; i = i + 1 {
 		return 0;
 	}
 	
-	i32[] arr;
+	s32[] arr;
 	for v; arr {
 		return 0;
 	}
@@ -23,7 +22,7 @@ main :: (string[] argv) -> i32 {
 }
 
 test_if_1 :: () {
-	i32 v = 1;
+	s32 v = 1;
 	if v {
 		return 1;
 	}
@@ -31,7 +30,7 @@ test_if_1 :: () {
 }
 
 test_if_2 :: () {
-	i32 v = 1;
+	s32 v = 1;
 	if v {
 		return 1;
 	} else {
@@ -40,7 +39,7 @@ test_if_2 :: () {
 }
 
 test_if_3 :: () {
-	i32 v = 1;
+	s32 v = 1;
 	if !v {
 		return 0;
 	} else if v {

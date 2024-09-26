@@ -328,7 +328,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer:
-      return find_type_id("i32", {});
+      return find_type_id("s32", {});
     case ASTLiteral::Float:
       return find_type_id("f32", {});
     case ASTLiteral::String:
