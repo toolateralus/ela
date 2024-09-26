@@ -46,11 +46,13 @@ int main(int argc, char *argv[]) {
 
   printf("%p\n", root);
   
-  SerializeVisitor visitor;
-  
-  auto serialized_view = std::any_cast<std::string>(visitor.visit(root));
-  
-  printf("%s\n", serialized_view.c_str());
 
+  
+  TypeVisitor typer {context};
+  typer.visit(root);
+  
+  SerializeVisitor serializer;
+  auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
+  printf("%s\n", serialized_view.c_str());
   return 0;
 }

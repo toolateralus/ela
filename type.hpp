@@ -2,12 +2,13 @@
 #pragma once
 
 #include "error.hpp"
+#include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <jstl/memory/arena.hpp>
 #include <jstl/containers/vector.hpp>
+#include <jstl/memory/arena.hpp>
 
 enum TypeFlags {
   TYPE_FLAGS_NONE = 0 << 0,
@@ -38,55 +39,79 @@ extern Type *type_table[MAX_NUM_TYPES];
 extern int num_types;
 extern jstl::Arena type_arena;
 
-
-enum  TypeExtensionEnum {
+enum TypeExtensionEnum {
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
 };
 
-struct TypeExtensions {
+struct TypeExtensionInfo {
+  TypeExtensionInfo() = default;
   // this stores things like * and [], [20] etc.
   jstl::Vector<TypeExtensionEnum> extensions{};
-  // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed array size.
+  // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
+  // array size.
   jstl::Vector<int> array_sizes{};
-  
-  inline bool operator ==(const TypeExtensions &other) const {
+
+  inline bool operator==(const TypeExtensionInfo &other) const {
     return equals(other);
   }
-  
-  inline bool equals(const TypeExtensions &other) const {
-    if (extensions.size() != other.extensions.size()) return false; 
-    if (array_sizes.size() != other.array_sizes.size()) return false;
-    for (int i = 0; i < extensions.size(); ++i) 
-      if (extensions[i] != other.extensions[i]) 
+
+  inline bool equals(const TypeExtensionInfo &other) const {
+    if (extensions.size() != other.extensions.size())
+      return false;
+    if (array_sizes.size() != other.array_sizes.size())
+      return false;
+    for (int i = 0; i < extensions.size(); ++i)
+      if (extensions[i] != other.extensions[i])
         return false;
-    for (int i = 0; i < array_sizes.size(); ++i) 
-      if (array_sizes[i] != other.array_sizes[i]) return false;
+    for (int i = 0; i < array_sizes.size(); ++i)
+      if (array_sizes[i] != other.array_sizes[i])
+        return false;
     return true;
   }
-  
+
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
-};
 
+  inline std::string to_string() const {
+    std::stringstream ss;
+    jstl::Vector<int> array_sizes = this->array_sizes;
+    for (const auto ext : extensions) {
+      if (ext == TYPE_EXT_ARRAY) {
+        auto size = array_sizes.pop();
+        if (size == -1)
+          ss << "[]";
+        else {
+          ss << "[" << size << "]";
+        }
+      }
+      if (ext == TYPE_EXT_POINTER) {
+        ss << "*";
+      }
+    }
+    return ss.str();
+  }
+};
 
 struct Type {
   const int id = -1;
   const int flags = -1;
   const int kind = -1;
-  
+
   // nameof(T)
   std::string name;
-  
-  TypeExtensions type_extensions;
 
-  inline bool equals(const std::string &name, const TypeExtensions &type_extensions) const {
-    if (name != this->name)  return false;
+  TypeExtensionInfo type_extensions;
+
+  inline bool equals(const std::string &name,
+                     const TypeExtensionInfo &type_extensions) const {
+    if (name != this->name)
+      return false;
     return type_extensions == this->type_extensions;
   }
-  
-  Type() {};
+
+  Type(){};
   Type(const int id, const int kind, const int flags)
       : id(id), kind(kind), flags(flags) {}
 
@@ -105,11 +130,12 @@ template <class T> T *type_alloc(size_t n = 1) {
   return new (mem) T();
 }
 
-static int create_type(TypeKind kind, TypeFlags flags, const std::string &name, const TypeExtensions &extensions = {}) {
+static int create_type(TypeKind kind, TypeFlags flags, const std::string &name,
+                       const TypeExtensionInfo &extensions = {}) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind, flags);
 
   type->type_extensions = extensions;
-  
+
   type->name = name;
 
   if (type->id > MAX_NUM_TYPES) {
@@ -121,7 +147,7 @@ static int create_type(TypeKind kind, TypeFlags flags, const std::string &name, 
     printf("type system created a type with the same ID twice\n");
     exit(1);
   }
-  
+
   type_table[type->id] = type;
   num_types += 1;
   return type->id;
@@ -149,14 +175,23 @@ static ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 }
 
 // Returns -1 if not found.
-static int find_type_id(const std::string &name, const TypeExtensions &type_extensions) {
+static int find_type_id(const std::string &name,
+                        const TypeExtensionInfo &type_extensions) {
+
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
+    if (type_extensions.has_no_extensions()) {
+      if (tinfo->name == name && tinfo->type_extensions.has_no_extensions()) {
+        return tinfo->id;
+      }
+    }
     if (tinfo->equals(name, type_extensions))
       return tinfo->id;
   }
-  int base_id = -1;
   
+  // printf("\e[33mfailed to find type: \e[31m%s\e[33m with extensions: '\e[31m%s\e[33m'\e[0m\n", name.c_str(), type_extensions.to_string().c_str());
+  int base_id = -1;
+
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
     if (tinfo->name == name && tinfo->type_extensions.has_no_extensions()) {
@@ -164,10 +199,14 @@ static int find_type_id(const std::string &name, const TypeExtensions &type_exte
       break;
     }
   }
+  
   if (base_id != -1) {
     auto t = get_type(base_id);
-    return create_type((TypeKind)t->kind, (TypeFlags)t->flags, name, type_extensions);
+    printf("creating type: %s\n", t->name.c_str());
+    return create_type((TypeKind)t->kind, (TypeFlags)t->flags, name,
+                       type_extensions);
   }
+  
   return -1;
 }
 static void init_type_system() {
@@ -192,10 +231,11 @@ static void init_type_system() {
     create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f32");
     create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "f64");
   }
-  
+
   // Other
   {
     // Other
+    create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "char");
     create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "string");
     create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "bool");
     create_type(TYPE_SCALAR, TYPE_FLAGS_NONE, "void");

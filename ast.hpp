@@ -4,10 +4,11 @@
 #include "lex.hpp"
 #include "nullable.hpp"
 #include "scope.hpp"
+#include "type.hpp"
 #include <any>
 #include <format>
-#include <jstl/memory/arena.hpp>
 #include <jstl/containers/vector.hpp>
+#include <jstl/memory/arena.hpp>
 
 extern jstl::Arena ast_arena;
 
@@ -37,8 +38,9 @@ struct ASTProgram : ASTNode {
 
 struct ASTType : ASTNode {
   std::string base;
-  int ptr_depth;
-  jstl::Vector<int> array_dims;
+  TypeExtensionInfo extension_info{};
+
+  int resolved_type = Type::invalid_id;
 
   static ASTType *get_void() {
     static ASTType *type = [] {
@@ -111,21 +113,50 @@ struct ASTFuncDecl : ASTStatement {
   ASTBlock *block;
   Token name;
   ASTType *return_type;
+
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct ASTArguments: ASTNode {
-  jstl::Vector<ASTExpr*> arguments;
+struct ASTArguments : ASTNode {
+  jstl::Vector<ASTExpr *> arguments;
 
   std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTCall : ASTExpr {
   Token name;
-  ASTArguments* arguments;
-
+  ASTArguments *arguments;
+  int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
 };
+
+struct ASTReturn : ASTStatement {
+  Nullable<ASTExpr> expression;
+  std::any accept(VisitorBase *visitor) override;
+};
+struct ASTBreak : ASTStatement {
+  std::any accept(VisitorBase *visitor) override;
+};
+struct ASTContinue : ASTStatement {
+  std::any accept(VisitorBase *visitor) override;
+};
+
+// struct ASTFor : ASTStatement {
+//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
+// };
+
+// struct ASTElse;
+// struct ASTIf : ASTStatement {
+//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
+// };
+
+// struct ASTElse : ASTStatement {
+//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
+// };
+
+// struct ASTWhile : ASTStatement {
+//   std::any accept(VisitorBase *visitor) override { visitor->accept(this); }
+// };
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
@@ -144,9 +175,9 @@ struct ASTCall : ASTExpr {
   std::any visit(ASTType *node) override {}                                    \
   std::any visit(ASTCall *node) override {}                                    \
   std::any visit(ASTArguments *node) override {}                               \
-  
-  
-  
+  std::any visit(ASTReturn *node) override {}                                  \
+  std::any visit(ASTContinue *node) override {}                                \
+  std::any visit(ASTBreak *node) override {}
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -162,7 +193,10 @@ struct ASTCall : ASTExpr {
   virtual std::any visit(ASTLiteral *node) = 0;                                \
   virtual std::any visit(ASTType *node) = 0;                                   \
   virtual std::any visit(ASTCall *node) = 0;                                   \
-  virtual std::any visit(ASTArguments *node) = 0;                               \
+  virtual std::any visit(ASTArguments *node) = 0;                              \
+  virtual std::any visit(ASTReturn *node) = 0;                                 \
+  virtual std::any visit(ASTContinue *node) = 0;                               \
+  virtual std::any visit(ASTBreak *node) = 0;
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,

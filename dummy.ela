@@ -1,6 +1,48 @@
 
-main :: (i32 a, i32 b, i32 c) -> i32 {
-	i32 xaryu1 = 100;
-	printf ("%d :: %d :: %d", a, b, c, xaryu1);
+main :: (string[] argv) -> i32 {
+	i32 xaryu = 0;
+	f32 xaryus_brother = 0.1;
+	return xaryu;
 }
+
+// FIRST TASK // TODO: Control flow. Break, Return, Continue, If, For, While
+
+
+// Thursday
+// TODO: [0] Dot expressions, call expressions,  postfix expressions. dont use -> to dereference.
+
+// TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
+// TODO(cont.) better typing in expressions  (||, != return bool) etc.
+
+// If we get time.
+// TODO: [3] # directives, and the ability to define custom ones that just run routines.
+// TODO: [4] ffi with C. #extern or #foreign or something for declarations, linking against libc.
+
+// Friday
+// TODO: [0] First class types. make(int*) etc.
+// TODO: [1] Function pointers, first class functions.
+// TODO: [2] Compile time reflection
+
+// Monday
+// TODO: [0] Struct Declarations
+// TODO: [1] Method declarations
+
+// Tuesday
+// TODO: [0] Operator Overloads. (do we even want this? could be helpful)
+// TODO: [1] Constructor/Destructor.
+// object :: struct {
+// 	#constructor :: (object *self) {
+		
+// 	}
+// 	#destructor :: (object *self) {
+		
+// 	}
+// }
+
+// Unforseen future.
+// TODO: [1] in-language build system. library with build related functions
+// TODO: [2] in-language testing system. 'ela test' type ish. #test attributes
+// TODO: [3] compile time programs. use consteval and constexpr to try to get as far as possible without bytecode runtime.
+
+
 

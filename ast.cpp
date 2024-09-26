@@ -263,12 +263,10 @@ ASTExpr *Parser::parse_unary() {
   }
   return parse_postfix();
 }
-
 ASTExpr *Parser::parse_postfix() {
   // TODO: implement me
   return parse_primary();
 }
-
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
 
@@ -320,24 +318,22 @@ ASTExpr *Parser::parse_primary() {
 }
 ASTType *Parser::parse_type() {
   auto base = eat().value;
-  jstl::Vector<int> array_dims;
-  int ptr_depth = 0;
+  TypeExtensionInfo extension_info;
   
   while (true) {
     if (peek().type == TType::LBrace) {
+      extension_info.extensions.push(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
-        array_dims.push(std::stoi(eat().value));
+        auto integer = expect(TType::Integer);;
+        extension_info.array_sizes.push(std::stoi(integer.value));
       } else {
-        array_dims.push(-1); // dynamic array
-      }
-      if (peek().type != TType::RBrace) {
-        throw_error({.message = "Expected ']'", .severity = ERROR_FAILURE});
+        extension_info.array_sizes.push(-1);
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
-      ptr_depth++;
+      extension_info.extensions.push(TYPE_EXT_POINTER);
     } else {
       break;
     }
@@ -345,8 +341,7 @@ ASTType *Parser::parse_type() {
   
   auto node = ast_alloc<ASTType>();
   node->base = base;
-  node->array_dims = array_dims;
-  node->ptr_depth = ptr_depth;
+  node->extension_info = extension_info;
   return node;
 }
 ASTParamsDecl *Parser::parse_parameters() {
@@ -388,7 +383,6 @@ ASTArguments *Parser::parse_arguments() {
   expect(TType::RParen);
   return args;
 }
-
 ASTStatement *Parser::parse_call_statement(Token iden) {
   auto args = parse_arguments();
  ASTExprStatement *statement = ast_alloc<ASTExprStatement>();
@@ -427,4 +421,12 @@ std::any ASTArguments::accept(VisitorBase *visitor) {
   ###########################################
 */
 
-
+std::any ASTReturn::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};
+std::any ASTBreak::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};
+std::any ASTContinue::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};

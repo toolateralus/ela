@@ -45,6 +45,14 @@ enum struct TType {
   RBrace,
   DoubleColon,
   Dot,
+  
+  Return,
+  Break,
+  Continue,
+  For,
+  While,
+  If,
+  Else,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -90,7 +98,18 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Dot);
     TTYPE_CASE(Not);
     TTYPE_CASE(BitwiseNot);
+    
+    TTYPE_CASE(Return);
+    TTYPE_CASE(Break);
+    TTYPE_CASE(Continue);
+    
+    // TODO: implement these
+    TTYPE_CASE(For);
+    TTYPE_CASE(While);
+    TTYPE_CASE(If);
+    TTYPE_CASE(Else);
   }
+  
   return "Unknown";
 }
 
@@ -107,7 +126,7 @@ struct SourceLocation {
       : line(line), column(column), file(file) {}
   size_t line = 0, column = 0;
   size_t file = 0;
-  
+
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
     return files;
@@ -119,7 +138,7 @@ struct SourceLocation {
 };
 
 struct Token {
-  Token () {}
+  Token() {}
   Token(SourceLocation location, std::string value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family),
         location(location) {}
@@ -169,7 +188,13 @@ struct Lexer {
     }
   };
 
-  const std::unordered_map<std::string, TType> keywords{};
+  const std::unordered_map<std::string, TType> keywords{
+      {"return", TType::Return},     {"break", TType::Break},
+      {"continue", TType::Continue}, 
+      
+      {"for", TType::For},
+      {"while", TType::While},       {"if", TType::If},
+      {"else", TType::Else}};
 
   const std::unordered_map<std::string, TType> operators{
       {".", TType::Dot},        {"!", TType::Not},
