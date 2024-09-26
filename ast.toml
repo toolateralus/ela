@@ -1,11 +1,8 @@
 Program {
-  Function main {
+  Function test_for {
     Parameters {
-      Parameter argv : type: 16, string[]
     }
     Block {
-      Declaration deref : type: 10, float
-      Declaration xaryus_brother : type: 10, float = deref
       For {
         CStyle:        Declaration i : type: 1, s32
         condition: (i < 10)
@@ -14,7 +11,7 @@ Program {
           Return: 0          
         }
       }
-      Declaration arr : type: 17, s32[]
+      Declaration arr : type: 16, s32[]
       For {
         RangeBased:
         target: v -> arr
@@ -22,6 +19,13 @@ Program {
           Return: 0          
         }
       }
+    }
+    returns: type: 15, void
+  }
+  Function test_while {
+    Parameters {
+    }
+    Block {
       While {
         condition: 
         Block {
@@ -35,7 +39,7 @@ Program {
         }
       }
     }
-    returns: type: 1, s32
+    returns: type: 15, void
   }
   Function test_if_1 {
     Parameters {
@@ -98,7 +102,7 @@ Program {
     }
     returns: type: 15, void
   }
-  Function test_if {
+  Function test_if_0 {
     Parameters {
     }
     Block {
@@ -116,5 +120,39 @@ Program {
 
     }
     returns: type: 15, void
+  }
+  Function main {
+    Parameters {
+      Parameter argv : type: 17, string[]
+    }
+    Block {
+      Declaration deref : type: 10, float
+      Declaration xaryus_brother : type: 10, float = deref
+      Call test_for {
+        Arguments {}
+      }
+
+      Call test_while {
+        Arguments {}
+      }
+
+      Call test_if_0 {
+        Arguments {}
+      }
+
+      Call test_if_1 {
+        Arguments {}
+      }
+
+      Call test_if_2 {
+        Arguments {}
+      }
+
+      Call test_if_3 {
+        Arguments {}
+      }
+
+    }
+    returns: type: 1, s32
   }
 }
