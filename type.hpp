@@ -30,12 +30,11 @@ struct Type;
 
 extern Type *type_table[MAX_NUM_TYPES];
 
-static Type *get_type(int id) { 
-  [[unlikely]]
-  if (id < 0) 
+static Type *get_type(int id) {
+  [[unlikely]] if (id < 0)
     return nullptr;
-  
-  return type_table[id]; 
+
+  return type_table[id];
 }
 
 extern int num_types;
@@ -82,44 +81,58 @@ struct TypeExtensionInfo {
     }
     return ss.str();
   }
+  inline std::string to_cpp_string(const std::string &base) const {
+    jstl::Vector<int> array_sizes = this->array_sizes;
+    std::stringstream ss;
+    ss << base;
+    for (const auto ext : extensions) {
+      if (ext == TYPE_EXT_ARRAY) {
+        auto size = array_sizes.pop();
+        if (size == -1) {
+          std::string current = ss.str();
+          ss.str("_array<" + current + ">");
+        } else {
+          ss << "[" << size << "]";
+        }
+      }
+      if (ext == TYPE_EXT_POINTER) {
+        ss << "*";
+      }
+    }
+    return ss.str();
+  }
 };
 
 struct TypeInfo {
   virtual ~TypeInfo() = default;
-  virtual std::string to_string() const {
-    return "Abstract TypeInfo base.";
-  }
+  virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 struct FunctionTypeInfo : TypeInfo {
-  int return_type;
+  int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
-  int params_len;
+  int params_len = 0;
+  int default_params = 0; // number of default params, always trailing.
   // defined in cpp file
   virtual std::string to_string() const override;
 };
 struct ScalarTypeInfo : TypeInfo {
-  virtual std::string to_string() const override {
-    return "";
-  }
+  virtual std::string to_string() const override { return ""; }
 };
 struct StructTypeInfo : TypeInfo {
-  virtual std::string to_string() const override {
-    return ""; 
-  }
+  virtual std::string to_string() const override { return ""; }
 };
 
 struct Type {
   const int id = -1;
   const TypeKind kind = TypeKind::TYPE_SCALAR;
-  std::string name;
+  std::string base;
   Nullable<TypeInfo> info = nullptr;
   TypeExtensionInfo extensions;
   bool equals(const std::string &name,
               const TypeExtensionInfo &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   Type(){};
-  Type(const int id, const TypeKind kind)
-      : id(id), kind(kind) {}
+  Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   Type(const Type &) = delete;
   Type &operator=(const Type &) = delete;
   Type(Type &&) = delete;
@@ -127,6 +140,7 @@ struct Type {
   bool operator==(const Type &type) const;
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
+  std::string to_cpp_string() const;
 
   constexpr static int invalid_id = -1;
 };
@@ -137,8 +151,8 @@ template <class T> T *type_alloc(size_t n = 1) {
 }
 
 int create_type(TypeKind kind, const std::string &name,
-                       TypeInfo *info = nullptr,
-                       const TypeExtensionInfo &extensions = {});
+                TypeInfo *info = nullptr,
+                const TypeExtensionInfo &extensions = {});
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -150,10 +164,10 @@ enum ConversionRule {
 ConversionRule type_conversion_rule(const Type *from, const Type *to);
 
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                        const TypeExtensionInfo &ext);
+                 const TypeExtensionInfo &ext);
 
 int find_type_id(const std::string &name,
-                        const TypeExtensionInfo &type_extensions);
+                 const TypeExtensionInfo &type_extensions);
 void init_type_system();
 
 // used as a marker for the type visitor that we need to resolve this type at

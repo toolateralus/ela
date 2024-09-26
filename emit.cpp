@@ -71,7 +71,7 @@ std ::any EmitVisitor::visit(ASTArguments *node) {
   return {};
 }
 std ::any EmitVisitor::visit(ASTType *node) {
-  ss << get_type(node->resolved_type)->to_string();
+  ss << get_type(node->resolved_type)->to_cpp_string();
   return {};
 }
 std ::any EmitVisitor::visit(ASTCall *node) {

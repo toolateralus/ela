@@ -4,7 +4,7 @@
 
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
-  ss << get_type(return_type)->name;
+  ss << get_type(return_type)->base;
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = get_type(parameter_types[i]);
@@ -22,7 +22,7 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
     const Type *type = type_table[i];
-    if (name == type->name && type->type_info_equals(&info, TYPE_FUNCTION) &&
+    if (name == type->base && type->type_info_equals(&info, TYPE_FUNCTION) &&
         ext.equals(type->extensions)) {
       return type->id;
     }
@@ -36,7 +36,7 @@ int find_type_id(const std::string &name,
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
     if (type_extensions.has_no_extensions()) {
-      if (type->name == name && type->extensions.has_no_extensions()) {
+      if (type->base == name && type->extensions.has_no_extensions()) {
         return type->id;
       }
     }
@@ -50,7 +50,7 @@ int find_type_id(const std::string &name,
 
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
-    if (tinfo->name == name && tinfo->extensions.has_no_extensions()) {
+    if (tinfo->base == name && tinfo->extensions.has_no_extensions()) {
       base_id = tinfo->id;
       break;
     }
@@ -58,7 +58,7 @@ int find_type_id(const std::string &name,
 
   if (base_id != -1) {
     auto t = get_type(base_id);
-    printf("creating type: %s\n", t->name.c_str());
+    printf("creating type: %s\n", t->base.c_str());
     return create_type((TypeKind)t->kind, name, nullptr, type_extensions);
   }
 
@@ -122,7 +122,7 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   type->info = info;
   type->extensions = extensions;
 
-  type->name = name;
+  type->base = name;
 
   if (type->id > MAX_NUM_TYPES) {
     throw_error(
@@ -144,7 +144,7 @@ std::string Type::to_string() const {
 
   switch (kind) {
   case TYPE_SCALAR:
-    return name + extensions.to_string();
+    return base + extensions.to_string();
   case TYPE_FUNCTION:
     if (info.is_not_null())
       return info.get()->to_string();
@@ -159,7 +159,7 @@ bool Type::operator==(const Type &type) const {
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
 
-    if (tinfo->equals(name, extensions) && type.info.is_not_null() &&
+    if (tinfo->equals(base, extensions) && type.info.is_not_null() &&
         type_info_equals(type.info.get(), type.kind))
       return true;
   }
@@ -190,7 +190,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 }
 bool Type::equals(const std::string &name,
                   const TypeExtensionInfo &type_extensions) const {
-  if (name != this->name)
+  if (name != this->base)
     return false;
   return type_extensions == this->extensions;
 }
@@ -206,4 +206,18 @@ bool TypeExtensionInfo::equals(const TypeExtensionInfo &other) const {
     if (array_sizes[i] != other.array_sizes[i])
       return false;
   return true;
+}
+std::string Type::to_cpp_string() const {
+  switch (kind) {
+  case TYPE_SCALAR:
+    return extensions.to_cpp_string(this->base);
+  case TYPE_FUNCTION:
+    if (info.is_not_null())
+      return info.get()->to_string();
+    else
+      return "invalid function type";
+  case TYPE_STRUCT:
+    return "struct NYI";
+    break;
+  }
 }

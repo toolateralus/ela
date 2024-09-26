@@ -1,16 +1,15 @@
+test_for :: () -> s32 {
+	for s32 i; i < 10; i = i + 1 {
+		return 0;
+	}
+	s32[] arr;
+	// for v; arr {
+	// 	return 0;
+	// }
+	return 1;
+}
 
-// test_for :: () -> s32 {
-// 	for s32 i; i < 10; i = i + 1 {
-// 		return 0;
-// 	}
-// 	s32[] arr;
-// 	for v; arr {
-// 		return 0;
-// 	}
-// 	return 1;
-// }
-
-test_while :: () -> s32 {
+test_while :: (s32 n = 0) -> s32 {
 	s32 v;
 	while {
 		return 1;
@@ -116,55 +115,4 @@ main :: (s32 argc, char **argv) -> s32 {
 	test_if_3();
 	return 0;
 }
-
-
-// TODO: (CONTROL FLOW)
-// TODO(_started, cooper pls help :3) {
-// 	We need to type check and control flow check our blocks.
-// 	For example, a function needs to know in which all control paths, a return could occur.
-// 	And if this is present, maybe in the form of a BLOCK_FLAGS enum,
-// 	We need to be able to ensure all of these paths have homogenous types,
-// 	and that all paths return a value if neccesary.
-// TODO }
-
-// TODO(PARTIALLY DONE):
-// TODO(cont.) better typing in expressions  (||, != return bool) etc.
-// SECOND // TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
-// 			added function types and better type info.
-// 			no conversion table yet: that can be done later easily.
-
-// TODO: [0] call expressions,  postfix expressions. dont use -> to dereference.
-
-
-// If we get time.
-// TODO: [3] # directives, and the ability to define custom ones that just run routines.
-// TODO: [4] ffi with C. #extern or #foreign or something for declarations, linking against libc.
-
-// Friday
-// TODO: [0] First class types. make(int*) etc.
-// TODO: [1] Function pointers, first class functions.
-// TODO: [2] Compile time reflection
-
-// Monday
-// TODO: [0] Struct Declarations
-// TODO: [1] Method declarations
-
-// Tuesday
-// TODO: [0] Operator Overloads. (do we even want this? could be helpful)
-// TODO: [1] Constructor/Destructor.
-// object :: struct {
-// 	#constructor :: (object *self) {
-		
-// 	}
-// 	#destructor :: (object *self) {
-		
-// 	}
-// }
-
-// Unforseen future.
-// TODO: [1] in-language build system. library with build related functions
-// TODO: [2] in-language testing system. 'ela test' type ish. #test attributes
-// TODO: [3] compile time programs. use consteval and constexpr to try to get as far as possible without bytecode runtime.
-
-
 

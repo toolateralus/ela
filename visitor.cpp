@@ -105,7 +105,7 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
     auto type = get_type(node->resolved_type);
-    ss << "type: " << node->resolved_type << ", " << type->name
+    ss << "type: " << node->resolved_type << ", " << type->base
        << type->extensions.to_string();
     return {};
   }
@@ -269,9 +269,11 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   FunctionTypeInfo info;
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
-
+  info.default_params = 0;
+  
   auto params = node->params->params;
   for (const auto &param : params) {
+    if (param->default_value.is_not_null()) info.default_params++;
     node->block->scope->insert(param->name, param->type->resolved_type);
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
@@ -300,7 +302,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
           node->source_tokens);
     } else {
       throw_error(
-          std::format("Function {} : return type mismatch. Expected: {}, Found: {}", node->name.value, expected_type->name, found_type->name),
+          std::format("Function {} : return type mismatch. Expected: {}, Found: {}", node->name.value, expected_type->base, found_type->base),
           ERROR_FAILURE,
           node->source_tokens
       );
@@ -327,7 +329,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
       auto expected_type = get_type(return_type);
       auto found_type = get_type(new_type);
       throw_error(
-          std::format("Inconsistent return types in block. Expected: {}, Found: {}", expected_type->name, found_type->name),
+          std::format("Inconsistent return types in block. Expected: {}, Found: {}", expected_type->base, found_type->base),
           ERROR_FAILURE,
           node->source_tokens
       );
@@ -434,8 +436,8 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
       throw_error(
           std::format(
               "Incompatible types in expression. declaring: {}  provided {}",
-              get_type(node->type->resolved_type)->name,
-              get_type(expr_type)->name),
+              get_type(node->type->resolved_type)->base,
+              get_type(expr_type)->base),
           ERROR_FAILURE,
           node->source_tokens
       );
@@ -455,7 +457,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
       throw_error(
           std::format(
               "Incompatible types in expression. declaring: {}  provided {}",
-              tleft->name, tright->name),
+              tleft->base, tright->base),
            ERROR_FAILURE,
            node->source_tokens
       );
@@ -496,7 +498,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     throw_error(
         std::format("binary expression {} with left: {}, right {}, "
                                "is invalid due to their types.",
-                               node->op.value, tleft->name, tright->name),
+                               node->op.value, tleft->base, tright->base),
         ERROR_FAILURE,
         node->source_tokens
     );
@@ -560,7 +562,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
 
-  if (arg_tys.size() != info->params_len) {
+  if (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params) {
     throw_error(
         std::format("Function call '{}' has incorrect number of arguments. "
                         "Expected: {}, Found: {}",
@@ -571,12 +573,16 @@ std::any TypeVisitor::visit(ASTCall *node) {
   }
 
   for (int i = 0; i < info->params_len; ++i) {
+    // TODO: default parameters evade type checking
+    if (arg_tys.size() <= i) {
+      continue;
+    }
     if (info->parameter_types[i] != arg_tys[i]) {
       throw_error(
           std::format(
               "Invalid parameter type at argument {}. Expected: {}, Found: {}",
-              i, get_type(info->parameter_types[i])->name,
-              get_type(arg_tys[i])->name),
+              i, get_type(info->parameter_types[i])->base,
+              get_type(arg_tys[i])->base),
           ERROR_FAILURE,
           node->source_tokens
       );
@@ -650,8 +656,8 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
     throw_error(
         std::format("Incompatible types in compound assignment. "
                                "declaring: {}  provided {}",
-                               get_type(symbol->type_id)->name,
-                               get_type(expr_ty)->name),
+                               get_type(symbol->type_id)->base,
+                               get_type(expr_ty)->base),
         ERROR_FAILURE,
         node->source_tokens
     );
