@@ -43,7 +43,37 @@ std ::any EmitVisitor::visit(ASTIf *node) {
   return {};
 }
 std ::any EmitVisitor::visit(ASTFor *node) {
-  // TODO: 
+  
+  
+  
+  const auto emit_range_based = [&] {
+    auto v = node->value.range_based;
+    ss << "auto ";
+    v.target->accept(this);
+    ss << " : ";
+    v.collection->accept(this);
+  };
+  
+  const auto emit_c_style = [&] {
+    auto v = node->value.c_style;
+    v.decl->accept(this);
+    semicolon();
+    v.condition->accept(this);
+    semicolon();
+    v.increment->accept(this);
+  };
+  
+  ss << "for (";  
+  switch (node->tag) {
+  case ASTFor::RangeBased:
+    emit_range_based();
+    break;
+  case ASTFor::CStyle:
+    emit_c_style();
+    break;
+  }
+  ss << ") ";
+  node->block->accept(this);
   return {};
 }
 std ::any EmitVisitor::visit(ASTBreak *node) {

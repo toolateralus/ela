@@ -609,10 +609,13 @@ std::any TypeVisitor::visit(ASTContinue *node) { return {}; }
 std::any TypeVisitor::visit(ASTBreak *node) { return {}; }
 
 std::any TypeVisitor::visit(ASTFor *node) {
+  context.enter_scope(node->block->scope);
   switch (node->tag) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
-    v.collection->accept(this);
+    auto type = int_from_any(v.collection->accept(this));
+    auto iden = static_cast<ASTIdentifier*>(v.target);
+    context.current_scope->insert(iden->value.value, type);
     v.target->accept(this);
   } break;
   case ASTFor::CStyle: {
@@ -622,6 +625,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     v.increment->accept(this);
   } break;
   }
+  context.exit_scope();
   return node->block->accept(this);
 }
 std::any TypeVisitor::visit(ASTIf *node) {

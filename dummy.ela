@@ -3,9 +3,9 @@ test_for :: () -> s32 {
 		return 0;
 	}
 	s32[] arr;
-	// for v; arr {
-	// 	return 0;
-	// }
+	for v; arr {
+		return 0;
+	}
 	return 1;
 }
 
