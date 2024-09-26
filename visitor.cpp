@@ -3,9 +3,7 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
-#include <exception>
 #include <jstl/containers/vector.hpp>
-#include <stdexcept>
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
   printf("%s\n", typeid(node).name());
@@ -270,6 +268,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
   auto params = node->params->params;
   for (const auto &param : params) {
+    node->block->scope->insert(param->name, param->type->resolved_type);
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
@@ -295,8 +294,9 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
     if (!expected_type || !found_type) {
       throw_error({
-          .message =
-              std::format("Function {} return type mismatch. One of the types is invalid.", node->name.value),
+          .message = std::format(
+              "Function {} return type mismatch. One of the types is invalid.",
+              node->name.value),
           .severity = ERROR_FAILURE,
       });
     } else {
@@ -507,9 +507,32 @@ std::any TypeVisitor::visit(ASTFor *node) {
   }
   return {};
 }
-std::any TypeVisitor::visit(ASTIf *node) { return {}; }
-std::any TypeVisitor::visit(ASTElse *node) { return {}; }
-std::any TypeVisitor::visit(ASTWhile *node) { return {}; }
+std::any TypeVisitor::visit(ASTIf *node) { 
+  // TODO: type check to confirm this is convertible to, or is a bool.
+  node->condition->accept(this);
+  
+  if (node->_else.is_not_null()) {
+    node->_else.get()->accept(this);
+  } else {
+    node->block->accept(this);
+  }
+  return {}; 
+}
+std::any TypeVisitor::visit(ASTElse *node) { 
+  if (node->_if.is_not_null()) {
+    node->_if.get()->accept(this);
+  } else {
+    node->block.get()->accept(this);
+  }
+  return {}; 
+}
+std::any TypeVisitor::visit(ASTWhile *node) { 
+  if (node->condition.is_not_null()) {
+    node->condition.get()->accept(this);
+  }
+  node->block->accept(this);
+  return {}; 
+}
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));

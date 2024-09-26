@@ -91,6 +91,18 @@ ASTStatement *Parser::parse_statement() {
   
   eat();
   
+  // TODO: make this nicer.
+  if (peek().type == TType::Increment || peek().type == TType::Decrement) {
+    auto statement = ast_alloc<ASTExprStatement>();
+    auto unary = ast_alloc<ASTUnaryExpr>();
+    unary->op = eat();
+    auto operand = ast_alloc<ASTIdentifier>();
+    operand->value = tok;
+    unary->operand = operand;
+    statement->expression = unary;
+    return statement;
+  }
+  
   if (peek().is_comp_assign()) {
     if (tok.type != TType::Identifier) {
       throw_error(Error{
@@ -325,7 +337,7 @@ ASTExpr *Parser::parse_multiplicative() {
 }
 ASTExpr *Parser::parse_unary() {
   if (peek().type == TType::Add || peek().type == TType::Sub ||
-      peek().type == TType::Not || peek().type == TType::BitwiseNot) {
+      peek().type == TType::Not || peek().type == TType::BitwiseNot || peek().type == TType::Increment || peek().type == TType::Decrement) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();

@@ -1,3 +1,4 @@
+
 test_for :: () -> s32 {
 	for s32 i; i < 10; i = i + 1 {
 		return 0;
@@ -88,15 +89,25 @@ test_operators :: () -> float {
 	return result;
 }
 
-abs :: (float f) -> f32 {
-	return 0.0;
+abs :: (float f) -> float {
+	float zero;
+	if f < zero { 
+		return -f; 
+	}
+	return f;
 }
 
-sqrt :: (float f) -> f32 {
-	return 0.0;
+sqrt :: (float f) -> float {
+	return f;
 }
 
 main :: (string[] argv) -> s32 {
+	s32 i = 0;
+	
+	i++;
+	
+	i = ++i;
+	
 	float deref;	
 	test_for();
 	test_while();
