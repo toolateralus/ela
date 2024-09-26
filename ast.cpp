@@ -34,9 +34,7 @@ ASTStatement *Parser::parse_statement() {
   } else if (tok.type == TType::Continue) {
     eat();
     return ast_alloc<ASTContinue>();
-  }
-  
-  if (tok.type == TType::For) {
+  } else if (tok.type == TType::For) {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
@@ -86,15 +84,26 @@ ASTStatement *Parser::parse_statement() {
       node->_else = node_else;
     }
     return node;
-  }
-  
-  if (find_type_id(tok.value, {}) != -1) {
+  } else if (find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     return decl;
   }
   
   eat();
-  if (peek().type == TType::DoubleColon) {
+  
+  if (peek().is_comp_assign()) {
+    if (tok.type != TType::Identifier) {
+      throw_error(Error{
+          .message = std::format("Compound assignment must target an identifier. Got {}", tok.value),
+          .severity = ERROR_CRITICAL,
+      });
+    }
+    auto comp_assign = ast_alloc<ASTCompAssign>();
+    comp_assign->op = eat();
+    comp_assign->name = tok;
+    comp_assign->expr = parse_expr();
+    return comp_assign;
+  } else if (peek().type == TType::DoubleColon) {
     eat();
     if (peek().type == TType::LParen) {
       return parse_function_declaration(tok);
@@ -164,11 +173,11 @@ ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   ASTExpr *left;
   
   if (iden != nullptr)  {
-    auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = iden->value;
-    left = iden;
+    auto iden_node = ast_alloc<ASTIdentifier>();
+    iden_node->value = iden->value;
+    left = iden_node;
   } else {
-     left = parse_logical_or();  
+    left = parse_logical_or();  
   }
   
   if (peek().type == TType::Assign) {
@@ -490,11 +499,14 @@ std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
-
+std::any ASTCompAssign::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
 
 /*
   ###########################################
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
 

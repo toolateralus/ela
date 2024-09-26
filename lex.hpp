@@ -45,7 +45,10 @@ enum struct TType {
   RBrace,
   DoubleColon,
   Dot,
-  
+
+  Increment,
+  Decrement,
+
   Return,
   Break,
   Continue,
@@ -53,6 +56,17 @@ enum struct TType {
   While,
   If,
   Else,
+
+  CompAdd,
+  CompSub,
+  CompMul,
+  CompDiv,
+  CompMod,
+  CompAnd,
+  CompOr,
+  CompXor,
+  CompSHL,
+  CompSHR,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -98,18 +112,32 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Dot);
     TTYPE_CASE(Not);
     TTYPE_CASE(BitwiseNot);
-    
+
+    TTYPE_CASE(Increment);
+    TTYPE_CASE(Decrement);
+
     TTYPE_CASE(Return);
     TTYPE_CASE(Break);
     TTYPE_CASE(Continue);
-    
+
     // TODO: implement these
     TTYPE_CASE(For);
     TTYPE_CASE(While);
     TTYPE_CASE(If);
     TTYPE_CASE(Else);
+
+    TTYPE_CASE(CompAdd);
+    TTYPE_CASE(CompSub);
+    TTYPE_CASE(CompMul);
+    TTYPE_CASE(CompDiv);
+    TTYPE_CASE(CompMod);
+    TTYPE_CASE(CompAnd);
+    TTYPE_CASE(CompOr);
+    TTYPE_CASE(CompXor);
+    TTYPE_CASE(CompSHL);
+    TTYPE_CASE(CompSHR);
   }
-  
+
   return "Unknown";
 }
 
@@ -138,6 +166,15 @@ struct SourceLocation {
 };
 
 struct Token {
+
+  inline bool is_comp_assign() const {
+    return type == TType::CompAdd || type == TType::CompSub ||
+           type == TType::CompMul || type == TType::CompDiv ||
+           type == TType::CompMod || type == TType::CompAnd ||
+           type == TType::CompOr || type == TType::CompXor ||
+           type == TType::CompSHL || type == TType::CompSHR;
+  }
+
   Token() {}
   Token(SourceLocation location, std::string value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family),
@@ -189,11 +226,13 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> keywords{
-      {"return", TType::Return},     {"break", TType::Break},
-      {"continue", TType::Continue}, 
-      
+      {"return", TType::Return},
+      {"break", TType::Break},
+      {"continue", TType::Continue},
+
       {"for", TType::For},
-      {"while", TType::While},       {"if", TType::If},
+      {"while", TType::While},
+      {"if", TType::If},
       {"else", TType::Else}};
 
   const std::unordered_map<std::string, TType> operators{
@@ -213,8 +252,14 @@ struct Lexer {
       {">", TType::GT},         {"==", TType::EQ},
       {"!=", TType::NEQ},       {"<=", TType::LE},
       {">=", TType::GE},        {"[", TType::LBrace},
-      {"]", TType::RBrace},
-  };
+      {"]", TType::RBrace},     {"++", TType::Increment},
+      {"--", TType::Decrement},
+
+      {"+=", TType::CompAdd},   {"-=", TType::CompSub},
+      {"*=", TType::CompMul},   {"/=", TType::CompDiv},
+      {"%=", TType::CompMod},   {"&=", TType::CompAnd},
+      {"|=", TType::CompOr},    {"^=", TType::CompXor},
+      {"<<=", TType::CompSHL},  {">>=", TType::CompSHR}};
 
   Token get_token(State &state);
 };

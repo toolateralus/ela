@@ -1,76 +1,118 @@
-test_for :: () {
-	for s32 i; i < 10; i = i + 1 {
-		return 0;
-	}
-	s32[] arr;
-	for v; arr {
-		return 0;
-	}
+// test_for :: () {
+// 	for s32 i; i < 10; i = i + 1 {
+// 		return 0;
+// 	}
+// 	s32[] arr;
+// 	for v; arr {
+// 		return 0;
+// 	}
+// }
+
+// test_while :: () {
+// 	while {
+// 		continue;
+// 	}
+// 	while v {
+// 		continue;
+// 	}
+// }
+
+// test_if_1 :: () {
+// 	s32 v = 1;
+// 	if v {
+// 		return 1;
+// 	}
+// 	return 0;
+// }
+
+// test_if_2 :: () {
+// 	s32 v = 1;
+// 	if v {
+// 		return 1;
+// 	} else {
+// 		return 0;
+// 	}
+// }
+
+// test_if_3 :: () {
+// 	s32 v = 1;
+// 	if !v {
+// 		return 0;
+// 	} else if v {
+// 		return 1;
+// 	} else {
+// 		return 0;
+// 	}
+// }
+
+// test_if_0 :: () {
+// 	test_if_1();
+// 	test_if_2();
+// 	test_if_3();
+// }
+
+test_comp_assign :: () {
+	float deref;
+	deref += deref; 
+	deref -= deref;
+	deref *= deref; 
+	deref /= deref;
+	deref %= deref; 
+	deref &= deref;
+	deref |= deref; 
+	deref ^= deref;
+	deref <<= deref; 
+	deref >>= deref;
 }
 
-test_while :: () {
-	while {
-		continue;
-	}
-	while v {
-		continue;
-	}
-}
-
-test_if_1 :: () {
-	s32 v = 1;
-	if v {
-		return 1;
-	}
-	return 0;
-}
-
-test_if_2 :: () {
-	s32 v = 1;
-	if v {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-test_if_3 :: () {
-	s32 v = 1;
-	if !v {
-		return 0;
-	} else if v {
-		return 1;
-	} else {
-		return 0;
-	}
-}
-
-test_if_0 :: () {
-	test_if_1();
-	test_if_2();
-	test_if_3();
+test_operators :: () -> float {
+	float left;
+	float right;
+	float result;
+	result = left + right;
+	result = left - right;
+	result = left * right;
+	result = left / right;
+	result = left % right;
+	result = left == right;
+	result = left != right;
+	result = left < right;
+	result = left > right;
+	result = left <= right;
+	result = left >= right;
+	result = left && right;
+	result = left || right;
+	result = left & right;
+	result = left | right;
+	result = left ^ right;
+	result = left << right;
+	result = left >> right;
+	return result;
 }
 
 main :: (string[] argv) -> s32 {
 	float deref;	
 	float xaryus_brother = deref;
+	deref += xaryus_brother;
+
 	
-	test_for();
-	test_while();
+	// test_for();
+	// test_while();
 	
-	test_if_0();
-	test_if_1();
-	test_if_2();
-	test_if_3();
+	// test_if_0();
+	// test_if_1();
+	// test_if_2();
+	// test_if_3();
+	return 0;
 }
 
 
-// FIRST TASK // TODO: Control flow. Break, Return, Continue, If, For, While
+// TODO(PARTIALLY DONE):
 // SECOND // TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
+			// added function types and better type info.
+			// no conversion table yet: that can be done later easily.
 
-
-// Thursday
-// TODO: [0] Dot expressions, call expressions,  postfix expressions. dont use -> to dereference.
+// TODO: [0] call expressions,  postfix expressions. dont use -> to dereference.
 
 // TODO(cont.) better typing in expressions  (||, != return bool) etc.
 

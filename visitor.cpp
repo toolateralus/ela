@@ -2,6 +2,8 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
+#include <exception>
+#include <stdexcept>
 #include "visitor.hpp"
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
@@ -29,14 +31,14 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
 std::any SerializeVisitor::visit(ASTFuncDecl *node) {
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
+  auto sym = context.current_scope->lookup(node->name.value);
+  ss << indent() << "type: " << get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
   visit(node->block);
   ss << indent() << "returns: ";
   visit(node->return_type);
   ss << '\n';
   
-  auto sym = context.current_scope->lookup(node->name.value);
-  ss << "type: " << get_type(sym->type_id)->to_string() << '\n';
   indentLevel--;
   ss << indent() << "}\n";
   return {};
@@ -219,6 +221,19 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 
+std::any SerializeVisitor::visit(ASTCompAssign *node) {
+  ss << indent() << "Compound Assignment {\n";
+  indentLevel++;
+  ss << indent() << "left: " << node->name.value;
+  ss << '\n' << indent() << "operator: " << node->op.value << '\n';
+  ss << indent() << "right: ";
+  node->expr->accept(this);
+  ss << '\n';
+  indentLevel--;
+  ss << indent() << "}\n";
+  return {};
+}
+
 /*
   ######################
   #### TYPE VISITOR ####
@@ -244,7 +259,6 @@ std::any TypeVisitor::visit(ASTProgram *node) {
 std::any TypeVisitor::visit(ASTFuncDecl *node) {
   node->return_type->accept(this);
   node->params->accept(this);
-  node->block->accept(this);
   
   FunctionTypeInfo info;
   info.return_type = node->return_type->resolved_type;
@@ -258,6 +272,26 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   
   auto id = find_type_id("", info, {});
   context.current_scope->insert(node->name.value, id);
+  
+  auto return_type = find_type_id("void", {});
+  
+  context.enter_scope(node->block->scope);
+    for (const auto &statement: node->block->statements) {
+      statement->accept(this);
+      
+      if (auto node_return = dynamic_cast<ASTReturn*>(statement)) 
+        if (node_return->expression.is_not_null()) 
+          return_type = int_from_any(node_return->expression.get()->accept(this)); 
+    }
+  context.exit_scope();
+  
+  if (return_type != info.return_type) {
+    throw_error({
+      .message = std::format("Function return type mismatch. Expected: {}, Found: {}", get_type(info.return_type)->name, get_type(return_type)->name),
+      .severity = ERROR_FAILURE,
+    });
+  }
+  
   return {};
 }
 std::any TypeVisitor::visit(ASTBlock *node) {
@@ -314,6 +348,14 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
+  
+  if (left == -1 || right == -1)  {
+    throw_error({
+      .message = std::format("one of the types in the expression was null. {} left: {}, right: {}", node->op.value, left, right),
+      .severity = ERROR_CRITICAL,
+    });
+  }
+  
   // TODO: type check in accordance to which operators are permitted to be used on this type;
   // TODO: type convert certain operations where neccesary, like == returns a boolean regardless of it's operands types.  
   auto tleft = get_type(left), tright = get_type(right);
@@ -396,5 +438,16 @@ std::any TypeVisitor::visit(ASTElse *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTWhile *node) {
+  return {};
+}
+std::any TypeVisitor::visit(ASTCompAssign *node) {
+  auto symbol = context.current_scope->lookup(node->name.value);
+  auto expr_ty = int_from_any(node->expr->accept(this));
+  if (symbol->type_id != expr_ty) {
+    throw_error({
+      .message = std::format("Incompatible types in compound assignment. declaring: {}  provided {}", get_type(symbol->type_id)->name, get_type(expr_ty)->name),
+      .severity = ERROR_FAILURE,
+    });
+  }
   return {};
 }

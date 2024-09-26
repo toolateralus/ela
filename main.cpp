@@ -39,8 +39,6 @@ int main(int argc, char *argv[]) {
   ss << stream.rdbuf();
   auto str = ss.str();
 
-  
-
   Context context;
   Parser parser(str, "dummy.ela", context);
   ASTProgram *root = parser.parse();

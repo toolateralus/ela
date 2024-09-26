@@ -46,6 +46,7 @@ struct ASTType : ASTNode {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
       type->base = "void";
+      type->resolved_type = find_type_id("void", {});
       return type;
     }();
     return type;
@@ -58,6 +59,14 @@ struct ASTExpr : ASTNode {};
 
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTCompAssign : ASTStatement {
+  Token name;
+  Token op;
+  ASTExpr *expr;
+
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -206,9 +215,10 @@ struct ASTWhile : ASTStatement {
   std::any visit(ASTContinue *node) override {}                                \
   std::any visit(ASTBreak *node) override {}                                   \
   std::any visit(ASTFor *node) override {}                                     \
-  std::any visit(ASTIf *node) override {}                             \
-  std::any visit(ASTElse *node) override {}                           \
-  std::any visit(ASTWhile *node) override {}
+  std::any visit(ASTIf *node) override {}                                      \
+  std::any visit(ASTElse *node) override {}                                    \
+  std::any visit(ASTWhile *node) override {}                                   \
+  std::any visit(ASTCompAssign *node) override {}
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -231,7 +241,8 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTFor *node) = 0;                                    \
   virtual std::any visit(ASTIf *node) = 0;                                     \
   virtual std::any visit(ASTElse *node) = 0;                                   \
-  virtual std::any visit(ASTWhile *node) = 0;
+  virtual std::any visit(ASTWhile *node) = 0;                                  \
+  virtual std::any visit(ASTCompAssign *node) = 0;
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
