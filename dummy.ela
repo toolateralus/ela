@@ -93,8 +93,9 @@ abs :: (float f) -> float {
 	float zero;
 	if f < zero { 
 		return -f; 
-	}
-	return f;
+	} else if 1 {
+		return f;
+	} 
 }
 
 sqrt :: (float f) -> float {
@@ -104,7 +105,7 @@ sqrt :: (float f) -> float {
 main :: (string[] argv) -> s32 {
 	s32 i = 0;
 	
-	i++;
+	++i;
 	
 	i = ++i;
 	
@@ -123,21 +124,21 @@ main :: (string[] argv) -> s32 {
 
 // TODO: (CONTROL FLOW)
 // TODO() {
-	// We need to type check and control flow check our blocks.
-	// For example, a function needs to know in which all control paths, a return could occur.
-	// And if this is present, maybe in the form of a BLOCK_FLAGS enum,
-	// We need to be able to ensure all of these paths have homogenous types,
-	// and that all paths return a value if neccesary.
+// 	We need to type check and control flow check our blocks.
+// 	For example, a function needs to know in which all control paths, a return could occur.
+// 	And if this is present, maybe in the form of a BLOCK_FLAGS enum,
+// 	We need to be able to ensure all of these paths have homogenous types,
+// 	and that all paths return a value if neccesary.
 // TODO }
 
 // TODO(PARTIALLY DONE):
+// TODO(cont.) better typing in expressions  (||, != return bool) etc.
 // SECOND // TODO: [2] Better typing. explicit type conversions, implicit type conversions, 
-			// added function types and better type info.
-			// no conversion table yet: that can be done later easily.
+// 			added function types and better type info.
+// 			no conversion table yet: that can be done later easily.
 
 // TODO: [0] call expressions,  postfix expressions. dont use -> to dereference.
 
-// TODO(cont.) better typing in expressions  (||, != return bool) etc.
 
 // If we get time.
 // TODO: [3] # directives, and the ability to define custom ones that just run routines.

@@ -25,7 +25,29 @@ struct ASTNode {
 
 struct ASTStatement : ASTNode {};
 
+enum BlockFlags {
+  BLOCK_FLAGS_FALL_THROUGH = 1 << 0,
+  BLOCK_FLAGS_RETURN = 1 << 1,
+  BLOCK_FLAGS_CONTINUE = 1 << 2,
+  BLOCK_FLAGS_BREAK = 1 << 3,
+};
+
+#define BLOCK_FLAG_TO_STRING(flag)                                             \
+  if (flags & flag)                                                            \
+    result += #flag " ";
+
+inline static std::string block_flags_to_string(int flags) {
+  std::string result;
+  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_FALL_THROUGH)
+  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_RETURN)
+  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_CONTINUE)
+  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_BREAK)
+  return result;
+}
+
 struct ASTBlock : ASTStatement {
+  int flags = BLOCK_FLAGS_FALL_THROUGH;
+  int return_type = Type::invalid_id;
   Scope *scope;
   jstl::Vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;

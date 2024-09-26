@@ -19,6 +19,12 @@ std::any SerializeVisitor::visit(ASTProgram *node) {
 }
 std::any SerializeVisitor::visit(ASTBlock *node) {
   ss << indent() << "Block {\n";
+
+  ss << indent() << "flags: " << block_flags_to_string(node->flags) << '\n';
+  auto type = get_type(node->return_type);
+  if (type)
+    ss << indent() << "type: " << type->to_string() << '\n';
+
   indentLevel++;
   for (auto statement : node->statements) {
     statement->accept(this);
@@ -82,6 +88,7 @@ std::any SerializeVisitor::visit(ASTBinExpr *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTUnaryExpr *node) {
+  ss << indent() << "unary: ";
   ss << node->op.value;
   node->operand->accept(this);
   return {};
@@ -278,15 +285,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
   auto return_type = find_type_id("void", {});
 
-  context.enter_scope(node->block->scope);
-  for (const auto &statement : node->block->statements) {
-    statement->accept(this);
-
-    if (auto node_return = dynamic_cast<ASTReturn *>(statement))
-      if (node_return->expression.is_not_null())
-        return_type = int_from_any(node_return->expression.get()->accept(this));
-  }
-  context.exit_scope();
+  return_type = int_from_any(node->block->accept(this));
 
   if (return_type != info.return_type) {
     auto expected_type = get_type(info.return_type);
@@ -312,12 +311,149 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTBlock *node) {
-  context.enter_scope(node->scope);
-  for (auto &statement : node->statements) {
-    statement->accept(this);
+
+  bool fn_root_level = visitor_flags & FLAG_VISITING_FUNCTION &&
+                       visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
+
+  if (fn_root_level) {
+    visitor_flags &= ~FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
   }
+
+  context.enter_scope(node->scope);
+  int flags = BLOCK_FLAGS_FALL_THROUGH;
+  int return_type = -1;
+
+  for (auto &statement : node->statements) {
+    auto result = statement->accept(this);
+
+    if (auto block = dynamic_cast<ASTBlock *>(statement)) {
+      flags |= block->flags;
+      if ((block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      }
+
+      auto block_ret_ty = int_from_any(result);
+
+      if (return_type != -1 && block_ret_ty != -1 &&
+          block_ret_ty != return_type) {
+        auto expected_type = get_type(return_type);
+        auto found_type = get_type(block_ret_ty);
+        throw_error({
+            .message = std::format(
+                "Inconsistent return types in block. Expected: {}, Found: {}",
+                expected_type->name, found_type->name),
+            .severity = ERROR_FAILURE,
+        });
+      }
+
+      return_type = block_ret_ty;
+    } else if (auto if_stmt = dynamic_cast<ASTIf *>(statement)) {
+      flags |= if_stmt->block->flags;
+      if ((if_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      }
+      
+      auto if_ret_ty = int_from_any(result);
+      if (return_type == -1) {
+        return_type = if_ret_ty;
+      } else {
+        if (if_ret_ty != -1 && if_ret_ty != return_type) {
+          auto expected_type = get_type(return_type);
+          auto found_type = get_type(if_ret_ty);
+          throw_error({
+              .message = std::format("Inconsistent return types in block. "
+                                     "Expected: {}, Found: {}",
+                                     expected_type->name, found_type->name),
+              .severity = ERROR_FAILURE,
+          });
+        }
+      }
+    } else if (auto for_stmt = dynamic_cast<ASTFor *>(statement)) {
+      auto for_ret_ty = int_from_any(result);
+      flags |= for_stmt->block->flags;
+      if ((for_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      }
+      if (return_type == -1) {
+        return_type = for_ret_ty;
+      } else if (for_ret_ty != -1 && for_ret_ty != return_type) {
+        auto expected_type = get_type(return_type);
+        auto found_type = get_type(for_ret_ty);
+        throw_error({
+            .message = std::format(
+                "Inconsistent return types in block. Expected: {}, Found: {}",
+                expected_type->name, found_type->name),
+            .severity = ERROR_FAILURE,
+        });
+      }
+    } else if (auto while_stmt = dynamic_cast<ASTWhile *>(statement)) {
+      auto while_ret_ty = int_from_any(result);
+      
+      flags |= while_stmt->block->flags;
+      if ((while_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      }
+      if (return_type == -1) {
+        return_type = while_ret_ty;
+      } else if (while_ret_ty != -1 && while_ret_ty != return_type) {
+        auto expected_type = get_type(return_type);
+        auto found_type = get_type(while_ret_ty);
+        throw_error({
+            .message = std::format(
+                "Inconsistent return types in block. Expected: {}, Found: {}",
+                expected_type->name, found_type->name),
+            .severity = ERROR_FAILURE,
+        });
+      }
+    } else if (auto cont = dynamic_cast<ASTContinue *>(statement)) {
+      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      flags |= BLOCK_FLAGS_CONTINUE;
+    } else if (auto ret = dynamic_cast<ASTReturn *>(statement)) {
+      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      flags |= BLOCK_FLAGS_RETURN;
+
+      auto type = -1;
+      if (ret->expression.is_not_null())
+        type = int_from_any(ret->expression.get()->accept(this));
+      else
+        type = find_type_id("void", {});
+
+      if (return_type == -1) {
+        return_type = type;
+      } else if (return_type != type) {
+        auto expected_type = get_type(return_type);
+        auto found_type = get_type(type);
+        throw_error({
+            .message = std::format(
+                "Inconsistent return types in block. Expected: {}, Found: {}",
+                expected_type->name, found_type->name),
+            .severity = ERROR_FAILURE,
+        });
+      }
+    } else if (auto brk = dynamic_cast<ASTBreak *>(statement)) {
+      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+      flags |= BLOCK_FLAGS_BREAK;
+    }
+  }
+
+  if (return_type == -1) {
+    return_type = find_type_id("void", {});
+  }
+
+  // check all code paths return a value if this isn't a void.
+  if (fn_root_level && return_type != find_type_id("void", {})) {
+    if ((flags & BLOCK_FLAGS_RETURN) == 0) {
+      throw_error({
+          .message = "Function must return a value.",
+          .severity = ERROR_FAILURE,
+      });
+    }
+  }
+
+  node->flags = flags;
+  node->return_type = return_type;
   context.exit_scope();
-  return {};
+  return return_type;
 }
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
@@ -505,33 +641,32 @@ std::any TypeVisitor::visit(ASTFor *node) {
     v.increment->accept(this);
   } break;
   }
-  return {};
+  return node->block->accept(this);
 }
-std::any TypeVisitor::visit(ASTIf *node) { 
+std::any TypeVisitor::visit(ASTIf *node) {
   // TODO: type check to confirm this is convertible to, or is a bool.
   node->condition->accept(this);
-  
+
   if (node->_else.is_not_null()) {
-    node->_else.get()->accept(this);
+    return node->_else.get()->accept(this);
   } else {
-    node->block->accept(this);
+    return node->block->accept(this);
   }
-  return {}; 
+  return {};
 }
-std::any TypeVisitor::visit(ASTElse *node) { 
+std::any TypeVisitor::visit(ASTElse *node) {
   if (node->_if.is_not_null()) {
-    node->_if.get()->accept(this);
+    return node->_if.get()->accept(this);
   } else {
-    node->block.get()->accept(this);
+    return node->block.get()->accept(this);
   }
-  return {}; 
+  return {};
 }
-std::any TypeVisitor::visit(ASTWhile *node) { 
+std::any TypeVisitor::visit(ASTWhile *node) {
   if (node->condition.is_not_null()) {
     node->condition.get()->accept(this);
   }
-  node->block->accept(this);
-  return {}; 
+  return node->block->accept(this);
 }
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);

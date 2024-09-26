@@ -5,6 +5,15 @@
 #include <sstream>
 
 struct VisitorBase {
+  
+  enum VisitorFlags {
+    FLAG_NO_STATE = 0,
+    FLAG_VISITING_FUNCTION = 1 << 1,
+    FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
+  };
+  
+  int visitor_flags = FLAG_NO_STATE;
+  
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
 };

@@ -19,6 +19,17 @@ ASTProgram *Parser::parse() {
 ASTStatement *Parser::parse_statement() {
   auto tok = peek();
 
+  if (tok.type == TType::Increment || tok.type == TType::Decrement) {
+    auto statement = ast_alloc<ASTExprStatement>();
+    auto unary = ast_alloc<ASTUnaryExpr>();
+    unary->op = eat();
+    auto operand = ast_alloc<ASTIdentifier>();
+    operand->value = eat().value;
+    unary->operand = operand;
+    statement->expression = unary;
+    return statement;
+  }
+
   if (tok.type == TType::LCurly) {
     return parse_block();
   } else if (tok.type == TType::Return) {
@@ -90,18 +101,6 @@ ASTStatement *Parser::parse_statement() {
   }
   
   eat();
-  
-  // TODO: make this nicer.
-  if (peek().type == TType::Increment || peek().type == TType::Decrement) {
-    auto statement = ast_alloc<ASTExprStatement>();
-    auto unary = ast_alloc<ASTUnaryExpr>();
-    unary->op = eat();
-    auto operand = ast_alloc<ASTIdentifier>();
-    operand->value = tok;
-    unary->operand = operand;
-    statement->expression = unary;
-    return statement;
-  }
   
   if (peek().is_comp_assign()) {
     if (tok.type != TType::Identifier) {
