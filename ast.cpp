@@ -9,7 +9,8 @@
 ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
-  while (tok) {
+  
+  while (tok.type != TType::Eof) {
     program->statements.push(parse_statement());
     if (semicolon())
       eat();

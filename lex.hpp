@@ -189,8 +189,6 @@ struct Token {
     return eof;
   }
 
-  operator bool() const { return type != TType::Eof; }
-
   bool is_eof() const { return type == TType::Eof; }
 };
 
