@@ -59,9 +59,7 @@ ASTStatement *Parser::parse_statement() {
     node->block = parse_block();
     
     return node;
-  }
-  
-  if (tok.type == TType::While) {
+  } else if (tok.type == TType::While) {
     eat();
     auto node = ast_alloc<ASTWhile>();
     if (peek().type != TType::LCurly) {
@@ -69,9 +67,7 @@ ASTStatement *Parser::parse_statement() {
     }
     node->block = parse_block();
     return node;
-  }
-  
-  if (tok.type == TType::If) {
+  } else if (tok.type == TType::If) {
     eat();
     auto node = ast_alloc<ASTIf>();
     node->condition = parse_expr();
@@ -138,6 +134,7 @@ ASTDeclaration *Parser::parse_declaration() {
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
   auto function = ast_alloc<ASTFuncDecl>();
   function->params = parse_parameters();
+  function->name = name;
   
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();

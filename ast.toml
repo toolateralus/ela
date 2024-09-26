@@ -1,5 +1,5 @@
 Program {
-  Function  {
+  Function main {
     Parameters {
       Parameter argv : type: 14, string[]
     }
@@ -8,8 +8,8 @@ Program {
       Declaration xaryus_brother : type: 8, f32 = (0.1 * deref)
       For {
         CStyle:        Declaration i : type: 1, i32
-        condition: (i < 10)        
-increment: (i = (i + 1))
+        condition: (i < 10)
+        increment: (i = (i + 1))
         Block {
           Return: 0          
         }
@@ -17,16 +17,27 @@ increment: (i = (i + 1))
       Declaration arr : type: 15, i32[]
       For {
         RangeBased:
-
-target: v -> arr
+        target: v -> arr
         Block {
           Return: 0          
+        }
+      }
+      While {
+        condition: 
+        Block {
+          Continue
+        }
+      }
+      While {
+        condition: v
+        Block {
+          Continue
         }
       }
     }
     returns: type: 1, i32
   }
-  Function  {
+  Function test_if_1 {
     Parameters {
     }
     Block {
@@ -41,7 +52,7 @@ target: v -> arr
     }
     returns: type: 13, void
   }
-  Function  {
+  Function test_if_2 {
     Parameters {
     }
     Block {
@@ -60,7 +71,7 @@ target: v -> arr
     }
     returns: type: 13, void
   }
-  Function  {
+  Function test_if_3 {
     Parameters {
     }
     Block {
@@ -87,7 +98,7 @@ target: v -> arr
     }
     returns: type: 13, void
   }
-  Function  {
+  Function test_if {
     Parameters {
     }
     Block {

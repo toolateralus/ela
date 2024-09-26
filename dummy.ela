@@ -12,15 +12,13 @@ main :: (string[] argv) -> i32 {
 		return 0;
 	}
 	
-	// while {
-	// 	continue;
-	// }
+	while {
+		continue;
+	}
 	
-	// s32 v = 1;
-	
-	// while v {
-	// 	continue;
-	// }
+	while v {
+		continue;
+	}
 
 }
 

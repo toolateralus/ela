@@ -151,7 +151,7 @@ std::any SerializeVisitor::visit(ASTFor *node) {
     case ASTFor::RangeBased: {
       auto v = node->value.range_based;
       ss << indent() << "RangeBased:\n";
-      ss << "\ntarget: ";
+      ss << indent() << "target: ";
       v.target->accept(this);
       ss << " -> ";
       v.collection->accept(this);
@@ -163,7 +163,7 @@ std::any SerializeVisitor::visit(ASTFor *node) {
       v.decl->accept(this);
       ss << indent() << "condition: ";
       v.condition->accept(this);
-      ss << indent() <<  "\nincrement: ";
+      ss << '\n' << indent() <<  "increment: ";
       v.increment->accept(this);
       ss << '\n';
     } break;
