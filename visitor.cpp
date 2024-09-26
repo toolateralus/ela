@@ -34,6 +34,9 @@ std::any SerializeVisitor::visit(ASTFuncDecl *node) {
   ss << indent() << "returns: ";
   visit(node->return_type);
   ss << '\n';
+  
+  auto sym = context.current_scope->lookup(node->name.value);
+  ss << "type: " << get_type(sym->type_id)->to_string() << '\n';
   indentLevel--;
   ss << indent() << "}\n";
   return {};
@@ -96,7 +99,7 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
     auto type = get_type(node->resolved_type);
-    ss << "type: " << node->resolved_type << ", " << type->name << type->type_extensions.to_string();
+    ss << "type: " << node->resolved_type << ", " << type->name << type->extensions.to_string();
     return {};
   }
   ss << node->base;
@@ -190,7 +193,6 @@ std::any SerializeVisitor::visit(ASTIf *node) {
   
   return {};
 }
-
 std::any SerializeVisitor::visit(ASTElse *node) {
   ss << indent() << "Else {\n";
   indentLevel++;
@@ -203,7 +205,6 @@ std::any SerializeVisitor::visit(ASTElse *node) {
   ss << indent() << "}\n";
   return {};
 }
-
 std::any SerializeVisitor::visit(ASTWhile *node) {
   ss << indent() << "While {\n";
   indentLevel++;
@@ -241,10 +242,22 @@ std::any TypeVisitor::visit(ASTProgram *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTFuncDecl *node) {
-  // TODO: we need to store this in the symbol table.
   node->return_type->accept(this);
   node->params->accept(this);
   node->block->accept(this);
+  
+  FunctionTypeInfo info;
+  info.return_type = node->return_type->resolved_type;
+  info.params_len = 0;
+  
+  auto params = node->params->params;
+  for (const auto &param: params) {
+    info.parameter_types[info.params_len] = param->type->resolved_type;
+    info.params_len++;
+  }
+  
+  auto id = find_type_id("", info, {});
+  context.current_scope->insert(node->name.value, id);
   return {};
 }
 std::any TypeVisitor::visit(ASTBlock *node) {

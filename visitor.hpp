@@ -11,8 +11,10 @@ struct VisitorBase {
 
 
 struct SerializeVisitor : VisitorBase {
+  SerializeVisitor(Context &context) : context(context) {}
   std::stringstream ss {};
   int indentLevel = 0;
+  Context &context;
   std::string indent();
   std::any visit(ASTProgram *node) override;
   std::any visit(ASTFuncDecl *node) override;

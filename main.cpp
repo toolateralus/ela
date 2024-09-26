@@ -30,6 +30,8 @@ jstl::Arena ast_arena{MB(10)};
 
 
 int main(int argc, char *argv[]) {
+  // initialize the basic scalar types etc.
+  init_type_system();
   Lexer lexer;
 
   std::ifstream stream(argc > 1 ? argv[1] : "dummy.ela");
@@ -37,8 +39,7 @@ int main(int argc, char *argv[]) {
   ss << stream.rdbuf();
   auto str = ss.str();
 
-  // initialize the basic scalar types etc.
-  init_type_system();
+  
 
   Context context;
   Parser parser(str, "dummy.ela", context);
@@ -49,7 +50,7 @@ int main(int argc, char *argv[]) {
   TypeVisitor typer {context};
   typer.visit(root);
   
-  SerializeVisitor serializer;
+  SerializeVisitor serializer(context);
   auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
   printf("%s\n", serialized_view.c_str());
   
@@ -60,3 +61,5 @@ int main(int argc, char *argv[]) {
   
   return 0;
 }
+
+

@@ -88,7 +88,6 @@ ASTStatement *Parser::parse_statement() {
     return node;
   }
   
-  
   if (find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     return decl;

@@ -17,10 +17,10 @@ struct Nullable {
   operator bool() const {
     return ptr;
   }
-  bool is_null() {
+  bool is_null() const {
     return ptr == nullptr;
   }
-  bool is_not_null() {
+  bool is_not_null() const {
     return ptr != nullptr;
   }
 };

@@ -113,7 +113,6 @@ struct ASTFuncDecl : ASTStatement {
   ASTBlock *block;
   Token name;
   ASTType *return_type;
-
   std::any accept(VisitorBase *visitor) override;
 };
 
