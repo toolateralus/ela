@@ -43,19 +43,30 @@ int main(int argc, char *argv[]) {
   Parser parser(str, "dummy.ela", context);
   ASTProgram *root = parser.parse();
 
-  printf("%p\n", root);
-  
   TypeVisitor typer {context};
   typer.visit(root);
   
   SerializeVisitor serializer(context);
   auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
-  printf("%s\n", serialized_view.c_str());
+  
+  if (argc >= 3 && strcmp(argv[2], "--full") == 0) {
+    printf("%s\n", serialized_view.c_str());
+  }
   
   FILE *ast = fopen("ast.toml", "w");
   fprintf(ast, "%s", serialized_view.c_str());
   fflush(ast);
   fclose(ast);
+  
+  
+  EmitVisitor emit(context);
+  
+  emit.visit(root);
+  auto program = emit.ss.str();
+  FILE *output = fopen("output.cpp", "w");
+  fprintf(output, "%s", program.c_str());
+  fflush(output);
+  fclose(output);
   
   return 0;
 }

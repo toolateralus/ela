@@ -10,117 +10,112 @@
 // 	return 1;
 // }
 
-// test_while :: () -> s32 {
-// 	while {
-// 		continue;
-// 	}
-// 	while v {
-// 		continue;
-// 	}
-// 	return 1;
-// }
+test_while :: () -> s32 {
+	s32 v;
+	while {
+		return 1;
+	}
+	while v {
+		return 1;
+	}
+	return 1;
+}
 
-// test_if_1 :: () -> s32  {
-// 	s32 v = 1;
-// 	if v {
-// 		return 1;
-// 	}
-// 	return 0;
-// }
+test_if_1 :: () -> s32  {
+	s32 v = 1;
+	if v {
+		return 1;
+	}
+	return 0;
+}
 
-// test_if_2 :: () -> s32 {
-// 	s32 v = 1;
-// 	if v {
-// 		return 1;
-// 	} else {
-// 		return 0;
-// 	}
-// 	return 1;
-// }
+test_if_2 :: () -> s32 {
+	s32 v = 1;
+	if v {
+		return 1;
+	} else {
+		return 0;
+	}
+	return 1;
+}
 
-// test_if_3 :: () -> s32 {
-// 	s32 v = 1;
-// 	if !v {
-// 		return 0;
-// 	} else if v {
-// 		return 1;
-// 	} else {
-// 		return 0;
-// 	}
-// 	return 1;
-// }
+test_if_3 :: () -> s32 {
+	s32 v = 1;
+	if !v {
+		return 0;
+	} else if v {
+		return 1;
+	} else {
+		return 0;
+	}
+	return 1;
+}
 
-// test_comp_assign :: () {
-// 	float deref;
-// 	deref += deref; 
-// 	deref -= deref;
-// 	deref *= deref; 
-// 	deref /= deref;
-// 	deref %= deref; 
-// 	deref &= deref;
-// 	deref |= deref; 
-// 	deref ^= deref;
-// 	deref <<= deref; 
-// 	deref >>= deref;
-// }
+test_comp_assign :: () {
+	s32 deref = 1;
+	deref += deref; 
+	deref -= deref;
+	deref *= deref; 
+	deref /= deref;
+	deref %= deref; 
+	deref &= deref;
+	deref |= deref; 
+	deref ^= deref;
+	deref <<= deref; 
+	deref >>= deref;
+}
 
-// test_operators :: () -> float {
-// 	float left;
-// 	float right;
-// 	float result;
-// 	result = left + right;
-// 	result = left - right;
-// 	result = left * right;
-// 	result = left / right;
-// 	result = left % right;
-// 	result = left == right;
-// 	result = left != right;
-// 	result = left < right;
-// 	result = left > right;
-// 	result = left <= right;
-// 	result = left >= right;
-// 	result = left && right;
-// 	result = left || right;
-// 	result = left & right;
-// 	result = left | right;
-// 	result = left ^ right;
-// 	result = left << right;
-// 	result = left >> right;
-// 	return result;
-// }
+test_operators :: () -> s32 {
+	s32 left;
+	s32 right;
+	s32 result;
+	result = left + right;
+	result = left - right;
+	result = left * right;
+	result = left / right;
+	result = left % right;
+	result = left == right;
+	result = left != right;
+	result = left < right;
+	result = left > right;
+	result = left <= right;
+	result = left >= right;
+	result = left && right;
+	result = left || right;
+	result = left & right;
+	result = left | right;
+	result = left ^ right;
+	result = left << right;
+	result = left >> right;
+	return result;
+}
 
-
-
-// sqrt :: (float f) -> float {
-// 	return f;
-// }
+sqrt :: (float f) -> float {
+	return f;
+}
 
 abs :: () -> s32 {
 	return 0;
 }
 
-main :: () -> s32 {
-	return abs();
+main :: (s32 argc, char **argv) -> s32 {
+	s32 i = 0;
+	
+	++i;
+	
+	i = ++i;
+	
+	float deref;	
+	//test_for();
+	test_while();
+	
+	sqrt(deref);
+	
+	test_if_1();
+	test_if_2();
+	test_if_3();
+	return 0;
 }
-
-// main :: (string[] argv) -> s32 {
-// 	s32 i = 0;
-	
-// 	++i;
-	
-// 	i = ++i;
-	
-// 	float deref;	
-// 	test_for();
-// 	test_while();
-	
-// 	sqrt(deref);
-	
-// 	test_if_1();
-// 	test_if_2();
-// 	test_if_3();
-// 	return 0;
-// }
 
 
 // TODO: (CONTROL FLOW)

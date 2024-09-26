@@ -9,6 +9,7 @@
 #include <format>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
+#include <vector>
 
 extern jstl::Arena ast_arena;
 
@@ -19,6 +20,7 @@ template <class T> T *ast_alloc(size_t n = 1) {
 struct VisitorBase;
 
 struct ASTNode {
+  std::vector<Token> source_tokens {};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
 };
@@ -61,9 +63,8 @@ struct ASTProgram : ASTNode {
 struct ASTType : ASTNode {
   std::string base;
   TypeExtensionInfo extension_info{};
-
+  
   int resolved_type = Type::invalid_id;
-
   static ASTType *get_void() {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
@@ -279,6 +280,7 @@ struct Parser {
 
   inline Token eat() {
     auto tok = this->tok;
+    token_frames.back().push_back(tok);
     this->tok = lexer.get_token(state);
     return tok;
   }
@@ -290,11 +292,12 @@ struct Parser {
 
   inline Token expect(TType type) {
     if (peek().type != type) {
-      throw_error(Error{
-          .message = std::format("Expected {}, got {}", TTypeToString(type),
+      throw_error(
+          std::format("Expected {}, got {}", TTypeToString(type),
                                  TTypeToString(peek().type)),
-          .severity = ERROR_CRITICAL,
-      });
+          ERROR_CRITICAL,
+          token_frames.back()
+      );
     }
     return eat();
   }
@@ -302,6 +305,18 @@ struct Parser {
   Token tok = Token::Eof();
   Lexer lexer{};
   Lexer::State state;
+  
+  std::vector<std::vector<Token>> token_frames = {};
+  
+  inline void begin_token_frame() {
+    token_frames.push_back({});
+  }
+  inline void end_token_frame(ASTNode *node) {
+    if (node) node->source_tokens = token_frames.back();
+    token_frames.pop_back();
+  }
+  
+  
   ASTType *parse_type();
 
   ASTProgram *parse();

@@ -102,8 +102,8 @@ int get_type_unresolved() { return Type::invalid_id; }
 
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
-    throw_error({.message = "type was null when checking type conversion rules",
-                 .severity = ERROR_CRITICAL});
+    throw_error("type was null when checking type conversion rules",
+                 ERROR_CRITICAL, {});
   }
 
   if (from->id == to->id)
@@ -125,13 +125,15 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   type->name = name;
 
   if (type->id > MAX_NUM_TYPES) {
-    throw_error({
-        .message = "Max types exceeded",
-    });
+    throw_error(
+        "Max types exceeded",
+        ERROR_CRITICAL,
+        {}
+    );
   }
   if (type_table[type->id]) {
-    throw_error({.message = "type system created a type with the same ID twice",
-                 .severity = ERROR_CRITICAL});
+    throw_error("type system created a type with the same ID twice",
+                 ERROR_CRITICAL, {});
   }
 
   type_table[type->id] = type;

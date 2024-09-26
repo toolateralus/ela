@@ -6,8 +6,6 @@
 #include <jstl/containers/vector.hpp>
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
-  printf("%s\n", typeid(node).name());
-
   ss << indent() << "Program {\n";
   indentLevel++;
   for (auto statement : node->statements) {
@@ -229,7 +227,6 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   ss << indent() << "}\n";
   return {};
 }
-
 std::any SerializeVisitor::visit(ASTCompAssign *node) {
   ss << indent() << "Compound Assignment {\n";
   indentLevel++;
@@ -297,19 +294,16 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     auto found_type = get_type(return_type);
 
     if (!expected_type || !found_type) {
-      throw_error({
-          .message = std::format(
-              "Function {} return type mismatch. One of the types is invalid.",
-              node->name.value),
-          .severity = ERROR_FAILURE,
-      });
+      throw_error(
+          std::format("Function {} return type mismatch. One of the types is invalid.", node->name.value),
+          ERROR_FAILURE,
+          node->source_tokens);
     } else {
-      throw_error({
-          .message = std::format(
-              "Function {} : return type mismatch. Expected: {}, Found: {}",
-              node->name.value, expected_type->name, found_type->name),
-          .severity = ERROR_FAILURE,
-      });
+      throw_error(
+          std::format("Function {} : return type mismatch. Expected: {}, Found: {}", node->name.value, expected_type->name, found_type->name),
+          ERROR_FAILURE,
+          node->source_tokens
+      );
     }
   }
 
@@ -325,19 +319,18 @@ std::any TypeVisitor::visit(ASTBlock *node) {
       flags &= ~BLOCK_FLAGS_FALL_THROUGH;
     }
   };
-  const auto check_return_type_consistency = [](int &return_type,
+  const auto check_return_type_consistency = [&](int &return_type,
                                                 int new_type) {
     if (return_type == -1) {
       return_type = new_type;
     } else if (new_type != -1 && new_type != return_type) {
       auto expected_type = get_type(return_type);
       auto found_type = get_type(new_type);
-      throw_error({
-          .message = std::format(
-              "Inconsistent return types in block. Expected: {}, Found: {}",
-              expected_type->name, found_type->name),
-          .severity = ERROR_FAILURE,
-      });
+      throw_error(
+          std::format("Inconsistent return types in block. Expected: {}, Found: {}", expected_type->name, found_type->name),
+          ERROR_FAILURE,
+          node->source_tokens
+      );
     }
   };
 
@@ -413,10 +406,11 @@ std::any TypeVisitor::visit(ASTBlock *node) {
 
   if (fn_root_level && return_type != find_type_id("void", {}) &&
       (flags & BLOCK_FLAGS_RETURN) == 0) {
-    throw_error({
-        .message = "Not all code paths return a value.",
-        .severity = ERROR_FAILURE,
-    });
+    throw_error(
+        "Not all code paths return a value.",
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
 
   node->flags = flags;
@@ -437,13 +431,14 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     if (expr_type != node->type->resolved_type) {
-      throw_error({
-          .message = std::format(
+      throw_error(
+          std::format(
               "Incompatible types in expression. declaring: {}  provided {}",
               get_type(node->type->resolved_type)->name,
               get_type(expr_type)->name),
-          .severity = ERROR_FAILURE,
-      });
+          ERROR_FAILURE,
+          node->source_tokens
+      );
     }
   }
   return {};
@@ -457,12 +452,13 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
     if (expr_type != node->type->resolved_type) {
       auto tleft = get_type(node->type->resolved_type),
            tright = get_type(expr_type);
-      throw_error({
-          .message = std::format(
+      throw_error(
+          std::format(
               "Incompatible types in expression. declaring: {}  provided {}",
               tleft->name, tright->name),
-          .severity = ERROR_FAILURE,
-      });
+           ERROR_FAILURE,
+           node->source_tokens
+      );
     }
   }
 
@@ -480,12 +476,13 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto right = int_from_any(node->right->accept(this));
 
   if (left == -1 || right == -1) {
-    throw_error({
-        .message = std::format("one of the types in the expression was null. "
+    throw_error(
+        std::format("one of the types in the expression was null. "
                                "{} left: {}, right: {}",
                                node->op.value, left, right),
-        .severity = ERROR_CRITICAL,
-    });
+        ERROR_CRITICAL,
+        node->source_tokens
+    );
   }
 
   // TODO: type check in accordance to which operators are permitted to be used
@@ -496,12 +493,13 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
   if (left != right &&
       type_conversion_rule(tleft, tright) == CONVERT_PROHIBITED) {
-    throw_error({
-        .message = std::format("binary expression {} with left: {}, right {}, "
+    throw_error(
+        std::format("binary expression {} with left: {}, right {}, "
                                "is invalid due to their types.",
                                node->op.value, tleft->name, tright->name),
-        .severity = ERROR_FAILURE,
-    });
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
 
   // for now we just return the lhs.
@@ -516,8 +514,13 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = context.current_scope->lookup(node->value.value);
   if (symbol)
     return symbol->type_id;
-  else
-    return -1;
+  else {
+    throw_error(
+        std::format("Use of undeclared identifier '{}'", node->value.value),
+        ERROR_FAILURE,
+        node->source_tokens
+    );
+  }
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
@@ -534,11 +537,11 @@ std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
 
   if (!symbol) {
-    throw_error({
-        .message =
-            std::format("Use of undeclared symbol '{}'", node->name.value),
-        .severity = ERROR_FAILURE,
-    });
+    throw_error(
+        std::format("Use of undeclared symbol '{}'", node->name.value),
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
 
   jstl::Vector<int> arg_tys =
@@ -547,35 +550,36 @@ std::any TypeVisitor::visit(ASTCall *node) {
   auto fn_ty_info = get_type(symbol->type_id)->info;
 
   if (fn_ty_info.is_null()) {
-    throw_error({
-        .message =
-            std::format("Function call '{}' does not refer to a function type.",
+    throw_error(
+        std::format("Function call '{}' does not refer to a function type.",
                         node->name.value),
-        .severity = ERROR_FAILURE,
-    });
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
 
   if (arg_tys.size() != info->params_len) {
-    throw_error({
-        .message =
-            std::format("Function call '{}' has incorrect number of arguments. "
+    throw_error(
+        std::format("Function call '{}' has incorrect number of arguments. "
                         "Expected: {}, Found: {}",
                         node->name.value, info->params_len, arg_tys.size()),
-        .severity = ERROR_FAILURE,
-    });
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
 
   for (int i = 0; i < info->params_len; ++i) {
     if (info->parameter_types[i] != arg_tys[i]) {
-      throw_error({
-          .message = std::format(
+      throw_error(
+          std::format(
               "Invalid parameter type at argument {}. Expected: {}, Found: {}",
               i, get_type(info->parameter_types[i])->name,
               get_type(arg_tys[i])->name),
-          .severity = ERROR_FAILURE,
-      });
+          ERROR_FAILURE,
+          node->source_tokens
+      );
     }
   }
 
@@ -643,13 +647,14 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
   if (symbol->type_id != expr_ty) {
-    throw_error({
-        .message = std::format("Incompatible types in compound assignment. "
+    throw_error(
+        std::format("Incompatible types in compound assignment. "
                                "declaring: {}  provided {}",
                                get_type(symbol->type_id)->name,
                                get_type(expr_ty)->name),
-        .severity = ERROR_FAILURE,
-    });
+        ERROR_FAILURE,
+        node->source_tokens
+    );
   }
   return {};
 }

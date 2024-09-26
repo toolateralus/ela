@@ -3,3 +3,6 @@
 /compile_commands.json
 /objs
 ast.toml
+
+output.cpp
+output

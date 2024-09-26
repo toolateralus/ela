@@ -4,9 +4,8 @@ LD_FLAGS :=
 OBJ_DIR := objs
 BIN_DIR := bin
 
-SRCS := $(wildcard *.cpp)
-OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(wildcard *.cpp))
-
+SRCS := $(filter-out output.cpp, $(wildcard *.cpp))
+OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 all: directories ela
 
 directories:

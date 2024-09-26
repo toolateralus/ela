@@ -1,22 +1,26 @@
 #include "ast.hpp"
-#include "visitor.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
+#include "visitor.hpp"
 #include <cassert>
 #include <format>
 
 ASTProgram *Parser::parse() {
+  begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
   while (tok) {
     program->statements.push(parse_statement());
-    if (semicolon()) eat();
+    if (semicolon())
+      eat();
   }
+  end_token_frame(program);
   return program;
 }
 
 // TODO: Cleanup this horrific function before it gets too out of control.
 ASTStatement *Parser::parse_statement() {
+  begin_token_frame();
   auto tok = peek();
 
   if (tok.type == TType::Increment || tok.type == TType::Decrement) {
@@ -38,18 +42,23 @@ ASTStatement *Parser::parse_statement() {
     if (peek().type != TType::Semi) {
       return_node->expression = parse_expr();
     }
+    end_token_frame(return_node);
     return return_node;
   } else if (tok.type == TType::Break) {
     eat();
-    return ast_alloc<ASTBreak>();
+    auto _break = ast_alloc<ASTBreak>();
+    end_token_frame(_break);
+    return _break;
   } else if (tok.type == TType::Continue) {
     eat();
-    return ast_alloc<ASTContinue>();
+    auto _continue = ast_alloc<ASTContinue>();
+    end_token_frame(_continue);
+    return _continue;
   } else if (tok.type == TType::For) {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    
+
     if (find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
       node->value.c_style.decl = parse_declaration();
@@ -64,9 +73,10 @@ ASTStatement *Parser::parse_statement() {
       expect(TType::Semi);
       node->value.range_based.collection = parse_expr();
     }
-    
+
     node->block = parse_block();
-    
+
+    end_token_frame(node);
     return node;
   } else if (tok.type == TType::While) {
     eat();
@@ -75,18 +85,19 @@ ASTStatement *Parser::parse_statement() {
       node->condition = parse_expr();
     }
     node->block = parse_block();
+    end_token_frame(node);
     return node;
   } else if (tok.type == TType::If) {
     eat();
     auto node = ast_alloc<ASTIf>();
     node->condition = parse_expr();
     node->block = parse_block();
-    
+
     if (peek().type == TType::Else) {
       eat();
       auto node_else = ast_alloc<ASTElse>();
       if (peek().type == TType::If) {
-        auto inner_if = dynamic_cast<ASTIf*>(parse_statement());
+        auto inner_if = dynamic_cast<ASTIf *>(parse_statement());
         assert(inner_if != NULL);
         node_else->_if = inner_if;
       } else {
@@ -94,103 +105,114 @@ ASTStatement *Parser::parse_statement() {
       }
       node->_else = node_else;
     }
+    end_token_frame(node);
     return node;
   } else if (find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
+    end_token_frame(nullptr);
     return decl;
   }
-  
+
   eat();
-  
+
   if (peek().is_comp_assign()) {
     if (tok.type != TType::Identifier) {
-      throw_error(Error{
-          .message = std::format("Compound assignment must target an identifier. Got {}", tok.value),
-          .severity = ERROR_CRITICAL,
-      });
+      throw_error(
+          std::format("Compound assignment must target an identifier. Got {}",
+                      tok.value),
+          ERROR_CRITICAL, token_frames.back());
     }
     auto comp_assign = ast_alloc<ASTCompAssign>();
     comp_assign->op = eat();
     comp_assign->name = tok;
     comp_assign->expr = parse_expr();
+    end_token_frame(comp_assign);
     return comp_assign;
   } else if (peek().type == TType::DoubleColon) {
     eat();
     if (peek().type == TType::LParen) {
-      return parse_function_declaration(tok);
+      auto node = parse_function_declaration(tok);
+      end_token_frame(node);
+      return node;
     }
   } else if (peek().type == TType::Assign) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_assignment(&tok);
+    end_token_frame(statement);
     return statement;
   } else if (tok.type == TType::Identifier && peek().type == TType::LParen) {
-    auto statement =  parse_call_statement(tok);
+    auto statement = parse_call_statement(tok);
+    end_token_frame(statement);
     return statement;
   }
 
-  throw_error(Error{
-      .message =
-          std::format("Unexpected token when parsing statement: {}", tok.value),
-      .severity = ERROR_CRITICAL,
-  });
+  throw_error(
+      std::format("Unexpected token when parsing statement: {}", tok.value),
+      ERROR_CRITICAL, token_frames.back());
 }
 ASTDeclaration *Parser::parse_declaration() {
+  begin_token_frame();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
   decl->type = parse_type();
   auto iden = eat();
   decl->name = iden;
-
   if (peek().type == TType::Assign) {
     eat();
     auto expr = parse_expr();
     decl->value = expr;
   }
-  
   context.current_scope->insert(iden.value, -1);
-  
+  end_token_frame(decl);
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
+  begin_token_frame();
+  token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
   function->params = parse_parameters();
   function->name = name;
-  
+
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
   } else {
-    expect(TType::Arrow); 
+    expect(TType::Arrow);
     function->return_type = parse_type();
   }
-  
+
+  end_token_frame(function);
   function->block = parse_block();
   return function;
 }
 ASTBlock *Parser::parse_block() {
+  begin_token_frame();
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
   context.enter_scope();
   while (not_eof() && peek().type != TType::RCurly) {
     block->statements.push(parse_statement());
-    if (semicolon()) eat();
+    if (semicolon())
+      eat();
   }
   expect(TType::RCurly);
   block->scope = context.exit_scope();
+  end_token_frame(block);
   return block;
 }
 ASTExpr *Parser::parse_expr() {
-  return parse_assignment(nullptr);
+  auto expr = parse_assignment(nullptr);
+  return expr;
 }
 ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   ASTExpr *left;
-  
-  if (iden != nullptr)  {
+
+  if (iden != nullptr) {
     auto iden_node = ast_alloc<ASTIdentifier>();
     iden_node->value = *iden;
     left = iden_node;
   } else {
-    left = parse_logical_or();  
+    left = parse_logical_or();
   }
-  
+
   if (peek().type == TType::Assign) {
     auto op = eat();
     auto right = parse_assignment();
@@ -336,7 +358,8 @@ ASTExpr *Parser::parse_multiplicative() {
 }
 ASTExpr *Parser::parse_unary() {
   if (peek().type == TType::Add || peek().type == TType::Sub ||
-      peek().type == TType::Not || peek().type == TType::BitwiseNot || peek().type == TType::Increment || peek().type == TType::Decrement) {
+      peek().type == TType::Not || peek().type == TType::BitwiseNot ||
+      peek().type == TType::Increment || peek().type == TType::Decrement) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
@@ -348,18 +371,18 @@ ASTExpr *Parser::parse_unary() {
 }
 ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
-  
-  if (auto identifier = dynamic_cast<ASTIdentifier*>(left)) {
+
+  if (auto identifier = dynamic_cast<ASTIdentifier *>(left)) {
     if (peek().type == TType::LParen) {
       auto tok = identifier->value;
       return parse_call(tok);
     }
   }
-    
-  // TODO: add -- and ++? 
+
+  // TODO: add -- and ++?
   // TODO: parse and build AST for dot expressions.
   // while (peek().type == TType::Dot) { }
-  
+
   return left;
 }
 ASTExpr *Parser::parse_primary() {
@@ -369,7 +392,8 @@ ASTExpr *Parser::parse_primary() {
   case TType::Identifier: {
     eat();
     auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = tok;;
+    iden->value = tok;
+    ;
     return iden;
   }
   case TType::Integer: {
@@ -397,16 +421,15 @@ ASTExpr *Parser::parse_primary() {
     eat(); // consume '('
     auto expr = parse_expr();
     if (peek().type != TType::RParen) {
-      throw_error({.message = "Expected ')'", .severity = ERROR_FAILURE});
+      throw_error("Expected ')'", ERROR_FAILURE, token_frames.back());
     }
     eat(); // consume ')'
     return expr;
   }
   default: {
-    throw_error({.message = std::format(
-                     "Invalid primary expression. Token: {}, Type: {}",
-                     tok.value, TTypeToString(tok.type)),
-                 .severity = ERROR_FAILURE});
+    throw_error(std::format("Invalid primary expression. Token: {}, Type: {}",
+                            tok.value, TTypeToString(tok.type)),
+                ERROR_FAILURE, token_frames.back());
     return nullptr;
   }
   }
@@ -414,13 +437,14 @@ ASTExpr *Parser::parse_primary() {
 ASTType *Parser::parse_type() {
   auto base = eat().value;
   TypeExtensionInfo extension_info;
-  
+
   while (true) {
     if (peek().type == TType::LBrace) {
       extension_info.extensions.push(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
-        auto integer = expect(TType::Integer);;
+        auto integer = expect(TType::Integer);
+        ;
         extension_info.array_sizes.push(std::stoi(integer.value));
       } else {
         extension_info.array_sizes.push(-1);
@@ -433,48 +457,49 @@ ASTType *Parser::parse_type() {
       break;
     }
   }
-  
+
   auto node = ast_alloc<ASTType>();
   node->base = base;
   node->extension_info = extension_info;
   return node;
 }
 ASTParamsDecl *Parser::parse_parameters() {
-    ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
+  ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
-  
+
   while (peek().type != TType::RParen) {
     auto type = parse_type();
     auto name = expect(TType::Identifier).value;
-    
+
     auto param = ast_alloc<ASTParamDecl>();
     param->type = type;
     param->name = name;
-    
+
     if (peek().type == TType::Assign) {
       eat();
       param->default_value = parse_expr();
     }
-    
+
     params->params.push(param);
-    
+
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
-    } else break;
+    } else
+      break;
   }
-  
+
   expect(TType::RParen);
   return params;
 }
 ASTArguments *Parser::parse_arguments() {
   auto args = ast_alloc<ASTArguments>();
   expect(TType::LParen);
-  
+
   if (peek().type == TType::RParen) {
     expect(TType::RParen);
     return args;
   }
-  
+
   while (peek().type != TType::RParen) {
     args->arguments.push(parse_expr());
     if (peek().type != TType::RParen) {
@@ -487,20 +512,21 @@ ASTArguments *Parser::parse_arguments() {
 
 ASTCall *Parser::parse_call(const Token &name) {
   auto args = parse_arguments();
-  ASTCall *call = ast_alloc<ASTCall>(); 
+  ASTCall *call = ast_alloc<ASTCall>();
   call->name = name;
   call->arguments = args;
   return call;
 }
 
 ASTStatement *Parser::parse_call_statement(Token iden) {
- auto args = parse_arguments();
- ASTExprStatement *statement = ast_alloc<ASTExprStatement>();
- ASTCall *call = ast_alloc<ASTCall>(); 
- call->name = iden;
- call->arguments = args;
- statement->expression = call;
- return statement;
+
+  auto args = parse_arguments();
+  ASTExprStatement *statement = ast_alloc<ASTExprStatement>();
+  ASTCall *call = ast_alloc<ASTCall>();
+  call->name = iden;
+  call->arguments = args;
+  statement->expression = call;
+  return statement;
 }
 
 /*
@@ -508,25 +534,51 @@ ASTStatement *Parser::parse_call_statement(Token iden) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
-std::any ASTProgram::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTProgram::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
 std::any ASTBlock::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTType::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTExprStatement::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTBinExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTUnaryExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTIdentifier::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTFuncDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTExprStatement::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTDeclaration::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTBinExpr::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTUnaryExpr::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTIdentifier::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTLiteral::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTParamDecl::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTParamsDecl::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTFuncDecl::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
 std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTArguments::accept(VisitorBase *visitor) {
   return visitor->visit(this);
 }
-std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };
-std::any ASTBreak::accept(VisitorBase *visitor) { return visitor->visit(this); };
-std::any ASTContinue::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTReturn::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};
+std::any ASTBreak::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};
+std::any ASTContinue::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+};
 std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
@@ -540,5 +592,3 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
-
-
