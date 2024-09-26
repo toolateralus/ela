@@ -113,7 +113,7 @@ struct ASTUnaryExpr : ASTExpr {
 };
 
 struct ASTIdentifier : ASTExpr {
-  std::string value;
+  Token value;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -314,6 +314,8 @@ struct Parser {
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
+
+  ASTCall *parse_call(const Token&);
 
   ASTExpr *parse_expr();
   ASTExpr *parse_assignment(Token *);

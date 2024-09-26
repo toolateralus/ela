@@ -280,12 +280,17 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     info.params_len++;
   }
 
-  auto id = find_type_id("", info, {});
-  context.current_scope->insert(node->name.value, id);
+  auto type_id = find_type_id("", info, {});
+
+  // insert function
+  context.current_scope->insert(node->name.value, type_id);
 
   auto return_type = find_type_id("void", {});
 
+  visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
+  visitor_flags |= VisitorBase::FLAG_VISITING_FUNCTION;
   return_type = int_from_any(node->block->accept(this));
+  visitor_flags &= ~VisitorBase::FLAG_VISITING_FUNCTION;
 
   if (return_type != info.return_type) {
     auto expected_type = get_type(info.return_type);
@@ -310,7 +315,31 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
   return {};
 }
+
+// TODO: wrangle this absolute mess of a function. I have no fucking idea how we
+// will ever fix this.
 std::any TypeVisitor::visit(ASTBlock *node) {
+  const auto update_flags = [](int &flags, int block_flags) {
+    flags |= block_flags;
+    if ((block_flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+    }
+  };
+  const auto check_return_type_consistency = [](int &return_type,
+                                                int new_type) {
+    if (return_type == -1) {
+      return_type = new_type;
+    } else if (new_type != -1 && new_type != return_type) {
+      auto expected_type = get_type(return_type);
+      auto found_type = get_type(new_type);
+      throw_error({
+          .message = std::format(
+              "Inconsistent return types in block. Expected: {}, Found: {}",
+              expected_type->name, found_type->name),
+          .severity = ERROR_FAILURE,
+      });
+    }
+  };
 
   bool fn_root_level = visitor_flags & FLAG_VISITING_FUNCTION &&
                        visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
@@ -325,129 +354,69 @@ std::any TypeVisitor::visit(ASTBlock *node) {
 
   for (auto &statement : node->statements) {
     auto result = statement->accept(this);
+    int stmt_flags = BLOCK_FLAGS_FALL_THROUGH;
+    int stmt_ret_ty = -1;
 
-    if (auto block = dynamic_cast<ASTBlock *>(statement)) {
-      flags |= block->flags;
-      if ((block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      }
+    {
+      // TODO: this needs a lot of work. @Cooper-Pilot for gods sake I need help.
+      // ASTBlock *block = nullptr;
 
-      auto block_ret_ty = int_from_any(result);
+      // if (auto block_stmt = dynamic_cast<ASTBlock *>(statement)) {
+      //   block = block_stmt;
+      // }
+      // if (auto if_stmt = dynamic_cast<ASTIf *>(statement)) {
+      //   block = if_stmt->block;
+      //   stmt_ret_ty = int_from_any(result);
+      //   if (if_stmt->_else.is_not_null()) {
+      //     auto else_result = if_stmt->_else.get()->accept(this);
+      //     int else_ret_ty = int_from_any(else_result);
+      //     check_return_type_consistency(stmt_ret_ty, else_ret_ty);
+      //   }
+      // } else if (auto for_stmt = dynamic_cast<ASTFor *>(statement)) {
+      //   block = for_stmt->block;
+      // } else if (auto while_stmt = dynamic_cast<ASTWhile *>(statement)) {
+      //   block = while_stmt->block;
+      // }
 
-      if (return_type != -1 && block_ret_ty != -1 &&
-          block_ret_ty != return_type) {
-        auto expected_type = get_type(return_type);
-        auto found_type = get_type(block_ret_ty);
-        throw_error({
-            .message = std::format(
-                "Inconsistent return types in block. Expected: {}, Found: {}",
-                expected_type->name, found_type->name),
-            .severity = ERROR_FAILURE,
-        });
-      }
-
-      return_type = block_ret_ty;
-    } else if (auto if_stmt = dynamic_cast<ASTIf *>(statement)) {
-      flags |= if_stmt->block->flags;
-      if ((if_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      }
-      
-      auto if_ret_ty = int_from_any(result);
-      if (return_type == -1) {
-        return_type = if_ret_ty;
-      } else {
-        if (if_ret_ty != -1 && if_ret_ty != return_type) {
-          auto expected_type = get_type(return_type);
-          auto found_type = get_type(if_ret_ty);
-          throw_error({
-              .message = std::format("Inconsistent return types in block. "
-                                     "Expected: {}, Found: {}",
-                                     expected_type->name, found_type->name),
-              .severity = ERROR_FAILURE,
-          });
-        }
-      }
-    } else if (auto for_stmt = dynamic_cast<ASTFor *>(statement)) {
-      auto for_ret_ty = int_from_any(result);
-      flags |= for_stmt->block->flags;
-      if ((for_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      }
-      if (return_type == -1) {
-        return_type = for_ret_ty;
-      } else if (for_ret_ty != -1 && for_ret_ty != return_type) {
-        auto expected_type = get_type(return_type);
-        auto found_type = get_type(for_ret_ty);
-        throw_error({
-            .message = std::format(
-                "Inconsistent return types in block. Expected: {}, Found: {}",
-                expected_type->name, found_type->name),
-            .severity = ERROR_FAILURE,
-        });
-      }
-    } else if (auto while_stmt = dynamic_cast<ASTWhile *>(statement)) {
-      auto while_ret_ty = int_from_any(result);
-      
-      flags |= while_stmt->block->flags;
-      if ((while_stmt->block->flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      }
-      if (return_type == -1) {
-        return_type = while_ret_ty;
-      } else if (while_ret_ty != -1 && while_ret_ty != return_type) {
-        auto expected_type = get_type(return_type);
-        auto found_type = get_type(while_ret_ty);
-        throw_error({
-            .message = std::format(
-                "Inconsistent return types in block. Expected: {}, Found: {}",
-                expected_type->name, found_type->name),
-            .severity = ERROR_FAILURE,
-        });
-      }
-    } else if (auto cont = dynamic_cast<ASTContinue *>(statement)) {
+      // if (block) {
+      //   stmt_flags = block->flags;
+      //   stmt_ret_ty = int_from_any(result);
+      // } else
+    }
+     if (auto cont = dynamic_cast<ASTContinue *>(statement)) {
       flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       flags |= BLOCK_FLAGS_CONTINUE;
+      continue;
     } else if (auto ret = dynamic_cast<ASTReturn *>(statement)) {
       flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       flags |= BLOCK_FLAGS_RETURN;
-
-      auto type = -1;
-      if (ret->expression.is_not_null())
-        type = int_from_any(ret->expression.get()->accept(this));
-      else
-        type = find_type_id("void", {});
-
-      if (return_type == -1) {
-        return_type = type;
-      } else if (return_type != type) {
-        auto expected_type = get_type(return_type);
-        auto found_type = get_type(type);
-        throw_error({
-            .message = std::format(
-                "Inconsistent return types in block. Expected: {}, Found: {}",
-                expected_type->name, found_type->name),
-            .severity = ERROR_FAILURE,
-        });
-      }
+      stmt_ret_ty = ret->expression.is_not_null()
+                        ? int_from_any(ret->expression.get()->accept(this))
+                        : find_type_id("void", {});
+      update_flags(flags, stmt_flags);
+      check_return_type_consistency(return_type, stmt_ret_ty);
+      break;
+      
     } else if (auto brk = dynamic_cast<ASTBreak *>(statement)) {
       flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       flags |= BLOCK_FLAGS_BREAK;
+      continue;
     }
+
+    update_flags(flags, stmt_flags);
+    check_return_type_consistency(return_type, stmt_ret_ty);
   }
 
   if (return_type == -1) {
     return_type = find_type_id("void", {});
   }
 
-  // check all code paths return a value if this isn't a void.
-  if (fn_root_level && return_type != find_type_id("void", {})) {
-    if ((flags & BLOCK_FLAGS_RETURN) == 0) {
-      throw_error({
-          .message = "Function must return a value.",
-          .severity = ERROR_FAILURE,
-      });
-    }
+  if (fn_root_level && return_type != find_type_id("void", {}) &&
+      (flags & BLOCK_FLAGS_RETURN) == 0) {
+    throw_error({
+        .message = "Not all code paths return a value.",
+        .severity = ERROR_FAILURE,
+    });
   }
 
   node->flags = flags;
@@ -455,6 +424,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   context.exit_scope();
   return return_type;
 }
+
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
@@ -543,7 +513,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   return node->operand->accept(this);
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
-  auto symbol = context.current_scope->lookup(node->value);
+  auto symbol = context.current_scope->lookup(node->value.value);
   if (symbol)
     return symbol->type_id;
   else
@@ -609,8 +579,9 @@ std::any TypeVisitor::visit(ASTCall *node) {
     }
   }
 
-  node->type = symbol->type_id;
-  return {};
+  node->type = info->return_type;
+  return info->return_type;
+  
 }
 std::any TypeVisitor::visit(ASTArguments *node) {
   jstl::Vector<int> argument_types;

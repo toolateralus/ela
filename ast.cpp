@@ -24,7 +24,7 @@ ASTStatement *Parser::parse_statement() {
     auto unary = ast_alloc<ASTUnaryExpr>();
     unary->op = eat();
     auto operand = ast_alloc<ASTIdentifier>();
-    operand->value = eat().value;
+    operand->value = eat();
     unary->operand = operand;
     statement->expression = unary;
     return statement;
@@ -185,7 +185,7 @@ ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
   
   if (iden != nullptr)  {
     auto iden_node = ast_alloc<ASTIdentifier>();
-    iden_node->value = iden->value;
+    iden_node->value = *iden;
     left = iden_node;
   } else {
     left = parse_logical_or();  
@@ -347,8 +347,20 @@ ASTExpr *Parser::parse_unary() {
   return parse_postfix();
 }
 ASTExpr *Parser::parse_postfix() {
-  // TODO: implement me
-  return parse_primary();
+  auto left = parse_primary();
+  
+  if (auto identifier = dynamic_cast<ASTIdentifier*>(left)) {
+    if (peek().type == TType::LParen) {
+      auto tok = identifier->value;
+      return parse_call(tok);
+    }
+  }
+    
+  // TODO: add -- and ++? 
+  // TODO: parse and build AST for dot expressions.
+  // while (peek().type == TType::Dot) { }
+  
+  return left;
 }
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
@@ -357,7 +369,7 @@ ASTExpr *Parser::parse_primary() {
   case TType::Identifier: {
     eat();
     auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = tok.value;
+    iden->value = tok;;
     return iden;
   }
   case TType::Integer: {
@@ -472,8 +484,17 @@ ASTArguments *Parser::parse_arguments() {
   expect(TType::RParen);
   return args;
 }
-ASTStatement *Parser::parse_call_statement(Token iden) {
+
+ASTCall *Parser::parse_call(const Token &name) {
   auto args = parse_arguments();
+  ASTCall *call = ast_alloc<ASTCall>(); 
+  call->name = name;
+  call->arguments = args;
+  return call;
+}
+
+ASTStatement *Parser::parse_call_statement(Token iden) {
+ auto args = parse_arguments();
  ASTExprStatement *statement = ast_alloc<ASTExprStatement>();
  ASTCall *call = ast_alloc<ASTCall>(); 
  call->name = iden;
