@@ -47,8 +47,6 @@ test_if_1 :: () {
     } else {
         assert("Unexpected case", false);
     }
-    
-    assert("This is a FRICKEN FAILURE!", false);
 }
 
 #test
