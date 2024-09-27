@@ -1,4 +1,12 @@
+
 #foreign fabs :: (float f) -> float;
+#foreign malloc :: (s64 nbytes) -> void*;
+#foreign free :: (void *ptr) -> void;
+
+#test
+failure_case :: () {
+    assert("This should fail", false);
+}
 
 #test
 test_if_3 :: () {
@@ -90,11 +98,6 @@ test_comp_assign :: () {
 }
 
 #test
-failure_case :: () {
-    assert("This should fail", false);
-}
-
-#test
 test_operators :: () {
     s32 left = 1;
     s32 right = 1;
@@ -149,4 +152,23 @@ test_relational_results :: () {
     assert("test2 should be true", test2 == true);
     assert("test3 should be true", test3 == true);
     assert("test4 should be true", test4 == true);
+}
+
+#test
+test_address_of :: () {
+    s32 v = 0;
+    s32* addr_of_v = &v;
+    assert("address of grabbed a non-null ptr", addr_of_v != null);
+    v = *addr_of_v;
+    assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
+}
+
+
+#test
+test_malloc :: () {
+    s32* ptr = malloc(4);
+    assert("malloc'd pointer was null", ptr != null);
+    free(ptr);
+    ptr = null;
+    assert("freed ptr and set to null was not == null", ptr == null);
 }
