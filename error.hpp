@@ -38,8 +38,7 @@ struct Error {
 
 static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
 
-// marked noreturn for now to avoid warnings.
-// todo; fix this
+
 [[noreturn]] static void throw_error(const std::string &message,
                                      const ErrorSeverity severity,
                                      const std::vector<Token> &source_tokens) {
@@ -61,8 +60,7 @@ static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
 
   const auto token_str = ss.str();
 
-  // TODO: do something more sophisticated here. for now in early dev, just
-  // throw on all errors.
+  // TODO: do something more sophisticated here. for now in early dev, just throw on all errors.
   switch (severity) {
   case ERROR_INFO:
   case ERROR_WARNING:

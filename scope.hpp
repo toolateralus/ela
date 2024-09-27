@@ -9,6 +9,7 @@
 // possibly returns, breaks, continues, etc.
 // TODO(cont.) executing would be an executing body like if, func, declaring
 // would be things like struct declarations, etc.
+// Would this even help?
 
 extern jstl::Arena scope_arena;
 
@@ -47,8 +48,6 @@ struct Context {
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Scope *root_scope;
   Context() {
-    // TODO: add a #extern directive that tags functions and their type info that they're external symbols so we 
-    // can generate extern's in c++ or include the appropriate headers or something.
     FunctionTypeInfo printf_info {};
     printf_info.return_type = find_type_id("void", {});
     printf_info.is_varargs = true;

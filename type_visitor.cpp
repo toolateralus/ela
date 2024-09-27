@@ -50,7 +50,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
-  info.flags = node->function_mode;
+  info.flags = node->flags;
   
   auto params = node->params->params;
   for (const auto &param : params) {
@@ -68,7 +68,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   // insert function
   context.current_scope->insert(node->name.value, type_id);
 
-  if (info.flags == FUNCTION_FOREIGN) {
+  if (info.flags & FUNCTION_FOREIGN) {
     return {};  
   }
   
@@ -92,8 +92,6 @@ const auto check_return_type_consistency (int &return_type, int new_type, ASTNod
   }
 };
 
-// TODO: wrangle this absolute mess of a function. I have no fucking idea how we
-// will ever fix this.
 std::any TypeVisitor::visit(ASTBlock *node) {
   bool fn_root_level = visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
 
@@ -109,7 +107,6 @@ std::any TypeVisitor::visit(ASTBlock *node) {
     auto result = statement->accept(this);
     int stmt_ret_ty = -1;
 
-    // TODO: this needs a lot of work. @Cooper-Pilot for gods sake I need help.
     ASTBlock *block = nullptr;
 
     if (auto block_stmt = dynamic_cast<ASTBlock *>(statement)) {
@@ -131,7 +128,6 @@ std::any TypeVisitor::visit(ASTBlock *node) {
       block = while_stmt->block;
     }
 
-    // TODO: scrap code after break continue or return
     if (block) {
       flags |= block->flags;
       stmt_ret_ty = int_from_any(result);
@@ -233,7 +229,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   
   if (node->op.type == TType::And) {
     auto ty = get_type(operand_ty);
-    return find_type_id(ty->base, TypeExtensionInfo{
+    return find_type_id(ty->base, TypeExt{
       .extensions = {
         TYPE_EXT_POINTER
       }
@@ -272,7 +268,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   case ASTLiteral::Bool:
     return find_type_id("bool", {});
   case ASTLiteral::Null:
-    return find_type_id("void", TypeExtensionInfo { .extensions = {TYPE_EXT_POINTER}, .array_sizes = {} });
+    return find_type_id("void", TypeExt { .extensions = {TYPE_EXT_POINTER}, .array_sizes = {} });
     break;
   }
 }
@@ -361,9 +357,10 @@ std::any TypeVisitor::visit(ASTFor *node) {
   return node->block->accept(this);
 }
 std::any TypeVisitor::visit(ASTIf *node) {
-  // TODO: type check to confirm this is convertible to, or is a bool.
-  //auto bool_type = find_type_id("bool", {});
-  node->condition->accept(this);
+  
+  auto cond_ty = int_from_any(node->condition->accept(this));
+  validate_type_compatability(find_type_id("bool", {}), cond_ty , node->source_tokens, "expected: {}, got {}", "if statement condition was not convertible to boolean");
+  
   auto stmt_ret_type = int_from_any(node->block->accept(this));
   auto if_flags = node->block->flags;
   if (node->_else.is_not_null()) {

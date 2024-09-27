@@ -132,7 +132,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Break);
     TTYPE_CASE(Continue);
 
-    // TODO: implement these
     TTYPE_CASE(For);
     TTYPE_CASE(While);
     TTYPE_CASE(If);

@@ -1,5 +1,6 @@
-#include <jstl/containers/vector.hpp>
+#include <stdlib.h>
 #include <stdint.h>
+#include <stdio.h>
 
 using f64 = double;
 using u64 = uint64_t;
@@ -17,9 +18,20 @@ using u8 = uint8_t;
 
 using string = const char *;
 
-template <class T> using _array = jstl::Vector<T>;
+template <class T> struct _array {
+  T *m_data = nullptr;
+  int m_length = 0;
+  _array() {}
+  T* begin() const {
+    return m_data;
+  }
+  T* end() const {
+    return m_data + m_length;
+  }
+};
 
 #ifdef TESTING
+#include <jstl/containers/vector.hpp>
 #include <stdexcept>
 
 #define assert(message, condition)                                                      \

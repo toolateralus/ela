@@ -16,10 +16,6 @@ enum TypeKind {
   TYPE_STRUCT,
 };
 
-// TODO: probably use a better way to do this, and not a fix number of max
-// types. However for now, this is reasonable, and if we need more that can be
-// passed in to the compiler with a -D flag or something
-
 #ifndef MAX_NUM_TYPES
 #define MAX_NUM_TYPES 1000
 #endif
@@ -40,18 +36,17 @@ static Type *get_type(const int id) {
 extern int num_types;
 extern jstl::Arena type_arena;
 
-enum TypeExtensionEnum {
+enum TypeExtEnum {
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
 };
 
-struct TypeExtensionInfo {
+struct TypeExt {
   // this stores things like * and [], [20] etc.
-  jstl::Vector<TypeExtensionEnum> extensions{};
+  jstl::Vector<TypeExtEnum> extensions{};
   // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
   // array size.
   jstl::Vector<int> array_sizes{};
-
   inline bool is_pointer(int depth) const {
     bool eq = false;
     int n = 0;
@@ -63,17 +58,13 @@ struct TypeExtensionInfo {
     }
     return n == depth;
   }
-
-  inline bool operator==(const TypeExtensionInfo &other) const {
+  inline bool operator==(const TypeExt &other) const {
     return equals(other);
   }
-
-  bool equals(const TypeExtensionInfo &other) const;
-
+  bool equals(const TypeExt &other) const;
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
-
   inline std::string to_string() const {
     std::stringstream ss;
     jstl::Vector<int> array_sizes = this->array_sizes;
@@ -119,10 +110,10 @@ struct TypeInfo {
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
-enum FunctionFlags {
-  FUNCTION_NORMAL,
-  FUNCTION_TEST,
-  FUNCTION_FOREIGN,
+enum FunctionTypeFlags {
+  FUNCTION_NORMAL = 1 << 0,
+  FUNCTION_TEST = 1 << 1,
+  FUNCTION_FOREIGN = 1 << 2,
 };
 
 struct FunctionTypeInfo : TypeInfo {
@@ -132,26 +123,35 @@ struct FunctionTypeInfo : TypeInfo {
   int params_len = 0;
   int default_params = 0; // number of default params, always trailing.
   
+  // TODO: add a way to declare varargs for externs only. Right now, we only use this for printf;
   // if this is set to true, on emit we will add a ..., and not check for too many arguments to calling this.
   bool is_varargs = false;
+  
   // defined in cpp file
   virtual std::string to_string() const override;
 };
+
+// TODO(josh): add scalar casting info for each type here.
+// TODO(cont.) builtins can just have a table of types they can implicitly explicitly and cant cast to.
 struct ScalarTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
+
+// TODO: implement structs.
 struct StructTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
 struct Type {
   const int id = -1;
+  // TODO: we could just have our builtins not be referred to only as a scalar, but just have
+  // enum variants for all of them. TYPE_INT, TYPE_BOOL, TYPE_F32, etc.
   const TypeKind kind = TypeKind::TYPE_SCALAR;
   std::string base;
   Nullable<TypeInfo> info = nullptr;
-  TypeExtensionInfo extensions;
+  TypeExt extensions;
   bool equals(const std::string &name,
-              const TypeExtensionInfo &type_extensions) const;
+              const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   Type(){};
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
@@ -174,7 +174,7 @@ template <class T> T *type_alloc(size_t n = 1) {
 
 int create_type(TypeKind kind, const std::string &name,
                 TypeInfo *info = nullptr,
-                const TypeExtensionInfo &extensions = {});
+                const TypeExt &extensions = {});
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -186,10 +186,10 @@ enum ConversionRule {
 ConversionRule type_conversion_rule(const Type *from, const Type *to);
 
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                 const TypeExtensionInfo &ext);
+                 const TypeExt &ext);
 
 int find_type_id(const std::string &name,
-                 const TypeExtensionInfo &type_extensions);
+                 const TypeExt &type_extensions);
 
 std::string get_cpp_scalar_type(int);
                  

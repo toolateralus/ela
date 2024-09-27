@@ -23,7 +23,7 @@ std::string FunctionTypeInfo::to_string() const {
   return ss.str();
 }
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                 const TypeExtensionInfo &ext) {
+                 const TypeExt &ext) {
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
@@ -37,7 +37,7 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
   return create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
 int find_type_id(const std::string &name,
-                 const TypeExtensionInfo &type_extensions) {
+                 const TypeExt &type_extensions) {
 
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
@@ -100,7 +100,7 @@ std::string get_cpp_scalar_type(int id) {
   else if (type->base == "char")
     name = "char";
   else if (type->base == "string")
-    name = "std::string";
+    name = "const char *";
   else if (type->base == "bool")
     name = "bool";
   else if (type->base == "void")
@@ -183,15 +183,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
-  // TODO: have more thorough type conversion rules defined in the typeinfo or
-  // something.
-  // if (from->is_kind(TYPE_SCALAR) && to->is_kind(TYPE_SCALAR))
-  //   return CONVERT_EXPLICIT;
 
   return CONVERT_PROHIBITED;
 }
 int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
-                const TypeExtensionInfo &extensions) {
+                const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
   type->info = info;
   type->extensions = extensions;
@@ -259,12 +255,12 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 bool Type::equals(const std::string &name,
-                  const TypeExtensionInfo &type_extensions) const {
+                  const TypeExt &type_extensions) const {
   if (name != this->base)
     return false;
   return type_extensions == this->extensions;
 }
-bool TypeExtensionInfo::equals(const TypeExtensionInfo &other) const {
+bool TypeExt::equals(const TypeExt &other) const {
   if (extensions.size() != other.extensions.size())
     return false;
   if (array_sizes.size() != other.array_sizes.size())
@@ -307,7 +303,7 @@ int remove_one_pointer_ext(int operand_ty,
   }
 
   bool pointer_removed = false;
-  jstl::Vector<TypeExtensionEnum> extensions{};
+  jstl::Vector<TypeExtEnum> extensions{};
   for (const auto &ext : ty->extensions.extensions) {
     if (!pointer_removed && ext == TYPE_EXT_POINTER) {
       pointer_removed = true;
@@ -316,6 +312,6 @@ int remove_one_pointer_ext(int operand_ty,
     }
   }
   return find_type_id(
-      ty->base, TypeExtensionInfo{.extensions = extensions,
+      ty->base, TypeExt{.extensions = extensions,
                                   .array_sizes = ty->extensions.array_sizes});
 }

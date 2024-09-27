@@ -223,12 +223,12 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto test_flag = get_compilation_flag("test");
 
   // if we're not testing, don't emit for test functions
-  if (!test_flag && node->function_mode == FUNCTION_TEST) {
+  if (!test_flag && node->flags & FUNCTION_TEST) {
     return {};
   } 
   
   // generate a test based on this function pointer.
-  if (test_flag && node->function_mode == FUNCTION_TEST) {
+  if (test_flag && node->flags & FUNCTION_TEST) {
     test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
   }
   
@@ -240,7 +240,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   
   
-  if (node->function_mode == FUNCTION_FOREIGN) {
+  if (node->flags & FUNCTION_FOREIGN) {
     if (node->name.value == "main") {
       throw_error("main function cannot be foreign", ERROR_CRITICAL, node->source_tokens);
     }

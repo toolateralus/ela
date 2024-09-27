@@ -20,7 +20,15 @@ template <class T> T *ast_alloc(size_t n = 1) {
 
 struct VisitorBase;
 
+// TODO: add an enum member in the base that says what type this node is,
+// so we can be more performant and just static_cast<T*> instead of dynamic_cast<T*>;
+// TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
+// this way we can use things before theyre defined, prune unused code, etc.
 struct ASTNode {
+  // TODO: use a more data oriented approach here, instead of copying vectors around everywhere.
+  // I am sure we can have a UID for ASTNode, and just lookup our source tokens range in that table with a 
+  // int src_info_start, int src_info_end, and capture that info in a similar way in the parser.
+  // Also, we can definitely improve the way that we capture stuff in the parser.
   std::vector<Token> source_tokens{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
@@ -35,6 +43,9 @@ enum BlockFlags {
   BLOCK_FLAGS_BREAK = 1 << 3,
 };
 
+// TODO: rename me, and add this stuff to visiting While, For, etc.
+// Probably create another visitor to do this, the type visitor is getting too large and cumbersome.
+// Maybe even have a base class for ASTNode's that have control flow attributes?
 struct ControlFlow {
   int flags;
   int type;
@@ -68,7 +79,7 @@ struct ASTProgram : ASTNode {
 
 struct ASTType : ASTNode {
   std::string base;
-  TypeExtensionInfo extension_info{};
+  TypeExt extension_info{};
 
   int resolved_type = Type::invalid_id;
   static ASTType *get_void() {
@@ -150,7 +161,7 @@ struct ASTParamsDecl : ASTStatement {
 };
 
 struct ASTFuncDecl : ASTStatement {
-  int function_mode = 0;
+  int flags = 0;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
   Token name;

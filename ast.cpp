@@ -11,119 +11,17 @@
 
 void Parser::init_directive_routines() {
   // #include
+  // Just like C's include, just paste a text file right above where the include
+  // is used. Not a pre processor!
   {
     directive_routines.push_back(DirectiveRoutine{
-      .identifier = "include", 
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) static {
-        auto filename = parser->expect(TType::String).value;
-        if (!std::filesystem::exists(filename)) {
-          throw_error(
-              std::format("Couldn't find included file: {}", filename),
-              ERROR_CRITICAL, {});
-        }
-        std::stringstream ss;
-        std::ifstream isftr(filename);
-        ss << isftr.rdbuf();
-        parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
-        return nullptr;
-      }
-    });
-  }
-
-  // #read
-  {
-    directive_routines.push_back({
-      .identifier = "read",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) static {
-        auto filename = parser->expect(TType::String).value;
-        if (!std::filesystem::exists(filename)) {
-          throw_error(std::format("Couldn't find 'read' file: {}", filename),
-                      ERROR_CRITICAL, {});
-        }
-        std::stringstream ss;
-        std::ifstream isftr(filename);
-        ss << isftr.rdbuf();
-        auto string = ast_alloc<ASTLiteral>();
-        string->tag = ASTLiteral::RawString;
-        string->value = ss.str();
-        return string;
-      }
-    });
-  }
-  
-  
-  // #test 
-  {
-    directive_routines.push_back({
-      .identifier = "test",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [] (Parser *parser) static -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        auto func = parser->parse_function_declaration(name);
-        func->function_mode |= FUNCTION_TEST; 
-        return func;
-      }
-    });
-  }
-  
-  
-  // #foreign
-  {
-    directive_routines.push_back({
-      .identifier = "foreign",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) static {
-        
-        auto function = ast_alloc<ASTFuncDecl>();
-        parser->begin_token_frame();
-        
-        auto name = parser->expect(TType::Identifier);
-        
-        if (parser->context.current_scope != parser->context.root_scope) {
-          throw_error(std::format("cannot declare a non-top level foreign function:: {}", name.value), ERROR_CRITICAL, parser->token_frames.back());
-        }
-        
-        parser->expect(TType::DoubleColon);
-        function->params = parser->parse_parameters();
-        function->name = name;
-        
-        if (parser->peek().type != TType::Arrow) {
-          function->return_type = ASTType::get_void();
-        } else {
-          parser->expect(TType::Arrow);
-          function->return_type = parser->parse_type();
-        }
-        
-        parser->end_token_frame(function);
-        function->function_mode = FUNCTION_FOREIGN;
-        parser->expect(TType::Semi);
-        return function;
-      }
-    }); 
-  }
-  
-  // #import 
-  
-  {
-      directive_routines.push_back({
-        .identifier = "import",
+        .identifier = "include",
         .kind = DIRECTIVE_KIND_STATEMENT,
-        .run = [](Parser *parser) static -> Nullable<ASTNode> {
-          auto iden = parser->expect(TType::Identifier).value;
-          static std::filesystem::path path = []{
-            #ifdef _WIN32
-              return std::filesystem::path("C:\\Program Files\\ela");
-            #else
-              return std::filesystem::path("/usr/local/lib/ela");
-            #endif
-          }();
-          auto filename = path.string() + "/" + iden + ".ela";
+        .run = [](Parser *parser) static {
+          auto filename = parser->expect(TType::String).value;
           if (!std::filesystem::exists(filename)) {
             throw_error(
-                std::format("Couldn't find imported module: {}", filename),
+                std::format("Couldn't find included file: {}", filename),
                 ERROR_CRITICAL, {});
           }
           std::stringstream ss;
@@ -131,27 +29,135 @@ void Parser::init_directive_routines() {
           ss << isftr.rdbuf();
           parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
           return nullptr;
-        }
-      });
+        }});
+  }
+
+  // #read
+  // Read a file into a string at compile time. Nice for embedding resources
+  // into your program.
+  // TODO: add a binary mode, where its just an array of chars or something.
+  {
+    directive_routines.push_back(
+        {.identifier = "read",
+         .kind = DIRECTIVE_KIND_EXPRESSION,
+         .run = [](Parser *parser) static {
+           auto filename = parser->expect(TType::String).value;
+           if (!std::filesystem::exists(filename)) {
+             throw_error(std::format("Couldn't find 'read' file: {}", filename),
+                         ERROR_CRITICAL, {});
+           }
+           std::stringstream ss;
+           std::ifstream isftr(filename);
+           ss << isftr.rdbuf();
+           auto string = ast_alloc<ASTLiteral>();
+           string->tag = ASTLiteral::RawString;
+           string->value = ss.str();
+           return string;
+         }});
+  }
+
+  // #test
+  // declare a test function. Only gets compiled into --test builds, and
+  // produces a test main, a builtin test suite.
+  // TODO: add categories and extra naming stuff to these. would be nice for
+  // filtering etc.
+  {
+    directive_routines.push_back(
+        {.identifier = "test",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) static -> Nullable<ASTNode> {
+           auto name = parser->expect(TType::Identifier);
+           parser->expect(TType::DoubleColon);
+           auto func = parser->parse_function_declaration(name);
+           func->flags |= FUNCTION_TEST;
+           return func;
+         }});
+  }
+
+  // #foreign
+  // Declare a foreign function, like C's extern. Super janky and bad because
+  // our boilerplate is crap and uses stdlib stuff.
+  {
+    directive_routines.push_back(
+        {.identifier = "foreign",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) static {
+           auto function = ast_alloc<ASTFuncDecl>();
+           parser->begin_token_frame();
+
+           auto name = parser->expect(TType::Identifier);
+
+           if (parser->context.current_scope != parser->context.root_scope) {
+             throw_error(
+                 std::format(
+                     "cannot declare a non-top level foreign function:: {}",
+                     name.value),
+                 ERROR_CRITICAL, parser->token_frames.back());
+           }
+
+           parser->expect(TType::DoubleColon);
+           function->params = parser->parse_parameters();
+           function->name = name;
+
+           if (parser->peek().type != TType::Arrow) {
+             function->return_type = ASTType::get_void();
+           } else {
+             parser->expect(TType::Arrow);
+             function->return_type = parser->parse_type();
+           }
+
+           parser->end_token_frame(function);
+           function->flags |= FUNCTION_FOREIGN;
+           parser->expect(TType::Semi);
+           return function;
+         }});
+  }
+
+  // #import
+  // Imports from usr/local/lib/ela by identifier and no file ext.
+  {
+    directive_routines.push_back(
+        {.identifier = "import",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) static -> Nullable<ASTNode> {
+           auto iden = parser->expect(TType::Identifier).value;
+           static std::filesystem::path path = [] {
+#ifdef _WIN32
+             return std::filesystem::path("C:\\Program Files\\ela");
+#else
+              return std::filesystem::path("/usr/local/lib/ela");
+#endif
+           }();
+           auto filename = path.string() + "/" + iden + ".ela";
+           if (!std::filesystem::exists(filename)) {
+             throw_error(
+                 std::format("Couldn't find imported module: {}", filename),
+                 ERROR_CRITICAL, {});
+           }
+           std::stringstream ss;
+           std::ifstream isftr(filename);
+           ss << isftr.rdbuf();
+           parser->states.push_back(
+               Lexer::State::from_file(ss.str(), filename));
+           return nullptr;
+         }});
   }
 }
 
-
-// take a ROUTINE_KIND_STATEMENT
-Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const std::string &identifier) {
-  // compare aganist the kind of the routine with expected type, based on parser location
-  for (const auto &routine: directive_routines) {
+Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
+                                            const std::string &identifier) {
+  // compare aganist the kind of the routine with expected type, based on parser
+  // location
+  for (const auto &routine : directive_routines) {
     if (routine.kind == kind && routine.identifier == identifier) {
       return routine.run(this);
     }
   }
-  
-  
+
   throw_error(
       std::format("failed to call unknown directive routine: {}", identifier),
       ERROR_FAILURE, {});
 }
-
 
 ASTProgram *Parser::parse() {
   begin_token_frame();
@@ -163,12 +169,13 @@ ASTProgram *Parser::parse() {
       auto identifer = expect(TType::Identifier).value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
       if (result.is_not_null()) {
-        auto statement = dynamic_cast<ASTStatement*>(result.get());
+        auto statement = dynamic_cast<ASTStatement *>(result.get());
         if (statement) {
           program->statements.push(statement);
         }
       }
-      if (semicolon()) eat();
+      if (semicolon())
+        eat();
       continue;
     }
     program->statements.push(parse_statement());
@@ -184,14 +191,17 @@ ASTStatement *Parser::parse_statement() {
   begin_token_frame();
   auto tok = peek();
 
-  // TODO: fix this. it should be pretty easy, we either try to use a directive, and if we can't we error. No need to continue.
   if (tok.type == TType::Directive) {
     eat();
-    auto statement = dynamic_cast<ASTStatement*>(process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value).get());
+    auto statement = dynamic_cast<ASTStatement *>(
+        process_directive(DIRECTIVE_KIND_STATEMENT,
+                          expect(TType::Identifier).value)
+            .get());
     if (!statement) {
       throw_error(
-        std::format("Directive '{}' did not return a valid statement node", tok.value),
-        ERROR_CRITICAL, token_frames.back());
+          std::format("Directive '{}' did not return a valid statement node",
+                      tok.value),
+          ERROR_CRITICAL, token_frames.back());
     }
   }
 
@@ -338,11 +348,13 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
-  
+
   if (context.current_scope != context.root_scope) {
-    throw_error(std::format("cannot declare a non-top level function:: {}", name.value), ERROR_CRITICAL, token_frames.back());
+    throw_error(
+        std::format("cannot declare a non-top level function:: {}", name.value),
+        ERROR_CRITICAL, token_frames.back());
   }
-  
+
   begin_token_frame();
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
@@ -537,7 +549,8 @@ ASTExpr *Parser::parse_multiplicative() {
 ASTExpr *Parser::parse_unary() {
   if (peek().type == TType::Add || peek().type == TType::Sub ||
       peek().type == TType::Not || peek().type == TType::BitwiseNot ||
-      peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Mul || peek().type == TType::And) {
+      peek().type == TType::Increment || peek().type == TType::Decrement ||
+      peek().type == TType::Mul || peek().type == TType::And) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
@@ -565,7 +578,7 @@ ASTExpr *Parser::parse_postfix() {
 }
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
-  
+
   // if theres a #... that returns a value, use that.
   if (auto directive_expr = try_parse_directive_expr()) {
     return directive_expr.get();
@@ -640,7 +653,7 @@ ASTExpr *Parser::parse_primary() {
 }
 ASTType *Parser::parse_type() {
   auto base = eat().value;
-  TypeExtensionInfo extension_info;
+  TypeExt extension_info;
 
   while (true) {
     if (peek().type == TType::LBrace) {
@@ -713,7 +726,6 @@ ASTArguments *Parser::parse_arguments() {
   expect(TType::RParen);
   return args;
 }
-
 ASTCall *Parser::parse_call(const Token &name) {
   auto args = parse_arguments();
   ASTCall *call = ast_alloc<ASTCall>();
@@ -721,7 +733,6 @@ ASTCall *Parser::parse_call(const Token &name) {
   call->arguments = args;
   return call;
 }
-
 ASTStatement *Parser::parse_call_statement(Token iden) {
 
   auto args = parse_arguments();
@@ -796,5 +807,3 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
-
-

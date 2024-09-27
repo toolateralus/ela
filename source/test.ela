@@ -7,11 +7,11 @@ failure_case :: () {
 
 #test
 test_if_3 :: () {
-    s32 v = 1;
+    bool v = true;
     if !v {
-        assert("v should be 0", v == 0);
+        assert("Unexpected case", false);
     } else if v {
-        assert("v should be 1", v == 1);
+        assert("v should be 1", v == true);
     } else {
         assert("Unexpected case", false);
     }
@@ -33,14 +33,9 @@ test_for :: () {
 
 #test
 test_while :: () {
-    s32* n;
-    s32 v;
     bool b = true;
-    if b {
-        assert("b should be true", b == true);
-    }
-    while v {
-        assert("v should not be 0", v != 0);
+    while b {
+        assert("while condition == true", b == true);
         return;
     }
     assert("End of test_while reached", true);
@@ -48,9 +43,9 @@ test_while :: () {
 
 #test
 test_if_1 :: () {
-    s32 v = 1;
+    bool v = true;
     if v {
-        assert("v should be 1", v == 1);
+        assert("v should be true", v == true);
     } else {
         assert("Unexpected case", false);
     }
@@ -58,9 +53,9 @@ test_if_1 :: () {
 
 #test
 test_if_2 :: () {
-    s32 v = 1;
+    bool v = true;
     if v {
-        assert("v should be 1", v == 1);
+        assert("v should be true", v == true);
     } else {
         assert("Unexpected case", false);
     }

@@ -1,13 +1,16 @@
+#import core;
+
+#foreign system :: (string cmd) -> int;
 
 #test test_something :: () {
 	assert("junk", false);
 }
 
-#foreign fabs :: (f64 f) -> f64;
-#foreign malloc :: (s64 nbytes) -> void*;
+// this is dumb but cool lol.
+string test_runner = #read "run_test.sh";
 
 main :: (s32 argc, char **argv) -> s32 {
-	s32 *buffer = malloc(4);
+	s32 *buffer = malloc(4*4);
 	
 	printf("%p\n", buffer);
 	
@@ -17,8 +20,6 @@ main :: (s32 argc, char **argv) -> s32 {
 	
 	int *v1 = &v;
 	
-	
-	
-	//printf("fabs(-1.0f)==%f\n", fabs(-1.0));
+	printf("fabs(-1.0f)==%f\n", fabs(-1.0));
 	return 0;
 }

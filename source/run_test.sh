@@ -1,1 +1,1 @@
-../bin/ela ./test.ela --silent --test && ./test 
+ela ./source/test.ela --silent --test && ./source/test 
