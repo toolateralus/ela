@@ -63,12 +63,47 @@ void Parser::init_directive_routines() {
         auto name = parser->expect(TType::Identifier);
         parser->expect(TType::DoubleColon);
         auto func = parser->parse_function_declaration(name);
-        func->flags |= FUNCTION_TEST; 
+        func->function_mode |= FUNCTION_TEST; 
         return func;
       }
     });
   }
   
+  
+  // #foreign
+  {
+    directive_routines.push_back({
+      .identifier = "foreign",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) static {
+        
+        auto function = ast_alloc<ASTFuncDecl>();
+        parser->begin_token_frame();
+        
+        auto name = parser->expect(TType::Identifier);
+        
+        if (parser->context.current_scope != parser->context.root_scope) {
+          throw_error(std::format("cannot declare a non-top level foreign function:: {}", name.value), ERROR_CRITICAL, parser->token_frames.back());
+        }
+        
+        parser->expect(TType::DoubleColon);
+        function->params = parser->parse_parameters();
+        function->name = name;
+        
+        if (parser->peek().type != TType::Arrow) {
+          function->return_type = ASTType::get_void();
+        } else {
+          parser->expect(TType::Arrow);
+          function->return_type = parser->parse_type();
+        }
+        
+        parser->end_token_frame(function);
+        function->function_mode = FUNCTION_FOREIGN;
+        parser->expect(TType::Semi);
+        return function;
+      }
+    }); 
+  }
 }
 
 
@@ -118,6 +153,17 @@ ASTProgram *Parser::parse() {
 ASTStatement *Parser::parse_statement() {
   begin_token_frame();
   auto tok = peek();
+
+  // TODO: fix this. it should be pretty easy, we either try to use a directive, and if we can't we error. No need to continue.
+  if (tok.type == TType::Directive) {
+    eat();
+    auto statement = dynamic_cast<ASTStatement*>(process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value).get());
+    if (!statement) {
+      throw_error(
+        std::format("Directive '{}' did not return a valid statement node", tok.value),
+        ERROR_CRITICAL, token_frames.back());
+    }
+  }
 
   if (tok.type == TType::Increment || tok.type == TType::Decrement) {
     auto statement = ast_alloc<ASTExprStatement>();
@@ -262,6 +308,11 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
+  
+  if (context.current_scope != context.root_scope) {
+    throw_error(std::format("cannot declare a non-top level function:: {}", name.value), ERROR_CRITICAL, token_frames.back());
+  }
+  
   begin_token_frame();
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
@@ -456,7 +507,7 @@ ASTExpr *Parser::parse_multiplicative() {
 ASTExpr *Parser::parse_unary() {
   if (peek().type == TType::Add || peek().type == TType::Sub ||
       peek().type == TType::Not || peek().type == TType::BitwiseNot ||
-      peek().type == TType::Increment || peek().type == TType::Decrement) {
+      peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Mul || peek().type == TType::And) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();

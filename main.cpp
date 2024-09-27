@@ -91,7 +91,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.close();
 
 
-  std::string extra_flags;
+  std::string extra_flags = "-lc -lGL";
 
   printf("\e[31m");
   system(std::format("clang++ -std=c++23 {} {} -o {}", extra_flags, output_path.string(),

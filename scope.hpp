@@ -43,8 +43,9 @@ static Scope *create_child(Scope *parent) {
 }
 
 struct Context {
-  Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   
+  Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  Scope *root_scope;
   Context() {
     // TODO: add a #extern directive that tags functions and their type info that they're external symbols so we 
     // can generate extern's in c++ or include the appropriate headers or something.
@@ -55,12 +56,12 @@ struct Context {
     
     FunctionTypeInfo assert_info {};
     assert_info.return_type = find_type_id("void", {});
-    
     assert_info.parameter_types[0] = find_type_id("string", {});
     assert_info.parameter_types[1] = find_type_id("bool", {});
     assert_info.params_len = 2;
-    
     current_scope->insert("assert", find_type_id("", assert_info, {}));
+    
+    root_scope = current_scope;
   }
   
   inline void enter_scope(Scope *scope = nullptr) {

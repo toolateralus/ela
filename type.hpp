@@ -122,7 +122,7 @@ struct TypeInfo {
 enum FunctionFlags {
   FUNCTION_NORMAL,
   FUNCTION_TEST,
-  FUNCTION_EXTERN,
+  FUNCTION_FOREIGN,
 };
 
 struct FunctionTypeInfo : TypeInfo {
@@ -190,5 +190,14 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
 
 int find_type_id(const std::string &name,
                  const TypeExtensionInfo &type_extensions);
+
+std::string get_cpp_scalar_type(int);
                  
+                 
+#include <vector>
+
+struct Token;
+int remove_one_pointer_ext(int operand_ty,
+                           const std::vector<Token> &source_tokens);
+
 void init_type_system();

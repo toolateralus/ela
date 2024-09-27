@@ -150,9 +150,9 @@ struct ASTParamsDecl : ASTStatement {
 };
 
 struct ASTFuncDecl : ASTStatement {
-  int flags = 0;
+  int function_mode = 0;
   ASTParamsDecl *params;
-  ASTBlock *block;
+  Nullable<ASTBlock> block;
   Token name;
   ASTType *return_type;
   std::any accept(VisitorBase *visitor) override;
@@ -228,6 +228,7 @@ struct ASTWhile : ASTStatement {
 };
 
 
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                \
@@ -289,7 +290,6 @@ struct DirectiveRoutine {
   ~DirectiveRoutine() = default;
   std::string identifier;
   DirectiveKind kind;
-  
   std::function<Nullable<ASTNode>(Parser *parser)> run;
 };
 

@@ -3,3 +3,4 @@
 !*.ela
 !boilerplate.hpp
 !.gitignore
+!run_test.sh

@@ -1,5 +1,6 @@
 #include "type.hpp"
 #include "error.hpp"
+#include <format>
 #include <sstream>
 
 std::string FunctionTypeInfo::to_string() const {
@@ -13,11 +14,12 @@ std::string FunctionTypeInfo::to_string() const {
       ss << ", ";
     }
   }
-  
-  if (is_varargs) 
+
+  if (is_varargs)
     ss << ", ...)";
-  else ss << ')';
-  
+  else
+    ss << ')';
+
   return ss.str();
 }
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,
@@ -67,6 +69,54 @@ int find_type_id(const std::string &name,
 
   return -1;
 }
+
+std::string get_cpp_scalar_type(int id) {
+  auto type = get_type(id);
+  std::string name = "";
+  if (type->base == "s64")
+    name = "size_t";
+  else if (type->base == "s32")
+    name = "int32_t";
+  else if (type->base == "s16")
+    name = "int16_t";
+  else if (type->base == "s8")
+    name = "int8_t";
+  else if (type->base == "u64")
+    name = "uint64_t";
+  else if (type->base == "u32")
+    name = "uint32_t";
+  else if (type->base == "u16")
+    name = "uint16_t";
+  else if (type->base == "u8")
+    name = "uint8_t";
+  else if (type->base == "f32")
+    name = "float";
+  else if (type->base == "f64")
+    name = "double";
+  else if (type->base == "float")
+    name = "float";
+  else if (type->base == "int")
+    name = "int";
+  else if (type->base == "char")
+    name = "char";
+  else if (type->base == "string")
+    name = "std::string";
+  else if (type->base == "bool")
+    name = "bool";
+  else if (type->base == "void")
+    name = "void";
+  else {
+    throw_error(std::format("cannot get cpp scalar type from : {}", type->base),
+                ERROR_CRITICAL, {});
+  }
+
+  if (type->extensions.has_no_extensions()) {
+    return name;
+  }
+
+  return type->extensions.to_cpp_string(name);
+}
+
 void init_type_system() {
   // Signed integers
   {
@@ -101,12 +151,29 @@ void init_type_system() {
     create_type(TYPE_SCALAR, "void");
   }
 }
-int get_type_unresolved() { return Type::invalid_id; }
+constexpr int get_type_unresolved() { return Type::invalid_id; }
+
+// TODO: use some kind of SCALAR_TYPE flags in the ScalarType info to tell if somethings an integer, float, etc,
+// TODO: and add conversion rules to it so we can safely up cast but explicitly down cast only.
+// Right now, if we had user defined types, you could trick the type system into casting a number to and from your type if it ended with a multiple of 8 -> 64
+constexpr bool type_is_numerical(const Type *t) {
+  return t->base.ends_with("64") || t->base.ends_with("32") ||
+          t->base.ends_with("16") || t->base.ends_with("8") ||
+          t->base == "int" || t->base == "float";
+};
 
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("type was null when checking type conversion rules",
-                 ERROR_CRITICAL, {});
+                ERROR_CRITICAL, {});
+  }
+  
+  if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
+      to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions() &&
+      from->base.starts_with(to->base[0])) {
+    if (type_is_numerical(from) && type_is_numerical(to)) {
+      return CONVERT_IMPLICIT;
+    }
   }
 
   if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
@@ -132,15 +199,11 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   type->base = name;
 
   if (type->id > MAX_NUM_TYPES) {
-    throw_error(
-        "Max types exceeded",
-        ERROR_CRITICAL,
-        {}
-    );
+    throw_error("Max types exceeded", ERROR_CRITICAL, {});
   }
   if (type_table[type->id]) {
     throw_error("type system created a type with the same ID twice",
-                 ERROR_CRITICAL, {});
+                ERROR_CRITICAL, {});
   }
 
   type_table[type->id] = type;
@@ -227,4 +290,32 @@ std::string Type::to_cpp_string() const {
     return "struct NYI";
     break;
   }
+}
+
+int remove_one_pointer_ext(int operand_ty,
+                           const std::vector<Token> &source_tokens) {
+  auto ty = get_type(operand_ty);
+  int ptr_depth = 0;
+  for (const auto &ext : ty->extensions.extensions) {
+    if (ext == TYPE_EXT_POINTER)
+      ptr_depth++;
+  }
+
+  if (ptr_depth == 0) {
+    throw_error("cannot dereference a non-pointer type.", ERROR_FAILURE,
+                source_tokens);
+  }
+
+  bool pointer_removed = false;
+  jstl::Vector<TypeExtensionEnum> extensions{};
+  for (const auto &ext : ty->extensions.extensions) {
+    if (!pointer_removed && ext == TYPE_EXT_POINTER) {
+      pointer_removed = true;
+    } else {
+      extensions.push(ext);
+    }
+  }
+  return find_type_id(
+      ty->base, TypeExtensionInfo{.extensions = extensions,
+                                  .array_sizes = ty->extensions.array_sizes});
 }

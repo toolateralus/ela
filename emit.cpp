@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -174,6 +175,18 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   space();
   if (node->value.is_not_null()) {
     (*ss) <<" = ";
+    
+    // TODO: remove me, add explicit casting.
+    // CASTING ALL POINTERS ALWAYS::
+    // This is so we can use malloc tempoarily. 
+    // It's very bad.    
+    {
+      auto type = get_type(node->type->resolved_type);
+      auto isptr = type->extensions.is_pointer(1);
+      if (isptr) (*ss) << "(" << type->to_cpp_string() << ")";
+    }
+    
+    
     node->value.get()->accept(this);
   } else {
     (*ss) <<"{}";
@@ -208,18 +221,45 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
   
   auto test_flag = get_compilation_flag("test");
-  
-  if (!test_flag && node->flags == FUNCTION_TEST) {
+
+  // if we're not testing, don't emit for test functions
+  if (!test_flag && node->function_mode == FUNCTION_TEST) {
     return {};
-  } else if (test_flag && node->flags == FUNCTION_TEST) {
+  } 
+  
+  // generate a test based on this function pointer.
+  if (test_flag && node->function_mode == FUNCTION_TEST) {
     test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
   }
   
+  // dont emit a main if we're in test mode.
   if (test_flag && node->name.value == "main") {
     return {};
   }
   
   auto symbol = context.current_scope->lookup(node->name.value);
+  
+  
+  if (node->function_mode == FUNCTION_FOREIGN) {
+    if (node->name.value == "main") {
+      throw_error("main function cannot be foreign", ERROR_CRITICAL, node->source_tokens);
+    }
+    
+    (*ss) << "extern \"C\" ";
+    (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
+    space();
+    (*ss) << node->name.value << '(';
+    for (const auto &param: node->params->params) {
+      // TODO: right now this disallows us from using struct or non-scalar types in extern declarations.
+      (*ss) << get_cpp_scalar_type(param->type->resolved_type);
+      if (param != node->params->params.back()) {
+        (*ss) << ", ";
+      }
+    }
+    (*ss) << ");";
+    return {};
+  }
+  
   
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
@@ -232,7 +272,9 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   
   (*ss) <<node->name.value;
   node->params->accept(this);  
-  node->block->accept(this);
+  
+  if (node->block.is_not_null())
+    node->block.get()->accept(this);
   
   if (node->name.value != "main") {
     use_header();

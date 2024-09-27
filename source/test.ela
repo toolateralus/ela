@@ -1,3 +1,4 @@
+#foreign fabs :: (float f) -> float;
 
 #test
 test_if_3 :: () {

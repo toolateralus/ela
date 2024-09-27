@@ -52,7 +52,10 @@ std::any SerializeVisitor::visit(ASTFuncDecl *node) {
   auto sym = context.current_scope->lookup(node->name.value);
   ss << indent() << "type: " << get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
-  visit(node->block);
+  
+  if (node->block.is_not_null())
+    visit(node->block.get());
+  
   ss << indent() << "returns: ";
   visit(node->return_type);
   ss << '\n';
@@ -286,12 +289,15 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
-  info.flags = node->flags;
+  info.flags = node->function_mode;
   
   auto params = node->params->params;
   for (const auto &param : params) {
     if (param->default_value.is_not_null()) info.default_params++;
-    node->block->scope->insert(param->name, param->type->resolved_type);
+    
+    if (node->block.is_not_null())
+      node->block.get()->scope->insert(param->name, param->type->resolved_type);
+    
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
@@ -301,11 +307,13 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   // insert function
   context.current_scope->insert(node->name.value, type_id);
 
-  auto return_type = find_type_id("void", {});
-
-  visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
-  return_type = int_from_any(node->block->accept(this));
+  if (info.flags == FUNCTION_FOREIGN) {
+    return {};  
+  }
   
+  auto return_type = find_type_id("void", {});
+  visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
+  return_type = int_from_any(node->block.get()->accept(this));
   validate_type_compatability(return_type, info.return_type, node->source_tokens, "invalid function return type: {} {}", std::format("function: {}", node->name.value));
   return {};
 }
@@ -461,6 +469,21 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Not && can_convert) {
      return find_type_id("bool", {});
   }
+  
+  if (node->op.type == TType::And) {
+    auto ty = get_type(operand_ty);
+    return find_type_id(ty->base, TypeExtensionInfo{
+      .extensions = {
+        TYPE_EXT_POINTER
+      }
+    });
+  }
+  
+  if (node->op.type == TType::Mul) {
+    return remove_one_pointer_ext(operand_ty, node->source_tokens);
+  }
+  
+  
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
