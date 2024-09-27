@@ -34,6 +34,11 @@ enum BlockFlags {
   BLOCK_FLAGS_BREAK = 1 << 3,
 };
 
+struct ControlFlow {
+  int flags;
+  int type;
+};
+
 #define BLOCK_FLAG_TO_STRING(flag)                                             \
   if (flags & flag)                                                            \
     result += #flag " ";
