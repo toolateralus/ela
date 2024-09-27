@@ -1,3 +1,4 @@
+#include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
@@ -119,7 +120,11 @@ std::any EmitVisitor::visit(ASTCall *node) {
 }
 
 std::any EmitVisitor::visit(ASTLiteral *node) {
-  ss << node->value;
+  if (node->tag == ASTLiteral::Null) {
+    ss << "nullptr";
+  } else {
+    ss << node->value;
+  }
   return {};
 }
 
@@ -135,6 +140,11 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTBinExpr *node) {
+  
+  // if (node->op.type == TType::Assign) {
+  //   indented("");
+  // }
+  
   auto left = node->left->accept(this);
   space();
   ss << node->op.value;; 
@@ -144,6 +154,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTExprStatement *node) {
+  ss << indent();
   node->expression->accept(this);
   return {};
 }

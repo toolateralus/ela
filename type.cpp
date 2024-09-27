@@ -106,6 +106,10 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
                  ERROR_CRITICAL, {});
   }
 
+  if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
+    return CONVERT_IMPLICIT;
+  }
+
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 

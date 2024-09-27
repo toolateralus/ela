@@ -1,5 +1,7 @@
+
+
 test_for :: () -> s32 {
-	for s32 i; i < 10; i = i + 1 {
+	for s32 i; i < 10; ++i {
 		return 0;
 	}
 	s32[] arr;
@@ -10,9 +12,11 @@ test_for :: () -> s32 {
 }
 
 test_while :: (s32 n = 0) -> s32 {
+	
+	s32* n = null;
 	s32 v;
-	while {
-		return 1;
+	if true {
+		// do something;
 	}
 	while v {
 		return 1;

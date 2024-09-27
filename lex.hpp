@@ -67,6 +67,10 @@ enum struct TType {
   CompXor,
   CompSHL,
   CompSHR,
+  
+  True,
+  False,
+  Null,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -74,6 +78,9 @@ enum struct TType {
     return #type
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(True);
+    TTYPE_CASE(False);
+    TTYPE_CASE(Null);
     TTYPE_CASE(Identifier);
     TTYPE_CASE(Integer);
     TTYPE_CASE(Float);
@@ -231,7 +238,12 @@ struct Lexer {
       {"for", TType::For},
       {"while", TType::While},
       {"if", TType::If},
-      {"else", TType::Else}};
+      {"else", TType::Else},
+      
+      {"true", TType::True},
+      {"false", TType::False},
+      {"null", TType::Null}
+      };
 
   const std::unordered_map<std::string, TType> operators{
       {".", TType::Dot},        {"!", TType::Not},

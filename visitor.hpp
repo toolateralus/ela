@@ -49,7 +49,6 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTCompAssign *node) override;
 };
 
-
 struct TypeVisitor : VisitorBase {
   TypeVisitor(Context &context) : context(context){}
   Context &context;
