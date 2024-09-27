@@ -42,6 +42,7 @@ void test_if_1 () {
   } else  {
     assert("Unexpected case", false);
   };
+  assert("This is a FRICKEN FAILURE!", false);
 };
 void test_if_2 () {
   s32 v  = 1;

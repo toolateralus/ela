@@ -24,7 +24,7 @@ template <class T> using _array = jstl::Vector<T>;
 
 #define assert(message, condition)                                                      \
   if (condition == false)                                                      \
-    throw std::runtime_error("assertion: " #condition " failed" + std::string(message));
+    throw std::runtime_error("\e[33massertion: " #condition " failed :: \e[31m" + std::string(message));
 
 #include <iostream>
 #include <iomanip>
@@ -40,7 +40,7 @@ struct _test {
         function();
         std::cout << "\033[1;32m[passed]\033[0m\n";
     } catch (const std::runtime_error &e) {
-        std::cout << "\033[1;31m[failed]\033[0m\n";
+        std::cout << "\033[1;31m[failed]...\n" << e.what() << "\033[0m\n";
     }
 }
 };
