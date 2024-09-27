@@ -72,6 +72,7 @@ enum struct TType {
   False,
   Null,
   Varargs,
+  Directive
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -80,6 +81,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Directive);
     TTYPE_CASE(Varargs);
     TTYPE_CASE(True);
     TTYPE_CASE(False);
@@ -206,14 +208,14 @@ struct Lexer {
   struct State {
     State(const std::string &input, size_t file_idx, size_t input_len)
         : input(input), file_idx(file_idx), input_len(input_len) {}
-    const std::string &input;
-    State() = delete;
-    std::vector<Token> queue;
+        
+    std::string input {};
+    std::vector<Token> queue {};
     size_t pos = 0;
     size_t col = 1;
     size_t line = 1;
-    size_t file_idx;
-    const size_t input_len;
+    size_t file_idx {};
+    size_t input_len {};
 
     static State from_file(const std::string &input,
                            const std::string &filename) {
@@ -250,6 +252,7 @@ struct Lexer {
 
   const std::unordered_map<std::string, TType> operators{
       {"...", TType::Varargs},
+      {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},
       {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},
       {"->", TType::Arrow},     {"..", TType::Range},

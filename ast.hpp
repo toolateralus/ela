@@ -6,9 +6,13 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include <any>
+#include <filesystem>
 #include <format>
+#include <fstream>
+#include <functional>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
+#include <sstream>
 #include <vector>
 
 extern jstl::Arena ast_arena;
@@ -274,21 +278,31 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTWhile *node) = 0;                                  \
   virtual std::any visit(ASTCompAssign *node) = 0;
 
+
+
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
-      : state(Lexer::State::from_file(contents, filename)), context(context) {
-    tok = lexer.get_token(state);
+      : states({Lexer::State::from_file(contents, filename)}), context(context) {
+    init_directive_routines();
+    tok = lexer.get_token(states.back());
   }
 
   Context &context;
-
+ 
   const Token &peek() const { return tok; }
 
   inline Token eat() {
     auto tok = this->tok;
     token_frames.back().push_back(tok);
-    this->tok = lexer.get_token(state);
+    this->tok = lexer.get_token(states.back());
+    
+    // pop the state stack and move into the next stream.
+    if (this->tok.is_eof() && states.size() > 1) {
+      states.pop_back();
+      this->tok = lexer.get_token(states.back());
+    }
+    
     return tok;
   }
 
@@ -311,7 +325,8 @@ struct Parser {
 
   Token tok = Token::Eof();
   Lexer lexer{};
-  Lexer::State state;
+  
+  std::vector<Lexer::State> states;
   
   std::vector<std::vector<Token>> token_frames = {};
   
@@ -323,6 +338,31 @@ struct Parser {
     token_frames.pop_back();
   }
   
+  
+void process_directive(const std::string &identifier);
+
+struct DirectiveRoutine {
+  std::string identifier;
+  std::function<void(Parser *parser)> run;
+};
+
+jstl::Vector<DirectiveRoutine> directive_routines;
+
+inline void init_directive_routines() {
+  directive_routines.push(DirectiveRoutine {
+    .identifier = "include",
+    .run = [](Parser *parser) static {
+      auto filename = parser->expect(TType::String).value;
+      if (!std::filesystem::exists(filename)) {
+        throw_error(std::format("Couldn't find included file: {}", filename), ERROR_CRITICAL, {});
+      }
+      std::stringstream ss;
+      std::ifstream isftr(filename);
+      ss << isftr.rdbuf();
+      parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+    }
+  });
+}
   
   ASTType *parse_type();
 

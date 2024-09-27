@@ -6,11 +6,34 @@
 #include <cassert>
 #include <format>
 
+void Parser::process_directive(const std::string &identifier) {
+  for (const auto &routine: directive_routines) {
+    if (routine.identifier == identifier) {
+      routine.run(this);
+      return;
+    }
+  }
+  
+  throw_error(
+      std::format("failed to call unknown directive routine: {}", identifier),
+      ERROR_FAILURE, {});
+}
+
+
 ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
 
   while (tok.type != TType::Eof) {
+    
+    if (tok.type == TType::Directive) {
+      eat();
+      auto identifer = expect(TType::Identifier).value;
+      process_directive(identifer);
+      if (semicolon()) eat();
+      continue;
+    }
+    
     program->statements.push(parse_statement());
     if (semicolon())
       eat();
@@ -614,3 +637,4 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
