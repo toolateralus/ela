@@ -1,0 +1,4 @@
+*
+!*.ela
+!boilerplate.hpp
+!.gitignore
