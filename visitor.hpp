@@ -79,6 +79,8 @@ struct TypeVisitor : VisitorBase {
 
 
 struct EmitVisitor : VisitorBase {
+  bool emit_default_args = false;
+  
   std::stringstream header {};
   std::stringstream code {};
   std::stringstream *ss {};

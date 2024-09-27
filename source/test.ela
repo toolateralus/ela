@@ -163,3 +163,24 @@ test_malloc :: () {
     ptr = null;
     assert("freed ptr and set to null was not == null", ptr == null);
 }
+
+many_params :: (f32 a, f32 b, f32 c, f32 d = 1.0) -> f32 {
+    return a * b * c * d;
+}
+
+mul_params :: (f32 n, f32 f) -> f32 {
+    return n * f; 
+}
+#test
+test_param :: () {
+    assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
+    assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
+}
+
+returns :: () -> s32  { 
+    return 1; 
+}
+#test
+test_return_value :: () {
+    assert("function expected to return 1", returns() == 1);
+}

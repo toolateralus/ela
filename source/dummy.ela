@@ -1,25 +1,5 @@
 #import core;
 
-#foreign system :: (string cmd) -> int;
-
-#test test_something :: () {
-	assert("junk", false);
-}
-
-// this is dumb but cool lol.
-string test_runner = #read "run_test.sh";
-
 main :: (s32 argc, char **argv) -> s32 {
-	s32 *buffer = malloc(4*4);
-	
-	printf("%p\n", buffer);
-	
-	s32 derefd = *buffer;
-	
-	int v;
-	
-	int *v1 = &v;
-	
-	printf("fabs(-1.0f)==%f\n", fabs(-1.0));
 	return 0;
 }
