@@ -58,7 +58,7 @@ int find_type_id(const std::string &name,
 
   if (base_id != -1) {
     auto t = get_type(base_id);
-    printf("creating type: %s\n", t->base.c_str());
+    printf("creating type: %s\n", t->to_string().c_str());
     return create_type((TypeKind)t->kind, name, nullptr, type_extensions);
   }
 
