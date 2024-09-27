@@ -67,7 +67,7 @@ enum struct TType {
   CompXor,
   CompSHL,
   CompSHR,
-  
+
   True,
   False,
   Null,
@@ -178,7 +178,21 @@ struct SourceLocation {
 };
 
 struct Token {
-
+  inline bool is_relational() const {
+    switch (type) {
+    case TType::LT:
+    case TType::GT:
+    case TType::EQ:
+    case TType::NEQ:
+    case TType::LE:
+    case TType::GE:
+    case TType::LogicalOr:
+    case TType::LogicalAnd:
+      return true;
+    default:
+      return false;
+    }
+  }
   inline bool is_comp_assign() const {
     return type == TType::CompAdd || type == TType::CompSub ||
            type == TType::CompMul || type == TType::CompDiv ||
@@ -208,14 +222,14 @@ struct Lexer {
   struct State {
     State(const std::string &input, size_t file_idx, size_t input_len)
         : input(input), file_idx(file_idx), input_len(input_len) {}
-        
-    std::string input {};
-    std::vector<Token> queue {};
+
+    std::string input{};
+    std::vector<Token> queue{};
     size_t pos = 0;
     size_t col = 1;
     size_t line = 1;
-    size_t file_idx {};
-    size_t input_len {};
+    size_t file_idx{};
+    size_t input_len{};
 
     static State from_file(const std::string &input,
                            const std::string &filename) {
@@ -244,15 +258,13 @@ struct Lexer {
       {"while", TType::While},
       {"if", TType::If},
       {"else", TType::Else},
-      
+
       {"true", TType::True},
       {"false", TType::False},
-      {"null", TType::Null}
-      };
+      {"null", TType::Null}};
 
   const std::unordered_map<std::string, TType> operators{
-      {"...", TType::Varargs},
-      {"#", TType::Directive},
+      {"...", TType::Varargs},  {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},
       {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},
       {"->", TType::Arrow},     {"..", TType::Range},

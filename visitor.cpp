@@ -446,15 +446,24 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
+  
   validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
-  // for now we just return the lhs.
+  
+  if (node->op.is_relational()) {
+    return find_type_id("bool", {});    
+  }
   return left;
 }
 
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
-  // TODO: type convert certain operations where neccesary, like ! returns a
-  // boolean regardless of it's operands types.
-  return node->operand->accept(this);
+  auto operand_ty = int_from_any(node->operand->accept(this));
+  auto conversion_rule = type_conversion_rule(get_type(operand_ty), get_type(find_type_id("bool", {})));
+  auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
+  
+  if (node->op.type == TType::Not && can_convert) {
+     return find_type_id("bool", {});
+  }
+  return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = context.current_scope->lookup(node->value.value);
@@ -474,6 +483,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return find_type_id("s32", {});
   case ASTLiteral::Float:
     return find_type_id("f32", {});
+  case ASTLiteral::RawString:
   case ASTLiteral::String:
     return find_type_id("string", {});
     break;

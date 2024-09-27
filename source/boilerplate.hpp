@@ -15,6 +15,7 @@ using u16 = uint16_t;
 using s8 = int8_t;
 using u8 = uint8_t;
 
+using string = const char *;
 
 template<class T>
 using _array = jstl::Vector<T>;

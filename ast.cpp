@@ -6,11 +6,10 @@
 #include <cassert>
 #include <format>
 
-void Parser::process_directive(const std::string &identifier) {
+Nullable<ASTExpr> Parser::process_directive(const std::string &identifier) {
   for (const auto &routine: directive_routines) {
     if (routine.identifier == identifier) {
-      routine.run(this);
-      return;
+      return routine.run(this);
     }
   }
   
@@ -222,6 +221,7 @@ ASTBlock *Parser::parse_block() {
   end_token_frame(block);
   return block;
 }
+
 ASTExpr *Parser::parse_expr() {
   auto expr = parse_assignment(nullptr);
   return expr;
@@ -411,6 +411,11 @@ ASTExpr *Parser::parse_postfix() {
 }
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
+  
+  // if theres a #... that returns a value, use that.
+  if (auto directive_expr = try_parse_directive_expr()) {
+    return directive_expr.get();
+  }
 
   switch (tok.type) {
   case TType::Identifier: {

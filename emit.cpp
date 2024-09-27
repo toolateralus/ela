@@ -125,8 +125,11 @@ std::any EmitVisitor::visit(ASTCall *node) {
 std::any EmitVisitor::visit(ASTLiteral *node) {
   if (node->tag == ASTLiteral::Null) {
     ss << "nullptr";
-  } if (node->tag == ASTLiteral::String) {
+  } else if (node->tag == ASTLiteral::String) {
     ss << std::format("\"{}\"", node->value);
+  } else if (node->tag == ASTLiteral::RawString) {
+    // TODO: search for a pattern '__()__' for example, that doesn't exist at all in the string.
+    ss << std::format("R\"__({})__\"", node->value);
   } else {
     ss << node->value;
   }
@@ -145,16 +148,15 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTBinExpr *node) {
-  
-  // if (node->op.type == TType::Assign) {
-  //   indented("");
-  // }
-  
+  // TODO: Figure out how we want to control custom precedence. Right now,
+  // TODO(cont): We'll just parenthesize every single sub-expression;
+  ss << "(";
   auto left = node->left->accept(this);
   space();
   ss << node->op.value;; 
   space();
   auto right = node->right->accept(this);
+  ss << ")";
   return {};
 }
 

@@ -101,13 +101,19 @@ struct CompileCommand {
     std::ifstream stream(input_path);
     std::stringstream ss;
     ss << stream.rdbuf();
+    
+    if (ss.str().empty()) {
+      throw std::runtime_error(std::format("\e[31mError: {} is empty.\e[0m", input_path.string()));
+    }
+    
     return ss.str();
   }
 
   ASTProgram *process_ast(Context &context) {
+    auto input = read_input_file();
     original_path = std::filesystem::current_path();
     std::filesystem::current_path(input_path.parent_path());
-    Parser parser(read_input_file(), input_path, context);
+    Parser parser(input, input_path, context);
     ASTProgram *root = parser.parse();
     TypeVisitor typer{context};
     typer.visit(root);

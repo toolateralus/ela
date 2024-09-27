@@ -1,31 +1,24 @@
+(CONTROL FLOW):
+	Add control flow stuff to 
+	While
+	For
+	etc.
+	
 
- (CONTROL FLOW):
- (started, cooper pls help :3) {
- 	We need to type check and control flow check our blocks.
- 	For example, a function needs to know in which all control paths, a return could occur.
- 	And if this is present, maybe in the form of a BLOCK_FLAGS enum,
- 	We need to be able to ensure all of these paths have homogenous types,
- 	and that all paths return a value if neccesary.
-  }
-
- 
- (PARTIALLY DONE): 
- (not started) {
-  better typing in expressions  (||, != return bool) etc.
+-- TODO:
+better typing in expressions  (||, != return bool) etc.
   explicit type conversions, implicit type conversions, 
  			added function types and better type info.
  			no conversion table yet: that can be done later easily.
-  
- }
  
-If all above is done and very well tested: 
- Next phase
- : [3] # directives, and the ability to define custom ones that just run routines.
- : [4] ffi with C. #extern or #foreign or something for declarations, linking against libc.
- : [0] First class types. make(int*) etc.
+Next phase
+ 
+ : [0] ffi with C. #extern or #foreign or something for declarations;
+ 
+ // less important
+ : [1] First class types. make(int*) etc.
  : [1] Function pointers, first class functions.
  
-
 Next phase
  : [0] Struct Declarations
  : [1] Method Declarations

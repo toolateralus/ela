@@ -24,7 +24,7 @@ template <class T> T *ast_alloc(size_t n = 1) {
 struct VisitorBase;
 
 struct ASTNode {
-  std::vector<Token> source_tokens {};
+  std::vector<Token> source_tokens{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
 };
@@ -72,7 +72,7 @@ struct ASTProgram : ASTNode {
 struct ASTType : ASTNode {
   std::string base;
   TypeExtensionInfo extension_info{};
-  
+
   int resolved_type = Type::invalid_id;
   static ASTType *get_void() {
     static ASTType *type = [] {
@@ -132,6 +132,7 @@ struct ASTLiteral : ASTExpr {
     Integer,
     Float,
     String,
+    RawString,
     Bool,
     Null,
   } tag;
@@ -278,31 +279,30 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTWhile *node) = 0;                                  \
   virtual std::any visit(ASTCompAssign *node) = 0;
 
-
-
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
-      : states({Lexer::State::from_file(contents, filename)}), context(context) {
+      : states({Lexer::State::from_file(contents, filename)}),
+        context(context) {
     init_directive_routines();
     tok = lexer.get_token(states.back());
   }
 
   Context &context;
- 
+
   const Token &peek() const { return tok; }
 
   inline Token eat() {
     auto tok = this->tok;
     token_frames.back().push_back(tok);
     this->tok = lexer.get_token(states.back());
-    
+
     // pop the state stack and move into the next stream.
     if (this->tok.is_eof() && states.size() > 1) {
       states.pop_back();
       this->tok = lexer.get_token(states.back());
     }
-    
+
     return tok;
   }
 
@@ -313,57 +313,91 @@ struct Parser {
 
   inline Token expect(TType type) {
     if (peek().type != type) {
-      throw_error(
-          std::format("Expected {}, got {}", TTypeToString(type),
-                                 TTypeToString(peek().type)),
-          ERROR_CRITICAL,
-          token_frames.back()
-      );
+      throw_error(std::format("Expected {}, got {}", TTypeToString(type),
+                              TTypeToString(peek().type)),
+                  ERROR_CRITICAL, token_frames.back());
     }
     return eat();
   }
 
   Token tok = Token::Eof();
   Lexer lexer{};
-  
+
   std::vector<Lexer::State> states;
-  
+
   std::vector<std::vector<Token>> token_frames = {};
-  
-  inline void begin_token_frame() {
-    token_frames.push_back({});
-  }
+
+  inline void begin_token_frame() { token_frames.push_back({}); }
   inline void end_token_frame(ASTNode *node) {
-    if (node) node->source_tokens = token_frames.back();
+    if (node)
+      node->source_tokens = token_frames.back();
     token_frames.pop_back();
   }
-  
-  
-void process_directive(const std::string &identifier);
 
-struct DirectiveRoutine {
-  std::string identifier;
-  std::function<void(Parser *parser)> run;
-};
+  Nullable<ASTExpr> process_directive(const std::string &identifier);
+  struct DirectiveRoutine {
+    std::string identifier;
+    std::function<Nullable<ASTExpr>(Parser *parser)> run;
+  };
+  jstl::Vector<DirectiveRoutine> directive_routines;
 
-jstl::Vector<DirectiveRoutine> directive_routines;
-
-inline void init_directive_routines() {
-  directive_routines.push(DirectiveRoutine {
-    .identifier = "include",
-    .run = [](Parser *parser) static {
-      auto filename = parser->expect(TType::String).value;
-      if (!std::filesystem::exists(filename)) {
-        throw_error(std::format("Couldn't find included file: {}", filename), ERROR_CRITICAL, {});
-      }
-      std::stringstream ss;
-      std::ifstream isftr(filename);
-      ss << isftr.rdbuf();
-      parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+  inline void init_directive_routines() {
+    // #include
+    {
+      directive_routines.push(DirectiveRoutine{
+          .identifier = "include", .run = [](Parser *parser) static {
+            auto filename = parser->expect(TType::String).value;
+            if (!std::filesystem::exists(filename)) {
+              throw_error(
+                  std::format("Couldn't find included file: {}", filename),
+                  ERROR_CRITICAL, {});
+            }
+            std::stringstream ss;
+            std::ifstream isftr(filename);
+            ss << isftr.rdbuf();
+            parser->states.push_back(
+                Lexer::State::from_file(ss.str(), filename));
+            return nullptr;
+          }});
     }
-  });
-}
-  
+
+    // #read
+    {
+      directive_routines.push({
+          .identifier = "read", .run = [](Parser *parser) {
+            auto filename = parser->expect(TType::String).value;
+            if (!std::filesystem::exists(filename)) {
+              throw_error(
+                  std::format("Couldn't find 'read' file: {}", filename),
+                  ERROR_CRITICAL, {});
+            }
+            std::stringstream ss;
+            std::ifstream isftr(filename);
+            ss << isftr.rdbuf();
+            auto string = ast_alloc<ASTLiteral>();
+            string->tag = ASTLiteral::RawString;
+            string->value = ss.str();
+            return string;
+          }});
+    }
+  }
+
+  Nullable<ASTExpr> try_parse_directive_expr() {
+    if (peek().type == TType::Directive) {
+      eat();
+      auto identifier = expect(TType::Identifier);
+      Nullable<ASTExpr> expr = process_directive(identifier.value);
+      if (expr.is_not_null()) {
+        return expr;
+      } else {
+        throw_error("Invalid directive in expression: directives in "
+                    "expressions must return a value.",
+                    ERROR_FAILURE, token_frames.back());
+      }
+    }
+    return nullptr;
+  }
+
   ASTType *parse_type();
 
   ASTProgram *parse();
@@ -377,7 +411,7 @@ inline void init_directive_routines() {
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
 
-  ASTCall *parse_call(const Token&);
+  ASTCall *parse_call(const Token &);
 
   ASTExpr *parse_expr();
   ASTExpr *parse_assignment(Token *);
