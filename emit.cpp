@@ -101,8 +101,11 @@ std::any EmitVisitor::visit(ASTReturn *node) {
 
 std::any EmitVisitor::visit(ASTArguments *node) {
   ss << "(";
-  for (const auto &arg : node->arguments) {
-    arg->accept(this);
+  for (int i = 0; i < node->arguments.size(); ++i) {
+    node->arguments[i]->accept(this);
+    if (i != node->arguments.size() - 1) {
+      ss << ", ";
+    }
   }
   ss << ")";
   return {};
@@ -122,6 +125,8 @@ std::any EmitVisitor::visit(ASTCall *node) {
 std::any EmitVisitor::visit(ASTLiteral *node) {
   if (node->tag == ASTLiteral::Null) {
     ss << "nullptr";
+  } if (node->tag == ASTLiteral::String) {
+    ss << std::format("\"{}\"", node->value);
   } else {
     ss << node->value;
   }
@@ -199,7 +204,14 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
 
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
-  node->return_type->accept(this);
+  
+  // we override main's return value to allow compilation without explicitly returning int from main.
+  if (node->name.value == "main") {
+    ss << "int";
+  } else {
+    node->return_type->accept(this);
+  }
+  
   space();
   ss << node->name.value;
   node->params->accept(this);  

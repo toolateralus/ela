@@ -281,6 +281,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   node->params->accept(this);
 
   FunctionTypeInfo info;
+  
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
@@ -519,7 +520,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
 
-  if (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params) {
+  if ((arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params) && !info->is_varargs) {
     throw_error(
         std::format("Function call '{}' has incorrect number of arguments. "
                         "Expected: {}, Found: {}",
@@ -528,7 +529,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         node->source_tokens
     );
   }
-
+  
   for (int i = 0; i < info->params_len; ++i) {
     // TODO: default parameters evade type checking
     if (arg_tys.size() <= i) {

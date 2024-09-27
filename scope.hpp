@@ -1,5 +1,6 @@
 #pragma once
 
+#include "type.hpp"
 #include <jstl/memory/arena.hpp>
 #include <string>
 #include <unordered_map>
@@ -43,6 +44,14 @@ static Scope *create_child(Scope *parent) {
 
 struct Context {
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  
+  Context() {
+    FunctionTypeInfo func_info {};
+    func_info.return_type = find_type_id("void", {});
+    func_info.is_varargs = true;
+    current_scope->insert("printf", find_type_id("", func_info, {}));
+  }
+  
   inline void enter_scope(Scope *scope = nullptr) {
     if (!scope) {
       scope = create_child(current_scope);

@@ -13,7 +13,11 @@ std::string FunctionTypeInfo::to_string() const {
       ss << ", ";
     }
   }
-  ss << ')';
+  
+  if (is_varargs) 
+    ss << ", ...)";
+  else ss << ')';
+  
   return ss.str();
 }
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,

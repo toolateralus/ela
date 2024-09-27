@@ -71,13 +71,16 @@ enum struct TType {
   True,
   False,
   Null,
+  Varargs,
 };
 
 #define TTYPE_CASE(type)                                                       \
   case TType::type:                                                            \
     return #type
+
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Varargs);
     TTYPE_CASE(True);
     TTYPE_CASE(False);
     TTYPE_CASE(Null);
@@ -246,6 +249,7 @@ struct Lexer {
       };
 
   const std::unordered_map<std::string, TType> operators{
+      {"...", TType::Varargs},
       {".", TType::Dot},        {"!", TType::Not},
       {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},
       {"->", TType::Arrow},     {"..", TType::Range},
