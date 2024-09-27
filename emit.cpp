@@ -212,7 +212,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   if (!test_flag && node->flags == FUNCTION_TEST) {
     return {};
   } else if (test_flag && node->flags == FUNCTION_TEST) {
-    test_functions << "_test(\"" << node->name.value << "\", " << node->name.value << "),";
+    test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
   }
   
   if (test_flag && node->name.value == "main") {
@@ -283,7 +283,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    code << "const jstl::Vector<_test> tests" << "{" << test_init << "};\n";
+    code << "const jstl::Vector<__COMPILER_GENERATED_TEST> tests" << "{" << test_init << "};\n";
     code << "__TEST_RUNNER_MAIN;";
   }
   

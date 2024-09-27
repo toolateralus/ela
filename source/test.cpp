@@ -42,7 +42,6 @@ void test_if_1 () {
   } else  {
     assert("Unexpected case", false);
   };
-  assert("This is a FRICKEN FAILURE!", false);
 };
 void test_if_2 () {
   s32 v  = 1;
@@ -56,27 +55,30 @@ void test_if_2 () {
 void test_comp_assign () {
   s32 deref  = 1;
   deref += deref;
-  assert("deref should be 2", (deref == 2));
+  assert("+=", (deref == 2));
   deref -= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("-=", (deref == 0));
   deref *= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("*=)", (deref == 0));
   (deref = 2);
   deref /= deref;
-  assert("deref should be 1", (deref == 1));
+  assert("/=", (deref == 1));
   (deref = 2);
   deref %= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("%=", (deref == 0));
   deref &= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("&=", (deref == 0));
   deref |= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("|=", (deref == 0));
   deref ^= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("^=", (deref == 0));
   deref <<= deref;
-  assert("deref should be 0", (deref == 0));
+  assert("<<=", (deref == 0));
   deref >>= deref;
-  assert("deref should be 0", (deref == 0));
+  assert(">>=", (deref == 0));
+};
+void failure_case () {
+  assert("This should fail", false);
 };
 void test_operators () {
   s32 left  = 1;
@@ -120,7 +122,7 @@ void test_operators () {
   (result = (left >> right));
   assert("left >> right should be 0", (result == 0));
 };
-void test_bool () {
+void test_relational_results () {
   bool test1  = ((1 == (1 + 2)) || (1 == 2));
   bool test2  = ((3 > 2) && (2 < 4));
   bool test3  = (!(5 <= 5) || (6 >= 6));
@@ -130,8 +132,5 @@ void test_bool () {
   assert("test3 should be true", (test3 == true));
   assert("test4 should be true", (test4 == true));
 };
-void abs () {
-  assert("0 should equal 0", (0 == 0));
-};
-const jstl::Vector<_test> tests{_test("test_if_3", test_if_3),_test("test_for", test_for),_test("test_while", test_while),_test("test_if_1", test_if_1),_test("test_if_2", test_if_2),_test("test_comp_assign", test_comp_assign),_test("test_operators", test_operators),_test("test_bool", test_bool),_test("abs", abs)};
+const jstl::Vector<__COMPILER_GENERATED_TEST> tests{__COMPILER_GENERATED_TEST("test_if_3", test_if_3),__COMPILER_GENERATED_TEST("test_for", test_for),__COMPILER_GENERATED_TEST("test_while", test_while),__COMPILER_GENERATED_TEST("test_if_1", test_if_1),__COMPILER_GENERATED_TEST("test_if_2", test_if_2),__COMPILER_GENERATED_TEST("test_comp_assign", test_comp_assign),__COMPILER_GENERATED_TEST("failure_case", failure_case),__COMPILER_GENERATED_TEST("test_operators", test_operators),__COMPILER_GENERATED_TEST("test_relational_results", test_relational_results)};
 __TEST_RUNNER_MAIN;

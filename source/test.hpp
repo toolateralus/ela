@@ -5,6 +5,6 @@ void test_while  ();
 void test_if_1  ();
 void test_if_2  ();
 void test_comp_assign  ();
+void failure_case  ();
 void test_operators  ();
-void test_bool  ();
-void abs  ();
+void test_relational_results  ();

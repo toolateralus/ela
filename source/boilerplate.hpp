@@ -24,25 +24,26 @@ template <class T> using _array = jstl::Vector<T>;
 
 #define assert(message, condition)                                                      \
   if (condition == false)                                                      \
-    throw std::runtime_error("\e[33massertion: " #condition " failed :: \e[31m" + std::string(message));
+    throw std::runtime_error("\e[33m '" #condition "' \e[31m" + std::string(message));
 
 #include <iostream>
 #include <iomanip>
 
-struct _test {
-  _test() {}
-  _test(const char *name, void (*function)()): name(name), function(function) { }
+struct __COMPILER_GENERATED_TEST {
+  __COMPILER_GENERATED_TEST() {}
+  __COMPILER_GENERATED_TEST(const char *name, void (*function)()): name(name), function(function) { }
   const char *name;
   void (*function)();
   void run() const {
-    std::cout << "\033[1;33mtesting \033[1;37m...\033[1;36m" << std::setw(20) << std::left << name;
+    std::cout << "\033[1;33mtesting \033[1;37m...\033[1;36m" << std::setw(40) << std::left << name;
     try {
         function();
         std::cout << "\033[1;32m[passed]\033[0m\n";
     } catch (const std::runtime_error &e) {
-        std::cout << "\033[1;31m[failed]...\n" << e.what() << "\033[0m\n";
+        std::cout << "\033[1;31m[failed]\033[0m\n";
+        std::cout << std::setw(40) << std::left << "" << e.what() << "\n";
     }
-}
+  }
 };
 
 #define __TEST_RUNNER_MAIN                                                                                               \

@@ -1,3 +1,4 @@
+
 #test
 test_if_3 :: () {
     s32 v = 1;
@@ -64,27 +65,32 @@ test_if_2 :: () {
 test_comp_assign :: () {
     s32 deref = 1;
     deref += deref; 
-    assert("deref should be 2", deref == 2);
+    assert("+=", deref == 2);
     deref -= deref;
-    assert("deref should be 0", deref == 0);
+    assert("-=", deref == 0);
     deref *= deref; 
-    assert("deref should be 0", deref == 0);
+    assert("*=)", deref == 0);
     deref = 2;
     deref /= deref;
-    assert("deref should be 1", deref == 1);
+    assert("/=", deref == 1);
     deref = 2;
     deref %= deref; 
-    assert("deref should be 0", deref == 0);
+    assert("%=", deref == 0);
     deref &= deref;
-    assert("deref should be 0", deref == 0);
+    assert("&=", deref == 0);
     deref |= deref; 
-    assert("deref should be 0", deref == 0);
+    assert("|=", deref == 0);
     deref ^= deref;
-    assert("deref should be 0", deref == 0);
+    assert("^=", deref == 0);
     deref <<= deref; 
-    assert("deref should be 0", deref == 0);
+    assert("<<=", deref == 0);
     deref >>= deref;
-    assert("deref should be 0", deref == 0);
+    assert(">>=", deref == 0);
+}
+
+#test
+failure_case :: () {
+    assert("This should fail", false);
 }
 
 #test
@@ -133,7 +139,7 @@ test_operators :: () {
 }
 
 #test
-test_bool :: () {
+test_relational_results :: () {
     bool test1 = (1 == 1 + 2) || 1 == 2;
     bool test2 = (3 > 2) && (2 < 4);
     bool test3 = !(5 <= 5) || (6 >= 6);
@@ -142,9 +148,4 @@ test_bool :: () {
     assert("test2 should be true", test2 == true);
     assert("test3 should be true", test3 == true);
     assert("test4 should be true", test4 == true);
-}
-
-#test
-abs :: () {
-    assert("0 should equal 0", 0 == 0);
 }
