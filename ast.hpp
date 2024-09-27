@@ -150,6 +150,7 @@ struct ASTParamsDecl : ASTStatement {
 };
 
 struct ASTFuncDecl : ASTStatement {
+  int flags = 0;
   ASTParamsDecl *params;
   ASTBlock *block;
   Token name;

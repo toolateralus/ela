@@ -1,3 +1,4 @@
+#include "core.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -205,8 +206,20 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
 }
 
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
-  auto symbol = context.current_scope->lookup(node->name.value);
   
+  auto test_flag = get_compilation_flag("test");
+  
+  if (!test_flag && node->flags == FUNCTION_TEST) {
+    return {};
+  } else if (test_flag && node->flags == FUNCTION_TEST) {
+    test_functions << "_test(\"" << node->name.value << "\", " << node->name.value << "),";
+  }
+  
+  if (test_flag && node->name.value == "main") {
+    return {};
+  }
+  
+  auto symbol = context.current_scope->lookup(node->name.value);
   
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
@@ -221,7 +234,6 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   node->params->accept(this);  
   node->block->accept(this);
   
-  
   if (node->name.value != "main") {
     use_header();
     node->return_type->accept(this);
@@ -230,6 +242,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     (*ss) << ";\n";
     use_code();
   }
+  
   
   return {};
 }
@@ -254,12 +267,24 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 }
 
 std::any EmitVisitor::visit(ASTProgram *node) {
+  const auto testing = get_compilation_flag("test");
+  
   header <<R"_(#include "boilerplate.hpp")_" << '\n';
+  
   
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
     newline();
   }
+  
+  if (testing) {
+    auto test_init = test_functions.str();
+    if (test_init.ends_with(',')) {
+      test_init.pop_back();
+    }
+    code << "__TEST_RUNNER_MAIN(auto tests = " << "{" << test_init << "});";
+  }
+  
   return {};
 }

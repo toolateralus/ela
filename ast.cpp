@@ -63,7 +63,7 @@ void Parser::init_directive_routines() {
         auto name = parser->expect(TType::Identifier);
         parser->expect(TType::DoubleColon);
         auto func = parser->parse_function_declaration(name);
-        // func.flags |= FUNCTION_TEST; 
+        func->flags |= FUNCTION_TEST; 
         return func;
       }
     });

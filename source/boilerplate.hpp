@@ -19,19 +19,18 @@ using string = const char *;
 
 template <class T> using _array = jstl::Vector<T>;
 
-
-
 #ifdef TESTING
 #include <stdexcept>
 
 #define assert(condition)                                                      \
   if (condition == false)                                                      \
     throw std::runtime_error("assertion: " #condition " failed");
-    
+
 struct _test {
+  _test(const char *name, void (*function)()): name(name), function(function) { }
   const char *name;
   void (*function)();
-  void run() {
+  void run() const {
     printf("\033[1;34mrunning test: \033[1;33m%s\033[0m...\n", name);
     try {
       function();
@@ -42,13 +41,15 @@ struct _test {
   }
 };
 
-#define __TEST_RUNNER_MAIN                                                     \
-  int main() {                                                                 \
-    for (const auto &test : tests) {                                           \
-      test.run();                                                              \
-    }                                                                          \
-  }                                                                            \
+#define __TEST_RUNNER_MAIN(INIT_TESTS)                                                                                               \
+  int main() {                                                                                                                       \
+    INIT_TESTS;                                                                                                                       \
+    for (const auto &test : tests) {                                                                                                 \
+      test.run();                                                                                                                    \
+    }                                                                                                                                \
+  }
 
-#else 
+#else
 #include <assert.h>
 #endif
+

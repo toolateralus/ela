@@ -8,7 +8,7 @@ struct VisitorBase {
   
   enum VisitorFlags {
     FLAG_NO_STATE = 0,
-    FLAG_VISITING_FUNCTION = 1 << 1,
+
     FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
   };
   
@@ -82,6 +82,7 @@ struct EmitVisitor : VisitorBase {
   std::stringstream header {};
   std::stringstream code {};
   std::stringstream *ss {};
+  std::stringstream test_functions {};
   
   int indentLevel = 0;
   Context &context;

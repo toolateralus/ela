@@ -286,6 +286,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
+  info.flags = node->flags;
   
   auto params = node->params->params;
   for (const auto &param : params) {
@@ -303,9 +304,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   auto return_type = find_type_id("void", {});
 
   visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
-  visitor_flags |= VisitorBase::FLAG_VISITING_FUNCTION;
   return_type = int_from_any(node->block->accept(this));
-  visitor_flags &= ~VisitorBase::FLAG_VISITING_FUNCTION;
   
   validate_type_compatability(return_type, info.return_type, node->source_tokens, "invalid function return type: {} {}", std::format("function: {}", node->name.value));
   return {};
@@ -327,8 +326,7 @@ const auto check_return_type_consistency (int &return_type, int new_type, ASTNod
 // TODO: wrangle this absolute mess of a function. I have no fucking idea how we
 // will ever fix this.
 std::any TypeVisitor::visit(ASTBlock *node) {
-  bool fn_root_level = visitor_flags & FLAG_VISITING_FUNCTION &&
-                       visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
+  bool fn_root_level = visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
 
   if (fn_root_level) {
     visitor_flags &= ~FLAG_FUNCTION_ROOT_LEVEL_BLOCK;

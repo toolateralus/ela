@@ -1,3 +1,2 @@
 #include "boilerplate.hpp"
-
-void test_something ();
+void test_something  ();
