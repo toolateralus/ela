@@ -22,28 +22,31 @@ template <class T> using _array = jstl::Vector<T>;
 #ifdef TESTING
 #include <stdexcept>
 
-#define assert(condition)                                                      \
+#define assert(message, condition)                                                      \
   if (condition == false)                                                      \
-    throw std::runtime_error("assertion: " #condition " failed");
+    throw std::runtime_error("assertion: " #condition " failed" + std::string(message));
+
+#include <iostream>
+#include <iomanip>
 
 struct _test {
+  _test() {}
   _test(const char *name, void (*function)()): name(name), function(function) { }
   const char *name;
   void (*function)();
   void run() const {
-    printf("\033[1;34mrunning test: \033[1;33m%s\033[0m...\n", name);
+    std::cout << "\033[1;33mtesting \033[1;37m...\033[1;36m" << std::setw(20) << std::left << name;
     try {
-      function();
-      printf("\033[1;32mpassed\033[0m\n");
+        function();
+        std::cout << "\033[1;32m[passed]\033[0m\n";
     } catch (const std::runtime_error &e) {
-      printf("\033[1;31mfailed: %s\033[0m\n", e.what());
+        std::cout << "\033[1;31m[failed]\033[0m\n";
     }
-  }
+}
 };
 
-#define __TEST_RUNNER_MAIN(INIT_TESTS)                                                                                               \
+#define __TEST_RUNNER_MAIN                                                                                               \
   int main() {                                                                                                                       \
-    INIT_TESTS;                                                                                                                       \
     for (const auto &test : tests) {                                                                                                 \
       test.run();                                                                                                                    \
     }                                                                                                                                \

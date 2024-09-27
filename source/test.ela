@@ -1,127 +1,150 @@
-
-
-test_if_3 :: () -> s32 {
-	s32 v = 1;
-	if !v {
-		return 0;
-	} else if v {
-		return 1;
-	} else {
-		return 0;
-	}
+#test
+test_if_3 :: () {
+    s32 v = 1;
+    if !v {
+        assert("v should be 0", v == 0);
+    } else if v {
+        assert("v should be 1", v == 1);
+    } else {
+        assert("Unexpected case", false);
+    }
 }
 
-test_for :: () -> s32 {
-	for s32 i; i < 10; ++i {
-		return 0;
-	}
-	s32[] arr;
-	for v; arr {
-		return 0;
-	}
-	return 1;
+#test
+test_for :: () {
+    for s32 i; i < 10; ++i {
+        assert("i should be less than 10", i < 10);
+        return;
+    }
+    s32[] arr;
+    for v; arr {
+        assert("Unexpected case in array loop", false);
+        return;
+    }
+    assert("End of test_for reached", true);
 }
 
-test_while :: () -> s32 {
-	s32* n;
-	s32 v;
-	bool b = true;
-	if b {
-		
-	}
-	while v {
-		return 1;
-	}
-	return 1;
+#test
+test_while :: () {
+    s32* n;
+    s32 v;
+    bool b = true;
+    if b {
+        assert("b should be true", b == true);
+    }
+    while v {
+        assert("v should not be 0", v != 0);
+        return;
+    }
+    assert("End of test_while reached", true);
 }
 
-test_if_1 :: () -> s32  {
-	s32 v = 1;
-	if v {
-		return 1;
-	}
-	return 0;
+#test
+test_if_1 :: () {
+    s32 v = 1;
+    if v {
+        assert("v should be 1", v == 1);
+    } else {
+        assert("Unexpected case", false);
+    }
 }
 
-test_if_2 :: () -> s32 {
-	s32 v = 1;
-	if v {
-		return 1;
-	} else {
-		return 0;
-	}
-	return 1;
+#test
+test_if_2 :: () {
+    s32 v = 1;
+    if v {
+        assert("v should be 1", v == 1);
+    } else {
+        assert("Unexpected case", false);
+    }
+    assert("End of test_if_2 reached", true);
 }
 
+#test
 test_comp_assign :: () {
-	s32 deref = 1;
-	deref += deref; 
-	deref -= deref;
-	deref *= deref; 
-	deref /= deref;
-	deref %= deref; 
-	deref &= deref;
-	deref |= deref; 
-	deref ^= deref;
-	deref <<= deref; 
-	deref >>= deref;
+    s32 deref = 1;
+    deref += deref; 
+    assert("deref should be 2", deref == 2);
+    deref -= deref;
+    assert("deref should be 0", deref == 0);
+    deref *= deref; 
+    assert("deref should be 0", deref == 0);
+    deref = 2;
+    deref /= deref;
+    assert("deref should be 1", deref == 1);
+    deref = 2;
+    deref %= deref; 
+    assert("deref should be 0", deref == 0);
+    deref &= deref;
+    assert("deref should be 0", deref == 0);
+    deref |= deref; 
+    assert("deref should be 0", deref == 0);
+    deref ^= deref;
+    assert("deref should be 0", deref == 0);
+    deref <<= deref; 
+    assert("deref should be 0", deref == 0);
+    deref >>= deref;
+    assert("deref should be 0", deref == 0);
 }
 
-test_operators :: () -> s32 {
-	s32 left;
-	s32 right;
-	s32 result;
-	bool result_bool;
-	result_bool = left == right;
-	result_bool = left != right;
-	result_bool = left < right;
-	result_bool = left > right;
-	result_bool = left <= right;
-	result_bool = left >= right;
-	result_bool = left && right;
-	result_bool = left || right;
-	
-	result = left + right;
-	result = left - right;
-	result = left * right;
-	result = left / right;
-	result = left % right;
-	result = left & right;
-	result = left | right;
-	result = left ^ right;
-	result = left << right;
-	result = left >> right;
-	return result;
+#test
+test_operators :: () {
+    s32 left = 1;
+    s32 right = 1;
+    s32 result;
+    bool result_bool;
+    result_bool = left == right;
+    assert("left should equal right", result_bool == true);
+    result_bool = left != right;
+    assert("left should not equal right", result_bool == false);
+    result_bool = left < right;
+    assert("left should not be less than right", result_bool == false);
+    result_bool = left > right;
+    assert("left should not be greater than right", result_bool == false);
+    result_bool = left <= right;
+    assert("left should be less than or equal to right", result_bool == true);
+    result_bool = left >= right;
+    assert("left should be greater than or equal to right", result_bool == true);
+    result_bool = left && right;
+    assert("left and right should be true", result_bool == true);
+    result_bool = left || right;
+    assert("left or right should be true", result_bool == true);
+    
+    result = left + right;
+    assert("left + right should be 2", result == 2);
+    result = left - right;
+    assert("left - right should be 0", result == 0);
+    result = left * right;
+    assert("left * right should be 1", result == 1);
+    result = left / right;
+    assert("left / right should be 1", result == 1);
+    result = left % right;
+    assert("left % right should be 0", result == 0);
+    result = left & right;
+    assert("left & right should be 1", result == 1);
+    result = left | right;
+    assert("left | right should be 1", result == 1);
+    result = left ^ right;
+    assert("left ^ right should be 0", result == 0);
+    result = left << right;
+    assert("left << right should be 2", result == 2);
+    result = left >> right;
+    assert("left >> right should be 0", result == 0);
 }
 
-sqrt :: (f32 f) -> f32 {
-	return f;
+#test
+test_bool :: () {
+    bool test1 = (1 == 1 + 2) || 1 == 2;
+    bool test2 = (3 > 2) && (2 < 4);
+    bool test3 = !(5 <= 5) || (6 >= 6);
+    bool test4 = (7 != 8) && (9 == 9);
+    assert("test1 should be false", test1 == false);
+    assert("test2 should be true", test2 == true);
+    assert("test3 should be true", test3 == true);
+    assert("test4 should be true", test4 == true);
 }
 
-test_bool :: () -> void {
-	bool test1 = (1 == 1 + 2) || 1 == 2;
-	bool test2 = (3 > 2) && (2 < 4);
-	bool test3 = !(5 <= 5) || (6 >= 6);
-	bool test4 = (7 != 8) && (9 == 9);
-	assert(test1 == false);
-	assert(test2 == true);
-	assert(test3 == true);
-	assert(test4 == true);
-}
-
-abs :: () -> s32 {
-	return 0;
-}
-
-main :: () {
-	assert(test_for() == 1);
-	assert(test_while() == 1);
-	assert(test_if_1() == 1);
-	assert(test_if_2() == 1);
-	test_comp_assign(); 
-	s32 result = test_operators();
-	assert(result == 0);
-	assert(sqrt(4.0) == 4.0);
-	test_bool();
-	assert(abs() == 0);
+#test
+abs :: () {
+    assert("0 should equal 0", 0 == 0);
 }

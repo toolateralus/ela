@@ -283,7 +283,8 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    code << "__TEST_RUNNER_MAIN(auto tests = " << "{" << test_init << "});";
+    code << "const jstl::Vector<_test> tests" << "{" << test_init << "};\n";
+    code << "__TEST_RUNNER_MAIN;";
   }
   
   return {};

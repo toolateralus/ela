@@ -1,114 +1,136 @@
-#include "boilerplate.hpp"
-s32 test_if_3 () {
+#define TESTING
+#include "test.hpp"
+void test_if_3 () {
   s32 v  = 1;
   if (!v) {
-    return 0;
+    assert("v should be 0", (v == 0));
   } else   if (v) {
-    return 1;
+    assert("v should be 1", (v == 1));
   } else  {
-    return 0;
+    assert("Unexpected case", false);
   };
 };
-s32 test_for () {
+void test_for () {
   for (s32 i {}; (i < 10); ++i) {
-    return 0;
+    assert("i should be less than 10", (i < 10));
+    return;
   };
   _array<s32> arr {};
   for (auto v : arr) {
-    return 0;
+    assert("Unexpected case in array loop", false);
+    return;
   };
-  return 1;
+  assert("End of test_for reached", true);
 };
-s32 test_while () {
+void test_while () {
   s32* n {};
   s32 v {};
   bool b  = true;
   if (b) {
+    assert("b should be true", (b == true));
   };
   while (v) {
-    return 1;
+    assert("v should not be 0", (v != 0));
+    return;
   };
-  return 1;
+  assert("End of test_while reached", true);
 };
-s32 test_if_1 () {
+void test_if_1 () {
   s32 v  = 1;
   if (v) {
-    return 1;
-  };
-  return 0;
-};
-s32 test_if_2 () {
-  s32 v  = 1;
-  if (v) {
-    return 1;
+    assert("v should be 1", (v == 1));
   } else  {
-    return 0;
+    assert("Unexpected case", false);
   };
-  return 1;
+};
+void test_if_2 () {
+  s32 v  = 1;
+  if (v) {
+    assert("v should be 1", (v == 1));
+  } else  {
+    assert("Unexpected case", false);
+  };
+  assert("End of test_if_2 reached", true);
 };
 void test_comp_assign () {
   s32 deref  = 1;
   deref += deref;
+  assert("deref should be 2", (deref == 2));
   deref -= deref;
+  assert("deref should be 0", (deref == 0));
   deref *= deref;
+  assert("deref should be 0", (deref == 0));
+  (deref = 2);
   deref /= deref;
+  assert("deref should be 1", (deref == 1));
+  (deref = 2);
   deref %= deref;
+  assert("deref should be 0", (deref == 0));
   deref &= deref;
+  assert("deref should be 0", (deref == 0));
   deref |= deref;
+  assert("deref should be 0", (deref == 0));
   deref ^= deref;
+  assert("deref should be 0", (deref == 0));
   deref <<= deref;
+  assert("deref should be 0", (deref == 0));
   deref >>= deref;
+  assert("deref should be 0", (deref == 0));
 };
-s32 test_operators () {
-  s32 left {};
-  s32 right {};
+void test_operators () {
+  s32 left  = 1;
+  s32 right  = 1;
   s32 result {};
   bool result_bool {};
   (result_bool = (left == right));
+  assert("left should equal right", (result_bool == true));
   (result_bool = (left != right));
+  assert("left should not equal right", (result_bool == false));
   (result_bool = (left < right));
+  assert("left should not be less than right", (result_bool == false));
   (result_bool = (left > right));
+  assert("left should not be greater than right", (result_bool == false));
   (result_bool = (left <= right));
+  assert("left should be less than or equal to right", (result_bool == true));
   (result_bool = (left >= right));
+  assert("left should be greater than or equal to right", (result_bool == true));
   (result_bool = (left && right));
+  assert("left and right should be true", (result_bool == true));
   (result_bool = (left || right));
+  assert("left or right should be true", (result_bool == true));
   (result = (left + right));
+  assert("left + right should be 2", (result == 2));
   (result = (left - right));
+  assert("left - right should be 0", (result == 0));
   (result = (left * right));
+  assert("left * right should be 1", (result == 1));
   (result = (left / right));
+  assert("left / right should be 1", (result == 1));
   (result = (left % right));
+  assert("left % right should be 0", (result == 0));
   (result = (left & right));
+  assert("left & right should be 1", (result == 1));
   (result = (left | right));
+  assert("left | right should be 1", (result == 1));
   (result = (left ^ right));
+  assert("left ^ right should be 0", (result == 0));
   (result = (left << right));
+  assert("left << right should be 2", (result == 2));
   (result = (left >> right));
-  return result;
-};
-f32 sqrt (f32 f) {
-  return f;
+  assert("left >> right should be 0", (result == 0));
 };
 void test_bool () {
   bool test1  = ((1 == (1 + 2)) || (1 == 2));
   bool test2  = ((3 > 2) && (2 < 4));
   bool test3  = (!(5 <= 5) || (6 >= 6));
   bool test4  = ((7 != 8) && (9 == 9));
-  assert((test1 == false));
-  assert((test2 == true));
-  assert((test3 == true));
-  assert((test4 == true));
+  assert("test1 should be false", (test1 == false));
+  assert("test2 should be true", (test2 == true));
+  assert("test3 should be true", (test3 == true));
+  assert("test4 should be true", (test4 == true));
 };
-s32 abs () {
-  return 0;
+void abs () {
+  assert("0 should equal 0", (0 == 0));
 };
-int main () {
-  assert((test_for() == 1));
-  assert((test_while() == 1));
-  assert((test_if_1() == 1));
-  assert((test_if_2() == 1));
-  test_comp_assign();
-  s32 result  = test_operators();
-  assert((result == 0));
-  assert((sqrt(4.0) == 4.0));
-  test_bool();
-  assert((abs() == 0));
-};
+const jstl::Vector<_test> tests{_test("test_if_3", test_if_3),_test("test_for", test_for),_test("test_while", test_while),_test("test_if_1", test_if_1),_test("test_if_2", test_if_2),_test("test_comp_assign", test_comp_assign),_test("test_operators", test_operators),_test("test_bool", test_bool),_test("abs", abs)};
+__TEST_RUNNER_MAIN;
