@@ -1,6 +1,5 @@
 #include "ast.hpp"
 #include "core.hpp"
-#include "error.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"

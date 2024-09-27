@@ -2,7 +2,11 @@
 /bin
 /compile_commands.json
 /objs
-ast.toml
 
-output.cpp
 output
+
+# ignore all files in source then negate that pattern? This is confusing.
+source/*
+source/*.cpp
+!source/*.*
+source/*.toml
