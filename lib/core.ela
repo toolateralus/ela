@@ -1,0 +1,10 @@
+
+#foreign fabs :: (float f) -> float;
+#foreign abs :: (int n) -> int;
+#foreign malloc :: (s64 nbytes) -> void*;
+#foreign free :: (void *ptr) -> void;
+#foreign memcpy :: (void *dest, void *src, s64 n) -> void*;
+#foreign memset :: (void *dest, int c, s64 n) -> void*;
+#foreign strlen :: (char *str) -> s64;
+#foreign strcmp :: (char *str1, char *str2) -> int;
+#foreign strcpy :: (char *dest, char *src) -> char*;

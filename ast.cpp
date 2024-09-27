@@ -104,6 +104,36 @@ void Parser::init_directive_routines() {
       }
     }); 
   }
+  
+  // #import 
+  
+  {
+      directive_routines.push_back({
+        .identifier = "import",
+        .kind = DIRECTIVE_KIND_STATEMENT,
+        .run = [](Parser *parser) static -> Nullable<ASTNode> {
+          auto iden = parser->expect(TType::Identifier).value;
+          static std::filesystem::path path = []{
+            #ifdef _WIN32
+              return std::filesystem::path("C:\\Program Files\\ela");
+            #else
+              return std::filesystem::path("/usr/local/lib/ela");
+            #endif
+          }();
+          auto filename = path.string() + "/" + iden + ".ela";
+          if (!std::filesystem::exists(filename)) {
+            throw_error(
+                std::format("Couldn't find imported module: {}", filename),
+                ERROR_CRITICAL, {});
+          }
+          std::stringstream ss;
+          std::ifstream isftr(filename);
+          ss << isftr.rdbuf();
+          parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+          return nullptr;
+        }
+      });
+  }
 }
 
 

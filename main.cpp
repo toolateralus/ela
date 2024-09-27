@@ -57,7 +57,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   SerializeVisitor serializer(context);
   auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
 
-  if (!has_flag("silent")) {
+  if (has_flag("verbose")) {
     printf("%s\n", serialized_view.c_str());
   }
 
@@ -91,13 +91,19 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.close();
 
 
-  std::string extra_flags = "-lc -lGL";
+  std::string extra_flags = "-lc";
 
   printf("\e[31m");
   system(std::format("clang++ -std=c++23 {} {} -o {}", extra_flags, output_path.string(),
                      binary_path.string())
              .c_str());
   printf("\e[0m");
+
+
+  if (!has_flag("s")) {
+    std::filesystem::remove(output_path);
+    std::filesystem::remove(header_output_path);
+  }
 
   std::filesystem::current_path(original_path);
 }

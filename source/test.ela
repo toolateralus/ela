@@ -1,9 +1,6 @@
+#import core;
 
-#foreign fabs :: (float f) -> float;
-#foreign malloc :: (s64 nbytes) -> void*;
-#foreign free :: (void *ptr) -> void;
-
-#test
+#test 
 failure_case :: () {
     assert("This should fail", false);
 }
@@ -162,7 +159,6 @@ test_address_of :: () {
     v = *addr_of_v;
     assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
-
 
 #test
 test_malloc :: () {
