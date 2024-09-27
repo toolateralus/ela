@@ -6,13 +6,10 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include <any>
-#include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
-#include <sstream>
 #include <vector>
 
 extern jstl::Arena ast_arena;
@@ -229,6 +226,7 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                \
@@ -278,6 +276,21 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTElse *node) = 0;                                   \
   virtual std::any visit(ASTWhile *node) = 0;                                  \
   virtual std::any visit(ASTCompAssign *node) = 0;
+
+
+enum DirectiveKind {
+  DIRECTIVE_KIND_STATEMENT,
+  DIRECTIVE_KIND_EXPRESSION,
+};
+    
+struct Parser;
+struct DirectiveRoutine {
+  ~DirectiveRoutine() = default;
+  std::string identifier;
+  DirectiveKind kind;
+  
+  std::function<Nullable<ASTNode>(Parser *parser)> run;
+};
 
 struct Parser {
   Parser(const std::string &contents, const std::string &filename,
@@ -334,59 +347,19 @@ struct Parser {
     token_frames.pop_back();
   }
 
-  Nullable<ASTExpr> process_directive(const std::string &identifier);
-  struct DirectiveRoutine {
-    std::string identifier;
-    std::function<Nullable<ASTExpr>(Parser *parser)> run;
-  };
-  jstl::Vector<DirectiveRoutine> directive_routines;
+  Nullable<ASTNode> process_directive(DirectiveKind kind, const std::string &identifier);
+  
+  std::vector<DirectiveRoutine> directive_routines;
 
-  inline void init_directive_routines() {
-    // #include
-    {
-      directive_routines.push(DirectiveRoutine{
-          .identifier = "include", .run = [](Parser *parser) static {
-            auto filename = parser->expect(TType::String).value;
-            if (!std::filesystem::exists(filename)) {
-              throw_error(
-                  std::format("Couldn't find included file: {}", filename),
-                  ERROR_CRITICAL, {});
-            }
-            std::stringstream ss;
-            std::ifstream isftr(filename);
-            ss << isftr.rdbuf();
-            parser->states.push_back(
-                Lexer::State::from_file(ss.str(), filename));
-            return nullptr;
-          }});
-    }
-
-    // #read
-    {
-      directive_routines.push({
-          .identifier = "read", .run = [](Parser *parser) {
-            auto filename = parser->expect(TType::String).value;
-            if (!std::filesystem::exists(filename)) {
-              throw_error(
-                  std::format("Couldn't find 'read' file: {}", filename),
-                  ERROR_CRITICAL, {});
-            }
-            std::stringstream ss;
-            std::ifstream isftr(filename);
-            ss << isftr.rdbuf();
-            auto string = ast_alloc<ASTLiteral>();
-            string->tag = ASTLiteral::RawString;
-            string->value = ss.str();
-            return string;
-          }});
-    }
-  }
+  void init_directive_routines();
 
   Nullable<ASTExpr> try_parse_directive_expr() {
     if (peek().type == TType::Directive) {
       eat();
       auto identifier = expect(TType::Identifier);
-      Nullable<ASTExpr> expr = process_directive(identifier.value);
+      Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
+      
+      auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr*>(node.get()));
       if (expr.is_not_null()) {
         return expr;
       } else {

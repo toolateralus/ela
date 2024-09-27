@@ -1,12 +1,4 @@
 #include "boilerplate.hpp"
 int main (s32 argc, char** argv) {
-  bool test1  = ((1 == (1 + 2)) || (1 == 2));
-  bool test2  = ((3 > 2) && (2 < 4));
-  bool test3  = (!(5 <= 5) || (6 >= 6));
-  bool test4  = ((7 != 8) && (9 == 9));
-  printf("Test1: %d (Expected: 0)\n", test1);
-  printf("Test2: %d (Expected: 1)\n", test2);
-  printf("Test3: %d (Expected: 1)\n", test3);
-  printf("Test4: %d (Expected: 1)\n", test4);
   return 0;
 };

@@ -46,10 +46,18 @@ struct Context {
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   
   Context() {
-    FunctionTypeInfo func_info {};
-    func_info.return_type = find_type_id("void", {});
-    func_info.is_varargs = true;
-    current_scope->insert("printf", find_type_id("", func_info, {}));
+    // TODO: add a #extern directive that tags functions and their type info that they're external symbols so we 
+    // can generate extern's in c++ or include the appropriate headers or something.
+    FunctionTypeInfo printf_info {};
+    printf_info.return_type = find_type_id("void", {});
+    printf_info.is_varargs = true;
+    current_scope->insert("printf", find_type_id("", printf_info, {}));
+    
+    FunctionTypeInfo assert_info {};
+    assert_info.return_type = find_type_id("void", {});
+    assert_info.parameter_types[0] = find_type_id("bool", {});
+    assert_info.params_len = 1;
+    current_scope->insert("assert", find_type_id("", assert_info, {}));
   }
   
   inline void enter_scope(Scope *scope = nullptr) {

@@ -1,17 +1,86 @@
 #include "ast.hpp"
 #include "error.hpp"
 #include "lex.hpp"
+#include "nullable.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include <cassert>
+#include <filesystem>
 #include <format>
+#include <fstream>
 
-Nullable<ASTExpr> Parser::process_directive(const std::string &identifier) {
+void Parser::init_directive_routines() {
+  // #include
+  {
+    directive_routines.push_back(DirectiveRoutine{
+      .identifier = "include", 
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) static {
+        auto filename = parser->expect(TType::String).value;
+        if (!std::filesystem::exists(filename)) {
+          throw_error(
+              std::format("Couldn't find included file: {}", filename),
+              ERROR_CRITICAL, {});
+        }
+        std::stringstream ss;
+        std::ifstream isftr(filename);
+        ss << isftr.rdbuf();
+        parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+        return nullptr;
+      }
+    });
+  }
+
+  // #read
+  {
+    directive_routines.push_back({
+      .identifier = "read",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) static {
+        auto filename = parser->expect(TType::String).value;
+        if (!std::filesystem::exists(filename)) {
+          throw_error(std::format("Couldn't find 'read' file: {}", filename),
+                      ERROR_CRITICAL, {});
+        }
+        std::stringstream ss;
+        std::ifstream isftr(filename);
+        ss << isftr.rdbuf();
+        auto string = ast_alloc<ASTLiteral>();
+        string->tag = ASTLiteral::RawString;
+        string->value = ss.str();
+        return string;
+      }
+    });
+  }
+  
+  
+  // #test 
+  {
+    directive_routines.push_back({
+      .identifier = "test",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [] (Parser *parser) static -> Nullable<ASTNode> {
+        auto name = parser->expect(TType::Identifier);
+        parser->expect(TType::DoubleColon);
+        auto func = parser->parse_function_declaration(name);
+        // func.flags |= FUNCTION_TEST; 
+        return func;
+      }
+    });
+  }
+  
+}
+
+
+// take a ROUTINE_KIND_STATEMENT
+Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const std::string &identifier) {
+  // compare aganist the kind of the routine with expected type, based on parser location
   for (const auto &routine: directive_routines) {
-    if (routine.identifier == identifier) {
+    if (routine.kind == kind && routine.identifier == identifier) {
       return routine.run(this);
     }
   }
+  
   
   throw_error(
       std::format("failed to call unknown directive routine: {}", identifier),
@@ -24,15 +93,19 @@ ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
 
   while (tok.type != TType::Eof) {
-    
     if (tok.type == TType::Directive) {
       eat();
       auto identifer = expect(TType::Identifier).value;
-      process_directive(identifer);
+      auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
+      if (result.is_not_null()) {
+        auto statement = dynamic_cast<ASTStatement*>(result.get());
+        if (statement) {
+          program->statements.push(statement);
+        }
+      }
       if (semicolon()) eat();
       continue;
     }
-    
     program->statements.push(parse_statement());
     if (semicolon())
       eat();
@@ -642,4 +715,5 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
 

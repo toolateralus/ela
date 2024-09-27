@@ -1,5 +1,14 @@
-#include <cstdint>
+#include <stdint.h>
+#include <assert.h>
 #include <jstl/containers/vector.hpp>
+
+
+// crazy way to stop a warning on assert.h is not used.
+constexpr auto _______ = []{
+  assert(true);
+  return 1;
+}();
+
 
 using f64 = double;
 using u64 = uint64_t;
