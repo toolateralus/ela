@@ -1,4 +1,5 @@
 #include "type.hpp"
+#include "ast.hpp"
 #include "error.hpp"
 #include <format>
 #include <sstream>
@@ -99,7 +100,9 @@ std::string get_cpp_scalar_type(int id) {
     name = "int";
   else if (type->base == "char")
     name = "char";
-  else if (type->base == "string")
+  else if (type->base == "char" && type->extensions.is_pointer(1)) 
+    name = "const char *";
+  else if (type->base == "u8" && type->extensions.is_pointer(1))
     name = "const char *";
   else if (type->base == "bool")
     name = "bool";
@@ -117,38 +120,47 @@ std::string get_cpp_scalar_type(int id) {
   return type->extensions.to_cpp_string(name);
 }
 
+ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
+  auto info = ast_alloc<ScalarTypeInfo>();
+  info->scalar_type = type;
+  info->size = size;
+  info->is_integral = is_integral;
+  return info;
+}
+
 void init_type_system() {
   // Signed integers
   {
-    create_type(TYPE_SCALAR, "s64");
-    create_type(TYPE_SCALAR, "s32");
-    create_type(TYPE_SCALAR, "s16");
-    create_type(TYPE_SCALAR, "s8");
+    create_type(TYPE_SCALAR, "s64", get_scalar_type_info(TYPE_S64, 8, true));
+    create_type(TYPE_SCALAR, "s32", get_scalar_type_info(TYPE_S32, 4, true));
+    create_type(TYPE_SCALAR, "s16", get_scalar_type_info(TYPE_S16, 2, true));
+    create_type(TYPE_SCALAR, "s8", get_scalar_type_info(TYPE_S16, 1, true));
   }
 
   // Unsigned integers
   {
-    create_type(TYPE_SCALAR, "u64");
-    create_type(TYPE_SCALAR, "u32");
-    create_type(TYPE_SCALAR, "u16");
-    create_type(TYPE_SCALAR, "u8");
+    create_type(TYPE_SCALAR, "u64", get_scalar_type_info(TYPE_U64, 8, true));
+    create_type(TYPE_SCALAR, "u32", get_scalar_type_info(TYPE_U32, 4, true));
+    create_type(TYPE_SCALAR, "u16", get_scalar_type_info(TYPE_U16, 2, true));
+    create_type(TYPE_SCALAR, "u8", get_scalar_type_info(TYPE_U16, 1, true));
   }
 
   // Floats
   {
-    create_type(TYPE_SCALAR, "f32");
-    create_type(TYPE_SCALAR, "f64");
+    create_type(TYPE_SCALAR, "f32", get_scalar_type_info(TYPE_FLOAT, 4));
+    create_type(TYPE_SCALAR, "f64", get_scalar_type_info(TYPE_DOUBLE, 8));
   }
 
   // Other
   {
     // Other
-    create_type(TYPE_SCALAR, "float");
-    create_type(TYPE_SCALAR, "int");
-    create_type(TYPE_SCALAR, "char");
-    create_type(TYPE_SCALAR, "string");
-    create_type(TYPE_SCALAR, "bool");
-    create_type(TYPE_SCALAR, "void");
+    // todo: alias these.
+    create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
+    create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
+    
+    create_type(TYPE_SCALAR, "char", get_scalar_type_info(TYPE_U8, 1, true));
+    create_type(TYPE_SCALAR, "bool", get_scalar_type_info(TYPE_BOOL, 1, true));
+    create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
   }
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
@@ -157,32 +169,49 @@ constexpr int get_type_unresolved() { return Type::invalid_id; }
 // TODO: and add conversion rules to it so we can safely up cast but explicitly down cast only.
 // Right now, if we had user defined types, you could trick the type system into casting a number to and from your type if it ended with a multiple of 8 -> 64
 constexpr bool type_is_numerical(const Type *t) {
-  return t->base.ends_with("64") || t->base.ends_with("32") ||
-          t->base.ends_with("16") || t->base.ends_with("8") ||
-          t->base == "int" || t->base == "float";
-};
+  auto info = dynamic_cast<ScalarTypeInfo*>(t->info.get());
+  if (!info) return false;
+  
+  auto scalar = info->scalar_type;
+  return scalar == TYPE_S8 || scalar == TYPE_S16 || scalar == TYPE_S32 ||
+         scalar == TYPE_S64 || scalar == TYPE_U8 || scalar == TYPE_U16 ||
+         scalar == TYPE_U32 || scalar == TYPE_U64 || scalar == TYPE_FLOAT ||
+         scalar == TYPE_DOUBLE;
+}
 
+constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
+  if (from->kind != TYPE_SCALAR || from->info.is_null() || to->kind != TYPE_SCALAR || to->info.is_null()) return false;
+  auto from_info = static_cast<ScalarTypeInfo*>(from->info.get());
+  auto to_info = static_cast<ScalarTypeInfo*>(to->info.get());
+  return from_info->size < to_info->size;
+}
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("type was null when checking type conversion rules",
                 ERROR_CRITICAL, {});
   }
   
-  if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
-      to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions() &&
-      from->base.starts_with(to->base[0])) {
-    if (type_is_numerical(from) && type_is_numerical(to)) {
-      return CONVERT_IMPLICIT;
-    }
-  }
-
-  if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
-    return CONVERT_IMPLICIT;
-  }
-
+  // same exact type. no cast needed.
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
+  // implicitly upcast integer and float types.
+  // u8 -> u16 -> u32 etc legal.
+  // u16 -> u8 == implicit required. 
+  if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
+      to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions()) {
+    if (type_is_numerical(from) && type_is_numerical(to)) {
+      
+      if (numerical_type_safe_to_upcast(from, to))
+        return CONVERT_IMPLICIT;
+      return CONVERT_EXPLICIT;
+    }
+  }
+
+  // TODO: probably want to fix this. right now we have C style pointer casting: any two pointers of the same depth can cast implicitly
+  if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
+    return CONVERT_IMPLICIT;
+  }
 
   return CONVERT_PROHIBITED;
 }
@@ -206,6 +235,7 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
+
 std::string Type::to_string() const {
 
   switch (kind) {

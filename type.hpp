@@ -10,6 +10,23 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 
+enum ScalarType {
+  TYPE_VOID,
+  TYPE_S8,
+  TYPE_S16,
+  TYPE_S32,
+  TYPE_S64,
+  TYPE_U8,
+  TYPE_U16,
+  TYPE_U32,
+  TYPE_U64,
+  TYPE_FLOAT,
+  TYPE_DOUBLE,
+  TYPE_STRING,
+  TYPE_CHAR,
+  TYPE_BOOL,
+};
+
 enum TypeKind {
   TYPE_SCALAR,
   TYPE_FUNCTION,
@@ -47,7 +64,14 @@ struct TypeExt {
   // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
   // array size.
   jstl::Vector<int> array_sizes{};
-  inline bool is_pointer(int depth) const {
+  inline bool is_pointer(int depth = -1) const {
+    if (depth == -1) {
+      for (const auto ext : extensions) {
+        if (ext == TYPE_EXT_POINTER) return true;
+      }
+      return false;
+    }
+    
     bool eq = false;
     int n = 0;
     for (const auto &ext: extensions) {
@@ -134,6 +158,9 @@ struct FunctionTypeInfo : TypeInfo {
 // TODO(josh): add scalar casting info for each type here.
 // TODO(cont.) builtins can just have a table of types they can implicitly explicitly and cant cast to.
 struct ScalarTypeInfo : TypeInfo {
+  bool is_integral = false;
+  size_t size = 0;
+  ScalarType scalar_type;
   virtual std::string to_string() const override { return ""; }
 };
 
@@ -144,9 +171,8 @@ struct StructTypeInfo : TypeInfo {
 
 struct Type {
   const int id = -1;
-  // TODO: we could just have our builtins not be referred to only as a scalar, but just have
-  // enum variants for all of them. TYPE_INT, TYPE_BOOL, TYPE_F32, etc.
-  const TypeKind kind = TypeKind::TYPE_SCALAR;
+  // probably have a better default than this.
+  const TypeKind kind = TYPE_SCALAR;
   std::string base;
   Nullable<TypeInfo> info = nullptr;
   TypeExt extensions;
