@@ -58,7 +58,6 @@ int find_type_id(const std::string &name,
 
   if (base_id != -1) {
     auto t = get_type(base_id);
-    printf("creating type: %s\n", t->base.c_str());
     return create_type((TypeKind)t->kind, name, nullptr, type_extensions);
   }
 
@@ -104,6 +103,10 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("type was null when checking type conversion rules",
                  ERROR_CRITICAL, {});
+  }
+
+  if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
+    return CONVERT_IMPLICIT;
   }
 
   if (from->id == to->id)

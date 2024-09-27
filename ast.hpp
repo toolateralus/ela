@@ -128,6 +128,8 @@ struct ASTLiteral : ASTExpr {
     Integer,
     Float,
     String,
+    Bool,
+    Null,
   } tag;
   std::string value;
   std::any accept(VisitorBase *visitor) override;

@@ -9,7 +9,7 @@
 ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
-  
+
   while (tok.type != TType::Eof) {
     program->statements.push(parse_statement());
     if (semicolon())
@@ -396,6 +396,27 @@ ASTExpr *Parser::parse_primary() {
     iden->value = tok;
     ;
     return iden;
+  }
+  case TType::Null: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Null;
+    literal->value = tok.value;
+    return literal;
+  }
+  case TType::True: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Bool;
+    literal->value = tok.value;
+    return literal;
+  }
+  case TType::False: {
+    eat();
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Bool;
+    literal->value = tok.value;
+    return literal;
   }
   case TType::Integer: {
     eat();

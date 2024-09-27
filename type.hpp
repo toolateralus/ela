@@ -30,7 +30,7 @@ struct Type;
 
 extern Type *type_table[MAX_NUM_TYPES];
 
-static Type *get_type(int id) {
+static Type *get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
 
@@ -46,12 +46,23 @@ enum TypeExtensionEnum {
 };
 
 struct TypeExtensionInfo {
-  TypeExtensionInfo() = default;
   // this stores things like * and [], [20] etc.
   jstl::Vector<TypeExtensionEnum> extensions{};
   // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
   // array size.
   jstl::Vector<int> array_sizes{};
+
+  inline bool is_pointer(int depth) const {
+    bool eq = false;
+    int n = 0;
+    for (const auto &ext: extensions) {
+      if (n >= depth || ext != TYPE_EXT_POINTER) {
+        return false;
+      }
+      n++;
+    }
+    return n == depth;
+  }
 
   inline bool operator==(const TypeExtensionInfo &other) const {
     return equals(other);
@@ -168,8 +179,5 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
 
 int find_type_id(const std::string &name,
                  const TypeExtensionInfo &type_extensions);
+                 
 void init_type_system();
-
-// used as a marker for the type visitor that we need to resolve this type at
-// visit time.
-int get_type_unresolved();

@@ -49,7 +49,6 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTCompAssign *node) override;
 };
 
-
 struct TypeVisitor : VisitorBase {
   TypeVisitor(Context &context) : context(context){}
   Context &context;
@@ -82,8 +81,23 @@ struct TypeVisitor : VisitorBase {
 struct EmitVisitor : VisitorBase {
   EmitVisitor(Context &context) : context(context) {}
   
+  inline void indented(const std::string &s) {
+    ss << indent() << s;
+  }
+  inline void indentedln(const std::string &s) {
+    ss << indent() << s << '\n';
+  }
+  inline void newline() {
+    ss << '\n';
+  }
+  inline void newline_indented() {
+    ss << '\n' << indent();
+  }
   inline void semicolon() {
-    ss << ";\n";
+    ss << ";";
+  }
+  inline void space() {
+    ss << ' ';
   }
   
   std::stringstream ss {};

@@ -3,8 +3,22 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
+#include <format>
 #include <any>
 #include <jstl/containers/vector.hpp>
+
+void validate_type_compatability(const int node_ty, const int expr_type, const std::vector<Token> &source_tokens, std::format_string<std::string, std::string> format, std::string message) {
+  auto tleft = get_type(node_ty),
+        tright = get_type(expr_type);
+        
+  auto conv_rule = type_conversion_rule(tleft, tright);
+  
+  if (expr_type != node_ty && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
+    throw_error(
+        message + '\n' + std::format(format, tleft->to_string(), tright->to_string()),
+        ERROR_FAILURE, source_tokens);
+  }
+}
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
   ss << indent() << "Program {\n";
@@ -291,25 +305,8 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   visitor_flags |= VisitorBase::FLAG_VISITING_FUNCTION;
   return_type = int_from_any(node->block->accept(this));
   visitor_flags &= ~VisitorBase::FLAG_VISITING_FUNCTION;
-
-  if (return_type != info.return_type) {
-    auto expected_type = get_type(info.return_type);
-    auto found_type = get_type(return_type);
-
-    if (!expected_type || !found_type) {
-      throw_error(
-          std::format("Function {} return type mismatch. One of the types is invalid.", node->name.value),
-          ERROR_FAILURE,
-          node->source_tokens);
-    } else {
-      throw_error(
-          std::format("Function {} : return type mismatch. Expected: {}, Found: {}", node->name.value, expected_type->base, found_type->base),
-          ERROR_FAILURE,
-          node->source_tokens
-      );
-    }
-  }
-
+  
+  validate_type_compatability(return_type, info.return_type, node->source_tokens, "invalid function return type: {} {}", std::format("function: {}", node->name.value));
   return {};
 }
 const auto check_return_type_consistency (int &return_type, int new_type, ASTNode * node) {
@@ -420,39 +417,20 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 }
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
-
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
-    if (expr_type != node->type->resolved_type) {
-      throw_error(
-          std::format(
-              "Incompatible types in expression. declaring: {}  provided {}",
-              get_type(node->type->resolved_type)->base,
-              get_type(expr_type)->base),
-          ERROR_FAILURE,
-          node->source_tokens
-      );
-    }
+    validate_type_compatability(node->type->resolved_type, expr_type, node->source_tokens, "invalid parameter declaration; expected: {} got: {}", std::format("parameter: {}", node->name));
   }
   return {};
 }
+// throws if inequal and unassignable.
+
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
 
   if (node->value.is_not_null()) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
-
-    if (expr_type != node->type->resolved_type) {
-      auto tleft = get_type(node->type->resolved_type),
-           tright = get_type(expr_type);
-      throw_error(
-          std::format(
-              "Incompatible types in expression. declaring: {}  provided {}",
-              tleft->base, tright->base),
-           ERROR_FAILURE,
-           node->source_tokens
-      );
-    }
+    validate_type_compatability(node->type->resolved_type, expr_type, node->source_tokens, "invalid declaration types. expected: {}, got {}", std::format("declaration: {}", node->name.value));
   }
 
   // TODO: probably want something a bit nicer than this.
@@ -467,37 +445,11 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
-
-  if (left == -1 || right == -1) {
-    throw_error(
-        std::format("one of the types in the expression was null. "
-                               "{} left: {}, right: {}",
-                               node->op.value, left, right),
-        ERROR_CRITICAL,
-        node->source_tokens
-    );
-  }
-
-  // TODO: type check in accordance to which operators are permitted to be used
-  // on this type;
-  // TODO: type convert certain operations where neccesary, like == returns a
-  // boolean regardless of it's operands types.
-  auto tleft = get_type(left), tright = get_type(right);
-
-  if (left != right &&
-      type_conversion_rule(tleft, tright) == CONVERT_PROHIBITED) {
-    throw_error(
-        std::format("binary expression {} with left: {}, right {}, "
-                               "is invalid due to their types.",
-                               node->op.value, tleft->base, tright->base),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
-  }
-
+  validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   // for now we just return the lhs.
   return left;
 }
+
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   // TODO: type convert certain operations where neccesary, like ! returns a
   // boolean regardless of it's operands types.
@@ -523,6 +475,11 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return find_type_id("f32", {});
   case ASTLiteral::String:
     return find_type_id("string", {});
+    break;
+  case ASTLiteral::Bool:
+    return find_type_id("bool", {});
+  case ASTLiteral::Null:
+    return find_type_id("void", TypeExtensionInfo { .extensions = {TYPE_EXT_POINTER}, .array_sizes = {} });
     break;
   }
 }
@@ -568,16 +525,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     if (arg_tys.size() <= i) {
       continue;
     }
-    if (info->parameter_types[i] != arg_tys[i]) {
-      throw_error(
-          std::format(
-              "Invalid parameter type at argument {}. Expected: {}, Found: {}",
-              i, get_type(info->parameter_types[i])->base,
-              get_type(arg_tys[i])->base),
-          ERROR_FAILURE,
-          node->source_tokens
-      );
-    }
+    validate_type_compatability(info->parameter_types[i], arg_tys[i], node->source_tokens, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
   }
 
   node->type = info->return_type;
@@ -621,6 +569,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 }
 std::any TypeVisitor::visit(ASTIf *node) {
   // TODO: type check to confirm this is convertible to, or is a bool.
+  //auto bool_type = find_type_id("bool", {});
   node->condition->accept(this);
   auto stmt_ret_type = int_from_any(node->block->accept(this));
   auto if_flags = node->block->flags;
@@ -655,15 +604,6 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
-  if (symbol->type_id != expr_ty) {
-    throw_error(
-        std::format("Incompatible types in compound assignment. "
-                               "declaring: {}  provided {}",
-                               get_type(symbol->type_id)->base,
-                               get_type(expr_ty)->base),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
-  }
+  validate_type_compatability(symbol->type_id, expr_ty, node->source_tokens, "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
 }
