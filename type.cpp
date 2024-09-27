@@ -183,6 +183,10 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || from->info.is_null() || to->kind != TYPE_SCALAR || to->info.is_null()) return false;
   auto from_info = static_cast<ScalarTypeInfo*>(from->info.get());
   auto to_info = static_cast<ScalarTypeInfo*>(to->info.get());
+  // do not allow casting of float to integer implicitly
+  if (!from_info->is_integral && to_info->is_integral) {
+    return false;
+  }
   return from_info->size < to_info->size;
 }
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {

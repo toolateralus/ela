@@ -202,14 +202,15 @@ returns :: () -> s32  {
     s64 s4 = s3;
     assert("unable to upcast successfully", s1 == s4);
     
-    f32 f;
+    float f;
     f64 f1 = f;
     assert("unable to upcast successfully", f == f1);
 }
 
 #test
 test_printf :: () {
-    printf("testing printing a string: %s\n", "Hello I am a string");
+    u8* s = "Hello i am a string";
+    printf("testing printing a string: %s\n", s);
     return;
 }
 
