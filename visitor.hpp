@@ -79,33 +79,52 @@ struct TypeVisitor : VisitorBase {
 
 
 struct EmitVisitor : VisitorBase {
-  EmitVisitor(Context &context) : context(context) {}
+  std::stringstream header {};
+  std::stringstream code {};
+  std::stringstream *ss {};
   
-  inline void indented(const std::string &s) {
-    ss << indent() << s;
-  }
-  inline void indentedln(const std::string &s) {
-    ss << indent() << s << '\n';
-  }
-  inline void newline() {
-    ss << '\n';
-  }
-  inline void newline_indented() {
-    ss << '\n' << indent();
-  }
-  inline void semicolon() {
-    ss << ";";
-  }
-  inline void space() {
-    ss << ' ';
-  }
-  
-  std::stringstream ss {};
   int indentLevel = 0;
   Context &context;
+
+  std::string get_code() const {
+    return code.str();
+  }
+  std::string get_header() const {
+    return header.str();
+  }
+  
+  void use_code() {
+    ss = &code;
+  }
+  void use_header() {
+    ss = &header;
+  }
+  
+  EmitVisitor(Context &context) : context(context) {
+    ss = &code;
+  }
   std::string indent() {
     return std::string(indentLevel * 2, ' ');
+  }  
+  inline void indented(const std::string &s) {
+    (*ss) <<indent() << s;
   }
+  inline void indentedln(const std::string &s) {
+    (*ss) <<indent() << s << '\n';
+  }
+  inline void newline() {
+    (*ss) <<'\n';
+  }
+  inline void newline_indented() {
+    (*ss) <<'\n' << indent();
+  }
+  inline void semicolon() {
+    (*ss) <<";";
+  }
+  inline void space() {
+    (*ss) <<' ';
+  }
+  
   
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;

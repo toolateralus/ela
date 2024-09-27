@@ -135,8 +135,16 @@ struct CompileCommand {
 
     EmitVisitor emit(context);
     emit.visit(root);
-    auto program = emit.ss.str();
 
+    auto header = emit.get_header();
+    std::filesystem::path header_output_path = output_path;
+    header_output_path.replace_extension(".hpp");
+    std::ofstream header_file(header_output_path);
+    header_file << header;
+    header_file.flush();
+    header_file.close();
+
+    auto program = std::format("#include \"{}\"\n", header_output_path.filename().string()) + emit.get_code();
     std::ofstream output(output_path);
     output << program;
     output.flush();

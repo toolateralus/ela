@@ -118,7 +118,15 @@ struct TypeInfo {
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
+
+enum FunctionFlags {
+  FUNCTION_NORMAL,
+  FUNCTION_TEST,
+  FUNCTION_EXTERN,
+};
+
 struct FunctionTypeInfo : TypeInfo {
+  int flags = FUNCTION_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;

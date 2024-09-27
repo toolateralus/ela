@@ -5,27 +5,27 @@
 #include <jstl/containers/vector.hpp>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
-  ss << indent() << node->name.value << " ";
-  ss << node->op.value << " ";
+  (*ss) <<indent() << node->name.value << " ";
+  (*ss) <<node->op.value << " ";
   node->expr->accept(this);
   return {};
 }
 
 std::any EmitVisitor::visit(ASTWhile *node) {
-  ss << indent() << "while ";
+  (*ss) <<indent() << "while ";
   if (node->condition.is_not_null()) {
-    ss << "(";
+    (*ss) <<"(";
     node->condition.get()->accept(this);
-    ss << ")";
+    (*ss) <<")";
   } else {
-    ss << "(true)";
+    (*ss) <<"(true)";
   }
   node->block->accept(this);
   return {};
 }
 
 std::any EmitVisitor::visit(ASTElse *node) {
-  ss << " else ";
+  (*ss) <<" else ";
   if (node->_if.is_not_null()) {
     node->_if.get()->accept(this);
   } else if (node->block.is_not_null()) {
@@ -35,9 +35,9 @@ std::any EmitVisitor::visit(ASTElse *node) {
 }
 
 std::any EmitVisitor::visit(ASTIf *node) {
-  ss << indent() << "if (";
+  (*ss) <<indent() << "if (";
   node->condition->accept(this);
-  ss << ")";
+  (*ss) <<")";
   node->block->accept(this);
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
@@ -49,9 +49,9 @@ std::any EmitVisitor::visit(ASTIf *node) {
 std::any EmitVisitor::visit(ASTFor *node) {
   const auto emit_range_based = [&] {
     auto v = node->value.range_based;
-    ss << "auto ";
+    (*ss) <<"auto ";
     v.target->accept(this);
-    ss << " : ";
+    (*ss) <<" : ";
     v.collection->accept(this);
   };
   
@@ -66,7 +66,7 @@ std::any EmitVisitor::visit(ASTFor *node) {
     v.increment->accept(this);
   };
   
-  ss << indent() << "for (";
+  (*ss) <<indent() << "for (";
   switch (node->tag) {
   case ASTFor::RangeBased:
     emit_range_based();
@@ -75,7 +75,7 @@ std::any EmitVisitor::visit(ASTFor *node) {
     emit_c_style();
     break;
   }
-  ss << ")";
+  (*ss) <<")";
   node->block->accept(this);
   return {};
 }
@@ -100,49 +100,49 @@ std::any EmitVisitor::visit(ASTReturn *node) {
 }
 
 std::any EmitVisitor::visit(ASTArguments *node) {
-  ss << "(";
+  (*ss) <<"(";
   for (int i = 0; i < node->arguments.size(); ++i) {
     node->arguments[i]->accept(this);
     if (i != node->arguments.size() - 1) {
-      ss << ", ";
+      (*ss) <<", ";
     }
   }
-  ss << ")";
+  (*ss) <<")";
   return {};
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  ss << get_type(node->resolved_type)->to_cpp_string();
+  (*ss) <<get_type(node->resolved_type)->to_cpp_string();
   return {};
 }
 
 std::any EmitVisitor::visit(ASTCall *node) {
-  ss << node->name.value;
+  (*ss) <<node->name.value;
   node->arguments->accept(this);
   return {};
 }
 
 std::any EmitVisitor::visit(ASTLiteral *node) {
   if (node->tag == ASTLiteral::Null) {
-    ss << "nullptr";
+    (*ss) <<"nullptr";
   } else if (node->tag == ASTLiteral::String) {
-    ss << std::format("\"{}\"", node->value);
+    (*ss) <<std::format("\"{}\"", node->value);
   } else if (node->tag == ASTLiteral::RawString) {
     // TODO: search for a pattern '__()__' for example, that doesn't exist at all in the string.
-    ss << std::format("R\"__({})__\"", node->value);
+    (*ss) <<std::format("R\"__({})__\"", node->value);
   } else {
-    ss << node->value;
+    (*ss) <<node->value;
   }
   return {};
 }
 
 std::any EmitVisitor::visit(ASTIdentifier *node) {
-  ss << node->value.value;
+  (*ss) <<node->value.value;
   return {};
 }
 
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
-  ss << node->op.value;
+  (*ss) <<node->op.value;
   node->operand->accept(this);
   return {};
 }
@@ -150,18 +150,18 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 std::any EmitVisitor::visit(ASTBinExpr *node) {
   // TODO: Figure out how we want to control custom precedence. Right now,
   // TODO(cont): We'll just parenthesize every single sub-expression;
-  ss << "(";
+  (*ss) <<"(";
   auto left = node->left->accept(this);
   space();
-  ss << node->op.value;; 
+  (*ss) <<node->op.value;; 
   space();
   auto right = node->right->accept(this);
-  ss << ")";
+  (*ss) <<")";
   return {};
 }
 
 std::any EmitVisitor::visit(ASTExprStatement *node) {
-  ss << indent();
+  (*ss) <<indent();
   node->expression->accept(this);
   return {};
 }
@@ -169,60 +169,73 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   space();
-  ss << node->name.value;
+  (*ss) <<node->name.value;
   space();
   if (node->value.is_not_null()) {
-    ss << " = ";
+    (*ss) <<" = ";
     node->value.get()->accept(this);
   } else {
-    ss << "{}";
+    (*ss) <<"{}";
   }
   return {};
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
-  ss << ' ' << node->name;
+  (*ss) <<' ' << node->name;
   if (node->default_value.is_not_null()) {
-    ss << " = ";
+    (*ss) <<" = ";
     node->default_value.get()->accept(this);
   }
   return {};
 }
 
 std::any EmitVisitor::visit(ASTParamsDecl *node) {
-  ss << " (";
+  (*ss) <<" (";
   int i = 0;
   for (const auto &param : node->params) {
     param->accept(this);
     if (i != node->params.size() - 1) {
-      ss << ", ";
+      (*ss) <<", ";
     }
     ++i;
   }
-  ss << ")";
+  (*ss) <<")";
   return {};
 }
 
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   
+  
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
-    ss << "int";
+    (*ss) <<"int";
   } else {
     node->return_type->accept(this);
   }
   
   space();
-  ss << node->name.value;
+  
+  (*ss) <<node->name.value;
   node->params->accept(this);  
   node->block->accept(this);
+  
+  
+  if (node->name.value != "main") {
+    use_header();
+    node->return_type->accept(this);
+    (*ss) << ' ' <<node->name.value << ' ';
+    node->params->accept(this);
+    (*ss) << ";\n";
+    use_code();
+  }
+  
   return {};
 }
 
 std::any EmitVisitor::visit(ASTBlock *node) {
-  ss << (" {\n");
+  (*ss) <<(" {\n");
   indentLevel++;
   context.enter_scope(node->scope);
   for (const auto &statement : node->statements) {
@@ -241,7 +254,8 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 }
 
 std::any EmitVisitor::visit(ASTProgram *node) {
-  ss << R"_(#include "boilerplate.hpp")_" << '\n';
+  header <<R"_(#include "boilerplate.hpp")_" << '\n';
+  
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
