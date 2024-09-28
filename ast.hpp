@@ -339,6 +339,9 @@ struct DirectiveRoutine {
 struct Parser {
   
   inline Token peek() const {
+    if (states.empty()) {
+      return Token::Eof();
+    }
     return states.back().lookahead_buffer.front();
   }
 
@@ -365,17 +368,15 @@ struct Parser {
 
   inline Token eat() {
     fill_buffer_if_needed();
-    auto tok = peek();
     
-    if (tok.is_eof() && states.size() > 1) {
+    if (peek().is_eof() && states.size() > 1) {
       states.pop_back();
       fill_buffer_if_needed();
       return peek();
     } 
-    
+    auto tok = peek();
     lookahead_buf().pop_front();
     lexer.get_token(states.back());
-    
     token_frames.back().push_back(tok);
     return tok;
   }

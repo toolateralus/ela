@@ -160,9 +160,13 @@ ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
 
-  while (states.size() > 1) {
+  while (true) {
     
-    if (states.size() == 1 && peek().type == TType::Eof) {
+    if (peek().type == TType::Eof && states.size() > 0) {
+      states.pop_back();
+    }
+    
+    if (peek().type == TType::Eof && states.empty()) {
       break;
     }
     
@@ -191,6 +195,8 @@ ASTProgram *Parser::parse() {
 // TODO: Cleanup this horrific function before it gets too out of control.
 // TODO(later): I said that and then proceeded to make it out of control
 ASTStatement *Parser::parse_statement() {
+  if (semicolon()) eat();
+  
   begin_token_frame();
   auto tok = peek();
 
