@@ -132,6 +132,9 @@ struct EmitVisitor : VisitorBase {
     (*ss) <<' ';
   }
 
+  void emit_local_function(ASTFuncDecl *node);
+  void emit_forward_declaration(ASTFuncDecl *node);
+  void emit_foreign_function(ASTFuncDecl * node);
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;
