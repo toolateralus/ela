@@ -412,7 +412,7 @@ struct Parser {
   ASTArguments *parse_arguments();
 
   ASTStructDeclaration *parse_struct_declaration(Token);
-
+  ASTExprStatement *parse_dot_statement(Token);
   ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();

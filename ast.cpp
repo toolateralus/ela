@@ -191,6 +191,7 @@ ASTStatement *Parser::parse_statement() {
   begin_token_frame();
   auto tok = peek();
 
+
   if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
@@ -297,6 +298,10 @@ ASTStatement *Parser::parse_statement() {
 
   eat();
 
+  if (tok.type == TType::Identifier && peek().type == TType::Dot) {
+    return parse_dot_statement(tok);
+  }
+
   if (peek().is_comp_assign()) {
     if (tok.type != TType::Identifier) {
       throw_error(
@@ -331,11 +336,42 @@ ASTStatement *Parser::parse_statement() {
     end_token_frame(statement);
     return statement;
   }
+  
+
 
   throw_error(
       std::format("Unexpected token when parsing statement: {}", tok.value),
       ERROR_CRITICAL, token_frames.back());
 }
+
+ASTExprStatement *Parser::parse_dot_statement(Token iden) {
+  auto dot = ast_alloc<ASTDotExpr>();
+  dot->type = ast_alloc<ASTType>();
+  auto left = ast_alloc<ASTIdentifier>();
+  left->value = iden;
+  dot->left = left;
+  expect(TType::Dot);
+  dot->right = parse_postfix();
+  auto statement= ast_alloc<ASTExprStatement>();
+  
+  // TODO: fixup this incredible jank
+  if (peek().type == TType::Assign) {
+    eat();
+    auto value = parse_expr();
+    auto binexpr = ast_alloc<ASTBinExpr>();
+    binexpr->op = {};
+    binexpr->op.type = TType::Dot;
+    binexpr->op.value = "=";
+    binexpr->left = dot;
+    binexpr->right = value;
+    statement->expression = binexpr;
+    return statement;
+  }
+  
+  statement->expression = dot;
+  return statement;
+}
+
 ASTDeclaration *Parser::parse_declaration() {
   begin_token_frame();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
