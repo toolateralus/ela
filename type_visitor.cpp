@@ -75,13 +75,18 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     return {};
   }
 
-  auto return_type = find_type_id("void", {});
-  visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
   auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
-  if (control_flow.type != -1) {
-    return_type = control_flow.type;
+  if (control_flow.type == -1) {
+    control_flow.type = find_type_id("void", {});
   }
-  validate_type_compatability(return_type, info.return_type,
+
+  if (control_flow.flags != BLOCK_FLAGS_RETURN &&
+      control_flow.type != find_type_id("void", {})) {
+    throw_error("Not all code paths return a value.", ERROR_FAILURE,
+                node->source_tokens);
+  }
+
+  validate_type_compatability(control_flow.type, info.return_type,
                               node->source_tokens,
                               "invalid function return type: {} {}",
                               std::format("function: {}", node->name.value));
@@ -103,60 +108,34 @@ const auto check_return_type_consistency(int &return_type, int new_type,
 };
 
 std::any TypeVisitor::visit(ASTBlock *node) {
-  bool fn_root_level = visitor_flags & FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
-
-  if (fn_root_level) {
-    visitor_flags &= ~FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
-  }
-
   context.enter_scope(node->scope);
-  int flags = BLOCK_FLAGS_FALL_THROUGH;
-  int return_type = -1;
+  ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
   for (auto &statement : node->statements) {
     auto result = statement->accept(this);
-    auto control_flow = ControlFlow{BLOCK_FLAGS_FALL_THROUGH, -1};
     if (dynamic_cast<ASTBlock *>(statement) ||
         dynamic_cast<ASTIf *>(statement) ||
         dynamic_cast<ASTFor *>(statement) ||
-        dynamic_cast<ASTWhile *>(statement)
+        dynamic_cast<ASTWhile *>(statement) ||
+        dynamic_cast<ASTReturn *>(statement) ||
+        dynamic_cast<ASTContinue *>(statement) ||
+        dynamic_cast<ASTBreak *>(statement)
     ) {
-      control_flow = std::any_cast<ControlFlow>(result);
-    } else if (dynamic_cast<ASTContinue *>(statement)) {
-      control_flow.flags = BLOCK_FLAGS_CONTINUE;
-    } else if (dynamic_cast<ASTBreak *>(statement)) {
-      control_flow.flags = BLOCK_FLAGS_BREAK;
-    } else if (auto ret = dynamic_cast<ASTReturn *>(statement)) {
-      control_flow.flags = BLOCK_FLAGS_RETURN;
-      if (ret->expression.is_not_null()) {
-        control_flow.type = int_from_any(ret->expression.get()->accept(this));
-      } else {
-        control_flow.type = find_type_id("void", {});
+      auto stmnt_cf = std::any_cast<ControlFlow>(result);
+      block_cf.flags |= stmnt_cf.flags;
+      if ((stmnt_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
+        check_return_type_consistency(block_cf.type, stmnt_cf.type, node);
+      }
+      if ((stmnt_cf.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+        block_cf.flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       }
     }
-    flags |= control_flow.flags;
-    if ((control_flow.flags & BLOCK_FLAGS_RETURN) != 0) {
-      check_return_type_consistency(return_type, control_flow.type, node);
-    }
-    if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-    }
   }
 
-  if (return_type == -1) {
-    return_type = find_type_id("void", {});
-  }
-
-  if (fn_root_level && return_type != find_type_id("void", {}) &&
-      flags != BLOCK_FLAGS_RETURN) {
-    throw_error("Not all code paths return a value.", ERROR_FAILURE,
-                node->source_tokens);
-  }
-
-  node->flags = flags;
-  node->return_type = return_type;
+  node->flags = block_cf.flags;
+  node->return_type = block_cf.type;
   context.exit_scope();
-  return ControlFlow{flags, return_type};
+  return block_cf;
 }
 
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
@@ -308,12 +287,16 @@ std::any TypeVisitor::visit(ASTArguments *node) {
   return argument_types;
 }
 std::any TypeVisitor::visit(ASTReturn *node) {
-  if (node->expression.is_not_null())
-    node->expression.get()->accept(this);
-  return {};
+  int type;
+  if (node->expression.is_not_null()) {
+    type = int_from_any(node->expression.get()->accept(this));
+  } else {
+    type = find_type_id("void", {});
+  }
+  return ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
-std::any TypeVisitor::visit(ASTContinue *node) { return {}; }
-std::any TypeVisitor::visit(ASTBreak *node) { return {}; }
+std::any TypeVisitor::visit(ASTContinue *node) { return ControlFlow{BLOCK_FLAGS_CONTINUE, -1}; }
+std::any TypeVisitor::visit(ASTBreak *node) { return ControlFlow{BLOCK_FLAGS_BREAK, -1}; }
 
 std::any TypeVisitor::visit(ASTFor *node) {
   context.enter_scope(node->block->scope);
