@@ -439,21 +439,8 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
   context.enter_scope(info->scope);
   
-  int type = -1;
-  if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
-    if (!context.current_scope->lookup(iden->value.value)) {
-      throw_error(std::format("use of undeclared identifier: {}", iden->value.value), ERROR_FAILURE, node->source_tokens);
-    }
-    for (const auto &field: info->fields) {
-      if (field->name.value == iden->value.value) {
-        type =  node->type->resolved_type = field->type->resolved_type;
-        break;
-      }
-    }
-  } 
-  if (auto dot = dynamic_cast<ASTDotExpr*>(node->right)) {
-    type = node->type->resolved_type = int_from_any(dot->accept(this));
-  }
+  int type = int_from_any(node->right->accept(this));
+  
   context.current_scope = previous_scope;
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);

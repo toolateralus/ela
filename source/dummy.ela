@@ -1,7 +1,7 @@
 #import core;
 
 otherstruct :: struct {
-	s32 thing2;
+	s32[2] thing2;
 }
 
 mystruct :: struct {
@@ -11,5 +11,8 @@ mystruct :: struct {
 
 main :: () {
 	mystruct s;
-	printf("%d\n", s.other.thing2);
+	s.other.thing2[0] = 1;
+	s.other.thing2[1] = 2;
+	printf("%d\n", s.other.thing2[0]);
+	printf("%d\n", s.other.thing2[1]);
 }

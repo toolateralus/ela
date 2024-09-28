@@ -436,8 +436,6 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto left_info = static_cast<StructTypeInfo*>(left_type->info.get());;
   
   auto previous_scope = context.current_scope;
-
-  std::cout << "for type: " << left_type->to_string() << "emitting: " << op << '\n';
   
   context.enter_scope(left_info->scope);
   node->left->accept(this);
