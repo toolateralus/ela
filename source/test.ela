@@ -2,6 +2,11 @@
 // same for import.
 #import core;
 
+// Vector2 :: struct {
+//     f32 x;
+//     f32 y;
+// }
+
 #test 
 failure_case :: () {
     assert("This should fail", false);
@@ -189,7 +194,8 @@ returns :: () -> s32  {
     return 1; 
 }
 
-#test test_implicit_numerical_casting :: () {
+#test 
+test_implicit_numerical_casting :: () {
     u8 u1;
     u16 u2 = u1;
     u32 u3 = u2;

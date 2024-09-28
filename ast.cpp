@@ -807,3 +807,6 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) {
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+// std::any ASTStructDeclaration::accept(VisitorBase *visitor) {
+//   return visitor->accept(this);
+// }

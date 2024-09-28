@@ -238,7 +238,11 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-
+// struct ASTStructDeclaration : ASTStatement {
+//   ASTType *type;
+//   jstl::Vector<ASTDeclaration *> declarations;
+//   std::any accept(VisitorBase *visitor) override;
+// };
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
