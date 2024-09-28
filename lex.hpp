@@ -72,7 +72,8 @@ enum struct TType {
   False,
   Null,
   Varargs,
-  Directive
+  Directive,
+  Struct,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -131,7 +132,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Return);
     TTYPE_CASE(Break);
     TTYPE_CASE(Continue);
-
+    TTYPE_CASE(Struct);
     TTYPE_CASE(For);
     TTYPE_CASE(While);
     TTYPE_CASE(If);
@@ -257,7 +258,7 @@ struct Lexer {
       {"while", TType::While},
       {"if", TType::If},
       {"else", TType::Else},
-
+      {"struct", TType::Struct},
       {"true", TType::True},
       {"false", TType::False},
       {"null", TType::Null}};

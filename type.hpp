@@ -164,8 +164,10 @@ struct ScalarTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
+struct ASTDeclaration;
 // TODO: implement structs.
 struct StructTypeInfo : TypeInfo {
+  jstl::Vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
 };
 
@@ -201,6 +203,9 @@ template <class T> T *type_alloc(size_t n = 1) {
 int create_type(TypeKind kind, const std::string &name,
                 TypeInfo *info = nullptr,
                 const TypeExt &extensions = {});
+
+int create_struct_type(const std::string &name,
+                       const jstl::Vector<ASTDeclaration*> &fields);
 
 enum ConversionRule {
   CONVERT_PROHIBITED,

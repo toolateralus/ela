@@ -349,3 +349,15 @@ int remove_one_pointer_ext(int operand_ty,
       ty->base, TypeExt{.extensions = extensions,
                                   .array_sizes = ty->extensions.array_sizes});
 }
+int create_struct_type(
+    const std::string &name,
+    const jstl::Vector<ASTDeclaration*> &fields) {
+  auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
+  type_table[num_types] = type;
+  type->base = name;
+  auto info = type_alloc<StructTypeInfo>();
+  type->info = info;
+  info->fields = fields;
+  num_types++;
+  return type->id;
+}

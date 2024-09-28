@@ -47,12 +47,14 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTElse *node) override;
   std::any visit(ASTWhile *node) override;
   std::any visit(ASTCompAssign *node) override;
+  std::any visit(ASTStructDeclaration *node) override;
 };
 
 struct TypeVisitor : VisitorBase {
   TypeVisitor(Context &context) : context(context){}
   Context &context;
   std::string getIndent();
+  std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTProgram *node) override;
   std::any visit(ASTFuncDecl *node) override;
   std::any visit(ASTBlock *node) override;
@@ -127,8 +129,8 @@ struct EmitVisitor : VisitorBase {
   inline void space() {
     (*ss) <<' ';
   }
-  
-  
+
+  std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;
   std ::any visit(ASTFuncDecl *node) override;

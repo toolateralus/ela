@@ -242,3 +242,40 @@ std::any SerializeVisitor::visit(ASTCompAssign *node) {
   ss << indent() << "}\n";
   return {};
 }
+
+std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
+  ss << indent() << "Struct " << node->type->base << " {\n";
+  indentLevel++;
+  for (auto decl : node->declarations) {
+    decl->accept(this);
+  }
+  indentLevel--;
+  ss << indent() << "}\n";
+  return {};
+}
+
+std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+  context.enter_scope(node->scope);
+  jstl::Vector<ASTDeclaration*> fields;
+  for (auto decl : node->declarations) {
+    decl->accept(this);
+    fields.push(decl);
+  }
+  node->type->resolved_type = create_struct_type(node->type->base, fields);
+  context.exit_scope();
+  return {};
+}
+std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+  (*ss) << "struct " << node->type->base << "{\n";
+  indentLevel++;
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  for (const auto &decl: info->fields) {
+    decl->accept(this);
+    semicolon();
+    newline();
+  }
+  (*ss) << "}\n";
+  indentLevel--;
+  return {};
+}

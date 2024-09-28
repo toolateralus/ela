@@ -238,11 +238,12 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-// struct ASTStructDeclaration : ASTStatement {
-//   ASTType *type;
-//   jstl::Vector<ASTDeclaration *> declarations;
-//   std::any accept(VisitorBase *visitor) override;
-// };
+struct ASTStructDeclaration : ASTStatement {
+  Scope *scope;
+  ASTType *type;
+  jstl::Vector<ASTDeclaration *> declarations;
+  std::any accept(VisitorBase *visitor) override;
+};
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
@@ -292,7 +293,8 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTIf *node) = 0;                                     \
   virtual std::any visit(ASTElse *node) = 0;                                   \
   virtual std::any visit(ASTWhile *node) = 0;                                  \
-  virtual std::any visit(ASTCompAssign *node) = 0;
+  virtual std::any visit(ASTCompAssign *node) = 0;                             \
+  virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
 
 
 enum DirectiveKind {
@@ -395,12 +397,12 @@ struct Parser {
   ASTStatement *parse_call_statement(Token);
   ASTArguments *parse_arguments();
 
+  ASTStructDeclaration *parse_struct_declaration(Token);
+
   ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
-
-  ASTCall *parse_call(const Token &);
 
   ASTExpr *parse_expr();
   ASTExpr *parse_assignment(Token *);
@@ -417,4 +419,5 @@ struct Parser {
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
+  ASTCall *parse_call(const Token &);
 };

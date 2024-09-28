@@ -316,6 +316,10 @@ ASTStatement *Parser::parse_statement() {
       auto node = parse_function_declaration(tok);
       end_token_frame(node);
       return node;
+    } else if (peek().type == TType::Struct) {
+      auto struct_decl = parse_struct_declaration(tok);
+      end_token_frame(struct_decl);
+      return struct_decl;
     }
   } else if (peek().type == TType::Assign) {
     auto statement = ast_alloc<ASTExprStatement>();
@@ -386,6 +390,25 @@ ASTBlock *Parser::parse_block() {
   block->scope = context.exit_scope();
   end_token_frame(block);
   return block;
+}
+
+ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
+  expect(TType::Struct);
+  auto decl = ast_alloc<ASTStructDeclaration>();
+  auto block = parse_block();
+  for (const auto &statement: block->statements) {
+    if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
+      decl->declarations.push(field);
+    } else {
+      throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
+    }
+  }
+  auto type = ast_alloc<ASTType>();
+  decl->type = type;
+  decl->type->base = name.value;
+  decl->type->extension_info = {};
+  decl->scope = block->scope;
+  return decl;
 }
 
 ASTExpr *Parser::parse_expr() {
@@ -801,12 +824,14 @@ std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTCompAssign::accept(VisitorBase *visitor) {
   return visitor->visit(this);
 }
-
+std::any ASTStructDeclaration::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
 /*
   ###########################################
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
-// std::any ASTStructDeclaration::accept(VisitorBase *visitor) {
-//   return visitor->accept(this);
-// }
+
+
+
