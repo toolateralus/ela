@@ -89,6 +89,16 @@ struct TypeExt {
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
+  
+  inline bool is_fixed_sized_array() const {
+    for (const auto &ext: array_sizes) {
+      if (ext != -1) {
+        return true;
+      }
+    }
+    return false;
+  }
+  
   inline std::string to_string() const {
     std::stringstream ss;
     jstl::Vector<int> array_sizes = this->array_sizes;
@@ -111,6 +121,7 @@ struct TypeExt {
     jstl::Vector<int> array_sizes = this->array_sizes;
     std::stringstream ss;
     ss << base;
+    
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         auto size = array_sizes.pop();
