@@ -90,7 +90,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
                 node->source_tokens);
   }
 
-  if ((control_flow.flags & BLOCK_FLAGS_RETURN) == 0 &&
+  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 &&
       control_flow.type != find_type_id("void", {})) {
     throw_error("Not all code paths return a value.", ERROR_FAILURE,
                 node->source_tokens);
