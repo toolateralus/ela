@@ -1,7 +1,6 @@
 #include "type.hpp"
 #include "ast.hpp"
 #include "error.hpp"
-#include <format>
 #include <sstream>
 
 std::string FunctionTypeInfo::to_string() const {

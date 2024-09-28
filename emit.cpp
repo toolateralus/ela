@@ -5,7 +5,6 @@
 #include "visitor.hpp"
 #include "ast.hpp"
 #include <jstl/containers/vector.hpp>
-#include <string_view>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
