@@ -65,7 +65,6 @@ struct Context {
     sizeof_info.return_type = find_type_id("s64", {});
     sizeof_info.is_varargs = true;
     current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
-    sizeof_info.flags |= FUNCTION_FOREIGN;
     root_scope = current_scope;
   }
   

@@ -43,6 +43,8 @@ std::any TypeVisitor::visit(ASTProgram *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTFuncDecl *node) {
+  
+  
   node->return_type->accept(this);
   node->params->accept(this);
 
@@ -51,7 +53,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
-  info.flags = node->flags;
+  info.meta_type = node->meta_type;
 
   auto params = node->params->params;
   for (const auto &param : params) {
@@ -70,7 +72,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   // insert function
   context.current_scope->insert(node->name.value, type_id);
 
-  if (info.flags & FUNCTION_FOREIGN) {
+  if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     return {};
   }
 
@@ -385,6 +387,13 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
 }
 
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
+    return {};
+  }
+  
   // TODO: we can improve this to not rely so heavily on a Scope object.
   // It seems wrong to store a scope in a Type *.
   context.enter_scope(node->scope);
@@ -393,8 +402,6 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     decl->accept(this);
     fields.push(decl);
   }
-  auto type = get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo*>(type->info.get());
   info->fields = fields;
   info->scope = node->scope;
   context.exit_scope();

@@ -60,7 +60,7 @@ Token Lexer::get_token(State &state) {
       return Token(location, token.str(), TType::String, TFamily::Literal);
     }
 
-    if (std::isalpha(c)) {
+    if (std::isalpha(c) || c == '_') {
       while (pos < len && (std::isalnum(c) || c == '_')) {
         token.put(c);
         pos++;

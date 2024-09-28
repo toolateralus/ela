@@ -1,27 +1,10 @@
+#import file;
 
-#import core;
-
-vec2f :: struct {
-	f32 x;
-	f32 y;
-}
-
-
-Node :: struct {
-	Node *next;
-}
-
-
-#test test :: () {
-	Node node;
-	node.next = malloc(sizeof(Node));
-	printf("%p\n", node.next);
-	
-	return;
-	
-	printf("\nsizeof s8: %ld\n", sizeof(s8));
-	printf("sizeof s16: %ld\n", sizeof(s16));
-	printf("sizeof s32: %ld\n", sizeof(s32));
-	printf("sizeof s64: %ld\n", sizeof(s64));
-	printf("sizeof vec2f: %ld\n", sizeof(vec2f));
+main :: () {
+	_IO_FILE * file = fopen("dummy.ela", "rw");
+	s32 eof = -1;
+	s8 c;
+	while ((c = fgetc(file)) != eof) {
+		printf("%c", c);
+	}
 }
