@@ -377,4 +377,61 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
       symbol->type_id, expr_ty, node->source_tokens,
       "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
+
+}
+
+
+std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+  context.enter_scope(node->scope);
+  jstl::Vector<ASTDeclaration*> fields;
+  for (auto decl : node->declarations) {
+    decl->accept(this);
+    fields.push(decl);
+  }
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  info->fields = fields;
+  info->scope = node->scope;
+  context.exit_scope();
+  return {};
+}
+
+std::any TypeVisitor::visit(ASTDotExpr *node) {
+  auto left = int_from_any(node->left->accept(this));
+  auto left_ty = get_type(left);
+  if (left_ty->kind != TYPE_STRUCT) {
+    throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE, node->source_tokens);
+  }
+  auto info = static_cast<StructTypeInfo*>(left_ty->info.get());
+  
+  auto old_parent = info->scope->parent;
+  auto above = context.current_scope;
+  
+  if (above->is_struct_scope) {
+    info->scope->parent = above;
+  }
+  context.enter_scope(info->scope);
+  
+  const auto exit_scope = [&]  {
+    if (above->is_struct_scope) {
+      info->scope->parent = old_parent;
+    }
+    context.current_scope = above;
+  };
+  
+  if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
+    for (const auto &field: info->fields) {
+      if (field->name.value == iden->value.value) {
+        auto value =  node->type->resolved_type = field->type->resolved_type;
+        exit_scope();
+        return value;
+      }
+    }
+  }
+  if (auto dot = dynamic_cast<ASTDotExpr*>(node->right)) {
+    auto value = node->type->resolved_type = int_from_any(dot->accept(this));
+    exit_scope();
+    return value;
+  }
+  throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);
 }

@@ -333,3 +333,29 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   
   return {};
 }
+
+std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+  (*ss) << "struct " << node->type->base << "{\n";
+  indentLevel++;
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  for (const auto &decl: info->fields) {
+    decl->accept(this);
+    semicolon();
+    newline();
+  }
+  (*ss) << "}\n";
+  indentLevel--;
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTDotExpr *node) {
+  auto ty = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(ty->info.get());
+  context.enter_scope(info->scope);
+  node->left->accept(this);
+  (*ss) << '.';
+  node->right->accept(this);
+  context.exit_scope();
+  return {};
+}

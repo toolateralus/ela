@@ -19,6 +19,7 @@ struct Symbol {
 };
 
 struct Scope {
+  bool is_struct_scope = false;
   
   std::unordered_map<std::string, Symbol> symbols;
   Scope *parent = nullptr;

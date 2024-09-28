@@ -165,8 +165,10 @@ struct ScalarTypeInfo : TypeInfo {
 };
 
 struct ASTDeclaration;
+struct Scope;
 // TODO: implement structs.
 struct StructTypeInfo : TypeInfo {
+  Scope *scope;
   jstl::Vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
 };

@@ -243,6 +243,7 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
 std::string Type::to_string() const {
 
   switch (kind) {
+  case TYPE_STRUCT:
   case TYPE_SCALAR:
     return base + extensions.to_string();
   case TYPE_FUNCTION:
@@ -250,8 +251,6 @@ std::string Type::to_string() const {
       return info.get()->to_string();
     else
       return "invalid function type";
-  case TYPE_STRUCT:
-    return "struct NYI";
     break;
   }
 }
@@ -310,14 +309,13 @@ bool TypeExt::equals(const TypeExt &other) const {
 std::string Type::to_cpp_string() const {
   switch (kind) {
   case TYPE_SCALAR:
+  case TYPE_STRUCT:
     return extensions.to_cpp_string(this->base);
   case TYPE_FUNCTION:
     if (info.is_not_null())
       return info.get()->to_string();
     else
       return "invalid function type";
-  case TYPE_STRUCT:
-    return "struct NYI";
     break;
   }
 }

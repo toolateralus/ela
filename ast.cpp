@@ -395,7 +395,12 @@ ASTBlock *Parser::parse_block() {
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   expect(TType::Struct);
   auto decl = ast_alloc<ASTStructDeclaration>();
+  
+  // fwd declare the type.
+  auto type_id = create_struct_type(name.value, {});
+  
   auto block = parse_block();
+  block->scope->is_struct_scope = true;
   for (const auto &statement: block->statements) {
     if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
       decl->declarations.push(field);
@@ -407,6 +412,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   decl->type = type;
   decl->type->base = name.value;
   decl->type->extension_info = {};
+  decl->type->resolved_type = type_id;
   decl->scope = block->scope;
   return decl;
 }
@@ -595,7 +601,14 @@ ASTExpr *Parser::parse_postfix() {
 
   // TODO: add -- and ++?
   // TODO: parse and build AST for dot expressions.
-  // while (peek().type == TType::Dot) { }
+  while (peek().type == TType::Dot) { 
+    eat();
+    auto dot = ast_alloc<ASTDotExpr>();
+    dot->type = ast_alloc<ASTType>();
+    dot->left = left;
+    dot->right = parse_postfix();
+    left = dot;
+  }
 
   return left;
 }
@@ -833,5 +846,6 @@ std::any ASTStructDeclaration::accept(VisitorBase *visitor) {
   ###########################################
 */
 
-
-
+std::any ASTDotExpr::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
