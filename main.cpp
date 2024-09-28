@@ -56,19 +56,19 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
   return root;
 }
 void CompileCommand::emit_code(ASTProgram *root, Context &context) {
+  TypeVisitor type_visitor{context};
+  type_visitor.visit(root);
+
   if (has_flag("verbose")) {
     SerializeVisitor serializer(context);
     auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
     printf("%s\n", serialized_view.c_str());
-    std::ofstream ast("ast.toml");
+    std::ofstream ast(binary_path.string() + ".coffee");
     ast << serialized_view;
     ast.flush();
     ast.close();
   }
 
-  TypeVisitor type_visitor{context};
-  type_visitor.visit(root);
-  
   EmitVisitor emit(context, type_visitor);
   emit.visit(root);
 

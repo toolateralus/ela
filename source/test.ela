@@ -30,7 +30,7 @@ test_referencing_pointer :: () {
     node.next.next = &other;
     
     assert("mallocing 'next' of 'Node' failed.", node.next != null);
-    assert("dereferencing other into node.next failed.", node.next.next == null);
+    assert("dereferencing other into node.next failed.", node.next.next != null);
 }
 
 

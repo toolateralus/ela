@@ -435,30 +435,15 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   
   auto left_info = static_cast<StructTypeInfo*>(left_type->info.get());;
   
-  auto old_parent = left_info->scope->parent;
-  auto above = context.current_scope;
-  
-  const auto enter_scope = [&] {
-    if (above && above->is_struct_scope) {
-      left_info->scope->parent = above;
-    }
-    context.enter_scope(left_info->scope);
-  };
-  
-  const auto exit_scope = [&]  {
-    if (above && above->is_struct_scope) {
-      left_info->scope->parent = old_parent;
-    }
-    context.current_scope = above;
-  };
-    
+  auto previous_scope = context.current_scope;
+
   std::cout << "for type: " << left_type->to_string() << "emitting: " << op << '\n';
   
-  enter_scope();
+  context.enter_scope(left_info->scope);
   node->left->accept(this);
   (*ss) << (op);
   node->right->accept(this);
-  exit_scope();
+  context.current_scope = previous_scope;
   
   return {};
 }

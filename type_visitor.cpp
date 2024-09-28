@@ -435,20 +435,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
   auto info = static_cast<StructTypeInfo*>(left_ty->info.get());
   
-  auto old_parent = info->scope->parent;
-  auto above = context.current_scope;
-  
-  if (above && above->is_struct_scope) {
-    info->scope->parent = above;
-  }
+  auto previous_scope = context.current_scope;
+
   context.enter_scope(info->scope);
-  
-  const auto exit_scope = [&]  {
-    if (above && above->is_struct_scope) {
-      info->scope->parent = old_parent;
-    }
-    context.current_scope = above;
-  };
   
   int type = -1;
   if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
@@ -465,7 +454,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (auto dot = dynamic_cast<ASTDotExpr*>(node->right)) {
     type = node->type->resolved_type = int_from_any(dot->accept(this));
   }
-  exit_scope();
+  context.current_scope = previous_scope;
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);
 }
