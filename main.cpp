@@ -18,17 +18,21 @@ int num_types;
 // this is just an approximation.
 // It may be too little since this arena is used a lot.
 jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
+
 // the same for this
 jstl::Arena scope_arena{MB(10)};
+
 // the same for this
 jstl::Arena ast_arena{MB(10)};
+
+CompileCommand compile_command;
+
 /*
   #########################
   ### PROVIDING EXTERNS ###
   #########################
 */
 
-CompileCommand compile_command;
 
 int main(int argc, char *argv[]) {
   try {

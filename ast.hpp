@@ -80,7 +80,9 @@ struct ASTProgram : ASTNode {
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct ASTType : ASTNode {
+struct ASTExpr : ASTNode {};
+
+struct ASTType : ASTExpr {
   std::string base;
   TypeExt extension_info{};
 
@@ -97,8 +99,6 @@ struct ASTType : ASTNode {
 
   std::any accept(VisitorBase *visitor) override;
 };
-
-struct ASTExpr : ASTNode {};
 
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;

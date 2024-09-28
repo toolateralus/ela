@@ -142,6 +142,7 @@ void Parser::init_directive_routines() {
            return nullptr;
          }});
   }
+  
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
@@ -383,14 +384,26 @@ ASTDeclaration *Parser::parse_declaration() {
     auto expr = parse_expr();
     decl->value = expr;
   }
-  context.current_scope->insert(iden.value, -1);
   end_token_frame(decl);
+  if (context.current_scope->lookup(iden.value)) {
+    throw_error(std::format("re-definition of '{}'", iden.value), ERROR_FAILURE, decl->source_tokens);
+  }
+  context.current_scope->insert(iden.value, -1);
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
+  
   begin_token_frame();
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
+  
+  if (context.current_scope->lookup(name.value)) {
+    throw_error(std::format("re-definition of function '{}'", name.value), ERROR_FAILURE, {});
+  }
+  
+  // to allow for recursion
+  context.current_scope->insert(name.value, -1);
+  
   function->params = parse_parameters();
   function->name = name;
 
@@ -403,6 +416,7 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
 
   end_token_frame(function);
   function->block = parse_block();
+  
   return function;
 }
 ASTBlock *Parser::parse_block() {
@@ -651,10 +665,12 @@ ASTExpr *Parser::parse_primary() {
 
   switch (tok.type) {
   case TType::Identifier: {
+    if (find_type_id(tok.value, {}) != -1) {
+      return parse_type();
+    }
     eat();
     auto iden = ast_alloc<ASTIdentifier>();
     iden->value = tok;
-    ;
     return iden;
   }
   case TType::Null: {

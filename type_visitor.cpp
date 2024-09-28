@@ -34,8 +34,7 @@ static inline int int_from_any(const std::any &any) {
 }
 
 std::any TypeVisitor::visit(ASTType *node) {
-  node->resolved_type = find_type_id(node->base, node->extension_info);
-  return {};
+  return node->resolved_type = find_type_id(node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
   for (auto &statement : node->statements) {

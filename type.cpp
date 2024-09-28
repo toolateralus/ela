@@ -187,7 +187,7 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
   }
-  return from_info->size < to_info->size;
+  return from_info->size <= to_info->size;
 }
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
@@ -394,4 +394,17 @@ int f32_type() {
   static int type = -1;
   [[unlikely]] if (type == -1) { type = find_type_id("f32", {}); }
   return type;
+}
+int StructTypeInfo::size() const {
+  if (m_size == -1)
+    for (const auto field : fields) {
+      int type;
+      if (field->type->resolved_type == -1) {
+        type =  field->type->resolved_type = find_type_id(field->type->base, field->type->extension_info);
+      } else {
+        type = field->type->resolved_type;
+      }
+      m_size += get_type(type)->size();
+    }
+  return m_size;
 }
