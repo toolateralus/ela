@@ -160,7 +160,12 @@ ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
 
-  while (peek().type != TType::Eof) {
+  while (states.size() > 1) {
+    
+    if (states.size() == 1 && peek().type == TType::Eof) {
+      break;
+    }
+    
     if (peek().type == TType::Directive) {
       eat();
       auto identifer = expect(TType::Identifier).value;
@@ -168,14 +173,14 @@ ASTProgram *Parser::parse() {
       if (result.is_not_null()) {
         auto statement = dynamic_cast<ASTStatement *>(result.get());
         if (statement) {
-          program->statements.push(statement);
+          program->statements.push_back(statement);
         }
       }
       if (semicolon())
         eat();
       continue;
     }
-    program->statements.push(parse_statement());
+    program->statements.push_back(parse_statement());
     if (semicolon())
       eat();
   }
@@ -422,6 +427,7 @@ ASTDeclaration *Parser::parse_declaration() {
   context.current_scope->insert(iden.value, -1);
   return decl;
 }
+
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
   
   begin_token_frame();
@@ -450,13 +456,14 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
   
   return function;
 }
+
 ASTBlock *Parser::parse_block() {
   begin_token_frame();
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
   context.enter_scope();
   while (not_eof() && peek().type != TType::RCurly) {
-    block->statements.push(parse_statement());
+    block->statements.push_back(parse_statement());
     if (semicolon())
       eat();
   }
@@ -484,7 +491,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     block->scope->is_struct_scope = true;
     for (const auto &statement: block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
-        decl->declarations.push(field);
+        decl->declarations.push_back(field);
       } else {
         throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
       }
@@ -787,19 +794,19 @@ ASTType *Parser::parse_type() {
 
   while (true) {
     if (peek().type == TType::LBrace) {
-      extension_info.extensions.push(TYPE_EXT_ARRAY);
+      extension_info.extensions.push_back(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
         auto integer = expect(TType::Integer);
         ;
-        extension_info.array_sizes.push(std::stoi(integer.value));
+        extension_info.array_sizes.push_back(std::stoi(integer.value));
       } else {
-        extension_info.array_sizes.push(-1);
+        extension_info.array_sizes.push_back(-1);
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
-      extension_info.extensions.push(TYPE_EXT_POINTER);
+      extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else {
       break;
     }
@@ -827,7 +834,7 @@ ASTParamsDecl *Parser::parse_parameters() {
       param->default_value = parse_expr();
     }
 
-    params->params.push(param);
+    params->params.push_back(param);
 
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
@@ -848,7 +855,7 @@ ASTArguments *Parser::parse_arguments() {
   }
 
   while (peek().type != TType::RParen) {
-    args->arguments.push(parse_expr());
+    args->arguments.push_back(parse_expr());
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
     }

@@ -73,12 +73,12 @@ struct ASTBlock : ASTStatement {
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   int return_type = Type::invalid_id;
   Scope *scope;
-  jstl::Vector<ASTNode *> statements;
+  std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTProgram : ASTNode {
-  jstl::Vector<ASTStatement *> statements;
+  std::vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -163,7 +163,7 @@ struct ASTParamDecl : ASTNode {
 };
 
 struct ASTParamsDecl : ASTStatement {
-  jstl::Vector<ASTParamDecl *> params;
+  std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -179,7 +179,7 @@ struct ASTFuncDecl : ASTStatement {
 };
 
 struct ASTArguments : ASTNode {
-  jstl::Vector<ASTExpr *> arguments;
+  std::vector<ASTExpr *> arguments;
 
   std::any accept(VisitorBase *visitor) override;
 };
@@ -263,7 +263,7 @@ struct ASTSubscript: ASTExpr {
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   ASTType *type;
-  jstl::Vector<ASTDeclaration *> declarations;
+  std::vector<ASTDeclaration *> declarations;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -338,8 +338,9 @@ struct DirectiveRoutine {
 
 struct Parser {
   
-  #define peek() \
-    states.back().lookahead_buffer.front()
+  inline Token peek() const {
+    return states.back().lookahead_buffer.front();
+  }
 
   #define lookahead_buf() \
     states.back().lookahead_buffer
@@ -364,14 +365,14 @@ struct Parser {
 
   inline Token eat() {
     fill_buffer_if_needed();
+    auto tok = peek();
     
-    if (peek().is_eof() && states.size() > 1) {
+    if (tok.is_eof() && states.size() > 1) {
       states.pop_back();
       fill_buffer_if_needed();
       return peek();
     } 
     
-    auto tok = peek();
     lookahead_buf().pop_front();
     lexer.get_token(states.back());
     

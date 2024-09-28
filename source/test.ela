@@ -18,9 +18,8 @@ Node :: struct {
     s32[100] arr;
     arr[50] = 0;
     assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
-    
     int n;
-    n++;
+    ++n;
 }
 
 #test 
