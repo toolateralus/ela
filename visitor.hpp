@@ -87,6 +87,8 @@ struct EmitVisitor : VisitorBase {
   bool needs_semi_newline = true;
   int num_tests = 0;
   
+  TypeVisitor &type_visitor;
+  
   std::stringstream header {};
   std::stringstream code {};
   std::stringstream *ss {};
@@ -109,7 +111,7 @@ struct EmitVisitor : VisitorBase {
     ss = &header;
   }
   
-  EmitVisitor(Context &context) : context(context) {
+  EmitVisitor(Context &context, TypeVisitor &type_visitor) : context(context), type_visitor(type_visitor) {
     ss = &code;
   }
   std::string indent() {

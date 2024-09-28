@@ -429,6 +429,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
+  
   if (left_ty->kind != TYPE_STRUCT) {
     throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE, node->source_tokens);
   }
@@ -437,35 +438,35 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto old_parent = info->scope->parent;
   auto above = context.current_scope;
   
-  if (above->is_struct_scope) {
+  if (above && above->is_struct_scope) {
     info->scope->parent = above;
   }
   context.enter_scope(info->scope);
   
   const auto exit_scope = [&]  {
-    if (above->is_struct_scope) {
+    if (above && above->is_struct_scope) {
       info->scope->parent = old_parent;
     }
     context.current_scope = above;
   };
   
+  int type = -1;
   if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
     if (!context.current_scope->lookup(iden->value.value)) {
       throw_error(std::format("use of undeclared identifier: {}", iden->value.value), ERROR_FAILURE, node->source_tokens);
     }
     for (const auto &field: info->fields) {
       if (field->name.value == iden->value.value) {
-        auto value =  node->type->resolved_type = field->type->resolved_type;
-        exit_scope();
-        return value;
+        type =  node->type->resolved_type = field->type->resolved_type;
+        break;
       }
     }
-  }
+  } 
   if (auto dot = dynamic_cast<ASTDotExpr*>(node->right)) {
-    auto value = node->type->resolved_type = int_from_any(dot->accept(this));
-    exit_scope();
-    return value;
+    type = node->type->resolved_type = int_from_any(dot->accept(this));
   }
+  exit_scope();
+  return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);
 }
 
@@ -475,12 +476,15 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left_ty = get_type(left);
   
   // TODO: make it so array types are not scalars. It makes no darn sense.
-  if (left_ty->kind != TYPE_SCALAR || !left_ty->extensions.is_array()) {
+  if (left_ty->kind != TYPE_SCALAR || (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer())) {
     throw_error("cannot index into non array type.", ERROR_FAILURE, node->source_tokens);
   }
   
-  // removes one layer of array.
-  auto element_id = left_ty->get_element_type();
   
-  return element_id;
+  if (left_ty->extensions.is_array()) {
+    auto element_id = left_ty->get_element_type();
+    return element_id;
+  } else {
+    return remove_one_pointer_ext(left_ty->id, node->source_tokens);
+  }
 }

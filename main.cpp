@@ -53,24 +53,23 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
   std::filesystem::current_path(input_path.parent_path());
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
-  TypeVisitor typer{context};
-  typer.visit(root);
   return root;
 }
 void CompileCommand::emit_code(ASTProgram *root, Context &context) {
-  SerializeVisitor serializer(context);
-  auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
-
   if (has_flag("verbose")) {
+    SerializeVisitor serializer(context);
+    auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
     printf("%s\n", serialized_view.c_str());
+    std::ofstream ast("ast.toml");
+    ast << serialized_view;
+    ast.flush();
+    ast.close();
   }
 
-  std::ofstream ast("ast.toml");
-  ast << serialized_view;
-  ast.flush();
-  ast.close();
-
-  EmitVisitor emit(context);
+  TypeVisitor type_visitor{context};
+  type_visitor.visit(root);
+  
+  EmitVisitor emit(context, type_visitor);
   emit.visit(root);
 
   auto header = emit.get_header();
