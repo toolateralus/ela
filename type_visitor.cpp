@@ -1,10 +1,10 @@
-#include "visitor.hpp"
 #include "ast.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
-#include <format>
+#include "visitor.hpp"
 #include <any>
+#include <format>
 #include <jstl/containers/vector.hpp>
 
 // these are called from and to because in the event of an implicit cast this should be the behaviour.
@@ -16,7 +16,8 @@ void validate_type_compatability(const int from, const int to, const std::vector
   
   if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(
-        message + '\n' + std::format(format, tleft->to_string(), tright->to_string()),
+        message + '\n' +
+            std::format(format, tleft->to_string(), tright->to_string()),
         ERROR_FAILURE, source_tokens);
   }
 }
@@ -47,19 +48,20 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   node->params->accept(this);
 
   FunctionTypeInfo info;
-  
+
   info.return_type = node->return_type->resolved_type;
   info.params_len = 0;
   info.default_params = 0;
   info.flags = node->flags;
-  
+
   auto params = node->params->params;
   for (const auto &param : params) {
-    if (param->default_value.is_not_null()) info.default_params++;
-    
+    if (param->default_value.is_not_null())
+      info.default_params++;
+
     if (node->block.is_not_null())
       node->block.get()->scope->insert(param->name, param->type->resolved_type);
-    
+
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
@@ -70,26 +72,33 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   context.current_scope->insert(node->name.value, type_id);
 
   if (info.flags & FUNCTION_FOREIGN) {
-    return {};  
+    return {};
   }
-  
+
   auto return_type = find_type_id("void", {});
   visitor_flags |= VisitorBase::FLAG_FUNCTION_ROOT_LEVEL_BLOCK;
-  return_type = int_from_any(node->block.get()->accept(this));
-  validate_type_compatability(return_type, info.return_type, node->source_tokens, "invalid function return type: {} {}", std::format("function: {}", node->name.value));
+  auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
+  if (control_flow.type != -1) {
+    return_type = control_flow.type;
+  }
+  validate_type_compatability(return_type, info.return_type,
+                              node->source_tokens,
+                              "invalid function return type: {} {}",
+                              std::format("function: {}", node->name.value));
   return {};
 }
-const auto check_return_type_consistency (int &return_type, int new_type, ASTNode * node) {
+const auto check_return_type_consistency(int &return_type, int new_type,
+                                         ASTNode *node) {
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
     auto expected_type = get_type(return_type);
     auto found_type = get_type(new_type);
     throw_error(
-        std::format("Inconsistent return types in block. Expected: {}, Found: {}", expected_type->base, found_type->base),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+        std::format(
+            "Inconsistent return types in block. Expected: {}, Found: {}",
+            expected_type->base, found_type->base),
+        ERROR_FAILURE, node->source_tokens);
   }
 };
 
@@ -106,72 +115,48 @@ std::any TypeVisitor::visit(ASTBlock *node) {
 
   for (auto &statement : node->statements) {
     auto result = statement->accept(this);
-    int stmt_ret_ty = -1;
-
-    ASTBlock *block = nullptr;
-
-    if (auto block_stmt = dynamic_cast<ASTBlock *>(statement)) {
-      block = block_stmt;
-    }
-    if (auto if_stmt = dynamic_cast<ASTIf *>(statement)) {
-      auto if_cf = std::any_cast<ControlFlow>(result);
-      flags |= if_cf.flags; 
-      if ((if_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
-        check_return_type_consistency(return_type, if_cf.type, node);
-      }
-      if ((if_cf.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
-        flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-        break;
-      } 
-    } else if (auto for_stmt = dynamic_cast<ASTFor *>(statement)) {
-      block = for_stmt->block;
-    } else if (auto while_stmt = dynamic_cast<ASTWhile *>(statement)) {
-      block = while_stmt->block;
-    }
-
-    if (block) {
-      flags |= block->flags;
-      stmt_ret_ty = int_from_any(result);
-    } else if (auto cont = dynamic_cast<ASTContinue *>(statement)) {
-      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      flags |= BLOCK_FLAGS_CONTINUE;
-      break;
+    auto control_flow = ControlFlow{BLOCK_FLAGS_FALL_THROUGH, -1};
+    if (dynamic_cast<ASTBlock *>(statement) ||
+        dynamic_cast<ASTIf *>(statement) ||
+        dynamic_cast<ASTFor *>(statement) ||
+        dynamic_cast<ASTWhile *>(statement)
+    ) {
+      control_flow = std::any_cast<ControlFlow>(result);
+    } else if (dynamic_cast<ASTContinue *>(statement)) {
+      control_flow.flags = BLOCK_FLAGS_CONTINUE;
+    } else if (dynamic_cast<ASTBreak *>(statement)) {
+      control_flow.flags = BLOCK_FLAGS_BREAK;
     } else if (auto ret = dynamic_cast<ASTReturn *>(statement)) {
-      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      flags |= BLOCK_FLAGS_RETURN;
-      stmt_ret_ty = ret->expression.is_not_null()
-                        ? int_from_any(ret->expression.get()->accept(this))
-                        : find_type_id("void", {});
-      check_return_type_consistency(return_type, stmt_ret_ty, node);
-      break;
-      
-    } else if (auto brk = dynamic_cast<ASTBreak *>(statement)) {
-      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
-      flags |= BLOCK_FLAGS_BREAK;
-      break;
+      control_flow.flags = BLOCK_FLAGS_RETURN;
+      if (ret->expression.is_not_null()) {
+        control_flow.type = int_from_any(ret->expression.get()->accept(this));
+      } else {
+        control_flow.type = find_type_id("void", {});
+      }
     }
-    check_return_type_consistency(return_type, stmt_ret_ty, node);
+    flags |= control_flow.flags;
+    if ((control_flow.flags & BLOCK_FLAGS_RETURN) != 0) {
+      check_return_type_consistency(return_type, control_flow.type, node);
+    }
+    if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+      flags &= ~BLOCK_FLAGS_FALL_THROUGH;
+    }
   }
 
   if (return_type == -1) {
     return_type = find_type_id("void", {});
   }
 
-  if (fn_root_level &&
-      return_type != find_type_id("void", {}) &&
-      flags != BLOCK_FLAGS_RETURN
-  ) {
-    throw_error(
-        "Not all code paths return a value.",
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+  if (fn_root_level && return_type != find_type_id("void", {}) &&
+      flags != BLOCK_FLAGS_RETURN) {
+    throw_error("Not all code paths return a value.", ERROR_FAILURE,
+                node->source_tokens);
   }
 
   node->flags = flags;
   node->return_type = return_type;
   context.exit_scope();
-  return return_type;
+  return ControlFlow{flags, return_type};
 }
 
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
@@ -184,7 +169,10 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
-    validate_type_compatability(node->type->resolved_type, expr_type, node->source_tokens, "invalid parameter declaration; expected: {} got: {}", std::format("parameter: {}", node->name));
+    validate_type_compatability(
+        node->type->resolved_type, expr_type, node->source_tokens,
+        "invalid parameter declaration; expected: {} got: {}",
+        std::format("parameter: {}", node->name));
   }
   return {};
 }
@@ -221,27 +209,24 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
-  auto conversion_rule = type_conversion_rule(get_type(operand_ty), get_type(find_type_id("bool", {})));
-  auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
-  
+  auto conversion_rule = type_conversion_rule(
+      get_type(operand_ty), get_type(find_type_id("bool", {})));
+  auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
+                      conversion_rule != CONVERT_EXPLICIT);
+
   if (node->op.type == TType::Not && can_convert) {
-     return find_type_id("bool", {});
+    return find_type_id("bool", {});
   }
-  
+
   if (node->op.type == TType::And) {
     auto ty = get_type(operand_ty);
-    return find_type_id(ty->base, TypeExt{
-      .extensions = {
-        TYPE_EXT_POINTER
-      }
-    });
+    return find_type_id(ty->base, TypeExt{.extensions = {TYPE_EXT_POINTER}});
   }
-  
+
   if (node->op.type == TType::Mul) {
     return remove_one_pointer_ext(operand_ty, node->source_tokens);
   }
-  
-  
+
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
@@ -251,9 +236,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   else {
     throw_error(
         std::format("Use of undeclared identifier '{}'", node->value.value),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+        ERROR_FAILURE, node->source_tokens);
   }
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
@@ -269,7 +252,8 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   case ASTLiteral::Bool:
     return find_type_id("bool", {});
   case ASTLiteral::Null:
-    return find_type_id("void", TypeExt { .extensions = {TYPE_EXT_POINTER}, .array_sizes = {} });
+    return find_type_id(
+        "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
     break;
   }
 }
@@ -277,11 +261,8 @@ std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
 
   if (!symbol) {
-    throw_error(
-        std::format("Use of undeclared symbol '{}'", node->name.value),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+    throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
+                ERROR_FAILURE, node->source_tokens);
   }
 
   jstl::Vector<int> arg_tys =
@@ -292,24 +273,22 @@ std::any TypeVisitor::visit(ASTCall *node) {
   if (fn_ty_info.is_null()) {
     throw_error(
         std::format("Function call '{}' does not refer to a function type.",
-                        node->name.value),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+                    node->name.value),
+        ERROR_FAILURE, node->source_tokens);
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
 
-  if ((arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params) && !info->is_varargs) {
+  if ((arg_tys.size() > info->params_len ||
+       arg_tys.size() < info->params_len - info->default_params) &&
+      !info->is_varargs) {
     throw_error(
         std::format("Function call '{}' has incorrect number of arguments. "
-                        "Expected: {}, Found: {}",
-                        node->name.value, info->params_len, arg_tys.size()),
-        ERROR_FAILURE,
-        node->source_tokens
-    );
+                    "Expected: {}, Found: {}",
+                    node->name.value, info->params_len, arg_tys.size()),
+        ERROR_FAILURE, node->source_tokens);
   }
-  
+
   for (int i = 0; i < info->params_len; ++i) {
     // TODO: default parameters evade type checking
     if (arg_tys.size() <= i) {
@@ -320,7 +299,6 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   node->type = info->return_type;
   return info->return_type;
-  
 }
 std::any TypeVisitor::visit(ASTArguments *node) {
   jstl::Vector<int> argument_types;
@@ -343,7 +321,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
-    auto iden = static_cast<ASTIdentifier*>(v.target);
+    auto iden = static_cast<ASTIdentifier *>(v.target);
     context.current_scope->insert(iden->value.value, type);
     v.target->accept(this);
   } break;
@@ -358,31 +336,31 @@ std::any TypeVisitor::visit(ASTFor *node) {
   return node->block->accept(this);
 }
 std::any TypeVisitor::visit(ASTIf *node) {
-  
+
   auto cond_ty = int_from_any(node->condition->accept(this));
-  validate_type_compatability(find_type_id("bool", {}), cond_ty , node->source_tokens, "expected: {}, got {}", "if statement condition was not convertible to boolean");
-  
-  auto stmt_ret_type = int_from_any(node->block->accept(this));
-  auto if_flags = node->block->flags;
+  validate_type_compatability(
+      find_type_id("bool", {}), cond_ty, node->source_tokens,
+      "expected: {}, got {}",
+      "if statement condition was not convertible to boolean");
+
+  auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   if (node->_else.is_not_null()) {
     auto _else = node->_else.get();
     auto else_cf = std::any_cast<ControlFlow>(_else->accept(this));
-    if_flags |= else_cf.flags;
+    control_flow.flags |= else_cf.flags;
     if ((else_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
-      check_return_type_consistency(stmt_ret_type, else_cf.type, node);
+      check_return_type_consistency(control_flow.type, else_cf.type, node);
     }
   } else {
-    if_flags |= BLOCK_FLAGS_FALL_THROUGH;
+    control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
-  return ControlFlow{if_flags, stmt_ret_type};
+  return control_flow;
 }
 std::any TypeVisitor::visit(ASTElse *node) {
   if (node->_if.is_not_null()) {
     return node->_if.get()->accept(this);
   } else {
-    auto block = node->block.get();
-    auto ret_type = int_from_any(block->accept(this));
-    return ControlFlow{block->flags, ret_type};
+    return node->block.get()->accept(this);
   }
   return {};
 }
@@ -395,6 +373,8 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
-  validate_type_compatability(symbol->type_id, expr_ty, node->source_tokens, "invalid types in compound assignment. expected: {}, got {}", "");
+  validate_type_compatability(
+      symbol->type_id, expr_ty, node->source_tokens,
+      "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
 }
