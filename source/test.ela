@@ -274,3 +274,22 @@ test_struct_as_param :: () {
     Vector2 v;
     assert("", struct_as_param(v) == 0.0);
 }
+
+something :: (f32 f) -> f32 {
+    return f;
+}
+
+#test
+test_struct_member_as_param :: () {
+
+    Vector2 v;
+    assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
+}
+
+#test
+test_local_function :: () {
+    local_function :: () -> s32 {
+        return 0;
+    }
+    assert("failed to get 0 from local function call", local_function() == 0);
+}

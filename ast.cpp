@@ -388,13 +388,6 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
-
-  if (context.current_scope != context.root_scope) {
-    throw_error(
-        std::format("cannot declare a non-top level function:: {}", name.value),
-        ERROR_CRITICAL, token_frames.back());
-  }
-
   begin_token_frame();
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();

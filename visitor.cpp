@@ -1,5 +1,6 @@
 #include "visitor.hpp"
 #include "ast.hpp"
+#include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include <any>
@@ -35,11 +36,15 @@ std::any SerializeVisitor::visit(ASTFuncDecl *node) {
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
   auto sym = context.current_scope->lookup(node->name.value);
+  
   ss << indent() << "type: " << get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
   
-  if (node->block.is_not_null())
+  if (node->block.is_not_null()) {
+    context.enter_scope(node->block.get()->scope);
     visit(node->block.get());
+    context.exit_scope();
+  }
   
   ss << indent() << "returns: ";
   visit(node->return_type);

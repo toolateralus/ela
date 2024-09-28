@@ -261,20 +261,36 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     return {};
   }
   
+  // local function
+  auto is_local = context.current_scope != context.root_scope;  
+  
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
     (*ss) <<"int";
   } else {
-    node->return_type->accept(this);
+    if (is_local) {
+      (*ss) << "const auto " << node->name.value << " = []";   
+    } else {
+      node->return_type->accept(this);
+    }
   }
   
-  space();
-  (*ss) <<node->name.value;
-  node->params->accept(this);  
+  if (!is_local) {
+    space();
+    (*ss) <<node->name.value;
+  }
+  
+  node->params->accept(this);
+  
+  if (is_local) {
+    (*ss) << " -> ";
+    node->return_type->accept(this);
+  }
   
   if (node->block.is_not_null())
     node->block.get()->accept(this);
   
+  // Emit a forward declaration in the header to allow use-before-defined.
   if (node->name.value != "main") {
     emit_default_args = true;
     use_header();
@@ -285,7 +301,6 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     use_code();
     emit_default_args = false;
   }
-  
   
   return {};
 }
