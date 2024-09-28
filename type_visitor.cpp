@@ -468,3 +468,19 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);
 }
+
+std::any TypeVisitor::visit(ASTSubscript *node) {
+  auto left = int_from_any(node->left->accept(this));
+  auto subscript = int_from_any(node->subscript->accept(this));
+  auto left_ty = get_type(left);
+  
+  // TODO: make it so array types are not scalars. It makes no darn sense.
+  if (left_ty->kind != TYPE_SCALAR || !left_ty->extensions.is_array()) {
+    throw_error("cannot index into non array type.", ERROR_FAILURE, node->source_tokens);
+  }
+  
+  // removes one layer of array.
+  auto element_id = left_ty->get_element_type();
+  
+  return element_id;
+}

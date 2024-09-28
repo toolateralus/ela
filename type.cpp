@@ -402,3 +402,13 @@ int f32_type() {
   static int type = find_type_id("f32", {});
   return type;
 }
+
+int Type::get_element_type() const {
+  if (!extensions.is_array()) {
+    return -1;
+  }
+  auto extensions = this->extensions;
+  extensions.extensions.pop();
+  extensions.array_sizes.pop();
+  return find_type_id(base, extensions);
+}

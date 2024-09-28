@@ -16,6 +16,12 @@ Node :: struct {
     Node *next;
 }
 
+#test test_subscript :: () {
+    s32[100] arr;
+    arr[50] = 0;
+    assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+}
+
 #test 
 test_referencing_pointer :: () {
     Node node;

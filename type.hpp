@@ -90,6 +90,11 @@ struct TypeExt {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
   
+  inline bool is_array() const {
+    return !array_sizes.empty();
+  }
+
+  
   inline bool is_fixed_sized_array() const {
     for (const auto &ext: array_sizes) {
       if (ext != -1) {
@@ -214,6 +219,9 @@ struct Type {
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
   std::string to_cpp_string() const;
+  
+  // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
+  int get_element_type() const;
   constexpr static int invalid_id = -1;
 };
 

@@ -296,9 +296,35 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
-  
 
   eat();
+  
+  // likely subscript assignment.
+  if (tok.type == TType::Identifier && peek().type == TType::LBrace) {
+    auto subscript = ast_alloc<ASTSubscript>();
+    auto iden = ast_alloc<ASTIdentifier>();
+    iden->value = tok;
+    subscript->left = iden;
+    
+    expect(TType::LBrace);
+    auto index = parse_expr();
+    expect(TType::RBrace);
+    subscript->subscript = index;
+    
+    auto statement = ast_alloc<ASTExprStatement>();
+    if (peek().type == TType::Assign) {
+      eat();
+      auto value = parse_expr();
+      auto binexpr = ast_alloc<ASTBinExpr>();
+      binexpr->left = subscript;
+      binexpr->op = Token({}, "=", TType::Assign, TFamily::Operator);
+      binexpr->right = value;
+      statement->expression = binexpr;
+    } else statement->expression = subscript;
+    end_token_frame(statement);
+    return statement;
+  }
+  
 
   if (tok.type == TType::Identifier && peek().type == TType::Dot) {
     return parse_dot_statement(tok);
@@ -644,6 +670,7 @@ ASTExpr *Parser::parse_unary() {
 ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
 
+  // TODO: Probably add this to the loop below, when and if we have dot calls.
   if (auto identifier = dynamic_cast<ASTIdentifier *>(left)) {
     if (peek().type == TType::LParen) {
       auto tok = identifier->value;
@@ -651,15 +678,24 @@ ASTExpr *Parser::parse_postfix() {
     }
   }
 
-  // TODO: add -- and ++?
-  // TODO: parse and build AST for dot expressions.
-  while (peek().type == TType::Dot) { 
-    eat();
-    auto dot = ast_alloc<ASTDotExpr>();
-    dot->type = ast_alloc<ASTType>();
-    dot->left = left;
-    dot->right = parse_postfix();
-    left = dot;
+  // build dot and subscript expressions
+  while (peek().type == TType::Dot || peek().type == TType::LBrace) { 
+    if (peek().type == TType::Dot) {
+      eat();
+      auto dot = ast_alloc<ASTDotExpr>();
+      dot->type = ast_alloc<ASTType>();
+      dot->left = left;
+      dot->right = parse_postfix();
+      left = dot;
+    } else {
+      eat();
+      auto index = parse_expr();
+      expect(TType::RBrace);
+      auto subscript = ast_alloc<ASTSubscript>();
+      subscript->left = left;
+      subscript->subscript = index;
+      left = subscript;
+    }
   }
 
   return left;
@@ -833,3 +869,5 @@ ASTStatement *Parser::parse_call_statement(Token iden) {
   statement->expression = call;
   return statement;
 }
+
+

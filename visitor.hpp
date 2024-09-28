@@ -5,10 +5,8 @@
 #include <sstream>
 
 struct VisitorBase {
-  
   enum VisitorFlags {
     FLAG_NO_STATE = 0,
-
     FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
   };
   
@@ -49,6 +47,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTCompAssign *node) override;
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTDotExpr *node) override;
+  std::any visit(ASTSubscript *node) override;
 };
 
 struct TypeVisitor : VisitorBase {
@@ -79,6 +78,7 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTWhile *node) override;
   std::any visit(ASTCompAssign *node) override;
   std::any visit(ASTDotExpr *node) override;
+  std::any visit(ASTSubscript *node) override;
 };
 
 
@@ -162,4 +162,5 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTWhile *node) override;
   std ::any visit(ASTCompAssign *node) override;
   std::any visit(ASTDotExpr *node) override;
+  std::any visit(ASTSubscript *node) override;
 };

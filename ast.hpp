@@ -152,6 +152,7 @@ struct ASTLiteral : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
@@ -251,6 +252,12 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTSubscript: ASTExpr {
+  ASTExpr *left;
+  ASTExpr *subscript;
+  std::any accept(VisitorBase *visitor) override;
+};
+
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   ASTType *type;
@@ -284,7 +291,8 @@ struct ASTStructDeclaration : ASTStatement {
   std::any visit(ASTWhile *node) override {}                                   \
   std::any visit(ASTCompAssign *node) override {}                              \
   std::any visit(ASTStructDeclaration *node) override {}                       \
-  std::any visit(ASTDotExpr *node) override {}
+  std::any visit(ASTDotExpr *node) override {} \
+  std::any visit(ASTSubscript *node) override {} \
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -310,7 +318,8 @@ struct ASTStructDeclaration : ASTStatement {
   virtual std::any visit(ASTWhile *node) = 0;                                  \
   virtual std::any visit(ASTCompAssign *node) = 0;                             \
   virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
-  virtual std::any visit(ASTDotExpr *node) = 0;
+  virtual std::any visit(ASTDotExpr *node) = 0; \
+  virtual std::any visit(ASTSubscript *node) = 0; \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
