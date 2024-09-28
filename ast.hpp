@@ -124,6 +124,7 @@ struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   Token op;
+  int resolved_type;
   std::any accept(VisitorBase *visitor) override;
 };
 

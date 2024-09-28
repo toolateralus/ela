@@ -188,10 +188,12 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto right = int_from_any(node->right->accept(this));
   // TODO: relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no sense.
   if (node->op.is_relational()) {
+    node->resolved_type = bool_type();
     return bool_type();    
   } else {
     validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   }
+  node->resolved_type = left;
   return left;
 }
 

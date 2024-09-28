@@ -1,0 +1,10 @@
+#foreign FILE :: struct;
+
+#foreign fread :: (void *ptr, u64 size, u64 count, FILE *stream) -> u64;
+#foreign fwrite :: (void *ptr, u64 size, u64 count, FILE *stream) -> u64;
+#foreign fseek :: (FILE *stream, s64 offset, s32 origin) -> int;
+#foreign ftell :: (FILE *stream) -> s64 int;
+#foreign rewind :: (FILE *stream) -> void;
+#foreign fopen :: (char *fname, char *flags) -> FILE*;
+#foreign fclose :: (FILE *file) -> void;
+

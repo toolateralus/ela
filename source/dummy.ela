@@ -1,14 +1,24 @@
-vec2d :: struct {
-	f64 x;
-	f32 y;
-}
+
+#import core;
 
 vec2f :: struct {
 	f32 x;
 	f32 y;
 }
 
+
+Node :: struct {
+	Node *next;
+}
+
+
 #test test :: () {
+	Node node;
+	node.next = malloc(sizeof(Node));
+	printf("%p\n", node.next);
+	
+	return;
+	
 	printf("\nsizeof s8: %ld\n", sizeof(s8));
 	printf("sizeof s16: %ld\n", sizeof(s16));
 	printf("sizeof s32: %ld\n", sizeof(s32));

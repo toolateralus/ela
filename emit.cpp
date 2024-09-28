@@ -155,7 +155,15 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) <<"(";
   auto left = node->left->accept(this);
   space();
-  (*ss) <<node->op.value;; 
+  (*ss) <<node->op.value;
+  
+  if (node->op.type == TType::Assign) {
+    auto type = get_type(node->resolved_type);
+    auto isptr = type->extensions.is_pointer(1);
+    if (isptr)
+      (*ss) << "(" << type->to_cpp_string() << ")";
+  }
+  
   space();
   auto right = node->right->accept(this);
   (*ss) <<")";
@@ -167,6 +175,17 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
+    
+// TODO: remove me, add explicit casting.
+// CASTING ALL POINTERS ALWAYS::
+// This is so we can use malloc tempoarily. 
+// It's very bad.
+void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
+    auto type = get_type(node->type->resolved_type);
+    auto isptr = type->extensions.is_pointer(1);
+    if (isptr)
+      (*ss) << "(" << type->to_cpp_string() << ")";
+}
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
@@ -175,18 +194,9 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   space();
   if (node->value.is_not_null()) {
     (*ss) <<" = ";
-    
-    // TODO: remove me, add explicit casting.
-    // CASTING ALL POINTERS ALWAYS::
-    // This is so we can use malloc tempoarily. 
-    // It's very bad.    
-    {
-      auto type = get_type(node->type->resolved_type);
-      auto isptr = type->extensions.is_pointer(1);
-      if (isptr) (*ss) << "(" << type->to_cpp_string() << ")";
-    }
-    
-    
+
+    cast_pointers_implicit(node);
+
     node->value.get()->accept(this);
   } else {
     (*ss) <<"{}";
@@ -387,10 +397,8 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto ty = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(ty->info.get());
-  context.enter_scope(info->scope);
   node->left->accept(this);
   (*ss) << '.';
   node->right->accept(this);
-  context.exit_scope();
   return {};
 }

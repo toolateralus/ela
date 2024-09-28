@@ -3,7 +3,6 @@
 #include "lex.hpp"
 #include "nullable.hpp"
 #include "type.hpp"
-#include "visitor.hpp"
 #include <cassert>
 #include <filesystem>
 #include <format>
@@ -78,39 +77,40 @@ void Parser::init_directive_routines() {
   // Declare a foreign function, like C's extern. Super janky and bad because
   // our boilerplate is crap and uses stdlib stuff.
   {
-    directive_routines.push_back(
-        {.identifier = "foreign",
-         .kind = DIRECTIVE_KIND_STATEMENT,
-         .run = [](Parser *parser) static {
-           auto function = ast_alloc<ASTFuncDecl>();
-           parser->begin_token_frame();
+    directive_routines.push_back({
+      .identifier = "foreign",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) static {
+        auto function = ast_alloc<ASTFuncDecl>();
+        parser->begin_token_frame();
 
-           auto name = parser->expect(TType::Identifier);
+        auto name = parser->expect(TType::Identifier);
 
-           if (parser->context.current_scope != parser->context.root_scope) {
-             throw_error(
-                 std::format(
-                     "cannot declare a non-top level foreign function:: {}",
-                     name.value),
-                 ERROR_CRITICAL, parser->token_frames.back());
-           }
+        if (parser->context.current_scope != parser->context.root_scope) 
+          throw_error(std::format("cannot declare a non-top level foreign function:: {}", name.value), ERROR_CRITICAL, parser->token_frames.back());
 
-           parser->expect(TType::DoubleColon);
-           function->params = parser->parse_parameters();
-           function->name = name;
+        if (parser->peek().type == TType::Struct) {
+          // TODO: add foreign structs
+          
+        }
 
-           if (parser->peek().type != TType::Arrow) {
-             function->return_type = ASTType::get_void();
-           } else {
-             parser->expect(TType::Arrow);
-             function->return_type = parser->parse_type();
-           }
+      
+        parser->expect(TType::DoubleColon);
+        function->params = parser->parse_parameters();
+        function->name = name;
 
-           parser->end_token_frame(function);
-           function->flags |= FUNCTION_FOREIGN;
-           parser->expect(TType::Semi);
-           return function;
-         }});
+        if (parser->peek().type != TType::Arrow) {
+          function->return_type = ASTType::get_void();
+        } else {
+          parser->expect(TType::Arrow);
+          function->return_type = parser->parse_type();
+        }
+
+        parser->end_token_frame(function);
+        function->flags |= FUNCTION_FOREIGN;
+        parser->expect(TType::Semi);
+        return function;
+    }});
   }
 
   // #import
@@ -361,7 +361,7 @@ ASTExprStatement *Parser::parse_dot_statement(Token iden) {
     auto value = parse_expr();
     auto binexpr = ast_alloc<ASTBinExpr>();
     binexpr->op = {};
-    binexpr->op.type = TType::Dot;
+    binexpr->op.type = TType::Assign;
     binexpr->op.value = "=";
     binexpr->left = dot;
     binexpr->right = value;

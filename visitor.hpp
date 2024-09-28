@@ -141,6 +141,7 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFuncDecl *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
+  void cast_pointers_implicit(ASTDeclaration *&node);
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
   std ::any visit(ASTBinExpr *node) override;

@@ -12,6 +12,18 @@ Vector3 :: struct {
     f32 z;
 } 
 
+Node :: struct {
+    Node *next;
+}
+
+#test 
+test_referencing_pointer :: () {
+    Node node;
+    node.next = malloc(sizeof(Node));
+    assert("mallocing 'next' of 'Node' failed.", node.next != null);
+}
+
+
 #test 
 failure_case :: () {
     assert("This should fail", false);
