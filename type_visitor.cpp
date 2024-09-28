@@ -190,7 +190,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     node->resolved_type = bool_type();
     return bool_type();    
   } else {
-    validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
+    validate_type_compatability(right, left, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   }
   node->resolved_type = left;
   return left;
