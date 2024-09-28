@@ -7,9 +7,17 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug",
+      "name": "Debug test",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["source/test.ela",  "--test", "--s"],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug dummy",
+      "program": "${workspaceFolder}/bin/ela",
+      "args": ["source/dummy.ela"],
       "cwd": "${workspaceFolder}"
     }
   ]
