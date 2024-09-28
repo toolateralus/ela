@@ -281,7 +281,6 @@ something :: (f32 f) -> f32 {
 
 #test
 test_struct_member_as_param :: () {
-
     Vector2 v;
     assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }

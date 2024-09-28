@@ -2,7 +2,7 @@
 #foreign abs :: (int n) -> int;
 #foreign malloc :: (s64 nbytes) -> void*;
 #foreign free :: (void *ptr) -> void;
-#foreign system :: (string cmd) -> int;
+#foreign system :: (u8* cmd) -> int;
 
 // TODO: fix this. we have conflicting declarations since we use crappy crap in boilerplate.hpp
 // We should probably just completely avoid having a 'boilerplate.hpp' and inject specific code circumstantially,
