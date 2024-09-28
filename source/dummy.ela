@@ -1,12 +1,16 @@
-// #import core;
+#import core;
 
-// Vector2 :: struct {
-// 	f32 x;
-// 	f32 y;
-// };
+Vector2 :: struct {
+	f32 x;
+	f32 y;
+};
 
-// Vector2 v;
-v.x = 10.0;
-// v.y = 10.0;
-// assert("assigning v.x = 10.0 failed", v.x == 10.0);
-// assert("assigning v.y = 10.0 failed", v.y == 10.0);
+
+#test
+test :: ()  {
+	Vector2 v;
+	v.x = 10.0;
+	v.y = 10.0;
+	assert("assigning v.x = 10.0 failed", v.x == 10.0);
+	assert("assigning v.y = 10.0 failed", v.y == 10.0);
+}

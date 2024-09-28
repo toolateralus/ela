@@ -254,3 +254,14 @@ test_struct_assign_member :: () {
     assert("assigning v.x = 10.0 failed", v.x == 10.0);
     assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }
+
+#test
+test_struct_assign_nested_member :: () {
+    Vector3 v;
+    v.vec2.x = 1.0;
+    v.vec2.y = 2.0;
+    v.z = 3.0;
+    assert("assigning v.vec2.x = 1.0 failed", v.vec2.x == 1.0);
+    assert("assigning v.vec2.y = 1.0 failed", v.vec2.y == 2.0);
+    assert("assigning v.z = 3.0 failed", v.z == 3.0);
+}
