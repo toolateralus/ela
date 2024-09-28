@@ -21,6 +21,11 @@ Array :: struct {
 #test test_chained_dot_subscript :: () {
     Array a;
     a.ptr[0].next = null;
+    assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
+    
+    Node n;
+    a.ptr[0].next = &n;
+    assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
 #test test_subscript :: () {
