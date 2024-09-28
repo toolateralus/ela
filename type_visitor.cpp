@@ -111,7 +111,7 @@ const auto check_return_type_consistency(int &return_type, int new_type,
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
-    validate_type_compatability(return_type, new_type,
+    validate_type_compatability(new_type, return_type,
                                 node->source_tokens,
                                 "Expected: {}, Found: {}",
                                 "Inconsistent return types in block.");
@@ -160,7 +160,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     validate_type_compatability(
-        node->type->resolved_type, expr_type, node->source_tokens,
+        expr_type, node->type->resolved_type, node->source_tokens,
         "invalid parameter declaration; expected: {} got: {}",
         std::format("parameter: {}", node->name));
   }
@@ -354,7 +354,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 std::any TypeVisitor::visit(ASTIf *node) {
   auto cond_ty = int_from_any(node->condition->accept(this));
   validate_type_compatability(
-      bool_type(), cond_ty, node->source_tokens,
+      cond_ty, bool_type(), node->source_tokens,
       "expected: {}, got {}",
       "if statement condition was not convertible to boolean");
 
@@ -397,7 +397,7 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
   validate_type_compatability(
-      symbol->type_id, expr_ty, node->source_tokens,
+      expr_ty, symbol->type_id, node->source_tokens,
       "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
 }
