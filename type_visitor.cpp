@@ -80,7 +80,17 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     control_flow.type = find_type_id("void", {});
   }
 
-  if (control_flow.flags != BLOCK_FLAGS_RETURN &&
+  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
+    throw_error("Keyword \"continue\" must be in a loop.", ERROR_FAILURE,
+                node->source_tokens);
+  }
+
+  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0) {
+    throw_error("Keyword \"break\" must be in a loop.", ERROR_FAILURE,
+                node->source_tokens);
+  }
+
+  if ((control_flow.flags & BLOCK_FLAGS_RETURN) == 0 &&
       control_flow.type != find_type_id("void", {})) {
     throw_error("Not all code paths return a value.", ERROR_FAILURE,
                 node->source_tokens);
@@ -316,7 +326,13 @@ std::any TypeVisitor::visit(ASTFor *node) {
   } break;
   }
   context.exit_scope();
-  return node->block->accept(this);
+  auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
+  control_flow.flags &= ~BLOCK_FLAGS_BREAK;
+  control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
+  // we add fall through here because we dont know if this will get excecuted since we cant
+  // evaluate the condition to know
+  control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  return control_flow;
 }
 std::any TypeVisitor::visit(ASTIf *node) {
 
@@ -351,7 +367,13 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   if (node->condition.is_not_null()) {
     node->condition.get()->accept(this);
   }
-  return node->block->accept(this);
+  auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
+  control_flow.flags &= ~BLOCK_FLAGS_BREAK;
+  control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
+  // we add fall through here because we dont know if this will get excecuted since we cant
+  // evaluate the condition to know
+  control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  return control_flow;
 }
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
