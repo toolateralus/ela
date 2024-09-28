@@ -1,20 +1,10 @@
+// TODO: add memoization so we don't double include anything ever.
+// same for import.
 #import core;
 
 #test 
 failure_case :: () {
     assert("This should fail", false);
-}
-
-#test
-test_if_3 :: () {
-    bool v = true;
-    if !v {
-        assert("Unexpected case", false);
-    } else if v {
-        assert("v should be 1", v == true);
-    } else {
-        assert("Unexpected case", false);
-    }
 }
 
 #test
@@ -44,22 +34,40 @@ test_while :: () {
 #test
 test_if_1 :: () {
     bool v = true;
+    bool hit = false;
     if v {
         assert("v should be true", v == true);
+        hit = true;
     } else {
         assert("Unexpected case", false);
     }
+    assert("failed to fall through if statement", hit);
 }
 
 #test
 test_if_2 :: () {
-    bool v = true;
+    bool v = false;
+    bool hit = true;
     if v {
-        assert("v should be true", v == true);
-    } else {
         assert("Unexpected case", false);
+    } else if !v {
+        hit = true;
     }
-    assert("End of test_if_2 reached", true);
+    assert("fell through if else, but didn't set the variable", hit);
+}
+
+#test
+test_if_3 :: () {
+    bool v = false;
+    bool hit = true;
+    if v {
+        assert("Unexpected case", false);
+    } else if v {
+        assert("Unexpected case", false);
+    } else {
+        hit = true;
+    }
+    assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
 #test
@@ -162,4 +170,51 @@ test_malloc :: () {
     free(ptr);
     ptr = null;
     assert("freed ptr and set to null was not == null", ptr == null);
+}
+
+many_params :: (f32 a, f32 b, f32 c, f32 d = 1.0) -> f32 {
+    return a * b * c * d;
+}
+
+mul_params :: (f32 n, f32 f) -> f32 {
+    return n * f; 
+}
+#test
+test_param :: () {
+    assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
+    assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
+}
+
+returns :: () -> s32  { 
+    return 1; 
+}
+
+#test test_implicit_numerical_casting :: () {
+    u8 u1;
+    u16 u2 = u1;
+    u32 u3 = u2;
+    u64 u4 = u3;
+    assert("unable to upcast successfully", u4 == u1);
+    
+    s8 s1;
+    s16 s2 = s1;
+    s32 s3 = s2;
+    s64 s4 = s3;
+    assert("unable to upcast successfully", s1 == s4);
+    
+    float f;
+    f64 f1 = f;
+    assert("unable to upcast successfully", f == f1);
+}
+
+#test
+test_printf :: () {
+    u8* s = "Hello i am a string";
+    printf("testing printing a string: %s\n", s);
+    return;
+}
+
+#test
+test_return_value :: () {
+    assert("function expected to return 1", returns() == 1);
 }

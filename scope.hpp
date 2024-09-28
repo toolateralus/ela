@@ -55,7 +55,7 @@ struct Context {
     
     FunctionTypeInfo assert_info {};
     assert_info.return_type = find_type_id("void", {});
-    assert_info.parameter_types[0] = find_type_id("string", {});
+    assert_info.parameter_types[0] = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}});
     assert_info.parameter_types[1] = find_type_id("bool", {});
     assert_info.params_len = 2;
     current_scope->insert("assert", find_type_id("", assert_info, {}));

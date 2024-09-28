@@ -197,7 +197,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
   (*ss) <<' ' << node->name;
-  if (node->default_value.is_not_null()) {
+  if (node->default_value.is_not_null() && emit_default_args) {
     (*ss) <<" = ";
     node->default_value.get()->accept(this);
   }
@@ -277,12 +277,14 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     node->block.get()->accept(this);
   
   if (node->name.value != "main") {
+    emit_default_args = true;
     use_header();
     node->return_type->accept(this);
     (*ss) << ' ' <<node->name.value << ' ';
     node->params->accept(this);
     (*ss) << ";\n";
     use_code();
+    emit_default_args = false;
   }
   
   

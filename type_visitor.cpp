@@ -7,16 +7,14 @@
 #include <format>
 #include <jstl/containers/vector.hpp>
 
-void validate_type_compatability(
-    const int node_ty, const int expr_type,
-    const std::vector<Token> &source_tokens,
-    std::format_string<std::string, std::string> format, std::string message) {
-  auto tleft = get_type(node_ty), tright = get_type(expr_type);
-
+// these are called from and to because in the event of an implicit cast this should be the behaviour.
+void validate_type_compatability(const int from, const int to, const std::vector<Token> &source_tokens, std::format_string<std::string, std::string> format, std::string message) {
+  auto tleft = get_type(from),
+        tright = get_type(to);
+        
   auto conv_rule = type_conversion_rule(tleft, tright);
-
-  if (expr_type != node_ty &&
-      (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
+  
+  if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(
         message + '\n' +
             std::format(format, tleft->to_string(), tright->to_string()),
@@ -185,10 +183,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
 
   if (node->value.is_not_null()) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
-    validate_type_compatability(
-        node->type->resolved_type, expr_type, node->source_tokens,
-        "invalid declaration types. expected: {}, got {}",
-        std::format("declaration: {}", node->name.value));
+    validate_type_compatability(expr_type, node->type->resolved_type, node->source_tokens, "invalid declaration types. expected: {}, got {}", std::format("declaration: {}", node->name.value));
   }
 
   // TODO: probably want something a bit nicer than this.
@@ -203,13 +198,11 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
-
-  validate_type_compatability(
-      left, right, node->source_tokens,
-      "invalid types in binary expression. expected: {}, got {}", "");
-
+  // TODO: relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no sense.
   if (node->op.is_relational()) {
-    return find_type_id("bool", {});
+    return find_type_id("bool", {});    
+  } else {
+    validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   }
   return left;
 }
@@ -254,7 +247,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return find_type_id("f32", {});
   case ASTLiteral::RawString:
   case ASTLiteral::String:
-    return find_type_id("string", {});
+    return find_type_id("u8", {.extensions = { TYPE_EXT_POINTER }});
     break;
   case ASTLiteral::Bool:
     return find_type_id("bool", {});
@@ -301,10 +294,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     if (arg_tys.size() <= i) {
       continue;
     }
-    validate_type_compatability(
-        info->parameter_types[i], arg_tys[i], node->source_tokens,
-        "invalid argument types. expected: {}, got: {}",
-        std::format("parameter: {} of function: {}", i, node->name.value));
+    validate_type_compatability(arg_tys[i], info->parameter_types[i], node->source_tokens, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
   }
 
   node->type = info->return_type;

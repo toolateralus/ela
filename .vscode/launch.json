@@ -9,7 +9,7 @@
       "request": "launch",
       "name": "Debug",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["source/dummy.ela"],
+      "args": ["source/test.ela", "--test", "--s"],
       "cwd": "${workspaceFolder}"
     }
   ]
