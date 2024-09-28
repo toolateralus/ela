@@ -7,6 +7,11 @@ Vector2 :: struct {
     f32 y;
 }
 
+Vector3 :: struct {
+    Vector2 vec2;
+    f32 z;
+} 
+
 #test 
 failure_case :: () {
     assert("This should fail", false);
@@ -223,4 +228,20 @@ test_printf :: () {
 #test
 test_return_value :: () {
     assert("function expected to return 1", returns() == 1);
+}
+
+
+#test
+test_struct_single_level :: () {
+    Vector2 v;
+    assert("v.x != 0.0", v.x == 0.0);
+    assert("v.y != 0.0", v.y == 0.0);
+}
+
+#test
+test_struct_nested_once :: () {
+    Vector3 v;
+    assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
+    assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
+    assert("v.z != 0.0", v.z == 0.0);
 }
