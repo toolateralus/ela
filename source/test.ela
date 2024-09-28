@@ -36,8 +36,7 @@ Array :: struct {
     ++n;
 }
 
-#test 
-test_referencing_pointer :: () {
+#test test_referencing_pointer :: () {
     Node node;
     node.next = malloc(sizeof(Node));
     Node other;
@@ -47,13 +46,11 @@ test_referencing_pointer :: () {
     assert("dereferencing other into node.next failed.", node.next.next != null);
 }
 
-#test 
-failure_case :: () {
+#test failure_case :: () {
     assert("This should fail", false);
 }
 
-#test
-test_for :: () {
+#test test_for :: () {
     for s32 i; i < 10; ++i {
         assert("i should be less than 10", i < 10);
         return;
@@ -66,8 +63,7 @@ test_for :: () {
     assert("End of test_for reached", true);
 }
 
-#test
-test_while :: () {
+#test test_while :: () {
     bool b = true;
     while b {
         assert("while condition == true", b == true);
@@ -76,8 +72,7 @@ test_while :: () {
     assert("End of test_while reached", true);
 }
 
-#test
-test_if_1 :: () {
+#test test_if_1 :: () {
     bool v = true;
     bool hit = false;
     if v {
@@ -89,8 +84,7 @@ test_if_1 :: () {
     assert("failed to fall through if statement", hit);
 }
 
-#test
-test_if_2 :: () {
+#test test_if_2 :: () {
     bool v = false;
     bool hit = true;
     if v {
@@ -101,8 +95,7 @@ test_if_2 :: () {
     assert("fell through if else, but didn't set the variable", hit);
 }
 
-#test
-test_if_3 :: () {
+#test test_if_3 :: () {
     bool v = false;
     bool hit = true;
     if v {
@@ -115,8 +108,7 @@ test_if_3 :: () {
     assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
-#test
-test_comp_assign :: () {
+#test test_comp_assign :: () {
     s32 deref = 1;
     deref += deref; 
     assert("+=", deref == 2);
@@ -142,8 +134,7 @@ test_comp_assign :: () {
     assert(">>=", deref == 0);
 }
 
-#test
-test_operators :: () {
+#test test_operators :: () {
     s32 left = 1;
     s32 right = 1;
     s32 result;
@@ -187,8 +178,7 @@ test_operators :: () {
     assert("left >> right should be 0", result == 0);
 }
 
-#test
-test_relational_results :: () {
+#test test_relational_results :: () {
     bool test1 = (1 == 1 + 2) || 1 == 2;
     bool test2 = (3 > 2) && (2 < 4);
     bool test3 = !(5 <= 5) || (6 >= 6);
@@ -199,8 +189,7 @@ test_relational_results :: () {
     assert("test4 should be true", test4 == true);
 }
 
-#test
-test_address_of :: () {
+#test test_address_of :: () {
     s32 v = 0;
     s32* addr_of_v = &v;
     assert("address of grabbed a non-null ptr", addr_of_v != null);
@@ -208,8 +197,7 @@ test_address_of :: () {
     assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
 
-#test
-test_malloc :: () {
+#test test_malloc :: () {
     s32* ptr = malloc(4);
     assert("malloc'd pointer was null", ptr != null);
     free(ptr);
@@ -224,8 +212,8 @@ many_params :: (f32 a, f32 b, f32 c, f32 d = 1.0) -> f32 {
 mul_params :: (f32 n, f32 f) -> f32 {
     return n * f; 
 }
-#test
-test_param :: () {
+
+#test test_param :: () {
     assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
     assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
 }
@@ -234,8 +222,7 @@ returns :: () -> s32  {
     return 1; 
 }
 
-#test 
-test_implicit_numerical_casting :: () {
+#test test_implicit_numerical_casting :: () {
     u8 u1;
     u16 u2 = u1;
     u32 u3 = u2;
@@ -253,35 +240,30 @@ test_implicit_numerical_casting :: () {
     assert("unable to upcast successfully", f == f1);
 }
 
-#test
-test_printf :: () {
+#test test_printf :: () {
     u8* s = "Hello i am a string";
     printf("testing printing a string: %s\n", s);
     return;
 }
 
-#test
-test_return_value :: () {
+#test test_return_value :: () {
     assert("function expected to return 1", returns() == 1);
 }
 
-#test
-test_struct_single_level :: () {
+#test test_struct_single_level :: () {
     Vector2 v;
     assert("v.x != 0.0", v.x == 0.0);
     assert("v.y != 0.0", v.y == 0.0);
 }
 
-#test
-test_struct_nested_once :: () {
+#test test_struct_nested_once :: () {
     Vector3 v;
     assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
     assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
     assert("v.z != 0.0", v.z == 0.0);
 }
 
-#test 
-test_struct_assign_member :: () {
+#test test_struct_assign_member :: () {
     Vector2 v;
     v.x = 10.0;
     v.y = 10.0;
@@ -289,8 +271,7 @@ test_struct_assign_member :: () {
     assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }
 
-#test
-test_struct_assign_nested_member :: () {
+#test test_struct_assign_nested_member :: () {
     Vector3 v;
     v.vec2.x = 1.0;
     v.vec2.y = 2.0;
@@ -304,8 +285,7 @@ struct_as_param :: (Vector2 v)  -> f32 {
     return v.x;
 }
 
-#test
-test_struct_as_param :: () {
+#test test_struct_as_param :: () {
     Vector2 v;
     assert("", struct_as_param(v) == 0.0);
 }
@@ -314,14 +294,12 @@ something :: (f32 f) -> f32 {
     return f;
 }
 
-#test
-test_struct_member_as_param :: () {
+#test test_struct_member_as_param :: () {
     Vector2 v;
     assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 
-#test
-test_local_function :: () {
+#test test_local_function :: () {
     local_function :: () -> s32 {
         return 0;
     }

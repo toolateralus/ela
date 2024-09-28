@@ -33,9 +33,31 @@ template <class T> struct _array {
 #ifdef TESTING
 #define assert(message, condition)                                             \
   if (!(condition))                                                            \
-    printf("\e[31mAssertion failed: %s, message: %s\e[0m\n", #condition,       \
-           message);                                                           \
-                                                                               
+    throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n", #condition,       \
+           #message);                                                           \
+  
+  extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
+  extern "C" int strcpy(const char *, char *);
+  extern "C" int strlen(const char *);
+  struct __test_exception {
+    const char *m_what;
+
+    template<typename ...Args>
+    __test_exception(const char *fmt, Args&&... args) {
+        char buf[1024];
+        snprintf(buf, sizeof(buf), fmt, args...);
+        m_what = new char[strlen(buf) + 1];
+        strcpy(const_cast<char*>(m_what), buf);
+    }
+
+    ~__test_exception() {
+        delete[] m_what;
+    }
+
+    const char* what() const {
+        return m_what;
+    }
+};                                               
   struct __COMPILER_GENERATED_TEST {                                           
     __COMPILER_GENERATED_TEST() {}                                             
     __COMPILER_GENERATED_TEST(const char *name, void (*function)())            
@@ -47,9 +69,9 @@ template <class T> struct _array {
       try {                                                                    
         function();                                                            
         printf("\033[1;32m[passed]\033[0m\n");                                 
-      } catch (...) {                                                          
-        printf("\033[1;31m[failed]\033[0m\n");                                 
-        printf("%-40sUnknown error\n", "");                                    
+      } catch (__test_exception &e) {                                                          
+        printf("\033[1;31m[failed]\033[0m\n");
+        printf("%s", e.what());
       }                                                                        
     }                                                                          
   };
