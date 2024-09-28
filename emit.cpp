@@ -196,7 +196,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
-  (*ss) <<' ' << node->name;
+  (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
     (*ss) <<" = ";
     node->default_value.get()->accept(this);
@@ -205,7 +205,7 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamsDecl *node) {
-  (*ss) <<" (";
+  (*ss) <<"(";
   int i = 0;
   for (const auto &param : node->params) {
     param->accept(this);
@@ -240,6 +240,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   
   
+  // for #foreign declarations  
   if (node->flags & FUNCTION_FOREIGN) {
     if (node->name.value == "main") {
       throw_error("main function cannot be foreign", ERROR_CRITICAL, node->source_tokens);
@@ -256,10 +257,9 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
         (*ss) << ", ";
       }
     }
-    (*ss) << ");";
+    (*ss) << ")";
     return {};
   }
-  
   
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
@@ -269,7 +269,6 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   }
   
   space();
-  
   (*ss) <<node->name.value;
   node->params->accept(this);  
   
@@ -336,15 +335,17 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   (*ss) << "struct " << node->type->base << "{\n";
+  header << "struct " << node->type->base << ";\n";
   indentLevel++;
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(type->info.get());
   for (const auto &decl: info->fields) {
+    indented("");
     decl->accept(this);
     semicolon();
     newline();
   }
-  (*ss) << "}\n";
+  (*ss) << "}";
   indentLevel--;
   return {};
 }

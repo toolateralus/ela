@@ -230,7 +230,6 @@ test_return_value :: () {
     assert("function expected to return 1", returns() == 1);
 }
 
-
 #test
 test_struct_single_level :: () {
     Vector2 v;
@@ -264,4 +263,14 @@ test_struct_assign_nested_member :: () {
     assert("assigning v.vec2.x = 1.0 failed", v.vec2.x == 1.0);
     assert("assigning v.vec2.y = 1.0 failed", v.vec2.y == 2.0);
     assert("assigning v.z = 3.0 failed", v.z == 3.0);
+}
+
+struct_as_param :: (Vector2 v)  -> f32 {
+    return v.x;
+}
+
+#test
+test_struct_as_param :: () {
+    Vector2 v;
+    assert("", struct_as_param(v) == 0.0);
 }
