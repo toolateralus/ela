@@ -360,37 +360,46 @@ int create_struct_type(
 }
 
 int voidptr_type() {
-  static int type{-1};
-  [[unlikely]] if (type == -1) { type = find_type_id("void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}}); }
+  static int type = find_type_id("void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
   return type;
 }
 
 int bool_type() {
-  static int type{-1};
-  [[unlikely]] if (type == -1) { type = find_type_id("bool", {}); }
+  static int type = find_type_id("bool", {});
   return type;
 }
 
 int void_type() {
-  static int type = -1;
-  [[unlikely]] if (type == -1) { type = find_type_id("void", {}); }
+  static int type = find_type_id("void", {});
+  return type;
+}
+
+int s8_type() {
+  static int type = find_type_id("s8", {});
+  return type;
+}
+
+int s16_type() {
+  static int type = find_type_id("s16", {});
   return type;
 }
 
 int s32_type() {
-  static int type = -1;
-  [[unlikely]] if (type == -1) { type = find_type_id("s32", {}); }
+  static int type = find_type_id("s32", {});
+  return type;
+}
+
+int s64_type() {
+  static int type = find_type_id("s64", {});
   return type;
 }
 
 int string_type() {
-  static int type = -1;
-  [[unlikely]] if (type == -1) { type = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}}); }
+  static int type = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
 
 int f32_type() {
-  static int type = -1;
-  [[unlikely]] if (type == -1) { type = find_type_id("f32", {}); }
+  static int type = find_type_id("f32", {});
   return type;
 }
