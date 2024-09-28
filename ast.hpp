@@ -21,14 +21,16 @@ template <class T> T *ast_alloc(size_t n = 1) {
 struct VisitorBase;
 
 // TODO: add an enum member in the base that says what type this node is,
-// so we can be more performant and just static_cast<T*> instead of dynamic_cast<T*>;
+// so we can be more performant and just static_cast<T*> instead of
+// dynamic_cast<T*>;
 // TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
 // this way we can use things before theyre defined, prune unused code, etc.
 struct ASTNode {
-  // TODO: use a more data oriented approach here, instead of copying vectors around everywhere.
-  // I am sure we can have a UID for ASTNode, and just lookup our source tokens range in that table with a 
-  // int src_info_start, int src_info_end, and capture that info in a similar way in the parser.
-  // Also, we can definitely improve the way that we capture stuff in the parser.
+  // TODO: use a more data oriented approach here, instead of copying vectors
+  // around everywhere. I am sure we can have a UID for ASTNode, and just lookup
+  // our source tokens range in that table with a int src_info_start, int
+  // src_info_end, and capture that info in a similar way in the parser. Also,
+  // we can definitely improve the way that we capture stuff in the parser.
   std::vector<Token> source_tokens{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
@@ -44,8 +46,9 @@ enum BlockFlags {
 };
 
 // TODO: rename me, and add this stuff to visiting While, For, etc.
-// Probably create another visitor to do this, the type visitor is getting too large and cumbersome.
-// Maybe even have a base class for ASTNode's that have control flow attributes?
+// Probably create another visitor to do this, the type visitor is getting too
+// large and cumbersome. Maybe even have a base class for ASTNode's that have
+// control flow attributes?
 struct ControlFlow {
   int flags;
   int type;
@@ -182,6 +185,13 @@ struct ASTCall : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTDotExpr : ASTExpr {
+  ASTExpr *left;
+  ASTExpr *right;
+  ASTType *type;
+  std::any accept(VisitorBase *visitor) override;
+};
+
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
@@ -238,7 +248,12 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-
+struct ASTStructDeclaration : ASTStatement {
+  Scope *scope;
+  ASTType *type;
+  jstl::Vector<ASTDeclaration *> declarations;
+  std::any accept(VisitorBase *visitor) override;
+};
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
@@ -264,7 +279,9 @@ struct ASTWhile : ASTStatement {
   std::any visit(ASTIf *node) override {}                                      \
   std::any visit(ASTElse *node) override {}                                    \
   std::any visit(ASTWhile *node) override {}                                   \
-  std::any visit(ASTCompAssign *node) override {}
+  std::any visit(ASTCompAssign *node) override {}                              \
+  std::any visit(ASTStructDeclaration *node) override {}                       \
+  std::any visit(ASTDotExpr *node) override {}
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -288,14 +305,15 @@ struct ASTWhile : ASTStatement {
   virtual std::any visit(ASTIf *node) = 0;                                     \
   virtual std::any visit(ASTElse *node) = 0;                                   \
   virtual std::any visit(ASTWhile *node) = 0;                                  \
-  virtual std::any visit(ASTCompAssign *node) = 0;
-
+  virtual std::any visit(ASTCompAssign *node) = 0;                             \
+  virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
+  virtual std::any visit(ASTDotExpr *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
 };
-    
+
 struct Parser;
 struct DirectiveRoutine {
   ~DirectiveRoutine() = default;
@@ -359,8 +377,9 @@ struct Parser {
     token_frames.pop_back();
   }
 
-  Nullable<ASTNode> process_directive(DirectiveKind kind, const std::string &identifier);
-  
+  Nullable<ASTNode> process_directive(DirectiveKind kind,
+                                      const std::string &identifier);
+
   std::vector<DirectiveRoutine> directive_routines;
 
   void init_directive_routines();
@@ -369,9 +388,10 @@ struct Parser {
     if (peek().type == TType::Directive) {
       eat();
       auto identifier = expect(TType::Identifier);
-      Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
-      
-      auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr*>(node.get()));
+      Nullable<ASTNode> node =
+          process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
+
+      auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
       if (expr.is_not_null()) {
         return expr;
       } else {
@@ -391,12 +411,12 @@ struct Parser {
   ASTStatement *parse_call_statement(Token);
   ASTArguments *parse_arguments();
 
+  ASTStructDeclaration *parse_struct_declaration(Token);
+  ASTExprStatement *parse_dot_statement(Token);
   ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
-
-  ASTCall *parse_call(const Token &);
 
   ASTExpr *parse_expr();
   ASTExpr *parse_assignment(Token *);
@@ -413,4 +433,5 @@ struct Parser {
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
+  ASTCall *parse_call(const Token &);
 };

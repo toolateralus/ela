@@ -2,6 +2,16 @@
 // same for import.
 #import core;
 
+Vector2 :: struct {
+    f32 x;
+    f32 y;
+}
+
+Vector3 :: struct {
+    Vector2 vec2;
+    f32 z;
+} 
+
 #test 
 failure_case :: () {
     assert("This should fail", false);
@@ -189,7 +199,8 @@ returns :: () -> s32  {
     return 1; 
 }
 
-#test test_implicit_numerical_casting :: () {
+#test 
+test_implicit_numerical_casting :: () {
     u8 u1;
     u16 u2 = u1;
     u32 u3 = u2;
@@ -217,4 +228,68 @@ test_printf :: () {
 #test
 test_return_value :: () {
     assert("function expected to return 1", returns() == 1);
+}
+
+#test
+test_struct_single_level :: () {
+    Vector2 v;
+    assert("v.x != 0.0", v.x == 0.0);
+    assert("v.y != 0.0", v.y == 0.0);
+}
+
+#test
+test_struct_nested_once :: () {
+    Vector3 v;
+    assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
+    assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
+    assert("v.z != 0.0", v.z == 0.0);
+}
+
+#test 
+test_struct_assign_member :: () {
+    Vector2 v;
+    v.x = 10.0;
+    v.y = 10.0;
+    assert("assigning v.x = 10.0 failed", v.x == 10.0);
+    assert("assigning v.y = 10.0 failed", v.y == 10.0);
+}
+
+#test
+test_struct_assign_nested_member :: () {
+    Vector3 v;
+    v.vec2.x = 1.0;
+    v.vec2.y = 2.0;
+    v.z = 3.0;
+    assert("assigning v.vec2.x = 1.0 failed", v.vec2.x == 1.0);
+    assert("assigning v.vec2.y = 1.0 failed", v.vec2.y == 2.0);
+    assert("assigning v.z = 3.0 failed", v.z == 3.0);
+}
+
+struct_as_param :: (Vector2 v)  -> f32 {
+    return v.x;
+}
+
+#test
+test_struct_as_param :: () {
+    Vector2 v;
+    assert("", struct_as_param(v) == 0.0);
+}
+
+something :: (f32 f) -> f32 {
+    return f;
+}
+
+#test
+test_struct_member_as_param :: () {
+
+    Vector2 v;
+    assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
+}
+
+#test
+test_local_function :: () {
+    local_function :: () -> s32 {
+        return 0;
+    }
+    assert("failed to get 0 from local function call", local_function() == 0);
 }

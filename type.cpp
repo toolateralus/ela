@@ -243,6 +243,7 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
 std::string Type::to_string() const {
 
   switch (kind) {
+  case TYPE_STRUCT:
   case TYPE_SCALAR:
     return base + extensions.to_string();
   case TYPE_FUNCTION:
@@ -250,8 +251,6 @@ std::string Type::to_string() const {
       return info.get()->to_string();
     else
       return "invalid function type";
-  case TYPE_STRUCT:
-    return "struct NYI";
     break;
   }
 }
@@ -310,14 +309,13 @@ bool TypeExt::equals(const TypeExt &other) const {
 std::string Type::to_cpp_string() const {
   switch (kind) {
   case TYPE_SCALAR:
+  case TYPE_STRUCT:
     return extensions.to_cpp_string(this->base);
   case TYPE_FUNCTION:
     if (info.is_not_null())
       return info.get()->to_string();
     else
       return "invalid function type";
-  case TYPE_STRUCT:
-    return "struct NYI";
     break;
   }
 }
@@ -348,4 +346,16 @@ int remove_one_pointer_ext(int operand_ty,
   return find_type_id(
       ty->base, TypeExt{.extensions = extensions,
                                   .array_sizes = ty->extensions.array_sizes});
+}
+int create_struct_type(
+    const std::string &name,
+    const jstl::Vector<ASTDeclaration*> &fields) {
+  auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
+  type_table[num_types] = type;
+  type->base = name;
+  auto info = type_alloc<StructTypeInfo>();
+  type->info = info;
+  info->fields = fields;
+  num_types++;
+  return type->id;
 }

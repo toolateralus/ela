@@ -196,7 +196,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   node->type->accept(this);
-  (*ss) <<' ' << node->name;
+  (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
     (*ss) <<" = ";
     node->default_value.get()->accept(this);
@@ -205,7 +205,7 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamsDecl *node) {
-  (*ss) <<" (";
+  (*ss) <<"(";
   int i = 0;
   for (const auto &param : node->params) {
     param->accept(this);
@@ -218,48 +218,87 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
   return {};
 }
 
-std::any EmitVisitor::visit(ASTFuncDecl *node) {
-  
-  auto test_flag = get_compilation_flag("test");
-
+static bool should_emit_function(EmitVisitor *visitor, ASTFuncDecl *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
   if (!test_flag && node->flags & FUNCTION_TEST) {
-    return {};
+    return false;
   } 
-  
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_TEST) {
-    test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
+    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
   }
-  
   // dont emit a main if we're in test mode.
   if (test_flag && node->name.value == "main") {
-    return {};
+    return false;
   }
-  
-  auto symbol = context.current_scope->lookup(node->name.value);
-  
-  
-  if (node->flags & FUNCTION_FOREIGN) {
-    if (node->name.value == "main") {
+  return true;
+}
+
+void EmitVisitor::emit_forward_declaration(ASTFuncDecl *node) {
+  emit_default_args = true;
+  use_header();
+  node->return_type->accept(this);
+  (*ss) << ' ' <<node->name.value << ' ';
+  node->params->accept(this);
+  (*ss) << ";\n";
+  use_code();
+  emit_default_args = false;
+}
+
+void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
+  // creates a constexpr auto function = []() -> return_type { ... };
+  // these are alwyas constexpr because we do not do closure objects, nor do we have the ability to check that right now.
+  // TODO: we could have an option for like #closure to just use & and hope that it works fine. It should work fine
+  (*ss) << indent() <<  "constexpr auto " << node->name.value << " = []";   
+  node->params->accept(this);
+  (*ss) << " -> ";
+  node->return_type->accept(this);
+  if (node->block.is_null()) {
+    throw_error("local function cannot be #foreign", ERROR_FAILURE , node->source_tokens);
+  }
+  node->block.get()->accept(this);
+}
+
+void EmitVisitor::emit_foreign_function(ASTFuncDecl * node) {
+  if (node->name.value == "main") {
       throw_error("main function cannot be foreign", ERROR_CRITICAL, node->source_tokens);
     }
-    
     (*ss) << "extern \"C\" ";
     (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
     space();
     (*ss) << node->name.value << '(';
     for (const auto &param: node->params->params) {
       // TODO: right now this disallows us from using struct or non-scalar types in extern declarations.
+      // We shouldn't have to explicitly call this, i think to_cpp_string() on Type * should just return the appropriate data.
       (*ss) << get_cpp_scalar_type(param->type->resolved_type);
       if (param != node->params->params.back()) {
         (*ss) << ", ";
       }
     }
-    (*ss) << ");";
+    (*ss) << ")";
+}
+
+std::any EmitVisitor::visit(ASTFuncDecl *node) {
+  auto test_flag = get_compilation_flag("test");
+  
+  // this also happens to emit the test boilerplate that bootstraps it into the test runner, if applicable.
+  if (!should_emit_function(this, node, test_flag)) {
     return {};
   }
   
+  auto symbol = context.current_scope->lookup(node->name.value);
+  
+  // for #foreign declarations  
+  if (node->flags & FUNCTION_FOREIGN) {
+    emit_foreign_function(node);
+    return {};
+  }
+  
+  // local function
+  if (context.current_scope != context.root_scope) {
+    emit_local_function(node);
+    return {};
+  }
   
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
@@ -268,25 +307,19 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     node->return_type->accept(this);
   }
   
-  space();
+  // emit parameter signature && name.
+  (*ss) << " " + node->name.value;
+  node->params->accept(this);
   
-  (*ss) <<node->name.value;
-  node->params->accept(this);  
-  
+  // the function's block would only be null in a #foreign function
   if (node->block.is_not_null())
     node->block.get()->accept(this);
   
+  // emit a forward declaration in the header to allow use-before-defined.
+  // main is not forward declared.
   if (node->name.value != "main") {
-    emit_default_args = true;
-    use_header();
-    node->return_type->accept(this);
-    (*ss) << ' ' <<node->name.value << ' ';
-    node->params->accept(this);
-    (*ss) << ";\n";
-    use_code();
-    emit_default_args = false;
+    emit_forward_declaration(node);
   }
-  
   
   return {};
 }
@@ -331,5 +364,33 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   }
   
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+  (*ss) << "struct " << node->type->base << "{\n";
+  header << "struct " << node->type->base << ";\n";
+  indentLevel++;
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  for (const auto &decl: info->fields) {
+    indented("");
+    decl->accept(this);
+    semicolon();
+    newline();
+  }
+  (*ss) << "}";
+  indentLevel--;
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTDotExpr *node) {
+  auto ty = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(ty->info.get());
+  context.enter_scope(info->scope);
+  node->left->accept(this);
+  (*ss) << '.';
+  node->right->accept(this);
+  context.exit_scope();
   return {};
 }

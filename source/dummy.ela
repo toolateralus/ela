@@ -1,5 +1,16 @@
 #import core;
 
-main :: (s32 argc, char **argv) -> s32 {
-	return 0;
+Vector2 :: struct {
+	f32 x;
+	f32 y;
+};
+
+
+#test
+test :: ()  {
+	Vector2 v;
+	v.x = 10.0;
+	v.y = 10.0;
+	assert("assigning v.x = 10.0 failed", v.x == 10.0);
+	assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }

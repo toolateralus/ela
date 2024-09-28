@@ -191,6 +191,7 @@ ASTStatement *Parser::parse_statement() {
   begin_token_frame();
   auto tok = peek();
 
+
   if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
@@ -297,6 +298,10 @@ ASTStatement *Parser::parse_statement() {
 
   eat();
 
+  if (tok.type == TType::Identifier && peek().type == TType::Dot) {
+    return parse_dot_statement(tok);
+  }
+
   if (peek().is_comp_assign()) {
     if (tok.type != TType::Identifier) {
       throw_error(
@@ -316,6 +321,10 @@ ASTStatement *Parser::parse_statement() {
       auto node = parse_function_declaration(tok);
       end_token_frame(node);
       return node;
+    } else if (peek().type == TType::Struct) {
+      auto struct_decl = parse_struct_declaration(tok);
+      end_token_frame(struct_decl);
+      return struct_decl;
     }
   } else if (peek().type == TType::Assign) {
     auto statement = ast_alloc<ASTExprStatement>();
@@ -327,11 +336,42 @@ ASTStatement *Parser::parse_statement() {
     end_token_frame(statement);
     return statement;
   }
+  
+
 
   throw_error(
       std::format("Unexpected token when parsing statement: {}", tok.value),
       ERROR_CRITICAL, token_frames.back());
 }
+
+ASTExprStatement *Parser::parse_dot_statement(Token iden) {
+  auto dot = ast_alloc<ASTDotExpr>();
+  dot->type = ast_alloc<ASTType>();
+  auto left = ast_alloc<ASTIdentifier>();
+  left->value = iden;
+  dot->left = left;
+  expect(TType::Dot);
+  dot->right = parse_postfix();
+  auto statement= ast_alloc<ASTExprStatement>();
+  
+  // TODO: fixup this incredible jank
+  if (peek().type == TType::Assign) {
+    eat();
+    auto value = parse_expr();
+    auto binexpr = ast_alloc<ASTBinExpr>();
+    binexpr->op = {};
+    binexpr->op.type = TType::Dot;
+    binexpr->op.value = "=";
+    binexpr->left = dot;
+    binexpr->right = value;
+    statement->expression = binexpr;
+    return statement;
+  }
+  
+  statement->expression = dot;
+  return statement;
+}
+
 ASTDeclaration *Parser::parse_declaration() {
   begin_token_frame();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -348,13 +388,6 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 ASTFuncDecl *Parser::parse_function_declaration(Token name) {
-
-  if (context.current_scope != context.root_scope) {
-    throw_error(
-        std::format("cannot declare a non-top level function:: {}", name.value),
-        ERROR_CRITICAL, token_frames.back());
-  }
-
   begin_token_frame();
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
@@ -386,6 +419,31 @@ ASTBlock *Parser::parse_block() {
   block->scope = context.exit_scope();
   end_token_frame(block);
   return block;
+}
+
+ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
+  expect(TType::Struct);
+  auto decl = ast_alloc<ASTStructDeclaration>();
+  
+  // fwd declare the type.
+  auto type_id = create_struct_type(name.value, {});
+  
+  auto block = parse_block();
+  block->scope->is_struct_scope = true;
+  for (const auto &statement: block->statements) {
+    if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
+      decl->declarations.push(field);
+    } else {
+      throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
+    }
+  }
+  auto type = ast_alloc<ASTType>();
+  decl->type = type;
+  decl->type->base = name.value;
+  decl->type->extension_info = {};
+  decl->type->resolved_type = type_id;
+  decl->scope = block->scope;
+  return decl;
 }
 
 ASTExpr *Parser::parse_expr() {
@@ -572,7 +630,14 @@ ASTExpr *Parser::parse_postfix() {
 
   // TODO: add -- and ++?
   // TODO: parse and build AST for dot expressions.
-  // while (peek().type == TType::Dot) { }
+  while (peek().type == TType::Dot) { 
+    eat();
+    auto dot = ast_alloc<ASTDotExpr>();
+    dot->type = ast_alloc<ASTType>();
+    dot->left = left;
+    dot->right = parse_postfix();
+    left = dot;
+  }
 
   return left;
 }
@@ -801,9 +866,15 @@ std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTCompAssign::accept(VisitorBase *visitor) {
   return visitor->visit(this);
 }
-
+std::any ASTStructDeclaration::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
 /*
   ###########################################
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+
+std::any ASTDotExpr::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
