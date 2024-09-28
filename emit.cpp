@@ -5,6 +5,7 @@
 #include "visitor.hpp"
 #include "ast.hpp"
 #include <jstl/containers/vector.hpp>
+#include <string_view>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
@@ -188,18 +189,22 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 }
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
-  node->type->accept(this);
-  space();
-  (*ss) <<node->name.value;
-  space();
-  if (node->value.is_not_null()) {
-    (*ss) <<" = ";
-
-    cast_pointers_implicit(node);
-
-    node->value.get()->accept(this);
+  auto type = get_type(node->type->resolved_type);
+  if (type->extensions.is_fixed_sized_array()) {
+    auto type_str = type->extensions.to_string();
+    (*ss) << type->base << ' ' << node->name.value << type_str;
   } else {
-    (*ss) <<"{}";
+    node->type->accept(this);
+    space();
+    (*ss) <<node->name.value;
+    space();
+    if (node->value.is_not_null()) {
+      (*ss) <<" = ";
+      cast_pointers_implicit(node);
+      node->value.get()->accept(this);
+    } else {
+      (*ss) <<"{}";
+    }
   }
   return {};
 }
@@ -270,23 +275,30 @@ void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
   node->block.get()->accept(this);
 }
 
-void EmitVisitor::emit_foreign_function(ASTFuncDecl * node) {
+void EmitVisitor::emit_foreign_function(ASTFuncDecl *node) {
   if (node->name.value == "main") {
-      throw_error("main function cannot be foreign", ERROR_CRITICAL, node->source_tokens);
+    throw_error("main function cannot be foreign", ERROR_CRITICAL,
+                node->source_tokens);
+  }
+  
+  use_header();
+
+  (*ss) << "extern \"C\" ";
+  (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
+  space();
+  (*ss) << node->name.value << '(';
+  for (const auto &param : node->params->params) {
+    // TODO: right now this disallows us from using struct or non-scalar types
+    // in extern declarations. We shouldn't have to explicitly call this, i
+    // think to_cpp_string() on Type * should just return the appropriate data.
+    (*ss) << get_cpp_scalar_type(param->type->resolved_type);
+    if (param != node->params->params.back()) {
+      (*ss) << ", ";
     }
-    (*ss) << "extern \"C\" ";
-    (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
-    space();
-    (*ss) << node->name.value << '(';
-    for (const auto &param: node->params->params) {
-      // TODO: right now this disallows us from using struct or non-scalar types in extern declarations.
-      // We shouldn't have to explicitly call this, i think to_cpp_string() on Type * should just return the appropriate data.
-      (*ss) << get_cpp_scalar_type(param->type->resolved_type);
-      if (param != node->params->params.back()) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << ")";
+  }
+  (*ss) << ");";
+  use_code();
+  needs_semi_newline = false;
 }
 
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
@@ -330,6 +342,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   // main is not forward declared.
   if (node->name.value != "main") {
     emit_forward_declaration(node);
+    needs_semi_newline = false;
   }
   
   return {};
@@ -345,8 +358,14 @@ std::any EmitVisitor::visit(ASTBlock *node) {
     }
     
     statement->accept(this);
-    semicolon();
-    newline();
+    
+    if (needs_semi_newline) {
+      semicolon();
+      newline();
+    } else {
+      needs_semi_newline = true;
+    }
+    
   }
   indentLevel--;
   indented("}");
@@ -362,8 +381,12 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   
   for (const auto &statement : node->statements) {
     statement->accept(this);
-    semicolon();
-    newline();
+    if (needs_semi_newline) {
+      semicolon();
+      newline();
+    } else {
+      needs_semi_newline = true;
+    }
   }
   
   if (testing) {

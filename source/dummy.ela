@@ -1,6 +1,15 @@
 #import file;
+#import core;
 
 main :: () {
+	s32[100] array;	
+	
+	s32 *ptr = malloc(sizeof(s32));
+	
+	*ptr = 100000;
+}
+
+print_file_out :: () {
 	_IO_FILE * file = fopen("dummy.ela", "r");
 	s32 eof = -1;
 	s8 c;

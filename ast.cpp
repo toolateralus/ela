@@ -288,7 +288,15 @@ ASTStatement *Parser::parse_statement() {
     auto decl = parse_declaration();
     end_token_frame(nullptr);
     return decl;
+  } else if (tok.type == TType::Mul) {
+    auto expr = parse_expr();
+    auto statement = ast_alloc<ASTExprStatement>();
+    statement->expression = expr;
+    end_token_frame(statement);
+    return statement;
   }
+
+  
 
   eat();
 
