@@ -88,6 +88,10 @@ std::string get_cpp_scalar_type(int id) {
     name = "uint32_t";
   else if (type->base == "u16")
     name = "uint16_t";
+  else if (type->base == "char" && type->extensions.is_pointer(1)) 
+    name = "const char";
+  else if (type->base == "u8" && type->extensions.is_pointer(1))
+    name = "const char";
   else if (type->base == "u8")
     name = "uint8_t";
   else if (type->base == "f32")
@@ -100,17 +104,12 @@ std::string get_cpp_scalar_type(int id) {
     name = "int";
   else if (type->base == "char")
     name = "char";
-  else if (type->base == "char" && type->extensions.is_pointer(1)) 
-    name = "const char *";
-  else if (type->base == "u8" && type->extensions.is_pointer(1))
-    name = "const char *";
   else if (type->base == "bool")
     name = "bool";
   else if (type->base == "void")
     name = "void";
   else {
-    throw_error(std::format("cannot get cpp scalar type from : {}", type->base),
-                ERROR_CRITICAL, {});
+    return type->to_cpp_string();
   }
 
   if (type->extensions.has_no_extensions()) {
@@ -403,17 +402,4 @@ int string_type() {
 int f32_type() {
   static int type = find_type_id("f32", {});
   return type;
-}
-int StructTypeInfo::size() const {
-  if (m_size == -1)
-    for (const auto field : fields) {
-      int type;
-      if (field->type->resolved_type == -1) {
-        type =  field->type->resolved_type = find_type_id(field->type->base, field->type->extension_info);
-      } else {
-        type = field->type->resolved_type;
-      }
-      m_size += get_type(type)->size();
-    }
-  return m_size;
 }

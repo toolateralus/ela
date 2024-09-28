@@ -2,6 +2,7 @@
 #include "error.hpp"
 #include "lex.hpp"
 #include "nullable.hpp"
+#include "scope.hpp"
 #include "type.hpp"
 #include <cassert>
 #include <filesystem>
@@ -68,7 +69,7 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto func = parser->parse_function_declaration(name);
-           func->flags |= FUNCTION_TEST;
+           func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
            return func;
          }});
   }
@@ -83,22 +84,12 @@ void Parser::init_directive_routines() {
       .run = [](Parser *parser) static {
         auto function = ast_alloc<ASTFuncDecl>();
         parser->begin_token_frame();
-
         auto name = parser->expect(TType::Identifier);
-
         if (parser->context.current_scope != parser->context.root_scope) 
           throw_error(std::format("cannot declare a non-top level foreign function:: {}", name.value), ERROR_CRITICAL, parser->token_frames.back());
-
-        if (parser->peek().type == TType::Struct) {
-          // TODO: add foreign structs
-          
-        }
-
-      
         parser->expect(TType::DoubleColon);
         function->params = parser->parse_parameters();
         function->name = name;
-
         if (parser->peek().type != TType::Arrow) {
           function->return_type = ASTType::get_void();
         } else {
@@ -107,7 +98,7 @@ void Parser::init_directive_routines() {
         }
 
         parser->end_token_frame(function);
-        function->flags |= FUNCTION_FOREIGN;
+        function->meta_type = FunctionMetaType::FUNCTION_TYPE_FOREIGN;
         parser->expect(TType::Semi);
         return function;
     }});
@@ -147,17 +138,19 @@ void Parser::init_directive_routines() {
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
                                             const std::string &identifier) {
+  begin_token_frame();                                              
   // compare aganist the kind of the routine with expected type, based on parser
   // location
   for (const auto &routine : directive_routines) {
     if (routine.kind == kind && routine.identifier == identifier) {
-      return routine.run(this);
+      auto result = routine.run(this);
+      end_token_frame(result.get());
+      return result;
     }
   }
-
   throw_error(
       std::format("failed to call unknown directive routine: {}", identifier),
-      ERROR_FAILURE, {});
+      ERROR_FAILURE, token_frames.back());
 }
 
 ASTProgram *Parser::parse() {
@@ -442,21 +435,29 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   // fwd declare the type.
   auto type_id = create_struct_type(name.value, {});
   
-  auto block = parse_block();
-  block->scope->is_struct_scope = true;
-  for (const auto &statement: block->statements) {
-    if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
-      decl->declarations.push(field);
-    } else {
-      throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
-    }
-  }
   auto type = ast_alloc<ASTType>();
   decl->type = type;
   decl->type->base = name.value;
   decl->type->extension_info = {};
   decl->type->resolved_type = type_id;
-  decl->scope = block->scope;
+  
+  if (!semicolon()) {
+    auto block = parse_block();
+    block->scope->is_struct_scope = true;
+    for (const auto &statement: block->statements) {
+      if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
+        decl->declarations.push(field);
+      } else {
+        throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
+      }
+    }
+    decl->scope = block->scope;
+  } else {
+    Type *t = get_type(type_id);
+    auto info = static_cast<StructTypeInfo *>(t->info.get());
+    info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
+  }
+  
   return decl;
 }
 

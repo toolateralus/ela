@@ -230,12 +230,13 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
 
 static bool should_emit_function(EmitVisitor *visitor, ASTFuncDecl *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
-  if (!test_flag && node->flags & FUNCTION_TEST) {
+  if (!test_flag && node->flags & FUNCTION_IS_TEST) {
     return false;
   } 
   // generate a test based on this function pointer.
-  if (test_flag && node->flags & FUNCTION_TEST) {
+  if (test_flag && node->flags & FUNCTION_IS_TEST) {
     visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value << "\", " << node->name.value << "),";
+    visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
   if (test_flag && node->name.value == "main") {
@@ -299,7 +300,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   
   // for #foreign declarations  
-  if (node->flags & FUNCTION_FOREIGN) {
+  if (node->meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     emit_foreign_function(node);
     return {};
   }
@@ -370,7 +371,9 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    code << "const jstl::Vector<__COMPILER_GENERATED_TEST> tests" << "{" << test_init << "};\n";
+       
+    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
+    
     code << "__TEST_RUNNER_MAIN;";
   }
   
@@ -378,11 +381,17 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 }
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+  auto type = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
+    header << "struct " << node->type->base << ";\n";  
+    return {};
+  }
+  
   (*ss) << "struct " << node->type->base << "{\n";
   header << "struct " << node->type->base << ";\n";
   indentLevel++;
-  auto type = get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo*>(type->info.get());
   for (const auto &decl: info->fields) {
     indented("");
     decl->accept(this);

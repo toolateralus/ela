@@ -1,10 +1,11 @@
-#foreign FILE :: struct;
+_IO_FILE :: struct;
 
-#foreign fread :: (void *ptr, u64 size, u64 count, FILE *stream) -> u64;
-#foreign fwrite :: (void *ptr, u64 size, u64 count, FILE *stream) -> u64;
-#foreign fseek :: (FILE *stream, s64 offset, s32 origin) -> int;
-#foreign ftell :: (FILE *stream) -> s64 int;
-#foreign rewind :: (FILE *stream) -> void;
-#foreign fopen :: (char *fname, char *flags) -> FILE*;
-#foreign fclose :: (FILE *file) -> void;
-
+#foreign fread :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
+#foreign fwrite :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
+#foreign fseek :: (_IO_FILE *stream, s64 offset, s32 origin) -> int;
+#foreign ftell :: (_IO_FILE *stream) -> s64;
+#foreign rewind :: (_IO_FILE *stream) -> void;
+#foreign fopen :: (char *fname, char *flags) -> _IO_FILE *;
+#foreign fclose :: (_IO_FILE *file) -> void;
+#foreign fgetc :: (_IO_FILE *file) -> u8;
+#foreign putc :: (u8 ch, _IO_FILE *file) -> void;

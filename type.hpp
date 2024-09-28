@@ -6,7 +6,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <utility>
 #include <vector>
 
 #include <jstl/containers/vector.hpp>
@@ -135,14 +134,17 @@ struct TypeInfo {
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
-enum FunctionTypeFlags {
-  FUNCTION_NORMAL = 1 << 0,
-  FUNCTION_TEST = 1 << 1,
-  FUNCTION_FOREIGN = 1 << 2,
+enum FunctionInstanceFlags {
+  FUNCTION_IS_TEST = 1 << 1,
+};
+
+enum struct FunctionMetaType {
+  FUNCTION_TYPE_NORMAL,
+  FUNCTION_TYPE_FOREIGN,
 };
 
 struct FunctionTypeInfo : TypeInfo {
-  int flags = FUNCTION_NORMAL;
+  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
@@ -168,13 +170,17 @@ struct ScalarTypeInfo : TypeInfo {
 struct ASTDeclaration;
 struct Scope;
 
+enum StructTypeFlags {
+  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
+};
+
 struct StructTypeInfo : TypeInfo {
+  int flags;
   Scope *scope;
   jstl::Vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
   // mutable for memoization
   mutable int m_size = -1;
-  int size() const;
 };
 
 struct Type {
@@ -197,20 +203,6 @@ struct Type {
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
   std::string to_cpp_string() const;
-
-  int size() const {
-    if (kind == TYPE_SCALAR) {
-      return static_cast<ScalarTypeInfo*>(info.get())->size;
-    }
-    else if (kind == TYPE_FUNCTION) {
-      return 0;
-    }
-    else if (kind == TYPE_STRUCT) {
-      return static_cast<StructTypeInfo*>(info.get())->size();
-    }
-    std::unreachable();
-  }
-
   constexpr static int invalid_id = -1;
 };
 

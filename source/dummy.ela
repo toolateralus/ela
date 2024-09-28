@@ -1,7 +1,13 @@
+#import file;
 
-#import core;
-
-main :: (int argc, char** argv) -> s32 {
-	s64 x = 5;
-	return x;
+main :: () {
+	_IO_FILE * file = fopen("dummy.ela", "r");
+	s32 eof = -1;
+	s8 c;
+	printf("\e[3;32mReading file dummy.ela...\n\e[0m\e[1;36m");
+	while ((c = fgetc(file)) != eof) {
+		printf("%c", c);
+	}
+	printf("\e[0m\n\e[3;32mDone reading\n\e[0m");
+	fclose(file);
 }

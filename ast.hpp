@@ -166,6 +166,8 @@ struct ASTParamsDecl : ASTStatement {
 
 struct ASTFuncDecl : ASTStatement {
   int flags = 0;
+  // extern, normal etc.
+  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
   Token name;
@@ -357,8 +359,8 @@ struct Parser {
 
   inline Token expect(TType type) {
     if (peek().type != type) {
-      throw_error(std::format("Expected {}, got {}", TTypeToString(type),
-                              TTypeToString(peek().type)),
+      throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
+                              TTypeToString(peek().type), peek().value),
                   ERROR_CRITICAL, token_frames.back());
     }
     return eat();
