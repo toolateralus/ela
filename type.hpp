@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <utility>
 #include <vector>
 
 #include <jstl/containers/vector.hpp>
@@ -171,6 +172,9 @@ struct StructTypeInfo : TypeInfo {
   Scope *scope;
   jstl::Vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
+  // mutable for memoization
+  mutable int m_size = -1;
+  int size() const;
 };
 
 struct Type {
@@ -193,6 +197,19 @@ struct Type {
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
   std::string to_cpp_string() const;
+
+  int size() const {
+    if (kind == TYPE_SCALAR) {
+      return static_cast<ScalarTypeInfo*>(info.get())->size;
+    }
+    else if (kind == TYPE_FUNCTION) {
+      return 0;
+    }
+    else if (kind == TYPE_STRUCT) {
+      return static_cast<StructTypeInfo*>(info.get())->size();
+    }
+    std::unreachable();
+  }
 
   constexpr static int invalid_id = -1;
 };

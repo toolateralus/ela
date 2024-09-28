@@ -37,8 +37,7 @@ static inline int int_from_any(const std::any &any) {
 }
 
 std::any TypeVisitor::visit(ASTType *node) {
-  node->resolved_type = find_type_id(node->base, node->extension_info);
-  return {};
+  return node->resolved_type = find_type_id(node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
   for (auto &statement : node->statements) {
@@ -188,10 +187,12 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto right = int_from_any(node->right->accept(this));
   // TODO: relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no sense.
   if (node->op.is_relational()) {
+    node->resolved_type = bool_type();
     return bool_type();    
   } else {
     validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   }
+  node->resolved_type = left;
   return left;
 }
 
@@ -442,6 +443,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   };
   
   if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
+    if (!context.current_scope->lookup(iden->value.value)) {
+      throw_error(std::format("use of undeclared identifier: {}", iden->value.value), ERROR_FAILURE, node->source_tokens);
+    }
     for (const auto &field: info->fields) {
       if (field->name.value == iden->value.value) {
         auto value =  node->type->resolved_type = field->type->resolved_type;
