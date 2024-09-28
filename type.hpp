@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <vector>
 
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
@@ -33,25 +34,24 @@ enum TypeKind {
   TYPE_STRUCT,
 };
 
+// TODO: we need a way to declare and use function types from in language.
+// if we want to have first class functions and function pointers.
+
 #ifndef MAX_NUM_TYPES
 #define MAX_NUM_TYPES 1000
 #endif
 
 struct Type;
 
-// static storage is zero init I guess? so these are all nullptr
-
 extern Type *type_table[MAX_NUM_TYPES];
+extern int num_types;
+extern jstl::Arena type_arena;
 
 static Type *get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
-
   return type_table[id];
 }
-
-extern int num_types;
-extern jstl::Arena type_arena;
 
 enum TypeExtEnum {
   TYPE_EXT_POINTER,
@@ -166,7 +166,7 @@ struct ScalarTypeInfo : TypeInfo {
 
 struct ASTDeclaration;
 struct Scope;
-// TODO: implement structs.
+
 struct StructTypeInfo : TypeInfo {
   Scope *scope;
   jstl::Vector<ASTDeclaration*> fields;
@@ -218,6 +218,14 @@ enum ConversionRule {
 
 ConversionRule type_conversion_rule(const Type *from, const Type *to);
 
+int voidptr_type();
+int bool_type();
+int void_type();
+int s32_type();
+int f32_type();
+// u8 **
+int string_type();
+
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,
                  const TypeExt &ext);
 
@@ -226,9 +234,6 @@ int find_type_id(const std::string &name,
 
 std::string get_cpp_scalar_type(int);
                  
-                 
-#include <vector>
-
 struct Token;
 int remove_one_pointer_ext(int operand_ty,
                            const std::vector<Token> &source_tokens);

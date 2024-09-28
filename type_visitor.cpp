@@ -77,7 +77,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
   auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
   if (control_flow.type == -1) {
-    control_flow.type = find_type_id("void", {});
+    control_flow.type = void_type();
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
@@ -189,7 +189,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto right = int_from_any(node->right->accept(this));
   // TODO: relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no sense.
   if (node->op.is_relational()) {
-    return find_type_id("bool", {});    
+    return bool_type();    
   } else {
     validate_type_compatability(left, right, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
   }
@@ -199,12 +199,12 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
   auto conversion_rule = type_conversion_rule(
-      get_type(operand_ty), get_type(find_type_id("bool", {})));
+      get_type(operand_ty), get_type(bool_type()));
   auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                       conversion_rule != CONVERT_EXPLICIT);
 
   if (node->op.type == TType::Not && can_convert) {
-    return find_type_id("bool", {});
+    return bool_type();
   }
 
   if (node->op.type == TType::And) {
@@ -231,19 +231,17 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer:
-    return find_type_id("s32", {});
+    return s32_type();
   case ASTLiteral::Float:
-    return find_type_id("f32", {});
+    return f32_type();
   case ASTLiteral::RawString:
   case ASTLiteral::String:
-    return find_type_id("u8", {.extensions = { TYPE_EXT_POINTER }});
+    return string_type();
     break;
   case ASTLiteral::Bool:
-    return find_type_id("bool", {});
+    return bool_type();
   case ASTLiteral::Null:
-    return find_type_id(
-        "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
-    break;
+    return voidptr_type();
   }
 }
 std::any TypeVisitor::visit(ASTCall *node) {
@@ -335,10 +333,9 @@ std::any TypeVisitor::visit(ASTFor *node) {
   return control_flow;
 }
 std::any TypeVisitor::visit(ASTIf *node) {
-
   auto cond_ty = int_from_any(node->condition->accept(this));
   validate_type_compatability(
-      find_type_id("bool", {}), cond_ty, node->source_tokens,
+      bool_type(), cond_ty, node->source_tokens,
       "expected: {}, got {}",
       "if statement condition was not convertible to boolean");
 
@@ -364,6 +361,7 @@ std::any TypeVisitor::visit(ASTElse *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTWhile *node) {
+  
   if (node->condition.is_not_null()) {
     node->condition.get()->accept(this);
   }
@@ -375,6 +373,7 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
+
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
@@ -382,11 +381,11 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
       symbol->type_id, expr_ty, node->source_tokens,
       "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
-
 }
 
-
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+  // TODO: we can improve this to not rely so heavily on a Scope object.
+  // It seems wrong to store a scope in a Type *.
   context.enter_scope(node->scope);
   jstl::Vector<ASTDeclaration*> fields;
   for (auto decl : node->declarations) {
@@ -402,6 +401,8 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 }
 
 std::any TypeVisitor::visit(ASTDotExpr *node) {
+  // TODO: this needs serious improvement. Check whether the left hand side variable even exists, etc.
+  
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
   if (left_ty->kind != TYPE_STRUCT) {

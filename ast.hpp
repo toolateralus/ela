@@ -89,7 +89,7 @@ struct ASTType : ASTNode {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
       type->base = "void";
-      type->resolved_type = find_type_id("void", {});
+      type->resolved_type = void_type();
       return type;
     }();
     return type;

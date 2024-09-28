@@ -50,14 +50,14 @@ struct Context {
   Scope *root_scope;
   Context() {
     FunctionTypeInfo printf_info {};
-    printf_info.return_type = find_type_id("void", {});
+    printf_info.return_type = void_type();
     printf_info.is_varargs = true;
     current_scope->insert("printf", find_type_id("", printf_info, {}));
     
     FunctionTypeInfo assert_info {};
-    assert_info.return_type = find_type_id("void", {});
+    assert_info.return_type = void_type();
     assert_info.parameter_types[0] = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}});
-    assert_info.parameter_types[1] = find_type_id("bool", {});
+    assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
     current_scope->insert("assert", find_type_id("", assert_info, {}));
     

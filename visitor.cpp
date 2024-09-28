@@ -247,7 +247,6 @@ std::any SerializeVisitor::visit(ASTCompAssign *node) {
   ss << indent() << "}\n";
   return {};
 }
-
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   ss << indent() << "Struct " << node->type->base << " {\n";
   indentLevel++;
@@ -259,9 +258,58 @@ std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   return {};
 }
 
-
 std::any SerializeVisitor::visit(ASTDotExpr *node) {
-  // todo:
-  ss << "dot expr. todo\n";
+  ss << indent() << "DotExpr {\n";
+  indentLevel++;
+  ss << indent() << "object: ";
+  node->left->accept(this);
+  ss << '\n' << indent() << "member: ";
+  node->right->accept(this);
+  indentLevel--;
+  ss << indent() << "}\n";
   return {};
 }
+
+
+
+/*
+  ###########################################
+  ##### DECLARE VISITOR ACCEPT METHODS ######
+  ###########################################
+*/
+// {
+
+// clang-format off
+std::any ASTProgram::accept(VisitorBase *visitor) {return visitor->visit(this); }
+std::any ASTBlock::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTType::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTExprStatement::accept(VisitorBase *visitor) {return visitor->visit(this); }
+std::any ASTDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTBinExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTUnaryExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTIdentifier::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTFuncDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTArguments::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTBreak::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTContinue::accept(VisitorBase *visitor) { return visitor->visit(this); };
+std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTCompAssign::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
+// clang-format on
+// }
+/*
+  ###########################################
+  ##### DECLARE VISITOR ACCEPT METHODS ######
+  ###########################################
+*/
+
+ 
