@@ -1,5 +1,10 @@
-Vector2 :: struct {
+vec2d :: struct {
 	f64 x;
+	f32 y;
+}
+
+vec2f :: struct {
+	f32 x;
 	f32 y;
 }
 
@@ -8,5 +13,5 @@ Vector2 :: struct {
 	printf("sizeof s16: %ld\n", sizeof(s16));
 	printf("sizeof s32: %ld\n", sizeof(s32));
 	printf("sizeof s64: %ld\n", sizeof(s64));
-	printf("sizeof Vector2: %ld\n", sizeof(Vector2));
+	printf("sizeof vec2f: %ld\n", sizeof(vec2f));
 }

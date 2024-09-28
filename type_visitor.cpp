@@ -425,6 +425,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   };
   
   if (auto iden = dynamic_cast<ASTIdentifier*>(node->right)) {
+    if (!context.current_scope->lookup(iden->value.value)) {
+      throw_error(std::format("use of undeclared identifier: {}", iden->value.value), ERROR_FAILURE, node->source_tokens);
+    }
     for (const auto &field: info->fields) {
       if (field->name.value == iden->value.value) {
         auto value =  node->type->resolved_type = field->type->resolved_type;
