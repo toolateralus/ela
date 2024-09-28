@@ -18,33 +18,6 @@ Array :: struct {
     Node[10] ptr;
 }
 
-#test test_chained_dot_subscript :: () {
-    Array a;
-    a.ptr[0].next = null;
-    assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
-    
-    Node n;
-    a.ptr[0].next = &n;
-    assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
-}
-
-#test test_subscript :: () {
-    s32[100] arr;
-    arr[50] = 0;
-    assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
-    int n;
-    ++n;
-}
-
-#test test_referencing_pointer :: () {
-    Node node;
-    node.next = malloc(sizeof(Node));
-    Node other;
-    node.next.next = &other;
-    
-    assert("mallocing 'next' of 'Node' failed.", node.next != null);
-    assert("dereferencing other into node.next failed.", node.next.next != null);
-}
 
 #test failure_case :: () {
     assert("This should fail", false);
@@ -304,4 +277,33 @@ something :: (f32 f) -> f32 {
         return 0;
     }
     assert("failed to get 0 from local function call", local_function() == 0);
+}
+
+
+#test test_chained_dot_subscript :: () {
+    Array a;
+    a.ptr[0].next = null;
+    assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
+    
+    Node n;
+    a.ptr[0].next = &n;
+    assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
+}
+
+#test test_subscript :: () {
+    s32[100] arr;
+    arr[50] = 0;
+    assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+    int n;
+    ++n;
+}
+
+#test test_referencing_pointer :: () {
+    Node node;
+    node.next = malloc(sizeof(Node));
+    Node other;
+    node.next.next = &other;
+    
+    assert("mallocing 'next' of 'Node' failed.", node.next != null);
+    assert("dereferencing other into node.next failed.", node.next.next != null);
 }

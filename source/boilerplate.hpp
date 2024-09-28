@@ -26,7 +26,7 @@ template <class T> struct _array {
   int m_length = 0;
   _array() {}
   T *begin() const { return m_data; }
-  T *end() const { return m_data + m_length; }
+  T *end() const { return &m_data[m_length]; }
 };
 
 #define TESTING
