@@ -28,6 +28,7 @@ void Parser::init_directive_routines() {
           std::ifstream isftr(filename);
           ss << isftr.rdbuf();
           parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+          parser->fill_buffer_if_needed();
           return nullptr;
         }});
   }
@@ -128,8 +129,10 @@ void Parser::init_directive_routines() {
            std::stringstream ss;
            std::ifstream isftr(filename);
            ss << isftr.rdbuf();
-           parser->states.push_back(
-               Lexer::State::from_file(ss.str(), filename));
+           
+           parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+           parser->fill_buffer_if_needed();
+           
            return nullptr;
          }});
   }
@@ -157,8 +160,8 @@ ASTProgram *Parser::parse() {
   begin_token_frame();
   auto program = ast_alloc<ASTProgram>();
 
-  while (tok.type != TType::Eof) {
-    if (tok.type == TType::Directive) {
+  while (peek().type != TType::Eof) {
+    if (peek().type == TType::Directive) {
       eat();
       auto identifer = expect(TType::Identifier).value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
@@ -181,6 +184,7 @@ ASTProgram *Parser::parse() {
 }
 
 // TODO: Cleanup this horrific function before it gets too out of control.
+// TODO(later): I said that and then proceeded to make it out of control
 ASTStatement *Parser::parse_statement() {
   begin_token_frame();
   auto tok = peek();

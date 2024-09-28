@@ -6,6 +6,8 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include <any>
+#include <cstdio>
+#include <deque>
 #include <format>
 #include <functional>
 #include <jstl/containers/vector.hpp>
@@ -335,38 +337,54 @@ struct DirectiveRoutine {
 };
 
 struct Parser {
+  
+  #define peek() \
+    states.back().lookahead_buffer.front()
+
+  #define lookahead_buf() \
+    states.back().lookahead_buffer
+    
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
       : states({Lexer::State::from_file(contents, filename)}),
         context(context) {
     init_directive_routines();
-    tok = lexer.get_token(states.back());
+    for (int i = lookahead_buf().size(); i < 8; ++i) {
+      lexer.get_token(states.back());
+    }
   }
 
   Context &context;
 
-  const Token &peek() const { return tok; }
+  inline void fill_buffer_if_needed(){
+    while (states.back().lookahead_buffer.size() < 8) {
+      lexer.get_token(states.back());
+    }
+  }
 
   inline Token eat() {
-    auto tok = this->tok;
-    token_frames.back().push_back(tok);
-    this->tok = lexer.get_token(states.back());
-
-    // pop the state stack and move into the next stream.
-    if (this->tok.is_eof() && states.size() > 1) {
+    fill_buffer_if_needed();
+    
+    if (peek().is_eof() && states.size() > 1) {
       states.pop_back();
-      this->tok = lexer.get_token(states.back());
-    }
-
+      fill_buffer_if_needed();
+      return peek();
+    } 
+    
+    auto tok = peek();
+    lookahead_buf().pop_front();
+    lexer.get_token(states.back());
+    
+    token_frames.back().push_back(tok);
     return tok;
   }
 
-  inline bool not_eof() const { return !tok.is_eof(); }
-  inline bool eof() const { return tok.is_eof(); }
-
-  inline bool semicolon() const { return tok.type == TType::Semi; }
+  inline bool not_eof() const { return !peek().is_eof(); }
+  inline bool eof() const { return peek().is_eof(); }
+  inline bool semicolon() const { return peek().type == TType::Semi; }
 
   inline Token expect(TType type) {
+    fill_buffer_if_needed();
     if (peek().type != type) {
       throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
                               TTypeToString(peek().type), peek().value),
@@ -375,7 +393,6 @@ struct Parser {
     return eat();
   }
 
-  Token tok = Token::Eof();
   Lexer lexer{};
 
   std::vector<Lexer::State> states;
