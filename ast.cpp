@@ -138,17 +138,19 @@ void Parser::init_directive_routines() {
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
                                             const std::string &identifier) {
+  begin_token_frame();                                              
   // compare aganist the kind of the routine with expected type, based on parser
   // location
   for (const auto &routine : directive_routines) {
     if (routine.kind == kind && routine.identifier == identifier) {
-      return routine.run(this);
+      auto result = routine.run(this);
+      end_token_frame(result.get());
+      return result;
     }
   }
-
   throw_error(
       std::format("failed to call unknown directive routine: {}", identifier),
-      ERROR_FAILURE, {});
+      ERROR_FAILURE, token_frames.back());
 }
 
 ASTProgram *Parser::parse() {
