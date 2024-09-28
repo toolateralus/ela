@@ -1,7 +1,6 @@
 #import core;
 
 main :: (int argc, char** argv) -> s32 {
-	if (true) {
-	} else {
-	}
+	s64 x = 5;
+	return x;
 }

@@ -221,7 +221,10 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to);
 int voidptr_type();
 int bool_type();
 int void_type();
+int s8_type();
+int s16_type();
 int s32_type();
+int s64_type();
 int f32_type();
 // u8 **
 int string_type();

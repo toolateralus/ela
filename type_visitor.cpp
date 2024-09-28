@@ -4,20 +4,23 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include <any>
+#include <cstdlib>
 #include <format>
 #include <jstl/containers/vector.hpp>
+#include <limits>
+#include <string>
 
 // these are called from and to because in the event of an implicit cast this should be the behaviour.
 void validate_type_compatability(const int from, const int to, const std::vector<Token> &source_tokens, std::format_string<std::string, std::string> format, std::string message) {
-  auto tleft = get_type(from),
-        tright = get_type(to);
-        
-  auto conv_rule = type_conversion_rule(tleft, tright);
+  auto from_t = get_type(from);
+  auto to_t = get_type(to);
+  
+  auto conv_rule = type_conversion_rule(from_t, to_t);
   
   if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(
         message + '\n' +
-            std::format(format, tleft->to_string(), tright->to_string()),
+            std::format(format, from_t->to_string(), to_t->to_string()),
         ERROR_FAILURE, source_tokens);
   }
 }
@@ -107,13 +110,10 @@ const auto check_return_type_consistency(int &return_type, int new_type,
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
-    auto expected_type = get_type(return_type);
-    auto found_type = get_type(new_type);
-    throw_error(
-        std::format(
-            "Inconsistent return types in block. Expected: {}, Found: {}",
-            expected_type->base, found_type->base),
-        ERROR_FAILURE, node->source_tokens);
+    validate_type_compatability(return_type, new_type,
+                                node->source_tokens,
+                                "Expected: {}, Found: {}",
+                                "Inconsistent return types in block.");
   }
 };
 
@@ -169,7 +169,6 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
-
   if (node->value.is_not_null()) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
     validate_type_compatability(expr_type, node->type->resolved_type, node->source_tokens, "invalid declaration types. expected: {}, got {}", std::format("declaration: {}", node->name.value));
@@ -230,8 +229,25 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
-  case ASTLiteral::Integer:
-    return s32_type();
+  case ASTLiteral::Integer: {
+    // TODO:
+    // this will fail if the number is greater than max int64_t or less
+    // than min int64_t
+    auto n = std::stoll(node->value);
+    if (n > std::numeric_limits<int32_t>::max() ||
+        n < std::numeric_limits<int32_t>::min()) {
+      return s64_type();
+    }
+    if (n > std::numeric_limits<int16_t>::max() ||
+        n < std::numeric_limits<int16_t>::min()) {
+      return s32_type();
+    }
+    if (n > std::numeric_limits<int8_t>::max() ||
+        n < std::numeric_limits<int8_t>::min()) {
+      return s16_type();
+    }
+    return s8_type();
+  }
   case ASTLiteral::Float:
     return f32_type();
   case ASTLiteral::RawString:
