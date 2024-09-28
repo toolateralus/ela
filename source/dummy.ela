@@ -1,18 +1,14 @@
 #import core;
 
-otherstruct :: struct {
-	s32[2] thing2;
-}
-
-mystruct :: struct {
-	s32 thing1;
-	otherstruct other;
+Vector2 :: struct {
+  f32 x;
+  f32 y;
 }
 
 main :: () {
-	mystruct s;
-	s.other.thing2[0] = 1;
-	s.other.thing2[1] = 2;
-	printf("%d\n", s.other.thing2[0]);
-	printf("%d\n", s.other.thing2[1]);
+  s32 *v;
+  s32 [24] arr;
+  
+  Vector2 v2;
 }
+

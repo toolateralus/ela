@@ -1,5 +1,3 @@
-// TODO: add memoization so we don't double include anything ever.
-// same for import.
 #import core;
 
 Vector2 :: struct {
@@ -20,6 +18,8 @@ Node :: struct {
     s32[100] arr;
     arr[50] = 0;
     assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+    int n;
+    ++n;
 }
 
 #test 
@@ -32,7 +32,6 @@ test_referencing_pointer :: () {
     assert("mallocing 'next' of 'Node' failed.", node.next != null);
     assert("dereferencing other into node.next failed.", node.next.next != null);
 }
-
 
 #test 
 failure_case :: () {

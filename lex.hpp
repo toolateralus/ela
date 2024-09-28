@@ -1,5 +1,6 @@
 #pragma once
 
+#include <deque>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -224,7 +225,7 @@ struct Lexer {
         : input(input), file_idx(file_idx), input_len(input_len) {}
 
     std::string input{};
-    std::vector<Token> queue{};
+    std::deque<Token> lookahead_buffer{};
     size_t pos = 0;
     size_t col = 1;
     size_t line = 1;
@@ -290,5 +291,5 @@ struct Lexer {
       {"|=", TType::CompOr},    {"^=", TType::CompXor},
       {"<<=", TType::CompSHL},  {">>=", TType::CompSHR}};
 
-  Token get_token(State &state);
+  void get_token(State &state);
 };

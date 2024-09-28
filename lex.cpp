@@ -2,17 +2,12 @@
 #include <cctype>
 #include <iostream>
 #include <sstream>
-#include <vector>
 
 using std::string;
 using std::stringstream;
 
-Token Lexer::get_token(State &state) {
-  if (!state.queue.empty()) {
-    auto tok = state.queue.back();
-    state.queue.pop_back();
-    return tok;
-  }
+void Lexer::get_token(State &state) {
+  
   size_t &pos = state.pos;
   const std::string &input = state.input;
   const size_t len = state.input_len;
@@ -57,7 +52,8 @@ Token Lexer::get_token(State &state) {
         c = input[pos];
       }
       pos++;
-      return Token(location, token.str(), TType::String, TFamily::Literal);
+      state.lookahead_buffer.push_back(Token(location, token.str(), TType::String, TFamily::Literal));
+      return;
     }
 
     if (std::isalpha(c) || c == '_') {
@@ -68,9 +64,11 @@ Token Lexer::get_token(State &state) {
       }
       string value = token.str();
       if (keywords.contains(value)) {
-        return Token(location, value, keywords.at(value), TFamily::Keyword);
+        state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
+        return;
       } else {
-        return Token(location, value, TType::Identifier, TFamily::Identifier);
+        state.lookahead_buffer.push_back(Token(location, value, TType::Identifier, TFamily::Identifier));
+        return;
       }
     } else if (std::ispunct(c)) {
       std::string longest_match;
@@ -84,8 +82,9 @@ Token Lexer::get_token(State &state) {
           longest_match = current_match;
         } else {
           if (!longest_match.empty()) {
-            return Token(location, longest_match, operators.at(longest_match),
-                         TFamily::Operator);
+            state.lookahead_buffer.push_back(Token(location, longest_match, operators.at(longest_match),
+                         TFamily::Operator));
+                         return;
           }
         }
         pos++;
@@ -93,8 +92,9 @@ Token Lexer::get_token(State &state) {
       }
 
       if (!longest_match.empty()) {
-        return Token(location, longest_match, operators.at(longest_match),
-                     TFamily::Operator);
+        state.lookahead_buffer.push_back(Token(location, longest_match, operators.at(longest_match),
+                     TFamily::Operator));
+                     return;
       } else {
         std::cout << "crisp: unable to lex operator: " << current_match
                   << std::endl;
@@ -109,9 +109,9 @@ Token Lexer::get_token(State &state) {
             auto str = token.str();
             str.pop_back();
             pos++;
-            state.queue.emplace_back(location, "..", TType::Range,
+            state.lookahead_buffer.emplace_back(location, "..", TType::Range,
                                      TFamily::Operator);
-            return Token(location, str, TType::Integer, TFamily::Literal);
+            state.lookahead_buffer.push_back(Token(location, str, TType::Integer, TFamily::Literal));
           }
           is_float = true;
         }
@@ -121,14 +121,18 @@ Token Lexer::get_token(State &state) {
       }
       auto value = token.str();
 
-      if (!is_float)
-        return Token(location, value, TType::Integer, TFamily::Literal);
-      else
-        return Token(location, value, TType::Float, TFamily::Literal);
+      if (!is_float) {
+        state.lookahead_buffer.push_back(Token(location, value, TType::Integer, TFamily::Literal));
+        return;
+      }
+      else {
+        state.lookahead_buffer.push_back(Token(location, value, TType::Float, TFamily::Literal));
+        return;
+      }
     } else {
       std::cout << "crisp: unable to lex : " << c << std::endl;
       exit(1);
     }
   }
-  return Token::Eof();
+  state.lookahead_buffer.push_back(Token::Eof());
 }

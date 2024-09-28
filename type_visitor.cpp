@@ -4,7 +4,6 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include <any>
-#include <cstdlib>
 #include <format>
 #include <jstl/containers/vector.hpp>
 #include <limits>
@@ -271,8 +270,8 @@ std::any TypeVisitor::visit(ASTCall *node) {
                 ERROR_FAILURE, node->source_tokens);
   }
 
-  jstl::Vector<int> arg_tys =
-      std::any_cast<jstl::Vector<int>>(node->arguments->accept(this));
+  std::vector<int> arg_tys =
+      std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   auto fn_ty_info = get_type(symbol->type_id)->info;
 
@@ -307,9 +306,9 @@ std::any TypeVisitor::visit(ASTCall *node) {
   return info->return_type;
 }
 std::any TypeVisitor::visit(ASTArguments *node) {
-  jstl::Vector<int> argument_types;
+  std::vector<int> argument_types;
   for (auto arg : node->arguments) {
-    argument_types.push(int_from_any(arg->accept(this)));
+    argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;
 }
@@ -413,10 +412,10 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   // TODO: we can improve this to not rely so heavily on a Scope object.
   // It seems wrong to store a scope in a Type *.
   context.enter_scope(node->scope);
-  jstl::Vector<ASTDeclaration*> fields;
+  std::vector<ASTDeclaration*> fields;
   for (auto decl : node->declarations) {
     decl->accept(this);
-    fields.push(decl);
+    fields.push_back(decl);
   }
   info->fields = fields;
   info->scope = node->scope;

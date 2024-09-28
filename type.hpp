@@ -60,10 +60,10 @@ enum TypeExtEnum {
 
 struct TypeExt {
   // this stores things like * and [], [20] etc.
-  jstl::Vector<TypeExtEnum> extensions{};
+  std::vector<TypeExtEnum> extensions{};
   // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
   // array size.
-  jstl::Vector<int> array_sizes{};
+  std::vector<int> array_sizes{};
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       for (const auto ext : extensions) {
@@ -94,7 +94,6 @@ struct TypeExt {
     return !array_sizes.empty();
   }
 
-  
   inline bool is_fixed_sized_array() const {
     for (const auto &ext: array_sizes) {
       if (ext != -1) {
@@ -106,10 +105,11 @@ struct TypeExt {
   
   inline std::string to_string() const {
     std::stringstream ss;
-    jstl::Vector<int> array_sizes = this->array_sizes;
+    std::vector<int> array_sizes = this->array_sizes;
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
-        auto size = array_sizes.pop();
+        auto size = array_sizes.back();
+        array_sizes.pop_back();
         if (size == -1)
           ss << "[]";
         else {
@@ -123,13 +123,14 @@ struct TypeExt {
     return ss.str();
   }
   inline std::string to_cpp_string(const std::string &base) const {
-    jstl::Vector<int> array_sizes = this->array_sizes;
+    std::vector<int> array_sizes = this->array_sizes;
     std::stringstream ss;
     ss << base;
     
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
-        auto size = array_sizes.pop();
+        auto size = array_sizes.back();
+        array_sizes.pop_back();
         if (size == -1) {
           std::string current = ss.str();
           ss.str("_array<" + current + ">");
@@ -193,7 +194,7 @@ enum StructTypeFlags {
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
-  jstl::Vector<ASTDeclaration*> fields;
+  std::vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
   // mutable for memoization
   mutable int m_size = -1;
@@ -235,7 +236,7 @@ int create_type(TypeKind kind, const std::string &name,
                 const TypeExt &extensions = {});
 
 int create_struct_type(const std::string &name,
-                       const jstl::Vector<ASTDeclaration*> &fields);
+                       const std::vector<ASTDeclaration*> &fields);
 
 enum ConversionRule {
   CONVERT_PROHIBITED,

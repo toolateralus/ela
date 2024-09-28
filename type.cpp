@@ -333,12 +333,12 @@ int remove_one_pointer_ext(int operand_ty,
   }
 
   bool pointer_removed = false;
-  jstl::Vector<TypeExtEnum> extensions{};
+  std::vector<TypeExtEnum> extensions{};
   for (const auto &ext : ty->extensions.extensions) {
     if (!pointer_removed && ext == TYPE_EXT_POINTER) {
       pointer_removed = true;
     } else {
-      extensions.push(ext);
+      extensions.push_back(ext);
     }
   }
   return find_type_id(
@@ -347,7 +347,7 @@ int remove_one_pointer_ext(int operand_ty,
 }
 int create_struct_type(
     const std::string &name,
-    const jstl::Vector<ASTDeclaration*> &fields) {
+    const std::vector<ASTDeclaration*> &fields) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
   type->base = name;
@@ -408,7 +408,7 @@ int Type::get_element_type() const {
     return -1;
   }
   auto extensions = this->extensions;
-  extensions.extensions.pop();
-  extensions.array_sizes.pop();
+  extensions.extensions.pop_back();
+  extensions.array_sizes.pop_back();
   return find_type_id(base, extensions);
 }
