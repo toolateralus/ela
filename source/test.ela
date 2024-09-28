@@ -14,6 +14,15 @@ Node :: struct {
     Node *next;
 }
 
+Array :: struct {
+    Node[10] ptr;
+}
+
+#test test_chained_dot_subscript :: () {
+    Array a;
+    a.ptr[0].next = null;
+}
+
 #test test_subscript :: () {
     s32[100] arr;
     arr[50] = 0;

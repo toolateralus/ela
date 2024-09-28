@@ -451,8 +451,8 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left_ty = get_type(left);
   
   // TODO: make it so array types are not scalars. It makes no darn sense.
-  if (left_ty->kind != TYPE_SCALAR || (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer())) {
-    throw_error("cannot index into non array type.", ERROR_FAILURE, node->source_tokens);
+  if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
+    throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), ERROR_FAILURE, node->source_tokens);
   }
   
   

@@ -215,14 +215,11 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
+
+  // Increment/ Decrement statements;
   if (tok.type == TType::Increment || tok.type == TType::Decrement) {
     auto statement = ast_alloc<ASTExprStatement>();
-    auto unary = ast_alloc<ASTUnaryExpr>();
-    unary->op = eat();
-    auto operand = ast_alloc<ASTIdentifier>();
-    operand->value = eat();
-    unary->operand = operand;
-    statement->expression = unary;
+    statement->expression = parse_expr();
     return statement;
   }
 
@@ -311,55 +308,37 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
-
-  eat();
   
-  // likely subscript assignment.
-  if (tok.type == TType::Identifier && peek().type == TType::LBrace) {
-    auto subscript = ast_alloc<ASTSubscript>();
-    auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = tok;
-    subscript->left = iden;
-    
-    expect(TType::LBrace);
-    auto index = parse_expr();
-    expect(TType::RBrace);
-    subscript->subscript = index;
-    
+  // subscript assignment
+  if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::LBrace) || 
+      (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Dot) 
+      || lookahead_buf()[1].type == TType::Assign
+      || lookahead_buf()[1].type == TType::LParen) {
     auto statement = ast_alloc<ASTExprStatement>();
-    if (peek().type == TType::Assign) {
-      eat();
-      auto value = parse_expr();
-      auto binexpr = ast_alloc<ASTBinExpr>();
-      binexpr->left = subscript;
-      binexpr->op = Token({}, "=", TType::Assign, TFamily::Operator);
-      binexpr->right = value;
-      statement->expression = binexpr;
-    } else statement->expression = subscript;
     end_token_frame(statement);
+    statement->expression = parse_expr();
     return statement;
   }
   
-
-  if (tok.type == TType::Identifier && peek().type == TType::Dot) {
-    return parse_dot_statement(tok);
-  }
-
-  if (peek().is_comp_assign()) {
+  if (lookahead_buf()[1].is_comp_assign()) {
     if (tok.type != TType::Identifier) {
       throw_error(
           std::format("Compound assignment must target an identifier. Got {}",
                       tok.value),
           ERROR_CRITICAL, token_frames.back());
     }
+    eat();
     auto comp_assign = ast_alloc<ASTCompAssign>();
     comp_assign->op = eat();
     comp_assign->name = tok;
     comp_assign->expr = parse_expr();
     end_token_frame(comp_assign);
     return comp_assign;
-  } else if (peek().type == TType::DoubleColon) {
-    eat();
+  }
+  
+  if (lookahead_buf()[1].type == TType::DoubleColon) {
+    expect(TType::Identifier);
+    expect(TType::DoubleColon);
     if (peek().type == TType::LParen) {
       auto node = parse_function_declaration(tok);
       end_token_frame(node);
@@ -369,18 +348,9 @@ ASTStatement *Parser::parse_statement() {
       end_token_frame(struct_decl);
       return struct_decl;
     }
-  } else if (peek().type == TType::Assign) {
-    auto statement = ast_alloc<ASTExprStatement>();
-    statement->expression = parse_assignment(&tok);
-    end_token_frame(statement);
-    return statement;
-  } else if (tok.type == TType::Identifier && peek().type == TType::LParen) {
-    auto statement = parse_call_statement(tok);
-    end_token_frame(statement);
-    return statement;
   }
   
-
+  eat();
 
   throw_error(
       std::format("Unexpected token when parsing statement: {}", tok.value),
