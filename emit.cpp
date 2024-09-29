@@ -521,10 +521,33 @@ std::any EmitVisitor::visit(ASTMake *node) {
   // TODO: make this robust to casting all types, copy construction only right now :: 2024-09-29 13:34:16
   auto type = get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
+    if (node->arguments->arguments.empty()) {
+      throw_error("cannot create a pointer currently with #make. it only casts pointers.", ERROR_FAILURE, node->source_tokens);
+    }
     (*ss) << "(" << type->to_cpp_string() << ")";
+    node->arguments->arguments[0]->accept(this);
   } else if (node->kind == MAKE_CTOR || node->kind == MAKE_COPY_CTOR) {
     (*ss) << type->to_cpp_string();
     node->arguments->accept(this);
   }
+  return {};
+}
+std::any EmitVisitor::visit(ASTSubscript *node) {
+  node->left->accept(this);
+  (*ss) << '[';
+  node->subscript->accept(this);
+  (*ss) << ']';
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTInitializerList *node) {
+  (*ss) << "{";
+  for (const auto &expr: node->expressions) {
+    expr->accept(this);
+    if (expr != node->expressions.back()) {
+      (*ss) << ", ";
+    }
+  }
+  (*ss) << "}";
   return {};
 }

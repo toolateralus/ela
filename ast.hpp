@@ -159,7 +159,6 @@ struct ASTLiteral : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
-
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
@@ -188,7 +187,6 @@ struct ASTArguments : ASTNode {
 
   std::any accept(VisitorBase *visitor) override;
 };
-
 
 // we'll use this node for several things,
 // to reduce ast amount
@@ -275,7 +273,7 @@ struct ASTWhile : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct ASTSubscript: ASTExpr {
+struct ASTSubscript : ASTExpr {
   ASTExpr *left;
   ASTExpr *subscript;
   std::any accept(VisitorBase *visitor) override;
@@ -284,10 +282,16 @@ struct ASTSubscript: ASTExpr {
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
-  
+
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFuncDecl *> methods;
-  
+
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTInitializerList : ASTExpr {
+  ASTType *type;
+  std::vector<ASTExpr*> expressions;
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -317,9 +321,11 @@ struct ASTStructDeclaration : ASTStatement {
   std::any visit(ASTWhile *node) override {}                                   \
   std::any visit(ASTCompAssign *node) override {}                              \
   std::any visit(ASTStructDeclaration *node) override {}                       \
-  std::any visit(ASTDotExpr *node) override {} \
-  std::any visit(ASTSubscript *node) override {} \
-  std::any visit(ASTMake *node) override {} \
+  std::any visit(ASTDotExpr *node) override {}                                 \
+  std::any visit(ASTSubscript *node) override {}                               \
+  std::any visit(ASTMake *node) override {}                                    \
+  std::any visit(ASTInitializerList *node) override {}                         \
+
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -345,9 +351,10 @@ struct ASTStructDeclaration : ASTStatement {
   virtual std::any visit(ASTWhile *node) = 0;                                  \
   virtual std::any visit(ASTCompAssign *node) = 0;                             \
   virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
-  virtual std::any visit(ASTDotExpr *node) = 0; \
-  virtual std::any visit(ASTSubscript *node) = 0; \
-  virtual std::any visit(ASTMake *node) = 0; \
+  virtual std::any visit(ASTDotExpr *node) = 0;                                \
+  virtual std::any visit(ASTSubscript *node) = 0;                              \
+  virtual std::any visit(ASTMake *node) = 0;                                   \
+  virtual std::any visit(ASTInitializerList *node) = 0;                        \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -363,8 +370,8 @@ struct DirectiveRoutine {
 };
 
 struct Parser {
-  Nullable<ASTStructDeclaration> current_struct_decl;
-  
+  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+
   inline Token peek() const {
     if (states.empty()) {
       return Token::Eof();
@@ -372,9 +379,8 @@ struct Parser {
     return states.back().lookahead_buffer.front();
   }
 
-  #define lookahead_buf() \
-    states.back().lookahead_buffer
-    
+#define lookahead_buf() states.back().lookahead_buffer
+
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
       : states({Lexer::State::from_file(contents, filename)}),
@@ -387,7 +393,7 @@ struct Parser {
 
   Context &context;
 
-  inline void fill_buffer_if_needed(){
+  inline void fill_buffer_if_needed() {
     while (states.back().lookahead_buffer.size() < 8) {
       lexer.get_token(states.back());
     }
@@ -395,12 +401,12 @@ struct Parser {
 
   inline Token eat() {
     fill_buffer_if_needed();
-    
+
     if (peek().is_eof() && states.size() > 1) {
       states.pop_back();
       fill_buffer_if_needed();
       return peek();
-    } 
+    }
     auto tok = peek();
     lookahead_buf().pop_front();
     lexer.get_token(states.back());
@@ -460,7 +466,7 @@ struct Parser {
     }
     return nullptr;
   }
-  
+
   ASTType *parse_type();
   ASTProgram *parse();
   ASTStatement *parse_statement();

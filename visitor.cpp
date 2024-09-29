@@ -321,6 +321,10 @@ std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->vi
 std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTInitializerList::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+
 // clang-format on
 // }
 /*
@@ -337,14 +341,6 @@ std::any SerializeVisitor::visit(ASTSubscript *node) {
   return {};
 }
 
-std::any EmitVisitor::visit(ASTSubscript *node) {
-  node->left->accept(this);
-  (*ss) << '[';
-  node->subscript->accept(this);
-  (*ss) << ']';
-  return {};
-}
-
 std::any SerializeVisitor::visit(ASTMake *node) {
   ss << "make: \n";
   indentLevel++;
@@ -355,5 +351,14 @@ std::any SerializeVisitor::visit(ASTMake *node) {
   node->arguments->accept(this);
   indentLevel--;
   
+  return {};
+}
+std::any SerializeVisitor::visit(ASTInitializerList *node) {
+  ss << "init list: {";
+  for(const auto &expr: node->expressions)  {
+    expr->accept(this);
+    ss << ", ";
+  }
+  ss << "}\n";
   return {};
 }

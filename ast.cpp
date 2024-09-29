@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "nullable.hpp"
@@ -204,7 +205,25 @@ void Parser::init_directive_routines() {
         auto make = ast_alloc<ASTMake>();
         make->type_arg = type_arg;
         make->arguments = args;
+        make->kind = MAKE_CTOR;
+        
+        if (type_arg->extension_info.is_pointer()) {
+          make->kind = MAKE_CAST;
+        }
+        
         return make;
+      }
+    });
+  }
+  
+  {
+    directive_routines.push_back({
+      .identifier = "compiler_flags",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto string = parser->expect(TType::String).value;
+        compile_command.add_compilation_flags(string);
+        return nullptr;
       }
     });
   }
@@ -753,6 +772,19 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+  case TType::LCurly: {
+    eat();
+    auto init_list = ast_alloc<ASTInitializerList>();
+    while (peek().type != TType::RCurly) {
+      init_list->expressions.push_back(parse_expr());
+      if (peek().type == TType::Comma) {
+        eat();
+      }
+    }
+    expect(TType::RCurly);
+    return init_list;
+  }
+    
   case TType::Identifier: {
     if (find_type_id(tok.value, {}) != -1) {
       return parse_type();
@@ -903,3 +935,4 @@ ASTCall *Parser::parse_call(const Token &name) {
   call->arguments = args;
   return call;
 }
+

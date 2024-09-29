@@ -18,6 +18,12 @@ Array :: struct {
     Node[10] ptr;
 }
 
+// Keep this at the top otherwise it messesup the output formatting in the middle
+#test test_printf :: () {
+    u8* s = "Hello i am a string";
+    printf("testing printing a string: %s\n", s);
+    return;
+}
 
 #test failure_case :: () {
     assert("This should fail", false);
@@ -273,7 +279,6 @@ something :: (f32 f) -> f32 {
     assert("failed to get 0 from local function call", local_function() == 0);
 }
 
-
 #test test_chained_dot_subscript :: () {
     Array a;
     a.ptr[0].next = null;
@@ -302,17 +307,23 @@ something :: (f32 f) -> f32 {
     assert("dereferencing other into node.next failed.", node.next.next != null);
 }
 
+// testing conflicting definitons. expected: compiler error if failed.
 #test for_loop_2 :: () {
-    for int i = 0; i < 10; ++i {}
-    for int i = 0; i < 10; ++i {}
-}
+    for int i; i < 10; ++i {
+        i = i;
+    }
+    for int i; i < 10; ++i {
+        i = i;
+    }
 
-
-// Keep this at the bottom otherwise it messesup the output formatting
-#test test_printf :: () {
-    u8* s = "Hello i am a string";
-    printf("testing printing a string: %s\n", s);
-    return;
+    int[] array;
+    
+    for k; array {
+        k = k;
+    }
+    for k; array {
+        k = k;
+    }
 }
 
 Constructible :: struct {

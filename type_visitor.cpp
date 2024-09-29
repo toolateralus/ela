@@ -250,15 +250,15 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     // than min int64_t
     auto n = std::stoll(node->value);
     if (n > std::numeric_limits<int32_t>::max() ||
-        n < std::numeric_limits<int32_t>::min()) {
+      n < std::numeric_limits<int32_t>::min()) {
       return s64_type();
     }
     if (n > std::numeric_limits<int16_t>::max() ||
-        n < std::numeric_limits<int16_t>::min()) {
+      n < std::numeric_limits<int16_t>::min()) {
       return s32_type();
     }
     if (n > std::numeric_limits<int8_t>::max() ||
-        n < std::numeric_limits<int8_t>::min()) {
+      n < std::numeric_limits<int8_t>::min()) {
       return s16_type();
     }
     return s8_type();
@@ -499,4 +499,20 @@ std::any TypeVisitor::visit(ASTMake *node) {
                 node->source_tokens);
   }
   return type;
+}
+
+std::any TypeVisitor::visit(ASTInitializerList *node) {
+  int type = -1;
+  for (const auto &expr : node->expressions) {
+    auto t = int_from_any(expr->accept(this));
+    if (type == -1) type = t;
+    else validate_type_compatability(t, type, node->source_tokens, "expected: {}, got {}", "initializer list had different types in one or many expressions");
+  }
+  if (type == -1) {
+    throw_error("Cannot have an empty initializer list currently. to be implemented.", ERROR_FAILURE, node->source_tokens);
+  }
+  
+  auto base = get_type(type);
+  // (int)node->expressions.size();
+  return find_type_id(base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = { -1 }});
 }

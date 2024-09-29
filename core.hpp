@@ -20,7 +20,7 @@ struct CompileCommand {
   std::filesystem::path binary_path;
   std::filesystem::path original_path; // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
-
+  std::string compilation_flags;
   inline void print() const {
     std::cout << "\e[1;32mInput Path:\e[0m " << input_path << std::endl;
     std::cout << "\e[1;32mOutput Path:\e[0m " << output_path << std::endl;
@@ -31,7 +31,12 @@ struct CompileCommand {
                 << "\e[0m: " << (flag.second ? "true" : "false") << std::endl;
     }
   }
-
+  inline void add_compilation_flags(const std::string &flags)  {
+    this->compilation_flags += flags;
+    if (!this->compilation_flags.ends_with(' ')) {
+      this->compilation_flags += ' ';
+    }
+  }
   inline CompileCommand(int argc, char *argv[]) {
     if (argc < 2) {
       throw std::invalid_argument("\e[31mUsage: <input.ela> (optional)::[-o "

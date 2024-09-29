@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstddef>
+#include <vector>
 
 using f64 = double;
 using u64 = size_t;
@@ -22,13 +23,24 @@ extern "C" int printf(const char *format, ...);
 
 #include <initializer_list>
 
-// UNUSED
 // TODO: implement a bare minimum array type.
+// not sure how we want to do this.
 template <class T> struct _array {
   T *m_data = nullptr;
   int m_length = 0;
   _array() {}
-  
+  T &operator [](int n){
+    return m_data[n];
+  }
+  T &operator [](int n) const{
+    return m_data[n];
+  }
+  explicit operator void*() {
+    return m_data;
+  }
+  explicit operator T*() {
+    return m_data;
+  }
   _array(std::initializer_list<T> list) {
     m_data = new T[list.size()];
     std::copy(list.begin(), list.end(), m_data);

@@ -1,40 +1,72 @@
+#compiler_flags "-g -lGLEW -lGL -lglfw -lassimp -lm"
 
-Vector2 :: struct {
+GLFWWindow :: struct;
+
+int GL_ARRAY_BUFFER1 = 34962;
+int GL_FLOAT = 5126;
+int GL_STATIC_DRAW = 5044;
+int GL_QUADS = 7;
+
+#foreign glfwInit :: () -> bool;
+#foreign glfwTerminate :: () -> void;
+#foreign glfwCreateWindow :: (int w, int h, u8* t, void* v, void* v1) -> GLFWWindow*;
+#foreign glfwMakeContextCurrent :: (void* ctx) -> void;
+#foreign glfwWindowShouldClose :: (GLFWWindow *window) -> bool;
+#foreign glfwPollEvents :: () -> void;
+#foreign glfwSwapBuffers :: (GLFWWindow *window) -> void;
+#foreign glewInit :: () -> bool;
+
+#foreign glGenBuffers :: (int n_buf, int* buf) -> void;
+#foreign glBindBuffer :: (int type, int buf) -> void;
+#foreign glBufferData :: (int target, s64 size, void* data, int usage) -> void;
+#foreign glEnableVertexAttribArray :: (int index) -> void;
+#foreign glVertexAttribPointer :: (int index, s64 size, int type, bool normalized, s64 stride, void* pointer) -> void;
+#foreign glDrawArrays :: (int mode, int first, int count) -> void;
+
+Vec2 :: struct {
   f32 x;
   f32 y;
-  
-  print :: () {
-    printf("x: %f, y: %f\n", x, y);
-  }
-  
-  zero :: () -> Vector2 {
-    Vector2 v;
-    return v;
-  };
-  
   #ctor :: (f32 _x, f32 _y) {
     x = _x;
     y = _y;
   }
-  
-  #ctor :: () {
-    
-  }
-  
-  
-  #dtor :: () {
-    
-  }
+  #ctor :: () {}
 }
 
-main :: () {
-  // run constructor.  
-  Vector2 v = #make(Vector2, 10.0, 10.0);
+float* vertices = #make(float*, #make(float[], { -0.5, -0.5, 0.5, -0.5, 0.5,  0.5, -0.5,  0.5 }));
+
+main :: () -> int {  
+  if !glfwInit() {
+    return 1;
+  }
   
-  // casting down with copy construction
-  f64 _double;
-  f32 _float;
-  _float = #make(f32, _double);
+  GLFWWindow *window = glfwCreateWindow(800, 600, "Hello World", null, null);
+  if window == null {
+    glfwTerminate();
+    return 1;
+  }
+
+  glfwMakeContextCurrent(window);
+
+  if glewInit() != 0 {
+    glfwTerminate();
+    return 1;
+  }
+
   
-  printf("%d\n", #make(int, v));
+  int vbo;
+  glGenBuffers(1, &vbo);
+  
+  glBindBuffer(GL_ARRAY_BUFFER, vbo);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), #make(void*, vertices), GL_STATIC_DRAW);
+  glEnableVertexAttribArray(0);
+  glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * sizeof(float), #make(void*, 0));
+
+  while !glfwWindowShouldClose(window) {
+    //glDrawArrays(GL_QUADS, 0, 4);
+    glfwSwapBuffers(window);
+    glfwPollEvents();
+  }
+  glfwTerminate();
+  return 0;
 }

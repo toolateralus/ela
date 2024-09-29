@@ -93,13 +93,14 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.flush();
   output.close();
 
-  std::string extra_flags = "-lc";
+  std::string extra_flags = "-lc " + compilation_flags;
 
-  printf("\e[31m");
-  system(std::format("clang++ -std=c++23  -Wno-c99-designator {} {} -o {}", extra_flags,
-                     output_path.string(), binary_path.string())
-             .c_str());
-  printf("\e[0m");
+  auto compilation_string = std::format("clang++ -std=c++23  -Wno-parentheses-equality -Wno-c99-designator {} {} -o {}", extra_flags,
+                     output_path.string(), binary_path.string());
+                     
+  printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
+  
+  system(compilation_string.c_str());
 
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
