@@ -1,4 +1,4 @@
-#compiler_flags "-g -lGLEW -lGL -lglfw -lassimp -lm"
+#compiler_flags "-lGLEW -lGL -lglfw -lm"
 
 GLFWwindow :: struct;
 
@@ -14,38 +14,30 @@ u32 GL_STACK_UNDERFLOW = 1284;
 u32 GL_OUT_OF_MEMORY = 1285;
 u32 GL_COLOR_BUFFER_BIT = 16384;
 u32 GL_INFO_LOG_LENGTH = 35716;
-
+u32 GL_COMPILE_STATUS = 35713;
+u32 GL_LINK_STATUS = 35714;
+u32 GL_VERTEX_SHADER = 35633;
+u32 GL_FRAGMENT_SHADER = 35632;
 
 #foreign glfwInit :: () -> bool;
 #foreign glfwTerminate :: ();
-
 #foreign glfwCreateWindow :: (int w, int h, char* t, void* v, void* v1) -> GLFWwindow*;
 #foreign glfwMakeContextCurrent :: (void* ctx);
 #foreign glfwWindowShouldClose :: (GLFWwindow *window) -> bool;
 #foreign glfwPollEvents :: ();
 #foreign glfwSwapBuffers :: (GLFWwindow *window);
 #foreign glewInit :: () -> bool;
-
 #foreign glGenVertexArrays :: (int n, u32* arrays);
 #foreign glBindVertexArray :: (int array);
-
 #foreign glGenBuffers :: (int n_buf, u32* buf);
 #foreign glBindBuffer :: (int type, u32 buf);
 #foreign glBufferData :: (int target, s64 size, void* data, int usage);
 #foreign glEnableVertexAttribArray :: (int index);
 #foreign glVertexAttribPointer :: (int index, s64 size, int type, bool normalized, s64 stride, void* pointer);
 #foreign glDrawArrays :: (u32 mode, int first, int count);
-
 #foreign glClearColor :: (float red, float green, float blue, float alpha);
 #foreign glClear :: (u32 mask);
-
 #foreign glGetError :: () -> int;
-
-u32 GL_COMPILE_STATUS = 35713;
-u32 GL_LINK_STATUS = 35714;
-u32 GL_VERTEX_SHADER = 35633;
-u32 GL_FRAGMENT_SHADER = 35632;
-
 #foreign glCreateShader :: (u32 type) -> u32;
 #foreign glShaderSource :: (u32 shader, int count, char** string, int* length);
 #foreign glCompileShader :: (u32 shader);
@@ -57,10 +49,8 @@ u32 GL_FRAGMENT_SHADER = 35632;
 #foreign glGetProgramiv :: (u32 program, u32 pname, int* params);
 #foreign glGetProgramInfoLog :: (u32 program, int maxLength, int* length, char* infoLog);
 #foreign glUseProgram :: (u32 program);
-
 #foreign glDeleteShader :: (s32 shader);
 #foreign glDeleteProgram :: (s32 shader);
-
 #foreign glViewport :: (int x, int y, int width, int height);
 
 compile_shader :: (u32 kind, char *source) -> u32 {
@@ -76,6 +66,7 @@ compile_shader :: (u32 kind, char *source) -> u32 {
     char* info_log = malloc(sizeof(char*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
+    free(info_log);
     return #make(u32, 0);
   }
   return shader;
@@ -102,6 +93,7 @@ create_program :: (char* vert_source, char* frag_source) -> u32 {
     char* info_log = malloc(sizeof(char*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
+    free(info_log);
     return #make(u32, 0);
   }
 

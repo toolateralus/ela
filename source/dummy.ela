@@ -1,15 +1,16 @@
 #import core;
 #import gl;
 
-float* vertices = #make(float*, #make(float[], { 
+#compiler_flags "-g"
+
+float[] vertices = #make(float[], { 
     -0.5, -0.5,
     -0.5, 0.5,
     0.5, -0.5, 
-    
-    0.5, -0.5
+    0.5, -0.5,
     -0.5, 0.5,
     0.5, 0.5,
-}));
+});
 
 char* vert = #read "shader.vert";
 char* frag = #read "shader.frag";
@@ -18,17 +19,12 @@ main :: () -> int {
   if !glfwInit() {
     return 1;
   }
-  
   GLFWwindow *window = glfwCreateWindow(800, 600, "Hello World", null, null);
-  
   if window == null {
     glfwTerminate();
     return 1;
   }
-
-
   glfwMakeContextCurrent(window);
-
   if glewInit() != 0 {
     glfwTerminate();
     return 1;
@@ -43,26 +39,19 @@ main :: () -> int {
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
   glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(float) * 2, #make(void*, 0));
   glEnableVertexAttribArray(0);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 2, #make(void*, vertices), GL_STATIC_DRAW);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 2, #make(float*, vertices), GL_STATIC_DRAW);
   
   int n = 0;
   glClearColor(1.0, 1.0, 1.0, 1.0);
-  check_error("clear_color");  
   u32 shader = create_program(vert, frag);
-  check_error("create");
   glUseProgram(shader);
-  check_error("use");
   glViewport(0, 0, 800, 600);
-  check_error("viewport");
+  
   while !glfwWindowShouldClose(window) {
     glClear(GL_COLOR_BUFFER_BIT);
-    check_error("clear");
     glDrawArrays(GL_TRIANGLES, 0, 6);
-    check_error("draw");
     glfwSwapBuffers(window);
-    check_error("swap");
     glfwPollEvents();
-    check_error("poll");
   }
   glfwTerminate();
   return 0;
