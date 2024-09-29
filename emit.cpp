@@ -308,7 +308,6 @@ void EmitVisitor::emit_foreign_function(ASTFuncDecl *node) {
   }
   (*ss) << ");";
   use_code();
-  needs_semi_newline = false;
 }
 
 std::any EmitVisitor::visit(ASTFuncDecl *node) {
@@ -352,7 +351,6 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   // main is not forward declared.
   if (node->name.value != "main") {
     emit_forward_declaration(node);
-    needs_semi_newline = false;
   }
   
   return {};
@@ -371,11 +369,6 @@ std::any EmitVisitor::visit(ASTBlock *node) {
     
     semicolon();
     newline();
-    // if (needs_semi_newline) {
-    // } else {
-    //   needs_semi_newline = true;
-    // }
-    
   }
   indentLevel--;
   indented("}");
@@ -390,12 +383,9 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   
   for (const auto &statement : node->statements) {
     statement->accept(this);
-    if (needs_semi_newline) {
-      semicolon();
-      newline();
-    } else {
-      needs_semi_newline = true;
-    }
+    semicolon();
+    newline();
+    
   }
   
   if (testing) {

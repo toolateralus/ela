@@ -84,7 +84,6 @@ struct TypeVisitor : VisitorBase {
 
 struct EmitVisitor : VisitorBase {
   bool emit_default_args = false;
-  bool needs_semi_newline = true;
   int num_tests = 0;
   
   TypeVisitor &type_visitor;
