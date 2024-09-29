@@ -266,9 +266,12 @@ struct ASTSubscript: ASTExpr {
 };
 
 struct ASTStructDeclaration : ASTStatement {
-  Scope *scope;
   ASTType *type;
-  std::vector<ASTDeclaration *> declarations;
+  Scope *scope;
+  
+  std::vector<ASTDeclaration *> fields;
+  std::vector<ASTFuncDecl *> methods;
+  
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -342,6 +345,7 @@ struct DirectiveRoutine {
 };
 
 struct Parser {
+  Nullable<ASTStructDeclaration> current_struct_decl;
   
   inline Token peek() const {
     if (states.empty()) {

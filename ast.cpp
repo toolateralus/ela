@@ -456,6 +456,7 @@ ASTBlock *Parser::parse_block() {
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   expect(TType::Struct);
   auto decl = ast_alloc<ASTStructDeclaration>();
+  current_struct_decl = decl;
   
   // fwd declare the type.
   auto type_id = create_struct_type(name.value, {});
@@ -469,19 +470,25 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   if (!semicolon()) {
     auto block = parse_block();
     block->scope->is_struct_scope = true;
+    
     for (const auto &statement: block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
-        decl->declarations.push_back(field);
+        decl->fields.push_back(field);
+      } else if (auto fn_decl = dynamic_cast<ASTFuncDecl*>(statement)) {
+        decl->methods.push_back(fn_decl);
       } else {
-        throw_error("Non-field declaration not allowed in struct.", ERROR_FAILURE, token_frames.back());
+        throw_error("Non-field or non-method declaration not allowed in struct.", ERROR_FAILURE, statement->source_tokens);
       }
     }
+    
     decl->scope = block->scope;
   } else {
     Type *t = get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->info.get());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
+  
+  current_struct_decl = nullptr;
   
   return decl;
 }

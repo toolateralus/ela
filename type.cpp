@@ -352,14 +352,13 @@ int remove_one_pointer_ext(int operand_ty,
                       TypeExt{.extensions = extensions,
                               .array_sizes = ty->extensions.array_sizes});
 }
-int create_struct_type(const std::string &name,
-                       const std::vector<ASTDeclaration *> &fields) {
+int create_struct_type(const std::string &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
   type->base = name;
   auto info = type_alloc<StructTypeInfo>();
+  info->scope = scope;
   type->info = info;
-  info->fields = fields;
   num_types++;
   return type->id;
 }
@@ -412,53 +411,55 @@ int Type::get_element_type() const {
   return find_type_id(base, extensions);
 }
 
+// TODO: re-implement this with a much better, non flipped up design. 2024-09-29 12:26:42
 std::string Type::to_type_struct(Context &context) {
-  static bool* type_cache = []{
-    auto arr = new bool[MAX_NUM_TYPES];
-    memset(arr, false, MAX_NUM_TYPES);
-    return arr;
-  }();
+  return "";
+  // static bool* type_cache = []{
+  //   auto arr = new bool[MAX_NUM_TYPES];
+  //   memset(arr, false, MAX_NUM_TYPES);
+  //   return arr;
+  // }();
   
-  if (type_cache[this->id]) {
-    return std::format("_type_info[{}]", this->id);
-  }
+  // if (type_cache[this->id]) {
+  //   return std::format("_type_info[{}]", this->id);
+  // }
   
-  std::stringstream fields_ss;
-  if (kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(this->info.get());
+  // std::stringstream fields_ss;
+  // if (kind == TYPE_STRUCT) {
+  //   auto info = static_cast<StructTypeInfo *>(this->info.get());
 
-    if (info->fields.empty()) {
-      fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << to_string() << "\","
-                << ".id = " << id << "}";
-      context.type_info_strings.push_back(fields_ss.str());
-      return std::string("_type_info[") + std::to_string(id) + "]";
-    }
+  //   if (info->fields.empty()) {
+  //     fields_ss << "_type_info[" << id << "] = new Type {"
+  //               << ".name = \"" << to_string() << "\","
+  //               << ".id = " << id << "}";
+  //     context.type_info_strings.push_back(fields_ss.str());
+  //     return std::string("_type_info[") + std::to_string(id) + "]";
+  //   }
     
-    fields_ss << "{";
-    for (const auto &field : info->fields) {
-      auto name = std::format(".name = \"{}\"", field->name.value);
-      auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct(context));
-      fields_ss << "new Field { " << name << ", " << type << " }";
+  //   fields_ss << "{";
+  //   for (const auto &field : info->fields) {
+  //     auto name = std::format(".name = \"{}\"", field->name.value);
+  //     auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct(context));
+  //     fields_ss << "new Field { " << name << ", " << type << " }";
       
-      if (field != info->fields.back()) {
-        fields_ss << ", ";
-      }
-    }
-    fields_ss << "}";
-  }
-  else {
-    fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << to_string() << "\","
-                << ".id = " << id << "}";
-    context.type_info_strings.push_back(fields_ss.str());
-    return std::string("_type_info[") + std::to_string(id) + "]";
-  }
+  //     if (field != info->fields.back()) {
+  //       fields_ss << ", ";
+  //     }
+  //   }
+  //   fields_ss << "}";
+  // }
+  // else {
+  //   fields_ss << "_type_info[" << id << "] = new Type {"
+  //               << ".name = \"" << to_string() << "\","
+  //               << ".id = " << id << "}";
+  //   context.type_info_strings.push_back(fields_ss.str());
+  //   return std::string("_type_info[") + std::to_string(id) + "]";
+  // }
   
   
-  type_cache[this->id] = true;
+  // type_cache[this->id] = true;
   
-  context.type_info_strings.push_back(std::format("_type_info[{}] = new Type {{ .id = {}, .fields = {}, }}",  id, id, fields_ss.str()));
+  // context.type_info_strings.push_back(std::format("_type_info[{}] = new Type {{ .id = {}, .fields = {}, }}",  id, id, fields_ss.str()));
               
-  return std::format("_type_info[{}]", this->id);
+  // return std::format("_type_info[{}]", this->id);
 }

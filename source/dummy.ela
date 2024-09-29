@@ -2,11 +2,22 @@
 Vector2 :: struct {
   f32 x;
   f32 y;
+  
+  print :: () {
+    printf("x: %f, y: %f\n", x, y);
+  }
+  
+  zero :: () -> Vector2 {
+    Vector2 v;
+    
+    return v;
+  }
 }
 
 main :: () {
-  Type *type = #type Vector2;
-  for field; type.fields {       
-    printf("field: %s, type: %s\n", field.name, field.type.name);
-  }
+  Vector2 v;
+  
+  v = v.zero();
+  
+  printf("%f\n", v.x);
 }

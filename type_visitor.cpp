@@ -414,21 +414,22 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   
   // TODO: we can improve this to not rely so heavily on a Scope object.
   // It seems wrong to store a scope in a Type *.
+  // TODO: 2024-09-29 12:29:13 actually its fine. better than storing AST
   context.enter_scope(node->scope);
-  std::vector<ASTDeclaration*> fields;
-  for (auto decl : node->declarations) {
+  
+  for (auto decl : node->fields) {
     decl->accept(this);
-    fields.push_back(decl);
   }
-  info->fields = fields;
+  for (auto method: node->methods) {
+    method->accept(this);
+  }
+  
   info->scope = node->scope;
   context.exit_scope();
   return {};
 }
 
 std::any TypeVisitor::visit(ASTDotExpr *node) {
-  // TODO: this needs serious improvement. Check whether the left hand side variable even exists, etc.
-  
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
   

@@ -2,7 +2,6 @@
 #pragma once
 
 #include "nullable.hpp"
-#include <format>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -153,7 +152,9 @@ struct TypeInfo {
 };
 
 enum FunctionInstanceFlags {
+  FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
+  FUNCTION_IS_METHOD = 1 << 2,
 };
 
 enum struct FunctionMetaType {
@@ -195,9 +196,7 @@ enum StructTypeFlags {
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
-  std::vector<ASTDeclaration*> fields;
   virtual std::string to_string() const override { return ""; }
-  // mutable for memoization
   mutable int m_size = -1;
 };
 
@@ -242,7 +241,7 @@ int create_type(TypeKind kind, const std::string &name,
                 const TypeExt &extensions = {});
 
 int create_struct_type(const std::string &name,
-                       const std::vector<ASTDeclaration*> &fields);
+                       Scope *scope);
 
 enum ConversionRule {
   CONVERT_PROHIBITED,

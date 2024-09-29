@@ -4,7 +4,6 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
-#include <iostream>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
 
@@ -257,6 +256,11 @@ static bool should_emit_function(EmitVisitor *visitor, ASTFuncDecl *node, bool t
 }
 
 void EmitVisitor::emit_forward_declaration(ASTFuncDecl *node) {
+  
+  if ((node->flags & FUNCTION_IS_METHOD) != 0) {
+    return;
+  }
+  
   emit_default_args = true;
   use_header();
   node->return_type->accept(this);
@@ -324,7 +328,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   }
   
   // local function
-  if (context.current_scope != context.root_scope) {
+  if (!context.current_scope->is_struct_scope && context.current_scope != context.root_scope && (node->flags & FUNCTION_IS_METHOD) == 0) {
     emit_local_function(node);
     return {};
   }
@@ -341,7 +345,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   node->params->accept(this);
   
   // the function's block would only be null in a #foreign function
-  if (node->block.is_not_null())
+  if (node->block.is_not_null()) 
     node->block.get()->accept(this);
   
   // emit a forward declaration in the header to allow use-before-defined.
@@ -365,12 +369,12 @@ std::any EmitVisitor::visit(ASTBlock *node) {
     
     statement->accept(this);
     
-    if (needs_semi_newline) {
-      semicolon();
-      newline();
-    } else {
-      needs_semi_newline = true;
-    }
+    semicolon();
+    newline();
+    // if (needs_semi_newline) {
+    // } else {
+    //   needs_semi_newline = true;
+    // }
     
   }
   indentLevel--;
@@ -432,13 +436,23 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   (*ss) << "struct " << node->type->base << "{\n";
   header << "struct " << node->type->base << ";\n";
   indentLevel++;
-  for (const auto &decl: info->fields) {
+  
+  context.enter_scope(node->scope);
+  for (const auto &decl: node->fields) {
     indented("");
     decl->accept(this);
     semicolon();
     newline();
   }
-  (*ss) << "}";
+  for (const auto &method: node->methods) {
+    indented("");
+    method->accept(this);
+    semicolon();
+    newline();
+  }
+  context.exit_scope();
+  
+  (*ss) << "};\n";
   indentLevel--;
   return {};
 }

@@ -142,21 +142,16 @@ Context::Context() {
   current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
   root_scope = current_scope;
 
-  // TODO: add a way to create struct types without relying on scope full of ast
-  auto type_id = create_struct_type("Type", {});
-  auto field_id = create_struct_type("Field", {});
-
-  auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-  auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-  
-  type_scope->insert("id", s32_type());
-  type_scope->insert("name", string_type());
-  type_scope->insert("fields", find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
-  
-  field_scope->insert("name", string_type());
-  field_scope->insert("type", find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}}));
-  
-  static_cast<StructTypeInfo*>(get_type(type_id)->info.get())->scope = type_scope;
-  static_cast<StructTypeInfo*>(get_type(field_id)->info.get())->scope = field_scope;
+  {
+    auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto type_id = create_struct_type("Type", type_scope);
+    auto field_id = create_struct_type("Field", field_scope);
+    type_scope->insert("id", s32_type());
+    type_scope->insert("name", string_type());
+    type_scope->insert("fields", find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
+    field_scope->insert("name", string_type());
+    field_scope->insert("type", find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}}));
+  }
   
 }

@@ -1,6 +1,5 @@
 #include "visitor.hpp"
 #include "ast.hpp"
-#include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include <any>
@@ -250,8 +249,11 @@ std::any SerializeVisitor::visit(ASTCompAssign *node) {
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   ss << indent() << "Struct " << node->type->base << " {\n";
   indentLevel++;
-  for (auto decl : node->declarations) {
+  for (auto decl : node->fields) {
     decl->accept(this);
+  }
+  for (auto method: node->methods) {
+    method->accept(this);
   }
   indentLevel--;
   ss << indent() << "}\n";
