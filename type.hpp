@@ -201,6 +201,8 @@ struct StructTypeInfo : TypeInfo {
   mutable int m_size = -1;
 };
 
+struct Context;
+
 struct Type {
   const int id = -1;
   // probably have a better default than this.
@@ -212,7 +214,7 @@ struct Type {
               const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
-  std::string to_type_struct();
+  std::string to_type_struct(Context &context);
 
   Type(){};
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}

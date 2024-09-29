@@ -4,6 +4,7 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
+#include <iostream>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
 
@@ -117,7 +118,7 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = get_type(node->resolved_type);
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
-    (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct();
+    (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
     return {};
   }
   (*ss) << type->to_cpp_string();
@@ -402,6 +403,18 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
     
     code << "__TEST_RUNNER_MAIN;";
+  }
+  
+  // Emit runtime reflection type info for requested types 
+  {
+    std::stringstream type_info{};
+    for (const auto &str: context.type_info_strings) {
+      type_info << str;
+      if (str != context.type_info_strings.back()) {
+        type_info << ", ";
+      }
+    }
+    header << std::format("static Type** _type_info = []{{ Type **_type_info = new Type*[{}]; {}; return _type_info; }}();", num_types, type_info.str());
   }
   
   return {};

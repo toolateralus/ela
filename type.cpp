@@ -369,42 +369,34 @@ int voidptr_type() {
       "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
   return type;
 }
-
 int bool_type() {
   static int type = find_type_id("bool", {});
   return type;
 }
-
 int void_type() {
   static int type = find_type_id("void", {});
   return type;
 }
-
 int s8_type() {
   static int type = find_type_id("s8", {});
   return type;
 }
-
 int s16_type() {
   static int type = find_type_id("s16", {});
   return type;
 }
-
 int s32_type() {
   static int type = find_type_id("s32", {});
   return type;
 }
-
 int s64_type() {
   static int type = find_type_id("s64", {});
   return type;
 }
-
 int string_type() {
   static int type = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
-
 int f32_type() {
   static int type = find_type_id("f32", {});
   return type;
@@ -420,22 +412,33 @@ int Type::get_element_type() const {
   return find_type_id(base, extensions);
 }
 
-std::string Type::to_type_struct() {
+std::string Type::to_type_struct(Context &context) {
+  static bool* type_cache = []{
+    auto arr = new bool[MAX_NUM_TYPES];
+    memset(arr, false, MAX_NUM_TYPES);
+    return arr;
+  }();
+  
+  if (type_cache[this->id]) {
+    return std::format("_type_info[{}]", this->id);
+  }
+  
   std::stringstream fields_ss;
   if (kind == TYPE_STRUCT) {
     auto info = static_cast<StructTypeInfo *>(this->info.get());
 
     if (info->fields.empty()) {
-      fields_ss << "new Type {"
+      fields_ss << "_type_info[" << id << "] = new Type {"
                 << ".name = \"" << to_string() << "\","
                 << ".id = " << id << "}";
-      return fields_ss.str();
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
     }
     
     fields_ss << "{";
     for (const auto &field : info->fields) {
       auto name = std::format(".name = \"{}\"", field->name.value);
-      auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct());
+      auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct(context));
       fields_ss << "new Field { " << name << ", " << type << " }";
       
       if (field != info->fields.back()) {
@@ -445,12 +448,17 @@ std::string Type::to_type_struct() {
     fields_ss << "}";
   }
   else {
-    fields_ss << "new Type {"
+    fields_ss << "_type_info[" << id << "] = new Type {"
                 << ".name = \"" << to_string() << "\","
                 << ".id = " << id << "}";
-      return fields_ss.str();
+    context.type_info_strings.push_back(fields_ss.str());
+    return std::string("_type_info[") + std::to_string(id) + "]";
   }
   
-  return std::format("{} .id = {}, .fields = {}, {}", 
-              "new Type{", id, fields_ss.str(), "}");
+  
+  type_cache[this->id] = true;
+  
+  context.type_info_strings.push_back(std::format("_type_info[{}] = new Type {{ .id = {}, .fields = {}, }}",  id, id, fields_ss.str()));
+              
+  return std::format("_type_info[{}]", this->id);
 }

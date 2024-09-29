@@ -51,6 +51,11 @@ static Scope *create_child(Scope *parent) {
 }
 
 struct Context {
+  // TODO: there's probably a much much better way to do this that doesn't intermix the entire
+  // TODO(cont.): type system, ast, and emitting system so much
+  // used by the type system to build type info instantiation code 
+  // to be emitted to cpp.
+  std::vector<std::string> type_info_strings;
   
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Scope *root_scope;

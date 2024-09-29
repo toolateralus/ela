@@ -96,7 +96,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   std::string extra_flags = "-lc";
 
   printf("\e[31m");
-  system(std::format("clang++ -std=c++23 {} {} -o {}", extra_flags,
+  system(std::format("clang++ -std=c++23  -Wno-c99-designator {} {} -o {}", extra_flags,
                      output_path.string(), binary_path.string())
              .c_str());
   printf("\e[0m");

@@ -1,4 +1,3 @@
-#import core;
 
 Vector2 :: struct {
   f32 x;
@@ -6,6 +5,8 @@ Vector2 :: struct {
 }
 
 main :: () {
-  Type * type = #type Vector2;
+  Type *type = #type Vector2;
+  for field; type.fields {       
+    printf("field: %s, type: %s\n", field.name, field.type.name);
+  }
 }
-
