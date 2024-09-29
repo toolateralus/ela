@@ -2,7 +2,7 @@
 
 GLFWWindow :: struct;
 
-int GL_ARRAY_BUFFER1 = 34962;
+int GL_ARRAY_BUFFER = 34962;
 int GL_FLOAT = 5126;
 int GL_STATIC_DRAW = 5044;
 int GL_QUADS = 7;
@@ -58,12 +58,14 @@ main :: () -> int {
   glGenBuffers(1, &vbo);
   
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  glBufferData(GL_ARRAY_BUFFER, sizeof(vertices), #make(void*, vertices), GL_STATIC_DRAW);
+  
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * 2, #make(void*, vertices), GL_STATIC_DRAW);
+  
   glEnableVertexAttribArray(0);
-  glVertexAttribPointer(0, 2, GL_FLOAT, false, 2 * sizeof(float), #make(void*, 0));
+  glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(float) * 2, #make(void*, 0));
 
   while !glfwWindowShouldClose(window) {
-    //glDrawArrays(GL_QUADS, 0, 4);
+    glDrawArrays(GL_QUADS, 0, 4);
     glfwSwapBuffers(window);
     glfwPollEvents();
   }

@@ -326,7 +326,7 @@ std::string Type::to_cpp_string() const {
 }
 
 int remove_one_pointer_ext(int operand_ty,
-                           const std::vector<Token> &source_tokens) {
+                           const SourceRange &source_range) {
   auto ty = get_type(operand_ty);
   int ptr_depth = 0;
   for (const auto &ext : ty->extensions.extensions) {
@@ -336,7 +336,7 @@ int remove_one_pointer_ext(int operand_ty,
 
   if (ptr_depth == 0) {
     throw_error("cannot dereference a non-pointer type.", ERROR_FAILURE,
-                source_tokens);
+                source_range);
   }
 
   bool pointer_removed = false;

@@ -12,7 +12,7 @@
 // these are called from and to because in the event of an implicit cast this
 // should be the behaviour.
 void validate_type_compatability(
-    const int from, const int to, const std::vector<Token> &source_tokens,
+    const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
   auto from_t = get_type(from);
   auto to_t = get_type(to);
@@ -23,7 +23,7 @@ void validate_type_compatability(
       (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(message + '\n' +
                     std::format(format, to_t->to_string(), from_t->to_string()),
-                ERROR_FAILURE, source_tokens);
+                ERROR_FAILURE, source_range);
   }
 }
 /*
@@ -94,22 +94,22 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
 
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
     throw_error("Keyword \"continue\" must be in a loop.", ERROR_FAILURE,
-                node->source_tokens);
+                node->source_range);
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0) {
     throw_error("Keyword \"break\" must be in a loop.", ERROR_FAILURE,
-                node->source_tokens);
+                node->source_range);
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 &&
       info.return_type != void_type() && !(is_ctor || is_dtor)) {
     throw_error("Not all code paths return a value.", ERROR_FAILURE,
-                node->source_tokens);
+                node->source_range);
   }
 
   validate_type_compatability(control_flow.type, info.return_type,
-                              node->source_tokens,
+                              node->source_range,
                               "invalid function return type: {} {}",
                               std::format("function: {}", node->name.value));
   return {};
@@ -119,7 +119,7 @@ const auto check_return_type_consistency(int &return_type, int new_type,
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
-    validate_type_compatability(new_type, return_type, node->source_tokens,
+    validate_type_compatability(new_type, return_type, node->source_range,
                                 "Expected: {}, Found: {}",
                                 "Inconsistent return types in block.");
   }
@@ -165,7 +165,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     validate_type_compatability(
-        expr_type, node->type->resolved_type, node->source_tokens,
+        expr_type, node->type->resolved_type, node->source_range,
         "invalid parameter declaration; expected: {} got: {}",
         std::format("parameter: {}", node->name));
   }
@@ -178,7 +178,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   if (node->value.is_not_null()) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
     validate_type_compatability(
-        expr_type, node->type->resolved_type, node->source_tokens,
+        expr_type, node->type->resolved_type, node->source_range,
         "invalid declaration types. expected: {}, got {}",
         std::format("declaration: {}", node->name.value));
   }
@@ -203,7 +203,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     return bool_type();
   } else {
     validate_type_compatability(
-        right, left, node->source_tokens,
+        right, left, node->source_range,
         "invalid types in binary expression. expected: {}, got {}", "");
   }
   node->resolved_type = left;
@@ -227,7 +227,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   }
 
   if (node->op.type == TType::Mul) {
-    return remove_one_pointer_ext(operand_ty, node->source_tokens);
+    return remove_one_pointer_ext(operand_ty, node->source_range);
   }
 
   return operand_ty;
@@ -239,7 +239,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   else {
     throw_error(
         std::format("Use of undeclared identifier '{}'", node->value.value),
-        ERROR_FAILURE, node->source_tokens);
+        ERROR_FAILURE, node->source_range);
   }
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
@@ -280,7 +280,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   if (!symbol) {
     throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
-                ERROR_FAILURE, node->source_tokens);
+                ERROR_FAILURE, node->source_range);
   }
 
   std::vector<int> arg_tys =
@@ -292,7 +292,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     throw_error(
         std::format("Function call '{}' does not refer to a function type.",
                     node->name.value),
-        ERROR_FAILURE, node->source_tokens);
+        ERROR_FAILURE, node->source_range);
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
@@ -304,7 +304,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         std::format("Function call '{}' has incorrect number of arguments. "
                     "Expected: {}, Found: {}",
                     node->name.value, info->params_len, arg_tys.size()),
-        ERROR_FAILURE, node->source_tokens);
+        ERROR_FAILURE, node->source_range);
   }
 
   for (int i = 0; i < info->params_len; ++i) {
@@ -313,7 +313,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
       continue;
     }
     validate_type_compatability(
-        arg_tys[i], info->parameter_types[i], node->source_tokens,
+        arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
         std::format("parameter: {} of function: {}", i, node->name.value));
   }
@@ -373,7 +373,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 std::any TypeVisitor::visit(ASTIf *node) {
   auto cond_ty = int_from_any(node->condition->accept(this));
   validate_type_compatability(
-      cond_ty, bool_type(), node->source_tokens, "expected: {}, got {}",
+      cond_ty, bool_type(), node->source_range, "expected: {}, got {}",
       "if statement condition was not convertible to boolean");
 
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
@@ -415,7 +415,7 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
   validate_type_compatability(
-      expr_ty, symbol->type_id, node->source_tokens,
+      expr_ty, symbol->type_id, node->source_range,
       "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
 }
@@ -451,7 +451,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
   if (left_ty->kind != TYPE_STRUCT) {
     throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE,
-                node->source_tokens);
+                node->source_range);
   }
   auto info = static_cast<StructTypeInfo *>(left_ty->info.get());
 
@@ -464,7 +464,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   context.current_scope = previous_scope;
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
-              node->source_tokens);
+              node->source_range);
 }
 
 std::any TypeVisitor::visit(ASTSubscript *node) {
@@ -476,14 +476,14 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
                             left_ty->to_string()),
-                ERROR_FAILURE, node->source_tokens);
+                ERROR_FAILURE, node->source_range);
   }
 
   if (left_ty->extensions.is_array()) {
     auto element_id = left_ty->get_element_type();
     return element_id;
   } else {
-    return remove_one_pointer_ext(left_ty->id, node->source_tokens);
+    return remove_one_pointer_ext(left_ty->id, node->source_range);
   }
 }
 
@@ -496,7 +496,7 @@ std::any TypeVisitor::visit(ASTMake *node) {
 
   if (type == -1) {
     throw_error("Cannot make non existent type", ERROR_FAILURE,
-                node->source_tokens);
+                node->source_range);
   }
   return type;
 }
@@ -506,10 +506,10 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   for (const auto &expr : node->expressions) {
     auto t = int_from_any(expr->accept(this));
     if (type == -1) type = t;
-    else validate_type_compatability(t, type, node->source_tokens, "expected: {}, got {}", "initializer list had different types in one or many expressions");
+    else validate_type_compatability(t, type, node->source_range, "expected: {}, got {}", "initializer list had different types in one or many expressions");
   }
   if (type == -1) {
-    throw_error("Cannot have an empty initializer list currently. to be implemented.", ERROR_FAILURE, node->source_tokens);
+    throw_error("Cannot have an empty initializer list currently. to be implemented.", ERROR_FAILURE, node->source_range);
   }
   
   auto base = get_type(type);

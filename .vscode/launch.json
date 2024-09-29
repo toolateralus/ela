@@ -23,6 +23,14 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug dummy executable",
+      "program": "${workspaceFolder}/source/dummy",
+      "args": [],
+      "cwd": "${workspaceFolder}"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug dummy tests",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["source/dummy.ela", "--s", "--test"],

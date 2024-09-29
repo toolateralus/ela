@@ -1,5 +1,6 @@
 #pragma once
 
+#include "lex.hpp"
 #include <format>
 #include <fstream>
 #include <iostream>
@@ -102,3 +103,22 @@ struct CompileCommand {
 
 extern CompileCommand compile_command;
 bool get_compilation_flag(const std::string &flag);
+extern std::vector<Token> all_tokens;
+
+struct SourceRange {
+  
+  
+  inline bool empty() const {
+    return begin < 0 || end < 0 ||
+           begin > end ||
+           begin == end ||
+           begin > all_tokens.size() ||
+           end > all_tokens.size(); 
+  }
+  int64_t begin, end;
+  int64_t begin_loc, end_loc;
+  std::span<Token> get_tokens() const {
+    return std::span<Token>(all_tokens).subspan(begin, end - begin);
+  }
+};
+

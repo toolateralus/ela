@@ -1,7 +1,6 @@
 #include <algorithm>
 #include <cstdint>
 #include <cstddef>
-#include <vector>
 
 using f64 = double;
 using u64 = size_t;

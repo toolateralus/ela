@@ -1,6 +1,6 @@
 #pragma once
 
-#include "lex.hpp"
+#include "core.hpp"
 #include <jstl/memory/arena.hpp>
 #include <sstream>
 #include <stdexcept>
@@ -28,12 +28,12 @@ enum ErrorSeverity {
 
 struct Error {
   Error(const std::string &message, const ErrorSeverity severity,
-        const std::vector<Token> source_tokens)
-      : message(message), severity(severity), source_tokens(source_tokens) {}
+        const SourceRange source_range)
+      : message(message), severity(severity), source_range(source_range) {}
 
   const std::string message = "";
   const ErrorSeverity severity = ERROR_INFO;
-  const std::vector<Token> source_tokens{};
+  const SourceRange source_range{};
 };
 
 static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
@@ -41,19 +41,21 @@ static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
 
 [[noreturn]] static void throw_error(const std::string &message,
                                      const ErrorSeverity severity,
-                                     const std::vector<Token> &source_tokens) {
+                                     const SourceRange &source_range) {
   if (num_errors >= MAX_ERRORS) {
     throw std::runtime_error("Maximum number of errors exceeded");
   }
 
   auto errid = num_errors++;
   auto memory = (Error *)error_arena.allocate(sizeof(Error));
-  error_table[errid] = new (memory) Error(message, severity, source_tokens);
+  error_table[errid] = new (memory) Error(message, severity, source_range);
 
   std::stringstream ss;
-  if (!source_tokens.empty()) {
-    ss << "\e[31m" << source_tokens.front().location.ToString() << "\e[0m\n";
-    for (const auto &tok : source_tokens) {
+  // TODO: emit a error message based on the global table of tokens.
+  if (!source_range.empty()) {
+    auto span = source_range.get_tokens();
+    ss << "\e[31m" << span.front().location.ToString() << "\e[0m\n";
+    for (const auto &tok : span) {
       ss << "\e[41;1;37m" << tok.value << " \e[0m";
     }
   }

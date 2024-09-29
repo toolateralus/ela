@@ -27,6 +27,8 @@ jstl::Arena ast_arena{MB(10)};
 
 CompileCommand compile_command;
 
+std::vector<Token> all_tokens;
+
 /*
   #########################
   ### PROVIDING EXTERNS ###

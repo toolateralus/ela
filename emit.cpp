@@ -281,7 +281,7 @@ void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
   (*ss) << " -> ";
   node->return_type->accept(this);
   if (node->block.is_null()) {
-    throw_error("local function cannot be #foreign", ERROR_FAILURE , node->source_tokens);
+    throw_error("local function cannot be #foreign", ERROR_FAILURE , node->source_range);
   }
   node->block.get()->accept(this);
 }
@@ -289,7 +289,7 @@ void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
 void EmitVisitor::emit_foreign_function(ASTFuncDecl *node) {
   if (node->name.value == "main") {
     throw_error("main function cannot be foreign", ERROR_CRITICAL,
-                node->source_tokens);
+                node->source_range);
   }
   
   use_header();
@@ -338,7 +338,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     (*ss) << '~' << name;
     node->params->accept(this);
     if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_tokens);
+      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
     }
     node->block.get()->accept(this);
     return {};
@@ -358,7 +358,7 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     }
     
     if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_tokens);
+      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
     }
     node->block.get()->accept(this);
     return {};
@@ -522,7 +522,7 @@ std::any EmitVisitor::visit(ASTMake *node) {
   auto type = get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
-      throw_error("cannot create a pointer currently with #make. it only casts pointers.", ERROR_FAILURE, node->source_tokens);
+      throw_error("cannot create a pointer currently with #make. it only casts pointers.", ERROR_FAILURE, node->source_range);
     }
     (*ss) << "(" << type->to_cpp_string() << ")";
     node->arguments->arguments[0]->accept(this);

@@ -1,5 +1,6 @@
 #pragma once
 
+#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "nullable.hpp"
@@ -24,8 +25,10 @@ template <class T> T *ast_alloc(size_t n = 1) {
   return new (ast_arena.allocate(sizeof(T) * n)) T();
 }
 
-struct VisitorBase;
 
+
+
+struct VisitorBase;
 // TODO: add an enum member in the base that says what type this node is,
 // so we can be more performant and just static_cast<T*> instead of
 // dynamic_cast<T*>;
@@ -37,7 +40,7 @@ struct ASTNode {
   // our source tokens range in that table with a int src_info_start, int
   // src_info_end, and capture that info in a similar way in the parser. Also,
   // we can definitely improve the way that we capture stuff in the parser.
-  std::vector<Token> source_tokens{};
+  SourceRange source_range{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
 };
@@ -400,6 +403,9 @@ struct Parser {
   }
 
   inline Token eat() {
+    all_tokens.push_back(peek());
+    token_idx++;
+    
     fill_buffer_if_needed();
 
     if (peek().is_eof() && states.size() > 1) {
@@ -410,7 +416,6 @@ struct Parser {
     auto tok = peek();
     lookahead_buf().pop_front();
     lexer.get_token(states.back());
-    token_frames.back().push_back(tok);
     return tok;
   }
 
@@ -423,7 +428,7 @@ struct Parser {
     if (peek().type != type) {
       throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
                               TTypeToString(peek().type), peek().value),
-                  ERROR_CRITICAL, token_frames.back());
+                  ERROR_CRITICAL, {token_idx, token_idx + 1});
     }
     return eat();
   }
@@ -432,14 +437,7 @@ struct Parser {
 
   std::vector<Lexer::State> states;
 
-  std::vector<std::vector<Token>> token_frames = {};
-
-  inline void begin_token_frame() { token_frames.push_back({}); }
-  inline void end_token_frame(ASTNode *node) {
-    if (node)
-      node->source_tokens = token_frames.back();
-    token_frames.pop_back();
-  }
+  int64_t token_idx{};
 
   Nullable<ASTNode> process_directive(DirectiveKind kind,
                                       const std::string &identifier);
@@ -461,10 +459,21 @@ struct Parser {
       } else {
         throw_error("Invalid directive in expression: directives in "
                     "expressions must return a value.",
-                    ERROR_FAILURE, token_frames.back());
+                    ERROR_FAILURE, {token_idx, token_idx + 5});
       }
     }
     return nullptr;
+  }
+
+  SourceRange begin_node() {
+    return SourceRange{.begin = token_idx, .begin_loc = (int64_t)peek().location.line};
+  }
+  
+  void end_node(ASTNode *node, SourceRange &range) {
+    range.end = token_idx;
+    range.end_loc = peek().location.line;
+    if (node)
+      node->source_range = range;
   }
 
   ASTType *parse_type();
@@ -492,4 +501,7 @@ struct Parser {
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
   ASTCall *parse_call(const Token &);
+  
+  
+  
 };

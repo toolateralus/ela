@@ -1,6 +1,7 @@
 
 #pragma once
 
+#include "core.hpp"
 #include "nullable.hpp"
 #include <sstream>
 #include <stdio.h>
@@ -275,6 +276,6 @@ std::string get_cpp_scalar_type(int);
                  
 struct Token;
 int remove_one_pointer_ext(int operand_ty,
-                           const std::vector<Token> &source_tokens);
+                           const SourceRange &source_range);
 
 void init_type_system();
