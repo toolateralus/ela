@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.hpp"
+#include "nullable.hpp"
 #include "scope.hpp"
 #include <any>
 #include <sstream>
@@ -85,6 +86,8 @@ struct TypeVisitor : VisitorBase {
 struct EmitVisitor : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
+
+  Nullable<ASTStructDeclaration> current_struct_decl;
   
   TypeVisitor &type_visitor;
   

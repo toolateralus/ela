@@ -4,8 +4,10 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
+#include <functional>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
+#include <system_error>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
@@ -332,6 +334,28 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
     return {};
   }
   
+  if ((node->flags & FUNCTION_IS_DTOR) != 0) {
+    auto name = current_struct_decl.get()->type->base;
+    (*ss) << '~' << name;
+    node->params->accept(this);
+    if (!node->block) {
+      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_tokens);
+    }
+    node->block.get()->accept(this);
+    return {};
+  }
+  
+  if ((node->flags & FUNCTION_IS_CTOR) != 0) {
+    auto name = current_struct_decl.get()->type->base;
+    (*ss) << name;
+    node->params->accept(this);
+    if (!node->block) {
+      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_tokens);
+    }
+    node->block.get()->accept(this);
+    return {};
+  }
+  
   // we override main's return value to allow compilation without explicitly returning int from main.
   if (node->name.value == "main") {
     (*ss) <<"int";
@@ -414,9 +438,25 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   return {};
 }
 
+struct Defer {
+  const std::function<void()> func;
+  Defer(const std::function<void()> &&func) : func(func){
+    
+  } 
+  ~Defer() {
+    func();
+  }
+};
+
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(type->info.get());
+  
+  current_struct_decl = node;
+  
+  Defer deferred([&]{
+    current_struct_decl = nullptr;
+  });
   
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     header << "struct " << node->type->base << ";\n";  

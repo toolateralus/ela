@@ -155,6 +155,8 @@ enum FunctionInstanceFlags {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
+  FUNCTION_IS_CTOR = 1 << 3,
+  FUNCTION_IS_DTOR = 1 << 4,
 };
 
 enum struct FunctionMetaType {

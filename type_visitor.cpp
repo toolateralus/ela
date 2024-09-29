@@ -86,6 +86,8 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     control_flow.type = void_type();
   }
 
+  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0, is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
+
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
     throw_error("Keyword \"continue\" must be in a loop.", ERROR_FAILURE,
                 node->source_tokens);
@@ -97,7 +99,7 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 &&
-      info.return_type != void_type()) {
+      info.return_type != void_type() && !(is_ctor || is_dtor)) {
     throw_error("Not all code paths return a value.", ERROR_FAILURE,
                 node->source_tokens);
   }

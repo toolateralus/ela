@@ -138,6 +138,8 @@ void Parser::init_directive_routines() {
   }
   
   
+  
+  // TODO: fix this up. temporarily disabled. 2024-09-29 12:50:41
   // #type
   // get a 'Type *' struct ptr to reflect on a given type. 
   // has .fields and .size only currently
@@ -158,6 +160,33 @@ void Parser::init_directive_routines() {
       }
     });
   }
+  
+  
+  // #ctor and #dtor
+  {
+    directive_routines.push_back({
+      .identifier = "ctor",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        parser->expect(TType::DoubleColon);
+        auto func_decl = parser->parse_function_declaration(Token({}, parser->current_struct_decl.get()->type->base, TType::Identifier, TFamily::Identifier));
+        func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
+        return func_decl; 
+      }
+    });
+    
+    directive_routines.push_back({
+      .identifier = "dtor",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        parser->expect(TType::DoubleColon);
+        auto func_decl = parser->parse_function_declaration(Token({}, parser->current_struct_decl.get()->type->base, TType::Identifier, TFamily::Identifier));
+        func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
+        return func_decl; 
+      }
+    });
+  }
+  
   
 }
 
@@ -235,6 +264,7 @@ ASTStatement *Parser::parse_statement() {
                       tok.value),
           ERROR_CRITICAL, token_frames.back());
     }
+    return statement;
   }
 
 
@@ -414,7 +444,9 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
   token_frames.back().push_back(name);
   auto function = ast_alloc<ASTFuncDecl>();
   
-  if (context.current_scope->lookup(name.value)) {
+  const auto isnt_ctor_or_dtor = current_struct_decl.is_not_null() && current_struct_decl.get()->type->base != name.value;
+  
+  if (context.current_scope->lookup(name.value) && isnt_ctor_or_dtor) {
     throw_error(std::format("re-definition of function '{}'", name.value), ERROR_FAILURE, {});
   }
   

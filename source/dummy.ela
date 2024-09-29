@@ -9,15 +9,23 @@ Vector2 :: struct {
   
   zero :: () -> Vector2 {
     Vector2 v;
-    
     return v;
+  };
+  
+  #ctor :: () {}
+  
+  #ctor :: (f32 _x, f32 _y) {
+    x = _x;
+    y = _y;
   }
+
+  #dtor :: () {
+    
+  }
+  
 }
 
 main :: () {
-  Vector2 v;
-  
-  v = v.zero();
-  
+  Vector2 v = #make(1.0, 1.0);
   printf("%f\n", v.x);
 }
