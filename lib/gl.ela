@@ -121,3 +121,48 @@ check_error :: (char* location) {
     printf("unknown gl error: %d, from: %s\n", err, location);
   }
 }
+
+Shader :: struct {
+  u32 handle;
+  use :: () {
+    glUseProgram(handle);
+  }
+  #ctor :: (char * vertexSource, char *fragSource) {
+    handle = create_program(vertexSource, fragSource);
+  }
+  #dtor :: () {
+    glDeleteProgram(handle);
+  }
+}
+
+Window :: struct {
+  GLFWwindow *handle;
+  #ctor :: (int width, int height, char *title) {
+    if !glfwInit() {
+      return;
+    }
+    
+    handle = glfwCreateWindow(800, 600, "Hello World", null, null);
+    
+    if handle == null {
+      glfwTerminate();
+      return;
+    }
+    glfwMakeContextCurrent(handle);
+    if glewInit() != 0 {
+      glfwTerminate();
+      return;
+    }
+  }
+  
+  should_close :: () -> bool {
+    return glfwWindowShouldClose(handle);
+  }
+  present :: ()  {
+    glfwSwapBuffers(handle);
+    glfwPollEvents();
+  }
+  clear :: () {
+    glClear(GL_COLOR_BUFFER_BIT);
+  }
+}

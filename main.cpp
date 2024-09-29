@@ -97,7 +97,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
 
   std::string extra_flags = "-lc " + compilation_flags;
 
-  auto compilation_string = std::format("clang++ -std=c++23  -Wno-parentheses-equality -Wno-c99-designator {} {} -o {}", extra_flags,
+  auto compilation_string = std::format("clang++ -std=c++23 -Wno-writable-strings -Wno-parentheses-equality -Wno-c99-designator {} {} -o {}", extra_flags,
                      output_path.string(), binary_path.string());
                      
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
