@@ -81,7 +81,7 @@ struct CompileCommand {
     }
   }
   inline std::string read_input_file() {
-    std::ifstream stream(input_path);
+    std::ifstream stream(std::filesystem::canonical(input_path));
     std::stringstream ss;
     ss << stream.rdbuf();
     if (ss.str().empty()) {

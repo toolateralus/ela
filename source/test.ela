@@ -213,12 +213,6 @@ returns :: () -> s32  {
     assert("unable to upcast successfully", f == f1);
 }
 
-#test test_printf :: () {
-    u8* s = "Hello i am a string";
-    printf("testing printing a string: %s\n", s);
-    return;
-}
-
 #test test_return_value :: () {
     assert("function expected to return 1", returns() == 1);
 }
@@ -306,4 +300,17 @@ something :: (f32 f) -> f32 {
     
     assert("mallocing 'next' of 'Node' failed.", node.next != null);
     assert("dereferencing other into node.next failed.", node.next.next != null);
+}
+
+#test for_loop_2 :: () {
+    for int i = 0; i < 10; ++i {}
+    for int i = 0; i < 10; ++i {}
+}
+
+
+// Keep this at the bottom otherwise it messesup the output formatting
+#test test_printf :: () {
+    u8* s = "Hello i am a string";
+    printf("testing printing a string: %s\n", s);
+    return;
 }

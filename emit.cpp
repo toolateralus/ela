@@ -4,7 +4,9 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
+#include <fstream>
 #include <jstl/containers/vector.hpp>
+#include <sstream>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
@@ -375,8 +377,7 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 std::any EmitVisitor::visit(ASTProgram *node) {
   const auto testing = get_compilation_flag("test");
   
-  header <<R"_(#include "boilerplate.hpp")_" << '\n';
-  
+  header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
   
   for (const auto &statement : node->statements) {
     statement->accept(this);

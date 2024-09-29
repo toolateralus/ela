@@ -433,24 +433,18 @@ struct Parser {
     }
     return nullptr;
   }
-
+  
   ASTType *parse_type();
-
   ASTProgram *parse();
-
   ASTStatement *parse_statement();
-  ASTStatement *parse_call_statement(Token);
   ASTArguments *parse_arguments();
-
   ASTStructDeclaration *parse_struct_declaration(Token);
-  ASTExprStatement *parse_dot_statement(Token);
   ASTDeclaration *parse_declaration();
   ASTFuncDecl *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
-
   ASTExpr *parse_expr();
-  ASTExpr *parse_assignment(Token *);
+  ASTExpr *parse_assignment();
   ASTExpr *parse_logical_or();
   ASTExpr *parse_logical_and();
   ASTExpr *parse_bitwise_or();

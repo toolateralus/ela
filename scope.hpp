@@ -36,6 +36,10 @@ struct Scope {
     }
     return nullptr;
   }
+  inline void erase(const std::string &name) {
+    symbols.erase(name);
+  }
+  
 };
 
 static Scope *create_child(Scope *parent) {

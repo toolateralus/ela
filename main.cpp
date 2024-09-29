@@ -50,7 +50,7 @@ int main(int argc, char *argv[]) {
 ASTProgram *CompileCommand::process_ast(Context &context) {
   auto input = read_input_file();
   original_path = std::filesystem::current_path();
-  std::filesystem::current_path(input_path.parent_path());
+  std::filesystem::current_path(std::filesystem::canonical(input_path).parent_path());
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
   return root;

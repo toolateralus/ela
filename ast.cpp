@@ -161,10 +161,11 @@ ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
 
   while (true) {
-    
     if (peek().type == TType::Eof && states.size() > 0) {
       states.pop_back();
     }
+    
+    if (semicolon()) eat();
     
     if (peek().type == TType::Eof && states.empty()) {
       break;
@@ -195,7 +196,6 @@ ASTProgram *Parser::parse() {
 // TODO: Cleanup this horrific function before it gets too out of control.
 // TODO(later): I said that and then proceeded to make it out of control
 ASTStatement *Parser::parse_statement() {
-  if (semicolon()) eat();
   
   begin_token_frame();
   auto tok = peek();
@@ -250,7 +250,11 @@ ASTStatement *Parser::parse_statement() {
 
     if (find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
-      node->value.c_style.decl = parse_declaration();
+      
+      auto decl = parse_declaration();
+      node->value.c_style.decl = decl;
+      context.current_scope->erase(decl->name.value);
+      
       expect(TType::Semi);
       node->value.c_style.condition = parse_expr();
       expect(TType::Semi);
@@ -264,6 +268,12 @@ ASTStatement *Parser::parse_statement() {
     }
 
     node->block = parse_block();
+    
+    if (node->tag == ASTFor::CStyle) {
+      context.enter_scope(node->block->scope);
+      context.current_scope->insert(node->value.c_style.decl->name.value, -1);
+      context.exit_scope();
+    }
 
     end_token_frame(node);
     return node;
@@ -355,34 +365,6 @@ ASTStatement *Parser::parse_statement() {
   throw_error(
       std::format("Unexpected token when parsing statement: {}", tok.value),
       ERROR_CRITICAL, token_frames.back());
-}
-
-ASTExprStatement *Parser::parse_dot_statement(Token iden) {
-  auto dot = ast_alloc<ASTDotExpr>();
-  dot->type = ast_alloc<ASTType>();
-  auto left = ast_alloc<ASTIdentifier>();
-  left->value = iden;
-  dot->left = left;
-  expect(TType::Dot);
-  dot->right = parse_postfix();
-  auto statement= ast_alloc<ASTExprStatement>();
-  
-  // TODO: fixup this incredible jank
-  if (peek().type == TType::Assign) {
-    eat();
-    auto value = parse_expr();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->op = {};
-    binexpr->op.type = TType::Assign;
-    binexpr->op.value = "=";
-    binexpr->left = dot;
-    binexpr->right = value;
-    statement->expression = binexpr;
-    return statement;
-  }
-  
-  statement->expression = dot;
-  return statement;
 }
 
 ASTDeclaration *Parser::parse_declaration() {
@@ -483,19 +465,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 }
 
 ASTExpr *Parser::parse_expr() {
-  auto expr = parse_assignment(nullptr);
+  auto expr = parse_assignment();
   return expr;
 }
-ASTExpr *Parser::parse_assignment(Token *iden = nullptr) {
-  ASTExpr *left;
-
-  if (iden != nullptr) {
-    auto iden_node = ast_alloc<ASTIdentifier>();
-    iden_node->value = *iden;
-    left = iden_node;
-  } else {
-    left = parse_logical_or();
-  }
+ASTExpr *Parser::parse_assignment() {
+  ASTExpr *left = parse_logical_or();
 
   if (peek().type == TType::Assign) {
     auto op = eat();
@@ -846,15 +820,3 @@ ASTCall *Parser::parse_call(const Token &name) {
   call->arguments = args;
   return call;
 }
-ASTStatement *Parser::parse_call_statement(Token iden) {
-
-  auto args = parse_arguments();
-  ASTExprStatement *statement = ast_alloc<ASTExprStatement>();
-  ASTCall *call = ast_alloc<ASTCall>();
-  call->name = iden;
-  call->arguments = args;
-  statement->expression = call;
-  return statement;
-}
-
-
