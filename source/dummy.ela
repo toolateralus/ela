@@ -12,12 +12,15 @@ Vector2 :: struct {
     return v;
   };
   
-  #ctor :: () {}
-  
   #ctor :: (f32 _x, f32 _y) {
     x = _x;
     y = _y;
   }
+  
+  #ctor :: () {
+    
+  }
+  
   
   #dtor :: () {
     
@@ -33,5 +36,5 @@ main :: () {
   f32 _float;
   _float = #make(f32, _double);
   
-  printf("%f\n", v.x);
+  printf("%d\n", #make(int, v));
 }

@@ -32,6 +32,13 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTFuncDecl *node) {
+  
+  if ((node->flags & FUNCTION_IS_CTOR) != 0 || (node->flags & FUNCTION_IS_DTOR) != 0) {
+    ss << indent() << "constructor: ";
+    node->params->accept(this);
+    return {};
+  }
+  
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
   auto sym = context.current_scope->lookup(node->name.value);
@@ -249,12 +256,18 @@ std::any SerializeVisitor::visit(ASTCompAssign *node) {
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   ss << indent() << "Struct " << node->type->base << " {\n";
   indentLevel++;
+  
+  context.enter_scope(node->scope);
+  
   for (auto decl : node->fields) {
     decl->accept(this);
   }
   for (auto method: node->methods) {
     method->accept(this);
   }
+  
+  context.exit_scope();
+  
   indentLevel--;
   ss << indent() << "}\n";
   return {};

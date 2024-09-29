@@ -472,6 +472,11 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
 
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
+  
+  if (!node->arguments->arguments.empty()) {
+    node->arguments->accept(this);
+  }
+  
   if (type == -1) {
     throw_error("Cannot make non existent type", ERROR_FAILURE, node->source_tokens);
   }
