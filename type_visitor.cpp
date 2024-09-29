@@ -469,3 +469,11 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
     return remove_one_pointer_ext(left_ty->id, node->source_tokens);
   }
 }
+
+std::any TypeVisitor::visit(ASTMake *node) {
+  auto type = int_from_any(node->type_arg->accept(this));
+  if (type == -1) {
+    throw_error("Cannot make non existent type", ERROR_FAILURE, node->source_tokens);
+  }
+  return type;
+}

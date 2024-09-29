@@ -188,6 +188,28 @@ void Parser::init_directive_routines() {
   }
   
   
+  // #make, which also serves as a casting and copy construction method, as well as normal ctors.
+  {
+    directive_routines.push_back({
+      .identifier = "make",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto args = parser->parse_arguments();
+        auto type = args->arguments[0];
+        auto type_arg = dynamic_cast<ASTType*>(type);
+        if (!type_arg) {
+          throw_error("Expect a type as the first argument in a #make call.", ERROR_FAILURE, args->source_tokens);
+        }
+        args->arguments.erase(args->arguments.begin());
+        auto make = ast_alloc<ASTMake>();
+        make->type_arg = type_arg;
+        make->arguments = args;
+        return make;
+      }
+    });
+  }
+  
+  
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,

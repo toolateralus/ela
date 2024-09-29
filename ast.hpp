@@ -189,6 +189,22 @@ struct ASTArguments : ASTNode {
   std::any accept(VisitorBase *visitor) override;
 };
 
+
+// we'll use this node for several things,
+// to reduce ast amount
+enum ASTMakeKind {
+  MAKE_CTOR,
+  MAKE_COPY_CTOR,
+  MAKE_CAST,
+};
+
+struct ASTMake : ASTExpr {
+  int kind = MAKE_CTOR;
+  ASTType *type_arg;
+  ASTArguments *arguments;
+  std::any accept(VisitorBase *visitor) override;
+};
+
 struct ASTCall : ASTExpr {
   Token name;
   ASTArguments *arguments;
@@ -303,6 +319,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::any visit(ASTStructDeclaration *node) override {}                       \
   std::any visit(ASTDotExpr *node) override {} \
   std::any visit(ASTSubscript *node) override {} \
+  std::any visit(ASTMake *node) override {} \
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
@@ -330,6 +347,7 @@ struct ASTStructDeclaration : ASTStatement {
   virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
   virtual std::any visit(ASTDotExpr *node) = 0; \
   virtual std::any visit(ASTSubscript *node) = 0; \
+  virtual std::any visit(ASTMake *node) = 0; \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,

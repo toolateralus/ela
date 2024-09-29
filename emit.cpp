@@ -7,7 +7,6 @@
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
-#include <system_error>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
@@ -505,5 +504,18 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   node->right->accept(this);
   context.current_scope = previous_scope;
   
+  return {};
+}
+
+
+std::any EmitVisitor::visit(ASTMake *node) {
+  // TODO: make this robust to casting all types, copy construction only right now :: 2024-09-29 13:34:16
+  auto type = get_type(node->type_arg->resolved_type);
+  if (node->kind == MAKE_CAST) {
+    (*ss) << "(" << type->to_cpp_string() << ")";
+  } else if (node->kind == MAKE_CTOR || node->kind == MAKE_COPY_CTOR) {
+    (*ss) << type->to_cpp_string();
+    node->arguments->accept(this);
+  }
   return {};
 }

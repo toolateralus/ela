@@ -307,6 +307,7 @@ std::any ASTCompAssign::accept(VisitorBase *visitor) { return visitor->visit(thi
 std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
 // clang-format on
 // }
 /*
@@ -328,5 +329,18 @@ std::any EmitVisitor::visit(ASTSubscript *node) {
   (*ss) << '[';
   node->subscript->accept(this);
   (*ss) << ']';
+  return {};
+}
+
+std::any SerializeVisitor::visit(ASTMake *node) {
+  ss << "make: \n";
+  indentLevel++;
+  ss << "type: \n " << indent();
+  node->type_arg->accept(this);
+  
+  ss << "args: \n" << indent();
+  node->arguments->accept(this);
+  indentLevel--;
+  
   return {};
 }

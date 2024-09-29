@@ -18,14 +18,20 @@ Vector2 :: struct {
     x = _x;
     y = _y;
   }
-
+  
   #dtor :: () {
     
   }
-  
 }
 
 main :: () {
-  Vector2 v = #make(1.0, 1.0);
+  // run constructor.  
+  Vector2 v = #make(Vector2, 10.0, 10.0);
+  
+  // casting down with copy construction
+  f64 _double;
+  f32 _float;
+  _float = #make(f32, _double);
+  
   printf("%f\n", v.x);
 }
