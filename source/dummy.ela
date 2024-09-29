@@ -1,50 +1,31 @@
-#compiler_flags "-g -lGLEW -lGL -lglfw -lassimp -lm"
+#import core;
+#import gl;
 
-GLFWWindow :: struct;
+float* vertices = #make(float*, #make(float[], { 
+    -0.5, -0.5,
+    -0.5, 0.5,
+    0.5, -0.5, 
+    
+    0.5, -0.5
+    -0.5, 0.5,
+    0.5, 0.5,
+}));
 
-int GL_ARRAY_BUFFER = 34962;
-int GL_FLOAT = 5126;
-int GL_STATIC_DRAW = 5044;
-int GL_QUADS = 7;
-
-#foreign glfwInit :: () -> bool;
-#foreign glfwTerminate :: () -> void;
-#foreign glfwCreateWindow :: (int w, int h, u8* t, void* v, void* v1) -> GLFWWindow*;
-#foreign glfwMakeContextCurrent :: (void* ctx) -> void;
-#foreign glfwWindowShouldClose :: (GLFWWindow *window) -> bool;
-#foreign glfwPollEvents :: () -> void;
-#foreign glfwSwapBuffers :: (GLFWWindow *window) -> void;
-#foreign glewInit :: () -> bool;
-
-#foreign glGenBuffers :: (int n_buf, int* buf) -> void;
-#foreign glBindBuffer :: (int type, int buf) -> void;
-#foreign glBufferData :: (int target, s64 size, void* data, int usage) -> void;
-#foreign glEnableVertexAttribArray :: (int index) -> void;
-#foreign glVertexAttribPointer :: (int index, s64 size, int type, bool normalized, s64 stride, void* pointer) -> void;
-#foreign glDrawArrays :: (int mode, int first, int count) -> void;
-
-Vec2 :: struct {
-  f32 x;
-  f32 y;
-  #ctor :: (f32 _x, f32 _y) {
-    x = _x;
-    y = _y;
-  }
-  #ctor :: () {}
-}
-
-float* vertices = #make(float*, #make(float[], { -0.5, -0.5, 0.5, -0.5, 0.5,  0.5, -0.5,  0.5 }));
+char* vert = #read "shader.vert";
+char* frag = #read "shader.frag";
 
 main :: () -> int {  
   if !glfwInit() {
     return 1;
   }
   
-  GLFWWindow *window = glfwCreateWindow(800, 600, "Hello World", null, null);
+  GLFWwindow *window = glfwCreateWindow(800, 600, "Hello World", null, null);
+  
   if window == null {
     glfwTerminate();
     return 1;
   }
+
 
   glfwMakeContextCurrent(window);
 
@@ -53,21 +34,35 @@ main :: () -> int {
     return 1;
   }
 
-  
-  int vbo;
+  u32 vbo;
+  u32 vao;
+  glGenVertexArrays(1, &vao);
   glGenBuffers(1, &vbo);
   
+  glBindVertexArray(vao);
   glBindBuffer(GL_ARRAY_BUFFER, vbo);
-  
-  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 4 * 2, #make(void*, vertices), GL_STATIC_DRAW);
-  
-  glEnableVertexAttribArray(0);
   glVertexAttribPointer(0, 2, GL_FLOAT, false, sizeof(float) * 2, #make(void*, 0));
-
+  glEnableVertexAttribArray(0);
+  glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 2, #make(void*, vertices), GL_STATIC_DRAW);
+  
+  int n = 0;
+  glClearColor(1.0, 1.0, 1.0, 1.0);
+  check_error("clear_color");  
+  u32 shader = create_program(vert, frag);
+  check_error("create");
+  glUseProgram(shader);
+  check_error("use");
+  glViewport(0, 0, 800, 600);
+  check_error("viewport");
   while !glfwWindowShouldClose(window) {
-    glDrawArrays(GL_QUADS, 0, 4);
+    glClear(GL_COLOR_BUFFER_BIT);
+    check_error("clear");
+    glDrawArrays(GL_TRIANGLES, 0, 6);
+    check_error("draw");
     glfwSwapBuffers(window);
+    check_error("swap");
     glfwPollEvents();
+    check_error("poll");
   }
   glfwTerminate();
   return 0;

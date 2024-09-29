@@ -34,6 +34,31 @@ void Parser::init_directive_routines() {
         }});
   }
 
+  // #raw 
+  // string literals delimited by #raw and can span multiple lines.
+  // u8 *string = #raw string literal goes here #raw
+  {
+    directive_routines.push_back({
+      .identifier = "raw",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        std::string string;
+        while (parser->not_eof()) {
+          if (parser->peek().type == TType::Directive && parser->states.back().lookahead_buffer[1].value == "raw") {
+            parser->eat();
+            parser->eat();
+            break;
+          }
+          string += parser->eat().value;
+        }
+        auto literal = ast_alloc<ASTLiteral>();
+        literal->tag = ASTLiteral::RawString;
+        literal->value = string;
+        return literal;
+      },
+    });
+  }
+
   // #read
   // Read a file into a string at compile time. Nice for embedding resources
   // into your program.

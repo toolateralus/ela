@@ -1,0 +1,131 @@
+#compiler_flags "-g -lGLEW -lGL -lglfw -lassimp -lm"
+
+GLFWwindow :: struct;
+
+u32 GL_ARRAY_BUFFER = 34962;
+u32 GL_FLOAT = 5126;
+u32 GL_STATIC_DRAW = 35044;
+u32 GL_TRIANGLES = 4;
+u32 GL_INVALID_ENUM = 1280;
+u32 GL_INVALID_VALUE = 1281;
+u32 GL_INVALID_OPERATION = 1282;
+u32 GL_STACK_OVERFLOW = 1283;
+u32 GL_STACK_UNDERFLOW = 1284;
+u32 GL_OUT_OF_MEMORY = 1285;
+u32 GL_COLOR_BUFFER_BIT = 16384;
+u32 GL_INFO_LOG_LENGTH = 35716;
+
+
+#foreign glfwInit :: () -> bool;
+#foreign glfwTerminate :: ();
+
+#foreign glfwCreateWindow :: (int w, int h, char* t, void* v, void* v1) -> GLFWwindow*;
+#foreign glfwMakeContextCurrent :: (void* ctx);
+#foreign glfwWindowShouldClose :: (GLFWwindow *window) -> bool;
+#foreign glfwPollEvents :: ();
+#foreign glfwSwapBuffers :: (GLFWwindow *window);
+#foreign glewInit :: () -> bool;
+
+#foreign glGenVertexArrays :: (int n, u32* arrays);
+#foreign glBindVertexArray :: (int array);
+
+#foreign glGenBuffers :: (int n_buf, u32* buf);
+#foreign glBindBuffer :: (int type, u32 buf);
+#foreign glBufferData :: (int target, s64 size, void* data, int usage);
+#foreign glEnableVertexAttribArray :: (int index);
+#foreign glVertexAttribPointer :: (int index, s64 size, int type, bool normalized, s64 stride, void* pointer);
+#foreign glDrawArrays :: (u32 mode, int first, int count);
+
+#foreign glClearColor :: (float red, float green, float blue, float alpha);
+#foreign glClear :: (u32 mask);
+
+#foreign glGetError :: () -> int;
+
+u32 GL_COMPILE_STATUS = 35713;
+u32 GL_LINK_STATUS = 35714;
+u32 GL_VERTEX_SHADER = 35633;
+u32 GL_FRAGMENT_SHADER = 35632;
+
+#foreign glCreateShader :: (u32 type) -> u32;
+#foreign glShaderSource :: (u32 shader, int count, char** string, int* length);
+#foreign glCompileShader :: (u32 shader);
+#foreign glGetShaderiv :: (u32 shader, u32 pname, int* params);
+#foreign glGetShaderInfoLog :: (u32 shader, int maxLength, int* length, char* infoLog);
+#foreign glCreateProgram :: () -> u32;
+#foreign glAttachShader :: (u32 program, u32 shader);
+#foreign glLinkProgram :: (u32 program);
+#foreign glGetProgramiv :: (u32 program, u32 pname, int* params);
+#foreign glGetProgramInfoLog :: (u32 program, int maxLength, int* length, char* infoLog);
+#foreign glUseProgram :: (u32 program);
+
+#foreign glDeleteShader :: (s32 shader);
+#foreign glDeleteProgram :: (s32 shader);
+
+#foreign glViewport :: (int x, int y, int width, int height);
+
+compile_shader :: (u32 kind, char *source) -> u32 {
+  u32 shader = glCreateShader(kind);
+  glShaderSource(shader, 1, &source, null);
+  glCompileShader(shader);
+
+  int success;
+  glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+  if success == 0 {
+    int length;
+    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+    char* info_log = malloc(sizeof(char*) * length);
+    glGetShaderInfoLog(shader, length, &length, info_log);
+    printf("Shader compilation failed: %s\n", info_log);
+    return #make(u32, 0);
+  }
+  return shader;
+}
+
+create_program :: (char* vert_source, char* frag_source) -> u32 {
+  u32 vertex_shader = compile_shader(GL_VERTEX_SHADER, vert_source);
+  u32 fragment_shader = compile_shader(GL_FRAGMENT_SHADER, frag_source);
+
+  if vertex_shader == 0 || fragment_shader == 0 {
+    return #make(u32, 0);
+  }
+
+  u32 program = glCreateProgram();
+  glAttachShader(program, vertex_shader);
+  glAttachShader(program, fragment_shader);
+  glLinkProgram(program);
+
+  int success;
+  glGetProgramiv(program, GL_LINK_STATUS, &success);
+  if success == 0 {
+    int length;
+    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+    char* info_log = malloc(sizeof(char*) * length);
+    glGetProgramInfoLog(program, length, &length, info_log);
+    printf("Program linking failed: %s\n", info_log);
+    return #make(u32, 0);
+  }
+
+  glDeleteShader(vertex_shader);
+  glDeleteShader(fragment_shader);
+
+  return program;
+}
+
+check_error :: (char* location) {
+  int err = glGetError();
+  if err == GL_INVALID_ENUM {
+    printf("error: %s, from: %s\n", "GL_INVALID_ENUM", location);
+  } else if err == GL_INVALID_VALUE {
+    printf("error: %s, from: %s\n", "GL_INVALID_VALUE", location);
+  } else if err == GL_INVALID_OPERATION {
+    printf("error: %s, from: %s\n", "GL_INVALID_OPERATION", location);
+  } else if err == GL_STACK_OVERFLOW {
+    printf("error: %s, from: %s\n", "GL_STACK_OVERFLOW", location);
+  } else if err == GL_STACK_UNDERFLOW {
+    printf("error: %s, from: %s\n", "GL_STACK_UNDERFLOW", location);
+  } else if err == GL_OUT_OF_MEMORY {
+    printf("error: %s, from: %s\n", "GL_OUT_OF_MEMORY", location);
+  } else if err != 0 {
+    printf("unknown gl error: %d, from: %s\n", err, location);
+  }
+}

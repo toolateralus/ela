@@ -223,7 +223,9 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   if (node->op.type == TType::And) {
     auto ty = get_type(operand_ty);
-    return find_type_id(ty->base, TypeExt{.extensions = {TYPE_EXT_POINTER}});
+    auto extensions = ty->extensions;
+    extensions.extensions.push_back(TYPE_EXT_POINTER);
+    return find_type_id(ty->base, extensions);
   }
 
   if (node->op.type == TType::Mul) {
