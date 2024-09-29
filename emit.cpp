@@ -347,7 +347,16 @@ std::any EmitVisitor::visit(ASTFuncDecl *node) {
   if ((node->flags & FUNCTION_IS_CTOR) != 0) {
     auto name = current_struct_decl.get()->type->base;
     (*ss) << name;
-    node->params->accept(this);
+    
+    
+    // This is a copy constructor, so we need to pass the parameter by reference.
+    // TODO: add a nicer way to take args by reference, or have a good way to dicate when to do so implicitly, if we want that ::  2024-09-29 14:02:16
+    if (node->params->params.size() == 1 && node->params->params[0]->type->resolved_type == current_struct_decl.get()->type->resolved_type) {
+      (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
+    } else {
+      node->params->accept(this);
+    }
+    
     if (!node->block) {
       throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_tokens);
     }

@@ -314,3 +314,46 @@ something :: (f32 f) -> f32 {
     printf("testing printing a string: %s\n", s);
     return;
 }
+
+Constructible :: struct {
+    f32 x;
+    #ctor :: (f32 _x) {
+        x = _x;
+    }
+    #ctor :: (Constructible other) {
+        x = other.x;
+    }
+    #ctor :: () {}
+}
+
+#test test_copy_make :: () {
+    Constructible c;
+    Constructible c1 = #make(Constructible, c);
+    assert("failed to copy construct Constructible (struct)", c1.x == c.x);
+}
+
+#test test_make :: () {
+    Constructible c = #make(Constructible, 10.0);
+    assert("failed to construct", c.x == 10.0);
+}
+
+#test test_make_cast :: () {
+    u16 big = #make(u16, 65365);
+    u8 small = #make(u8, big);
+    assert("failed to down cast", small == (big % 256));
+}
+
+IHaveAMethod :: struct {
+    method :: () -> f32 {
+        return 0.0;
+    }
+    parameter_method :: (f32 x) -> f32 {
+        return x;
+    }
+}
+
+#test test_method :: () {
+    IHaveAMethod owner;
+    assert("failed to get 0.0 from method.", owner.method() == 0.0);
+    assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
+}

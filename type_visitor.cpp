@@ -9,18 +9,21 @@
 #include <limits>
 #include <string>
 
-// these are called from and to because in the event of an implicit cast this should be the behaviour.
-void validate_type_compatability(const int from, const int to, const std::vector<Token> &source_tokens, std::format_string<std::string, std::string> format, std::string message) {
+// these are called from and to because in the event of an implicit cast this
+// should be the behaviour.
+void validate_type_compatability(
+    const int from, const int to, const std::vector<Token> &source_tokens,
+    std::format_string<std::string, std::string> format, std::string message) {
   auto from_t = get_type(from);
   auto to_t = get_type(to);
-  
+
   auto conv_rule = type_conversion_rule(from_t, to_t);
-  
-  if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
-    throw_error(
-        message + '\n' +
-            std::format(format, from_t->to_string(), to_t->to_string()),
-        ERROR_FAILURE, source_tokens);
+
+  if (to != from &&
+      (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
+    throw_error(message + '\n' +
+                    std::format(format, to_t->to_string(), from_t->to_string()),
+                ERROR_FAILURE, source_tokens);
   }
 }
 /*
@@ -48,8 +51,7 @@ std::any TypeVisitor::visit(ASTProgram *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTFuncDecl *node) {
-  
-  
+
   node->return_type->accept(this);
   node->params->accept(this);
 
@@ -81,12 +83,14 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
     return {};
   }
 
-  auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
+  auto control_flow =
+      std::any_cast<ControlFlow>(node->block.get()->accept(this));
   if (control_flow.type == -1) {
     control_flow.type = void_type();
   }
 
-  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0, is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
+  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0,
+             is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
 
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
     throw_error("Keyword \"continue\" must be in a loop.", ERROR_FAILURE,
@@ -115,8 +119,7 @@ const auto check_return_type_consistency(int &return_type, int new_type,
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
-    validate_type_compatability(new_type, return_type,
-                                node->source_tokens,
+    validate_type_compatability(new_type, return_type, node->source_tokens,
                                 "Expected: {}, Found: {}",
                                 "Inconsistent return types in block.");
   }
@@ -129,13 +132,11 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   for (auto &statement : node->statements) {
     auto result = statement->accept(this);
     if (dynamic_cast<ASTBlock *>(statement) ||
-        dynamic_cast<ASTIf *>(statement) ||
-        dynamic_cast<ASTFor *>(statement) ||
+        dynamic_cast<ASTIf *>(statement) || dynamic_cast<ASTFor *>(statement) ||
         dynamic_cast<ASTWhile *>(statement) ||
         dynamic_cast<ASTReturn *>(statement) ||
         dynamic_cast<ASTContinue *>(statement) ||
-        dynamic_cast<ASTBreak *>(statement)
-    ) {
+        dynamic_cast<ASTBreak *>(statement)) {
       auto stmnt_cf = std::any_cast<ControlFlow>(result);
       block_cf.flags |= stmnt_cf.flags;
       if ((stmnt_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
@@ -176,7 +177,10 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   if (node->value.is_not_null()) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
-    validate_type_compatability(expr_type, node->type->resolved_type, node->source_tokens, "invalid declaration types. expected: {}, got {}", std::format("declaration: {}", node->name.value));
+    validate_type_compatability(
+        expr_type, node->type->resolved_type, node->source_tokens,
+        "invalid declaration types. expected: {}, got {}",
+        std::format("declaration: {}", node->name.value));
   }
 
   // TODO: probably want something a bit nicer than this.
@@ -191,12 +195,16 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
-  // TODO: relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no sense.
+  // TODO: relational expressions need to have their operands type checked, but
+  // right now that would involve casting scalars to each other, which makes no
+  // sense.
   if (node->op.is_relational()) {
     node->resolved_type = bool_type();
-    return bool_type();    
+    return bool_type();
   } else {
-    validate_type_compatability(right, left, node->source_tokens, "invalid types in binary expression. expected: {}, got {}", "");
+    validate_type_compatability(
+        right, left, node->source_tokens,
+        "invalid types in binary expression. expected: {}, got {}", "");
   }
   node->resolved_type = left;
   return left;
@@ -204,8 +212,8 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
-  auto conversion_rule = type_conversion_rule(
-      get_type(operand_ty), get_type(bool_type()));
+  auto conversion_rule =
+      type_conversion_rule(get_type(operand_ty), get_type(bool_type()));
   auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                       conversion_rule != CONVERT_EXPLICIT);
 
@@ -304,7 +312,10 @@ std::any TypeVisitor::visit(ASTCall *node) {
     if (arg_tys.size() <= i) {
       continue;
     }
-    validate_type_compatability(arg_tys[i], info->parameter_types[i], node->source_tokens, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
+    validate_type_compatability(
+        arg_tys[i], info->parameter_types[i], node->source_tokens,
+        "invalid argument types. expected: {}, got: {}",
+        std::format("parameter: {} of function: {}", i, node->name.value));
   }
 
   node->type = info->return_type;
@@ -326,8 +337,12 @@ std::any TypeVisitor::visit(ASTReturn *node) {
   }
   return ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
-std::any TypeVisitor::visit(ASTContinue *node) { return ControlFlow{BLOCK_FLAGS_CONTINUE, -1}; }
-std::any TypeVisitor::visit(ASTBreak *node) { return ControlFlow{BLOCK_FLAGS_BREAK, -1}; }
+std::any TypeVisitor::visit(ASTContinue *node) {
+  return ControlFlow{BLOCK_FLAGS_CONTINUE, -1};
+}
+std::any TypeVisitor::visit(ASTBreak *node) {
+  return ControlFlow{BLOCK_FLAGS_BREAK, -1};
+}
 
 std::any TypeVisitor::visit(ASTFor *node) {
   context.enter_scope(node->block->scope);
@@ -350,16 +365,15 @@ std::any TypeVisitor::visit(ASTFor *node) {
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
-  // we add fall through here because we dont know if this will get excecuted since we cant
-  // evaluate the condition to know
+  // we add fall through here because we dont know if this will get excecuted
+  // since we cant evaluate the condition to know
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
 std::any TypeVisitor::visit(ASTIf *node) {
   auto cond_ty = int_from_any(node->condition->accept(this));
   validate_type_compatability(
-      cond_ty, bool_type(), node->source_tokens,
-      "expected: {}, got {}",
+      cond_ty, bool_type(), node->source_tokens, "expected: {}, got {}",
       "if statement condition was not convertible to boolean");
 
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
@@ -384,15 +398,15 @@ std::any TypeVisitor::visit(ASTElse *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTWhile *node) {
-  
+
   if (node->condition.is_not_null()) {
     node->condition.get()->accept(this);
   }
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
-  // we add fall through here because we dont know if this will get excecuted since we cant
-  // evaluate the condition to know
+  // we add fall through here because we dont know if this will get excecuted
+  // since we cant evaluate the condition to know
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
@@ -408,24 +422,24 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
 
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo*>(type->info.get());
-  
+  auto info = static_cast<StructTypeInfo *>(type->info.get());
+
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
   }
-  
+
   // TODO: we can improve this to not rely so heavily on a Scope object.
   // It seems wrong to store a scope in a Type *.
   // TODO: 2024-09-29 12:29:13 actually its fine. better than storing AST
   context.enter_scope(node->scope);
-  
+
   for (auto decl : node->fields) {
     decl->accept(this);
   }
-  for (auto method: node->methods) {
+  for (auto method : node->methods) {
     method->accept(this);
   }
-  
+
   info->scope = node->scope;
   context.exit_scope();
   return {};
@@ -434,34 +448,37 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
-  
+
   if (left_ty->kind != TYPE_STRUCT) {
-    throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE, node->source_tokens);
+    throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE,
+                node->source_tokens);
   }
-  auto info = static_cast<StructTypeInfo*>(left_ty->info.get());
-  
+  auto info = static_cast<StructTypeInfo *>(left_ty->info.get());
+
   auto previous_scope = context.current_scope;
 
   context.enter_scope(info->scope);
-  
+
   int type = int_from_any(node->right->accept(this));
-  
+
   context.current_scope = previous_scope;
   return type;
-  throw_error("unable to resolve dot expression type.", ERROR_FAILURE, node->source_tokens);
+  throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
+              node->source_tokens);
 }
 
 std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = get_type(left);
-  
+
   // TODO: make it so array types are not scalars. It makes no darn sense.
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
-    throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), ERROR_FAILURE, node->source_tokens);
+    throw_error(std::format("cannot index into non array type. {}",
+                            left_ty->to_string()),
+                ERROR_FAILURE, node->source_tokens);
   }
-  
-  
+
   if (left_ty->extensions.is_array()) {
     auto element_id = left_ty->get_element_type();
     return element_id;
@@ -472,13 +489,14 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
 
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
-  
+
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
   }
-  
+
   if (type == -1) {
-    throw_error("Cannot make non existent type", ERROR_FAILURE, node->source_tokens);
+    throw_error("Cannot make non existent type", ERROR_FAILURE,
+                node->source_tokens);
   }
   return type;
 }
