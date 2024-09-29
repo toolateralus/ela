@@ -2,6 +2,7 @@
 #pragma once
 
 #include "nullable.hpp"
+#include <format>
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -210,6 +211,9 @@ struct Type {
   bool equals(const std::string &name,
               const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
+
+  std::string to_type_struct();
+
   Type(){};
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   Type(const Type &) = delete;

@@ -33,7 +33,6 @@ CompileCommand compile_command;
   #########################
 */
 
-
 int main(int argc, char *argv[]) {
   try {
     compile_command = CompileCommand(argc, argv);
@@ -50,7 +49,8 @@ int main(int argc, char *argv[]) {
 ASTProgram *CompileCommand::process_ast(Context &context) {
   auto input = read_input_file();
   original_path = std::filesystem::current_path();
-  std::filesystem::current_path(std::filesystem::canonical(input_path).parent_path());
+  std::filesystem::current_path(
+      std::filesystem::canonical(input_path).parent_path());
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
   return root;
@@ -83,7 +83,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   auto program =
       std::format("#include \"{}\"\n", header_output_path.filename().string()) +
       emit.get_code();
-      
+
   if (compile_command.has_flag("test")) {
     program = "#define TESTING\n" + program;
   }
@@ -93,15 +93,13 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.flush();
   output.close();
 
-
   std::string extra_flags = "-lc";
 
   printf("\e[31m");
-  system(std::format("clang++ -std=c++23 {} {} -o {}", extra_flags, output_path.string(),
-                     binary_path.string())
+  system(std::format("clang++ -std=c++23 {} {} -o {}", extra_flags,
+                     output_path.string(), binary_path.string())
              .c_str());
   printf("\e[0m");
-
 
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
@@ -123,4 +121,42 @@ void CompileCommand::compile() {
 
 bool get_compilation_flag(const std::string &flag) {
   return compile_command.has_flag(flag);
+}
+
+Context::Context() {
+  FunctionTypeInfo printf_info{};
+  printf_info.return_type = void_type();
+  printf_info.is_varargs = true;
+  current_scope->insert("printf", find_type_id("", printf_info, {}));
+
+  FunctionTypeInfo assert_info{};
+  assert_info.return_type = void_type();
+  assert_info.parameter_types[0] = string_type();
+  assert_info.parameter_types[1] = bool_type();
+  assert_info.params_len = 2;
+  current_scope->insert("assert", find_type_id("", assert_info, {}));
+
+  FunctionTypeInfo sizeof_info{};
+  sizeof_info.return_type = find_type_id("s64", {});
+  sizeof_info.is_varargs = true;
+  current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
+  root_scope = current_scope;
+
+  // TODO: add a way to create struct types without relying on scope full of ast
+  auto type_id = create_struct_type("Type", {});
+  auto field_id = create_struct_type("Field", {});
+
+  auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  
+  type_scope->insert("id", s32_type());
+  type_scope->insert("name", string_type());
+  type_scope->insert("fields", find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
+  
+  field_scope->insert("name", string_type());
+  field_scope->insert("type", find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}}));
+  
+  static_cast<StructTypeInfo*>(get_type(type_id)->info.get())->scope = type_scope;
+  static_cast<StructTypeInfo*>(get_type(field_id)->info.get())->scope = field_scope;
+  
 }

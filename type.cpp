@@ -36,8 +36,7 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
   auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
-int find_type_id(const std::string &name,
-                 const TypeExt &type_extensions) {
+int find_type_id(const std::string &name, const TypeExt &type_extensions) {
 
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
@@ -87,7 +86,7 @@ std::string get_cpp_scalar_type(int id) {
     name = "uint32_t";
   else if (type->base == "u16")
     name = "uint16_t";
-  else if (type->base == "char" && type->extensions.is_pointer(1)) 
+  else if (type->base == "char" && type->extensions.is_pointer(1))
     name = "const char";
   else if (type->base == "u8" && type->extensions.is_pointer(1))
     name = "const char";
@@ -118,7 +117,8 @@ std::string get_cpp_scalar_type(int id) {
   return type->extensions.to_cpp_string(name);
 }
 
-ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
+ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
+                                     bool is_integral = false) {
   auto info = ast_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
   info->size = size;
@@ -155,7 +155,7 @@ void init_type_system() {
     // todo: alias these.
     create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
     create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
-    
+
     create_type(TYPE_SCALAR, "char", get_scalar_type_info(TYPE_U8, 1, true));
     create_type(TYPE_SCALAR, "bool", get_scalar_type_info(TYPE_BOOL, 1, true));
     create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
@@ -163,13 +163,17 @@ void init_type_system() {
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
 
-// TODO: use some kind of SCALAR_TYPE flags in the ScalarType info to tell if somethings an integer, float, etc,
-// TODO: and add conversion rules to it so we can safely up cast but explicitly down cast only.
-// Right now, if we had user defined types, you could trick the type system into casting a number to and from your type if it ended with a multiple of 8 -> 64
+// TODO: use some kind of SCALAR_TYPE flags in the ScalarType info to tell if
+// somethings an integer, float, etc,
+// TODO: and add conversion rules to it so we can safely up cast but explicitly
+// down cast only. Right now, if we had user defined types, you could trick the
+// type system into casting a number to and from your type if it ended with a
+// multiple of 8 -> 64
 constexpr bool type_is_numerical(const Type *t) {
-  auto info = dynamic_cast<ScalarTypeInfo*>(t->info.get());
-  if (!info) return false;
-  
+  auto info = dynamic_cast<ScalarTypeInfo *>(t->info.get());
+  if (!info)
+    return false;
+
   auto scalar = info->scalar_type;
   return scalar == TYPE_S8 || scalar == TYPE_S16 || scalar == TYPE_S32 ||
          scalar == TYPE_S64 || scalar == TYPE_U8 || scalar == TYPE_U16 ||
@@ -178,9 +182,11 @@ constexpr bool type_is_numerical(const Type *t) {
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
-  if (from->kind != TYPE_SCALAR || from->info.is_null() || to->kind != TYPE_SCALAR || to->info.is_null()) return false;
-  auto from_info = static_cast<ScalarTypeInfo*>(from->info.get());
-  auto to_info = static_cast<ScalarTypeInfo*>(to->info.get());
+  if (from->kind != TYPE_SCALAR || from->info.is_null() ||
+      to->kind != TYPE_SCALAR || to->info.is_null())
+    return false;
+  auto from_info = static_cast<ScalarTypeInfo *>(from->info.get());
+  auto to_info = static_cast<ScalarTypeInfo *>(to->info.get());
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
@@ -192,25 +198,26 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     throw_error("type was null when checking type conversion rules",
                 ERROR_CRITICAL, {});
   }
-  
+
   // same exact type. no cast needed.
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
-  // u16 -> u8 == implicit required. 
+  // u16 -> u8 == implicit required.
   if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
       to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
-      
+
       if (numerical_type_safe_to_upcast(from, to))
         return CONVERT_IMPLICIT;
       return CONVERT_EXPLICIT;
     }
   }
 
-  // TODO: probably want to fix this. right now we have C style pointer casting: any two pointers of the same depth can cast implicitly
+  // TODO: probably want to fix this. right now we have C style pointer casting:
+  // any two pointers of the same depth can cast implicitly
   if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
     return CONVERT_IMPLICIT;
   }
@@ -341,13 +348,12 @@ int remove_one_pointer_ext(int operand_ty,
       extensions.push_back(ext);
     }
   }
-  return find_type_id(
-      ty->base, TypeExt{.extensions = extensions,
-                                  .array_sizes = ty->extensions.array_sizes});
+  return find_type_id(ty->base,
+                      TypeExt{.extensions = extensions,
+                              .array_sizes = ty->extensions.array_sizes});
 }
-int create_struct_type(
-    const std::string &name,
-    const std::vector<ASTDeclaration*> &fields) {
+int create_struct_type(const std::string &name,
+                       const std::vector<ASTDeclaration *> &fields) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
   type->base = name;
@@ -359,7 +365,8 @@ int create_struct_type(
 }
 
 int voidptr_type() {
-  static int type = find_type_id("void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
+  static int type = find_type_id(
+      "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
   return type;
 }
 
@@ -411,4 +418,39 @@ int Type::get_element_type() const {
   extensions.extensions.pop_back();
   extensions.array_sizes.pop_back();
   return find_type_id(base, extensions);
+}
+
+std::string Type::to_type_struct() {
+  std::stringstream fields_ss;
+  if (kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(this->info.get());
+
+    if (info->fields.empty()) {
+      fields_ss << "new Type {"
+                << ".name = \"" << to_string() << "\","
+                << ".id = " << id << "}";
+      return fields_ss.str();
+    }
+    
+    fields_ss << "{";
+    for (const auto &field : info->fields) {
+      auto name = std::format(".name = \"{}\"", field->name.value);
+      auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct());
+      fields_ss << "new Field { " << name << ", " << type << " }";
+      
+      if (field != info->fields.back()) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  }
+  else {
+    fields_ss << "new Type {"
+                << ".name = \"" << to_string() << "\","
+                << ".id = " << id << "}";
+      return fields_ss.str();
+  }
+  
+  return std::format("{} .id = {}, .fields = {}, {}", 
+              "new Type{", id, fields_ss.str(), "}");
 }

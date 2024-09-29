@@ -6,9 +6,6 @@ Vector2 :: struct {
 }
 
 main :: () {
-  s32 *v;
-  s32 [24] arr;
-  
-  Vector2 v2;
+  Type * type = #type Vector2;
 }
 

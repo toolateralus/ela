@@ -137,6 +137,28 @@ void Parser::init_directive_routines() {
          }});
   }
   
+  
+  // #type
+  // get a 'Type *' struct ptr to reflect on a given type. 
+  // has .fields and .size only currently
+  {
+    directive_routines.push_back({
+      .identifier = "type",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto type = parser->parse_type();
+        auto outer = ast_alloc<ASTType>();
+        outer->flags = ASTTYPE_EMIT_OBJECT;
+        outer->base = "Type";
+        outer->extension_info = {
+          .extensions = {TYPE_EXT_POINTER}
+        };
+        outer->pointing_to = type;
+        return outer;
+      }
+    });
+  }
+  
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,

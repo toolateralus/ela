@@ -36,6 +36,9 @@ static inline int int_from_any(const std::any &any) {
 }
 
 std::any TypeVisitor::visit(ASTType *node) {
+  if (node->flags == ASTTYPE_EMIT_OBJECT) {
+    node->pointing_to.get()->accept(this);
+  }
   return node->resolved_type = find_type_id(node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {

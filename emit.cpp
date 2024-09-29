@@ -4,7 +4,6 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
-#include <fstream>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
 
@@ -116,7 +115,12 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  (*ss) <<get_type(node->resolved_type)->to_cpp_string();
+  auto type = get_type(node->resolved_type);
+  if (node->flags == ASTTYPE_EMIT_OBJECT) {
+    (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct();
+    return {};
+  }
+  (*ss) << type->to_cpp_string();
   return {};
 }
 

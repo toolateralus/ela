@@ -1,3 +1,4 @@
+#include <algorithm>
 #include <cstdint>
 #include <cstddef>
 
@@ -19,14 +20,38 @@ using string = const char *;
 
 extern "C" int printf(const char *format, ...);
 
+#include <initializer_list>
+
 // UNUSED
 // TODO: implement a bare minimum array type.
 template <class T> struct _array {
   T *m_data = nullptr;
   int m_length = 0;
   _array() {}
+  
+  _array(std::initializer_list<T> list) {
+    m_data = new T[list.size()];
+    std::copy(list.begin(), list.end(), m_data);
+    m_length = list.size();
+  }
+  ~_array() {
+    if (m_data)
+      delete[] m_data;
+  }
   T *begin() const { return m_data; }
   T *end() const { return &m_data[m_length]; }
+};
+
+struct Type;
+struct Field {
+  const char * name;
+  Type *type;  
+};
+
+struct Type {
+  int id;
+  const char * name;
+  _array<Field*> fields;
 };
 
 #define TESTING

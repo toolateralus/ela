@@ -1,5 +1,7 @@
 #pragma once
 
+
+#include "lex.hpp"
 #include "type.hpp"
 #include <jstl/memory/arena.hpp>
 #include <string>
@@ -52,26 +54,8 @@ struct Context {
   
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Scope *root_scope;
-  Context() {
-    FunctionTypeInfo printf_info {};
-    printf_info.return_type = void_type();
-    printf_info.is_varargs = true;
-    current_scope->insert("printf", find_type_id("", printf_info, {}));
-    
-    FunctionTypeInfo assert_info {};
-    assert_info.return_type = void_type();
-    assert_info.parameter_types[0] = string_type();
-    assert_info.parameter_types[1] = bool_type();
-    assert_info.params_len = 2;
-    current_scope->insert("assert", find_type_id("", assert_info, {}));
-    
-    FunctionTypeInfo sizeof_info {};
-    sizeof_info.return_type = find_type_id("s64", {});
-    sizeof_info.is_varargs = true;
-    current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
-    root_scope = current_scope;
-  }
-  
+  Context();
+
   inline void enter_scope(Scope *scope = nullptr) {
     if (!scope) {
       scope = create_child(current_scope);
