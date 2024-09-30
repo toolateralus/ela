@@ -261,6 +261,7 @@ void Parser::init_directive_routines() {
     });
   }
 
+  // #compiler_flags, for adding stuff like linker options, -g etc from within your program or header.
   {
     directive_routines.push_back(
         {.identifier = "compiler_flags",
@@ -270,6 +271,24 @@ void Parser::init_directive_routines() {
            compile_command.add_compilation_flags(string);
            return nullptr;
          }});
+  }
+  
+  // #flags, for making an enum declaration auto increment with a flags value.
+  {
+    directive_routines.push_back({
+      .identifier = "flags",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto name = parser->expect(TType::Identifier);
+        parser->expect(TType::DoubleColon);
+        auto enum_decl = parser->parse_enum_declaration(name);
+        enum_decl->is_flags = true;
+        auto type = get_type(enum_decl->type->resolved_type);
+        auto info = static_cast<EnumTypeInfo*>(type->info.get());
+        info->is_flags = true;
+        return enum_decl;
+      }
+    });
   }
 }
 
@@ -601,6 +620,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   for (const auto &[key, value]: node->key_values) {
     keys.push_back(key);
   }
+  
   node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
   
   expect(TType::RCurly);

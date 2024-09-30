@@ -1,6 +1,10 @@
 #import core;
 
-Banana :: enum  {
+// TODO: add Type.size, and specifically for enum: Type.length Type.min, Type.max, etc.
+// TODO: add some type safety to enums. if you have Banana and Pear flags, you shouldn't be able to mix them.
+// Right now we just implicitly cast all enums to integers, so that needs work for sure.
+
+#flags Banana :: enum  {
   Unripe,
   Ripe,
   Overripe,
@@ -8,6 +12,8 @@ Banana :: enum  {
 }
 
 main :: () {
-  printf("%d\n", Banana.Ripe);
+  int flags;
+  flags |= Banana.Ripe | Banana.Unripe;
+  printf("%d\n", (flags & Banana.Unripe) != 0);
 }
 
