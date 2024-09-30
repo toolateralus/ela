@@ -63,20 +63,12 @@ struct Context {
   Scope *root_scope;
   Context();
 
-  // BUG(Josh) Fix this weird scope bug associated with dot expressions being changed not being able to find the root of the expr. see the todolist for the explanation of the bug 9/30/2024, 10:13:16 AM
-  std::unordered_set<Scope*> scope_stack {};
   inline void set_scope(Scope *scope = nullptr) {
     if (!scope) {
       scope = create_child(current_scope);
     }
-    
-    if (scope_stack.contains(current_scope)) {
-      scope_stack.erase(current_scope);      
-    }
-    
     current_scope = scope;
     //printf("entering scope: %p\n", current_scope);
-    scope_stack.insert(current_scope);
   }
   inline Scope *exit_scope() {
     auto scope = current_scope;

@@ -7,6 +7,7 @@
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
+#include <string>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
   (*ss) <<indent() << node->name.value << " ";
@@ -158,8 +159,6 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTBinExpr *node) {
-  
-  
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
     (*ss) << "auto ";
@@ -208,6 +207,15 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;
+    std::string init = "{";
+    for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
+      auto elem = type->get_element_type();
+      auto ty = get_type(elem);
+      init += " " + ty->to_cpp_string() + "(),";
+    }
+    init.pop_back();
+    init += "}";
+    (*ss) << init;
   } else {
     node->type->accept(this);
     space();

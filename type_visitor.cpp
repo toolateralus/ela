@@ -364,8 +364,10 @@ std::any TypeVisitor::visit(ASTFor *node) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
+    auto t = get_type(type);
+    auto element_ty = t->get_element_type();
     auto iden = static_cast<ASTIdentifier *>(v.target);
-    context.current_scope->insert(iden->value.value, type);
+    context.current_scope->insert(iden->value.value, element_ty);
     v.target->accept(this);
   } break;
   case ASTFor::CStyle: {

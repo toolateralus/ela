@@ -1,11 +1,6 @@
 
 TODO(Josh): debug information is bad for some statements
 
-BUG(Josh): doing `n.to_string().data` results in a `n is undeclared` error. 
-  this bug manifests as when
-    `n.to_string()`
-  gets traversed, we lookup `n` and it doesn't exist because we're already in a struct scope?
-  How that happens i am not sure.
 
 ## new features
   - switch statements

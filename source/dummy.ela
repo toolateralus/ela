@@ -42,6 +42,9 @@ Vec2 :: struct {
 }
 
 main :: () {
-	n := #make(Vec2, 250, 250);
-	printf("%s\n", n.xaryu(10).to_string().data);
+	f32[100] v;
+  for i; v {
+    printf("%d\n", i);
+  }
+	
 }
