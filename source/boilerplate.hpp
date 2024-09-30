@@ -54,7 +54,7 @@ template <class T> struct _array {
 struct Type;
 struct Field {
   const char * name;
-  Type *type;  
+  Type *type;
 };
 
 struct Type {
@@ -69,7 +69,7 @@ struct Type {
   if (!(condition))                                                            \
     throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n", #condition,       \
            #message);                                                           \
-  
+
   extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
   extern "C" int strcpy(const char *, char *);
   extern "C" int strlen(const char *);
@@ -91,23 +91,23 @@ struct Type {
     const char* what() const {
         return m_what;
     }
-};                                               
-  struct __COMPILER_GENERATED_TEST {                                           
-    __COMPILER_GENERATED_TEST() {}                                             
-    __COMPILER_GENERATED_TEST(const char *name, void (*function)())            
-        : name(name), function(function) {}                                    
-    const char *name;                                                          
-    void (*function)();                                                        
-    void run() const {                                                         
-      printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);          
-      try {                                                                    
-        function();                                                            
-        printf("\033[1;32m[passed]\033[0m\n");                                 
-      } catch (__test_exception &e) {                                                          
+};
+  struct __COMPILER_GENERATED_TEST {
+    __COMPILER_GENERATED_TEST() {}
+    __COMPILER_GENERATED_TEST(const char *name, void (*function)())
+        : name(name), function(function) {}
+    const char *name;
+    void (*function)();
+    void run() const {
+      printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
+      try {
+        function();
+        printf("\033[1;32m[passed]\033[0m\n");
+      } catch (__test_exception &e) {
         printf("\033[1;31m[failed]\033[0m\n");
         printf("%s", e.what());
-      }                                                                        
-    }                                                                          
+      }
+    }
   };
 
 

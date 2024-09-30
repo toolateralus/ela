@@ -4,10 +4,7 @@ TODO(Josh): debug information is bad for some statements
 TODO: use #cast instead of #make for casting, so #make can do allocations.
 
 ## new features
-  - enum declarations. `enum {...} || enum MyEnum {...}`
-  - static member access, `Type.Something`. neccesary for enums.
   - static class members. maybe not neccesary, but above is.
-  - `#flags` for enums so instead of 0,1,2,3, you get `1 << 0, 1 << 1, 1 << 2, 1 << 3` etc. Also these types would have a .has() and .set() etc, and not need any integer casting.
   - switch statements
   - const modifier for variables, members, parameters, etc. `const s32 param, const s32 v = 1` works just like c++ const;
   - multiple return values. `v, v1 := func();`
@@ -17,21 +14,12 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
   - function overloading: right now a name can only have one value. all ctors get overwritten as we compile in the symbol table,
     even if theyre not callable.
     
-  ### EASY: Add binary and hexadecimal numbers in the lexer.
-    
-```
-func_a :: (s32 v) -> s32 {
-  return v;
-}
-func_a :: (s64 v) -> s64 {
-  return v;
-}
-```
-    
-  - Varargs, but in a more elegant way than C.
+  - Varargs, but in a more elegant way than C. probably a `params int[] values` kind of c# thing, with an optional way to do it with an `any` type.
   - Ranges, slicing. `0..10, 0..len+1, arr[0..5]`;
-  - Iterators builtin? probably not needed.
-  - Type aliasing.
+  - Iterators builtin? probably not needed, but added to stdlib.
+  
+  - Type aliasing. -- very neccesary for `$T` type args for polymorphic functions
+  - Polymorphic functions and polymorphic types. Like C++ templates, but less obnoxious.
 
   
 ## stuff that needs work now
@@ -39,8 +27,9 @@ func_a :: (s64 v) -> s64 {
 - we need type aliasing for `$T` type args
 - casting should not be mandatory for some of the types it is right now, especially in accordance to return types. it is way too strict.
 - `#make` needs a ton of work, and it should not be the only way to construct objects.
-- `#raw` concatenates all the tokens with no space. This should just be a lexer feature, not a directive.
-- better initializer lists. `int[10] v {0,1,2,3,4,5,6,7,8,9};`, `Vec2 v {0, 0}`, `int[] v {0,1,2,3,4} (this would get malloc'd)` 
+- better initializer lists. `int[10] v {0,1,2,3,4,5,6,7,8,9};`, `Vec2 v {0, 0}`, `int[] v {0,1,2,3,4} (this would get malloc'd)` <- the last one is questionable ->
+## easy : 
+  - `#raw` concatenates all the tokens with no space. This should just be a lexer feature, not a directive.
 
 **the entire compiler backend should get a cleanup pass all over. lot's of bloated code that's not neccesary** 
 

@@ -5,6 +5,10 @@ Something :: enum {
   SomeGayValue = 0b01001,
 }
 
+
+
+
+
 main :: () {
   printf("%d\n", Something.SomeGayValue);
 }
