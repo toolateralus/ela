@@ -13,15 +13,23 @@ bug: debug information is bad for some statements
   - #flags for enums so instead of 0,1,2,3, you get `1 << 0, 1 << 1, 1 << 2, 1 << 3` etc. Also these types would have a .has() and .set() etc, and not need any integer casting.
   - function overloading: right now a name can only have one value. all ctors get overwritten as we compile in the symbol table,
     even if theyre not callable.
+    
+  ### EASY: Add binary and hexadecimal numbers in the lexer.
+    
+```
+func_a :: (s32 v) -> s32 {
+  return v;
+}
+func_a :: (s64 v) -> s64 {
+  return v;
+}
+```
+    
+  - Varargs, but in a more elegant way than C.
+  - Ranges, slicing. `0..10, 0..len+1, arr[0..5]`;
+  - Iterators builtin? probably not needed.
   - Type aliasing.
-  ```
-  func_a :: (s32 v) -> s32 {
-    return v;
-  }
-  func_a :: (s64 v) -> s64 {
-    return v;
-  }
-  ```
+
   
 ## stuff that needs work now
 - types need to be in scope, not just completely global, or at least have ID's on scope where we can observe hierarchical behaviour.

@@ -109,15 +109,25 @@ void Parser::init_directive_routines() {
         {.identifier = "foreign",
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) static {
-           auto function = ast_alloc<ASTFuncDecl>();
+           auto function = ast_alloc<ASTFunctionDeclaration>();
            auto range = parser->begin_node();
            auto name = parser->expect(TType::Identifier);
+           
+           auto last_func_decl = parser->current_func_decl;
+           parser->current_func_decl = function;
+           
+           Defer deferred =  {[&]{
+            parser->current_func_decl = last_func_decl;
+           }};
+           
            if (parser->context.current_scope != parser->context.root_scope)
              throw_error(
                  std::format(
                      "cannot declare a non-top level foreign function:: {}",
                      name.value),
                  ERROR_CRITICAL, range);
+
+
 
            parser->expect(TType::DoubleColon);
            function->params = parser->parse_parameters();
@@ -440,6 +450,7 @@ ASTStatement *Parser::parse_statement() {
       (tok.type == TType::Identifier &&
        lookahead_buf()[1].type == TType::Dot) ||
       lookahead_buf()[1].type == TType::Assign ||
+      lookahead_buf()[1].type == TType::ColonEquals ||
       lookahead_buf()[1].type == TType::LParen) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
@@ -504,13 +515,16 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 
-ASTFuncDecl *Parser::parse_function_declaration(Token name) {
+ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
     range.begin = range.begin - 1;
-
-  auto function = ast_alloc<ASTFuncDecl>();
-
+  
+  auto function = ast_alloc<ASTFunctionDeclaration>();
+  
+  auto last_func_decl = current_func_decl;
+  current_func_decl = function;
+  
   const auto isnt_ctor_or_dtor =
       current_struct_decl.is_not_null() &&
       current_struct_decl.get()->type->base != name.value;
@@ -522,10 +536,8 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
 
   // to allow for recursion
   context.current_scope->insert(name.value, -1);
-
   function->params = parse_parameters();
   function->name = name;
-
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
   } else {
@@ -534,6 +546,7 @@ ASTFuncDecl *Parser::parse_function_declaration(Token name) {
   }
   function->block = parse_block();
   end_node(function, range);
+  current_func_decl = last_func_decl;
   return function;
 }
 
@@ -575,7 +588,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     for (const auto &statement : block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
         decl->fields.push_back(field);
-      } else if (auto fn_decl = dynamic_cast<ASTFuncDecl *>(statement)) {
+      } else if (auto fn_decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
         decl->methods.push_back(fn_decl);
       } else {
         throw_error(
@@ -605,7 +618,20 @@ ASTExpr *Parser::parse_expr() {
 ASTExpr *Parser::parse_assignment() {
   auto range = begin_node();
   ASTExpr *left = parse_logical_or();
-  if (peek().type == TType::Assign) {
+  if (peek().type == TType::Assign || peek().type == TType::ColonEquals) {
+    
+    // TODO(Josh) 9/30/2024, 8:34:56 AM Fix this, its far too limited. 
+    // Once we have multiple return values, this will prove to be a problem
+    
+    // for n := v, we need to place this declaration in the symbol table
+    // there's probably a better way to do this than in the expression hierarchy.
+    if (peek().type == TType::ColonEquals) {
+      auto iden = dynamic_cast<ASTIdentifier*>(left);
+      if (iden) {
+        context.current_scope->insert(iden->value.value, -1);
+      }
+    }
+    
     auto op = eat();
     auto right = parse_assignment();
     auto binexpr = ast_alloc<ASTBinExpr>();
@@ -965,6 +991,16 @@ ASTParamsDecl *Parser::parse_parameters() {
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
   while (peek().type != TType::RParen) {
+    
+    if (peek().type == TType::Varargs) {
+      eat();
+      if (!current_func_decl) {
+        throw_error("Cannot use varargs outside of a function declaration. Only use this for #foreign functions.", ERROR_FAILURE, range);
+      }
+      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
+      continue;
+    }
+    
     auto type = parse_type();
     auto name = expect(TType::Identifier).value;
 

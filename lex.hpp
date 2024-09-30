@@ -75,6 +75,7 @@ enum struct TType {
   Varargs,
   Directive,
   Struct,
+  ColonEquals,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -84,6 +85,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Directive);
+    TTYPE_CASE(ColonEquals);
     TTYPE_CASE(Varargs);
     TTYPE_CASE(True);
     TTYPE_CASE(False);
@@ -150,7 +152,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
   }
-
   return "Unknown";
 }
 
@@ -265,6 +266,7 @@ struct Lexer {
       {"null", TType::Null}};
 
   const std::unordered_map<std::string, TType> operators{
+      {":=", TType::ColonEquals },
       {"...", TType::Varargs},  {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},
       {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},

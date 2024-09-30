@@ -157,6 +157,18 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTBinExpr *node) {
+  
+  
+  // type inference assignment.
+  if (node->op.type == TType::ColonEquals) {
+    (*ss) << "auto ";
+    node->left->accept(this);
+    (*ss) << " = ";
+    node->right->accept(this);
+    return{};
+  }
+  
+  
   // TODO: Figure out how we want to control custom precedence. Right now,
   // TODO(cont): We'll just parenthesize every single sub-expression;
   (*ss) <<"(";
@@ -235,11 +247,17 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
     }
     ++i;
   }
+  
+  if (current_func_decl.is_not_null() && (current_func_decl.get()->flags & FUNCTION_IS_VARARGS) != 0) {
+    (*ss) << ", ...)";
+    return {};
+  }
+  
   (*ss) <<")";
   return {};
 }
 
-static bool should_emit_function(EmitVisitor *visitor, ASTFuncDecl *node, bool test_flag) {
+static bool should_emit_function(EmitVisitor *visitor, ASTFunctionDeclaration *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
   if (!test_flag && node->flags & FUNCTION_IS_TEST) {
     return false;
@@ -256,7 +274,7 @@ static bool should_emit_function(EmitVisitor *visitor, ASTFuncDecl *node, bool t
   return true;
 }
 
-void EmitVisitor::emit_forward_declaration(ASTFuncDecl *node) {
+void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   
   if ((node->flags & FUNCTION_IS_METHOD) != 0) {
     return;
@@ -272,7 +290,7 @@ void EmitVisitor::emit_forward_declaration(ASTFuncDecl *node) {
   emit_default_args = false;
 }
 
-void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
+void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   // creates a constexpr auto function = []() -> return_type { ... };
   // these are alwyas constexpr because we do not do closure objects, nor do we have the ability to check that right now.
   // TODO: we could have an option for like #closure to just use & and hope that it works fine. It should work fine
@@ -286,33 +304,41 @@ void EmitVisitor::emit_local_function(ASTFuncDecl *node) {
   node->block.get()->accept(this);
 }
 
-void EmitVisitor::emit_foreign_function(ASTFuncDecl *node) {
+void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name.value == "main") {
     throw_error("main function cannot be foreign", ERROR_CRITICAL,
                 node->source_range);
   }
   
   use_header();
-
   (*ss) << "extern \"C\" ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
   (*ss) << node->name.value << '(';
   for (const auto &param : node->params->params) {
-    // TODO: right now this disallows us from using struct or non-scalar types
-    // in extern declarations. We shouldn't have to explicitly call this, i
-    // think to_cpp_string() on Type * should just return the appropriate data.
     (*ss) << get_cpp_scalar_type(param->type->resolved_type);
     if (param != node->params->params.back()) {
       (*ss) << ", ";
     }
   }
-  (*ss) << ");";
+  
+  if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
+    (*ss) << ", ...);";
+  } else {
+    (*ss) << ");";
+  }
+  
   use_code();
 }
 
-std::any EmitVisitor::visit(ASTFuncDecl *node) {
+std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
+  
+  auto last_func_decl = current_func_decl;
+  current_func_decl = node;
+  
   auto test_flag = get_compilation_flag("test");
+  
+  Defer deferred = { [&](){ current_func_decl = last_func_decl; } };
   
   // this also happens to emit the test boilerplate that bootstraps it into the test runner, if applicable.
   if (!should_emit_function(this, node, test_flag)) {
@@ -446,15 +472,6 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   return {};
 }
 
-struct Defer {
-  const std::function<void()> func;
-  Defer(const std::function<void()> &&func) : func(func){
-    
-  } 
-  ~Defer() {
-    func();
-  }
-};
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);

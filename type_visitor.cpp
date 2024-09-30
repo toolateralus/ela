@@ -50,7 +50,7 @@ std::any TypeVisitor::visit(ASTProgram *node) {
   }
   return {};
 }
-std::any TypeVisitor::visit(ASTFuncDecl *node) {
+std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 
   node->return_type->accept(this);
   node->params->accept(this);
@@ -61,8 +61,13 @@ std::any TypeVisitor::visit(ASTFuncDecl *node) {
   info.params_len = 0;
   info.default_params = 0;
   info.meta_type = node->meta_type;
+  
+  if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
+    info.is_varargs = true;
+  } 
 
   auto params = node->params->params;
+  
   for (const auto &param : params) {
     if (param->default_value.is_not_null())
       info.default_params++;
@@ -192,10 +197,23 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
+
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
-  // TODO: relational expressions need to have their operands type checked, but
+  
+  // TODO: @Verify
+  // type inference declaration operator, always just assign left to equal the right type.
+  // perhaps this isn't the best move, but I'm unsure 2024-09-30 07:54:07
+  if (node->op.type == TType::ColonEquals) {
+    left = right; 
+    if (auto iden = dynamic_cast<ASTIdentifier*>(node->left)) {
+      context.current_scope->insert(iden->value.value, left); 
+    }
+  }
+  
+  // TODO(Josh) 9/30/2024, 8:24:17 AM 
+  // relational expressions need to have their operands type checked, but
   // right now that would involve casting scalars to each other, which makes no
   // sense.
   if (node->op.is_relational()) {
@@ -206,6 +224,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
         right, left, node->source_range,
         "invalid types in binary expression. expected: {}, got {}", "");
   }
+  
   node->resolved_type = left;
   return left;
 }
@@ -310,10 +329,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
   }
 
   for (int i = 0; i < info->params_len; ++i) {
+    
     // TODO: default parameters evade type checking
     if (arg_tys.size() <= i) {
       continue;
     }
+    
     validate_type_compatability(
         arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",

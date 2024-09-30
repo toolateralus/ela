@@ -73,7 +73,7 @@ std::string get_cpp_scalar_type(int id) {
   auto type = get_type(id);
   std::string name = "";
   if (type->base == "s64")
-    name = "size_t";
+    name = "int64_t";    
   else if (type->base == "s32")
     name = "int32_t";
   else if (type->base == "s16")
@@ -81,7 +81,7 @@ std::string get_cpp_scalar_type(int id) {
   else if (type->base == "s8")
     name = "int8_t";
   else if (type->base == "u64")
-    name = "uint64_t";
+    name = "size_t";
   else if (type->base == "u32")
     name = "uint32_t";
   else if (type->base == "u16")
@@ -89,7 +89,7 @@ std::string get_cpp_scalar_type(int id) {
   else if (type->base == "char" && type->extensions.is_pointer(1))
     name = "const char";
   else if (type->base == "u8" && type->extensions.is_pointer(1))
-    name = "const char";
+    name = "char";
   else if (type->base == "u8")
     name = "uint8_t";
   else if (type->base == "f32")

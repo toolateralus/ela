@@ -174,7 +174,7 @@ struct ASTParamsDecl : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct ASTFuncDecl : ASTStatement {
+struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
@@ -287,7 +287,7 @@ struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
 
   std::vector<ASTDeclaration *> fields;
-  std::vector<ASTFuncDecl *> methods;
+  std::vector<ASTFunctionDeclaration *> methods;
 
   std::any accept(VisitorBase *visitor) override;
 };
@@ -303,7 +303,7 @@ struct ASTInitializerList : ASTExpr {
 #define DECLARE_VISIT_METHODS()                                                \
   std::any visit(ASTProgram *node) override {}                                 \
   std::any visit(ASTBlock *node) override {}                                   \
-  std::any visit(ASTFuncDecl *node) override {}                                \
+  std::any visit(ASTFunctionDeclaration *node) override {}                                \
   std::any visit(ASTParamsDecl *node) override {}                              \
   std::any visit(ASTParamDecl *node) override {}                               \
   std::any visit(ASTDeclaration *node) override {}                             \
@@ -333,7 +333,7 @@ struct ASTInitializerList : ASTExpr {
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                \
   virtual std::any visit(ASTBlock *node) = 0;                                  \
-  virtual std::any visit(ASTFuncDecl *node) = 0;                               \
+  virtual std::any visit(ASTFunctionDeclaration *node) = 0;                               \
   virtual std::any visit(ASTParamsDecl *node) = 0;                             \
   virtual std::any visit(ASTParamDecl *node) = 0;                              \
   virtual std::any visit(ASTDeclaration *node) = 0;                            \
@@ -374,6 +374,7 @@ struct DirectiveRoutine {
 
 struct Parser {
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
   inline Token peek() const {
     if (states.empty()) {
@@ -482,7 +483,7 @@ struct Parser {
   ASTArguments *parse_arguments();
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
-  ASTFuncDecl *parse_function_declaration(Token);
+  ASTFunctionDeclaration *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTBlock *parse_block();
   ASTExpr *parse_expr();

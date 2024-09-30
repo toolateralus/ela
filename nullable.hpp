@@ -7,7 +7,7 @@ template<class T>
 struct Nullable {
   Nullable() {}
   Nullable(T *ptr) : ptr(ptr) {}
-  T *ptr;
+  T *ptr {};
   T *get() const {
     return ptr;
   }

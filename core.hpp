@@ -3,6 +3,7 @@
 #include "lex.hpp"
 #include <format>
 #include <fstream>
+#include <functional>
 #include <iostream>
 #include <sstream>
 #include <filesystem>
@@ -122,3 +123,12 @@ struct SourceRange {
   }
 };
 
+struct Defer {
+  const std::function<void()> func;
+  Defer(const std::function<void()> &&func) : func(func){
+    
+  } 
+  ~Defer() {
+    func();
+  }
+};

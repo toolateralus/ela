@@ -25,7 +25,7 @@ struct SerializeVisitor : VisitorBase {
   Context &context;
   std::string indent();
   std::any visit(ASTProgram *node) override;
-  std::any visit(ASTFuncDecl *node) override;
+  std::any visit(ASTFunctionDeclaration *node) override;
   std::any visit(ASTBlock *node) override;
   std::any visit(ASTParamsDecl *node) override;
   std::any visit(ASTParamDecl *node) override;
@@ -59,7 +59,7 @@ struct TypeVisitor : VisitorBase {
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTProgram *node) override;
-  std::any visit(ASTFuncDecl *node) override;
+  std::any visit(ASTFunctionDeclaration *node) override;
   std::any visit(ASTBlock *node) override;
   std::any visit(ASTParamsDecl *node) override;
   std::any visit(ASTParamDecl *node) override;
@@ -91,7 +91,8 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
 
-  Nullable<ASTStructDeclaration> current_struct_decl;
+  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   
   TypeVisitor &type_visitor;
   
@@ -142,13 +143,13 @@ struct EmitVisitor : VisitorBase {
     (*ss) <<' ';
   }
 
-  void emit_local_function(ASTFuncDecl *node);
-  void emit_forward_declaration(ASTFuncDecl *node);
-  void emit_foreign_function(ASTFuncDecl * node);
+  void emit_local_function(ASTFunctionDeclaration *node);
+  void emit_forward_declaration(ASTFunctionDeclaration *node);
+  void emit_foreign_function(ASTFunctionDeclaration * node);
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;
-  std ::any visit(ASTFuncDecl *node) override;
+  std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
   void cast_pointers_implicit(ASTDeclaration *&node);

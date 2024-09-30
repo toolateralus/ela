@@ -31,7 +31,7 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   ss << indent() << "}\n";
   return {};
 }
-std::any SerializeVisitor::visit(ASTFuncDecl *node) {
+std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
   
   if ((node->flags & FUNCTION_IS_CTOR) != 0 || (node->flags & FUNCTION_IS_DTOR) != 0) {
     ss << indent() << "constructor: ";
@@ -306,7 +306,7 @@ std::any ASTIdentifier::accept(VisitorBase *visitor) { return visitor->visit(thi
 std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTFuncDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTFunctionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTArguments::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };

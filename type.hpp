@@ -158,6 +158,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_METHOD = 1 << 2,
   FUNCTION_IS_CTOR = 1 << 3,
   FUNCTION_IS_DTOR = 1 << 4,
+  FUNCTION_IS_VARARGS = 1 << 5,
 };
 
 enum struct FunctionMetaType {
@@ -166,6 +167,9 @@ enum struct FunctionMetaType {
 };
 
 struct FunctionTypeInfo : TypeInfo {
+  FunctionTypeInfo() {
+    memset(parameter_types, -1, 256);
+  }
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.

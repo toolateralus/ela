@@ -1,14 +1,17 @@
 #foreign fabs :: (float f) -> float;
 #foreign abs :: (int n) -> int;
-#foreign malloc :: (s64 nbytes) -> void*;
+#foreign malloc :: (u64 nbytes) -> void*;
 #foreign free :: (void *ptr) -> void;
-#foreign system :: (u8* cmd) -> int;
+#foreign system :: (char* cmd) -> int;
+
 
 // TODO: fix this. we have conflicting declarations since we use crappy crap in boilerplate.hpp
 // We should probably just completely avoid having a 'boilerplate.hpp' and inject specific code circumstantially,
 // we shouldn't need much at all.
 
-#foreign memcpy :: (void *dest, void *src, s64 n) -> void*;
-#foreign memset :: (void *dest, int c, s64 n) -> void*;
+#foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
+#foreign memset :: (void *dest, int c, u64 n) -> void*;
 #foreign strlen :: (char *str) -> int;
 #foreign strcmp :: (char *str1, char *str2) -> int;
+
+#foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
