@@ -6,7 +6,9 @@
 #include "nullable.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include <algorithm>
 #include <any>
+#include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <format>
@@ -14,6 +16,7 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 #include <vector>
+#include <cmath>
 
 enum {
   ASTTYPE_EMIT_OBJECT,
@@ -297,6 +300,10 @@ struct ASTEnumDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTNoop : ASTStatement {
+  std::any accept(VisitorBase *visitor) override;
+};
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                \
@@ -429,9 +436,10 @@ struct Parser {
   inline Token expect(TType type) {
     fill_buffer_if_needed();
     if (peek().type != type) {
+      SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
       throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
                               TTypeToString(peek().type), peek().value),
-                  ERROR_CRITICAL, {token_idx, token_idx + 1});
+                  ERROR_CRITICAL, range);
     }
     return eat();
   }
@@ -462,7 +470,7 @@ struct Parser {
       } else {
         throw_error("Invalid directive in expression: directives in "
                     "expressions must return a value.",
-                    ERROR_FAILURE, {token_idx, token_idx + 5});
+                    ERROR_FAILURE, {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
       }
     }
     return nullptr;

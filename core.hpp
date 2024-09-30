@@ -119,7 +119,7 @@ struct SourceRange {
   int64_t begin, end;
   int64_t begin_loc, end_loc;
   std::span<Token> get_tokens() const {
-    return std::span<Token>(all_tokens).subspan(begin, end - begin);
+    return std::span<Token>(all_tokens).subspan(std::max(int64_t(), begin), std::min(end - begin, (int64_t)all_tokens.size()));
   }
 };
 

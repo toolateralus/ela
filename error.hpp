@@ -47,12 +47,11 @@ static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
   error_table[errid] = new (memory) Error(message, severity, source_range);
 
   std::stringstream ss;
-  if (!source_range.empty()) {
-    auto span = source_range.get_tokens();
-    ss << "\e[31m" << span.front().location.ToString() << "\e[0m\n";
-    for (const auto &tok : span) {
-      ss << "\e[41;1;37m" << tok.value << " \e[0m";
-    }
+  
+  auto span = source_range.get_tokens();
+  ss << "\e[31m" << span.front().location.ToString() << "\e[0m\n";
+  for (const auto &tok : span) {
+    ss << "\e[41;1;37m" << tok.value << " \e[0m";
   }
 
   const auto token_str = ss.str();

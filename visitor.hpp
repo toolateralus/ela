@@ -15,6 +15,10 @@ struct VisitorBase {
   
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
+  
+  std::any visit(ASTNoop *noop) {
+    return {};
+  }
 };
 
 

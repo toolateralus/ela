@@ -1,13 +1,9 @@
 #pragma once
 
-
-#include "lex.hpp"
 #include "type.hpp"
-#include <deque>
 #include <jstl/memory/arena.hpp>
 #include <string>
 #include <unordered_map>
-#include <unordered_set>
 
 // TODO(Josh) Add scope flags? so we can tell stuff like executing, declaring,
 // possibly returns, breaks, continues, etc.
@@ -18,18 +14,22 @@
 extern jstl::Arena scope_arena;
 
 struct Symbol {
+  // the identifier.
   std::string name;
-  int type_id;
+  // if this is a type alias, this
+  // is the type that this identifier points to.
+  int type_id; 
+  // is this a type alias?
+  bool type_alias;
 };
 
 struct Scope {
   bool is_struct_scope = false;
-  
   std::unordered_map<std::string, Symbol> symbols;
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
   }
-  inline void insert(const std::string &name, int type_id) {
+  inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {
     symbols[name] = Symbol{name, type_id};
   }
   inline Symbol *lookup(const std::string &name) {
@@ -42,6 +42,26 @@ struct Scope {
   }
   inline void erase(const std::string &name) {
     symbols.erase(name);
+  }
+  
+  inline void on_scope_enter() {
+    for (const auto &[id, sym]: symbols) {
+      if (sym.type_alias) {
+        auto pointed_to = get_type(sym.type_id);
+        pointed_to->aliases.push_back(id);
+      }
+    }
+  }
+  inline void on_scope_exit() {
+    for (const auto &[id, sym]: symbols) {
+      if (sym.type_alias) {
+        auto pointed_to = get_type(sym.type_id);
+        auto it = std::find(pointed_to->aliases.begin(), pointed_to->aliases.end(), sym.name);
+        
+        if (it != pointed_to->aliases.end())
+          pointed_to->aliases.erase(it);
+      }
+    }
   }
   
 };
@@ -68,11 +88,13 @@ struct Context {
       scope = create_child(current_scope);
     }
     current_scope = scope;
+    scope->on_scope_enter();
     //printf("entering scope: %p\n", current_scope);
   }
   inline Scope *exit_scope() {
     auto scope = current_scope;
     if (current_scope) {
+      current_scope->on_scope_exit();
       current_scope = current_scope->parent;
     }
     return scope;

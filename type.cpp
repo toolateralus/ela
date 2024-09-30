@@ -41,7 +41,7 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
     if (type_extensions.has_no_extensions()) {
-      if (type->base == name && type->extensions.has_no_extensions()) {
+      if (type->names_match_or_alias(name) && type->extensions.has_no_extensions()) {
         return type->id;
       }
     }
@@ -49,26 +49,23 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
       return type->id;
   }
 
-  // BELOW IS JUST FOR CREATING TYPES WITH NEW EXTENSIONS. NEW FUNCTION TYPES
-  // MUST BE CREATED MANUALLY
+  // NOTE:below is just for creating types with new extensions. new function types, struct types, and enum types
+  // must be created manually
+  // this just creates pointer and array types of base 'name'
   int base_id = -1;
-
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
-    if (tinfo->base == name && tinfo->extensions.has_no_extensions()) {
+    if (tinfo->names_match_or_alias(name) && tinfo->extensions.has_no_extensions()) {
       base_id = tinfo->id;
       break;
     }
   }
-
   if (base_id != -1) {
     auto t = get_type(base_id);
     return create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
-
   return -1;
 }
-
 std::string get_cpp_scalar_type(int id) {
   auto type = get_type(id);
   std::string name = "";
@@ -116,7 +113,6 @@ std::string get_cpp_scalar_type(int id) {
 
   return type->extensions.to_cpp_string(name);
 }
-
 ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
                                      bool is_integral = false) {
   auto info = ast_alloc<ScalarTypeInfo>();
@@ -125,7 +121,6 @@ ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
   info->is_integral = is_integral;
   return info;
 }
-
 void init_type_system() {
   // Signed integers
   {
@@ -162,7 +157,6 @@ void init_type_system() {
   }
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
-
 constexpr bool type_is_numerical(const Type *t) {
   auto info = dynamic_cast<ScalarTypeInfo *>(t->info);
   if (!info)
@@ -174,7 +168,6 @@ constexpr bool type_is_numerical(const Type *t) {
          scalar == TYPE_U32 || scalar == TYPE_U64 || scalar == TYPE_FLOAT ||
          scalar == TYPE_DOUBLE;
 }
-
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
@@ -218,7 +211,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   return CONVERT_PROHIBITED;
 }
-
 std::string Type::to_string() const {
   switch (kind) {
   case TYPE_STRUCT:
@@ -270,7 +262,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 }
 bool Type::equals(const std::string &name,
                   const TypeExt &type_extensions) const {
-  if (name != this->base)
+  if (names_match_or_alias(name))
     return false;
   return type_extensions == this->extensions;
 }
@@ -302,7 +294,6 @@ std::string Type::to_cpp_string() const {
     return base;
   }
 }
-
 int remove_one_pointer_ext(int operand_ty,
                            const SourceRange &source_range) {
   auto ty = get_type(operand_ty);
@@ -375,8 +366,6 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
-
-
 int voidptr_type() {
   static int type = find_type_id(
       "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
@@ -406,10 +395,12 @@ int s64_type() {
   static int type = find_type_id("s64", {});
   return type;
 }
+
 int string_type() {
-  static int type = find_type_id("u8", {.extensions = {TYPE_EXT_POINTER}});
+  static int type = find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
+
 int f32_type() {
   static int type = find_type_id("f32", {});
   return type;

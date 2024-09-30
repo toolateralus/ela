@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <string>
 #include <vector>
 
 #include <jstl/containers/vector.hpp>
@@ -211,18 +212,31 @@ struct StructTypeInfo : TypeInfo {
 struct Context;
 
 struct Type {
-  const int id = -1;
+  const int id = invalid_id;
+  
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
   std::string base;
   TypeInfo *info;
   TypeExt extensions;
+  
   bool equals(const std::string &name,
               const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
-
-  std::string to_type_struct(Context &context);
-
+  
+  std::vector<std::string> aliases {};
+  
+  inline bool names_match_or_alias(const std::string &name) const {
+    return has_alias(name) || this->base == name;
+  }
+  
+  inline bool has_alias(const std::string &in_alias) const {
+    for (const auto &alias: aliases) {
+      if (alias == in_alias) return true;
+    }
+    return false;
+  }
+  
   Type(){};
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   Type(const Type &) = delete;
@@ -233,6 +247,7 @@ struct Type {
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
   std::string to_cpp_string() const;
+  std::string to_type_struct(Context &context);
   
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;
@@ -272,7 +287,8 @@ int s16_type();
 int s32_type();
 int s64_type();
 int f32_type();
-// u8 **
+
+// char *
 int string_type();
 
 int find_type_id(const std::string &name, const FunctionTypeInfo &info,

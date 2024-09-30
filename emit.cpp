@@ -595,3 +595,37 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
   (*ss) << "}";
   return {};
 }
+
+
+std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
+  use_header();
+  (*ss) << "enum " << node->type->base << "{\n";
+  int i = 0;
+  auto get_next_index= [&] {
+    int value;
+    if (node->is_flags) {
+      value = 1 << i;
+    } else {
+      value = i;
+    }
+    i++;
+    return value;
+  };
+  int n = 0;
+  for (const auto &[key, value]: node->key_values) {
+    (*ss) << key;
+    (*ss) << " = ";
+    if (value.is_not_null()) {
+      value.get()->accept(this);
+    } else {
+      (*ss) << std::to_string(get_next_index());
+    }
+    if (n != node->key_values.size() - 1) {
+      (*ss) << ",\n";
+    }
+    n++;
+  }
+  (*ss) << "\n};";
+  use_code();
+  return {};
+}
