@@ -125,6 +125,17 @@ struct SourceRange {
   }
 };
 
+
+static std::string get_source_filename(const SourceRange &range) {
+  auto tokens = range.get_tokens();
+  if (tokens.empty()) {
+    return "";
+  } 
+  auto token = tokens[0];
+  auto location = token.location;
+  return location.files()[location.file];
+}
+
 struct Defer {
   const std::function<void()> func;
   Defer(const std::function<void()> &&func) : func(func){

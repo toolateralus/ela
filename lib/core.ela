@@ -8,7 +8,7 @@
 #foreign memset :: (void *dest, int c, u64 n) -> void*;
 #foreign strlen :: (char *str) -> int;
 #foreign strcmp :: (char *str1, char *str2) -> int;
-
+#foreign strcat :: (char *dest, char *src) -> char*;
 #foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
 #foreign sprintf :: (u8 *buffer, char *format, ...) -> int;
 #foreign printf :: (char *format, ...) -> int;

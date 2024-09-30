@@ -300,9 +300,7 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           auto type =
-               find_type_id(aliased_type->base, aliased_type->extension_info);
-           parser->context.current_scope->insert(name.value, type, true);
+           parser->context.current_scope->insert(name.value, find_type_id(aliased_type->base, aliased_type->extension_info), true);
            return ast_alloc<ASTNoop>();
          }});
   }
@@ -1122,6 +1120,7 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
     }
+    
 
     else {
       break;

@@ -411,3 +411,15 @@ MyEnum :: enum {
   Xaryu i = 0;
   assert("type alias failed", i == 0);
 }
+
+// test aliases, and making lists of function pointers.
+#test test_function_pointers :: () {
+  #alias VoidFunction :: void();
+  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+  for s32 i; i < 10; ++i {
+    func[i] = &test_function_pointers;
+  }
+  for s32 i; i < 10; ++i {
+    assert("func failed to == itself", func[i] == &test_function_pointers)
+  }
+}

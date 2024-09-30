@@ -492,7 +492,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
 
   if (left_ty->kind != TYPE_STRUCT) {
-    throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE,
+    throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,
                 node->source_range);
   }
   

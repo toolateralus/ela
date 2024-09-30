@@ -1,5 +1,6 @@
 #pragma once
 #include "ast.hpp"
+#include "core.hpp"
 #include "nullable.hpp"
 #include "scope.hpp"
 #include <any>
@@ -94,6 +95,14 @@ struct TypeVisitor : VisitorBase {
 
 
 struct EmitVisitor : VisitorBase {
+  
+  void emit_line_directive(ASTNode* node) {
+    if (get_compilation_flag("no-line-directives")) {
+      return;
+    }
+    (*ss) << "\n#line " << std::to_string(node->source_range.begin_loc) << " \"" << get_source_filename(node->source_range) << "\"\n";
+  }
+  
   bool emit_default_args = false;
   int num_tests = 0;
 

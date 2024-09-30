@@ -1,19 +1,88 @@
 #import core;
 
-// BUG(Josh) 9/30/2024, 3:33:33 PM
-// TODO: figure out why we can't parse type extensions *, [], on aliases.
+#compiler_flags "-g"
 
-#alias VoidFunction :: void();
+string_hash :: (char *in) -> s64 {
+	s64 hash = 5381;
+	for u32 i = 0; in[i] != 0; ++i {
+		hash = ((hash << 5) + hash) + in[i];
+	}
+	return hash;
+}
 
-#alias Xaryu :: int*;
+hashtable_node :: struct {
+	char *key;
+	void *value;
+	hashtable_node *next;
+}
 
-int n;
+hashtable :: struct {
+	hashtable_node **buckets;
+	u32 size;
+  
+	#ctor :: (u32 _size) {
+		size = _size;
+		buckets = #make(hashtable_node**, malloc(sizeof(hashtable_node*) * size));
+		for u32 i = 0; i < size; ++i {
+			buckets[i] = null;
+		}
+	}
+  
+	insert :: (char *key, void *value) {
+    s64 hash = string_hash(key);
+    s64 index = hash % size;
+    hashtable_node *new_node = malloc(sizeof(hashtable_node));
+    new_node.key = key;
+    new_node.value = value;
+    new_node.next = buckets[index];
+    buckets[index] = new_node;
+  }
+	lookup :: (char *key) -> void* {
+    s64 hash = string_hash(key);
+    s64 index = hash % size;
+    hashtable_node *node = buckets[index];
+    while (node != null) {
+      if (strcmp(node.key, key) == 0) {
+        return node.value;
+      }
+      node = node.next;
+    }
+    return null;
+  }
+}
+
+ValueTag :: enum {
+  Int,
+}
+  
+Value :: struct {
+  int tag;
+  void *data;
+  
+  #ctor :: (int value) {
+    tag = ValueTag.Int;
+    data = malloc(sizeof(int));
+    intptr_data := #make(int*, data);
+    *intptr_data = value;
+  }
+  print :: () {
+    if (tag == ValueTag.Int) {
+      printf("value=%d\n", *#make(int*, data));
+    }
+  }
+}
 
 main :: () {
-  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
-  for s32 i; i < 10; ++i {
-    func[i] = &main;
-  }
-  printf("%p\n", func);
+	table := #make(hashtable, 10);
   
+  str := #make(char*, malloc(sizeof(char *) * 100 * 10));
+  
+  for s32 i; i < 100; ++i {
+    strcat(str, "V");
+    Value *val = malloc(sizeof(Value));
+    *val = #make(Value, i)
+    table.insert(str, #make(void*, val)); 
+    out_val := #make(Value*, table.lookup(str));
+    out_val.print();
+  }
 }

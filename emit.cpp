@@ -10,6 +10,7 @@
 #include <string>
 
 std::any EmitVisitor::visit(ASTCompAssign *node) {
+  emit_line_directive(node);
   (*ss) <<indent() << node->name.value << " ";
   (*ss) <<node->op.value << " ";
   node->expr->accept(this);
@@ -17,6 +18,7 @@ std::any EmitVisitor::visit(ASTCompAssign *node) {
 }
 
 std::any EmitVisitor::visit(ASTWhile *node) {
+  emit_line_directive(node);
   (*ss) <<indent() << "while ";
   if (node->condition.is_not_null()) {
     (*ss) <<"(";
@@ -30,6 +32,7 @@ std::any EmitVisitor::visit(ASTWhile *node) {
 }
 
 std::any EmitVisitor::visit(ASTElse *node) {
+  emit_line_directive(node);
   (*ss) <<" else ";
   if (node->_if.is_not_null()) {
     node->_if.get()->accept(this);
@@ -40,6 +43,7 @@ std::any EmitVisitor::visit(ASTElse *node) {
 }
 
 std::any EmitVisitor::visit(ASTIf *node) {
+  emit_line_directive(node);
   (*ss) <<indent() << "if (";
   node->condition->accept(this);
   (*ss) <<")";
@@ -52,6 +56,7 @@ std::any EmitVisitor::visit(ASTIf *node) {
 }
 
 std::any EmitVisitor::visit(ASTFor *node) {
+  emit_line_directive(node);
   const auto emit_range_based = [&] {
     auto v = node->value.range_based;
     (*ss) <<"auto ";
@@ -86,16 +91,19 @@ std::any EmitVisitor::visit(ASTFor *node) {
 }
 
 std::any EmitVisitor::visit(ASTBreak *node) {
+  emit_line_directive(node);
   indented("break");
   return {};  
 }
 
 std::any EmitVisitor::visit(ASTContinue *node) {
+  emit_line_directive(node);
   indented("continue");
   return {};
 }
 
 std::any EmitVisitor::visit(ASTReturn *node) {
+  emit_line_directive(node);
   indented("return");
   if (node->expression.is_not_null()) {
     space();
@@ -189,6 +197,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTExprStatement *node) {
+  emit_line_directive(node);
   (*ss) <<indent();
   node->expression->accept(this);
   return {};
@@ -204,6 +213,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 }
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
+  emit_line_directive(node);
   auto type = get_type(node->type->resolved_type);
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
@@ -256,6 +266,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
+  
   node->type->accept(this);
   (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
@@ -360,6 +371,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
+  emit_line_directive(node);
   
   auto last_func_decl = current_func_decl;
   current_func_decl = node;
@@ -443,6 +455,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTBlock *node) {
+  emit_line_directive(node);
   (*ss) <<(" {\n");
   indentLevel++;
   context.set_scope(node->scope);
@@ -463,6 +476,7 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 }
 
 std::any EmitVisitor::visit(ASTProgram *node) {
+  emit_line_directive(node);
   const auto testing = get_compilation_flag("test");
   
   header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
@@ -502,6 +516,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+  emit_line_directive(node);
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(type->info);
   
@@ -616,6 +631,7 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
 
 
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
+  emit_line_directive(node);
   use_header();
   (*ss) << "enum " << node->type->base << "{\n";
   int i = 0;
