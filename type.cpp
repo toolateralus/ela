@@ -350,11 +350,14 @@ int create_enum_type(const std::string &name,
                      const std::vector<std::string> &keys, bool is_flags) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
+  type_table[num_types] = type;
+  type->base = name;
+  
   auto info = new (type_alloc<EnumTypeInfo>()) EnumTypeInfo();
   info->is_flags = is_flags;
   info->keys = keys;
   type->info = info;
-  type_table[num_types] = type;
+  
   num_types += 1;
   return type->id;
 }

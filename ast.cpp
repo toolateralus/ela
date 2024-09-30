@@ -596,6 +596,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     }
     node->key_values.push_back({iden, value});
   }
+  
+  std::vector<std::string> keys;
+  for (const auto &[key, value]: node->key_values) {
+    keys.push_back(key);
+  }
+  node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
+  
   expect(TType::RCurly);
   return node;
 }
@@ -908,6 +915,8 @@ ASTExpr *Parser::parse_primary() {
   }
   case TType::Identifier: {
     auto range = begin_node();
+    auto name = tok.value;
+    
     if (find_type_id(tok.value, {}) != -1) {
       return parse_type();
     }

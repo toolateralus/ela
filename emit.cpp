@@ -523,14 +523,22 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTDotExpr *node) {
-  auto left_ty = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_type = get_type(left_ty);
+  auto left = std::any_cast<int>(node->left->accept(&type_visitor));
+  auto left_ty = get_type(left);
   
   auto op = ".";
-  if (left_type->extensions.is_pointer()) 
+  
+  if (left_ty->is_kind(TYPE_ENUM)) {
+    (*ss) << left_ty->base << "::";
+    node->right->accept(this);
+    return {};
+  }
+
+  
+  if (left_ty->extensions.is_pointer()) 
     op = "->";
   
-  auto left_info = static_cast<StructTypeInfo*>(left_type->info.get());;
+  auto left_info = static_cast<StructTypeInfo*>(left_ty->info.get());;
   auto previous_scope = context.current_scope;
   
   auto prev_parent = left_info->scope->parent;

@@ -461,15 +461,34 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
-
-
-  // TODO(Josh)
-    // this expression fails because we don't actually emulate stack scoping, so the calling scope has no idea where to get this identifier
-    // n := 10.0;
-    // printf("%s\n", v.xaryu(n).to_string().data);
-    //                       ^^^
-    //                      Error occurs here.   
-  // 9/30/2024, 10:58:15 AM
+  
+  // Get enum variant
+  if (left_ty->is_kind(TYPE_ENUM)) {
+    // TODO: make type->info not nullable. it should never be null.
+    auto info = static_cast<EnumTypeInfo*>(left_ty->info.get());
+    auto iden = dynamic_cast<ASTIdentifier*>(node->right);
+    
+    if (!iden) {
+      throw_error("cannot use a dot expression with a non identifer on the right hand side when referring to a enum.", ERROR_FAILURE, node->source_range);
+    }
+    
+    auto name = iden->value.value;
+    
+    bool found = false;
+    for (const auto &key: info->keys) {
+      if (name == key) {
+        found = true;
+        break;
+      }
+    }
+    
+    if (!found) {
+      throw_error("failed to find key in enum type.", ERROR_FAILURE, node->source_range);
+    }
+    
+    // TODO(Josh) Add a way to support more than just s32 types from enums. Ideally, we could even use const char* etc. 9/30/2024, 11:53:45 AM
+    return s32_type();
+  }
 
   if (left_ty->kind != TYPE_STRUCT) {
     throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE,
@@ -546,9 +565,7 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
 }
 
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
-  std::vector<std::string> keys;
   for (const auto &[key, value]: node->key_values) {
-    keys.push_back(key);
     if (value.is_not_null()) {
       if (node->is_flags) {
         throw_error("You shouldn't use a #flags enum to generate auto flags, and also use non-default values.", ERROR_FAILURE, node->source_range);
@@ -558,6 +575,5 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
       validate_type_compatability(type, s32_type(), node->source_range, "expected: {}, got : {}", "Cannot have non-integral types in enums");
     }
   }
-  node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
   return {};
 }

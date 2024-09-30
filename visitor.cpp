@@ -377,13 +377,20 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   (*ss) << "enum " << node->type->base << "{\n";
   int i = 0;
   auto get_next_index= [&] {
-    return  node->is_flags ? i++ : 1 << i++;
+    int value;
+    if (node->is_flags) {
+      value = 1 << i;
+    } else {
+      value = i;
+    }
+    i++;
+    return value;
   };
   int n = 0;
   for (const auto &[key, value]: node->key_values) {
     (*ss) << key;
+    (*ss) << " = ";
     if (value.is_not_null()) {
-      (*ss) << " = ";
       value.get()->accept(this);
     } else {
       (*ss) << std::to_string(get_next_index());

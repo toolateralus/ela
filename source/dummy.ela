@@ -8,6 +8,6 @@ Banana :: enum  {
 }
 
 main :: () {
-  
+  printf("%d\n", Banana.Ripe);
 }
 
