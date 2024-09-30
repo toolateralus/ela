@@ -9,6 +9,7 @@
 #include <filesystem>
 #include <format>
 #include <fstream>
+#include <set>
 
 void Parser::init_directive_routines() {
   // #include
@@ -598,6 +599,7 @@ ASTBlock *Parser::parse_block() {
 }
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
+  auto range = begin_node();
   auto node = ast_alloc<ASTEnumDeclaration>();
   node->type = ast_alloc<ASTType>();
   node->type->base = tok.value;
@@ -616,13 +618,18 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     node->key_values.push_back({iden, value});
   }
   
+  end_node(node, range);
+  
   std::vector<std::string> keys;
+  std::set<std::string> keys_set;
   for (const auto &[key, value]: node->key_values) {
+    if (keys_set.contains(key)) {
+      throw_error(std::format("redefinition of enum variant: {}", key), ERROR_FAILURE, node->source_range);
+    }
     keys.push_back(key);
+    keys_set.insert(key);
   }
-  
   node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
-  
   expect(TType::RCurly);
   return node;
 }
