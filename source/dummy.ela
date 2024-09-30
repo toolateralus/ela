@@ -1,8 +1,19 @@
 #import core;
 
+// BUG(Josh) 9/30/2024, 3:33:33 PM
+// TODO: figure out why we can't parse type extensions *, [], on aliases.
+
+#alias VoidFunction :: void();
+
+#alias Xaryu :: int*;
+
+int n;
+
 main :: () {
-  #alias Floaty :: f32;
-  #alias Xaryu :: Floaty;
-  Xaryu i = 100.0;
-  printf("%f\n", i);
+  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+  for s32 i; i < 10; ++i {
+    func[i] = &main;
+  }
+  printf("%p\n", func);
+  
 }

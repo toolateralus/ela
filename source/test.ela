@@ -339,16 +339,15 @@ Constructible :: struct {
   }
 }
 
-
 #test make_parameterless :: () {
   n := #make(Constructible);
   assert("default construction failed.", n.x == 10.0);
 }
 
 #test test_copy_make :: () {
-Constructible c;
-Constructible c1 = #make(Constructible, c);
-assert("failed to copy construct Constructible (struct)", c1.x == c.x);
+  Constructible c;
+  Constructible c1 = #make(Constructible, c);
+  assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
 #test test_make :: () {
@@ -405,4 +404,10 @@ MyEnum :: enum {
   value1 := MyEnum.Value;
   assert("MyEnum.Value failed to == 100 * 2", value1 == 100 * 2);
   assert("Zero case of enum did not equal 0", value == 0);
+}
+
+#test test_type_alias :: () {
+  #alias Xaryu :: int;
+  Xaryu i = 0;
+  assert("type alias failed", i == 0);
 }

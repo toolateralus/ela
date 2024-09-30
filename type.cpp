@@ -217,7 +217,7 @@ std::string Type::to_string() const {
   case TYPE_SCALAR:
     return base + extensions.to_string();
   case TYPE_FUNCTION:
-    return info->to_string();
+    return info->to_string() + extensions.to_string();
     break;
     case TYPE_ENUM: {
       return base;
@@ -284,12 +284,22 @@ std::string Type::to_cpp_string() const {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
     return extensions.to_cpp_string(this->base);
-  case TYPE_FUNCTION:
-    if (info)
-      return info->to_string();
-    else
-      return "invalid function type";
-    break;
+  case TYPE_FUNCTION: {
+    // TODO: make it so we don't just presume every func type is a func ptr.
+    // I have no idea how we'll do that
+    // This is a HOT mess.
+    auto info = static_cast<FunctionTypeInfo*>(this->info);
+    auto ret = get_type(info->return_type)->to_cpp_string();
+    std::string params = "(" + extensions.to_string() +")(";
+    for (int i = 0; i < info->params_len; ++i) {
+      params += get_type(info->parameter_types[i])->to_cpp_string();
+      if (i != info->params_len - 1) {
+        params += ", ";
+      }
+    }
+    params += ")";
+    return ret + params;
+  }
   case TYPE_ENUM:
     return base;
   }
@@ -467,4 +477,20 @@ std::string Type::to_type_struct(Context &context) {
   // context.type_info_strings.push_back(std::format("_type_info[{}] = new Type {{ .id = {}, .fields = {}, }}",  id, id, fields_ss.str()));
               
   // return std::format("_type_info[{}]", this->id);
+}
+
+
+std::string get_function_type_name(ASTFunctionDeclaration *decl) {
+  std::stringstream ss;
+  auto return_type = decl->return_type;
+  ss << get_type(return_type->resolved_type)->to_string();
+  ss << "(";
+  for (const auto &param: decl->params->params) {
+    ss << get_type(param->type->resolved_type)->to_string();
+    if (param != decl->params->params.back()) {
+      ss << ", ";
+    }
+  }
+  ss << ")";
+  return ss.str();
 }

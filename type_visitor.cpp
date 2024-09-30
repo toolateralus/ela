@@ -78,8 +78,8 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
-
-  auto type_id = find_type_id("", info, {});
+  
+  auto type_id = find_type_id(get_function_type_name(node), info, {});
 
   // insert function
   context.current_scope->insert(node->name.value, type_id);

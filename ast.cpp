@@ -35,28 +35,29 @@ void Parser::init_directive_routines() {
         }});
   }
 
-  // #raw 
+  // #raw
   // string literals delimited by #raw and can span multiple lines.
   // u8 *string = #raw string literal goes here #raw
   {
     directive_routines.push_back({
-      .identifier = "raw",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        std::string string;
-        while (parser->not_eof()) {
-          if (parser->peek().type == TType::Directive && parser->states.back().lookahead_buffer[1].value == "raw") {
-            parser->eat();
-            parser->eat();
-            break;
+        .identifier = "raw",
+        .kind = DIRECTIVE_KIND_EXPRESSION,
+        .run = [](Parser *parser) -> Nullable<ASTNode> {
+          std::string string;
+          while (parser->not_eof()) {
+            if (parser->peek().type == TType::Directive &&
+                parser->states.back().lookahead_buffer[1].value == "raw") {
+              parser->eat();
+              parser->eat();
+              break;
+            }
+            string += parser->eat().value;
           }
-          string += parser->eat().value;
-        }
-        auto literal = ast_alloc<ASTLiteral>();
-        literal->tag = ASTLiteral::RawString;
-        literal->value = string;
-        return literal;
-      },
+          auto literal = ast_alloc<ASTLiteral>();
+          literal->tag = ASTLiteral::RawString;
+          literal->value = string;
+          return literal;
+        },
     });
   }
 
@@ -113,24 +114,21 @@ void Parser::init_directive_routines() {
            auto function = ast_alloc<ASTFunctionDeclaration>();
            auto range = parser->begin_node();
            auto name = parser->expect(TType::Identifier);
-           
+
            auto v = name.value;
-           
+
            auto last_func_decl = parser->current_func_decl;
            parser->current_func_decl = function;
-           
-           Defer deferred =  {[&]{
-            parser->current_func_decl = last_func_decl;
-           }};
-           
+
+           Defer deferred = {
+               [&] { parser->current_func_decl = last_func_decl; }};
+
            if (parser->context.current_scope != parser->context.root_scope)
              throw_error(
                  std::format(
                      "cannot declare a non-top level foreign function:: {}",
                      name.value),
                  ERROR_CRITICAL, range);
-
-
 
            parser->expect(TType::DoubleColon);
            function->params = parser->parse_parameters();
@@ -231,38 +229,39 @@ void Parser::init_directive_routines() {
   // #make, which also serves as a casting and copy construction method, as well
   // as normal ctors.
   {
-    directive_routines.push_back({
-      .identifier = "make",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto range = parser->begin_node();
-        auto args = parser->parse_arguments();
-        auto type = args->arguments[0];
-        auto type_arg = dynamic_cast<ASTType *>(type);
-        if (!type_arg) {
-          parser->end_node(type, range);
-          throw_error("Expect a type as the first argument in a #make call.",
-                      ERROR_FAILURE, range);
-        }
-        args->arguments.erase(args->arguments.begin());
-        auto make = ast_alloc<ASTMake>();
-        make->type_arg = type_arg;
-        make->arguments = args;
-        make->kind = MAKE_CTOR;
-        parser->end_node(make, range);
+    directive_routines.push_back(
+        {.identifier = "make",
+         .kind = DIRECTIVE_KIND_EXPRESSION,
+         .run = [](Parser *parser) -> Nullable<ASTNode> {
+           auto range = parser->begin_node();
+           auto args = parser->parse_arguments();
+           auto type = args->arguments[0];
+           auto type_arg = dynamic_cast<ASTType *>(type);
+           if (!type_arg) {
+             parser->end_node(type, range);
+             throw_error("Expect a type as the first argument in a #make call.",
+                         ERROR_FAILURE, range);
+           }
+           args->arguments.erase(args->arguments.begin());
+           auto make = ast_alloc<ASTMake>();
+           make->type_arg = type_arg;
+           make->arguments = args;
+           make->kind = MAKE_CTOR;
+           parser->end_node(make, range);
 
-        if (type_arg->extension_info.is_pointer()) {
-          make->kind = MAKE_CAST;
-        }
-        if (type_arg->extension_info.is_fixed_sized_array()) {
-        throw_error("Cannot use #make on fixed array types.", ERROR_FAILURE, range);
-        }
-        return make;
-      }
-    });
+           if (type_arg->extension_info.is_pointer()) {
+             make->kind = MAKE_CAST;
+           }
+           if (type_arg->extension_info.is_fixed_sized_array()) {
+             throw_error("Cannot use #make on fixed array types.",
+                         ERROR_FAILURE, range);
+           }
+           return make;
+         }});
   }
 
-  // #compiler_flags, for adding stuff like linker options, -g etc from within your program or header.
+  // #compiler_flags, for adding stuff like linker options, -g etc from within
+  // your program or header.
   {
     directive_routines.push_back(
         {.identifier = "compiler_flags",
@@ -273,38 +272,39 @@ void Parser::init_directive_routines() {
            return nullptr;
          }});
   }
-  
+
   // #flags, for making an enum declaration auto increment with a flags value.
+  // #flags MyEnum :: enum {...};
   {
-    directive_routines.push_back({
-      .identifier = "flags",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        auto enum_decl = parser->parse_enum_declaration(name);
-        enum_decl->is_flags = true;
-        auto type = get_type(enum_decl->type->resolved_type);
-        auto info = static_cast<EnumTypeInfo*>(type->info);
-        info->is_flags = true;
-        return enum_decl;
-      }
-    });
+    directive_routines.push_back(
+        {.identifier = "flags",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) -> Nullable<ASTNode> {
+           auto name = parser->expect(TType::Identifier);
+           parser->expect(TType::DoubleColon);
+           auto enum_decl = parser->parse_enum_declaration(name);
+           enum_decl->is_flags = true;
+           auto type = get_type(enum_decl->type->resolved_type);
+           auto info = static_cast<EnumTypeInfo *>(type->info);
+           info->is_flags = true;
+           return enum_decl;
+         }});
   }
-  
+
+  // #alias for making type aliases. #alias NewName :: OldName;
   {
-    directive_routines.push_back({
-      .identifier = "alias",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        auto aliased_type = parser->parse_type();
-        auto type = find_type_id(aliased_type->base, aliased_type->extension_info);
-        parser->context.current_scope->insert(name.value, type, true);
-        return ast_alloc<ASTNoop>();
-      }
-    });
+    directive_routines.push_back(
+        {.identifier = "alias",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) -> Nullable<ASTNode> {
+           auto name = parser->expect(TType::Identifier);
+           parser->expect(TType::DoubleColon);
+           auto aliased_type = parser->parse_type();
+           auto type =
+               find_type_id(aliased_type->base, aliased_type->extension_info);
+           parser->context.current_scope->insert(name.value, type, true);
+           return ast_alloc<ASTNoop>();
+         }});
   }
 }
 
@@ -380,7 +380,7 @@ ASTStatement *Parser::parse_statement() {
           ERROR_CRITICAL, range);
     }
     return statement;
-  // Increment/ Decrement statements;
+    // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
@@ -477,14 +477,14 @@ ASTStatement *Parser::parse_statement() {
     statement->expression = expr;
     end_node(statement, range);
     return statement;
-  // subscript assignment
+    // subscript assignment
   } else if ((tok.type == TType::Identifier &&
-       lookahead_buf()[1].type == TType::LBrace) ||
-      (tok.type == TType::Identifier &&
-       lookahead_buf()[1].type == TType::Dot) ||
-      lookahead_buf()[1].type == TType::Assign ||
-      lookahead_buf()[1].type == TType::ColonEquals ||
-      lookahead_buf()[1].type == TType::LParen) {
+              lookahead_buf()[1].type == TType::LBrace) ||
+             (tok.type == TType::Identifier &&
+              lookahead_buf()[1].type == TType::Dot) ||
+             lookahead_buf()[1].type == TType::Assign ||
+             lookahead_buf()[1].type == TType::ColonEquals ||
+             lookahead_buf()[1].type == TType::LParen) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
@@ -519,17 +519,20 @@ ASTStatement *Parser::parse_statement() {
       end_node(enum_decl, range);
       return enum_decl;
     } else {
-      throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", ERROR_FAILURE, range);
+      throw_error("invalid :: statement, expected '(' (for a function), "
+                  "'struct', or 'enum",
+                  ERROR_FAILURE, range);
     }
   }
 
-  // TODO: We should make it more clear where and how this failed. Right now, we get an unexpected token with no info when
-  // we use a non-existent type etc
+  // TODO: We should make it more clear where and how this failed. Right now, we
+  // get an unexpected token with no info when we use a non-existent type etc
   eat();
-  
-  throw_error(
-      std::format("Unexpected token when parsing statement: {}.. This is likely an undefined type.", tok.value),
-      ERROR_CRITICAL, range);
+
+  throw_error(std::format("Unexpected token when parsing statement: {}.. This "
+                          "is likely an undefined type.",
+                          tok.value),
+              ERROR_CRITICAL, range);
 }
 
 ASTDeclaration *Parser::parse_declaration() {
@@ -556,12 +559,12 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
     range.begin = range.begin - 1;
-  
+
   auto function = ast_alloc<ASTFunctionDeclaration>();
-  
+
   auto last_func_decl = current_func_decl;
   current_func_decl = function;
-  
+
   const auto isnt_ctor_or_dtor =
       current_struct_decl.is_not_null() &&
       current_struct_decl.get()->type->base != name.value;
@@ -609,10 +612,10 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   node->type = ast_alloc<ASTType>();
   node->type->base = tok.value;
   expect(TType::LCurly);
-  
+
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
-    ASTExpr* value = nullptr;
+    ASTExpr *value = nullptr;
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
@@ -622,19 +625,21 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     }
     node->key_values.push_back({iden, value});
   }
-  
+
   end_node(node, range);
-  
+
   std::vector<std::string> keys;
   std::set<std::string> keys_set;
-  for (const auto &[key, value]: node->key_values) {
+  for (const auto &[key, value] : node->key_values) {
     if (keys_set.contains(key)) {
-      throw_error(std::format("redefinition of enum variant: {}", key), ERROR_FAILURE, node->source_range);
+      throw_error(std::format("redefinition of enum variant: {}", key),
+                  ERROR_FAILURE, node->source_range);
     }
     keys.push_back(key);
     keys_set.insert(key);
   }
-  node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
+  node->type->resolved_type =
+      create_enum_type(node->type->base, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
 }
@@ -661,7 +666,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     for (const auto &statement : block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
         decl->fields.push_back(field);
-      } else if (auto fn_decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
+      } else if (auto fn_decl =
+                     dynamic_cast<ASTFunctionDeclaration *>(statement)) {
         decl->methods.push_back(fn_decl);
       } else {
         throw_error(
@@ -692,19 +698,20 @@ ASTExpr *Parser::parse_assignment() {
   auto range = begin_node();
   ASTExpr *left = parse_logical_or();
   if (peek().type == TType::Assign || peek().type == TType::ColonEquals) {
-    
-    // TODO(Josh) 9/30/2024, 8:34:56 AM Fix this, its far too limited. 
+
+    // TODO(Josh) 9/30/2024, 8:34:56 AM Fix this, its far too limited.
     // Once we have multiple return values, this will prove to be a problem
-    
+
     // for n := v, we need to place this declaration in the symbol table
-    // there's probably a better way to do this than in the expression hierarchy.
+    // there's probably a better way to do this than in the expression
+    // hierarchy.
     if (peek().type == TType::ColonEquals) {
-      auto iden = dynamic_cast<ASTIdentifier*>(left);
+      auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (iden) {
         context.current_scope->insert(iden->value.value, -1);
       }
     }
-    
+
     auto op = eat();
     auto right = parse_assignment();
     auto binexpr = ast_alloc<ASTBinExpr>();
@@ -886,12 +893,13 @@ ASTExpr *Parser::parse_unary() {
   return parse_postfix();
 }
 ASTExpr *Parser::parse_postfix() {
-  auto range = begin_node();  
+  auto range = begin_node();
   auto left = parse_primary();
 
   // build dot and subscript expressions
-  while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::LParen) {
-    
+  while (peek().type == TType::Dot || peek().type == TType::LBrace ||
+         peek().type == TType::LParen) {
+
     // TODO: make it so we don't have to have a name to call a function
     // This is ambitious but might be nice.
     if (peek().type == TType::LParen) {
@@ -900,8 +908,7 @@ ASTExpr *Parser::parse_postfix() {
         auto tok = identifier->value;
         left = parse_call(tok);
       }
-    }
-    else if (peek().type == TType::Dot) {
+    } else if (peek().type == TType::Dot) {
       eat();
       auto dot = ast_alloc<ASTDotExpr>();
       dot->type = ast_alloc<ASTType>();
@@ -948,7 +955,7 @@ ASTExpr *Parser::parse_primary() {
   case TType::Identifier: {
     auto range = begin_node();
     auto name = tok.value;
-    
+
     if (find_type_id(tok.value, {}) != -1) {
       return parse_type();
     }
@@ -1032,6 +1039,67 @@ ASTExpr *Parser::parse_primary() {
   }
   }
 }
+
+ASTType *Parser::parse_function_type(const std::string &base,
+                                     TypeExt extension_info) {
+  auto return_type = ast_alloc<ASTType>();
+  return_type->base = base;
+  return_type->extension_info = extension_info;
+
+  expect(TType::LParen);
+  std::vector<ASTType *> param_types;
+  while (peek().type != TType::RParen) {
+    auto param_type = parse_type();
+    param_types.push_back(param_type);
+    if (peek().type == TType::Comma) {
+      expect(TType::Comma);
+    } else {
+      break;
+    }
+  }
+  expect(TType::RParen);
+  FunctionTypeInfo info{};
+  info.return_type =
+      find_type_id(return_type->base, return_type->extension_info);
+  int i = 0;
+  std::string params_type_str = "(";
+  for (const auto &type : param_types) {
+    info.parameter_types[i] = find_type_id(type->base, type->extension_info);
+    auto ty = get_type(info.parameter_types[i]);
+    params_type_str += ty->to_string();
+    if (type != param_types.back()) {
+      params_type_str += ", ";
+    }
+    ++i;
+  }
+  params_type_str += ")";
+  auto return_type_str = get_type(info.return_type)->to_string();
+  auto type_name = return_type_str + params_type_str;
+  auto id = find_type_id(type_name, info, {});
+  return_type->resolved_type = id;
+  return_type->base = type_name;
+  return_type->extension_info = {};
+  while (peek().type == TType::Mul || peek().type == TType::LBrace) {
+    if (peek().type == TType::Mul) {
+      eat();
+      return_type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
+    }
+    else if (peek().type == TType::LBrace) {
+      return_type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
+      expect(TType::LBrace);
+      if (peek().type == TType::Integer) {
+        auto integer = expect(TType::Integer);
+        return_type->extension_info.array_sizes.push_back(
+            std::stoi(integer.value));
+      } else {
+        return_type->extension_info.array_sizes.push_back(-1);
+      }
+      expect(TType::RBrace);
+    }
+  }
+  return return_type;
+}
+
 ASTType *Parser::parse_type() {
   auto range = begin_node();
   auto base = eat().value;
@@ -1043,7 +1111,6 @@ ASTType *Parser::parse_type() {
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
         auto integer = expect(TType::Integer);
-        ;
         extension_info.array_sizes.push_back(std::stoi(integer.value));
       } else {
         extension_info.array_sizes.push_back(-1);
@@ -1052,7 +1119,11 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else {
+    } else if (peek().type == TType::LParen) {
+      return parse_function_type(base, extension_info);
+    }
+
+    else {
       break;
     }
   }
@@ -1068,16 +1139,18 @@ ASTParamsDecl *Parser::parse_parameters() {
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
   while (peek().type != TType::RParen) {
-    
+
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
-        throw_error("Cannot use varargs outside of a function declaration. Only use this for #foreign functions.", ERROR_FAILURE, range);
+        throw_error("Cannot use varargs outside of a function declaration. "
+                    "Only use this for #foreign functions.",
+                    ERROR_FAILURE, range);
       }
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
-    
+
     auto type = parse_type();
     auto name = expect(TType::Identifier).value;
 
@@ -1119,7 +1192,7 @@ ASTArguments *Parser::parse_arguments() {
     }
   }
   expect(TType::RParen);
-  
+
   end_node(args, range);
   return args;
 }
@@ -1132,5 +1205,3 @@ ASTCall *Parser::parse_call(const Token &name) {
   end_node(call, range);
   return call;
 }
-
-

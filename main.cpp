@@ -138,12 +138,13 @@ Context::Context() {
     assert_info.parameter_types[0] = string_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
-    current_scope->insert("assert", find_type_id("", assert_info, {}));
+    current_scope->insert("assert", find_type_id("void(char *, bool)", assert_info, {}));
 
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = find_type_id("s64", {});
     sizeof_info.is_varargs = true;
-    current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
+    // no other function will ever use this type. thats why we have a ?, because we have no first class types yet.
+    current_scope->insert("sizeof", find_type_id("s64(?)", sizeof_info, {}));
     root_scope = current_scope;  
   }
   

@@ -118,6 +118,7 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = get_type(node->resolved_type);
+  
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
     return {};
@@ -221,6 +222,23 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       init += "}";
       (*ss) << init;
     }
+  } else if (type->is_kind(TYPE_FUNCTION) && type->extensions.is_pointer()) {
+    auto type_str = type->to_cpp_string();
+    std::string name = node->name.value;
+    
+    size_t pos = type_str.find_last_of('*');
+    if (pos != std::string::npos) {
+        type_str.insert(pos + 1, name);
+    }
+    (*ss) << type_str;
+    space();
+    if (node->value.is_not_null()) {
+      (*ss) <<" = ";
+      cast_pointers_implicit(node);
+      node->value.get()->accept(this);
+    } else {
+      (*ss) <<"{}";
+    }
   } else {
     node->type->accept(this);
     space();
@@ -233,7 +251,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
     } else {
       (*ss) <<"{}";
     }
-  }
+  } 
   return {};
 }
 

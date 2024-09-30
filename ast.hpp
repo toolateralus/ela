@@ -488,6 +488,7 @@ struct Parser {
   }
 
   ASTType *parse_type();
+  ASTType *parse_function_type(const std::string&, TypeExt);
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();

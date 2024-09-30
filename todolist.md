@@ -18,7 +18,7 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
   - Ranges, slicing. `0..10, 0..len+1, arr[0..5]`;
   - Iterators builtin? probably not needed, but added to stdlib.
   
-  - Type aliasing. -- very neccesary for `$T` type args for polymorphic functions
+  ## these depend on function overloading
   - Polymorphic functions and polymorphic types. Like C++ templates, but less obnoxious.
 
   

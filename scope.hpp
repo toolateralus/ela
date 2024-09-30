@@ -27,6 +27,7 @@ struct Scope {
   bool is_struct_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
   Scope *parent = nullptr;
+  
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
   }
   inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {

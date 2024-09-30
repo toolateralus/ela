@@ -254,6 +254,10 @@ struct Type {
   constexpr static int invalid_id = -1;
 };
 
+
+struct ASTFunctionDeclaration;
+std::string get_function_type_name(ASTFunctionDeclaration *);
+
 template <class T> T *type_alloc(size_t n = 1) {
   auto mem = type_arena.allocate(sizeof(T) * n);
   return new (mem) T();
