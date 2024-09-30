@@ -83,6 +83,6 @@ main :: () {
     *val = #make(Value, i)
     table.insert(str, #make(void*, val)); 
     out_val := #make(Value*, table.lookup(str));
-    out_val.print();
+    //out_val.print();
   }
 }

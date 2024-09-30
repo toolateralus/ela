@@ -53,11 +53,16 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
   original_path = std::filesystem::current_path();
   std::filesystem::current_path(
       std::filesystem::canonical(input_path).parent_path());
+      
+  parse.begin();
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
+  parse.end(std::format("Parsed {} tokens", all_tokens.size()));
   return root;
 }
 void CompileCommand::emit_code(ASTProgram *root, Context &context) {
+  
+  lower.begin();
   TypeVisitor type_visitor{context};
   type_visitor.visit(root);
 
@@ -73,7 +78,7 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
 
   EmitVisitor emit(context, type_visitor);
   emit.visit(root);
-
+  lower.end("lowering to cpp complete");
   auto header = emit.get_header();
   std::filesystem::path header_output_path = output_path;
   header_output_path.replace_extension(".hpp");
@@ -101,14 +106,13 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
                      output_path.string(), binary_path.string());
                      
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
-  
+  cpp.begin();
   system(compilation_string.c_str());
-
+  cpp.end("compiling and linking cpp");
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
     std::filesystem::remove(header_output_path);
   }
-
   std::filesystem::current_path(original_path);
 }
 bool CompileCommand::has_flag(const std::string &flag) const {
@@ -120,6 +124,7 @@ void CompileCommand::compile() {
   Context context;
   ASTProgram *root = process_ast(context);
   emit_code(root, context);
+  print_metrics();
 }
 
 bool get_compilation_flag(const std::string &flag) {

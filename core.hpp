@@ -1,10 +1,12 @@
 #pragma once
 
 #include "lex.hpp"
+#include <chrono>
 #include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
+#include <ratio>
 #include <sstream>
 #include <filesystem>
 #include <unordered_map>
@@ -15,7 +17,48 @@
 struct ASTProgram;
 struct Context;
 
+struct CompilationMetric {
+  std::string id;
+  std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
+  std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
+  std::chrono::duration<double> duration;
+  void begin() {
+    start_time = std::chrono::high_resolution_clock::now();
+  }
+  void end(const std::string &note) {
+    id = note;
+    end_time = std::chrono::high_resolution_clock::now();
+    duration = end_time - start_time;
+  }
+  
+  std::string get_time() {
+      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+      if (ms >= 1000) {
+          auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+          return std::to_string(sec) + " s";
+      } else if (ms >= 1) {
+          return std::to_string(ms) + " ms";
+      } else {
+          auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+          return std::to_string(us) + " µs";
+      }
+  }
+};
+
 struct CompileCommand {
+  
+   void print_metrics() {
+      if (has_flag("metrics")) {
+        std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
+        std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
+        std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
+      }
+  }
+  
+  CompilationMetric parse;
+  CompilationMetric lower;
+  CompilationMetric cpp;
+  
   CompileCommand() = default;
   std::filesystem::path input_path;
   std::filesystem::path output_path;
