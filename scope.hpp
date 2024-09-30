@@ -30,7 +30,13 @@ struct Scope {
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
   }
   inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {
-    symbols[name] = Symbol{name, type_id};
+    symbols[name] = Symbol{name, type_id, is_type_alias};
+    
+    if (is_type_alias) {
+      auto ty = get_type(type_id);
+      ty->aliases.push_back(name);
+    }
+    
   }
   inline Symbol *lookup(const std::string &name) {
     if (symbols.find(name) != symbols.end()) {

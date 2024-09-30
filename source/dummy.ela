@@ -1,10 +1,8 @@
 #import core;
 
-push :: ($T* array, $T value) -> string {
-  
-}
-
 main :: () {
-  int* array = malloc(sizeof(int) * 10);
-  push(array, 10);
+  #alias Floaty :: f32;
+  #alias Xaryu :: Floaty;
+  Xaryu i = 100.0;
+  printf("%f\n", i);
 }

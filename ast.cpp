@@ -291,6 +291,21 @@ void Parser::init_directive_routines() {
       }
     });
   }
+  
+  {
+    directive_routines.push_back({
+      .identifier = "alias",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto name = parser->expect(TType::Identifier);
+        parser->expect(TType::DoubleColon);
+        auto aliased_type = parser->parse_type();
+        auto type = find_type_id(aliased_type->base, aliased_type->extension_info);
+        parser->context.current_scope->insert(name.value, type, true);
+        return ast_alloc<ASTNoop>();
+      }
+    });
+  }
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
@@ -352,7 +367,6 @@ ASTStatement *Parser::parse_statement() {
 
   auto range = begin_node();
   auto tok = peek();
-
   if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
@@ -366,16 +380,12 @@ ASTStatement *Parser::parse_statement() {
           ERROR_CRITICAL, range);
     }
     return statement;
-  }
-
   // Increment/ Decrement statements;
-  if (tok.type == TType::Increment || tok.type == TType::Decrement) {
+  } else if (tok.type == TType::Increment || tok.type == TType::Decrement) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     return statement;
-  }
-
-  if (tok.type == TType::LCurly) {
+  } else if (tok.type == TType::LCurly) {
     return parse_block();
   } else if (tok.type == TType::Return) {
     expect(TType::Return);
@@ -467,10 +477,8 @@ ASTStatement *Parser::parse_statement() {
     statement->expression = expr;
     end_node(statement, range);
     return statement;
-  }
-
   // subscript assignment
-  if ((tok.type == TType::Identifier &&
+  } else if ((tok.type == TType::Identifier &&
        lookahead_buf()[1].type == TType::LBrace) ||
       (tok.type == TType::Identifier &&
        lookahead_buf()[1].type == TType::Dot) ||
@@ -481,9 +489,7 @@ ASTStatement *Parser::parse_statement() {
     statement->expression = parse_expr();
     end_node(statement, range);
     return statement;
-  }
-
-  if (lookahead_buf()[1].is_comp_assign()) {
+  } else if (lookahead_buf()[1].is_comp_assign()) {
     if (tok.type != TType::Identifier) {
       throw_error(
           std::format("Compound assignment must target an identifier. Got {}",
@@ -497,12 +503,9 @@ ASTStatement *Parser::parse_statement() {
     comp_assign->expr = parse_expr();
     end_node(comp_assign, range);
     return comp_assign;
-  }
-
-  if (lookahead_buf()[1].type == TType::DoubleColon) {
+  } else if (lookahead_buf()[1].type == TType::DoubleColon) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
-    
     if (peek().type == TType::LParen) {
       auto node = parse_function_declaration(tok);
       end_node(node, range);
@@ -520,10 +523,12 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
+  // TODO: We should make it more clear where and how this failed. Right now, we get an unexpected token with no info when
+  // we use a non-existent type etc
   eat();
-
+  
   throw_error(
-      std::format("Unexpected token when parsing statement: {}", tok.value),
+      std::format("Unexpected token when parsing statement: {}.. This is likely an undefined type.", tok.value),
       ERROR_CRITICAL, range);
 }
 

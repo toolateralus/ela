@@ -262,7 +262,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 }
 bool Type::equals(const std::string &name,
                   const TypeExt &type_extensions) const {
-  if (names_match_or_alias(name))
+  if (!names_match_or_alias(name))
     return false;
   return type_extensions == this->extensions;
 }
