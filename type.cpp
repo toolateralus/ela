@@ -40,6 +40,8 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
 
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
+    auto base = type->base;
+    
     if (type_extensions.has_no_extensions()) {
       if (type->names_match_or_alias(name) && type->extensions.has_no_extensions()) {
         return type->id;
@@ -48,6 +50,9 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
     if (type->equals(name, type_extensions))
       return type->id;
   }
+  
+
+  
 
   // NOTE:below is just for creating types with new extensions. new function types, struct types, and enum types
   // must be created manually
@@ -64,6 +69,17 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
     auto t = get_type(base_id);
     return create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
+  
+  // linear search with extensions failed: for aliased types, 
+  // we may need to create a type with a non 'name' name.
+  // such as #alias intptr :: int*, where int* hasn't been used yet.
+  for (int i = 0; i < num_types; ++i) {
+    auto type = type_table[i];
+    if (type->has_alias(name) && type_extensions != type->extensions) {
+      return create_type(type->kind, type->base, type->info, type_extensions);
+    }
+  }
+  
   return -1;
 }
 std::string get_cpp_scalar_type(int id) {

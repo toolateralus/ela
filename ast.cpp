@@ -365,6 +365,13 @@ ASTStatement *Parser::parse_statement() {
 
   auto range = begin_node();
   auto tok = peek();
+  
+  if (find_type_id(tok.value, {}) != -1) {
+    auto decl = parse_declaration();
+    end_node(decl, range);
+    return decl;
+  }
+  
   if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
@@ -465,10 +472,6 @@ ASTStatement *Parser::parse_statement() {
     }
     end_node(node, range);
     return node;
-  } else if (find_type_id(tok.value, {}) != -1) {
-    auto decl = parse_declaration();
-    end_node(decl, range);
-    return decl;
   } else if (tok.type == TType::Mul) {
     auto expr = parse_expr();
     auto statement = ast_alloc<ASTExprStatement>();
@@ -1081,8 +1084,7 @@ ASTType *Parser::parse_function_type(const std::string &base,
     if (peek().type == TType::Mul) {
       eat();
       return_type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    }
-    else if (peek().type == TType::LBrace) {
+    } else if (peek().type == TType::LBrace) {
       return_type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
       if (peek().type == TType::Integer) {
@@ -1102,7 +1104,6 @@ ASTType *Parser::parse_type() {
   auto range = begin_node();
   auto base = eat().value;
   TypeExt extension_info;
-
   while (true) {
     if (peek().type == TType::LBrace) {
       extension_info.extensions.push_back(TYPE_EXT_ARRAY);
@@ -1119,14 +1120,10 @@ ASTType *Parser::parse_type() {
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
-    }
-
-
-    else {
+    } else {
       break;
     }
   }
-
   auto node = ast_alloc<ASTType>();
   node->base = base;
   node->extension_info = extension_info;
