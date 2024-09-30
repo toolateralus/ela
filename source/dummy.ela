@@ -37,6 +37,16 @@ main :: () -> int {
   shader.use();
   
   while !window.should_close() {
+    
+    u32 w = glfwGetKey(window.handle, GLFW_KEY_W);
+    
+    if w == GLFW_PRESS || w == GLFW_REPEAT {
+      for v; vertices {
+        v = v;
+      }
+      glBufferData(GL_ARRAY_BUFFER, sizeof(float) * 6 * 2, #make(float*, vertices), GL_STATIC_DRAW);
+    }
+    
     window.clear();
     glDrawArrays(GL_TRIANGLES, 0, 6);
     window.present();
