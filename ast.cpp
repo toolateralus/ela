@@ -230,29 +230,35 @@ void Parser::init_directive_routines() {
   // #make, which also serves as a casting and copy construction method, as well
   // as normal ctors.
   {
-    directive_routines.push_back(
-        {.identifier = "make",
-         .kind = DIRECTIVE_KIND_EXPRESSION,
-         .run = [](Parser *parser) -> Nullable<ASTNode> {
-           auto args = parser->parse_arguments();
-           auto type = args->arguments[0];
-           auto type_arg = dynamic_cast<ASTType *>(type);
-           if (!type_arg) {
-             throw_error("Expect a type as the first argument in a #make call.",
-                         ERROR_FAILURE, args->source_range);
-           }
-           args->arguments.erase(args->arguments.begin());
-           auto make = ast_alloc<ASTMake>();
-           make->type_arg = type_arg;
-           make->arguments = args;
-           make->kind = MAKE_CTOR;
+    directive_routines.push_back({
+      .identifier = "make",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto range = parser->begin_node();
+        auto args = parser->parse_arguments();
+        auto type = args->arguments[0];
+        auto type_arg = dynamic_cast<ASTType *>(type);
+        if (!type_arg) {
+          parser->end_node(type, range);
+          throw_error("Expect a type as the first argument in a #make call.",
+                      ERROR_FAILURE, range);
+        }
+        args->arguments.erase(args->arguments.begin());
+        auto make = ast_alloc<ASTMake>();
+        make->type_arg = type_arg;
+        make->arguments = args;
+        make->kind = MAKE_CTOR;
+        parser->end_node(make, range);
 
-           if (type_arg->extension_info.is_pointer()) {
-             make->kind = MAKE_CAST;
-           }
-
-           return make;
-         }});
+        if (type_arg->extension_info.is_pointer()) {
+          make->kind = MAKE_CAST;
+        }
+        if (type_arg->extension_info.is_fixed_sized_array()) {
+        throw_error("Cannot use #make on fixed array types.", ERROR_FAILURE, range);
+        }
+        return make;
+      }
+    });
   }
 
   {

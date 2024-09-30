@@ -42,9 +42,8 @@ Vec2 :: struct {
 }
 
 main :: () {
-	f32[100] v;
+	f32[100] v = #make(f32[100]);
   for i; v {
-    printf("%d\n", i);
+    printf("%f\n", i);
   }
-	
 }

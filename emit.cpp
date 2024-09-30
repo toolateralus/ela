@@ -207,15 +207,20 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;
-    std::string init = "{";
-    for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
-      auto elem = type->get_element_type();
-      auto ty = get_type(elem);
-      init += " " + ty->to_cpp_string() + "(),";
+    
+    if (node->value.is_not_null()) {
+      node->value.get()->accept(this);
+    } else {
+      std::string init = "{";
+      for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
+        auto elem = type->get_element_type();
+        auto ty = get_type(elem);
+        init += " " + ty->to_cpp_string() + "(),";
+      }
+      init.pop_back();
+      init += "}";
+      (*ss) << init;
     }
-    init.pop_back();
-    init += "}";
-    (*ss) << init;
   } else {
     node->type->accept(this);
     space();
