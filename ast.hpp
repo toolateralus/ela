@@ -290,6 +290,13 @@ struct ASTInitializerList : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTEnumDeclaration : ASTStatement {
+  bool is_flags = false;
+  ASTType* type;
+  std::vector<std::pair<std::string, Nullable<ASTExpr>>> key_values;
+  std::any accept(VisitorBase *visitor) override;
+};
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                \
@@ -320,6 +327,8 @@ struct ASTInitializerList : ASTExpr {
   std::any visit(ASTSubscript *node) override {}                               \
   std::any visit(ASTMake *node) override {}                                    \
   std::any visit(ASTInitializerList *node) override {}                         \
+  std::any visit(ASTEnumDeclaration *node) override {}                         \
+  
 
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
@@ -350,6 +359,7 @@ struct ASTInitializerList : ASTExpr {
   virtual std::any visit(ASTSubscript *node) = 0;                              \
   virtual std::any visit(ASTMake *node) = 0;                                   \
   virtual std::any visit(ASTInitializerList *node) = 0;                        \
+  virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -477,6 +487,8 @@ struct Parser {
   ASTDeclaration *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
+  ASTEnumDeclaration *parse_enum_declaration(Token);
+
   ASTBlock *parse_block();
   ASTExpr *parse_expr();
   ASTExpr *parse_assignment();

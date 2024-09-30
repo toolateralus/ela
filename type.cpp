@@ -218,29 +218,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   return CONVERT_PROHIBITED;
 }
-int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
-                const TypeExt &extensions) {
-  Type *type = new (type_alloc<Type>()) Type(num_types, kind);
-  type->info = info;
-  type->extensions = extensions;
-
-  type->base = name;
-
-  if (type->id > MAX_NUM_TYPES) {
-    throw_error("Max types exceeded", ERROR_CRITICAL, {});
-  }
-  if (type_table[type->id]) {
-    throw_error("type system created a type with the same ID twice",
-                ERROR_CRITICAL, {});
-  }
-
-  type_table[type->id] = type;
-  num_types += 1;
-  return type->id;
-}
 
 std::string Type::to_string() const {
-
   switch (kind) {
   case TYPE_STRUCT:
   case TYPE_SCALAR:
@@ -251,6 +230,9 @@ std::string Type::to_string() const {
     else
       return "invalid function type";
     break;
+    case TYPE_ENUM: {
+      return base;
+    }
   }
 }
 bool Type::operator==(const Type &type) const {
@@ -322,6 +304,8 @@ std::string Type::to_cpp_string() const {
     else
       return "invalid function type";
     break;
+  case TYPE_ENUM:
+    return base;
   }
 }
 
@@ -362,6 +346,39 @@ int create_struct_type(const std::string &name, Scope *scope) {
   num_types++;
   return type->id;
 }
+int create_enum_type(const std::string &name,
+                     const std::vector<std::string> &keys, bool is_flags) {
+  auto id = num_types;
+  auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
+  auto info = new (type_alloc<EnumTypeInfo>()) EnumTypeInfo();
+  info->is_flags = is_flags;
+  info->keys = keys;
+  type->info = info;
+  type_table[num_types] = type;
+  num_types += 1;
+  return type->id;
+}
+int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
+                const TypeExt &extensions) {
+  Type *type = new (type_alloc<Type>()) Type(num_types, kind);
+  type->info = info;
+  type->extensions = extensions;
+
+  type->base = name;
+
+  if (type->id > MAX_NUM_TYPES) {
+    throw_error("Max types exceeded", ERROR_CRITICAL, {});
+  }
+  if (type_table[type->id]) {
+    throw_error("type system created a type with the same ID twice",
+                ERROR_CRITICAL, {});
+  }
+
+  type_table[type->id] = type;
+  num_types += 1;
+  return type->id;
+}
+
 
 int voidptr_type() {
   static int type = find_type_id(

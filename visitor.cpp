@@ -321,9 +321,8 @@ std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->vi
 std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTInitializerList::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-}
+std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }
@@ -360,5 +359,41 @@ std::any SerializeVisitor::visit(ASTInitializerList *node) {
     ss << ", ";
   }
   ss << "}\n";
+  return {};
+}
+
+std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
+  ss << "enum : " << node->type->base;
+  for (const auto &[key, value]: node->key_values) {
+      ss << "\nkey: " << key;
+      ss << "value: ";
+      if (value.is_not_null()) value.get()->accept(this);
+  }
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
+  use_header();
+  (*ss) << "enum " << node->type->base << "{\n";
+  int i = 0;
+  auto get_next_index= [&] {
+    return  node->is_flags ? i++ : 1 << i++;
+  };
+  int n = 0;
+  for (const auto &[key, value]: node->key_values) {
+    (*ss) << key;
+    if (value.is_not_null()) {
+      (*ss) << " = ";
+      value.get()->accept(this);
+    } else {
+      (*ss) << std::to_string(get_next_index());
+    }
+    if (n != node->key_values.size() - 1) {
+      (*ss) << ",\n";
+    }
+    n++;
+  }
+  (*ss) << "\n};";
+  use_code();
   return {};
 }

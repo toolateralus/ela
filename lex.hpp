@@ -76,6 +76,7 @@ enum struct TType {
   Directive,
   Struct,
   ColonEquals,
+  Enum,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -85,6 +86,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Directive);
+    TTYPE_CASE(Enum);
     TTYPE_CASE(ColonEquals);
     TTYPE_CASE(Varargs);
     TTYPE_CASE(True);
@@ -252,6 +254,7 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> keywords{
+      {"enum", TType::Enum},
       {"return", TType::Return},
       {"break", TType::Break},
       {"continue", TType::Continue},

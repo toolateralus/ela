@@ -1,50 +1,13 @@
 #import core;
 
-string :: struct {
-	u8 *data;
-	u64 length;
-	#ctor :: () {}
-	#ctor :: (string other) {
-		data = malloc(sizeof(u8) * other.length);
-		memcpy(data, other.data, other.length);
-		length = other.length;
-		free(other.data);
-	}
-	#ctor :: (char *str) {
-		length = strlen(str);
-		data = malloc(sizeof(u8) * length);
-		memcpy(data, #make(u8*, str), length);
-	}
-	#dtor :: () {
-		if (data != null) {
-			free(data);
-		}
-	}
-}
-
-Vec2 :: struct {
-	f32 x;
-	f32 y;
-	#ctor :: (f32 _x, f32 _y) {
-		x = _x;
-		y = _y;
-	}
-	to_string :: () -> string {
-		char* str = malloc(sizeof(char) * 256);
-		snprintf(str, 256, "{ x: %f, y: %f }", x, y);
-		return #make(string, str);
-	}
-
-	xaryu :: (s32 f) -> Vec2 {
-		return #make(Vec2, f, 0.0);
-	}
-  
-  #ctor :: () {}
+Banana :: enum  {
+  Unripe,
+  Ripe,
+  Overripe,
+  Rotten,
 }
 
 main :: () {
-  n := 10;
-  Vec2 v;
-  printf("%s\n", v.xaryu(n).to_string().data);
-  printf("%d\n", n);
+  
 }
+

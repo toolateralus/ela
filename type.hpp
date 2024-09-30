@@ -33,6 +33,7 @@ enum TypeKind {
   TYPE_SCALAR,
   TYPE_FUNCTION,
   TYPE_STRUCT,
+  TYPE_ENUM,
 };
 
 // TODO: we need a way to declare and use function types from in language.
@@ -189,6 +190,11 @@ struct ScalarTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
+struct EnumTypeInfo : TypeInfo {
+  bool is_flags = false;
+  std::vector<std::string> keys;
+};
+
 struct ASTDeclaration;
 struct Scope;
 
@@ -245,6 +251,10 @@ int create_type(TypeKind kind, const std::string &name,
 
 int create_struct_type(const std::string &name,
                        Scope *scope);
+
+int create_enum_type(const std::string &name,
+                     const std::vector<std::string> &keys,
+                     bool is_keys = false);
 
 enum ConversionRule {
   CONVERT_PROHIBITED,

@@ -544,3 +544,20 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   // (int)node->expressions.size();
   return find_type_id(base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = { -1 }});
 }
+
+std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
+  std::vector<std::string> keys;
+  for (const auto &[key, value]: node->key_values) {
+    keys.push_back(key);
+    if (value.is_not_null()) {
+      if (node->is_flags) {
+        throw_error("You shouldn't use a #flags enum to generate auto flags, and also use non-default values.", ERROR_FAILURE, node->source_range);
+      }
+      auto expr = value.get();
+      auto type = int_from_any(value.get()->accept(this));
+      validate_type_compatability(type, s32_type(), node->source_range, "expected: {}, got : {}", "Cannot have non-integral types in enums");
+    }
+  }
+  node->type->resolved_type = create_enum_type(node->type->base, keys, node->is_flags);
+  return {};
+}

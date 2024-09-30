@@ -51,6 +51,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTSubscript *node) override;
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
+  std::any visit(ASTEnumDeclaration *node) override;
 };
 
 struct TypeVisitor : VisitorBase {
@@ -84,6 +85,7 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTSubscript *node) override;
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
+  std::any visit(ASTEnumDeclaration *node) override;
 };
 
 
@@ -174,4 +176,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTSubscript *node) override;
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
+  std::any visit(ASTEnumDeclaration *node) override;
 };

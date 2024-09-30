@@ -482,6 +482,7 @@ ASTStatement *Parser::parse_statement() {
   if (lookahead_buf()[1].type == TType::DoubleColon) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
+    
     if (peek().type == TType::LParen) {
       auto node = parse_function_declaration(tok);
       end_node(node, range);
@@ -490,6 +491,12 @@ ASTStatement *Parser::parse_statement() {
       auto struct_decl = parse_struct_declaration(tok);
       end_node(struct_decl, range);
       return struct_decl;
+    } else if (peek().type == TType::Enum) {
+      auto enum_decl = parse_enum_declaration(tok);
+      end_node(enum_decl, range);
+      return enum_decl;
+    } else {
+      throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", ERROR_FAILURE, range);
     }
   }
 
@@ -569,6 +576,28 @@ ASTBlock *Parser::parse_block() {
   block->scope = context.exit_scope();
   end_node(block, range);
   return block;
+}
+ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
+  expect(TType::Enum);
+  auto node = ast_alloc<ASTEnumDeclaration>();
+  node->type = ast_alloc<ASTType>();
+  node->type->base = tok.value;
+  expect(TType::LCurly);
+  
+  while (peek().type != TType::RCurly) {
+    auto iden = expect(TType::Identifier).value;
+    ASTExpr* value = nullptr;
+    if (peek().type == TType::Assign) {
+      expect(TType::Assign);
+      value = parse_expr();
+    }
+    if (peek().type == TType::Comma) {
+      eat();
+    }
+    node->key_values.push_back({iden, value});
+  }
+  expect(TType::RCurly);
+  return node;
 }
 
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
@@ -1062,3 +1091,5 @@ ASTCall *Parser::parse_call(const Token &name) {
   end_node(call, range);
   return call;
 }
+
+
