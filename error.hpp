@@ -11,11 +11,7 @@ struct Error;
 #define MAX_ERRORS 100
 #endif
 
-// @Josh
-// TODO: determine if this is neccesary. Would we ever look up errors? or just
-// TODO(cont.): store them to emit them all once a critical error has been
-// encountered, or
-// TODO(cont.): once compilation is complete?
+// TODO(Josh) Use warnings more and add a way to report the non-critical errors at end of compilation. 9/30/2024, 10:22:07 AM
 static Error *error_table[MAX_ERRORS];
 static int num_errors = 0;
 
@@ -51,7 +47,6 @@ static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
   error_table[errid] = new (memory) Error(message, severity, source_range);
 
   std::stringstream ss;
-  // TODO: emit a error message based on the global table of tokens.
   if (!source_range.empty()) {
     auto span = source_range.get_tokens();
     ss << "\e[31m" << span.front().location.ToString() << "\e[0m\n";
@@ -66,6 +61,8 @@ static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
   switch (severity) {
   case ERROR_INFO:
   case ERROR_WARNING:
+    // TODO: for warnings and infos, we don't want a [[noreturn]], but for failures and critical errors, we do.
+    // We should just have seperate functions for this stuff.
   case ERROR_FAILURE:
   case ERROR_CRITICAL:
     throw std::runtime_error(message + '\n' + token_str);

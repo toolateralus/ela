@@ -131,7 +131,7 @@ const auto check_return_type_consistency(int &return_type, int new_type,
 };
 
 std::any TypeVisitor::visit(ASTBlock *node) {
-  context.enter_scope(node->scope);
+  context.set_scope(node->scope);
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
   for (auto &statement : node->statements) {
@@ -188,9 +188,8 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
         std::format("declaration: {}", node->name.value));
   }
 
-  // TODO: probably want something a bit nicer than this.
-  context.current_scope->lookup(node->name.value)->type_id =
-      node->type->resolved_type;
+  auto symbol = context.current_scope->lookup(node->name.value);
+  symbol->type_id = node->type->resolved_type;
   return {};
 }
 std::any TypeVisitor::visit(ASTExprStatement *node) {
@@ -202,9 +201,6 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
   
-  // TODO: @Verify
-  // type inference declaration operator, always just assign left to equal the right type.
-  // perhaps this isn't the best move, but I'm unsure 2024-09-30 07:54:07
   if (node->op.type == TType::ColonEquals) {
     left = right; 
     if (auto iden = dynamic_cast<ASTIdentifier*>(node->left)) {
@@ -212,10 +208,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     }
   }
   
-  // TODO(Josh) 9/30/2024, 8:24:17 AM 
-  // relational expressions need to have their operands type checked, but
-  // right now that would involve casting scalars to each other, which makes no
-  // sense.
+  // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no  sense.
   if (node->op.is_relational()) {
     node->resolved_type = bool_type();
     return bool_type();
@@ -266,9 +259,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-    // TODO:
-    // this will fail if the number is greater than max int64_t or less
-    // than min int64_t
+    
     auto n = std::stoll(node->value);
     if (n > std::numeric_limits<int32_t>::max() ||
       n < std::numeric_limits<int32_t>::min()) {
@@ -329,7 +320,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   for (int i = 0; i < info->params_len; ++i) {
     
-    // TODO: default parameters evade type checking
+    // BUG: default parameters evade type checking
     if (arg_tys.size() <= i) {
       continue;
     }
@@ -368,7 +359,7 @@ std::any TypeVisitor::visit(ASTBreak *node) {
 }
 
 std::any TypeVisitor::visit(ASTFor *node) {
-  context.enter_scope(node->block->scope);
+  context.set_scope(node->block->scope);
   switch (node->tag) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
@@ -451,10 +442,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     return {};
   }
 
-  // TODO: we can improve this to not rely so heavily on a Scope object.
-  // It seems wrong to store a scope in a Type *.
-  // TODO: 2024-09-29 12:29:13 actually its fine. better than storing AST
-  context.enter_scope(node->scope);
+  context.set_scope(node->scope);
 
   for (auto decl : node->fields) {
     decl->accept(this);
@@ -480,11 +468,11 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
   auto previous_scope = context.current_scope;
 
-  context.enter_scope(info->scope);
+  context.set_scope(info->scope);
 
   int type = int_from_any(node->right->accept(this));
 
-  context.current_scope = previous_scope;
+  context.set_scope(previous_scope);
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
               node->source_range);
@@ -495,7 +483,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = get_type(left);
 
-  // TODO: make it so array types are not scalars. It makes no darn sense.
+  
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
                             left_ty->to_string()),
@@ -512,11 +500,9 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
 
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
-
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
   }
-
   if (type == -1) {
     throw_error("Cannot make non existent type", ERROR_FAILURE,
                 node->source_range);

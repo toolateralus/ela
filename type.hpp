@@ -59,6 +59,7 @@ enum TypeExtEnum {
   TYPE_EXT_ARRAY,
 };
 
+// TODO: make it so array types are not scalars. It makes no darn sense.
 struct TypeExt {
   // this stores things like * and [], [20] etc.
   std::vector<TypeExtEnum> extensions{};
@@ -175,17 +176,12 @@ struct FunctionTypeInfo : TypeInfo {
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
   int default_params = 0; // number of default params, always trailing.
-  
-  // TODO: add a way to declare varargs for externs only. Right now, we only use this for printf;
-  // if this is set to true, on emit we will add a ..., and not check for too many arguments to calling this.
   bool is_varargs = false;
   
   // defined in cpp file
   virtual std::string to_string() const override;
 };
 
-// TODO(josh): add scalar casting info for each type here.
-// TODO(cont.) builtins can just have a table of types they can implicitly explicitly and cant cast to.
 struct ScalarTypeInfo : TypeInfo {
   bool is_integral = false;
   size_t size = 0;

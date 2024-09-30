@@ -1,9 +1,14 @@
-bug : cannot do array[i] += n;
-bug : for i ; arr  assumes i is the array's type, not the element type.
-bug: debug information is bad for some statements
+
+TODO(Josh): debug information is bad for some statements
+
+BUG(Josh): doing `n.to_string().data` results in a `n is undeclared` error. 
+  this bug manifests as when
+    `n.to_string()`
+  gets traversed, we lookup `n` and it doesn't exist because we're already in a struct scope?
+  How that happens i am not sure.
 
 ## new features
-  - type inference and implicitly typed declarations. `var := value`
+  - switch statements
   - enum declarations. `enum {...} || enum MyEnum {...}`
   - static member access, `Type.Something`. neccesary for enums.
   - static class members. maybe not neccesary, but above is.
@@ -13,6 +18,8 @@ bug: debug information is bad for some statements
   - #flags for enums so instead of 0,1,2,3, you get `1 << 0, 1 << 1, 1 << 2, 1 << 3` etc. Also these types would have a .has() and .set() etc, and not need any integer casting.
   - function overloading: right now a name can only have one value. all ctors get overwritten as we compile in the symbol table,
     even if theyre not callable.
+    
+
     
   ### EASY: Add binary and hexadecimal numbers in the lexer.
     

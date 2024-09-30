@@ -322,8 +322,6 @@ ASTProgram *Parser::parse() {
   return program;
 }
 
-// TODO: Cleanup this horrific function before it gets too out of control.
-// TODO(later): I said that and then proceeded to make it out of control
 ASTStatement *Parser::parse_statement() {
 
   auto range = begin_node();
@@ -390,7 +388,6 @@ ASTStatement *Parser::parse_statement() {
     } else {
       node->tag = ASTFor::RangeBased;
       node->value.range_based.target = parse_expr();
-      // TODO: add 'in' keyword
       expect(TType::Semi);
       node->value.range_based.collection = parse_expr();
     }
@@ -398,7 +395,7 @@ ASTStatement *Parser::parse_statement() {
     node->block = parse_block();
 
     if (node->tag == ASTFor::CStyle) {
-      context.enter_scope(node->block->scope);
+      context.set_scope(node->block->scope);
       context.current_scope->insert(node->value.c_style.decl->name.value, -1);
       context.exit_scope();
     }
@@ -556,7 +553,7 @@ ASTBlock *Parser::parse_block() {
   auto range = begin_node();
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
-  context.enter_scope();
+  context.set_scope();
   while (not_eof() && peek().type != TType::RCurly) {
     block->statements.push_back(parse_statement());
     if (semicolon())
@@ -818,17 +815,19 @@ ASTExpr *Parser::parse_postfix() {
   auto range = begin_node();  
   auto left = parse_primary();
 
-  // TODO: Probably add this to the loop below, when and if we have dot calls.
-  if (auto identifier = dynamic_cast<ASTIdentifier *>(left)) {
-    if (peek().type == TType::LParen) {
-      auto tok = identifier->value;
-      return parse_call(tok);
-    }
-  }
-
   // build dot and subscript expressions
-  while (peek().type == TType::Dot || peek().type == TType::LBrace) {
-    if (peek().type == TType::Dot) {
+  while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::LParen) {
+    
+    // TODO: make it so we don't have to have a name to call a function
+    // This is ambitious but might be nice.
+    if (peek().type == TType::LParen) {
+      auto identifier = dynamic_cast<ASTIdentifier *>(left);
+      if (identifier && peek().type == TType::LParen) {
+        auto tok = identifier->value;
+        left = parse_call(tok);
+      }
+    }
+    else if (peek().type == TType::Dot) {
       eat();
       auto dot = ast_alloc<ASTDotExpr>();
       dot->type = ast_alloc<ASTType>();

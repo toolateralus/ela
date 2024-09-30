@@ -47,7 +47,7 @@ std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
   visit(node->params);
   
   if (node->block.is_not_null()) {
-    context.enter_scope(node->block.get()->scope);
+    context.set_scope(node->block.get()->scope);
     visit(node->block.get());
     context.exit_scope();
   }
@@ -257,7 +257,7 @@ std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   ss << indent() << "Struct " << node->type->base << " {\n";
   indentLevel++;
   
-  context.enter_scope(node->scope);
+  context.set_scope(node->scope);
   
   for (auto decl : node->fields) {
     decl->accept(this);

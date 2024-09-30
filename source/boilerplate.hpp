@@ -16,14 +16,12 @@ using u16 = uint16_t;
 using s8 = int8_t;
 using u8 = uint8_t;
 
-using string = const char *;
-
 extern "C" int printf(const char *format, ...);
 
 #include <initializer_list>
 
-// TODO: implement a bare minimum array type.
-// not sure how we want to do this.
+// TODO: implement this actually, where this will represent all dynamic arrays in the language, such as int[].
+// int[32] is still a C fixed buffer.
 template <class T> struct _array {
   T *m_data = nullptr;
   int m_length = 0;

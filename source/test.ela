@@ -1,370 +1,378 @@
 #import core;
 
 Vector2 :: struct {
-    f32 x;
-    f32 y;
+  f32 x;
+  f32 y;
 }
 
 Vector3 :: struct {
-    Vector2 vec2;
-    f32 z;
+  Vector2 vec2;
+  f32 z;
 } 
 
 Node :: struct {
-    Node *next;
+  Node *next;
 }
 
 Array :: struct {
-    Node[10] ptr;
+  Node[10] ptr;
 }
 
 // Keep this at the top otherwise it messesup the output formatting in the middle
 #test test_printf :: () {
-    u8* s = "Hello i am a string";
-    printf("testing printing a string: %s\n", s);
-    return;
+  u8* s = "Hello i am a string";
+  printf("testing printing a string: %s\n", s);
+  return;
 }
 
 #test failure_case :: () {
-    assert("This should fail", false);
+  assert("This should fail", false);
 }
 
 #test test_for :: () {
-    for s32 i; i < 10; ++i {
-        assert("i should be less than 10", i < 10);
-        return;
-    }
-    s32[] arr;
-    for v; arr {
-        assert("Unexpected case in array loop", false);
-        return;
-    }
-    assert("End of test_for reached", true);
+  for s32 i; i < 10; ++i {
+      assert("i should be less than 10", i < 10);
+      return;
+  }
+  s32[] arr;
+  for v; arr {
+      assert("Unexpected case in array loop", false);
+      return;
+  }
+  assert("End of test_for reached", true);
 }
 
 #test test_while :: () {
-    bool b = true;
-    while b {
-        assert("while condition == true", b == true);
-        return;
-    }
-    assert("End of test_while reached", true);
+  bool b = true;
+  while b {
+      assert("while condition == true", b == true);
+      return;
+  }
+  assert("End of test_while reached", true);
 }
 
 #test test_if_1 :: () {
-    bool v = true;
-    bool hit = false;
-    if v {
-        assert("v should be true", v == true);
-        hit = true;
-    } else {
-        assert("Unexpected case", false);
-    }
-    assert("failed to fall through if statement", hit);
+  bool v = true;
+  bool hit = false;
+  if v {
+      assert("v should be true", v == true);
+      hit = true;
+  } else {
+      assert("Unexpected case", false);
+  }
+  assert("failed to fall through if statement", hit);
 }
 
 #test test_if_2 :: () {
-    bool v = false;
-    bool hit = true;
-    if v {
-        assert("Unexpected case", false);
-    } else if !v {
-        hit = true;
-    }
-    assert("fell through if else, but didn't set the variable", hit);
+  bool v = false;
+  bool hit = true;
+  if v {
+      assert("Unexpected case", false);
+  } else if !v {
+      hit = true;
+  }
+  assert("fell through if else, but didn't set the variable", hit);
 }
 
 #test test_if_3 :: () {
-    bool v = false;
-    bool hit = true;
-    if v {
-        assert("Unexpected case", false);
-    } else if v {
-        assert("Unexpected case", false);
-    } else {
-        hit = true;
-    }
-    assert("fell though if,if_else,else but didn't set the variable", hit);
+  bool v = false;
+  bool hit = true;
+  if v {
+      assert("Unexpected case", false);
+  } else if v {
+      assert("Unexpected case", false);
+  } else {
+      hit = true;
+  }
+  assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
 #test test_comp_assign :: () {
-    s32 deref = 1;
-    deref += deref; 
-    assert("+=", deref == 2);
-    deref -= deref;
-    assert("-=", deref == 0);
-    deref *= deref; 
-    assert("*=)", deref == 0);
-    deref = 2;
-    deref /= deref;
-    assert("/=", deref == 1);
-    deref = 2;
-    deref %= deref; 
-    assert("%=", deref == 0);
-    deref &= deref;
-    assert("&=", deref == 0);
-    deref |= deref; 
-    assert("|=", deref == 0);
-    deref ^= deref;
-    assert("^=", deref == 0);
-    deref <<= deref; 
-    assert("<<=", deref == 0);
-    deref >>= deref;
-    assert(">>=", deref == 0);
+  s32 deref = 1;
+  deref += deref; 
+  assert("+=", deref == 2);
+  deref -= deref;
+  assert("-=", deref == 0);
+  deref *= deref; 
+  assert("*=)", deref == 0);
+  deref = 2;
+  deref /= deref;
+  assert("/=", deref == 1);
+  deref = 2;
+  deref %= deref; 
+  assert("%=", deref == 0);
+  deref &= deref;
+  assert("&=", deref == 0);
+  deref |= deref; 
+  assert("|=", deref == 0);
+  deref ^= deref;
+  assert("^=", deref == 0);
+  deref <<= deref; 
+  assert("<<=", deref == 0);
+  deref >>= deref;
+  assert(">>=", deref == 0);
 }
 
 #test test_operators :: () {
-    s32 left = 1;
-    s32 right = 1;
-    s32 result;
-    bool result_bool;
-    result_bool = left == right;
-    assert("left should equal right", result_bool == true);
-    result_bool = left != right;
-    assert("left should not equal right", result_bool == false);
-    result_bool = left < right;
-    assert("left should not be less than right", result_bool == false);
-    result_bool = left > right;
-    assert("left should not be greater than right", result_bool == false);
-    result_bool = left <= right;
-    assert("left should be less than or equal to right", result_bool == true);
-    result_bool = left >= right;
-    assert("left should be greater than or equal to right", result_bool == true);
-    result_bool = left && right;
-    assert("left and right should be true", result_bool == true);
-    result_bool = left || right;
-    assert("left or right should be true", result_bool == true);
-    
-    result = left + right;
-    assert("left + right should be 2", result == 2);
-    result = left - right;
-    assert("left - right should be 0", result == 0);
-    result = left * right;
-    assert("left * right should be 1", result == 1);
-    result = left / right;
-    assert("left / right should be 1", result == 1);
-    result = left % right;
-    assert("left % right should be 0", result == 0);
-    result = left & right;
-    assert("left & right should be 1", result == 1);
-    result = left | right;
-    assert("left | right should be 1", result == 1);
-    result = left ^ right;
-    assert("left ^ right should be 0", result == 0);
-    result = left << right;
-    assert("left << right should be 2", result == 2);
-    result = left >> right;
-    assert("left >> right should be 0", result == 0);
+  s32 left = 1;
+  s32 right = 1;
+  s32 result;
+  bool result_bool;
+  result_bool = left == right;
+  assert("left should equal right", result_bool == true);
+  result_bool = left != right;
+  assert("left should not equal right", result_bool == false);
+  result_bool = left < right;
+  assert("left should not be less than right", result_bool == false);
+  result_bool = left > right;
+  assert("left should not be greater than right", result_bool == false);
+  result_bool = left <= right;
+  assert("left should be less than or equal to right", result_bool == true);
+  result_bool = left >= right;
+  assert("left should be greater than or equal to right", result_bool == true);
+  result_bool = left && right;
+  assert("left and right should be true", result_bool == true);
+  result_bool = left || right;
+  assert("left or right should be true", result_bool == true);
+  
+  result = left + right;
+  assert("left + right should be 2", result == 2);
+  result = left - right;
+  assert("left - right should be 0", result == 0);
+  result = left * right;
+  assert("left * right should be 1", result == 1);
+  result = left / right;
+  assert("left / right should be 1", result == 1);
+  result = left % right;
+  assert("left % right should be 0", result == 0);
+  result = left & right;
+  assert("left & right should be 1", result == 1);
+  result = left | right;
+  assert("left | right should be 1", result == 1);
+  result = left ^ right;
+  assert("left ^ right should be 0", result == 0);
+  result = left << right;
+  assert("left << right should be 2", result == 2);
+  result = left >> right;
+  assert("left >> right should be 0", result == 0);
 }
 
 #test test_relational_results :: () {
-    bool test1 = (1 == 1 + 2) || 1 == 2;
-    bool test2 = (3 > 2) && (2 < 4);
-    bool test3 = !(5 <= 5) || (6 >= 6);
-    bool test4 = (7 != 8) && (9 == 9);
-    assert("test1 should be false", test1 == false);
-    assert("test2 should be true", test2 == true);
-    assert("test3 should be true", test3 == true);
-    assert("test4 should be true", test4 == true);
+  bool test1 = (1 == 1 + 2) || 1 == 2;
+  bool test2 = (3 > 2) && (2 < 4);
+  bool test3 = !(5 <= 5) || (6 >= 6);
+  bool test4 = (7 != 8) && (9 == 9);
+  assert("test1 should be false", test1 == false);
+  assert("test2 should be true", test2 == true);
+  assert("test3 should be true", test3 == true);
+  assert("test4 should be true", test4 == true);
 }
 
 #test test_address_of :: () {
-    s32 v = 0;
-    s32* addr_of_v = &v;
-    assert("address of grabbed a non-null ptr", addr_of_v != null);
-    v = *addr_of_v;
-    assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
+  s32 v = 0;
+  s32* addr_of_v = &v;
+  assert("address of grabbed a non-null ptr", addr_of_v != null);
+  v = *addr_of_v;
+  assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
 
 #test test_malloc :: () {
-    s32* ptr = malloc(4);
-    assert("malloc'd pointer was null", ptr != null);
-    free(ptr);
-    ptr = null;
-    assert("freed ptr and set to null was not == null", ptr == null);
+  s32* ptr = malloc(4);
+  assert("malloc'd pointer was null", ptr != null);
+  free(ptr);
+  ptr = null;
+  assert("freed ptr and set to null was not == null", ptr == null);
 }
 
 many_params :: (f32 a, f32 b, f32 c, f32 d = 1.0) -> f32 {
-    return a * b * c * d;
+  return a * b * c * d;
 }
 
 mul_params :: (f32 n, f32 f) -> f32 {
-    return n * f; 
+  return n * f; 
 }
 
 #test test_param :: () {
-    assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
-    assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
+  assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
+  assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
 }
 
 returns :: () -> s32  { 
-    return 1; 
+  return 1; 
 }
 
 #test test_implicit_numerical_casting :: () {
-    u8 u1;
-    u16 u2 = u1;
-    u32 u3 = u2;
-    u64 u4 = u3;
-    assert("unable to upcast successfully", u4 == u1);
-    
-    s8 s1;
-    s16 s2 = s1;
-    s32 s3 = s2;
-    s64 s4 = s3;
-    assert("unable to upcast successfully", s1 == s4);
-    
-    float f;
-    f64 f1 = f;
-    assert("unable to upcast successfully", f == f1);
+  u8 u1;
+  u16 u2 = u1;
+  u32 u3 = u2;
+  u64 u4 = u3;
+  assert("unable to upcast successfully", u4 == u1);
+  
+  s8 s1;
+  s16 s2 = s1;
+  s32 s3 = s2;
+  s64 s4 = s3;
+  assert("unable to upcast successfully", s1 == s4);
+  
+  float f;
+  f64 f1 = f;
+  assert("unable to upcast successfully", f == f1);
 }
 
 #test test_return_value :: () {
-    assert("function expected to return 1", returns() == 1);
+  assert("function expected to return 1", returns() == 1);
 }
 
 #test test_struct_single_level :: () {
-    Vector2 v;
-    assert("v.x != 0.0", v.x == 0.0);
-    assert("v.y != 0.0", v.y == 0.0);
+  Vector2 v;
+  assert("v.x != 0.0", v.x == 0.0);
+  assert("v.y != 0.0", v.y == 0.0);
 }
 
 #test test_struct_nested_once :: () {
-    Vector3 v;
-    assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
-    assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
-    assert("v.z != 0.0", v.z == 0.0);
+  Vector3 v;
+  assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
+  assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
+  assert("v.z != 0.0", v.z == 0.0);
 }
 
 #test test_struct_assign_member :: () {
-    Vector2 v;
-    v.x = 10.0;
-    v.y = 10.0;
-    assert("assigning v.x = 10.0 failed", v.x == 10.0);
-    assert("assigning v.y = 10.0 failed", v.y == 10.0);
+  Vector2 v;
+  v.x = 10.0;
+  v.y = 10.0;
+  assert("assigning v.x = 10.0 failed", v.x == 10.0);
+  assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }
 
 #test test_struct_assign_nested_member :: () {
-    Vector3 v;
-    v.vec2.x = 1.0;
-    v.vec2.y = 2.0;
-    v.z = 3.0;
-    assert("assigning v.vec2.x = 1.0 failed", v.vec2.x == 1.0);
-    assert("assigning v.vec2.y = 1.0 failed", v.vec2.y == 2.0);
-    assert("assigning v.z = 3.0 failed", v.z == 3.0);
+  Vector3 v;
+  v.vec2.x = 1.0;
+  v.vec2.y = 2.0;
+  v.z = 3.0;
+  assert("assigning v.vec2.x = 1.0 failed", v.vec2.x == 1.0);
+  assert("assigning v.vec2.y = 1.0 failed", v.vec2.y == 2.0);
+  assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
 struct_as_param :: (Vector2 v)  -> f32 {
-    return v.x;
+  return v.x;
 }
 
 #test test_struct_as_param :: () {
-    Vector2 v;
-    assert("", struct_as_param(v) == 0.0);
+  Vector2 v;
+  assert("", struct_as_param(v) == 0.0);
 }
 
 something :: (f32 f) -> f32 {
-    return f;
+  return f;
 }
 
 #test test_struct_member_as_param :: () {
-    Vector2 v;
-    assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
+  Vector2 v;
+  assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 
 #test test_local_function :: () {
-    local_function :: () -> s32 {
-        return 0;
-    }
-    assert("failed to get 0 from local function call", local_function() == 0);
+  local_function :: () -> s32 {
+      return 0;
+  }
+  assert("failed to get 0 from local function call", local_function() == 0);
 }
 
 #test test_chained_dot_subscript :: () {
-    Array a;
-    a.ptr[0].next = null;
-    assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
-    
-    Node n;
-    a.ptr[0].next = &n;
-    assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
+  Array a;
+  a.ptr[0].next = null;
+  assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
+  
+  Node n;
+  a.ptr[0].next = &n;
+  assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
 #test test_subscript :: () {
-    s32[100] arr;
-    arr[50] = 0;
-    assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
-    int n;
-    ++n;
+  s32[100] arr;
+  arr[50] = 0;
+  assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+  int n;
+  ++n;
 }
 
 #test test_referencing_pointer :: () {
-    Node node;
-    node.next = malloc(sizeof(Node));
-    Node other;
-    node.next.next = &other;
-    
-    assert("mallocing 'next' of 'Node' failed.", node.next != null);
-    assert("dereferencing other into node.next failed.", node.next.next != null);
+  Node node;
+  node.next = malloc(sizeof(Node));
+  Node other;
+  node.next.next = &other;
+  
+  assert("mallocing 'next' of 'Node' failed.", node.next != null);
+  assert("dereferencing other into node.next failed.", node.next.next != null);
 }
 
 // testing conflicting definitons. expected: compiler error if failed.
 #test for_loop_2 :: () {
-    for int i; i < 10; ++i {
-        i = i;
-    }
-    for int i; i < 10; ++i {
-        i = i;
-    }
+  for int i; i < 10; ++i {
+      i = i;
+  }
+  for int i; i < 10; ++i {
+      i = i;
+  }
 
-    int[] array;
-    
-    for k; array {
-        k = k;
-    }
-    for k; array {
-        k = k;
-    }
+  int[] array;
+  
+  for k; array {
+      k = k;
+  }
+  for k; array {
+      k = k;
+  }
 }
 
 Constructible :: struct {
-    f32 x;
-    #ctor :: (f32 _x) {
-        x = _x;
-    }
-    #ctor :: (Constructible other) {
-        x = other.x;
-    }
-    #ctor :: () {}
+  f32 x;
+  #ctor :: (f32 _x) {
+      x = _x;
+  }
+  #ctor :: (Constructible other) {
+      x = other.x;
+  }
+  #ctor :: () {
+    x = 10.0;
+  }
+}
+
+
+#test make_parameterless :: () {
+  n := #make(Constructible);
+  assert("default construction failed.", n.x == 10.0);
 }
 
 #test test_copy_make :: () {
-    Constructible c;
-    Constructible c1 = #make(Constructible, c);
-    assert("failed to copy construct Constructible (struct)", c1.x == c.x);
+Constructible c;
+Constructible c1 = #make(Constructible, c);
+assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
 #test test_make :: () {
-    Constructible c = #make(Constructible, 10.0);
-    assert("failed to construct", c.x == 10.0);
+  Constructible c = #make(Constructible, 10.0);
+  assert("failed to construct", c.x == 10.0);
 }
 
 #test test_make_cast :: () {
-    u16 big = #make(u16, 65365);
-    u8 small = #make(u8, big);
-    assert("failed to down cast", small == (big % 256));
+  u16 big = #make(u16, 65365);
+  u8 small = #make(u8, big);
+  assert("failed to down cast", small == (big % 256));
 }
 
 IHaveAMethod :: struct {
-    method :: () -> f32 {
-        return 0.0;
-    }
-    parameter_method :: (f32 x) -> f32 {
-        return x;
-    }
+  method :: () -> f32 {
+      return 0.0;
+  }
+  parameter_method :: (f32 x) -> f32 {
+      return x;
+  }
 }
 
 #test test_method :: () {
-    IHaveAMethod owner;
-    assert("failed to get 0.0 from method.", owner.method() == 0.0);
-    assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
+  IHaveAMethod owner;
+  assert("failed to get 0.0 from method.", owner.method() == 0.0);
+  assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }

@@ -35,11 +35,6 @@ struct VisitorBase;
 // TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
 // this way we can use things before theyre defined, prune unused code, etc.
 struct ASTNode {
-  // TODO: use a more data oriented approach here, instead of copying vectors
-  // around everywhere. I am sure we can have a UID for ASTNode, and just lookup
-  // our source tokens range in that table with a int src_info_start, int
-  // src_info_end, and capture that info in a similar way in the parser. Also,
-  // we can definitely improve the way that we capture stuff in the parser.
   SourceRange source_range{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
@@ -54,10 +49,7 @@ enum BlockFlags {
   BLOCK_FLAGS_BREAK = 1 << 3,
 };
 
-// TODO: rename me, and add this stuff to visiting While, For, etc.
-// Probably create another visitor to do this, the type visitor is getting too
-// large and cumbersome. Maybe even have a base class for ASTNode's that have
-// control flow attributes?
+// CLEANUP(Josh) Probably rename me 9/30/2024, 10:18:10 AM
 struct ControlFlow {
   int flags;
   int type;
@@ -115,11 +107,11 @@ struct ASTExprStatement : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// BUG(Josh) cannot do array[i] += n. use non-identifiers for comp assign 9/30/2024, 10:31:56 AM
 struct ASTCompAssign : ASTStatement {
   Token name;
   Token op;
   ASTExpr *expr;
-
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -231,6 +223,7 @@ struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// BUG(Josh) bug : for i ; arr  assumes i is the array's type, not the element type. 9/30/2024, 10:32:26 AM
 struct ASTFor : ASTStatement {
   enum ForType {
     RangeBased,
@@ -240,7 +233,6 @@ struct ASTFor : ASTStatement {
   union {
     struct {
       // TODO: add a way to use 'for v, idx in collection'
-      // the identifier
       ASTExpr *target;
       ASTExpr *collection;
     } range_based;

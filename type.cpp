@@ -163,12 +163,6 @@ void init_type_system() {
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
 
-// TODO: use some kind of SCALAR_TYPE flags in the ScalarType info to tell if
-// somethings an integer, float, etc,
-// TODO: and add conversion rules to it so we can safely up cast but explicitly
-// down cast only. Right now, if we had user defined types, you could trick the
-// type system into casting a number to and from your type if it ended with a
-// multiple of 8 -> 64
 constexpr bool type_is_numerical(const Type *t) {
   auto info = dynamic_cast<ScalarTypeInfo *>(t->info.get());
   if (!info)

@@ -138,6 +138,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     (*ss) <<std::format("\"{}\"", node->value);
   } else if (node->tag == ASTLiteral::RawString) {
     // TODO: search for a pattern '__()__' for example, that doesn't exist at all in the string.
+    // we can generate this based on the state of the string.
     (*ss) <<std::format("R\"__({})__\"", node->value);
   } else {
     (*ss) <<node->value;
@@ -168,9 +169,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     return{};
   }
   
-  
-  // TODO: Figure out how we want to control custom precedence. Right now,
-  // TODO(cont): We'll just parenthesize every single sub-expression;
+  // SIMPLIFY(Josh) We probably don't want to always parenthesize every single expression. We can just have a table of which operators need custom precedence 9/30/2024, 10:20:00 AM
   (*ss) <<"(";
   auto left = node->left->accept(this);
   space();
@@ -195,10 +194,8 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
   return {};
 }
     
-// TODO: remove me, add explicit casting.
-// CASTING ALL POINTERS ALWAYS::
-// This is so we can use malloc tempoarily. 
-// It's very bad.
+// TODO: remove me, add explicit casting, at least for non-void pointers.
+// I don't mind implicit casting to void*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
     auto type = get_type(node->type->resolved_type);
     auto isptr = type->extensions.is_pointer(1);
@@ -375,8 +372,8 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     (*ss) << name;
     
     
-    // This is a copy constructor, so we need to pass the parameter by reference.
     // TODO: add a nicer way to take args by reference, or have a good way to dicate when to do so implicitly, if we want that ::  2024-09-29 14:02:16
+    // This is a copy constructor, so we need to pass the parameter by reference.
     if (node->params->params.size() == 1 && node->params->params[0]->type->resolved_type == current_struct_decl.get()->type->resolved_type) {
       (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
     } else {
@@ -417,7 +414,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 std::any EmitVisitor::visit(ASTBlock *node) {
   (*ss) <<(" {\n");
   indentLevel++;
-  context.enter_scope(node->scope);
+  context.set_scope(node->scope);
   for (const auto &statement : node->statements) {
     if (dynamic_cast<ASTDeclaration*>(statement)){
       indented("");
@@ -492,7 +489,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   header << "struct " << node->type->base << ";\n";
   indentLevel++;
   
-  context.enter_scope(node->scope);
+  context.set_scope(node->scope);
   for (const auto &decl: node->fields) {
     indented("");
     decl->accept(this);
@@ -521,14 +518,13 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
     op = "->";
   
   auto left_info = static_cast<StructTypeInfo*>(left_type->info.get());;
-  
   auto previous_scope = context.current_scope;
   
-  context.enter_scope(left_info->scope);
+  context.set_scope(left_info->scope);
   node->left->accept(this);
   (*ss) << (op);
   node->right->accept(this);
-  context.current_scope = previous_scope;
+  context.set_scope(previous_scope);
   
   return {};
 }
