@@ -4,11 +4,11 @@ TODO(Josh): debug information is bad for some statements
 TODO: use #cast instead of #make for casting, so #make can do allocations.
 
 ## new features
-  - static class members. maybe not neccesary, but above is.
-  - switch statements
+  - static class members. maybe not neccesary, but above is. 
   - const modifier for variables, members, parameters, etc. `const s32 param, const s32 v = 1` works just like c++ const;
+  
   - multiple return values. `v, v1 := func();`
-  - `#closure` for local functions. our scope would already allow it, but we should have a specifier that allows us to translate that to c++ code.
+  
   - constexpr stuff. `#const some_expression := 100 * 2`
   
   - function overloading: right now a name can only have one value. all ctors get overwritten as we compile in the symbol table,
@@ -20,6 +20,10 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
   
   - Type aliasing. -- very neccesary for `$T` type args for polymorphic functions
   - Polymorphic functions and polymorphic types. Like C++ templates, but less obnoxious.
+
+  
+## super easy and nice features
+  - `#closure` for local functions. our scope would already allow it, but we should have a specifier that allows us to translate that to c++ code.
 
   
 ## stuff that needs work now
@@ -38,8 +42,6 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
 # This needs work. it is not where it needs to be at all.
 - **explicit type conversions, implicit type conversions** 
 - **no conversion table**, do we want one? or how do types define their ability to convert to others?
-
-
 
 - **Function pointers, first class functions.** 
 

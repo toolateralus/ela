@@ -2,7 +2,6 @@
 #pragma once
 
 #include "core.hpp"
-#include "nullable.hpp"
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -216,7 +215,7 @@ struct Type {
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
   std::string base;
-  Nullable<TypeInfo> info = nullptr;
+  TypeInfo *info;
   TypeExt extensions;
   bool equals(const std::string &name,
               const TypeExt &type_extensions) const;

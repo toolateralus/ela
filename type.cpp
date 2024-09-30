@@ -63,7 +63,7 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
 
   if (base_id != -1) {
     auto t = get_type(base_id);
-    return create_type((TypeKind)t->kind, name, t->info.get(), type_extensions);
+    return create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
 
   return -1;
@@ -164,7 +164,7 @@ void init_type_system() {
 constexpr int get_type_unresolved() { return Type::invalid_id; }
 
 constexpr bool type_is_numerical(const Type *t) {
-  auto info = dynamic_cast<ScalarTypeInfo *>(t->info.get());
+  auto info = dynamic_cast<ScalarTypeInfo *>(t->info);
   if (!info)
     return false;
 
@@ -176,11 +176,11 @@ constexpr bool type_is_numerical(const Type *t) {
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
-  if (from->kind != TYPE_SCALAR || from->info.is_null() ||
-      to->kind != TYPE_SCALAR || to->info.is_null())
+  if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
-  auto from_info = static_cast<ScalarTypeInfo *>(from->info.get());
-  auto to_info = static_cast<ScalarTypeInfo *>(to->info.get());
+  
+  auto from_info = static_cast<ScalarTypeInfo *>(from->info);
+  auto to_info = static_cast<ScalarTypeInfo *>(to->info);
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
@@ -225,10 +225,7 @@ std::string Type::to_string() const {
   case TYPE_SCALAR:
     return base + extensions.to_string();
   case TYPE_FUNCTION:
-    if (info.is_not_null())
-      return info.get()->to_string();
-    else
-      return "invalid function type";
+    return info->to_string();
     break;
     case TYPE_ENUM: {
       return base;
@@ -239,21 +236,18 @@ bool Type::operator==(const Type &type) const {
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
 
-    if (tinfo->equals(base, extensions) && type.info.is_not_null() &&
-        type_info_equals(type.info.get(), type.kind))
+    if (tinfo->equals(base, extensions) && type.info &&
+        type_info_equals(type.info, type.kind))
       return true;
   }
   return false;
 }
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  if (!this->info && info) {
-    return false;
-  }
   if (this->kind != kind)
     return false;
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
-    auto sinfo = static_cast<const FunctionTypeInfo *>(this->info.get());
+    auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
     
     if (finfo->is_varargs != sinfo->is_varargs) {
       return false;
@@ -299,8 +293,8 @@ std::string Type::to_cpp_string() const {
   case TYPE_STRUCT:
     return extensions.to_cpp_string(this->base);
   case TYPE_FUNCTION:
-    if (info.is_not_null())
-      return info.get()->to_string();
+    if (info)
+      return info->to_string();
     else
       return "invalid function type";
     break;
@@ -446,7 +440,7 @@ std::string Type::to_type_struct(Context &context) {
   
   // std::stringstream fields_ss;
   // if (kind == TYPE_STRUCT) {
-  //   auto info = static_cast<StructTypeInfo *>(this->info.get());
+  //   auto info = static_cast<StructTypeInfo *>(this->info);
 
   //   if (info->fields.empty()) {
   //     fields_ss << "_type_info[" << id << "] = new Type {"

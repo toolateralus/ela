@@ -485,7 +485,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo*>(type->info.get());
+  auto info = static_cast<StructTypeInfo*>(type->info);
   
   current_struct_decl = node;
   
@@ -538,7 +538,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   if (left_ty->extensions.is_pointer()) 
     op = "->";
   
-  auto left_info = static_cast<StructTypeInfo*>(left_ty->info.get());;
+  auto left_info = static_cast<StructTypeInfo*>(left_ty->info);;
   auto previous_scope = context.current_scope;
   
   auto prev_parent = left_info->scope->parent;

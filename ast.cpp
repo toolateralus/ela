@@ -285,7 +285,7 @@ void Parser::init_directive_routines() {
         auto enum_decl = parser->parse_enum_declaration(name);
         enum_decl->is_flags = true;
         auto type = get_type(enum_decl->type->resolved_type);
-        auto info = static_cast<EnumTypeInfo*>(type->info.get());
+        auto info = static_cast<EnumTypeInfo*>(type->info);
         info->is_flags = true;
         return enum_decl;
       }
@@ -668,7 +668,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     decl->scope = block->scope;
   } else {
     Type *t = get_type(type_id);
-    auto info = static_cast<StructTypeInfo *>(t->info.get());
+    auto info = static_cast<StructTypeInfo *>(t->info);
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
 

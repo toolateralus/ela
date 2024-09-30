@@ -1,15 +1,10 @@
 #import core;
 
-Something :: enum {
-  SomeValue = 0x45,
-  SomeGayValue = 0b01001,
+push :: ($T* array, $T value) -> string {
+  
 }
-
-
-
-
 
 main :: () {
-  printf("%d\n", Something.SomeGayValue);
+  int* array = malloc(sizeof(int) * 10);
+  push(array, 10);
 }
-

@@ -300,14 +300,15 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto fn_ty_info = get_type(symbol->type_id)->info;
 
-  if (fn_ty_info.is_null()) {
+  // TODO: fix this. shouldn't be checking the info but the type
+  if (!fn_ty_info) {
     throw_error(
         std::format("Function call '{}' does not refer to a function type.",
                     node->name.value),
         ERROR_FAILURE, node->source_range);
   }
 
-  auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
+  auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);
 
   if (!info->is_varargs && (arg_tys.size() > info->params_len ||
        arg_tys.size() < info->params_len - info->default_params)) {
@@ -438,7 +439,7 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
 
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(type->info.get());
+  auto info = static_cast<StructTypeInfo *>(type->info);
   info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
@@ -465,7 +466,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
     // TODO: make type->info not nullable. it should never be null.
-    auto info = static_cast<EnumTypeInfo*>(left_ty->info.get());
+    auto info = static_cast<EnumTypeInfo*>(left_ty->info);
     auto iden = dynamic_cast<ASTIdentifier*>(node->right);
     
     if (!iden) {
@@ -495,7 +496,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
                 node->source_range);
   }
   
-  auto info = static_cast<StructTypeInfo *>(left_ty->info.get());
+  auto info = static_cast<StructTypeInfo *>(left_ty->info);
 
   auto previous_scope = context.current_scope;
   auto prev_parent = info->scope->parent;
