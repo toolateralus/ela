@@ -19,15 +19,13 @@ hashtable_node :: struct {
 hashtable :: struct {
 	hashtable_node **buckets;
 	u32 size;
-  
-	#ctor :: (u32 _size) {
+	#ctor :: (u32 _size)  {
 		size = _size;
 		buckets = #make(hashtable_node**, malloc(sizeof(hashtable_node*) * size));
 		for u32 i = 0; i < size; ++i {
 			buckets[i] = null;
 		}
 	}
-  
 	insert :: (char *key, void *value) {
     s64 hash = string_hash(key);
     s64 index = hash % size;
@@ -54,11 +52,11 @@ hashtable :: struct {
 ValueTag :: enum {
   Int,
 }
-  
+
 Value :: struct {
   int tag;
   void *data;
-  
+
   #ctor :: (int value) {
     tag = ValueTag.Int;
     data = malloc(sizeof(int));
@@ -74,15 +72,13 @@ Value :: struct {
 
 main :: () {
 	table := #make(hashtable, 10);
-  
   str := #make(char*, malloc(sizeof(char *) * 100 * 10));
-  
   for s32 i; i < 100; ++i {
     strcat(str, "V");
     Value *val = malloc(sizeof(Value));
-    *val = #make(Value, i)
-    table.insert(str, #make(void*, val)); 
+    *val = #make(Value, i);
+    table.insert(str, val);
     out_val := #make(Value*, table.lookup(str));
-    //out_val.print();
+    out_val.print();
   }
 }

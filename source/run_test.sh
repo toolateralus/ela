@@ -1,1 +1,1 @@
-ela ./test.ela --test && ./test 
+ela ./test.ela --s --metrics --test && ./test 

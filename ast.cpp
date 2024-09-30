@@ -1120,7 +1120,7 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
     }
-    
+
 
     else {
       break;
