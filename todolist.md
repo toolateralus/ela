@@ -1,20 +1,21 @@
 
 TODO(Josh): debug information is bad for some statements
 
+TODO: use #cast instead of #make for casting, so #make can do allocations.
 
 ## new features
-  - switch statements
   - enum declarations. `enum {...} || enum MyEnum {...}`
   - static member access, `Type.Something`. neccesary for enums.
   - static class members. maybe not neccesary, but above is.
+  - `#flags` for enums so instead of 0,1,2,3, you get `1 << 0, 1 << 1, 1 << 2, 1 << 3` etc. Also these types would have a .has() and .set() etc, and not need any integer casting.
+  - switch statements
   - const modifier for variables, members, parameters, etc. `const s32 param, const s32 v = 1` works just like c++ const;
-  - multiple return values. `v, v1 := func()`
+  - multiple return values. `v, v1 := func();`
+  - `#closure` for local functions. our scope would already allow it, but we should have a specifier that allows us to translate that to c++ code.
   - constexpr stuff. `#const some_expression := 100 * 2`
-  - #flags for enums so instead of 0,1,2,3, you get `1 << 0, 1 << 1, 1 << 2, 1 << 3` etc. Also these types would have a .has() and .set() etc, and not need any integer casting.
+  
   - function overloading: right now a name can only have one value. all ctors get overwritten as we compile in the symbol table,
     even if theyre not callable.
-    
-
     
   ### EASY: Add binary and hexadecimal numbers in the lexer.
     

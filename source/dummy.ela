@@ -38,6 +38,7 @@ Vec2 :: struct {
 	xaryu :: (s32 f) -> Vec2 {
 		return #make(Vec2, f, 0.0);
 	}
+  
   #ctor :: () {}
 }
 
@@ -45,7 +46,5 @@ main :: () {
   n := 10;
   Vec2 v;
   printf("%s\n", v.xaryu(n).to_string().data);
-  
   printf("%d\n", n);
-  
 }
