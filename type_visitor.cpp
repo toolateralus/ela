@@ -439,7 +439,7 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info.get());
-
+  info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
   }
@@ -453,7 +453,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     method->accept(this);
   }
 
-  info->scope = node->scope;
+  
   context.exit_scope();
   return {};
 }
@@ -462,19 +462,36 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
 
+
+  // TODO(Josh)
+    // this expression fails because we don't actually emulate stack scoping, so the calling scope has no idea where to get this identifier
+    // n := 10.0;
+    // printf("%s\n", v.xaryu(n).to_string().data);
+    //                       ^^^
+    //                      Error occurs here.   
+  // 9/30/2024, 10:58:15 AM
+
   if (left_ty->kind != TYPE_STRUCT) {
     throw_error("cannot use dot expr on non-struct currently.", ERROR_FAILURE,
                 node->source_range);
   }
+  
   auto info = static_cast<StructTypeInfo *>(left_ty->info.get());
 
   auto previous_scope = context.current_scope;
-
+  auto prev_parent = info->scope->parent;
+  if (prev_parent && !previous_scope->is_struct_scope) {
+    info->scope->parent = previous_scope;
+  }
+  
+  // TODO: see above.
   context.set_scope(info->scope);
-
   int type = int_from_any(node->right->accept(this));
-
   context.set_scope(previous_scope);
+  
+  if (prev_parent && !previous_scope->is_struct_scope) {
+    info->scope->parent = prev_parent;
+  }
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
               node->source_range);
