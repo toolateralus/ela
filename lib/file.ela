@@ -10,7 +10,7 @@ _IO_FILE :: struct;
 #foreign fgetc :: (_IO_FILE *file) -> u8;
 #foreign putc :: (u8 ch, _IO_FILE *file) -> void;
 
-
+#foreign fprintf :: (_IO_FILE *stream, char *format, ...) -> int;
 
 s32 EOF=-1;
 // Seek from beginning of file.

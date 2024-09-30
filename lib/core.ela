@@ -4,10 +4,9 @@
 #foreign free :: (void *ptr) -> void;
 #foreign system :: (char* cmd) -> int;
 
-
-// TODO: fix this. we have conflicting declarations since we use crappy crap in boilerplate.hpp
-// We should probably just completely avoid having a 'boilerplate.hpp' and inject specific code circumstantially,
-// we shouldn't need much at all.
+// this can't be defined because it may be a macro.
+// we probably want to '#undef' #foreigns.
+// #foreign assert :: (char* message, bool condition);
 
 #foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
 #foreign memset :: (void *dest, int c, u64 n) -> void*;
@@ -15,3 +14,5 @@
 #foreign strcmp :: (char *str1, char *str2) -> int;
 
 #foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
+#foreign sprintf :: (u8 *buffer, char *format, ...) -> int;
+#foreign printf :: (char *format, ...) -> int;

@@ -278,6 +278,11 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
     auto sinfo = static_cast<const FunctionTypeInfo *>(this->info.get());
+    
+    if (finfo->is_varargs != sinfo->is_varargs) {
+      return false;
+    }
+    
     bool params_eq = finfo->params_len == sinfo->params_len;
 
     if (!params_eq)
@@ -288,6 +293,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
         params_eq = false;
         break;
       }
+      
     return finfo->return_type == sinfo->return_type && params_eq;
   }
   return false;

@@ -62,9 +62,9 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   info.default_params = 0;
   info.meta_type = node->meta_type;
   
-  if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
-    info.is_varargs = true;
-  } 
+  auto name = node->name.value;
+  
+  info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
 
   auto params = node->params->params;
   
@@ -318,9 +318,8 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info.get());
 
-  if ((arg_tys.size() > info->params_len ||
-       arg_tys.size() < info->params_len - info->default_params) &&
-      !info->is_varargs) {
+  if (!info->is_varargs && (arg_tys.size() > info->params_len ||
+       arg_tys.size() < info->params_len - info->default_params)) {
     throw_error(
         std::format("Function call '{}' has incorrect number of arguments. "
                     "Expected: {}, Found: {}",
@@ -344,6 +343,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   node->type = info->return_type;
   return info->return_type;
 }
+
 std::any TypeVisitor::visit(ASTArguments *node) {
   std::vector<int> argument_types;
   for (auto arg : node->arguments) {

@@ -127,24 +127,27 @@ bool get_compilation_flag(const std::string &flag) {
 }
 
 Context::Context() {
-  FunctionTypeInfo printf_info{};
-  printf_info.return_type = void_type();
-  printf_info.is_varargs = true;
-  current_scope->insert("printf", find_type_id("", printf_info, {}));
+  
+  // define some default functions that may or may not be macros.
+  {
+    // TODO(Josh) Fix this? if there is a way. Perhaps we want C style macros, as unsafe and annoying to debug they are. 9/30/2024, 9:30:29 AM
+    // We still define assert and sizeof manually here, because
+    // there's no way to do this in language currently, as they're macros
+    FunctionTypeInfo assert_info{};
+    assert_info.return_type = void_type();
+    assert_info.parameter_types[0] = string_type();
+    assert_info.parameter_types[1] = bool_type();
+    assert_info.params_len = 2;
+    current_scope->insert("assert", find_type_id("", assert_info, {}));
 
-  FunctionTypeInfo assert_info{};
-  assert_info.return_type = void_type();
-  assert_info.parameter_types[0] = string_type();
-  assert_info.parameter_types[1] = bool_type();
-  assert_info.params_len = 2;
-  current_scope->insert("assert", find_type_id("", assert_info, {}));
-
-  FunctionTypeInfo sizeof_info{};
-  sizeof_info.return_type = find_type_id("s64", {});
-  sizeof_info.is_varargs = true;
-  current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
-  root_scope = current_scope;
-
+    FunctionTypeInfo sizeof_info{};
+    sizeof_info.return_type = find_type_id("s64", {});
+    sizeof_info.is_varargs = true;
+    current_scope->insert("sizeof", find_type_id("", sizeof_info, {}));
+    root_scope = current_scope;  
+  }
+  
+  // define types used for reflection, which are currently half implemented due to ineffeciency.
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();

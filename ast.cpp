@@ -113,6 +113,8 @@ void Parser::init_directive_routines() {
            auto range = parser->begin_node();
            auto name = parser->expect(TType::Identifier);
            
+           auto v = name.value;
+           
            auto last_func_decl = parser->current_func_decl;
            parser->current_func_decl = function;
            
