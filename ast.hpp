@@ -307,7 +307,7 @@ struct ASTUnionDeclaration : ASTStatement {
 
 struct ASTAllocate : ASTExpr {
   Nullable<ASTType> type;
-  Nullable<ASTArguments> arguments;
+  Nullable<ASTArguments> arguments;  
   
   enum Kind {
     New,
@@ -316,6 +316,16 @@ struct ASTAllocate : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct AllocationInfo {
+  Symbol *symbol;
+  ASTAllocate* allocation;
+};
+
+extern std::vector<AllocationInfo> allocation_info;
+
+void insert_or_update_allocation_info(ASTAllocate *allocation, Symbol *symbol = nullptr);
+
+void report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };

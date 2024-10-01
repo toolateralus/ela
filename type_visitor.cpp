@@ -628,6 +628,14 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
     if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) {
       throw_error("invalid delete statement: you need at least one argument", ERROR_FAILURE, node->source_range);
     }
+    // keep track of which allocations were deleted.
+    for (auto it = allocation_info.begin(); it != allocation_info.end(); ++it) {
+      auto &alloc_info = *it;
+      if (alloc_info.allocation == node) {
+        allocation_info.erase(it);
+        break;
+      }
+    }
     return void_type();
   }
   
