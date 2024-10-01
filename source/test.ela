@@ -521,14 +521,19 @@ _Vec2 :: union {
   }
 }
 
+#test test_two_way_implicit_conversion_bin_ops :: () {
+  s32 v;
+  s8 v1;
+  float32 f;
+  assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
+}
+
 #test test_typename :: () {
   name := #typename(int);
-  assert("typename did not return the appropriate name.", name == "int");
+  assert("typename did not return the appropriate name.", strcmp(name, "int") == 0);
 }
 
 #test test_union_type_anonymous_sub_struct :: () {
   _Vec2 vec;
-  vec.method(0);
+  vec.method(0); // this does the assertions
 }
-
-

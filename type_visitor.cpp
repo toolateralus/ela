@@ -231,9 +231,18 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     node->resolved_type = bool_type();
     return bool_type();
   } else {
-    validate_type_compatability(
-        right, left, node->source_range,
-        "invalid types in binary expression. expected: {}, got {}", "");
+    auto left_t = get_type(left);
+    auto right_t = get_type(right);
+    auto conv_rule_0 = type_conversion_rule(left_t, right_t);
+    auto conv_rule_1 = type_conversion_rule(right_t, left_t);
+    // TODO(Josh) 10/1/2024, 3:07:47 PM
+    // validate that this is what we want. Before, it was too strict, now it feels like its too loose.
+    // also, we should probably do specific type checking based on the operator, we still need some sort of table.
+    if (((conv_rule_0 == CONVERT_PROHIBITED) && (conv_rule_1 == CONVERT_PROHIBITED)) || ((conv_rule_0 == CONVERT_EXPLICIT) && (conv_rule_1 == CONVERT_EXPLICIT))) {
+      throw_error(std::format("Type error in binary expression: cannot convert between {} and {}",
+              left_t->to_string(), right_t->to_string()),
+          ERROR_FAILURE, node->source_range);
+    }
   }
   
   node->resolved_type = left;
