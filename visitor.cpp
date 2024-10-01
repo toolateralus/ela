@@ -360,6 +360,7 @@ std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this
 std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }
@@ -382,5 +383,43 @@ std::any SerializeVisitor::visit(ASTUnionDeclaration *node) {
   return {};
 }
 
+std::any SerializeVisitor::visit(ASTAllocate *node) {
+  ss << "allocation: ";
+  if (node->type)
+    node->type.get()->accept(this);
+  if (node->arguments)
+    node->arguments.get()->accept(this);
+  return {};
+}
 
-
+std::any EmitVisitor::visit(ASTAllocate *node) {
+  switch (node->kind) {
+  case ASTAllocate::New: {
+    auto ptr_type = get_type(node->type.get()->resolved_type);
+    (*ss) << "new ";
+    auto ext = ptr_type->extensions;
+    ext.extensions.pop_back();
+    auto nonptr = find_type_id(ptr_type->base, ext);
+    auto nonptr_ty = get_type(nonptr);
+    auto str = nonptr_ty->to_cpp_string();
+    (*ss) << str;
+    if (!node->arguments) {
+      (*ss) << "()";
+    } else {
+      node->arguments.get()->accept(this);
+    }
+  } break;
+  case ASTAllocate::Delete:
+    auto args = node->arguments.get()->arguments;
+    for (const auto &arg : args) {
+      (*ss) << "delete "; 
+      arg->accept(this);
+      (*ss) << ";\n" << indent();
+      arg->accept(this);
+      (*ss) << " = nullptr";
+      (*ss) << ";\n" << indent();
+    }
+    break;
+  }
+  return {};
+}

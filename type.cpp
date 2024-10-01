@@ -323,7 +323,7 @@ std::string Type::to_cpp_string() const {
     return base;
   // TODO(Josh) 10/1/2024, 12:45:29 PM determine if this is correct.
   case TYPE_UNION:
-    return base;
+    return extensions.to_cpp_string(this->base);;
   }
 }
 int remove_one_pointer_ext(int operand_ty,

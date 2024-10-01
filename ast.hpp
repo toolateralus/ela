@@ -305,6 +305,17 @@ struct ASTUnionDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTAllocate : ASTExpr {
+  Nullable<ASTType> type;
+  Nullable<ASTArguments> arguments;
+  
+  enum Kind {
+    New,
+    Delete,
+  } kind;
+  std::any accept(VisitorBase *visitor) override;
+};
+
 struct ASTNoop : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
@@ -340,6 +351,7 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTInitializerList *node) override {}                         \
   std::any visit(ASTEnumDeclaration *node) override {}                         \
   std::any visit(ASTUnionDeclaration *node) override {}                        \
+  std::any visit(ASTAllocate *node) override {};                        \
   
 
 
@@ -372,6 +384,7 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTInitializerList *node) = 0;                        \
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
   virtual std::any visit(ASTUnionDeclaration *node) = 0;                        \
+  virtual std::any visit(ASTAllocate *node) = 0;                        \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -445,8 +458,7 @@ static inline Precedence get_operator_precedence(Token token) {
 }
 
 struct Parser {
-
-  
+  bool allow_function_type_parsing = true;
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();

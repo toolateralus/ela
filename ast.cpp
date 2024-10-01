@@ -320,7 +320,6 @@ void Parser::init_directive_routines() {
          }});
   }
   
-  
   // #typename, get the name of a type as a string.
   {
     directive_routines.push_back({
@@ -444,7 +443,7 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (peek().type == TType::LParen) {
+    } else if (allow_function_type_parsing && peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
     } else {
       break;
@@ -506,7 +505,7 @@ ASTStatement *Parser::parse_statement() {
     end_node(decl, range);
     return decl;
   }
-  
+    
   if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
@@ -521,7 +520,7 @@ ASTStatement *Parser::parse_statement() {
     }
     return statement;
     // Increment/ Decrement statements;
-  } else if (tok.type == TType::Increment || tok.type == TType::Decrement) {
+  } else if (tok.type == TType::Increment || tok.type == TType::Decrement || tok.type == TType::Delete) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     return statement;
@@ -942,7 +941,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   return node;
 }
 
-
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
   ASTExpr *left = parse_unary();
@@ -1032,6 +1030,30 @@ ASTExpr *Parser::parse_primary() {
   if (auto directive_expr = try_parse_directive_expr()) {
     return directive_expr.get();
   }
+  
+  if (tok.type == TType::New || tok.type == TType::Delete) {
+    eat();
+    ASTAllocate::Kind kind = tok.type == TType::New ?  ASTAllocate::Kind::New : ASTAllocate::Kind::Delete;
+    auto node = ast_alloc<ASTAllocate>();
+    
+    if (kind == ASTAllocate::New)  {
+      allow_function_type_parsing = false;
+      auto type = parse_type();
+      allow_function_type_parsing = true;
+      type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
+      node->type = type;
+    } 
+    
+    Nullable<ASTArguments> args = nullptr;
+    if (peek().type == TType::LParen) {
+      args = parse_arguments();
+    }
+    
+    node->arguments = args;
+    node->kind = kind;
+    return node;
+  }
+  
 
   switch (tok.type) {
   case TType::LCurly: {

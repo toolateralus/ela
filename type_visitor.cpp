@@ -619,3 +619,25 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   context.exit_scope();
   return {};
 }
+
+std::any TypeVisitor::visit(ASTAllocate *node) {
+  // TODO(Josh) 10/1/2024, 3:27:53 PM
+  // Do something here. This is probably bad,
+  // but this shouldn't be used as an expression really.
+  if (node->kind == ASTAllocate::Delete) {
+    if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) {
+      throw_error("invalid delete statement: you need at least one argument", ERROR_FAILURE, node->source_range);
+    }
+    return void_type();
+  }
+  
+  auto type = int_from_any(node->type.get()->accept(this));
+  // just type check them, no need to return
+  // we should probably type check parameters for a constructor 
+  // but we need a seperate system for that
+  if (node->arguments)
+    node->arguments.get()->accept(this);
+  
+  auto t = get_type(type);
+  return node->type.get()->resolved_type = t->id;
+}

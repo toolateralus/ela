@@ -79,6 +79,8 @@ enum struct TType {
   ColonEquals,
   Enum,
   Union,
+  New,
+  Delete,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -151,6 +153,8 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompMul);
     TTYPE_CASE(CompDiv);
     TTYPE_CASE(CompMod);
+    TTYPE_CASE(New);
+    TTYPE_CASE(Delete);
     TTYPE_CASE(CompAnd);
     TTYPE_CASE(CompOr);
     TTYPE_CASE(CompXor);
@@ -272,7 +276,11 @@ struct Lexer {
       {"struct", TType::Struct},
       {"true", TType::True},
       {"false", TType::False},
-      {"null", TType::Null}};
+      {"null", TType::Null},
+      {"new", TType::New},
+      {"delete", TType::Delete},
+      };
+      
 
   const std::unordered_map<std::string, TType> operators{
       {":=", TType::ColonEquals },
