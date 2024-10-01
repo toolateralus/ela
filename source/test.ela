@@ -434,9 +434,19 @@ MyEnum :: enum {
   // assert("alias failed to equal pointed to type field.", v == #make(int_ptr, v));
 }
 
+XaryuStruct :: struct {
+  float f;
+}
+
+// woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
   float32[12] arr;
   arr[0] = 10;
   arr[0] += 10;
   assert("comp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
+  
+  XaryuStruct[1] xarbars;
+  xarbars[0].f = 10.0;
+  xarbars[0].f += 10.0;
+  assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
