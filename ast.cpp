@@ -319,6 +319,41 @@ void Parser::init_directive_routines() {
            return ast_alloc<ASTNoop>();
          }});
   }
+  
+  // #anon, for declaring anonymous structs in unions primarily.
+  {
+    directive_routines.push_back({
+      .identifier = "anon",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        
+        parser->expect(TType::DoubleColon);
+        auto decl = parser->parse_struct_declaration(get_anonymous_struct_name());
+        auto t = get_type(decl->type->resolved_type);
+        auto info = static_cast<StructTypeInfo*>(t->info);
+        info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+        // auto iden = parser->expect(TType::Identifier);
+        // make a field and set its corresponding type.
+        // auto field = ast_alloc<ASTDeclaration>();
+        // field->type = ast_alloc<ASTType>();
+        // field->type->extension_info = t->extensions;
+        // field->type->base = t->base;
+        // TODO: validate whether we need this or not. field->type->flags = info->flags;
+        // add constructor as field value
+        // {
+        //   auto maker = ast_alloc<ASTMake>();
+        //   maker->kind = MAKE_CTOR;
+        //   maker->arguments = ast_alloc<ASTArguments>();
+        //   maker->type_arg = field->type;
+        //   field->value = maker;
+        // }
+        
+        // // insert the field into the union.
+        // parser->current_union_decl.get()->fields.push_back(field);
+        return decl;
+      }
+    });
+  }
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
@@ -821,7 +856,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   
   std::vector<ASTDeclaration*> fields;
   std::vector<ASTFunctionDeclaration*> methods;  
-  
+  std::vector<ASTStructDeclaration*> structs;
   auto block = parse_block();
   block->scope->is_struct_or_union_scope = true;
   
@@ -830,17 +865,27 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       fields.push_back(field);
     } else if (auto method = dynamic_cast<ASTFunctionDeclaration*>(statement)) {
       methods.push_back(method); 
+    } else if (auto struct_decl = dynamic_cast<ASTStructDeclaration*>(statement)) {
+      auto type = get_type(struct_decl->type->resolved_type);
+      auto info = static_cast<StructTypeInfo*>(type->info);
+      if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {;
+        throw_error("can only use #anon struct declarations within union types.", ERROR_FAILURE, node->source_range);
+      }
+      structs.push_back(struct_decl);
+      for (const auto &field: struct_decl->fields) {
+        block->scope->insert(field->name.value, field->type->resolved_type);
+      }
     } else {
       throw_error("Non method/field declarations not allowed in union", ERROR_FAILURE, range);
     }
   }
   
-  
   node->fields = fields;
   node->methods = methods;
+  node->structs = structs;
   node->scope = block->scope;
-  // TODO(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
   
+  // TODO(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
   node->type->resolved_type = create_union_type(name.value, block->scope, UNION_IS_NORMAL);
   end_node(node, range);
   return node;

@@ -207,7 +207,9 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
+  
   auto type = get_type(node->type->resolved_type);
+  
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;
@@ -526,8 +528,14 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
     return {};
   }
   
-  (*ss) << "struct " << node->type->base << "{\n";
-  header << "struct " << node->type->base << ";\n";
+  const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
+  
+  if (!is_anonymous) {
+    (*ss) << "struct " << node->type->base << "{\n";
+    header << "struct " << node->type->base << ";\n";
+  } else {
+    (*ss) << "struct {\n";
+  }
   indentLevel++;
   
   context.set_scope(node->scope);
@@ -668,4 +676,35 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   (*ss) << "\n};";
   use_code();
   return {};
+}
+
+std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
+  // TODO(Josh) 10/1/2024, 12:58:56 PM  implement sum types
+  use_header();
+  (*ss) << "union " << node->name.value << ";\n";
+  use_code();
+   
+  (*ss) << "union " << node->name.value << "{\n";
+  current_union_decl = node;
+  Defer _([&]{ current_union_decl = nullptr;});
+  indentLevel++;
+  context.set_scope(node->scope);
+  emit_default_init = false;
+  for (const auto &field: node->fields) {
+    field->accept(this);
+    (*ss) << ";\n";
+  }
+  for (const auto &method: node->methods) {
+    method->accept(this);
+    (*ss) << ";\n";
+  }
+  for (const auto &_struct: node->structs) {
+    _struct->accept(this);
+    (*ss) << ";\n";
+  }
+  emit_default_init = true;
+  indentLevel--;
+  context.exit_scope();
+  (*ss) << "};\n";
+  return {};  
 }

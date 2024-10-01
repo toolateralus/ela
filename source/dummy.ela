@@ -1,21 +1,30 @@
 #import core;
 
 Union :: union {
-  int a;
-  int b;
-  int c;
-  method :: () {
-    printf("%d\n", a);
+  #anon :: struct {
+    int a;
+    int b;
+    int c;
   }
+  
+  int[3] values;
+  method :: () {
+    printf("a=%d from method\n", a);
+  }
+  
   #ctor :: () {}
   #dtor :: () {}
 }
 
 main :: () {
   Union test_union;
-  test_union.a = 10;
+  printf("a=%d\n", test_union.a);
+  printf("b=%d\n", test_union.b);
+  printf("c=%d\n", test_union.c);
   
-  printf("%d\n", test_union.b);
+  for s32 i; i < 3; ++i {
+    printf("values[%d]=%d\n", i, test_union.values[i]);
+  }
   
   test_union.method();
   

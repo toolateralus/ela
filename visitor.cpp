@@ -242,8 +242,20 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
-  ss << indent() << "Struct " << node->type->base << " {\n";
+  
+  auto t = get_type(node->type->resolved_type);
+  auto info = static_cast<StructTypeInfo*>(t->info);
+  
+  const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
+  
+  
+  if (!is_anonymous) {
+    ss << indent() << "Struct " << node->type->base << " {\n";
+  } else {
+    ss << indent() << "anonymous struct" << '\n';
+  }
   indentLevel++;
+  
   
   context.set_scope(node->scope);
   
@@ -369,39 +381,6 @@ std::any SerializeVisitor::visit(ASTUnionDeclaration *node) {
   context.exit_scope();
   return {};
 }
-std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
-  // we store this ast just to type check the stuff.
-  context.set_scope(node->scope);
-  for (const auto &field: node->fields) {
-    field->accept(this);  
-  }
-  for (const auto &method: node->methods) {
-    method->accept(this);
-  }
-  context.exit_scope();
-  return {};
-}
 
 
-std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
-  // TODO(Josh) 10/1/2024, 12:58:56 PM  implement sum types
-  (*ss) << "union " << node->name.value << "{\n";
-  
-  current_union_decl = node;
-  Defer _([&]{current_union_decl = nullptr;});
-  
-  context.set_scope(node->scope);
-  emit_default_init = false;
-  for (const auto &field: node->fields) {
-    field->accept(this);  
-    (*ss) << "\n;";
-  }
-  emit_default_init = true;
-  for (const auto &method: node->methods) {
-    method->accept(this);
-    (*ss) << "\n;";
-  }
-  context.exit_scope();
-  (*ss) << "};\n";
-  return {};  
-}
+

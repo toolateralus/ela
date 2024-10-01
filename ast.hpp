@@ -301,6 +301,7 @@ struct ASTUnionDeclaration : ASTStatement {
   UnionKind kind = UNION_IS_NORMAL;
   std::vector<ASTDeclaration*> fields;
   std::vector<ASTFunctionDeclaration*> methods;
+  std::vector<ASTStructDeclaration*> structs;
   std::any accept(VisitorBase *visitor) override;
 };
 

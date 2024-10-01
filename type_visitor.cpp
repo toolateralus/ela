@@ -589,3 +589,22 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   }
   return {};
 }
+
+std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
+  // we store this ast just to type check the stuff.
+  context.set_scope(node->scope);
+  for (const auto &field: node->fields) {
+    field->accept(this);  
+  }
+  for (const auto &method: node->methods) {
+    method->accept(this);
+  }
+  for (const auto &_struct : node->structs) {
+    for (const auto &field: _struct->fields) {
+      field->accept(this);
+      node->scope->insert(field->name.value, field->type->resolved_type);
+    }
+  }
+  context.exit_scope();
+  return {};
+}

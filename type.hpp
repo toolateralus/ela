@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core.hpp"
+#include "lex.hpp"
 #include <sstream>
 #include <stdio.h>
 #include <stdlib.h>
@@ -38,8 +39,11 @@ enum ConversionRule {
   CONVERT_EXPLICIT,
 };
 
+Token get_anonymous_struct_name();
+
 enum StructTypeFlags {
   STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
+  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
 };
 
 enum ScalarType {

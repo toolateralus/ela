@@ -524,4 +524,10 @@ std::string get_function_type_name(ASTFunctionDeclaration *decl) {
   return ss.str();
 }
 
-
+Token get_anonymous_struct_name() {
+  static int num = 0;
+  auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
+                   TFamily::Identifier);
+  num++;
+  return tok;
+}
