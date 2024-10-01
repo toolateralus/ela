@@ -22,7 +22,7 @@ Array :: struct {
 
 // Keep this at the top otherwise it messesup the output formatting in the middle
 #test test_printf :: () {
-  u8* s = "Hello i am a string";
+  char* s = "Hello i am a string";
   printf("testing printing a string: %s\n", s);
   return;
 }

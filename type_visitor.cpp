@@ -11,14 +11,13 @@
 
 // these are called from and to because in the event of an implicit cast this
 // should be the behaviour.
+
 void validate_type_compatability(
     const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
   auto from_t = get_type(from);
   auto to_t = get_type(to);
-
   auto conv_rule = type_conversion_rule(from_t, to_t);
-
   if (to != from &&
       (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(message + '\n' +
@@ -26,6 +25,7 @@ void validate_type_compatability(
                 ERROR_FAILURE, source_range);
   }
 }
+
 /*
   ######################
   #### TYPE VISITOR ####
@@ -158,7 +158,6 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   context.exit_scope();
   return block_cf;
 }
-
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
@@ -176,8 +175,8 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   }
   return {};
 }
-// throws if inequal and unassignable.
 
+// throws if inequal and unassignable.
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   if (node->value.is_not_null()) {
@@ -196,7 +195,6 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
-
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
@@ -221,7 +219,6 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   node->resolved_type = left;
   return left;
 }
-
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
   auto conversion_rule =
@@ -304,7 +301,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors without
   // this function syntax, using #make(Type, ...) is really clunky and annoying;
   
-  if (!type || fn_ty_info) {
+  if (!type || !fn_ty_info) {
     throw_error("Unable to call function: {} did not refer to a function typed variable. Constructors currently use #make(Type, ...) syntax.", ERROR_FAILURE, node->source_range);
   }
 
@@ -335,7 +332,6 @@ std::any TypeVisitor::visit(ASTCall *node) {
   node->type = info->return_type;
   return info->return_type;
 }
-
 std::any TypeVisitor::visit(ASTArguments *node) {
   std::vector<int> argument_types;
   for (auto arg : node->arguments) {
@@ -358,7 +354,6 @@ std::any TypeVisitor::visit(ASTContinue *node) {
 std::any TypeVisitor::visit(ASTBreak *node) {
   return ControlFlow{BLOCK_FLAGS_BREAK, -1};
 }
-
 std::any TypeVisitor::visit(ASTFor *node) {
   context.set_scope(node->block->scope);
   switch (node->tag) {
@@ -427,7 +422,6 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
-
 std::any TypeVisitor::visit(ASTCompAssign *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
   auto expr_ty = int_from_any(node->expr->accept(this));
@@ -436,7 +430,6 @@ std::any TypeVisitor::visit(ASTCompAssign *node) {
       "invalid types in compound assignment. expected: {}, got {}", "");
   return {};
 }
-
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info);
@@ -458,7 +451,6 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   context.exit_scope();
   return {};
 }
-
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
@@ -516,7 +508,6 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
               node->source_range);
 }
-
 std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
@@ -536,7 +527,6 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
     return remove_one_pointer_ext(left_ty->id, node->source_range);
   }
 }
-
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
   if (!node->arguments->arguments.empty()) {
@@ -548,7 +538,6 @@ std::any TypeVisitor::visit(ASTMake *node) {
   }
   return type;
 }
-
 std::any TypeVisitor::visit(ASTInitializerList *node) {
   int type = -1;
   for (const auto &expr : node->expressions) {
@@ -564,7 +553,6 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   // (int)node->expressions.size();
   return find_type_id(base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = { -1 }});
 }
-
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   for (const auto &[key, value]: node->key_values) {
     if (value.is_not_null()) {
