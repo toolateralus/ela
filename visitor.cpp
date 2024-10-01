@@ -241,18 +241,6 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   ss << indent() << "}\n";
   return {};
 }
-std::any SerializeVisitor::visit(ASTCompAssign *node) {
-  ss << indent() << "Compound Assignment {\n";
-  indentLevel++;
-  ss << indent() << "left: " << node->name.value;
-  ss << '\n' << indent() << "operator: " << node->op.value << '\n';
-  ss << indent() << "right: ";
-  node->expr->accept(this);
-  ss << '\n';
-  indentLevel--;
-  ss << indent() << "}\n";
-  return {};
-}
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   ss << indent() << "Struct " << node->type->base << " {\n";
   indentLevel++;
@@ -316,7 +304,6 @@ std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTCompAssign::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }

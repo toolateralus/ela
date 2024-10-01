@@ -16,7 +16,6 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 #include <vector>
-#include <cmath>
 
 enum {
   ASTTYPE_EMIT_OBJECT,
@@ -110,13 +109,6 @@ struct ASTExprStatement : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-// BUG(Josh) cannot do array[i] += n. use non-identifiers for comp assign 9/30/2024, 10:31:56 AM
-struct ASTCompAssign : ASTStatement {
-  Token name;
-  Token op;
-  ASTExpr *expr;
-  std::any accept(VisitorBase *visitor) override;
-};
 
 struct ASTDeclaration : ASTStatement {
   Token name;
@@ -328,7 +320,6 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTIf *node) override {}                                      \
   std::any visit(ASTElse *node) override {}                                    \
   std::any visit(ASTWhile *node) override {}                                   \
-  std::any visit(ASTCompAssign *node) override {}                              \
   std::any visit(ASTStructDeclaration *node) override {}                       \
   std::any visit(ASTDotExpr *node) override {}                                 \
   std::any visit(ASTSubscript *node) override {}                               \
@@ -360,7 +351,6 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTIf *node) = 0;                                     \
   virtual std::any visit(ASTElse *node) = 0;                                   \
   virtual std::any visit(ASTWhile *node) = 0;                                  \
-  virtual std::any visit(ASTCompAssign *node) = 0;                             \
   virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
   virtual std::any visit(ASTDotExpr *node) = 0;                                \
   virtual std::any visit(ASTSubscript *node) = 0;                              \

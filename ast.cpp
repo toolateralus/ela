@@ -318,8 +318,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
       return result;
     }
   }
-  throw_error(
-      std::format("failed to call unknown directive routine: {}", identifier),
+  throw_error(std::format("failed to call unknown directive routine: {}", identifier),
       ERROR_FAILURE, range);
 }
 
@@ -360,7 +359,6 @@ ASTProgram *Parser::parse() {
   end_node(program, range);
   return program;
 }
-
 ASTStatement *Parser::parse_statement() {
 
   auto range = begin_node();
@@ -485,25 +483,12 @@ ASTStatement *Parser::parse_statement() {
               lookahead_buf()[1].type == TType::Dot) ||
              lookahead_buf()[1].type == TType::Assign ||
              lookahead_buf()[1].type == TType::ColonEquals ||
-             lookahead_buf()[1].type == TType::LParen) {
+             lookahead_buf()[1].type == TType::LParen ||
+             lookahead_buf()[1].is_comp_assign()) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
     return statement;
-  } else if (lookahead_buf()[1].is_comp_assign()) {
-    if (tok.type != TType::Identifier) {
-      throw_error(
-          std::format("Compound assignment must target an identifier. Got {}",
-                      tok.value),
-          ERROR_CRITICAL, range);
-    }
-    eat();
-    auto comp_assign = ast_alloc<ASTCompAssign>();
-    comp_assign->op = eat();
-    comp_assign->name = tok;
-    comp_assign->expr = parse_expr();
-    end_node(comp_assign, range);
-    return comp_assign;
   } else if (lookahead_buf()[1].type == TType::DoubleColon) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
@@ -535,7 +520,6 @@ ASTStatement *Parser::parse_statement() {
                           tok.value),
               ERROR_CRITICAL, range);
 }
-
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -556,6 +540,21 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 
+ASTBlock *Parser::parse_block() {
+  auto range = begin_node();
+  expect(TType::LCurly);
+  ASTBlock *block = ast_alloc<ASTBlock>();
+  context.set_scope();
+  while (not_eof() && peek().type != TType::RCurly) {
+    block->statements.push_back(parse_statement());
+    if (semicolon())
+      eat();
+  }
+  expect(TType::RCurly);
+  block->scope = context.exit_scope();
+  end_node(block, range);
+  return block;
+}
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
@@ -591,21 +590,88 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   return function;
 }
 
-ASTBlock *Parser::parse_block() {
+ASTParamsDecl *Parser::parse_parameters() {
   auto range = begin_node();
-  expect(TType::LCurly);
-  ASTBlock *block = ast_alloc<ASTBlock>();
-  context.set_scope();
-  while (not_eof() && peek().type != TType::RCurly) {
-    block->statements.push_back(parse_statement());
-    if (semicolon())
+  ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
+  expect(TType::LParen);
+  ASTType *type;
+  while (peek().type != TType::RParen) {
+
+    if (peek().type == TType::Varargs) {
       eat();
+      if (!current_func_decl) {
+        throw_error("Cannot use varargs outside of a function declaration. "
+                    "Only use this for #foreign functions.",
+                    ERROR_FAILURE, range);
+      }
+      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
+      continue;
+    }
+
+    auto next = peek();
+    
+    // if the cached type is null, or if the next token isn't 
+    // a valid type, we parse the type.
+    // this should allow us to do things like func :: (int a, b, c) {}
+    if (!type || find_type_id(next.value, {}) != -1) {
+      type = parse_type();
+    }
+
+    
+    auto name = expect(TType::Identifier).value;
+
+    auto param = ast_alloc<ASTParamDecl>();
+    param->type = type;
+    param->name = name;
+
+    if (peek().type == TType::Assign) {
+      eat();
+      param->default_value = parse_expr();
+    }
+
+    params->params.push_back(param);
+
+    if (peek().type != TType::RParen) {
+      expect(TType::Comma);
+    } else
+      break;
   }
-  expect(TType::RCurly);
-  block->scope = context.exit_scope();
-  end_node(block, range);
-  return block;
+  expect(TType::RParen);
+  end_node(params, range);
+  return params;
 }
+ASTArguments *Parser::parse_arguments() {
+  auto range = begin_node();
+  auto args = ast_alloc<ASTArguments>();
+  expect(TType::LParen);
+
+  if (peek().type == TType::RParen) {
+    expect(TType::RParen);
+    end_node(args, range);
+    return args;
+  }
+
+  while (peek().type != TType::RParen) {
+    args->arguments.push_back(parse_expr());
+    if (peek().type != TType::RParen) {
+      expect(TType::Comma);
+    }
+  }
+  expect(TType::RParen);
+
+  end_node(args, range);
+  return args;
+}
+ASTCall *Parser::parse_call(const Token &name) {
+  auto range = begin_node();
+  auto args = parse_arguments();
+  ASTCall *call = ast_alloc<ASTCall>();
+  call->name = name;
+  call->arguments = args;
+  end_node(call, range);
+  return call;
+}
+
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
   auto range = begin_node();
@@ -644,7 +710,6 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::RCurly);
   return node;
 }
-
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
@@ -689,12 +754,26 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return decl;
 }
 
+// CLEANUP(Josh) 10/1/2024, 9:16:15 AM
+// We could probably use an enum for operator precedence,
+// and then use a single parse_expr function for everything but primary
+// to save us 2-300 lines of code in this file, and reduce the surface area for bugs to appear.
 ASTExpr *Parser::parse_expr() {
   auto range = begin_node();
-  auto expr = parse_assignment();
-  end_node(expr, range);
-  return expr;
+  auto left = parse_assignment();
+  if (peek().is_comp_assign()) {
+    auto comp_assign = ast_alloc<ASTBinExpr>();
+    comp_assign->op = eat();
+    comp_assign->left = left;
+    comp_assign->right = parse_assignment();
+    end_node(comp_assign, range);
+    return comp_assign;
+  }
+  end_node(left, range);
+  return left;
 }
+
+
 ASTExpr *Parser::parse_assignment() {
   auto range = begin_node();
   ASTExpr *left = parse_logical_or();
@@ -1041,6 +1120,10 @@ ASTExpr *Parser::parse_primary() {
   }
 }
 
+
+// CLEANUP(Josh) 10/1/2024, 9:18:00 AM this method is an absolute mess. This could be much much cleaner, and more reliable
+// We could probably split up the different type extension parser things into their own functions.
+// Then we wouldn't have to re-write it all here
 ASTType *Parser::parse_function_type(const std::string &base,
                                      TypeExt extension_info) {
   auto return_type = ast_alloc<ASTType>();
@@ -1099,7 +1182,6 @@ ASTType *Parser::parse_function_type(const std::string &base,
   }
   return return_type;
 }
-
 ASTType *Parser::parse_type() {
   auto range = begin_node();
   auto base = eat().value;
@@ -1130,84 +1212,4 @@ ASTType *Parser::parse_type() {
   end_node(node, range);
   return node;
 }
-ASTParamsDecl *Parser::parse_parameters() {
-  auto range = begin_node();
-  ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
-  expect(TType::LParen);
-  ASTType *type;
-  while (peek().type != TType::RParen) {
 
-    if (peek().type == TType::Varargs) {
-      eat();
-      if (!current_func_decl) {
-        throw_error("Cannot use varargs outside of a function declaration. "
-                    "Only use this for #foreign functions.",
-                    ERROR_FAILURE, range);
-      }
-      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
-      continue;
-    }
-
-    auto next = peek();
-    
-    // if the cached type is null, or if the next token isn't 
-    // a valid type, we parse the type.
-    // this should allow us to do things like func :: (int a, b, c) {}
-    if (!type || find_type_id(next.value, {}) != -1) {
-      type = parse_type();
-    }
-
-    
-    auto name = expect(TType::Identifier).value;
-
-    auto param = ast_alloc<ASTParamDecl>();
-    param->type = type;
-    param->name = name;
-
-    if (peek().type == TType::Assign) {
-      eat();
-      param->default_value = parse_expr();
-    }
-
-    params->params.push_back(param);
-
-    if (peek().type != TType::RParen) {
-      expect(TType::Comma);
-    } else
-      break;
-  }
-  expect(TType::RParen);
-  end_node(params, range);
-  return params;
-}
-ASTArguments *Parser::parse_arguments() {
-  auto range = begin_node();
-  auto args = ast_alloc<ASTArguments>();
-  expect(TType::LParen);
-
-  if (peek().type == TType::RParen) {
-    expect(TType::RParen);
-    end_node(args, range);
-    return args;
-  }
-
-  while (peek().type != TType::RParen) {
-    args->arguments.push_back(parse_expr());
-    if (peek().type != TType::RParen) {
-      expect(TType::Comma);
-    }
-  }
-  expect(TType::RParen);
-
-  end_node(args, range);
-  return args;
-}
-ASTCall *Parser::parse_call(const Token &name) {
-  auto range = begin_node();
-  auto args = parse_arguments();
-  ASTCall *call = ast_alloc<ASTCall>();
-  call->name = name;
-  call->arguments = args;
-  end_node(call, range);
-  return call;
-}

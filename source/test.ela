@@ -186,11 +186,11 @@ Array :: struct {
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: (float32 a, float32 b, float32 c, float32 d = 1.0) -> float32 {
+many_params :: (float32 a, b, c, d = 1.0) -> float32 {
   return a * b * c * d;
 }
 
-mul_params :: (float32 n, float32 f) -> float32 {
+mul_params :: (float32 n, f) -> float32 {
   return n * f; 
 }
 
@@ -432,4 +432,11 @@ MyEnum :: enum {
   // #alias int_ptr :: int*;
   // int* v = malloc(sizeof(int));
   // assert("alias failed to equal pointed to type field.", v == #make(int_ptr, v));
+}
+
+#test test_comp_assign_non_iden :: () {
+  float32[12] arr;
+  arr[0] = 10;
+  arr[0] += 10;
+  assert("comp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
 }

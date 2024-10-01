@@ -9,13 +9,7 @@
 #include <sstream>
 #include <string>
 
-std::any EmitVisitor::visit(ASTCompAssign *node) {
-  emit_line_directive(node);
-  (*ss) <<indent() << node->name.value << " ";
-  (*ss) <<node->op.value << " ";
-  node->expr->accept(this);
-  return {};
-}
+
 
 std::any EmitVisitor::visit(ASTWhile *node) {
   emit_line_directive(node);

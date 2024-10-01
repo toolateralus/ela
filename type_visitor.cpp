@@ -422,14 +422,7 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
-std::any TypeVisitor::visit(ASTCompAssign *node) {
-  auto symbol = context.current_scope->lookup(node->name.value);
-  auto expr_ty = int_from_any(node->expr->accept(this));
-  validate_type_compatability(
-      expr_ty, symbol->type_id, node->source_range,
-      "invalid types in compound assignment. expected: {}, got {}", "");
-  return {};
-}
+
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info);
