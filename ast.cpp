@@ -320,6 +320,41 @@ void Parser::init_directive_routines() {
          }});
   }
   
+  
+  // #typename, get the name of a type as a string.
+  {
+    directive_routines.push_back({
+      .identifier = "typename",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto asttype = parser->parse_type();
+        auto type_id = find_type_id(asttype->base, asttype->extension_info);
+        auto type = get_type(type_id);
+        auto string = ast_alloc<ASTLiteral>();
+        string->tag = ASTLiteral::String;
+        string->value = type->to_string();
+        return string;
+      }
+    });
+  }
+  
+  // #self, return the type of the current declaring struct or union
+  {
+    directive_routines.push_back({
+      .identifier = "self",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        if (parser->current_union_decl) {
+          return parser->current_union_decl.get()->type;
+        }
+        if (parser->current_struct_decl) {
+          return parser->current_struct_decl.get()->type;
+        }
+        throw_error("can only use #self in unions and structs to get the type name of the current declaring type", ERROR_FAILURE, {});
+      }
+    });
+  }
+  
   // #anon, for declaring anonymous structs in unions primarily.
   {
     directive_routines.push_back({
@@ -374,6 +409,14 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
 
 ASTType *Parser::parse_type() {
   auto range = begin_node();
+  
+  if (peek().type == TType::Directive) {
+    auto type = dynamic_cast<ASTType*>(try_parse_directive_expr().get());
+    if (!type){
+      throw_error("unable to get type from directive expression where a type was expected.", ERROR_FAILURE, range);
+    } 
+    return type;
+  }
   auto base = eat().value;
   TypeExt extension_info;
   // TODO(Josh) 10/1/2024, 10:04:12 AM

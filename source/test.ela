@@ -490,3 +490,41 @@ Union :: union {
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
   test_union.method(10);
 }
+
+_Vec2 :: union {
+  #anon :: struct {
+    int x;
+    int y;
+    int z;
+  };
+  int[3] values;
+  
+  method :: (int n) {
+    assert("union equality check in method failed", n == x && n == y && n == z);
+    assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
+  }
+  
+  something :: () -> #self {
+    return #make(#self);
+  }
+  
+  #ctor :: () {
+    memset(#make(void*, values), 0, sizeof(int) * 3);
+    x=0;
+    y=0;
+    z=0;
+    //printf();
+  }
+  
+  #dtor :: () {
+    printf("%d, %d, %d", x, y, z);
+  }
+}
+
+
+#test test_union_type_anonymous_sub_struct :: () {
+  _Vec2 vec;
+  vec.method(0);
+}
+
+
