@@ -105,9 +105,9 @@ std::string get_cpp_scalar_type(int id) {
     name = "char";
   else if (type->base == "u8")
     name = "uint8_t";
-  else if (type->base == "f32")
+  else if (type->base == "float32")
     name = "float";
-  else if (type->base == "f64")
+  else if (type->base == "float64")
     name = "double";
   else if (type->base == "float")
     name = "float";
@@ -156,8 +156,8 @@ void init_type_system() {
 
   // Floats
   {
-    create_type(TYPE_SCALAR, "f32", get_scalar_type_info(TYPE_FLOAT, 4));
-    create_type(TYPE_SCALAR, "f64", get_scalar_type_info(TYPE_DOUBLE, 8));
+    create_type(TYPE_SCALAR, "float32", get_scalar_type_info(TYPE_FLOAT, 4));
+    create_type(TYPE_SCALAR, "float64", get_scalar_type_info(TYPE_DOUBLE, 8));
   }
 
   // Other
@@ -425,8 +425,8 @@ int string_type() {
   static int type = find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
-int f32_type() {
-  static int type = find_type_id("f32", {});
+int float32_type() {
+  static int type = find_type_id("float32", {});
   return type;
 }
 int Type::get_element_type() const {

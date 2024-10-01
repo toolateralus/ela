@@ -276,7 +276,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return s8_type();
   }
   case ASTLiteral::Float:
-    return f32_type();
+    return float32_type();
   case ASTLiteral::RawString:
   case ASTLiteral::String:
     return string_type();
@@ -298,14 +298,14 @@ std::any TypeVisitor::visit(ASTCall *node) {
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
-  auto fn_ty_info = get_type(symbol->type_id)->info;
-
-  // TODO: fix this. shouldn't be checking the info but the type
-  if (!fn_ty_info) {
-    throw_error(
-        std::format("Function call '{}' does not refer to a function type.",
-                    node->name.value),
-        ERROR_FAILURE, node->source_range);
+  auto type = get_type(symbol->type_id);
+  auto fn_ty_info = dynamic_cast<FunctionTypeInfo*>(type->info);
+  
+  // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors without
+  // this function syntax, using #make(Type, ...) is really clunky and annoying;
+  
+  if (!type || fn_ty_info) {
+    throw_error("Unable to call function: {} did not refer to a function typed variable. Constructors currently use #make(Type, ...) syntax.", ERROR_FAILURE, node->source_range);
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);

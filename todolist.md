@@ -1,7 +1,30 @@
+## TODO List
 
-TODO(Josh): debug information is bad for some statements
+### General Tasks
+- **Add the ability to cast initializer lists to an appropriate struct type, implicitly.**
+  - Example: `func :: (Vec2 ..) {}` and `func({0, 0});`
+- **Fix casting bug where we can't cast an initializer list of float literals (float32) to `float[]`.**
 
-TODO: use #cast instead of #make for casting, so #make can do allocations.
+- **Add union types, with an optional tagged union.**
+- **Add a way to use initializer lists with fixed arrays.**
+- **Add polymorphic functions & types.**
+- **Add the ability to cast initializer lists to an appropriate struct type, implicitly.**
+  - Example: `func :: (Vec2 ..) {}` and `func({0, 0});`
+- **Fix casting bug where we can't cast an initializer list of float literals (float32) to `float[]`.**
+
+- **Need to be able to take references to the variables in the array.**
+  ```jai
+  // such as 
+  for &v; vertices {
+    ...
+  }
+  
+  // or just a pointer to it, 
+  for *v; vertices {
+    ...
+  }
+  
+  we should be able to easily output different C code for that.
 
 ## new features
   - static class members. maybe not neccesary, but above is. 
@@ -18,7 +41,7 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
   - Ranges, slicing. `0..10, 0..len+1, arr[0..5]`;
   - Iterators builtin? probably not needed, but added to stdlib.
   
-  ## these depend on function overloading
+## these depend on function overloading
   - Polymorphic functions and polymorphic types. Like C++ templates, but less obnoxious.
 
   
@@ -48,3 +71,4 @@ TODO: use #cast instead of #make for casting, so #make can do allocations.
 ## Next phase
 - [2] Compile time reflection
 - [0] Operator Overloads. (do we even want this? could be helpful)
+

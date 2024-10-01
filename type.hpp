@@ -291,7 +291,7 @@ int s8_type();
 int s16_type();
 int s32_type();
 int s64_type();
-int f32_type();
+int float32_type();
 
 // char *
 int string_type();

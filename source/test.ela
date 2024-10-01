@@ -3,13 +3,13 @@
 #compiler_flags "-g"
 
 Vector2 :: struct {
-  f32 x;
-  f32 y;
+  float32 x;
+  float32 y;
 }
 
 Vector3 :: struct {
   Vector2 vec2;
-  f32 z;
+  float32 z;
 } 
 
 Node :: struct {
@@ -186,11 +186,11 @@ Array :: struct {
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: (f32 a, f32 b, f32 c, f32 d = 1.0) -> f32 {
+many_params :: (float32 a, float32 b, float32 c, float32 d = 1.0) -> float32 {
   return a * b * c * d;
 }
 
-mul_params :: (f32 n, f32 f) -> f32 {
+mul_params :: (float32 n, float32 f) -> float32 {
   return n * f; 
 }
 
@@ -217,7 +217,7 @@ returns :: () -> s32  {
   assert("unable to upcast successfully", s1 == s4);
   
   float f;
-  f64 f1 = f;
+  float64 f1 = f;
   assert("unable to upcast successfully", f == f1);
 }
 
@@ -256,7 +256,7 @@ returns :: () -> s32  {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: (Vector2 v)  -> f32 {
+struct_as_param :: (Vector2 v)  -> float32 {
   return v.x;
 }
 
@@ -265,7 +265,7 @@ struct_as_param :: (Vector2 v)  -> f32 {
   assert("", struct_as_param(v) == 0.0);
 }
 
-something :: (f32 f) -> f32 {
+something :: (float32 f) -> float32 {
   return f;
 }
 
@@ -329,8 +329,8 @@ something :: (f32 f) -> f32 {
 }
 
 Constructible :: struct {
-  f32 x;
-  #ctor :: (f32 _x) {
+  float32 x;
+  #ctor :: (float32 _x) {
       x = _x;
   }
   #ctor :: (Constructible other) {
@@ -364,10 +364,10 @@ Constructible :: struct {
 }
 
 IHaveAMethod :: struct {
-  method :: () -> f32 {
+  method :: () -> float32 {
       return 0.0;
   }
-  parameter_method :: (f32 x) -> f32 {
+  parameter_method :: (float32 x) -> float32 {
       return x;
   }
 }
@@ -416,18 +416,20 @@ MyEnum :: enum {
 
 // test aliases, and making lists of function pointers.
 #test test_function_pointers :: () {
-  #alias VoidFunction :: void();
-  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
-  for s32 i; i < 10; ++i {
-    func[i] = &test_function_pointers;
-  }
-  for s32 i; i < 10; ++i {
-    assert("func failed to == itself", func[i] == &test_function_pointers)
-  }
+  assert("aliasing a list of function pointers failed.", false);
+  // #alias VoidFunction :: void();
+  // VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+  // for s32 i; i < 10; ++i {
+  //   func[i] = &test_function_pointers;
+  // }
+  // for s32 i; i < 10; ++i {
+  //   assert("func failed to == itself", func[i] == &test_function_pointers)
+  // }
 }
 
 #test test_aliasing :: () {
-  #alias int_ptr :: int*;
-  int* v = malloc(sizeof(int));
-  assert("alias failed to equal pointed to type field.", v == #make(int_ptr, v));
+  assert("aliasing with type extensions failed.", false);
+  // #alias int_ptr :: int*;
+  // int* v = malloc(sizeof(int));
+  // assert("alias failed to equal pointed to type field.", v == #make(int_ptr, v));
 }

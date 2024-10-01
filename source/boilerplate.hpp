@@ -2,13 +2,13 @@
 #include <cstdint>
 #include <cstddef>
 
-using f64 = double;
+using float64 = double;
 using u64 = size_t;
 using s64 = int64_t;
 
 using s32 = int32_t;
 using u32 = uint32_t;
-using f32 = float;
+using float32 = float;
 
 using s16 = int16_t;
 using u16 = uint16_t;
