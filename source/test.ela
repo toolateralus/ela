@@ -521,6 +521,10 @@ _Vec2 :: union {
   }
 }
 
+#test test_typename :: () {
+  name := #typename(int);
+  assert("typename did not return the appropriate name.", name == "int");
+}
 
 #test test_union_type_anonymous_sub_struct :: () {
   _Vec2 vec;

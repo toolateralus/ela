@@ -327,12 +327,20 @@ void Parser::init_directive_routines() {
       .identifier = "typename",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
+        if (parser->peek().type == TType::LParen) {
+          parser->eat();
+        }
         auto asttype = parser->parse_type();
+        
+        if (parser->peek().type == TType::RParen) {
+          parser->eat();
+        }
         auto type_id = find_type_id(asttype->base, asttype->extension_info);
         auto type = get_type(type_id);
         auto string = ast_alloc<ASTLiteral>();
         string->tag = ASTLiteral::String;
         string->value = type->to_string();
+        
         return string;
       }
     });
