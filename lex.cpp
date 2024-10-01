@@ -37,6 +37,19 @@ void Lexer::get_token(State &state) {
       lines += (newlinePos != std::string::npos);
       continue;
     }
+    
+    if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
+      pos += 2;
+      while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
+        if (input[pos] == '\n') {
+          lines++;
+        }
+        pos++;
+      }
+      pos += 2;
+      continue;
+    }
+    
 
     size_t col = lines == 0 ? pos : pos / lines;
     SourceLocation location{state.line, state.col, state.file_idx};
