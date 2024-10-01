@@ -1,4 +1,5 @@
 #include "error.hpp"
+#include <cstdio>
 #include <format>
 #include <algorithm>
 #include "ast.hpp"
@@ -677,10 +678,6 @@ ASTDeclaration *Parser::parse_declaration() {
                 decl->source_range);
   }
   context.current_scope->insert(iden.value, -1);
-  
-  if (auto alloc = dynamic_cast<ASTAllocate*>(decl->value.get())) {
-    insert_or_update_allocation_info(alloc, context.current_scope->lookup(iden.value));
-  }
   return decl;
 }
 
@@ -1047,7 +1044,7 @@ ASTExpr *Parser::parse_primary() {
       allow_function_type_parsing = true;
       type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
       node->type = type;
-      insert_or_update_allocation_info(node);
+      insert_allocation(node);
     } 
     
     Nullable<ASTArguments> args = nullptr;
@@ -1232,37 +1229,30 @@ Token Parser::peek() const {
   }
   return states.back().lookahead_buffer.front();
 }
-
-void insert_or_update_allocation_info(ASTAllocate *allocation, Symbol *symbol) {
-  for (auto &info : allocation_info) {
-    if (info.allocation == allocation) {
-      info.symbol = symbol;
+void insert_allocation(ASTAllocate *in_alloc) {
+  for (auto &alloc : allocation_info)
+    if (alloc == in_alloc) {
       return;
     }
-  }
-  allocation_info.push_back({
-    .symbol = symbol,
-    .allocation = allocation,
-  });
+  allocation_info.push_back(in_alloc);
 }
-
-void report_unfreed_allocations() {
+bool report_unfreed_allocations() {
+  bool had_unfreed = !allocation_info.empty();
+  
   for (const auto &info : allocation_info) {
-    if (info.allocation) {
-      auto formatted_str = format_source_location(info.allocation->source_range, ERROR_FAILURE);
+    if (info) {
+      auto formatted_str = format_source_location(info->source_range, ERROR_FAILURE);
       std::cerr
           << "\e[31mUnfreed Allocation:\e[0m\n"; // Red color for the header
       std::cerr << "\e[33mAllocation:\e[0m " << formatted_str
-                << "\n"; // Yellow color for allocation
-      if (info.symbol) {
-        std::cerr << "\e[33mSymbol:\e[0m " << info.symbol->name
-                  << "\n"; // Yellow color for symbol
-      } else {
-        std::cerr
-            << "\e[33mSymbol:\e[0m \e[90m(null)\e[0m\n"; // Gray color for null
-      }
+                << "\n";
       std::cerr << "\e[90m" << std::string(80, '-')
                 << "\e[0m\n"; // Gray color for separator
     }
   }
+  return had_unfreed;
+}
+void erase_allocation(ASTAllocate *allocation) {
+  allocation_info.erase(
+      std::find(allocation_info.begin(), allocation_info.end(), allocation));
 }

@@ -321,11 +321,12 @@ struct AllocationInfo {
   ASTAllocate* allocation;
 };
 
-extern std::vector<AllocationInfo> allocation_info;
+extern std::vector<ASTAllocate*> allocation_info;
 
-void insert_or_update_allocation_info(ASTAllocate *allocation, Symbol *symbol = nullptr);
+void insert_allocation(ASTAllocate *allocation);
+void erase_allocation(ASTAllocate *allocation);
 
-void report_unfreed_allocations();
+bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };

@@ -30,7 +30,7 @@ jstl::Arena ast_arena{MB(10)};
 
 CompileCommand compile_command;
 
-std::vector<AllocationInfo> allocation_info;
+std::vector<ASTAllocate*> allocation_info;
 
 std::vector<Token> all_tokens;
 
@@ -46,7 +46,12 @@ int main(int argc, char *argv[]) {
     compile_command.print();
     init_type_system();
     compile_command.compile();
-    report_unfreed_allocations();
+    if (compile_command.has_flag("sanitize")) {
+      if (report_unfreed_allocations()) {
+        return 1;
+      }
+    }
+    
   } catch (const std::exception &e) {
     fprintf(stderr, "\e[31m%s\e[0m\n", e.what());
     return 1;

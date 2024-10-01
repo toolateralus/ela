@@ -8,6 +8,7 @@
 #include <jstl/containers/vector.hpp>
 #include <limits>
 #include <string>
+#include <vector>
 
 // these are called from and to because in the event of an implicit cast this
 // should be the behaviour.
@@ -628,14 +629,10 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
     if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) {
       throw_error("invalid delete statement: you need at least one argument", ERROR_FAILURE, node->source_range);
     }
-    // keep track of which allocations were deleted.
-    for (auto it = allocation_info.begin(); it != allocation_info.end(); ++it) {
-      auto &alloc_info = *it;
-      if (alloc_info.allocation == node) {
-        allocation_info.erase(it);
-        break;
-      }
-    }
+    // TODO(Josh) 10/1/2024, 4:40:04 PM This won't quite work, as the allocations aren't directly tied to the 
+    // delete. We try to delete the delete node, not the alloc node.
+    // we need to somehow lookup the source scope and variable, and then erase that.
+    // erase_allocation(node);
     return void_type();
   }
   
