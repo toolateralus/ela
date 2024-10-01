@@ -635,7 +635,7 @@ ASTParamsDecl *Parser::parse_parameters() {
   expect(TType::LParen);
   ASTType *type;
   while (peek().type != TType::RParen) {
-
+    auto subrange = begin_node();
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
@@ -646,17 +646,13 @@ ASTParamsDecl *Parser::parse_parameters() {
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
-
     auto next = peek();
-    
     // if the cached type is null, or if the next token isn't 
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
     if (!type || find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
-
-    
     auto name = expect(TType::Identifier).value;
 
     auto param = ast_alloc<ASTParamDecl>();
@@ -669,6 +665,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     }
 
     params->params.push_back(param);
+    end_node(param, subrange);
 
     if (peek().type != TType::RParen) {
       expect(TType::Comma);

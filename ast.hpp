@@ -282,6 +282,11 @@ struct ASTEnumDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// TODO: do this next.
+struct ASTUnionDeclaration : ASTStatement {
+  
+};
+
 struct ASTNoop : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };

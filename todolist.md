@@ -1,5 +1,8 @@
 ## TODO List
 
+Add a offsetof() or #offset() or something like that
+`#offset(Vector2, x);`
+
 ### General Tasks
 - **Add the ability to forward declare your own structs, not just ones that exist in external libraries**
   Right now, we get a redefinition error or just a straight failure to parse a statement when you try to do

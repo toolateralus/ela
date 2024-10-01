@@ -120,7 +120,6 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = get_type(node->resolved_type);
-  
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
     return {};
@@ -260,7 +259,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
-  
+  auto type = get_type(node->type->resolved_type);
   node->type->accept(this);
   (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {

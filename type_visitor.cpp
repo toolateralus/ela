@@ -165,7 +165,27 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTParamDecl *node) {
-  node->type->accept(this);
+  auto id = int_from_any(node->type->accept(this));
+  auto type = get_type(id);
+  
+  if (type->extensions.is_fixed_sized_array()) {
+    throw_warning("using a fixed array as a function parameter: note, this casts the length information off and gets passed as as pointer. Consider using a dynamic array", node->source_range);
+    if (node->default_value.is_not_null()) {
+      throw_error("Cannot currently use default parameters for fixed buffer pointers. Also, length information gets casted off. consider using a dynamic array", ERROR_WARNING, node->source_range);
+    }
+    
+    // cast the fixed sized array to a base*.
+    {
+      auto extensions = type->extensions;
+      auto it = std::find(extensions.extensions.begin(), extensions.extensions.end(), TYPE_EXT_ARRAY);
+      extensions.extensions.erase(it);
+      extensions.array_sizes.erase(extensions.array_sizes.begin() + 1);
+      extensions.extensions.insert(extensions.extensions.begin(), TYPE_EXT_POINTER);
+      node->type->resolved_type = find_type_id(type->base, extensions);
+    }
+    
+  }
+  
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     validate_type_compatability(
@@ -361,6 +381,11 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
     auto t = get_type(type);
+    
+    if (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array()) {
+      throw_error("cannot iterate with a range based for loop over a non collection type.", ERROR_FAILURE, node->source_range);
+    }
+    
     auto element_ty = t->get_element_type();
     auto iden = static_cast<ASTIdentifier *>(v.target);
     context.current_scope->insert(iden->value.value, element_ty);

@@ -162,10 +162,14 @@ struct SourceRange {
   int64_t begin, end;
   int64_t begin_loc, end_loc;
   std::span<Token> get_tokens() const {
-      int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
-      int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
-      return std::span<Token>(all_tokens).subspan(valid_begin, valid_end - valid_begin);
-  }
+    int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
+    int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
+    if (valid_end - valid_begin == 0) {
+        valid_begin = std::max(int64_t(0), valid_begin - 2);
+        valid_end = std::min(int64_t(all_tokens.size()), valid_end + 3);
+    }
+    return std::span<Token>(all_tokens).subspan(valid_begin, valid_end - valid_begin);
+}
 };
 
 

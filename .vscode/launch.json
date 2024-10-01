@@ -9,32 +9,32 @@
       "request": "launch",
       "name": "Debug test",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["source/test.ela",  "--test", "--s"],
-      "cwd": "${workspaceFolder}"
+      "args": ["test.ela",  "--test", "--s"],
+      "cwd": "${workspaceFolder}/source"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["source/dummy.ela", "--s", "--verbose"],
-      "cwd": "${workspaceFolder}"
+      "args": ["dummy.ela", "--s", "--verbose"],
+      "cwd": "${workspaceFolder}/source"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy executable",
-      "program": "${workspaceFolder}/source/dummy",
+      "program": "${workspaceFolder}/dummy",
       "args": [],
-      "cwd": "${workspaceFolder}"
+      "cwd": "${workspaceFolder}/source"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy tests",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["source/dummy.ela", "--s", "--test"],
-      "cwd": "${workspaceFolder}"
+      "args": ["dummy.ela", "--s", "--test"],
+      "cwd": "${workspaceFolder}/source"
     }
   ]
 }
