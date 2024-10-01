@@ -64,6 +64,7 @@ enum TypeKind {
   TYPE_FUNCTION,
   TYPE_STRUCT,
   TYPE_ENUM,
+  TYPE_UNION,
 };
 
 enum TypeExtEnum {
@@ -83,6 +84,11 @@ enum FunctionInstanceFlags {
 enum struct FunctionMetaType {
   FUNCTION_TYPE_NORMAL,
   FUNCTION_TYPE_FOREIGN,
+};
+
+enum UnionKind {
+  UNION_IS_NORMAL = 0,
+  UNION_IS_SUM_TYPE = 1,
 };
 
 // TODO: make it so array types are not scalars. It makes no darn sense.
@@ -201,11 +207,15 @@ struct EnumTypeInfo : TypeInfo {
   std::vector<std::string> keys;
 };
 
+struct UnionTypeInfo : TypeInfo {
+  UnionKind kind;
+  Scope *scope;
+};
+
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
   virtual std::string to_string() const override { return ""; }
-  mutable int m_size = -1;
 };
 
 // active aliases. alias -> pointed to type_id
@@ -270,6 +280,8 @@ int create_struct_type(const std::string &, Scope *);
 
 int create_enum_type(const std::string &, const std::vector<std::string> &,
                      bool = false);
+
+int create_union_type(const std::string &name, Scope *scope, UnionKind kind);
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
 

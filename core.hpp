@@ -6,7 +6,6 @@
 #include <fstream>
 #include <functional>
 #include <iostream>
-#include <ratio>
 #include <sstream>
 #include <filesystem>
 #include <unordered_map>

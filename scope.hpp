@@ -24,7 +24,8 @@ struct Symbol {
 };
 
 struct Scope {
-  bool is_struct_scope = false;
+  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flagsor something.
+  bool is_struct_or_union_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
   Scope *parent = nullptr;
   

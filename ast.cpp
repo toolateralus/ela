@@ -209,10 +209,16 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            parser->expect(TType::DoubleColon);
-           auto func_decl = parser->parse_function_declaration(
-               Token({}, parser->current_struct_decl.get()->type->base,
-                     TType::Identifier, TFamily::Identifier));
+           
+           auto tname = [&]{
+              if (parser->current_struct_decl)
+                return Token({}, parser->current_struct_decl.get()->type->base, TType::Identifier, TFamily::Identifier);
+              else return Token({}, parser->current_union_decl.get()->type->base, TType::Identifier, TFamily::Identifier);
+           }();
+           
+           auto func_decl = parser->parse_function_declaration(tname);
            func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
+           
            return func_decl;
          }});
 
@@ -221,9 +227,15 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            parser->expect(TType::DoubleColon);
-           auto func_decl = parser->parse_function_declaration(
-               Token({}, parser->current_struct_decl.get()->type->base,
-                     TType::Identifier, TFamily::Identifier));
+           
+           auto tname = [&]{
+              if (parser->current_struct_decl)
+                return Token({}, parser->current_struct_decl.get()->type->base, TType::Identifier, TFamily::Identifier);
+              else return Token({}, parser->current_union_decl.get()->type->base, TType::Identifier, TFamily::Identifier);
+           }();
+           
+           auto func_decl = parser->parse_function_declaration(tname);
+           
            func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
            return func_decl;
          }});
@@ -543,6 +555,9 @@ ASTStatement *Parser::parse_statement() {
       auto enum_decl = parse_enum_declaration(tok);
       end_node(enum_decl, range);
       return enum_decl;
+    } else if (peek().type == TType::Union) {
+      auto union_decl = parse_union_declaration(tok);
+      return union_decl;
     } else {
       throw_error("invalid :: statement, expected '(' (for a function), "
                   "'struct', or 'enum",
@@ -763,7 +778,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   if (!semicolon()) {
     auto block = parse_block();
-    block->scope->is_struct_scope = true;
+    block->scope->is_struct_or_union_scope = true;
 
     for (const auto &statement : block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
@@ -789,6 +804,48 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   end_node(decl, range);
   return decl;
 }
+ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
+  auto node = ast_alloc<ASTUnionDeclaration>();
+  current_union_decl = node;
+  
+  node->name = name;
+  node->type = ast_alloc<ASTType>();
+  node->type->base = name.value;
+  
+  Defer _([&]{
+    current_union_decl = nullptr;
+  });
+  
+  auto range = begin_node();
+  expect(TType::Union);
+  
+  std::vector<ASTDeclaration*> fields;
+  std::vector<ASTFunctionDeclaration*> methods;  
+  
+  auto block = parse_block();
+  block->scope->is_struct_or_union_scope = true;
+  
+  for (auto &statement: block->statements) {
+    if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
+      fields.push_back(field);
+    } else if (auto method = dynamic_cast<ASTFunctionDeclaration*>(statement)) {
+      methods.push_back(method); 
+    } else {
+      throw_error("Non method/field declarations not allowed in union", ERROR_FAILURE, range);
+    }
+  }
+  
+  
+  node->fields = fields;
+  node->methods = methods;
+  node->scope = block->scope;
+  // TODO(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
+  
+  node->type->resolved_type = create_union_type(name.value, block->scope, UNION_IS_NORMAL);
+  end_node(node, range);
+  return node;
+}
+
 
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
@@ -1051,3 +1108,5 @@ Token Parser::peek() const {
   }
   return states.back().lookahead_buffer.front();
 }
+
+

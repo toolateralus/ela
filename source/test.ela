@@ -457,3 +457,36 @@ XaryuStruct :: struct {
   xarbars[0].f += 10.0;
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
+
+Union :: union {
+  int a;
+  int b;
+  int c;
+  method :: (int n) {
+    assert("union equality check in method failed", n == a && n == b && n == c);
+  }
+  #ctor :: () {
+    a = -1;
+  }
+  #dtor :: () {
+    printf("union destructor\n");
+  }
+}
+
+// TODO(Josh) 10/1/2024, 1:20:30 PM
+// implement tagged unions once we have paramterized structs.
+// until we have that, this will be nearly pointless.
+// #tagged Union :: union {
+//   None,
+//   Some :: struct {
+//     $T data;
+//   }
+// }
+
+
+#test test_union_type :: () {
+  Union test_union;
+  test_union.a = 10;
+  assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
+  test_union.method(10);
+}

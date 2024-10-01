@@ -214,7 +214,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
     
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
-    } else {
+    } else if (emit_default_init) {
       std::string init = "{";
       for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
@@ -251,7 +251,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       (*ss) <<" = ";
       cast_pointers_implicit(node);
       node->value.get()->accept(this);
-    } else {
+    } else if (emit_default_init) {
       (*ss) <<"{}";
     }
   } 
@@ -387,40 +387,42 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   }
   
   // local function
-  if (!context.current_scope->is_struct_scope && context.current_scope != context.root_scope && (node->flags & FUNCTION_IS_METHOD) == 0) {
+  if (!context.current_scope->is_struct_or_union_scope && context.current_scope != context.root_scope && (node->flags & FUNCTION_IS_METHOD) == 0) {
     emit_local_function(node);
     return {};
   }
   
-  if ((node->flags & FUNCTION_IS_DTOR) != 0) {
-    auto name = current_struct_decl.get()->type->base;
-    (*ss) << '~' << name;
-    node->params->accept(this);
-    if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
-    }
-    node->block.get()->accept(this);
-    return {};
+    if ((node->flags & FUNCTION_IS_DTOR) != 0) {
+      auto name = current_struct_decl ? current_struct_decl.get()->type->base : current_union_decl.get()->type->base;
+      (*ss) << '~' << name;
+      node->params->accept(this);
+      if (!node->block) {
+        throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
+      }
+      node->block.get()->accept(this);
+      return {};
   }
   
-  if ((node->flags & FUNCTION_IS_CTOR) != 0) {
-    auto name = current_struct_decl.get()->type->base;
-    (*ss) << name;
-    
-    
-    // TODO: add a nicer way to take args by reference, or have a good way to dicate when to do so implicitly, if we want that ::  2024-09-29 14:02:16
-    // This is a copy constructor, so we need to pass the parameter by reference.
-    if (node->params->params.size() == 1 && node->params->params[0]->type->resolved_type == current_struct_decl.get()->type->resolved_type) {
-      (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
-    } else {
-      node->params->accept(this);
-    }
-    
-    if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
-    }
-    node->block.get()->accept(this);
-    return {};
+    if ((node->flags & FUNCTION_IS_CTOR) != 0) {
+      auto name = current_struct_decl ? current_struct_decl.get()->type->base : current_union_decl.get()->type->base;
+      (*ss) << name;
+  
+      auto is_copy_ctor = 
+            node->params->params.size() == 1 &&
+            node->params->params[0]->type->resolved_type == 
+            (current_struct_decl ? current_struct_decl.get()->type->resolved_type : current_union_decl.get()->type->resolved_type);
+            
+      if (is_copy_ctor) {
+        (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
+      } else {
+        node->params->accept(this);
+      }
+  
+      if (!node->block) {
+        throw_error("Cannot forward declare a constructor", ERROR_FAILURE, node->source_range);
+      }
+      node->block.get()->accept(this);
+      return {};
   }
   
   // we override main's return value to allow compilation without explicitly returning int from main.
@@ -564,23 +566,34 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   if (left_ty->extensions.is_pointer()) 
     op = "->";
   
-  auto left_info = static_cast<StructTypeInfo*>(left_ty->info);;
+  if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
+    throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,
+                node->source_range);
+  }
+  
+  Scope *scope;
+  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->info)) {
+    scope = info->scope;
+  } else if (auto info = dynamic_cast<UnionTypeInfo*>(left_ty->info)) {
+    scope = info->scope;
+  }
+  
   auto previous_scope = context.current_scope;
   
-  auto prev_parent = left_info->scope->parent;
-  if (prev_parent && !previous_scope->is_struct_scope) {
-    left_info->scope->parent = previous_scope;
+  auto prev_parent = scope->parent;
+  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+    scope->parent = previous_scope;
   }
       
   node->left->accept(this);
   
-  context.set_scope(left_info->scope);
+  context.set_scope(scope);
   (*ss) << (op);
   node->right->accept(this);
   context.set_scope(previous_scope);
   
-  if (prev_parent && !previous_scope->is_struct_scope) {
-    left_info->scope->parent = prev_parent;
+  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+    scope->parent = prev_parent;
   }
   
   return {};

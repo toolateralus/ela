@@ -1,12 +1,22 @@
 #import core;
 
-
-print_floats :: (float[16] floats) {
-  for f ; floats {
-    printf("%f\n", f);
+Union :: union {
+  int a;
+  int b;
+  int c;
+  method :: () {
+    printf("%d\n", a);
   }
+  #ctor :: () {}
+  #dtor :: () {}
 }
 
 main :: () {
+  Union test_union;
+  test_union.a = 10;
+  
+  printf("%d\n", test_union.b);
+  
+  test_union.method();
   
 }

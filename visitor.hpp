@@ -11,13 +11,11 @@ struct VisitorBase {
     FLAG_NO_STATE = 0,
     FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
   };
-
   int visitor_flags = FLAG_NO_STATE;
-
   virtual ~VisitorBase() = default;
-  DECLARE_VISIT_BASE_METHODS()
-
+  // TODO(Josh) 10/1/2024, 12:46:32 PM move into the macro
   std::any visit(ASTNoop *noop) { return {}; }
+  DECLARE_VISIT_BASE_METHODS()
 };
 
 struct SerializeVisitor : VisitorBase {
@@ -53,6 +51,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
+  std::any visit(ASTUnionDeclaration *node) override;
 };
 
 struct TypeVisitor : VisitorBase {
@@ -86,14 +85,16 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
+  std::any visit(ASTUnionDeclaration *node) override;
 };
 
 struct EmitVisitor : VisitorBase {
-
+  bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
   TypeVisitor &type_visitor;
@@ -177,4 +178,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
+  std::any visit(ASTUnionDeclaration *node) override;
 };

@@ -282,9 +282,26 @@ struct ASTEnumDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-// TODO: do this next.
+
+struct Sum {
+  enum Tags {
+    SUM_TAG_1,
+    SUM_TAG_0,
+  } tag;
+  union Data {
+    int one;
+    int zero;
+  } data;
+};
+
 struct ASTUnionDeclaration : ASTStatement {
-  
+  Scope *scope;
+  Token name;
+  ASTType* type;
+  UnionKind kind = UNION_IS_NORMAL;
+  std::vector<ASTDeclaration*> fields;
+  std::vector<ASTFunctionDeclaration*> methods;
+  std::any accept(VisitorBase *visitor) override;
 };
 
 struct ASTNoop : ASTStatement {
@@ -321,6 +338,7 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTMake *node) override {}                                    \
   std::any visit(ASTInitializerList *node) override {}                         \
   std::any visit(ASTEnumDeclaration *node) override {}                         \
+  std::any visit(ASTUnionDeclaration *node) override {}                        \
   
 
 
@@ -352,6 +370,7 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTMake *node) = 0;                                   \
   virtual std::any visit(ASTInitializerList *node) = 0;                        \
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
+  virtual std::any visit(ASTUnionDeclaration *node) = 0;                        \
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -433,6 +452,7 @@ struct Parser {
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
+  ASTUnionDeclaration *parse_union_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTBlock *parse_block();
@@ -551,6 +571,7 @@ struct Parser {
   Context &context;
   Lexer lexer{};
   std::vector<Lexer::State> states;
+  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   std::vector<DirectiveRoutine> directive_routines;

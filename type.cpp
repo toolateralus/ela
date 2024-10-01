@@ -235,9 +235,12 @@ std::string Type::to_string() const {
   case TYPE_FUNCTION:
     return info->to_string() + extensions.to_string();
     break;
-    case TYPE_ENUM: {
-      return base;
-    }
+  case TYPE_ENUM: {
+    return base;
+  }
+  // TODO(Josh) 10/1/2024, 12:45:29 PM determine if this is correct.
+  case TYPE_UNION:
+    return base;
   }
 }
 bool Type::operator==(const Type &type) const {
@@ -318,6 +321,9 @@ std::string Type::to_cpp_string() const {
   }
   case TYPE_ENUM:
     return base;
+  // TODO(Josh) 10/1/2024, 12:45:29 PM determine if this is correct.
+  case TYPE_UNION:
+    return base;
   }
 }
 int remove_one_pointer_ext(int operand_ty,
@@ -357,6 +363,19 @@ int create_struct_type(const std::string &name, Scope *scope) {
   num_types++;
   return type->id;
 }
+
+int create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
+  auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
+  type_table[num_types] = type;
+  type->base = name;
+  auto info = type_alloc<UnionTypeInfo>();
+  info->kind = kind;
+  info->scope = scope;
+  type->info = info;
+  num_types++;
+  return type->id;
+}
+
 int create_enum_type(const std::string &name,
                      const std::vector<std::string> &keys, bool is_flags) {
   auto id = num_types;
@@ -504,3 +523,5 @@ std::string get_function_type_name(ASTFunctionDeclaration *decl) {
   ss << ")";
   return ss.str();
 }
+
+

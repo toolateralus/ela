@@ -501,26 +501,31 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     return s32_type();
   }
 
-  if (left_ty->kind != TYPE_STRUCT) {
+  if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
     throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,
                 node->source_range);
   }
   
-  auto info = static_cast<StructTypeInfo *>(left_ty->info);
+  Scope *scope;
+  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->info)) {
+    scope = info->scope;
+  } else if (auto info = dynamic_cast<UnionTypeInfo*>(left_ty->info)) {
+    scope = info->scope;
+  }
 
   auto previous_scope = context.current_scope;
-  auto prev_parent = info->scope->parent;
-  if (prev_parent && !previous_scope->is_struct_scope) {
-    info->scope->parent = previous_scope;
+  auto prev_parent = scope->parent;
+  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+    scope->parent = previous_scope;
   }
   
   // TODO: see above.
-  context.set_scope(info->scope);
+  context.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
   context.set_scope(previous_scope);
   
-  if (prev_parent && !previous_scope->is_struct_scope) {
-    info->scope->parent = prev_parent;
+  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+    scope->parent = prev_parent;
   }
   return type;
   throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
