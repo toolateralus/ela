@@ -1,3 +1,6 @@
+#include "error.hpp"
+#include <format>
+#include <algorithm>
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -377,7 +380,9 @@ ASTProgram *Parser::parse() {
       auto identifer = expect(TType::Identifier).value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
       if (result.is_not_null()) {
-        auto statement = dynamic_cast<ASTStatement *>(result.get());
+        // todo: add a flag so we don't have to trust our routine is corerct,
+        // we can just read node->KIND_STATEMENT etc
+        auto statement = static_cast<ASTStatement *>(result.get());
         if (statement) {
           program->statements.push_back(statement);
         }
@@ -804,6 +809,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     if (token_precedence <= precedence) {
       break;
     }
+    
     auto op = eat();
     auto right = parse_expr(token_precedence);
     auto binexpr = ast_alloc<ASTBinExpr>();

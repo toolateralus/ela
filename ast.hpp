@@ -1,17 +1,15 @@
 #pragma once
 
 #include "core.hpp"
-#include "error.hpp"
 #include "lex.hpp"
 #include "nullable.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-#include <algorithm>
+
 #include <any>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
-#include <format>
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
@@ -27,10 +25,8 @@ template <class T> T *ast_alloc(size_t n = 1) {
   return new (ast_arena.allocate(sizeof(T) * n)) T();
 }
 
-
-
-
 struct VisitorBase;
+
 // TODO: add an enum member in the base that says what type this node is,
 // so we can be more performant and just static_cast<T*> instead of
 // dynamic_cast<T*>;
@@ -84,7 +80,6 @@ struct ASTProgram : ASTNode {
 };
 
 struct ASTExpr : ASTNode {};
-
 struct ASTType : ASTExpr {
   std::string base;
   TypeExt extension_info{};
@@ -103,20 +98,18 @@ struct ASTType : ASTExpr {
 
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
 };
 
-
+// All of our declarations could inherit from a base declaration. I am not sure if that would be useful.
 struct ASTDeclaration : ASTStatement {
   Token name;
   ASTType *type;
   Nullable<ASTExpr> value;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
@@ -124,18 +117,15 @@ struct ASTBinExpr : ASTExpr {
   int resolved_type;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTIdentifier : ASTExpr {
   Token value;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
@@ -149,18 +139,17 @@ struct ASTLiteral : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// CLEANUP(Josh) 10/1/2024, 10:31:35 AM This node is entirely unneccesary, and pruning any node we don't need from the AST significantly reduces code complexity.
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
   std::string name;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
@@ -171,7 +160,6 @@ struct ASTFunctionDeclaration : ASTStatement {
   ASTType *return_type;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
 
@@ -192,14 +180,12 @@ struct ASTMake : ASTExpr {
   ASTArguments *arguments;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTCall : ASTExpr {
   Token name;
   ASTArguments *arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
 };
-
 struct ASTDotExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
@@ -207,6 +193,10 @@ struct ASTDotExpr : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// CLEANUP(Josh) 10/1/2024, 10:32:12 AM
+// Remove these 3 nodes and have a generic ASTControlFlowChanger or something like that
+// that just uses an enum tag and has an expr field.
+// it would simplify our stuff.
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
@@ -217,8 +207,6 @@ struct ASTBreak : ASTStatement {
 struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
-
-// BUG(Josh) bug : for i ; arr  assumes i is the array's type, not the element type. 9/30/2024, 10:32:26 AM
 struct ASTFor : ASTStatement {
   enum ForType {
     RangeBased,
@@ -279,6 +267,8 @@ struct ASTStructDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// TODO(Josh) 10/1/2024, 10:33:12 AM Refactor the way this works to allow better typing and more flexibility with this. It really only works 
+// for a couple types right now.
 struct ASTInitializerList : ASTExpr {
   ASTType *type;
   std::vector<ASTExpr*> expressions;
