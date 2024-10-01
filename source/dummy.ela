@@ -2,6 +2,10 @@
 
 #alias int_ptr :: s64*;
 
+func :: (int a, b, c) {
+  
+}
+
 main :: () {
   int_ptr ptr_a;
   s64* ptr_b
