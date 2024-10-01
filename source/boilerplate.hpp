@@ -98,14 +98,17 @@ struct Type {
         : name(name), function(function) {}
     const char *name;
     void (*function)();
-    void run() const {
+    bool run() const {
+
       printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
       try {
         function();
         printf("\033[1;32m[passed]\033[0m\n");
+        return true;
       } catch (__test_exception &e) {
         printf("\033[1;31m[failed]\033[0m\n");
         printf("%s", e.what());
+        return false;
       }
     }
   };
@@ -113,9 +116,12 @@ struct Type {
 
 #define __TEST_RUNNER_MAIN                                                     \
   int main() {                                                                 \
+    int failed = 0;\
+    int passed = 0;\
     for (const auto &test : tests) {                                           \
-      test.run();                                                              \
+      if (test.run()) passed++; else failed++;                                                               \
     }                                                                          \
+    printf("Test run complete!\n\033[1;31mfailed: %d, \033[1;32mpassed: %d\033[0m\n", failed, passed);\
   }
 #else
 #endif
