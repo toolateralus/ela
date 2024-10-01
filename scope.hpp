@@ -32,12 +32,9 @@ struct Scope {
   }
   inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {
     symbols[name] = Symbol{name, type_id, is_type_alias};
-    
     if (is_type_alias) {
-      auto ty = get_type(type_id);
-      ty->aliases.push_back(name);
+      type_aliases.insert({name, type_id});
     }
-    
   }
   inline Symbol *lookup(const std::string &name) {
     if (symbols.find(name) != symbols.end()) {
@@ -54,8 +51,7 @@ struct Scope {
   inline void on_scope_enter() {
     for (const auto &[id, sym]: symbols) {
       if (sym.type_alias) {
-        auto pointed_to = get_type(sym.type_id);
-        pointed_to->aliases.push_back(id);
+        type_aliases.insert({id, sym.type_id});
       }
     }
   }
@@ -63,10 +59,9 @@ struct Scope {
     for (const auto &[id, sym]: symbols) {
       if (sym.type_alias) {
         auto pointed_to = get_type(sym.type_id);
-        auto it = std::find(pointed_to->aliases.begin(), pointed_to->aliases.end(), sym.name);
-        
-        if (it != pointed_to->aliases.end())
-          pointed_to->aliases.erase(it);
+        auto it = type_aliases.find(sym.name);
+        if (it != type_aliases.end())
+          type_aliases.erase(it);
       }
     }
   }

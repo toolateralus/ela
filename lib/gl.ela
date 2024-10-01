@@ -2,23 +2,6 @@
 
 GLFWwindow :: struct;
 
-u32 GL_ARRAY_BUFFER = 34962;
-u32 GL_FLOAT = 5126;
-u32 GL_STATIC_DRAW = 35044;
-u32 GL_TRIANGLES = 4;
-u32 GL_INVALID_ENUM = 1280;
-u32 GL_INVALID_VALUE = 1281;
-u32 GL_INVALID_OPERATION = 1282;
-u32 GL_STACK_OVERFLOW = 1283;
-u32 GL_STACK_UNDERFLOW = 1284;
-u32 GL_OUT_OF_MEMORY = 1285;
-u32 GL_COLOR_BUFFER_BIT = 16384;
-u32 GL_INFO_LOG_LENGTH = 35716;
-u32 GL_COMPILE_STATUS = 35713;
-u32 GL_LINK_STATUS = 35714;
-u32 GL_VERTEX_SHADER = 35633;
-u32 GL_FRAGMENT_SHADER = 35632;
-
 #foreign glfwInit :: () -> bool;
 #foreign glfwTerminate :: ();
 #foreign glfwCreateWindow :: (int w, int h, char* t, void* v, void* v1) -> GLFWwindow*;
@@ -59,133 +42,163 @@ u32 GL_FRAGMENT_SHADER = 35632;
 #foreign glfwSetCursorPos :: (GLFWwindow* window, float xpos, float ypos);
 #foreign glfwSetInputMode :: (GLFWwindow* window, int mode, int value);
 
+#foreign glGetUniformLocation :: (u32 program, char* name) -> int;
+#foreign glUniform4fv :: (int location, int count, float* value);
+#foreign glUniform3fv :: (int location, int count, float* value);
+#foreign glUniform2fv :: (int location, int count, float* value);
+#foreign glUniform1f :: (int location, float v0);
+#foreign glUniformMatrix4fv :: (int location, int count, bool transpose, float* value);
+#foreign glfwSwapInterval :: (int interval);
 
-u32 GLFW_RELEASE = 0;
-u32 GLFW_PRESS = 1;
-u32 GLFW_REPEAT = 2;
+GL :: enum {
+  ARRAY_BUFFER = 34962,
+  FLOAT = 5126,
+  STATIC_DRAW = 35044,
+  TRIANGLES = 4,
+  INVALID_ENUM = 1280,
+  INVALID_VALUE = 1281,
+  INVALID_OPERATION = 1282,
+  STACK_OVERFLOW = 1283,
+  STACK_UNDERFLOW = 1284,
+  OUT_OF_MEMORY = 1285,
+  COLOR_BUFFER_BIT = 16384,
+  INFO_LOG_LENGTH = 35716,
+  COMPILE_STATUS = 35713,
+  LINK_STATUS = 35714,
+  VERTEX_SHADER = 35633,
+  FRAGMENT_SHADER = 35632,
+}
 
-u32 GLFW_KEY_UNKNOWN = -1;
-u32 GLFW_KEY_SPACE = 32;
-u32 GLFW_KEY_APOSTROPHE = 39;
-u32 GLFW_KEY_COMMA = 44;
-u32 GLFW_KEY_MINUS = 45;
-u32 GLFW_KEY_PERIOD = 46;
-u32 GLFW_KEY_SLASH = 47;
-u32 GLFW_KEY_0 = 48;
-u32 GLFW_KEY_1 = 49;
-u32 GLFW_KEY_2 = 50;
-u32 GLFW_KEY_3 = 51;
-u32 GLFW_KEY_4 = 52;
-u32 GLFW_KEY_5 = 53;
-u32 GLFW_KEY_6 = 54;
-u32 GLFW_KEY_7 = 55;
-u32 GLFW_KEY_8 = 56;
-u32 GLFW_KEY_9 = 57;
-u32 GLFW_KEY_SEMICOLON = 59;
-u32 GLFW_KEY_EQUAL = 61;
-u32 GLFW_KEY_A = 65;
-u32 GLFW_KEY_B = 66;
-u32 GLFW_KEY_C = 67;
-u32 GLFW_KEY_D = 68;
-u32 GLFW_KEY_E = 69;
-u32 GLFW_KEY_F = 70;
-u32 GLFW_KEY_G = 71;
-u32 GLFW_KEY_H = 72;
-u32 GLFW_KEY_I = 73;
-u32 GLFW_KEY_J = 74;
-u32 GLFW_KEY_K = 75;
-u32 GLFW_KEY_L = 76;
-u32 GLFW_KEY_M = 77;
-u32 GLFW_KEY_N = 78;
-u32 GLFW_KEY_O = 79;
-u32 GLFW_KEY_P = 80;
-u32 GLFW_KEY_Q = 81;
-u32 GLFW_KEY_R = 82;
-u32 GLFW_KEY_S = 83;
-u32 GLFW_KEY_T = 84;
-u32 GLFW_KEY_U = 85;
-u32 GLFW_KEY_V = 86;
-u32 GLFW_KEY_W = 87;
-u32 GLFW_KEY_X = 88;
-u32 GLFW_KEY_Y = 89;
-u32 GLFW_KEY_Z = 90;
-u32 GLFW_KEY_LEFT_BRACKET = 91;
-u32 GLFW_KEY_BACKSLASH = 92;
-u32 GLFW_KEY_RIGHT_BRACKET = 93;
-u32 GLFW_KEY_GRAVE_ACCENT = 96;
-u32 GLFW_KEY_WORLD_1 = 161;
-u32 GLFW_KEY_WORLD_2 = 162;
-u32 GLFW_KEY_ESCAPE = 256;
-u32 GLFW_KEY_ENTER = 257;
-u32 GLFW_KEY_TAB = 258;
-u32 GLFW_KEY_BACKSPACE = 259;
-u32 GLFW_KEY_INSERT = 260;
-u32 GLFW_KEY_DELETE = 261;
-u32 GLFW_KEY_RIGHT = 262;
-u32 GLFW_KEY_LEFT = 263;
-u32 GLFW_KEY_DOWN = 264;
-u32 GLFW_KEY_UP = 265;
-u32 GLFW_KEY_PAGE_UP = 266;
-u32 GLFW_KEY_PAGE_DOWN = 267;
-u32 GLFW_KEY_HOME = 268;
-u32 GLFW_KEY_END = 269;
-u32 GLFW_KEY_CAPS_LOCK = 280;
-u32 GLFW_KEY_SCROLL_LOCK = 281;
-u32 GLFW_KEY_NUM_LOCK = 282;
-u32 GLFW_KEY_PRINT_SCREEN = 283;
-u32 GLFW_KEY_PAUSE = 284;
-u32 GLFW_KEY_F1 = 290;
-u32 GLFW_KEY_F2 = 291;
-u32 GLFW_KEY_F3 = 292;
-u32 GLFW_KEY_F4 = 293;
-u32 GLFW_KEY_F5 = 294;
-u32 GLFW_KEY_F6 = 295;
-u32 GLFW_KEY_F7 = 296;
-u32 GLFW_KEY_F8 = 297;
-u32 GLFW_KEY_F9 = 298;
-u32 GLFW_KEY_F10 = 299;
-u32 GLFW_KEY_F11 = 300;
-u32 GLFW_KEY_F12 = 301;
-u32 GLFW_KEY_F13 = 302;
-u32 GLFW_KEY_F14 = 303;
-u32 GLFW_KEY_F15 = 304;
-u32 GLFW_KEY_F16 = 305;
-u32 GLFW_KEY_F17 = 306;
-u32 GLFW_KEY_F18 = 307;
-u32 GLFW_KEY_F19 = 308;
-u32 GLFW_KEY_F20 = 309;
-u32 GLFW_KEY_F21 = 310;
-u32 GLFW_KEY_F22 = 311;
-u32 GLFW_KEY_F23 = 312;
-u32 GLFW_KEY_F24 = 313;
-u32 GLFW_KEY_F25 = 314;
-u32 GLFW_KEY_KP_0 = 320;
-u32 GLFW_KEY_KP_1 = 321;
-u32 GLFW_KEY_KP_2 = 322;
-u32 GLFW_KEY_KP_3 = 323;
-u32 GLFW_KEY_KP_4 = 324;
-u32 GLFW_KEY_KP_5 = 325;
-u32 GLFW_KEY_KP_6 = 326;
-u32 GLFW_KEY_KP_7 = 327;
-u32 GLFW_KEY_KP_8 = 328;
-u32 GLFW_KEY_KP_9 = 329;
-u32 GLFW_KEY_KP_DECIMAL = 330;
-u32 GLFW_KEY_KP_DIVIDE = 331;
-u32 GLFW_KEY_KP_MULTIPLY = 332;
-u32 GLFW_KEY_KP_SUBTRACT = 333;
-u32 GLFW_KEY_KP_ADD = 334;
-u32 GLFW_KEY_KP_ENTER = 335;
-u32 GLFW_KEY_KP_EQUAL = 336;
-u32 GLFW_KEY_LEFT_SHIFT = 340;
-u32 GLFW_KEY_LEFT_CONTROL = 341;
-u32 GLFW_KEY_LEFT_ALT = 342;
-u32 GLFW_KEY_LEFT_SUPER = 343;
-u32 GLFW_KEY_RIGHT_SHIFT = 344;
-u32 GLFW_KEY_RIGHT_CONTROL = 345;
-u32 GLFW_KEY_RIGHT_ALT = 346;
-u32 GLFW_KEY_RIGHT_SUPER = 347;
-u32 GLFW_KEY_MENU = 348;
-u32 GLFW_KEY_LAST = GLFW_KEY_MENU;
+KeyPress :: enum {
+  RELEASE = 0,
+  PRESS = 1,
+  REPEAT = 2,
+}
+
+Key :: enum {
+  UNKNOWN = -1,
+  SPACE = 32,
+  APOSTROPHE = 39,
+  COMMA = 44,
+  MINUS = 45,
+  PERIOD = 46,
+  SLASH = 47,
+  D0 = 48,
+  D1 = 49,
+  D2 = 50,
+  D3 = 51,
+  D4 = 52,
+  D5 = 53,
+  D6 = 54,
+  D7 = 55,
+  D8 = 56,
+  D9 = 57,
+  SEMICOLON = 59,
+  EQUAL = 61,
+  A = 65,
+  B = 66,
+  C = 67,
+  D = 68,
+  E = 69,
+  F = 70,
+  G = 71,
+  H = 72,
+  I = 73,
+  J = 74,
+  K = 75,
+  L = 76,
+  M = 77,
+  N = 78,
+  O = 79,
+  P = 80,
+  Q = 81,
+  R = 82,
+  S = 83,
+  T = 84,
+  U = 85,
+  V = 86,
+  W = 87,
+  X = 88,
+  Y = 89,
+  Z = 90,
+  LEFT_BRACKET = 91,
+  BACKSLASH = 92,
+  RIGHT_BRACKET = 93,
+  GRAVE_ACCENT = 96,
+  WORLD_1 = 161,
+  WORLD_2 = 162,
+  ESCAPE = 256,
+  ENTER = 257,
+  TAB = 258,
+  BACKSPACE = 259,
+  INSERT = 260,
+  DELETE = 261,
+  RIGHT = 262,
+  LEFT = 263,
+  DOWN = 264,
+  UP = 265,
+  PAGE_UP = 266,
+  PAGE_DOWN = 267,
+  HOME = 268,
+  END = 269,
+  CAPS_LOCK = 280,
+  SCROLL_LOCK = 281,
+  NUM_LOCK = 282,
+  PRINT_SCREEN = 283,
+  PAUSE = 284,
+  F1 = 290,
+  F2 = 291,
+  F3 = 292,
+  F4 = 293,
+  F5 = 294,
+  F6 = 295,
+  F7 = 296,
+  F8 = 297,
+  F9 = 298,
+  F10 = 299,
+  F11 = 300,
+  F12 = 301,
+  F13 = 302,
+  F14 = 303,
+  F15 = 304,
+  F16 = 305,
+  F17 = 306,
+  F18 = 307,
+  F19 = 308,
+  F20 = 309,
+  F21 = 310,
+  F22 = 311,
+  F23 = 312,
+  F24 = 313,
+  F25 = 314,
+  KP_0 = 320,
+  KP_1 = 321,
+  KP_2 = 322,
+  KP_3 = 323,
+  KP_4 = 324,
+  KP_5 = 325,
+  KP_6 = 326,
+  KP_7 = 327,
+  KP_8 = 328,
+  KP_9 = 329,
+  KP_DECIMAL = 330,
+  KP_DIVIDE = 331,
+  KP_MULTIPLY = 332,
+  KP_SUBTRACT = 333,
+  KP_ADD = 334,
+  KP_ENTER = 335,
+  KP_EQUAL = 336,
+  LEFT_SHIFT = 340,
+  LEFT_CONTROL = 341,
+  LEFT_ALT = 342,
+  LEFT_SUPER = 343,
+  RIGHT_SHIFT = 344,
+  RIGHT_CONTROL = 345,
+  RIGHT_ALT = 346,
+  RIGHT_SUPER = 347,
+  MENU = 348,
+  LAST = 348,
+}  
 
 compile_shader :: (u32 kind, char *source) -> u32 {
   u32 shader = glCreateShader(kind);
@@ -193,10 +206,10 @@ compile_shader :: (u32 kind, char *source) -> u32 {
   glCompileShader(shader);
 
   int success;
-  glGetShaderiv(shader, GL_COMPILE_STATUS, &success);
+  glGetShaderiv(shader, GL.COMPILE_STATUS, &success);
   if success == 0 {
     int length;
-    glGetShaderiv(shader, GL_INFO_LOG_LENGTH, &length);
+    glGetShaderiv(shader, GL.INFO_LOG_LENGTH, &length);
     char* info_log = malloc(sizeof(char*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
@@ -207,8 +220,8 @@ compile_shader :: (u32 kind, char *source) -> u32 {
 }
 
 create_program :: (char* vert_source, char* frag_source) -> u32 {
-  u32 vertex_shader = compile_shader(GL_VERTEX_SHADER, vert_source);
-  u32 fragment_shader = compile_shader(GL_FRAGMENT_SHADER, frag_source);
+  u32 vertex_shader = compile_shader(GL.VERTEX_SHADER, vert_source);
+  u32 fragment_shader = compile_shader(GL.FRAGMENT_SHADER, frag_source);
 
   if vertex_shader == 0 || fragment_shader == 0 {
     return #make(u32, 0);
@@ -220,10 +233,10 @@ create_program :: (char* vert_source, char* frag_source) -> u32 {
   glLinkProgram(program);
 
   int success;
-  glGetProgramiv(program, GL_LINK_STATUS, &success);
+  glGetProgramiv(program, GL.LINK_STATUS, &success);
   if success == 0 {
     int length;
-    glGetProgramiv(program, GL_INFO_LOG_LENGTH, &length);
+    glGetProgramiv(program, GL.INFO_LOG_LENGTH, &length);
     char* info_log = malloc(sizeof(char*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
@@ -239,18 +252,18 @@ create_program :: (char* vert_source, char* frag_source) -> u32 {
 
 check_error :: (char* location) {
   int err = glGetError();
-  if err == GL_INVALID_ENUM {
-    printf("error: %s, from: %s\n", "GL_INVALID_ENUM", location);
-  } else if err == GL_INVALID_VALUE {
-    printf("error: %s, from: %s\n", "GL_INVALID_VALUE", location);
-  } else if err == GL_INVALID_OPERATION {
-    printf("error: %s, from: %s\n", "GL_INVALID_OPERATION", location);
-  } else if err == GL_STACK_OVERFLOW {
-    printf("error: %s, from: %s\n", "GL_STACK_OVERFLOW", location);
-  } else if err == GL_STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n", "GL_STACK_UNDERFLOW", location);
-  } else if err == GL_OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n", "GL_OUT_OF_MEMORY", location);
+  if err == GL.INVALID_ENUM {
+    printf("error: %s, from: %s\n", "GL.INVALID_ENUM", location);
+  } else if err == GL.INVALID_VALUE {
+    printf("error: %s, from: %s\n", "GL.INVALID_VALUE", location);
+  } else if err == GL.INVALID_OPERATION {
+    printf("error: %s, from: %s\n", "GL.INVALID_OPERATION", location);
+  } else if err == GL.STACK_OVERFLOW {
+    printf("error: %s, from: %s\n", "GL.STACK_OVERFLOW", location);
+  } else if err == GL.STACK_UNDERFLOW {
+    printf("error: %s, from: %s\n", "GL.STACK_UNDERFLOW", location);
+  } else if err == GL.OUT_OF_MEMORY {
+    printf("error: %s, from: %s\n", "GL.OUT_OF_MEMORY", location);
   } else if err != 0 {
     printf("unknown gl error: %d, from: %s\n", err, location);
   }
@@ -297,6 +310,6 @@ Window :: struct {
     glfwPollEvents();
   }
   clear :: () {
-    glClear(GL_COLOR_BUFFER_BIT);
+    glClear(GL.COLOR_BUFFER_BIT);
   }
 }

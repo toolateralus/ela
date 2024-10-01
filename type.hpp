@@ -7,6 +7,7 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
+#include <unordered_map>
 #include <vector>
 
 #include <jstl/containers/vector.hpp>
@@ -211,6 +212,9 @@ struct StructTypeInfo : TypeInfo {
 
 struct Context;
 
+// active aliases. alias -> pointed to type_id
+extern std::unordered_map<std::string, int> type_aliases;
+
 struct Type {
   const int id = invalid_id;
   
@@ -224,17 +228,14 @@ struct Type {
               const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   
-  std::vector<std::string> aliases {};
+  
   
   inline bool names_match_or_alias(const std::string &name) const {
     return has_alias(name) || this->base == name;
   }
   
   inline bool has_alias(const std::string &in_alias) const {
-    for (const auto &alias: aliases) {
-      if (alias == in_alias) return true;
-    }
-    return false;
+    return type_aliases.contains(in_alias) && type_aliases[in_alias] == id;
   }
   
   Type(){};

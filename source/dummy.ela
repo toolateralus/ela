@@ -1,8 +1,12 @@
 
+
 #alias int_ptr :: s64*;
 
 main :: () {
-  int_ptr ptr;
+  int_ptr ptr_a;
+  s64* ptr_b
+  assert("", ptr_a == ptr_b);  
+  
 }
 
 // #import core;

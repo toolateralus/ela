@@ -37,7 +37,7 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
   return create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
 int find_type_id(const std::string &name, const TypeExt &type_extensions) {
-
+  
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
     auto base = type->base;
@@ -50,9 +50,6 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
     if (type->equals(name, type_extensions))
       return type->id;
   }
-  
-
-  
 
   // NOTE:below is just for creating types with new extensions. new function types, struct types, and enum types
   // must be created manually
@@ -65,17 +62,20 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
       break;
     }
   }
+  // TODO(Josh) 9/30/2024, 7:31:48 PM  fix the aliasing system. it's completely broken and generates too many types, then never finds the real aliased type.
   if (base_id != -1) {
     auto t = get_type(base_id);
-    return create_type((TypeKind)t->kind, name, t->info, type_extensions);
+    if (!t->has_alias(name))
+      return create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
-  
   // linear search with extensions failed: for aliased types, 
   // we may need to create a type with a non 'name' name.
   // such as #alias intptr :: int*, where int* hasn't been used yet.
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    if (type->has_alias(name) && type_extensions != type->extensions) {
+    if (type->has_alias(name) && type->extensions == type_extensions) {
+      return type->id;
+    } else if (type->has_alias(name) && type->extensions != type_extensions) {
       return create_type(type->kind, type->base, type->info, type_extensions);
     }
   }
@@ -421,17 +421,14 @@ int s64_type() {
   static int type = find_type_id("s64", {});
   return type;
 }
-
 int string_type() {
   static int type = find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
-
 int f32_type() {
   static int type = find_type_id("f32", {});
   return type;
 }
-
 int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
@@ -441,7 +438,6 @@ int Type::get_element_type() const {
   extensions.array_sizes.pop_back();
   return find_type_id(base, extensions);
 }
-
 // TODO: re-implement this with a much better, non flipped up design. 2024-09-29 12:26:42
 std::string Type::to_type_struct(Context &context) {
   return "";
@@ -494,8 +490,6 @@ std::string Type::to_type_struct(Context &context) {
               
   // return std::format("_type_info[{}]", this->id);
 }
-
-
 std::string get_function_type_name(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;

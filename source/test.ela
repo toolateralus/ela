@@ -425,3 +425,9 @@ MyEnum :: enum {
     assert("func failed to == itself", func[i] == &test_function_pointers)
   }
 }
+
+#test test_aliasing :: () {
+  #alias int_ptr :: int*;
+  int* v = malloc(sizeof(int));
+  assert("alias failed to equal pointed to type field.", v == #make(int_ptr, v));
+}
