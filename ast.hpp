@@ -430,113 +430,8 @@ static inline Precedence get_operator_precedence(Token token) {
 }
 
 struct Parser {
-  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
-  inline Token peek() const {
-    if (states.empty()) {
-      return Token::Eof();
-    }
-    return states.back().lookahead_buffer.front();
-  }
-
-#define lookahead_buf() states.back().lookahead_buffer
-
-  Parser(const std::string &contents, const std::string &filename,
-         Context &context)
-      : states({Lexer::State::from_file(contents, filename)}),
-        context(context) {
-    init_directive_routines();
-    for (int i = lookahead_buf().size(); i < 8; ++i) {
-      lexer.get_token(states.back());
-    }
-  }
-
-  Context &context;
-
-  inline void fill_buffer_if_needed() {
-    while (states.back().lookahead_buffer.size() < 8) {
-      lexer.get_token(states.back());
-    }
-  }
-
-  inline Token eat() {
-    all_tokens.push_back(peek());
-    token_idx++;
-    
-    fill_buffer_if_needed();
-
-    if (peek().is_eof() && states.size() > 1) {
-      states.pop_back();
-      fill_buffer_if_needed();
-      return peek();
-    }
-    auto tok = peek();
-    lookahead_buf().pop_front();
-    lexer.get_token(states.back());
-    return tok;
-  }
-
-  inline bool not_eof() const { return !peek().is_eof(); }
-  inline bool eof() const { return peek().is_eof(); }
-  inline bool semicolon() const { return peek().type == TType::Semi; }
-
-  inline Token expect(TType type) {
-    fill_buffer_if_needed();
-    if (peek().type != type) {
-      SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
-      throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
-                              TTypeToString(peek().type), peek().value),
-                  ERROR_CRITICAL, range);
-    }
-    return eat();
-  }
-
-  Lexer lexer{};
-
-  std::vector<Lexer::State> states;
-
-  int64_t token_idx{};
-
-  Nullable<ASTNode> process_directive(DirectiveKind kind,
-                                      const std::string &identifier);
-
-  std::vector<DirectiveRoutine> directive_routines;
-
-  void init_directive_routines();
-
-  Nullable<ASTExpr> try_parse_directive_expr() {
-    if (peek().type == TType::Directive) {
-      eat();
-      auto identifier = expect(TType::Identifier);
-      Nullable<ASTNode> node =
-          process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
-
-      auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
-      if (expr.is_not_null()) {
-        return expr;
-      } else {
-        throw_error("Invalid directive in expression: directives in "
-                    "expressions must return a value.",
-                    ERROR_FAILURE, {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
-      }
-    }
-    return nullptr;
-  }
-
-  SourceRange begin_node() {
-    return SourceRange{.begin = token_idx, .begin_loc = (int64_t)peek().location.line};
-  }
   
-  void end_node(ASTNode *node, SourceRange &range) {
-    range.end = token_idx;
-    range.end_loc = peek().location.line;
-    if (node)
-      node->source_range = range;
-  }
-
-  ASTType *parse_type();
-  ASTType *parse_function_type(const std::string&, TypeExt);
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
@@ -545,7 +440,6 @@ struct Parser {
   ASTFunctionDeclaration *parse_function_declaration(Token);
   ASTParamsDecl *parse_parameters();
   ASTEnumDeclaration *parse_enum_declaration(Token);
-
   ASTBlock *parse_block();
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
@@ -553,6 +447,117 @@ struct Parser {
   ASTExpr *parse_primary();
   ASTCall *parse_call(const Token &);
   
+  // ASTType* parsing routines
+  
+  ASTType *parse_type();
+  std::vector<ASTType *> parse_parameter_types() {
+    std::vector<ASTType *> param_types;
+    expect(TType::LParen);
+    while (peek().type != TType::RParen) {
+      auto param_type = parse_type();
+      param_types.push_back(param_type);
+      if (peek().type == TType::Comma) {
+        expect(TType::Comma);
+      } else {
+        break;
+      }
+    }
+    expect(TType::RParen);
+    return param_types;
+  }
+  void parse_type_extensions(ASTType *type) {
+    while (peek().type == TType::Mul || peek().type == TType::LBrace) {
+      if (peek().type == TType::Mul) {
+        eat();
+        type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
+      } else if (peek().type == TType::LBrace) {
+        type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
+        expect(TType::LBrace);
+        if (peek().type == TType::Integer) {
+          auto integer = expect(TType::Integer);
+          type->extension_info.array_sizes.push_back(std::stoi(integer.value));
+        } else {
+          type->extension_info.array_sizes.push_back(-1);
+        }
+        expect(TType::RBrace);
+      }
+    }
+  }
+  
+  ASTType *parse_function_type(const std::string &base, TypeExt extension_info) {
+    auto return_type = ast_alloc<ASTType>();
+    return_type->base = base;
+    return_type->extension_info = extension_info;
+    
+    FunctionTypeInfo info{};
+    info.return_type = find_type_id(return_type->base, return_type->extension_info);
+
+    auto param_types = parse_parameter_types();
+    std::ostringstream ss;
+    
+    // convert parameter types to a string
+    {
+      ss << "(";
+      for (size_t i = 0; i < param_types.size(); ++i) {
+        info.parameter_types[i] = find_type_id(param_types[i]->base, param_types[i]->extension_info);
+        ss << get_type(info.parameter_types[i])->to_string();
+        if (i != param_types.size() - 1) {
+          ss << ", ";
+        }
+      }
+      ss << ")";
+    }
+    
+    auto type_name = get_type(info.return_type)->to_string() + ss.str();
+    return_type->resolved_type = find_type_id(type_name, info, {});
+    return_type->base = type_name;
+    return_type->extension_info = {};
+
+    parse_type_extensions(return_type);
+
+    return return_type;
+  }
   
   
+  Nullable<ASTNode> process_directive(DirectiveKind kind,
+                                      const std::string &identifier);
+  void init_directive_routines();
+  Nullable<ASTExpr> try_parse_directive_expr();
+  
+  inline bool not_eof() const { return !peek().is_eof(); }
+  inline bool eof() const { return peek().is_eof(); }
+  inline bool semicolon() const { return peek().type == TType::Semi; }
+
+  inline std::deque<Token>& lookahead_buf() { return states.back().lookahead_buffer; }
+  
+  
+
+
+
+  Token eat();
+  Token expect(TType type);
+  Token peek() const;
+  
+  void fill_buffer_if_needed();
+  SourceRange begin_node();
+  void end_node(ASTNode *node, SourceRange &range);
+
+  Parser(const std::string &contents, const std::string &filename,
+         Context &context)
+      : states({Lexer::State::from_file(contents, filename)}),
+        context(context) {
+    init_directive_routines();
+    fill_buffer_if_needed();
+    // for (int i = lookahead_buf().size(); i < 8; ++i) {
+    //   lexer.get_token(states.back());
+    // }
+  }
+  
+  Context &context;
+  Lexer lexer{};
+  std::vector<Lexer::State> states;
+  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  std::vector<DirectiveRoutine> directive_routines;
+  int64_t token_idx{};
 };

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <filesystem>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -237,17 +238,19 @@ struct Lexer {
 
     static State from_file(const std::string &input,
                            const std::string &filename) {
+      auto canonical = std::filesystem::canonical(filename);
+      auto path = canonical.string();
       bool found = false;
       size_t file_idx = 0;
       for (const auto &file : SourceLocation::files()) {
-        if (file == filename) {
+        if (file == path) {
           found = 1;
         } else {
           ++file_idx;
         }
       }
       if (!found) {
-        SourceLocation::files().push_back(filename);
+        SourceLocation::files().push_back(path);
       }
       return State(input, file_idx, input.length());
     }

@@ -11,21 +11,18 @@ struct VisitorBase {
     FLAG_NO_STATE = 0,
     FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
   };
-  
+
   int visitor_flags = FLAG_NO_STATE;
-  
+
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
-  
-  std::any visit(ASTNoop *noop) {
-    return {};
-  }
-};
 
+  std::any visit(ASTNoop *noop) { return {}; }
+};
 
 struct SerializeVisitor : VisitorBase {
   SerializeVisitor(Context &context) : context(context) {}
-  std::stringstream ss {};
+  std::stringstream ss{};
   int indentLevel = 0;
   Context &context;
   std::string indent();
@@ -59,7 +56,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  TypeVisitor(Context &context) : context(context){}
+  TypeVisitor(Context &context) : context(context) {}
   Context &context;
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
@@ -91,74 +88,67 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
 };
 
-
 struct EmitVisitor : VisitorBase {
-  
-  void emit_line_directive(ASTNode* node) {
-    if (get_compilation_flag("no-line-directives")) {
-      return;
-    }
-    (*ss) << "\n#line " << std::to_string(node->source_range.begin_loc) << " \"" << get_source_filename(node->source_range) << "\"\n";
-  }
-  
+
   bool emit_default_args = false;
   int num_tests = 0;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  
+
   TypeVisitor &type_visitor;
-  
-  std::stringstream header {};
-  std::stringstream code {};
-  std::stringstream *ss {};
-  std::stringstream test_functions {};
-  
+
+  std::stringstream header{};
+  std::stringstream code{};
+  std::stringstream *ss{};
+  std::stringstream test_functions{};
+
   int indentLevel = 0;
   Context &context;
 
-  std::string get_code() const {
-    return code.str();
+  inline std::string get_code() const { return code.str(); }
+  inline std::string get_header() const { return header.str(); }
+  // TODO(Josh) 10/1/2024, 10:10:17 AM
+  // This causes a lot of empty lines. It would be nice to have a way to neatly
+  // do this.
+  inline void emit_line_directive(ASTNode *node) {
+    static int last_loc = -1;
+    static bool is_debugging = get_compilation_flag("debug");
+    if (!is_debugging) {
+      return;
+    }
+    auto loc = node->source_range.begin_loc;
+    if (loc != last_loc) {
+      auto filename = get_source_filename(node->source_range);
+
+      // TODO: figure out why this is sometimes empty.
+      if (filename.empty()) {
+        return;
+      }
+
+      (*ss) << "\n#line " << std::to_string(loc) << " \"" << filename << "\"\n";
+      last_loc = loc;
+    }
   }
-  std::string get_header() const {
-    return header.str();
-  }
-  
-  void use_code() {
+  inline void use_code() { ss = &code; }
+  inline void use_header() { ss = &header; }
+  inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
+      : context(context), type_visitor(type_visitor) {
     ss = &code;
   }
-  void use_header() {
-    ss = &header;
-  }
-  
-  EmitVisitor(Context &context, TypeVisitor &type_visitor) : context(context), type_visitor(type_visitor) {
-    ss = &code;
-  }
-  std::string indent() {
-    return std::string(indentLevel * 2, ' ');
-  }  
-  inline void indented(const std::string &s) {
-    (*ss) <<indent() << s;
-  }
+  inline std::string indent() { return std::string(indentLevel * 2, ' '); }
+  inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) {
-    (*ss) <<indent() << s << '\n';
+    (*ss) << indent() << s << '\n';
   }
-  inline void newline() {
-    (*ss) <<'\n';
-  }
-  inline void newline_indented() {
-    (*ss) <<'\n' << indent();
-  }
-  inline void semicolon() {
-    (*ss) <<";";
-  }
-  inline void space() {
-    (*ss) <<' ';
-  }
+  inline void newline() { (*ss) << '\n'; }
+  inline void newline_indented() { (*ss) << '\n' << indent(); }
+  inline void semicolon() { (*ss) << ";"; }
+  inline void space() { (*ss) << ' '; }
 
   void emit_local_function(ASTFunctionDeclaration *node);
   void emit_forward_declaration(ASTFunctionDeclaration *node);
-  void emit_foreign_function(ASTFunctionDeclaration * node);
+  void emit_foreign_function(ASTFunctionDeclaration *node);
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;

@@ -326,6 +326,9 @@ ASTType *Parser::parse_type() {
   auto range = begin_node();
   auto base = eat().value;
   TypeExt extension_info;
+  // TODO(Josh) 10/1/2024, 10:04:12 AM
+  // We need to use parse_type_extensions, to reduce code size and make things more reliable
+  // but right now that's tailored for certain tasks.
   while (true) {
     if (peek().type == TType::LBrace) {
       extension_info.extensions.push_back(TYPE_EXT_ARRAY);
@@ -977,64 +980,71 @@ ASTExpr *Parser::parse_primary() {
   }
 }
 
-// CLEANUP(Josh) 10/1/2024, 9:18:00 AM this method is an absolute mess. This could be much much cleaner, and more reliable
-// We could probably split up the different type extension parser things into their own functions.
-// Then we wouldn't have to re-write it all here
-ASTType *Parser::parse_function_type(const std::string &base,
-                                     TypeExt extension_info) {
-  auto return_type = ast_alloc<ASTType>();
-  return_type->base = base;
-  return_type->extension_info = extension_info;
+// Below is a bunch of helper routines and junk that doesn't change much
+Token Parser::eat() {
+  all_tokens.push_back(peek());
+  token_idx++;
 
-  expect(TType::LParen);
-  std::vector<ASTType *> param_types;
-  while (peek().type != TType::RParen) {
-    auto param_type = parse_type();
-    param_types.push_back(param_type);
-    if (peek().type == TType::Comma) {
-      expect(TType::Comma);
+  fill_buffer_if_needed();
+
+  if (peek().is_eof() && states.size() > 1) {
+    states.pop_back();
+    fill_buffer_if_needed();
+    return peek();
+  }
+  auto tok = peek();
+  lookahead_buf().pop_front();
+  lexer.get_token(states.back());
+  return tok;
+}
+void Parser::fill_buffer_if_needed() {
+  while (states.back().lookahead_buffer.size() < 8) {
+    lexer.get_token(states.back());
+  }
+}
+Token Parser::expect(TType type) {
+  fill_buffer_if_needed();
+  if (peek().type != type) {
+    SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
+    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
+                            TTypeToString(peek().type), peek().value),
+                ERROR_CRITICAL, range);
+  }
+  return eat();
+}
+Nullable<ASTExpr> Parser::try_parse_directive_expr() {
+  if (peek().type == TType::Directive) {
+    eat();
+    auto identifier = expect(TType::Identifier);
+    Nullable<ASTNode> node =
+        process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
+
+    auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
+    if (expr.is_not_null()) {
+      return expr;
     } else {
-      break;
+      throw_error("Invalid directive in expression: directives in "
+                  "expressions must return a value.",
+                  ERROR_FAILURE,
+                  {std::max(token_idx - 5, int64_t()),
+                   std::max(token_idx + 5, int64_t())});
     }
   }
-  expect(TType::RParen);
-  FunctionTypeInfo info{};
-  info.return_type =
-      find_type_id(return_type->base, return_type->extension_info);
-  int i = 0;
-  std::string params_type_str = "(";
-  for (const auto &type : param_types) {
-    info.parameter_types[i] = find_type_id(type->base, type->extension_info);
-    auto ty = get_type(info.parameter_types[i]);
-    params_type_str += ty->to_string();
-    if (type != param_types.back()) {
-      params_type_str += ", ";
-    }
-    ++i;
+  return nullptr;
+}
+SourceRange Parser::begin_node() {
+  return SourceRange{.begin = token_idx,
+                     .begin_loc = (int64_t)peek().location.line};
+}
+void Parser::end_node(ASTNode *node, SourceRange &range) {
+  range.end = token_idx;
+  range.end_loc = peek().location.line;
+  if (node)
+    node->source_range = range;
+}
+Token Parser::peek() const {
+  if (states.empty()) {
+    return Token::Eof();
   }
-  params_type_str += ")";
-  auto return_type_str = get_type(info.return_type)->to_string();
-  auto type_name = return_type_str + params_type_str;
-  auto id = find_type_id(type_name, info, {});
-  return_type->resolved_type = id;
-  return_type->base = type_name;
-  return_type->extension_info = {};
-  while (peek().type == TType::Mul || peek().type == TType::LBrace) {
-    if (peek().type == TType::Mul) {
-      eat();
-      return_type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (peek().type == TType::LBrace) {
-      return_type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
-      expect(TType::LBrace);
-      if (peek().type == TType::Integer) {
-        auto integer = expect(TType::Integer);
-        return_type->extension_info.array_sizes.push_back(
-            std::stoi(integer.value));
-      } else {
-        return_type->extension_info.array_sizes.push_back(-1);
-      }
-      expect(TType::RBrace);
-    }
-  }
-  return return_type;
+  return states.back().lookahead_buffer.front();
 }
