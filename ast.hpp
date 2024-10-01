@@ -371,6 +371,64 @@ struct DirectiveRoutine {
   std::function<Nullable<ASTNode>(Parser *parser)> run;
 };
 
+
+enum Precedence {
+  PRECEDENCE_LOWEST,
+  PRECEDENCE_ASSIGNMENT,    // =, :=
+  PRECEDENCE_LOGICALOR,     // ||
+  PRECEDENCE_LOGICALAND,    // &&
+  PRECEDENCE_BITWISEOR,     // |
+  PRECEDENCE_BITWISEXOR,    // ^
+  PRECEDENCE_BITWISEAND,    // &
+  PRECEDENCE_EQUALITY,      // ==, !=
+  PRECEDENCE_RELATIONAL,    // <, >, <=, >=
+  PRECEDENCE_SHIFT,         // <<, >>
+  PRECEDENCE_ADDITIVE,      // +, -
+  PRECEDENCE_MULTIPLICATIVE // *, /, %
+};
+
+static inline Precedence get_operator_precedence(Token token) {
+  if (token.is_comp_assign()) {
+    return PRECEDENCE_ASSIGNMENT;
+  }
+  auto type = token.type;
+  switch (type) {
+    case TType::Assign:
+    case TType::ColonEquals:
+      return PRECEDENCE_ASSIGNMENT;
+    case TType::LogicalOr:
+      return PRECEDENCE_LOGICALOR;
+    case TType::LogicalAnd:
+      return PRECEDENCE_LOGICALAND;
+    case TType::Or:
+      return PRECEDENCE_BITWISEOR;
+    case TType::Xor:
+      return PRECEDENCE_BITWISEXOR;
+    case TType::And:
+      return PRECEDENCE_BITWISEAND;
+    case TType::EQ:
+    case TType::NEQ:
+      return PRECEDENCE_EQUALITY;
+    case TType::LT:
+    case TType::GT:
+    case TType::LE:
+    case TType::GE:
+      return PRECEDENCE_RELATIONAL;
+    case TType::SHL:
+    case TType::SHR:
+      return PRECEDENCE_SHIFT;
+    case TType::Add:
+    case TType::Sub:
+      return PRECEDENCE_ADDITIVE;
+    case TType::Mul:
+    case TType::Div:
+    case TType::Modulo:
+      return PRECEDENCE_MULTIPLICATIVE;
+    default:
+      return PRECEDENCE_LOWEST;
+  }
+}
+
 struct Parser {
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
@@ -489,18 +547,7 @@ struct Parser {
   ASTEnumDeclaration *parse_enum_declaration(Token);
 
   ASTBlock *parse_block();
-  ASTExpr *parse_expr();
-  ASTExpr *parse_assignment();
-  ASTExpr *parse_logical_or();
-  ASTExpr *parse_logical_and();
-  ASTExpr *parse_bitwise_or();
-  ASTExpr *parse_bitwise_xor();
-  ASTExpr *parse_bitwise_and();
-  ASTExpr *parse_equality();
-  ASTExpr *parse_relational();
-  ASTExpr *parse_shift();
-  ASTExpr *parse_additive();
-  ASTExpr *parse_multiplicative();
+  ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();

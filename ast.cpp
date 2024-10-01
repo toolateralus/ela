@@ -322,6 +322,37 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
       ERROR_FAILURE, range);
 }
 
+ASTType *Parser::parse_type() {
+  auto range = begin_node();
+  auto base = eat().value;
+  TypeExt extension_info;
+  while (true) {
+    if (peek().type == TType::LBrace) {
+      extension_info.extensions.push_back(TYPE_EXT_ARRAY);
+      expect(TType::LBrace);
+      if (peek().type == TType::Integer) {
+        auto integer = expect(TType::Integer);
+        extension_info.array_sizes.push_back(std::stoi(integer.value));
+      } else {
+        extension_info.array_sizes.push_back(-1);
+      }
+      expect(TType::RBrace);
+    } else if (peek().type == TType::Mul) {
+      expect(TType::Mul);
+      extension_info.extensions.push_back(TYPE_EXT_POINTER);
+    } else if (peek().type == TType::LParen) {
+      return parse_function_type(base, extension_info);
+    } else {
+      break;
+    }
+  }
+  auto node = ast_alloc<ASTType>();
+  node->base = base;
+  node->extension_info = extension_info;
+  end_node(node, range);
+  return node;
+}
+
 ASTProgram *Parser::parse() {
   auto range = begin_node();
   auto program = ast_alloc<ASTProgram>();
@@ -754,208 +785,34 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return decl;
 }
 
-// CLEANUP(Josh) 10/1/2024, 9:16:15 AM
-// We could probably use an enum for operator precedence,
-// and then use a single parse_expr function for everything but primary
-// to save us 2-300 lines of code in this file, and reduce the surface area for bugs to appear.
-ASTExpr *Parser::parse_expr() {
+ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
-  auto left = parse_assignment();
-  if (peek().is_comp_assign()) {
-    auto comp_assign = ast_alloc<ASTBinExpr>();
-    comp_assign->op = eat();
-    comp_assign->left = left;
-    comp_assign->right = parse_assignment();
-    end_node(comp_assign, range);
-    return comp_assign;
-  }
-  end_node(left, range);
-  return left;
-}
-
-
-ASTExpr *Parser::parse_assignment() {
-  auto range = begin_node();
-  ASTExpr *left = parse_logical_or();
-  if (peek().type == TType::Assign || peek().type == TType::ColonEquals) {
-
-    // TODO(Josh) 9/30/2024, 8:34:56 AM Fix this, its far too limited.
-    // Once we have multiple return values, this will prove to be a problem
-
-    // for n := v, we need to place this declaration in the symbol table
-    // there's probably a better way to do this than in the expression
-    // hierarchy.
-    if (peek().type == TType::ColonEquals) {
+  ASTExpr *left = parse_unary();
+  while (true) {
+    Precedence token_precedence = get_operator_precedence(peek());
+    
+    if (token_precedence == PRECEDENCE_ASSIGNMENT && peek().type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (iden) {
         context.current_scope->insert(iden->value.value, -1);
       }
     }
+    
+    if (token_precedence <= precedence) {
+      break;
+    }
+    auto op = eat();
+    auto right = parse_expr(token_precedence);
+    auto binexpr = ast_alloc<ASTBinExpr>();
+    binexpr->left = left;
+    binexpr->right = right;
+    binexpr->op = op;
+    left = binexpr;
+  }
+  end_node(left, range);
+  return left;
+}
 
-    auto op = eat();
-    auto right = parse_assignment();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    end_node(binexpr, range);
-    return binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_logical_or() {
-  auto range = begin_node();
-  auto left = parse_logical_and();
-  while (peek().type == TType::LogicalOr) {
-    auto op = eat();
-    auto right = parse_logical_and();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_logical_and() {
-  auto range = begin_node();
-  auto left = parse_bitwise_or();
-  while (peek().type == TType::LogicalAnd) {
-    auto op = eat();
-    auto right = parse_bitwise_or();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_bitwise_or() {
-  auto range = begin_node();
-  auto left = parse_bitwise_xor();
-  while (peek().type == TType::Or) {
-    auto op = eat();
-    auto right = parse_bitwise_xor();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_bitwise_xor() {
-  auto range = begin_node();
-  auto left = parse_bitwise_and();
-  while (peek().type == TType::Xor) {
-    auto op = eat();
-    auto right = parse_bitwise_and();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_bitwise_and() {
-  auto range = begin_node();
-  auto left = parse_equality();
-  while (peek().type == TType::And) {
-    auto op = eat();
-    auto right = parse_equality();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_equality() {
-  auto range = begin_node();
-  auto left = parse_relational();
-  while (peek().type == TType::EQ || peek().type == TType::NEQ) {
-    auto op = eat();
-    auto right = parse_relational();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_relational() {
-  auto range = begin_node();
-  auto left = parse_shift();
-  while (peek().type == TType::LT || peek().type == TType::GT ||
-         peek().type == TType::LE || peek().type == TType::GE) {
-    auto op = eat();
-    auto right = parse_shift();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_shift() {
-  auto range = begin_node();
-  auto left = parse_additive();
-  while (peek().type == TType::SHL || peek().type == TType::SHR) {
-    auto op = eat();
-    auto right = parse_additive();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_additive() {
-  auto range = begin_node();
-  auto left = parse_multiplicative();
-  while (peek().type == TType::Add || peek().type == TType::Sub) {
-    auto op = eat();
-    auto right = parse_multiplicative();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
-ASTExpr *Parser::parse_multiplicative() {
-  auto range = begin_node();
-  auto left = parse_unary();
-  while (peek().type == TType::Mul || peek().type == TType::Div ||
-         peek().type == TType::Modulo) {
-    auto op = eat();
-    auto right = parse_unary();
-    auto binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
-  }
-  end_node(left, range);
-  return left;
-}
 ASTExpr *Parser::parse_unary() {
   auto range = begin_node();
   if (peek().type == TType::Add || peek().type == TType::Sub ||
@@ -1120,7 +977,6 @@ ASTExpr *Parser::parse_primary() {
   }
 }
 
-
 // CLEANUP(Josh) 10/1/2024, 9:18:00 AM this method is an absolute mess. This could be much much cleaner, and more reliable
 // We could probably split up the different type extension parser things into their own functions.
 // Then we wouldn't have to re-write it all here
@@ -1182,34 +1038,3 @@ ASTType *Parser::parse_function_type(const std::string &base,
   }
   return return_type;
 }
-ASTType *Parser::parse_type() {
-  auto range = begin_node();
-  auto base = eat().value;
-  TypeExt extension_info;
-  while (true) {
-    if (peek().type == TType::LBrace) {
-      extension_info.extensions.push_back(TYPE_EXT_ARRAY);
-      expect(TType::LBrace);
-      if (peek().type == TType::Integer) {
-        auto integer = expect(TType::Integer);
-        extension_info.array_sizes.push_back(std::stoi(integer.value));
-      } else {
-        extension_info.array_sizes.push_back(-1);
-      }
-      expect(TType::RBrace);
-    } else if (peek().type == TType::Mul) {
-      expect(TType::Mul);
-      extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (peek().type == TType::LParen) {
-      return parse_function_type(base, extension_info);
-    } else {
-      break;
-    }
-  }
-  auto node = ast_alloc<ASTType>();
-  node->base = base;
-  node->extension_info = extension_info;
-  end_node(node, range);
-  return node;
-}
-
