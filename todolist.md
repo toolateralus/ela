@@ -1,6 +1,18 @@
 ## TODO List
 
 ### General Tasks
+- **Add the ability to forward declare your own structs, not just ones that exist in external libraries**
+  Right now, we get a redefinition error or just a straight failure to parse a statement when you try to do
+  ```
+  // declaration
+    Something :: struct;
+  // definition
+    Something :: struct {
+      float32 value;
+      float32 other_value;
+    }
+  ```
+  
 - **Add the ability to cast initializer lists to an appropriate struct type, implicitly.**
   - Example: `func :: (Vec2 ..) {}` and `func({0, 0});`
 - **Fix casting bug where we can't cast an initializer list of float literals (float32) to `float[]`.**
