@@ -6,7 +6,8 @@
       "*.ela": "jai",
   },
   "files.exclude": {
-    "**/.clock_diff.txt": true
+    "**/.clock_diff.txt": true,
+    "**/compile_commands.json": true,
   }
 }
 
