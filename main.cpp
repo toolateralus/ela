@@ -208,7 +208,6 @@ Context::Context() {
   // add the base types for all of the primitives.  
   for (int i = 0; i < num_types; ++i) {
     auto type = global_get_type(i);
-    printf("adding type %d, named: %s\n", i, type->to_string().c_str());
     root_scope->types.insert(i);
   }
 }

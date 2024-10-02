@@ -144,7 +144,8 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = context.current_scope->get_type(node->resolved_type);
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
-    (*ss) << context.current_scope->get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
+    int pointed_to_ty = std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
+    (*ss) << context.current_scope->get_type(pointed_to_ty)->to_type_struct(context);
     return {};
   }
   (*ss) << type->to_cpp_string();

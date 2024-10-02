@@ -196,7 +196,7 @@ void Parser::init_directive_routines() {
         {.identifier = "type",
          .kind = DIRECTIVE_KIND_EXPRESSION,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
-           auto type = parser->parse_type();
+           auto type = parser->parse_expr();
            auto outer = ast_alloc<ASTType>();
            outer->flags = ASTTYPE_EMIT_OBJECT;
            outer->base = "Type";

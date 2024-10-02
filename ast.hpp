@@ -84,7 +84,7 @@ struct ASTType : ASTExpr {
   std::string base;
   TypeExt extension_info{};
   int flags = -1;
-  Nullable<ASTType> pointing_to;
+  Nullable<ASTExpr> pointing_to;
   int resolved_type = Type::invalid_id;
   static ASTType *get_void() {
     static ASTType *type = [] {
