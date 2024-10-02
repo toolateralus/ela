@@ -2,6 +2,86 @@
 
 #compiler_flags "-g"
 
+
+XaryuStruct :: struct {
+  float f;
+}
+
+Union :: union {
+  int a;
+  int b;
+  int c;
+  method :: (int n) {
+    assert("union equality check in method failed", n == a && n == b && n == c);
+  }
+  #ctor :: () {
+    a = -1;
+  }
+  #dtor :: () {
+    printf("union destructor\n");
+  }
+}
+_Vec2 :: union {
+  #anon :: struct {
+    int x;
+    int y;
+    int z;
+  };
+  int[3] values;
+
+  method :: (int n) {
+    assert("union equality check in method failed", n == x && n == y && n == z);
+    assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
+  }
+
+  something :: () -> #self {
+    return #make(#self);
+  }
+  #ctor :: (int _x, _y, _z) {
+    x = _x;
+    y = _y;
+    z = _z;
+  }
+
+  #ctor :: () {
+    memset(#make(void*, values), 0, sizeof(int) * 3);
+    x=0;
+    y=0;
+    z=0;
+    //printf();
+  }
+
+  #dtor :: () {
+    printf("%d, %d, %d", x, y, z);
+  }
+}
+
+CustomIteratorStruct :: struct {
+  int *value = malloc(sizeof(int) * 10);
+  begin :: () -> int * {
+    return value;
+  }
+  end :: () -> int * {
+    return value + 10;
+  }
+  #dtor :: () {
+    free(value);
+  }
+}
+
+Constructible :: struct {
+  float32 x;
+  #ctor :: (float32 _x) {
+      x = _x;
+  }
+  #ctor :: (Constructible other) {
+      x = other.x;
+  }
+  #ctor :: () {
+    x = 10.0;
+  }
+}
+
 Vector2 :: struct {
   float32 x;
   float32 y;
@@ -328,19 +408,6 @@ something :: (float32 f) -> float32 {
   }
 }
 
-Constructible :: struct {
-  float32 x;
-  #ctor :: (float32 _x) {
-      x = _x;
-  }
-  #ctor :: (Constructible other) {
-      x = other.x;
-  }
-  #ctor :: () {
-    x = 10.0;
-  }
-}
-
 #test make_parameterless :: () {
   n := #make(Constructible);
   assert("default construction failed.", n.x == 10.0);
@@ -441,10 +508,6 @@ MyEnum :: enum {
   assert("BUG: aliasing with type extensions still doensn't work.", false);
 }
 
-XaryuStruct :: struct {
-  float f;
-}
-
 // woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
   float32[12] arr;
@@ -456,21 +519,6 @@ XaryuStruct :: struct {
   xarbars[0].f = 10.0;
   xarbars[0].f += 10.0;
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
-}
-
-Union :: union {
-  int a;
-  int b;
-  int c;
-  method :: (int n) {
-    assert("union equality check in method failed", n == a && n == b && n == c);
-  }
-  #ctor :: () {
-    a = -1;
-  }
-  #dtor :: () {
-    printf("union destructor\n");
-  }
 }
 
 // TODO(Josh) 10/1/2024, 1:20:30 PM
@@ -489,41 +537,6 @@ Union :: union {
   test_union.a = 10;
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
   test_union.method(10);
-}
-
-_Vec2 :: union {
-  #anon :: struct {
-    int x;
-    int y;
-    int z;
-  };
-  int[3] values;
-
-  method :: (int n) {
-    assert("union equality check in method failed", n == x && n == y && n == z);
-    assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
-  }
-
-  something :: () -> #self {
-    return #make(#self);
-  }
-  #ctor :: (int _x, _y, _z) {
-    x = _x;
-    y = _y;
-    z = _z;
-  }
-
-  #ctor :: () {
-    memset(#make(void*, values), 0, sizeof(int) * 3);
-    x=0;
-    y=0;
-    z=0;
-    //printf();
-  }
-
-  #dtor :: () {
-    printf("%d, %d, %d", x, y, z);
-  }
 }
 
 #test test_two_way_implicit_conversion_bin_ops :: () {
@@ -548,19 +561,6 @@ _Vec2 :: union {
   _Vec2 *vec1 = new _Vec2(10, 10, 10);
   assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
   delete (vec, vec1);
-}
-
-CustomIteratorStruct :: struct {
-  int *value = malloc(sizeof(int) * 10);
-  begin :: () -> int * {
-    return value;
-  }
-  end :: () -> int * {
-    return value + 10;
-  }
-  #dtor :: () {
-    free(value);
-  }
 }
 
 #test ptr_iter_range_base :: () {
@@ -599,8 +599,3 @@ CustomIteratorStruct :: struct {
   // compared to normal narrowing rules.
   // bool[] arr = {0,1,2,3,4,5};
 }
-
-/*
-#test test_any :: () {
-  Any something = 10;
-}*/
