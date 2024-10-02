@@ -573,8 +573,8 @@ MyEnum :: enum {
 }
 
 #test test_function_pointers :: () {
-  #alias VoidFunction :: void();
-  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+  #alias VoidFunction :: void()*;
+  VoidFunction* func = #make(VoidFunction*, malloc(sizeof(VoidFunction) * 10));
   for s32 i; i < 10; ++i {
     func[i] = &test_function_pointers;
   }

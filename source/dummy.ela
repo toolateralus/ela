@@ -1,10 +1,8 @@
 #import core
 
-junk :: struct {
-  float32 *f;
-}
-
 main :: () {
-  junk j;  
-  printf("%p\n", j.f);
+  #alias S :: int*;
+  printf("%s\n", #typename(S*));
+  #alias VoidFunction :: void()*;
+  printf("%s\n", #typename(VoidFunction*));
 }
