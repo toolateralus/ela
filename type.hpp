@@ -222,7 +222,7 @@ struct StructTypeInfo : TypeInfo {
 };
 
 // active aliases. alias -> pointed to type_id
-extern std::unordered_map<std::string, int> type_aliases;
+extern std::unordered_map<std::string, int> global_type_aliases;
 
 struct Type {
   const int id = invalid_id;
@@ -242,7 +242,7 @@ struct Type {
   }
 
   inline bool has_alias(const std::string &in_alias) const {
-    return type_aliases.contains(in_alias) && type_aliases[in_alias] == id;
+    return global_type_aliases.contains(in_alias) && global_type_aliases[in_alias] == id;
   }
 
   Type(){};
@@ -270,7 +270,7 @@ template <class T> T *type_alloc(size_t n = 1) {
   return new (mem) T();
 }
 
-static Type *get_type(const int id) {
+static Type *global_get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
   return type_table[id];
@@ -300,14 +300,15 @@ int float32_type();
 // char *
 int charptr_type();
 
-int find_type_id(const std::string &, const FunctionTypeInfo &,
+int global_find_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
 
-int find_type_id(const std::string &, const TypeExt &);
+int global_find_type_id(const std::string &, const TypeExt &);
 
 std::string get_cpp_scalar_type(int);
 
 struct Token;
+
 int remove_one_pointer_ext(int, const SourceRange &);
 
 void init_type_system();

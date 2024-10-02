@@ -142,9 +142,9 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  auto type = get_type(node->resolved_type);
+  auto type = global_get_type(node->resolved_type);
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
-    (*ss) << get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
+    (*ss) << global_get_type(node->pointing_to.get()->resolved_type)->to_type_struct(context);
     return {};
   }
   (*ss) << type->to_cpp_string();
@@ -200,7 +200,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) <<node->op.value;
   
   if (node->op.type == TType::Assign) {
-    auto type = get_type(node->resolved_type);
+    auto type = global_get_type(node->resolved_type);
     auto isptr = type->extensions.is_pointer(1);
     if (isptr)
       (*ss) << "(" << type->to_cpp_string() << ")";
@@ -222,7 +222,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
-    auto type = get_type(node->type->resolved_type);
+    auto type = global_get_type(node->type->resolved_type);
     auto isptr = type->extensions.is_pointer(1);
     if (isptr)
       (*ss) << "(" << type->to_cpp_string() << ")";
@@ -231,7 +231,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   
-  auto type = get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
@@ -243,7 +243,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       std::string init = "{";
       for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
-        auto ty = get_type(elem);
+        auto ty = global_get_type(elem);
         init += " " + ty->to_cpp_string() + "(),";
       }
       init.pop_back();
@@ -284,7 +284,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
-  auto type = get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   node->type->accept(this);
   (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
@@ -537,7 +537,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
-  auto type = get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(type->info);
   
   current_struct_decl = node;
@@ -583,7 +583,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto left = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_ty = get_type(left);
+  auto left_ty = global_get_type(left);
   
   auto op = ".";
   
@@ -641,7 +641,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTMake *node) {
-  auto type = get_type(node->type_arg->resolved_type);
+  auto type = global_get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
       throw_error("cannot create a pointer currently with #make. it only casts pointers.", ERROR_FAILURE, node->source_range);

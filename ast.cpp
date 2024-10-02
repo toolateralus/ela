@@ -302,7 +302,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto enum_decl = parser->parse_enum_declaration(name);
            enum_decl->is_flags = true;
-           auto type = get_type(enum_decl->type->resolved_type);
+           auto type = global_get_type(enum_decl->type->resolved_type);
            auto info = static_cast<EnumTypeInfo *>(type->info);
            info->is_flags = true;
            return enum_decl;
@@ -318,7 +318,7 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           parser->context.current_scope->insert(name.value, find_type_id(aliased_type->base, aliased_type->extension_info), true);
+           parser->context.current_scope->insert(name.value, global_find_type_id(aliased_type->base, aliased_type->extension_info), true);
            return ast_alloc<ASTNoop>();
          }});
   }
@@ -337,8 +337,8 @@ void Parser::init_directive_routines() {
         if (parser->peek().type == TType::RParen) {
           parser->eat();
         }
-        auto type_id = find_type_id(asttype->base, asttype->extension_info);
-        auto type = get_type(type_id);
+        auto type_id = global_find_type_id(asttype->base, asttype->extension_info);
+        auto type = global_get_type(type_id);
         auto string = ast_alloc<ASTLiteral>();
         string->tag = ASTLiteral::String;
         string->value = type->to_string();
@@ -376,7 +376,7 @@ void Parser::init_directive_routines() {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->expect(TType::DoubleColon);
         auto decl = parser->parse_struct_declaration(get_anonymous_struct_name());
-        auto t = get_type(decl->type->resolved_type);
+        auto t = global_get_type(decl->type->resolved_type);
         auto info = static_cast<StructTypeInfo*>(t->info);
         info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
         return decl;
@@ -487,7 +487,7 @@ ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
   
-  if (find_type_id(tok.value, {}) != -1) {
+  if (global_find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -537,7 +537,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    if (find_type_id(tok.value, {}) != -1) {
+    if (global_find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
 
       auto decl = parse_declaration();
@@ -666,7 +666,7 @@ ASTStatement *Parser::parse_statement() {
   
   if (context.current_scope->lookup(tok.value)) {
     throw_error(std::format("Unexpected variable {}", tok.value), ERROR_FAILURE, range);
-  } if (find_type_id(tok.value, {}) == -1) {
+  } if (global_find_type_id(tok.value, {}) == -1) {
     throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), ERROR_FAILURE, range);
   }
 
@@ -768,7 +768,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     // if the cached type is null, or if the next token isn't 
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (!type || find_type_id(next.value, {}) != -1) {
+    if (!type || global_find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
     auto name = expect(TType::Identifier).value;
@@ -898,7 +898,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
     decl->scope = block->scope;
   } else {
-    Type *t = get_type(type_id);
+    Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->info);
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
@@ -934,7 +934,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     } else if (auto method = dynamic_cast<ASTFunctionDeclaration*>(statement)) {
       methods.push_back(method); 
     } else if (auto struct_decl = dynamic_cast<ASTStructDeclaration*>(statement)) {
-      auto type = get_type(struct_decl->type->resolved_type);
+      auto type = global_get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo*>(type->info);
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {;
         throw_error("can only use #anon struct declarations within union types.", ERROR_FAILURE, node->source_range);
@@ -1096,7 +1096,7 @@ ASTExpr *Parser::parse_primary() {
     auto range = begin_node();
     auto name = tok.value;
 
-    if (find_type_id(tok.value, {}) != -1) {
+    if (global_find_type_id(tok.value, {}) != -1) {
       return parse_type();
     }
     eat();

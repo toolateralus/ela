@@ -5,10 +5,10 @@
 
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
-  ss << get_type(return_type)->base;
+  ss << global_get_type(return_type)->base;
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
-    auto t = get_type(parameter_types[i]);
+    auto t = global_get_type(parameter_types[i]);
     ss << t->to_string();
     if (i < params_len - 1) {
       ss << ", ";
@@ -22,7 +22,7 @@ std::string FunctionTypeInfo::to_string() const {
 
   return ss.str();
 }
-int find_type_id(const std::string &name, const FunctionTypeInfo &info,
+int global_find_type_id(const std::string &name, const FunctionTypeInfo &info,
                  const TypeExt &ext) {
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
@@ -36,7 +36,7 @@ int find_type_id(const std::string &name, const FunctionTypeInfo &info,
   auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
-int find_type_id(const std::string &name, const TypeExt &type_extensions) {
+int global_find_type_id(const std::string &name, const TypeExt &type_extensions) {
   
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
@@ -64,7 +64,7 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
   }
   // TODO(Josh) 9/30/2024, 7:31:48 PM  fix the aliasing system. it's completely broken and generates too many types, then never finds the real aliased type.
   if (base_id != -1) {
-    auto t = get_type(base_id);
+    auto t = global_get_type(base_id);
     if (!t->has_alias(name))
       return create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
@@ -83,7 +83,7 @@ int find_type_id(const std::string &name, const TypeExt &type_extensions) {
   return -1;
 }
 std::string get_cpp_scalar_type(int id) {
-  auto type = get_type(id);
+  auto type = global_get_type(id);
   std::string name = "";
   if (type->base == "s64")
     name = "int64_t";    
@@ -257,8 +257,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // if the type extensions are equal, return the conversion rule for the bases.
   // this allows int[] to cast to s8[] etc;
   if (!from->extensions.has_no_extensions() && !to->extensions.has_no_extensions() && from->extensions.equals(to->extensions)) {
-    auto from_base = get_type(find_type_id(from->base, {}));
-    auto to_base = get_type(find_type_id(to->base, {}));
+    auto from_base = global_get_type(global_find_type_id(from->base, {}));
+    auto to_base = global_get_type(global_find_type_id(to->base, {}));
     return type_conversion_rule(from_base, to_base);
   }
 
@@ -344,10 +344,10 @@ std::string Type::to_cpp_string() const {
     // I have no idea how we'll do that
     // This is a HOT mess.
     auto info = static_cast<FunctionTypeInfo*>(this->info);
-    auto ret = get_type(info->return_type)->to_cpp_string();
+    auto ret = global_get_type(info->return_type)->to_cpp_string();
     std::string params = "(" + extensions.to_string() +")(";
     for (int i = 0; i < info->params_len; ++i) {
-      params += get_type(info->parameter_types[i])->to_cpp_string();
+      params += global_get_type(info->parameter_types[i])->to_cpp_string();
       if (i != info->params_len - 1) {
         params += ", ";
       }
@@ -363,7 +363,7 @@ std::string Type::to_cpp_string() const {
 }
 int remove_one_pointer_ext(int operand_ty,
                            const SourceRange &source_range) {
-  auto ty = get_type(operand_ty);
+  auto ty = global_get_type(operand_ty);
   int ptr_depth = 0;
   for (const auto &ext : ty->extensions.extensions) {
     if (ext == TYPE_EXT_POINTER)
@@ -384,7 +384,7 @@ int remove_one_pointer_ext(int operand_ty,
       extensions.push_back(ext);
     }
   }
-  return find_type_id(ty->base,
+  return global_find_type_id(ty->base,
                       TypeExt{.extensions = extensions,
                               .array_sizes = ty->extensions.array_sizes});
 }
@@ -447,40 +447,40 @@ int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   return type->id;
 }
 int voidptr_type() {
-  static int type = find_type_id(
+  static int type = global_find_type_id(
       "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
   return type;
 }
 int bool_type() {
-  static int type = find_type_id("bool", {});
+  static int type = global_find_type_id("bool", {});
   return type;
 }
 int void_type() {
-  static int type = find_type_id("void", {});
+  static int type = global_find_type_id("void", {});
   return type;
 }
 int s8_type() {
-  static int type = find_type_id("s8", {});
+  static int type = global_find_type_id("s8", {});
   return type;
 }
 int s16_type() {
-  static int type = find_type_id("s16", {});
+  static int type = global_find_type_id("s16", {});
   return type;
 }
 int s32_type() {
-  static int type = find_type_id("s32", {});
+  static int type = global_find_type_id("s32", {});
   return type;
 }
 int s64_type() {
-  static int type = find_type_id("s64", {});
+  static int type = global_find_type_id("s64", {});
   return type;
 }
 int charptr_type() {
-  static int type = find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
+  static int type = global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
 int float32_type() {
-  static int type = find_type_id("float32", {});
+  static int type = global_find_type_id("float32", {});
   return type;
 }
 int Type::get_element_type() const {
@@ -490,7 +490,7 @@ int Type::get_element_type() const {
   auto extensions = this->extensions;
   extensions.extensions.pop_back();
   extensions.array_sizes.pop_back();
-  return find_type_id(base, extensions);
+  return global_find_type_id(base, extensions);
 }
 // TODO: re-implement this with a much better, non flipped up design. 2024-09-29 12:26:42
 std::string Type::to_type_struct(Context &context) {
@@ -547,10 +547,10 @@ std::string Type::to_type_struct(Context &context) {
 std::string get_function_type_name(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
-  ss << get_type(return_type->resolved_type)->to_string();
+  ss << global_get_type(return_type->resolved_type)->to_string();
   ss << "(";
   for (const auto &param: decl->params->params) {
-    ss << get_type(param->type->resolved_type)->to_string();
+    ss << global_get_type(param->type->resolved_type)->to_string();
     if (param != decl->params->params.back()) {
       ss << ", ";
     }

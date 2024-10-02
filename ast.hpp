@@ -537,7 +537,7 @@ struct Parser {
     return_type->extension_info = extension_info;
     
     FunctionTypeInfo info{};
-    info.return_type = find_type_id(return_type->base, return_type->extension_info);
+    info.return_type = global_find_type_id(return_type->base, return_type->extension_info);
 
     auto param_types = parse_parameter_types();
     std::ostringstream ss;
@@ -546,8 +546,8 @@ struct Parser {
     {
       ss << "(";
       for (size_t i = 0; i < param_types.size(); ++i) {
-        info.parameter_types[i] = find_type_id(param_types[i]->base, param_types[i]->extension_info);
-        ss << get_type(info.parameter_types[i])->to_string();
+        info.parameter_types[i] = global_find_type_id(param_types[i]->base, param_types[i]->extension_info);
+        ss << global_get_type(info.parameter_types[i])->to_string();
         if (i != param_types.size() - 1) {
           ss << ", ";
         }
@@ -555,8 +555,8 @@ struct Parser {
       ss << ")";
     }
     
-    auto type_name = get_type(info.return_type)->to_string() + ss.str();
-    return_type->resolved_type = find_type_id(type_name, info, {});
+    auto type_name = global_get_type(info.return_type)->to_string() + ss.str();
+    return_type->resolved_type = global_find_type_id(type_name, info, {});
     return_type->base = type_name;
     return_type->extension_info = {};
 

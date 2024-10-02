@@ -20,7 +20,7 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   ss << indent() << "Block {\n";
 
   ss << indent() << "flags: " << block_flags_to_string(node->flags) << '\n';
-  auto type = get_type(node->return_type);
+  auto type = global_get_type(node->return_type);
   if (type)
     ss << indent() << "type: " << type->to_string() << '\n';
 
@@ -44,7 +44,7 @@ std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
   indentLevel++;
   auto sym = context.current_scope->lookup(node->name.value);
   
-  ss << indent() << "type: " << get_type(sym->type_id)->to_string() << '\n';
+  ss << indent() << "type: " << global_get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
   
   if (node->block.is_not_null()) {
@@ -119,7 +119,7 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 }
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
-    auto type = get_type(node->resolved_type);
+    auto type = global_get_type(node->resolved_type);
     ss << "type: " << node->resolved_type << ", " << type->base
        << type->extensions.to_string();
     return {};
@@ -144,7 +144,7 @@ std::any SerializeVisitor::visit(ASTArguments *node) {
 }
 std::any SerializeVisitor::visit(ASTCall *node) {
   ss << indent() << "Call " << node->name.value
-     << " type: " << get_type(node->type)->to_string() << " {\n";
+     << " type: " << global_get_type(node->type)->to_string() << " {\n";
   indentLevel++;
   visit(node->arguments);
   indentLevel--;
@@ -243,7 +243,7 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   
-  auto t = get_type(node->type->resolved_type);
+  auto t = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(t->info);
   
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
@@ -395,12 +395,12 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {
   case ASTAllocate::New: {
-    auto ptr_type = get_type(node->type.get()->resolved_type);
+    auto ptr_type = global_get_type(node->type.get()->resolved_type);
     (*ss) << "new ";
     auto ext = ptr_type->extensions;
     ext.extensions.pop_back();
-    auto nonptr = find_type_id(ptr_type->base, ext);
-    auto nonptr_ty = get_type(nonptr);
+    auto nonptr = global_find_type_id(ptr_type->base, ext);
+    auto nonptr_ty = global_get_type(nonptr);
     auto str = nonptr_ty->to_cpp_string();
     (*ss) << str;
     if (!node->arguments) {
