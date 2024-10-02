@@ -481,33 +481,6 @@ MyEnum :: enum {
   assert("type alias failed", i == 0);
 }
 
-#test test_function_pointers :: () {
-  // See the comment in `test_aliasing`
-  // to see more about aliasing.
-  // it's basically entirely broken, in other ways than described as well.
-
-  // #alias VoidFunction :: void();
-  // VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
-  // for s32 i; i < 10; ++i {
-  //   func[i] = &test_function_pointers;
-  // }
-  // for s32 i; i < 10; ++i {
-  //   assert("func failed to == itself", func[i] == &test_function_pointers)
-  // }
-  assert("aliasing a list of function pointers failed.", false);
-}
-#test test_aliasing :: () {
-  // TODO(Josh) 10/1/2024, 10:06:31 AM
-  // We still can't do this because instantiating int_ptr
-  // gives us an int not an int*.
-
-  // #alias int_ptr :: int*;
-  // int* v = malloc(sizeof(int));
-  // other := #make(int_ptr, v);
-  // assert("alias failed to equal pointed to type field.", v == other);
-  assert("BUG: aliasing with type extensions still doensn't work.", false);
-}
-
 // woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
   float32[12] arr;
@@ -592,10 +565,27 @@ MyEnum :: enum {
   // for dynamic ararys.
   int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
-
   // TODO: we need to fix this.
   // This throws C++ errors during compilation
   // because initializer lists have strangely strict typing
   // compared to normal narrowing rules.
   // bool[] arr = {0,1,2,3,4,5};
+}
+
+#test test_function_pointers :: () {
+  #alias VoidFunction :: void();
+  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+  for s32 i; i < 10; ++i {
+    func[i] = &test_function_pointers;
+  }
+  for s32 i; i < 10; ++i {
+    assert("func failed to == itself", func[i] == &test_function_pointers)
+  }
+}
+
+#test test_aliasing :: () {
+  #alias int_ptr :: int*;
+  int* v = malloc(sizeof(int));
+  int_ptr other = v;
+  assert("alias failed to equal pointed to type field.", v == other);
 }

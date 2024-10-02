@@ -31,7 +31,76 @@ struct Scope {
   bool is_struct_or_union_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
   std::set<int> types;
+
+  // we try to find an alias that we own or our parents own.
+  inline int find_alias(const std::string name, const TypeExt &ext) {
+    for (const auto &[symname, sym] : symbols) {
+      if (symname == name) {
+        auto type = global_get_type(sym.type_id);
+        if (type->extensions.equals(ext)) {
+          return type->id;
+        } else {
+          auto new_exts = type->extensions;
+          auto in_exts = ext;
+          for (const auto &ext_ : in_exts.extensions) {
+            if (ext_ == TYPE_EXT_ARRAY) {
+              auto back = in_exts.array_sizes.back();
+              in_exts.array_sizes.pop_back();
+              new_exts.array_sizes.push_back(back);
+              new_exts.extensions.push_back(TYPE_EXT_ARRAY);
+            } else {
+              new_exts.extensions.push_back(TYPE_EXT_POINTER);
+            }
+          }
+          auto new_id = global_find_type_id(name, new_exts);
+          types.insert(new_id);
+          return new_id;
+        }
+      }
+    }
+    if (parent) {
+      return parent->find_alias(name, ext);
+    }
+    return -1;
+  }
+  
+  // TODO: validate that we even need this for function types. The info is pretty irrelevant to an alias.
+  inline int find_alias(const std::string name, const FunctionTypeInfo &info, const TypeExt &ext) {
+    for (const auto &[symname, sym] : symbols) {
+      if (symname == name) {
+        auto type = global_get_type(sym.type_id);
+        if (type->extensions.equals(ext) && type->is_kind(TYPE_FUNCTION)) {
+          return type->id;
+        } else {
+          auto new_exts = type->extensions;
+          auto in_exts = ext;
+          for (const auto &ext_ : in_exts.extensions) {
+            if (ext_ == TYPE_EXT_ARRAY) {
+              auto back = in_exts.array_sizes.back();
+              in_exts.array_sizes.pop_back();
+              new_exts.array_sizes.push_back(back);
+              new_exts.extensions.push_back(TYPE_EXT_ARRAY);
+            } else {
+              new_exts.extensions.push_back(TYPE_EXT_POINTER);
+            }
+          }
+          auto new_id = global_find_type_id(name, info, new_exts);
+          types.insert(new_id);
+          return new_id;
+        }
+      }
+    }
+    if (parent) {
+      return parent->find_alias(name, ext);
+    }
+    return -1;
+  }
+
   inline int find_type_id(const std::string &name, const TypeExt &ext) {
+    if (global_type_aliases.contains(name)) {
+      return find_alias(name, ext);
+    }
+
     auto base_id = global_find_type_id(name, {});
     auto id = global_find_type_id(name, ext);
 
@@ -55,10 +124,17 @@ struct Scope {
   }
   inline int find_type_id(const std::string &name, const FunctionTypeInfo &info,
                           const TypeExt &ext) {
+                            
+    if (global_type_aliases.contains(name)) {
+      return find_alias(name, info, ext);
+    }
+                            
     auto base_id = global_find_type_id(name, info, {});
     auto id = global_find_type_id(name, info, ext);
-    
-    // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types declared in our scope. Fix the discord here, We shouldn't have to do this.
+
+    // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types
+    // declared in our scope. Fix the discord here, We shouldn't have to do
+    // this.
     if (!types.contains(id)) {
       types.insert(id);
       return id;

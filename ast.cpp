@@ -318,7 +318,8 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           parser->context.current_scope->insert(name.value, parser->context.current_scope->find_type_id(aliased_type->base, aliased_type->extension_info), true);
+           auto id = parser->context.current_scope->find_type_id(aliased_type->base, aliased_type->extension_info);
+           parser->context.current_scope->insert(name.value, id, true);
            return ast_alloc<ASTNoop>();
          }});
   }
@@ -401,9 +402,13 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
       ERROR_FAILURE, range);
 }
 
+// TODO(Josh) 10/1/2024, 10:04:12 AM
+// We need to use parse_type_extensions, to reduce code size and make things more reliable
+// but right now that's tailored for certain tasks.
 ASTType *Parser::parse_type() {
   auto range = begin_node();
   
+  // parse #self types.
   if (peek().type == TType::Directive) {
     auto type = dynamic_cast<ASTType*>(try_parse_directive_expr().get());
     if (!type){
@@ -411,11 +416,10 @@ ASTType *Parser::parse_type() {
     } 
     return type;
   }
+  
   auto base = eat().value;
   TypeExt extension_info;
-  // TODO(Josh) 10/1/2024, 10:04:12 AM
-  // We need to use parse_type_extensions, to reduce code size and make things more reliable
-  // but right now that's tailored for certain tasks.
+
   while (true) {
     if (peek().type == TType::LBrace) {
       extension_info.extensions.push_back(TYPE_EXT_ARRAY);
@@ -442,7 +446,6 @@ ASTType *Parser::parse_type() {
   end_node(node, range);
   return node;
 }
-
 ASTProgram *Parser::parse() {
   auto range = begin_node();
   auto program = ast_alloc<ASTProgram>();
@@ -482,7 +485,6 @@ ASTProgram *Parser::parse() {
   end_node(program, range);
   return program;
 }
-
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
@@ -675,7 +677,6 @@ ASTStatement *Parser::parse_statement() {
                           tok.value),
               ERROR_CRITICAL, range);
 }
-
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -696,7 +697,6 @@ ASTDeclaration *Parser::parse_declaration() {
   context.current_scope->insert(iden.value, -1);
   return decl;
 }
-
 ASTBlock *Parser::parse_block() {
   auto range = begin_node();
   expect(TType::LCurly);
@@ -935,6 +935,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     context.current_scope->types.insert(type);
   }
   
+  // TODO: fix this up, this is a mess.
   for (auto &statement: block->statements) {
     if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
       fields.push_back(field);
