@@ -263,7 +263,7 @@ struct Type {
 };
 
 struct ASTFunctionDeclaration;
-std::string get_function_type_name(ASTFunctionDeclaration *);
+std::string global_get_function_typename(ASTFunctionDeclaration *);
 
 template <class T> T *type_alloc(size_t n = 1) {
   auto mem = type_arena.allocate(sizeof(T) * n);
@@ -276,15 +276,15 @@ static Type *global_get_type(const int id) {
   return type_table[id];
 }
 
-int create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
+int global_create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
                 const TypeExt & = {});
 
-int create_struct_type(const std::string &, Scope *);
+int global_create_struct_type(const std::string &, Scope *);
 
-int create_enum_type(const std::string &, const std::vector<std::string> &,
+int global_create_enum_type(const std::string &, const std::vector<std::string> &,
                      bool = false);
 
-int create_union_type(const std::string &name, Scope *scope, UnionKind kind);
+int global_create_union_type(const std::string &name, Scope *scope, UnionKind kind);
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
 

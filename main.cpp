@@ -171,8 +171,8 @@ Context::Context() {
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    auto type_id = create_struct_type("Type", type_scope);
-    auto field_id = create_struct_type("Field", field_scope);
+    auto type_id = global_create_struct_type("Type", type_scope);
+    auto field_id = global_create_struct_type("Field", field_scope);
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());
     type_scope->insert("fields", global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
@@ -184,7 +184,7 @@ Context::Context() {
   // same as array.
   {
     auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    auto type_id = create_struct_type("string", str_scope);
+    auto type_id = global_create_struct_type("string", str_scope);
     auto type = global_get_type(type_id);
     
     static_cast<StructTypeInfo*>(type->info)->implicit_cast_table = {
@@ -199,4 +199,19 @@ Context::Context() {
   for (int i = 0; i < num_types; ++i) {
     root_scope->types.insert(i);
   }
+}
+
+std::string Scope::get_function_typename(ASTFunctionDeclaration *decl) {
+  std::stringstream ss;
+  auto return_type = decl->return_type;
+  ss << get_type(return_type->resolved_type)->to_string();
+  ss << "(";
+  for (const auto &param : decl->params->params) {
+    ss << get_type(param->type->resolved_type)->to_string();
+    if (param != decl->params->params.back()) {
+      ss << ", ";
+    }
+  }
+  ss << ")";
+  return ss.str();
 }

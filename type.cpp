@@ -34,7 +34,7 @@ int global_find_type_id(const std::string &name, const FunctionTypeInfo &info,
     }
   }
   auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
-  return create_type(TYPE_FUNCTION, name, info_ptr, ext);
+  return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
 int global_find_type_id(const std::string &name, const TypeExt &type_extensions) {
   
@@ -66,7 +66,7 @@ int global_find_type_id(const std::string &name, const TypeExt &type_extensions)
   if (base_id != -1) {
     auto t = global_get_type(base_id);
     if (!t->has_alias(name))
-      return create_type((TypeKind)t->kind, name, t->info, type_extensions);
+      return global_create_type((TypeKind)t->kind, name, t->info, type_extensions);
   }
   // linear search with extensions failed: for aliased types, 
   // we may need to create a type with a non 'name' name.
@@ -76,7 +76,7 @@ int global_find_type_id(const std::string &name, const TypeExt &type_extensions)
     if (type->has_alias(name) && type->extensions == type_extensions) {
       return type->id;
     } else if (type->has_alias(name) && type->extensions != type_extensions) {
-      return create_type(type->kind, type->base, type->info, type_extensions);
+      return global_create_type(type->kind, type->base, type->info, type_extensions);
     }
   }
   
@@ -140,36 +140,36 @@ ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
 void init_type_system() {
   // Signed integers
   {
-    create_type(TYPE_SCALAR, "s64", get_scalar_type_info(TYPE_S64, 8, true));
-    create_type(TYPE_SCALAR, "s32", get_scalar_type_info(TYPE_S32, 4, true));
-    create_type(TYPE_SCALAR, "s16", get_scalar_type_info(TYPE_S16, 2, true));
-    create_type(TYPE_SCALAR, "s8", get_scalar_type_info(TYPE_S16, 1, true));
+    global_create_type(TYPE_SCALAR, "s64", get_scalar_type_info(TYPE_S64, 8, true));
+    global_create_type(TYPE_SCALAR, "s32", get_scalar_type_info(TYPE_S32, 4, true));
+    global_create_type(TYPE_SCALAR, "s16", get_scalar_type_info(TYPE_S16, 2, true));
+    global_create_type(TYPE_SCALAR, "s8", get_scalar_type_info(TYPE_S16, 1, true));
   }
 
   // Unsigned integers
   {
-    create_type(TYPE_SCALAR, "u64", get_scalar_type_info(TYPE_U64, 8, true));
-    create_type(TYPE_SCALAR, "u32", get_scalar_type_info(TYPE_U32, 4, true));
-    create_type(TYPE_SCALAR, "u16", get_scalar_type_info(TYPE_U16, 2, true));
-    create_type(TYPE_SCALAR, "u8", get_scalar_type_info(TYPE_U16, 1, true));
+    global_create_type(TYPE_SCALAR, "u64", get_scalar_type_info(TYPE_U64, 8, true));
+    global_create_type(TYPE_SCALAR, "u32", get_scalar_type_info(TYPE_U32, 4, true));
+    global_create_type(TYPE_SCALAR, "u16", get_scalar_type_info(TYPE_U16, 2, true));
+    global_create_type(TYPE_SCALAR, "u8", get_scalar_type_info(TYPE_U16, 1, true));
   }
 
   // Floats
   {
-    create_type(TYPE_SCALAR, "float32", get_scalar_type_info(TYPE_FLOAT, 4));
-    create_type(TYPE_SCALAR, "float64", get_scalar_type_info(TYPE_DOUBLE, 8));
+    global_create_type(TYPE_SCALAR, "float32", get_scalar_type_info(TYPE_FLOAT, 4));
+    global_create_type(TYPE_SCALAR, "float64", get_scalar_type_info(TYPE_DOUBLE, 8));
   }
 
   // Other
   {
     // Other
     // todo: alias these, don't generate new types.
-    create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
-    create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
+    global_create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
+    global_create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
 
-    create_type(TYPE_SCALAR, "char", get_scalar_type_info(TYPE_U8, 1, true));
-    create_type(TYPE_SCALAR, "bool", get_scalar_type_info(TYPE_BOOL, 1, true));
-    create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
+    global_create_type(TYPE_SCALAR, "char", get_scalar_type_info(TYPE_U8, 1, true));
+    global_create_type(TYPE_SCALAR, "bool", get_scalar_type_info(TYPE_BOOL, 1, true));
+    global_create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
   }
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
@@ -388,7 +388,7 @@ int remove_one_pointer_ext(int operand_ty,
                       TypeExt{.extensions = extensions,
                               .array_sizes = ty->extensions.array_sizes});
 }
-int create_struct_type(const std::string &name, Scope *scope) {
+int global_create_struct_type(const std::string &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
   type->base = name;
@@ -399,7 +399,7 @@ int create_struct_type(const std::string &name, Scope *scope) {
   return type->id;
 }
 
-int create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
+int global_create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
   type_table[num_types] = type;
   type->base = name;
@@ -411,7 +411,7 @@ int create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
   return type->id;
 }
 
-int create_enum_type(const std::string &name,
+int global_create_enum_type(const std::string &name,
                      const std::vector<std::string> &keys, bool is_flags) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
@@ -426,7 +426,7 @@ int create_enum_type(const std::string &name,
   num_types += 1;
   return type->id;
 }
-int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
+int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
                 const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
   type->info = info;
@@ -544,7 +544,8 @@ std::string Type::to_type_struct(Context &context) {
               
   // return std::format("_type_info[{}]", this->id);
 }
-std::string get_function_type_name(ASTFunctionDeclaration *decl) {
+
+std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
   ss << global_get_type(return_type->resolved_type)->to_string();

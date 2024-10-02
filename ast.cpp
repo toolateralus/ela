@@ -860,7 +860,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys_set.insert(key);
   }
   node->type->resolved_type =
-      create_enum_type(node->type->base, keys, node->is_flags);
+      context.current_scope->create_enum_type(node->type->base, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
 }
@@ -871,7 +871,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   current_struct_decl = decl;
 
   // fwd declare the type.
-  auto type_id = create_struct_type(name.value, {});
+  auto type_id = context.current_scope->create_struct_type(name.value, {});
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
@@ -928,6 +928,13 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto block = parse_block();
   block->scope->is_struct_or_union_scope = true;
   
+  auto scope = block->scope;
+  
+  // TODO: remove this if we find a way to extract the anonymous types defined in the scope etc.
+  for (const auto &type: scope->types) {
+    context.current_scope->types.insert(type);
+  }
+  
   for (auto &statement: block->statements) {
     if (auto field = dynamic_cast<ASTDeclaration*>(statement)) {
       fields.push_back(field);
@@ -954,7 +961,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->scope = block->scope;
   
   // CLEANUP(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
-  node->type->resolved_type = create_union_type(name.value, block->scope, UNION_IS_NORMAL);
+  node->type->resolved_type = context.current_scope->create_union_type(name.value, block->scope, UNION_IS_NORMAL);
   end_node(node, range);
   return node;
 }

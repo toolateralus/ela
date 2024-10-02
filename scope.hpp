@@ -20,73 +20,104 @@ struct Symbol {
   std::string name;
   // if this is a type alias, this
   // is the type that this identifier points to.
-  int type_id; 
+  int type_id;
   // is this a type alias?
   bool type_alias;
 };
-
-
+struct ASTFunctionDeclaration;
 struct Scope {
-  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flagsor something.
+  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flagsor
+  // something.
   bool is_struct_or_union_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
   std::set<int> types;
   inline int find_type_id(const std::string &name, const TypeExt &ext) {
     auto base_id = global_find_type_id(name, {});
     auto id = global_find_type_id(name, ext);
-    
+
     if (!types.contains(id) && types.contains(base_id)) {
-      // a type with new extensions got created, so we just add it to this scope.
+      // a type with new extensions got created, so we just add it to this
+      // scope.
       types.insert(id);
       return id;
     }
-    
-    if (types.contains(id)) return id;
-    
+
+    if (types.contains(id))
+      return id;
+
     if (parent) {
       auto id = parent->find_type_id(name, ext);
       if (id != -1)
         return id;
     }
-    
+
     return -1;
   }
   inline int find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                 const TypeExt &ext) {
+                          const TypeExt &ext) {
     auto base_id = global_find_type_id(name, info, {});
     auto id = global_find_type_id(name, info, ext);
-     if (!types.contains(id) && types.contains(base_id)) {
-      // a type with new extensions got created, so we just add it to this scope.
+    
+    // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types declared in our scope. Fix the discord here, We shouldn't have to do this.
+    if (!types.contains(id)) {
       types.insert(id);
       return id;
     }
-    
-    if (types.contains(id)) return id;
-    
+
+    if (types.contains(id))
+      return id;
+
     if (parent) {
       auto id = parent->find_type_id(name, ext);
       if (id != -1)
         return id;
     }
-    
-    if (types.contains(id)) return id;
+
+    if (types.contains(id))
+      return id;
     return -1;
   }
-  inline Type* get_type(int id) const {
+  inline Type *get_type(int id) const {
     if (types.contains(id))
       return global_get_type(id);
-    
+
     if (parent) {
       return parent->get_type(id);
     }
-    // TODO: we should probably throw more information. this is basically nothing and you'd never be able to find where this happened
-    throw_error(std::format("Use of undeclared type"), ERROR_FAILURE, {});
+    return nullptr;
   }
-  
+
+  int create_struct_type(const std::string &name, Scope *scope) {
+    auto type = ::global_create_struct_type(name, scope);
+    types.insert(type);
+    return type;
+  }
+
+  int create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
+    auto type = ::global_create_union_type(name, scope, kind);
+    types.insert(type);
+    return type;
+  }
+
+  std::string get_function_typename(ASTFunctionDeclaration *decl);
+
+  int create_enum_type(const std::string &name,
+                       const std::vector<std::string> &keys, bool is_flags) {
+    auto type = ::global_create_enum_type(name, keys, is_flags);
+    types.insert(type);
+    return type;
+  }
+  int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
+                  const TypeExt &extensions) {
+    auto type = ::global_create_type(kind, name, info, extensions);
+    types.insert(type);
+    return type;
+  }
+
   Scope *parent = nullptr;
-  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
-  }
-  inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {
+  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
+  inline void insert(const std::string &name, int type_id,
+                     bool is_type_alias = false) {
     symbols[name] = Symbol{name, type_id, is_type_alias};
     if (is_type_alias) {
       global_type_aliases.insert({name, type_id});
@@ -100,19 +131,17 @@ struct Scope {
     }
     return nullptr;
   }
-  inline void erase(const std::string &name) {
-    symbols.erase(name);
-  }
-  
+  inline void erase(const std::string &name) { symbols.erase(name); }
+
   inline void on_scope_enter() {
-    for (const auto &[id, sym]: symbols) {
+    for (const auto &[id, sym] : symbols) {
       if (sym.type_alias) {
         global_type_aliases.insert({id, sym.type_id});
       }
     }
   }
   inline void on_scope_exit() {
-    for (const auto &[id, sym]: symbols) {
+    for (const auto &[id, sym] : symbols) {
       if (sym.type_alias) {
         auto pointed_to = global_get_type(sym.type_id);
         auto it = global_type_aliases.find(sym.name);
@@ -121,7 +150,6 @@ struct Scope {
       }
     }
   }
-  
 };
 
 static Scope *create_child(Scope *parent) {
@@ -131,12 +159,13 @@ static Scope *create_child(Scope *parent) {
 }
 
 struct Context {
-  // TODO: there's probably a much much better way to do this that doesn't intermix the entire
+  // TODO: there's probably a much much better way to do this that doesn't
+  // intermix the entire
   // TODO(cont.): type system, ast, and emitting system so much
-  // used by the type system to build type info instantiation code 
+  // used by the type system to build type info instantiation code
   // to be emitted to cpp.
   std::vector<std::string> type_info_strings;
-  
+
   Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Scope *root_scope;
   Context();
@@ -147,7 +176,7 @@ struct Context {
     }
     current_scope = scope;
     scope->on_scope_enter();
-    //printf("entering scope: %p\n", current_scope);
+    // printf("entering scope: %p\n", current_scope);
   }
   inline Scope *exit_scope() {
     auto scope = current_scope;
