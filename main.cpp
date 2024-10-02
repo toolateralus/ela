@@ -194,4 +194,9 @@ Context::Context() {
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
   }
+  
+  // add the base types for all of the primitives.  
+  for (int i = 0; i < num_types; ++i) {
+    root_scope->types.insert(i);
+  }
 }
