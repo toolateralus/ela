@@ -587,14 +587,12 @@ CustomIteratorStruct :: struct {
   assert("string length failed to equal expected value", my_string.length == 11);
 }
 
-
-/*
 #test test_array :: () {
   // TODO: put a lot more work into init lists, right now they only really work
   // for dynamic ararys.
-  s8[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
-}*/
+}
 
 
 /*

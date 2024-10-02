@@ -217,7 +217,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
       return CONVERT_EXPLICIT;
     }
   }
-  
+    
   // allow pointer arithmetic
   if (from->is_kind(TYPE_SCALAR) && from->extensions.is_pointer(-1) &&
        to->is_kind(TYPE_SCALAR) && type_is_numerical(to) 
@@ -238,6 +238,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return CONVERT_IMPLICIT;
   }
 
+  // search structs for their cast tables.
+  // Not super useful
   if (to->kind == TYPE_STRUCT) {
     auto info = static_cast<StructTypeInfo*>(to->info);
     for (const auto &cast: info->implicit_cast_table) {
@@ -250,6 +252,14 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
         return CONVERT_EXPLICIT;
       }
     }
+  }
+  
+  // if the type extensions are equal, return the conversion rule for the bases.
+  // this allows int[] to cast to s8[] etc;
+  if (!from->extensions.has_no_extensions() && !to->extensions.has_no_extensions() && from->extensions.equals(to->extensions)) {
+    auto from_base = get_type(find_type_id(from->base, {}));
+    auto to_base = get_type(find_type_id(to->base, {}));
+    return type_conversion_rule(from_base, to_base);
   }
 
   return CONVERT_PROHIBITED;

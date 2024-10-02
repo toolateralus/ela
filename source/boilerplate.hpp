@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <cstddef>
+#include <type_traits>
 
 using float64 = double;
 using u64 = size_t;
@@ -38,6 +39,16 @@ template <class T> struct _array {
   explicit operator T*() {
     return data;
   }
+  
+  template<class From> requires std::is_convertible_v<From, T>
+  operator _array<From>() {
+    _array<From> result;
+    result.length = length;
+    result.data = new From[length];
+    std::copy(data, data + length, result.data);
+    return result;
+  }
+  
   _array(std::initializer_list<T> list) {
     data = new T[list.size()];
     std::copy(list.begin(), list.end(), data);
