@@ -9,9 +9,8 @@ Xaryu :: struct {
 main :: () {
   Type *type = #type Xaryu;
   printf("%s type info:\n", type.name);
-  
   for field; type.fields {
-    printf("%p\n", field.name);
-    // printf("field: { name: %s , ttype_id=%d } ", field.name, field.type);
+    printf("...field: { name: %s, type=%s }\n", field.name, field.type.name);
+    
   }
 }

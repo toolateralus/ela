@@ -171,19 +171,20 @@ Context::Context() {
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    type_scope->parent= root_scope;
+    field_scope->parent=root_scope;
     auto type_id = global_create_struct_type("Type", type_scope);
     auto field_id = global_create_struct_type("Field", field_scope);
     
+    // Type*
+    auto type_ptr = global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}});
     // Field* []
     auto field_arr = global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {-1}});
     // Field*
     auto field_ptr = global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}});
-    // Type*
-    auto type_ptr = global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}});
     
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());
-    auto field_arr_ty = global_get_type(field_arr);
     type_scope->insert("fields", field_arr);
 
     field_scope->insert("name", charptr_type());
@@ -191,7 +192,6 @@ Context::Context() {
   }
   
   // string struct, stores length info.
-  // same as array.
   {
     auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto type_id = global_create_struct_type("string", str_scope);
@@ -207,6 +207,8 @@ Context::Context() {
   
   // add the base types for all of the primitives.  
   for (int i = 0; i < num_types; ++i) {
+    auto type = global_get_type(i);
+    printf("adding type %d, named: %s\n", i, type->to_string().c_str());
     root_scope->types.insert(i);
   }
 }

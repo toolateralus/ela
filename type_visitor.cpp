@@ -496,6 +496,10 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = context.current_scope->get_type(left);
   
+  if (!left_ty) {
+    throw_error("Internal Compiler Error: un-typed variable on lhs of dot expression?", ERROR_FAILURE, node->source_range);
+  }
+  
   // TODO: remove this hack to get array length
   if (left_ty->extensions.is_array()) {
     auto right = dynamic_cast<ASTIdentifier*>(node->right);
