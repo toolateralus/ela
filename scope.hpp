@@ -1,6 +1,5 @@
 #pragma once
 
-#include "error.hpp"
 #include "type.hpp"
 #include <jstl/memory/arena.hpp>
 #include <set>
@@ -24,11 +23,13 @@ struct Symbol {
   // is this a type alias?
   bool type_alias;
 };
+
 struct ASTFunctionDeclaration;
+
 struct Scope {
-  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flagsor
-  // something.
+  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flags or something.
   bool is_struct_or_union_scope = false;
+  
   std::unordered_map<std::string, Symbol> symbols;
   std::set<int> types;
 

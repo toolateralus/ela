@@ -114,7 +114,6 @@ static void throw_warning(const std::string message, const SourceRange &source_r
   ss << "\e[31m" << "Error:\n\t" << message << "\e[0m\n";
   ss << format_source_location(source_range, severity);
   const auto token_str = ss.str();
-
   switch (severity) {
   case ERROR_INFO:
   case ERROR_WARNING:

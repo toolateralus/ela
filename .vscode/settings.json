@@ -2,10 +2,11 @@
   "lldb.showDisassembly": "auto",
   "lldb.dereferencePointers": true,
   "lldb.consoleMode": "commands",
-  
   "files.associations": {
       "*.ela": "jai",
+  },
+  "files.exclude": {
+    "**/.clock_diff.txt": true
   }
-    
 }
 
