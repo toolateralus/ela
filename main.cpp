@@ -173,11 +173,21 @@ Context::Context() {
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto type_id = global_create_struct_type("Type", type_scope);
     auto field_id = global_create_struct_type("Field", field_scope);
+    
+    // Field* []
+    auto field_arr = global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {-1}});
+    // Field*
+    auto field_ptr = global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}});
+    // Type*
+    auto type_ptr = global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}});
+    
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());
-    type_scope->insert("fields", global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
+    auto field_arr_ty = global_get_type(field_arr);
+    type_scope->insert("fields", field_arr);
+
     field_scope->insert("name", charptr_type());
-    field_scope->insert("type", global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}}));
+    field_scope->insert("type", type_ptr);
   }
   
   // string struct, stores length info.

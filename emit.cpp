@@ -677,7 +677,15 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   use_header();
-  (*ss) << "enum " << node->type->base << "{\n";
+  
+  std::string iden;
+  if (node->is_flags) {
+    iden = "enum ";
+  } else {
+    // TODO: use enum struct to prevent naming conflicts?
+    iden = "enum ";
+  }
+  (*ss) << iden << node->type->base << " : s64" << "{\n";
   int i = 0;
   auto get_next_index= [&] {
     int value;

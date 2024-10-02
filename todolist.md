@@ -1,5 +1,10 @@
 ## TODO List
 
+# Super Important
+
+We desperately need to refactor the way we resolve symbols, 
+And we need function overloading and such. This is key to enabling things like calling constructors without #make, 
+It's mandatory for doing function polymorphism, and the same goes for parameterized structs.
 
 Add a offsetof() or #offset() or something like that
 `#offset(Vector2, x);`

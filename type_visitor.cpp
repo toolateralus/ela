@@ -10,9 +10,6 @@
 #include <string>
 #include <vector>
 
-// these are called from and to because in the event of an implicit cast this
-// should be the behaviour.
-
 void validate_type_compatability(
     const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
@@ -26,15 +23,17 @@ void validate_type_compatability(
                 ERROR_FAILURE, source_range);
   }
 }
+const auto check_return_type_consistency(int &return_type, int new_type,
+                                         ASTNode *node) {
+  if (return_type == -1) {
+    return_type = new_type;
+  } else if (new_type != -1 && new_type != return_type) {
+    validate_type_compatability(new_type, return_type, node->source_range,
+                                "Expected: {}, Found: {}",
+                                "Inconsistent return types in block.");
+  }
+};
 
-/*
-  ######################
-  #### TYPE VISITOR ####
-  ######################
-*/
-
-// Use this only to cast the result type of an expression.
-// visiting the ASTType resolves itself.
 static inline int int_from_any(const std::any &any) {
   return std::any_cast<int>(any);
 }
@@ -120,16 +119,6 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
                               std::format("function: {}", node->name.value));
   return {};
 }
-const auto check_return_type_consistency(int &return_type, int new_type,
-                                         ASTNode *node) {
-  if (return_type == -1) {
-    return_type = new_type;
-  } else if (new_type != -1 && new_type != return_type) {
-    validate_type_compatability(new_type, return_type, node->source_range,
-                                "Expected: {}, Found: {}",
-                                "Inconsistent return types in block.");
-  }
-};
 
 std::any TypeVisitor::visit(ASTBlock *node) {
   context.set_scope(node->scope);
@@ -165,7 +154,6 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
   }
   return {};
 }
-
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
   auto type = context.current_scope->get_type(id);
@@ -198,7 +186,6 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   return {};
 }
 
-// throws if inequal and unassignable.
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   if (node->value.is_not_null()) {
@@ -217,7 +204,6 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
-
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
@@ -252,7 +238,6 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   node->resolved_type = left;
   return left;
 }
-
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
   
@@ -281,7 +266,6 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   return operand_ty;
 }
-
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = context.current_scope->lookup(node->value.value);
   if (symbol)
@@ -403,7 +387,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto iden = static_cast<ASTIdentifier *>(v.target);
     
     int iter_ty = -1;
-    if (auto info = dynamic_cast<StructTypeInfo*>(t->info)) {
+    auto info = dynamic_cast<StructTypeInfo*>(t->info);
+    if (info && (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array())) {
       // TODO: add a way to use the value_semantic thing with custom iterators.
       Symbol* begin = info->scope->lookup("begin");
       Symbol* end = info->scope->lookup("end");
@@ -486,7 +471,6 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
-
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = context.current_scope->get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info);
@@ -635,7 +619,6 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   }
   return {};
 }
-
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   // we store this ast just to type check the stuff.
   context.set_scope(node->scope);
@@ -656,7 +639,6 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   context.exit_scope();
   return {};
 }
-
 std::any TypeVisitor::visit(ASTAllocate *node) {
   // TODO(Josh) 10/1/2024, 3:27:53 PM
   // Do something here. This is probably bad,

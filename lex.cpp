@@ -114,7 +114,8 @@ void Lexer::get_token(State &state) {
                                                TFamily::Operator));
         return;
       } else {
-        std::cout << "crisp: unable to lex operator: " << current_match
+        std::cout << location.ToString();
+        std::cout << "\nela: unable to lex operator: " << current_match
                   << std::endl;
         exit(1);
       }
@@ -169,7 +170,8 @@ void Lexer::get_token(State &state) {
       }
       return;
     } else {
-      std::cout << "crisp: unable to lex : " << c << std::endl;
+      std::cout << location.ToString();
+      std::cout << "\nela: unable to lex : " << c << std::endl;
       exit(1);
     }
   }

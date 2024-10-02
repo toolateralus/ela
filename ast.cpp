@@ -326,6 +326,9 @@ void Parser::init_directive_routines() {
   }
   
   // #typename, get the name of a type as a string.
+  
+  // Currently this is useless. This needs to be an ast node and needs to be later processed into a string literal
+  // because we can only use this on resolved symbols and types, which are nonexistent
   {
     directive_routines.push_back({
       .identifier = "typename",
@@ -334,13 +337,16 @@ void Parser::init_directive_routines() {
         if (parser->peek().type == TType::LParen) {
           parser->eat();
         }
-        auto asttype = parser->parse_type();
+        
+        auto asttype = parser->expect(TType::Identifier);
         
         if (parser->peek().type == TType::RParen) {
           parser->eat();
         }
-        auto type_id = parser->context.current_scope->find_type_id(asttype->base, asttype->extension_info);
-        auto type = parser->context.current_scope->get_type(type_id);
+        
+        
+        
+        auto type = parser->context.current_scope->get_type(parser->context.current_scope->find_type_id(asttype.value, {}));
         auto string = ast_alloc<ASTLiteral>();
         string->tag = ASTLiteral::String;
         string->value = type->to_string();

@@ -23,7 +23,7 @@ std::string FunctionTypeInfo::to_string() const {
   return ss.str();
 }
 int global_find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                 const TypeExt &ext) {
+                        const TypeExt &ext) {
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
@@ -36,9 +36,10 @@ int global_find_type_id(const std::string &name, const FunctionTypeInfo &info,
   auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
-int global_find_type_id(const std::string &name, const TypeExt &type_extensions) {
-  
-  // linear search with extensions failed: for aliased types, 
+int global_find_type_id(const std::string &name,
+                        const TypeExt &type_extensions) {
+
+  // linear search with extensions failed: for aliased types,
   // we may need to create a type with a non 'name' name.
   // such as #alias intptr :: int*, where int* hasn't been used yet.
   for (int i = 0; i < num_types; ++i) {
@@ -46,17 +47,18 @@ int global_find_type_id(const std::string &name, const TypeExt &type_extensions)
     if (type->has_alias(name) && type->extensions == type_extensions) {
       return type->id;
     } else if (type->has_alias(name) && type->extensions != type_extensions) {
-      return global_create_type(type->kind, type->base, type->info, type_extensions);
+      return global_create_type(type->kind, type->base, type->info,
+                                type_extensions);
     }
   }
-  
-  
+
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
     auto base = type->base;
-    
+
     if (type_extensions.has_no_extensions()) {
-      if (type->names_match_or_alias(name) && type->extensions.has_no_extensions()) {
+      if (type->names_match_or_alias(name) &&
+          type->extensions.has_no_extensions()) {
         return type->id;
       }
     }
@@ -64,31 +66,32 @@ int global_find_type_id(const std::string &name, const TypeExt &type_extensions)
       return type->id;
   }
 
-  // NOTE:below is just for creating types with new extensions. new function types, struct types, and enum types
-  // must be created manually
-  // this just creates pointer and array types of base 'name'
+  // NOTE:below is just for creating types with new extensions. new function
+  // types, struct types, and enum types must be created manually this just
+  // creates pointer and array types of base 'name'
   int base_id = -1;
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
-    if (tinfo->names_match_or_alias(name) && tinfo->extensions.has_no_extensions()) {
+    if (tinfo->names_match_or_alias(name) &&
+        tinfo->extensions.has_no_extensions()) {
       base_id = tinfo->id;
       break;
     }
   }
-  // TODO(Josh) 9/30/2024, 7:31:48 PM  fix the aliasing system. it's completely broken and generates too many types, then never finds the real aliased type.
   if (base_id != -1) {
     auto t = global_get_type(base_id);
     if (!t->has_alias(name))
-      return global_create_type((TypeKind)t->kind, name, t->info, type_extensions);
+      return global_create_type((TypeKind)t->kind, name, t->info,
+                                type_extensions);
   }
-  
+
   return -1;
 }
 std::string get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
   if (type->base == "s64")
-    name = "int64_t";    
+    name = "int64_t";
   else if (type->base == "s32")
     name = "int32_t";
   else if (type->base == "s16")
@@ -142,35 +145,49 @@ ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
 void init_type_system() {
   // Signed integers
   {
-    global_create_type(TYPE_SCALAR, "s64", get_scalar_type_info(TYPE_S64, 8, true));
-    global_create_type(TYPE_SCALAR, "s32", get_scalar_type_info(TYPE_S32, 4, true));
-    global_create_type(TYPE_SCALAR, "s16", get_scalar_type_info(TYPE_S16, 2, true));
-    global_create_type(TYPE_SCALAR, "s8", get_scalar_type_info(TYPE_S16, 1, true));
+    global_create_type(TYPE_SCALAR, "s64",
+                       get_scalar_type_info(TYPE_S64, 8, true));
+    global_create_type(TYPE_SCALAR, "s32",
+                       get_scalar_type_info(TYPE_S32, 4, true));
+    global_create_type(TYPE_SCALAR, "s16",
+                       get_scalar_type_info(TYPE_S16, 2, true));
+    global_create_type(TYPE_SCALAR, "s8",
+                       get_scalar_type_info(TYPE_S16, 1, true));
   }
 
   // Unsigned integers
   {
-    global_create_type(TYPE_SCALAR, "u64", get_scalar_type_info(TYPE_U64, 8, true));
-    global_create_type(TYPE_SCALAR, "u32", get_scalar_type_info(TYPE_U32, 4, true));
-    global_create_type(TYPE_SCALAR, "u16", get_scalar_type_info(TYPE_U16, 2, true));
-    global_create_type(TYPE_SCALAR, "u8", get_scalar_type_info(TYPE_U16, 1, true));
+    global_create_type(TYPE_SCALAR, "u64",
+                       get_scalar_type_info(TYPE_U64, 8, true));
+    global_create_type(TYPE_SCALAR, "u32",
+                       get_scalar_type_info(TYPE_U32, 4, true));
+    global_create_type(TYPE_SCALAR, "u16",
+                       get_scalar_type_info(TYPE_U16, 2, true));
+    global_create_type(TYPE_SCALAR, "u8",
+                       get_scalar_type_info(TYPE_U16, 1, true));
   }
 
   // Floats
   {
-    global_create_type(TYPE_SCALAR, "float32", get_scalar_type_info(TYPE_FLOAT, 4));
-    global_create_type(TYPE_SCALAR, "float64", get_scalar_type_info(TYPE_DOUBLE, 8));
+    global_create_type(TYPE_SCALAR, "float32",
+                       get_scalar_type_info(TYPE_FLOAT, 4));
+    global_create_type(TYPE_SCALAR, "float64",
+                       get_scalar_type_info(TYPE_DOUBLE, 8));
   }
 
   // Other
   {
     // Other
     // todo: alias these, don't generate new types.
-    global_create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
-    global_create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
+    global_create_type(TYPE_SCALAR, "float",
+                       get_scalar_type_info(TYPE_FLOAT, 4));
+    global_create_type(TYPE_SCALAR, "int",
+                       get_scalar_type_info(TYPE_S32, 4, true));
 
-    global_create_type(TYPE_SCALAR, "char", get_scalar_type_info(TYPE_U8, 1, true));
-    global_create_type(TYPE_SCALAR, "bool", get_scalar_type_info(TYPE_BOOL, 1, true));
+    global_create_type(TYPE_SCALAR, "char",
+                       get_scalar_type_info(TYPE_U8, 1, true));
+    global_create_type(TYPE_SCALAR, "bool",
+                       get_scalar_type_info(TYPE_BOOL, 1, true));
     global_create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
   }
 }
@@ -189,7 +206,7 @@ constexpr bool type_is_numerical(const Type *t) {
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
-  
+
   auto from_info = static_cast<ScalarTypeInfo *>(from->info);
   auto to_info = static_cast<ScalarTypeInfo *>(to->info);
   // do not allow casting of float to integer implicitly
@@ -219,20 +236,22 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
       return CONVERT_EXPLICIT;
     }
   }
-    
+
   // allow pointer arithmetic
   if (from->is_kind(TYPE_SCALAR) && from->extensions.is_pointer(-1) &&
-       to->is_kind(TYPE_SCALAR) && type_is_numerical(to) 
-       && to->extensions.has_no_extensions()) {
+      to->is_kind(TYPE_SCALAR) && type_is_numerical(to) &&
+      to->extensions.has_no_extensions()) {
     return CONVERT_IMPLICIT;
   }
-  
-  // cast all numerical types and pointers too booleans implicitly for if statements
-  // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow this in conditional statements.
-  if ((type_is_numerical(from) || from->extensions.is_pointer()) && to->id == bool_type()) {
+
+  // cast all numerical types and pointers too booleans implicitly for if
+  // statements
+  // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow
+  // this in conditional statements.
+  if ((type_is_numerical(from) || from->extensions.is_pointer()) &&
+      to->id == bool_type()) {
     return CONVERT_IMPLICIT;
   }
-  
 
   // TODO: probably want to fix this. right now we have C style pointer casting:
   // any two pointers of the same depth can cast implicitly
@@ -243,22 +262,24 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // search structs for their cast tables.
   // Not super useful
   if (to->kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo*>(to->info);
-    for (const auto &cast: info->implicit_cast_table) {
+    auto info = static_cast<StructTypeInfo *>(to->info);
+    for (const auto &cast : info->implicit_cast_table) {
       if (cast == from->id) {
         return CONVERT_IMPLICIT;
       }
     }
-    for (const auto & cast: info->explicit_cast_table) {
+    for (const auto &cast : info->explicit_cast_table) {
       if (cast == from->id) {
         return CONVERT_EXPLICIT;
       }
     }
   }
-  
+
   // if the type extensions are equal, return the conversion rule for the bases.
   // this allows int[] to cast to s8[] etc;
-  if (!from->extensions.has_no_extensions() && !to->extensions.has_no_extensions() && from->extensions.equals(to->extensions)) {
+  if (!from->extensions.has_no_extensions() &&
+      !to->extensions.has_no_extensions() &&
+      from->extensions.equals(to->extensions)) {
     auto from_base = global_get_type(global_find_type_id(from->base, {}));
     auto to_base = global_get_type(global_find_type_id(to->base, {}));
     return type_conversion_rule(from_base, to_base);
@@ -297,11 +318,11 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
     auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
-    
+
     if (finfo->is_varargs != sinfo->is_varargs) {
       return false;
     }
-    
+
     bool params_eq = finfo->params_len == sinfo->params_len;
 
     if (!params_eq)
@@ -312,7 +333,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
         params_eq = false;
         break;
       }
-      
+
     return finfo->return_type == sinfo->return_type && params_eq;
   }
   return false;
@@ -345,9 +366,9 @@ std::string Type::to_cpp_string() const {
     // TODO: make it so we don't just presume every func type is a func ptr.
     // I have no idea how we'll do that
     // This is a HOT mess.
-    auto info = static_cast<FunctionTypeInfo*>(this->info);
+    auto info = static_cast<FunctionTypeInfo *>(this->info);
     auto ret = global_get_type(info->return_type)->to_cpp_string();
-    std::string params = "(" + extensions.to_string() +")(";
+    std::string params = "(" + extensions.to_string() + ")(";
     for (int i = 0; i < info->params_len; ++i) {
       params += global_get_type(info->parameter_types[i])->to_cpp_string();
       if (i != info->params_len - 1) {
@@ -360,11 +381,11 @@ std::string Type::to_cpp_string() const {
   case TYPE_ENUM:
     return base;
   case TYPE_UNION:
-    return extensions.to_cpp_string(this->base);;
+    return extensions.to_cpp_string(this->base);
+    ;
   }
 }
-int remove_one_pointer_ext(int operand_ty,
-                           const SourceRange &source_range) {
+int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);
   int ptr_depth = 0;
   for (const auto &ext : ty->extensions.extensions) {
@@ -386,9 +407,9 @@ int remove_one_pointer_ext(int operand_ty,
       extensions.push_back(ext);
     }
   }
-  return global_find_type_id(ty->base,
-                      TypeExt{.extensions = extensions,
-                              .array_sizes = ty->extensions.array_sizes});
+  return global_find_type_id(
+      ty->base, TypeExt{.extensions = extensions,
+                        .array_sizes = ty->extensions.array_sizes});
 }
 int global_create_struct_type(const std::string &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
@@ -401,7 +422,8 @@ int global_create_struct_type(const std::string &name, Scope *scope) {
   return type->id;
 }
 
-int global_create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
+int global_create_union_type(const std::string &name, Scope *scope,
+                             UnionKind kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
   type_table[num_types] = type;
   type->base = name;
@@ -414,22 +436,23 @@ int global_create_union_type(const std::string &name, Scope *scope, UnionKind ki
 }
 
 int global_create_enum_type(const std::string &name,
-                     const std::vector<std::string> &keys, bool is_flags) {
+                            const std::vector<std::string> &keys,
+                            bool is_flags) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
   type_table[num_types] = type;
   type->base = name;
-  
+
   auto info = new (type_alloc<EnumTypeInfo>()) EnumTypeInfo();
   info->is_flags = is_flags;
   info->keys = keys;
   type->info = info;
-  
+
   num_types += 1;
   return type->id;
 }
 int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
-                const TypeExt &extensions) {
+                       const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
   type->info = info;
   type->extensions = extensions;
@@ -478,7 +501,8 @@ int s64_type() {
   return type;
 }
 int charptr_type() {
-  static int type = global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
+  static int type =
+      global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
 int float32_type() {
@@ -494,57 +518,67 @@ int Type::get_element_type() const {
   extensions.array_sizes.pop_back();
   return global_find_type_id(base, extensions);
 }
-// TODO: re-implement this with a much better, non flipped up design. 2024-09-29 12:26:42
+// TODO: re-implement this with a much better, non flipped up design. 2024-09-29
+// 12:26:42
 std::string Type::to_type_struct(Context &context) {
-  return "";
-  // static bool* type_cache = []{
-  //   auto arr = new bool[MAX_NUM_TYPES];
-  //   memset(arr, false, MAX_NUM_TYPES);
-  //   return arr;
-  // }();
-  
-  // if (type_cache[this->id]) {
-  //   return std::format("_type_info[{}]", this->id);
-  // }
-  
-  // std::stringstream fields_ss;
-  // if (kind == TYPE_STRUCT) {
-  //   auto info = static_cast<StructTypeInfo *>(this->info);
+  static bool *type_cache = [] {
+    auto arr = new bool[MAX_NUM_TYPES];
+    memset(arr, false, MAX_NUM_TYPES);
+    return arr;
+  }();
 
-  //   if (info->fields.empty()) {
-  //     fields_ss << "_type_info[" << id << "] = new Type {"
-  //               << ".name = \"" << to_string() << "\","
-  //               << ".id = " << id << "}";
-  //     context.type_info_strings.push_back(fields_ss.str());
-  //     return std::string("_type_info[") + std::to_string(id) + "]";
-  //   }
+  if (type_cache[this->id]) {
+    return std::format("_type_info[{}]", this->id);
+  }
+
+  std::stringstream fields_ss;
+  if (kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(this->info);
     
-  //   fields_ss << "{";
-  //   for (const auto &field : info->fields) {
-  //     auto name = std::format(".name = \"{}\"", field->name.value);
-  //     auto type = std::format(".type = {}", get_type(field->type->resolved_type)->to_type_struct(context));
-  //     fields_ss << "new Field { " << name << ", " << type << " }";
-      
-  //     if (field != info->fields.back()) {
-  //       fields_ss << ", ";
-  //     }
-  //   }
-  //   fields_ss << "}";
-  // }
-  // else {
-  //   fields_ss << "_type_info[" << id << "] = new Type {"
-  //               << ".name = \"" << to_string() << "\","
-  //               << ".id = " << id << "}";
-  //   context.type_info_strings.push_back(fields_ss.str());
-  //   return std::string("_type_info[") + std::to_string(id) + "]";
-  // }
-  
-  
-  // type_cache[this->id] = true;
-  
-  // context.type_info_strings.push_back(std::format("_type_info[{}] = new Type {{ .id = {}, .fields = {}, }}",  id, id, fields_ss.str()));
+    if (info->scope->symbols.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    fields_ss << "{";
+
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+        << std::format(".type = {}",
+                        context.current_scope->get_type(sym.type_id)
+                            ->to_type_struct(context)) << " }";
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else {
+    
+    // new Type { .id = id,
+    // .name = "name"
+    // }
+    
+    fields_ss << "_type_info[" << id << "] = new Type {"
+              << ".id = " << id << ",\n"
+              << ".name = \"" << to_string() << "\"}";
               
-  // return std::format("_type_info[{}]", this->id);
+    context.type_info_strings.push_back(fields_ss.str());
+    return std::string("_type_info[") + std::to_string(id) + "]";
+  }
+
+  type_cache[this->id] = true;
+
+  context.type_info_strings.push_back(
+      std::format("_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }}", id, 
+                  id, base, fields_ss.str()));
+
+  return std::format("_type_info[{}]", this->id);
 }
 
 std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
@@ -552,7 +586,7 @@ std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
   auto return_type = decl->return_type;
   ss << global_get_type(return_type->resolved_type)->to_string();
   ss << "(";
-  for (const auto &param: decl->params->params) {
+  for (const auto &param : decl->params->params) {
     ss << global_get_type(param->type->resolved_type)->to_string();
     if (param != decl->params->params.back()) {
       ss << ", ";

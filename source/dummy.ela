@@ -1,8 +1,17 @@
-#import core
+#import core;
+
+Xaryu :: struct {
+  float f;
+  float f1;
+  int x2;
+}
 
 main :: () {
-  #alias S :: int*;
-  printf("%s\n", #typename(S*));
-  #alias VoidFunction :: void()*;
-  printf("%s\n", #typename(VoidFunction*));
+  Type *type = #type Xaryu;
+  printf("%s type info:\n", type.name);
+  
+  for field; type.fields {
+    printf("%p\n", field.name);
+    // printf("field: { name: %s , ttype_id=%d } ", field.name, field.type);
+  }
 }
