@@ -53,10 +53,33 @@ std::any EmitVisitor::visit(ASTFor *node) {
   emit_line_directive(node);
   const auto emit_range_based = [&] {
     auto v = node->value.range_based;
-    (*ss) <<"auto ";
-    v.target->accept(this);
-    (*ss) <<" : ";
-    v.collection->accept(this);
+    
+    switch (v.value_semantic) {
+    case VALUE_SEMANTIC_COPY: {
+      (*ss) <<"auto ";
+      v.target->accept(this);
+      (*ss) <<" : ";
+      v.collection->accept(this);
+    } break;
+    case VALUE_SEMANTIC_POINTER: {
+      (*ss) << "auto* ";
+      v.target->accept(this);
+      (*ss) <<" = ";
+      v.collection->accept(this);
+      (*ss) << ".begin(); ";
+      v.target->accept(this);
+      (*ss) << "!= ";
+      v.collection->accept(this);
+      (*ss) << ".end();";
+      v.target->accept(this);
+      (*ss) << "++";
+      
+    } break;
+    case VALUE_SEMANTIC_MOVE:
+      break;
+    }
+
+    
   };
   
   const auto emit_c_style = [&] {

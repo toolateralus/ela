@@ -181,6 +181,12 @@ Context::Context() {
   {
     auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto type_id = create_struct_type("string", str_scope);
+    auto type = get_type(type_id);
+    
+    static_cast<StructTypeInfo*>(type->info)->implicit_cast_table = {
+      charptr_type(),
+    };
+    
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
   }

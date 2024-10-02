@@ -15,6 +15,8 @@
 #include <fstream>
 #include <set>
 
+// TODO(Josh) 10/2/2024, 9:22:21 AM
+// Reduce this code size. It ends up taking up the majority of the parsing code.
 void Parser::init_directive_routines() {
   // #include
   // Just like C's include, just paste a text file right above where the include
@@ -499,8 +501,8 @@ ASTProgram *Parser::parse() {
   end_node(program, range);
   return program;
 }
-ASTStatement *Parser::parse_statement() {
 
+ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
   
@@ -508,9 +510,7 @@ ASTStatement *Parser::parse_statement() {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
-  }
-    
-  if (tok.type == TType::Directive) {
+  } else if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
         process_directive(DIRECTIVE_KIND_STATEMENT,
@@ -522,14 +522,18 @@ ASTStatement *Parser::parse_statement() {
                       tok.value),
           ERROR_CRITICAL, range);
     }
+    end_node(statement, range);
     return statement;
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement || tok.type == TType::Delete) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
+    end_node(statement, range);
     return statement;
   } else if (tok.type == TType::LCurly) {
-    return parse_block();
+    auto block = parse_block();
+    end_node(block, range);
+    return block;
   } else if (tok.type == TType::Return) {
     expect(TType::Return);
     auto return_node = ast_alloc<ASTReturn>();
@@ -552,7 +556,6 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-
     if (find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
 
@@ -566,19 +569,24 @@ ASTStatement *Parser::parse_statement() {
       node->value.c_style.increment = parse_expr();
     } else {
       node->tag = ASTFor::RangeBased;
+      
+      if (peek().type == TType::Mul) {
+        eat();
+        node->value.range_based.value_semantic = VALUE_SEMANTIC_POINTER;
+      } else {
+        node->value.range_based.value_semantic = VALUE_SEMANTIC_COPY;
+      }
+      
       node->value.range_based.target = parse_expr();
       expect(TType::Semi);
       node->value.range_based.collection = parse_expr();
     }
-
     node->block = parse_block();
-
     if (node->tag == ASTFor::CStyle) {
       context.set_scope(node->block->scope);
       context.current_scope->insert(node->value.c_style.decl->name.value, -1);
       context.exit_scope();
     }
-
     end_node(node, range);
     return node;
   } else if (tok.type == TType::While) {
@@ -646,23 +654,51 @@ ASTStatement *Parser::parse_statement() {
       return enum_decl;
     } else if (peek().type == TType::Union) {
       auto union_decl = parse_union_declaration(tok);
+      end_node(union_decl, range);
       return union_decl;
     } else {
       throw_error("invalid :: statement, expected '(' (for a function), "
                   "'struct', or 'enum",
                   ERROR_FAILURE, range);
     }
+  } else if (lookahead_buf()[1].type == TType::Increment || lookahead_buf()[1].type == TType::Decrement) {
+    auto statement = ast_alloc<ASTExprStatement>();
+    statement->expression = parse_expr();
+    end_node(statement, range);
+    return statement;
   }
+  
+  end_node(nullptr, range);
+  
+    
+  if (tok.family == TFamily::Operator) {
+    throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), ERROR_FAILURE, range);
+  }
+  
+  if (tok.family == TFamily::Literal) {
+    throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), ERROR_FAILURE, range);
+  }
+  
+  if (tok.family == TFamily::Keyword) {
+    throw_error(std::format("Unexpected keyword: {}", tok.value), ERROR_FAILURE, range);
+  }
+  
+  if (context.current_scope->lookup(tok.value)) {
+    throw_error(std::format("Unexpected variable {}", tok.value), ERROR_FAILURE, range);
+  } if (find_type_id(tok.value, {}) == -1) {
+    throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), ERROR_FAILURE, range);
+  }
+
 
   // TODO: We should make it more clear where and how this failed. Right now, we
   // get an unexpected token with no info when we use a non-existent type etc
-  eat();
 
   throw_error(std::format("Unexpected token when parsing statement: {}.. This "
                           "is likely an undefined type.",
                           tok.value),
               ERROR_CRITICAL, range);
 }
+
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -990,6 +1026,15 @@ ASTExpr *Parser::parse_unary() {
 ASTExpr *Parser::parse_postfix() {
   auto range = begin_node();
   auto left = parse_primary();
+
+  if (peek().type == TType::Increment || peek().type == TType::Decrement) {
+    auto unary = ast_alloc<ASTUnaryExpr>();
+    unary->operand = left;
+    unary->op = peek();
+    eat();
+    end_node(unary, range);
+    return unary;
+  }
 
   // build dot and subscript expressions
   while (peek().type == TType::Dot || peek().type == TType::LBrace ||

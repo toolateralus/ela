@@ -219,6 +219,10 @@ struct UnionTypeInfo : TypeInfo {
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
+  
+  std::vector<int> implicit_cast_table;
+  std::vector<int> explicit_cast_table;
+  
   virtual std::string to_string() const override { return ""; }
 };
 

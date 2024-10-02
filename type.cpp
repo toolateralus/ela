@@ -238,6 +238,20 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return CONVERT_IMPLICIT;
   }
 
+  if (to->kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo*>(to->info);
+    for (const auto &cast: info->implicit_cast_table) {
+      if (cast == from->id) {
+        return CONVERT_IMPLICIT;
+      }
+    }
+    for (const auto & cast: info->explicit_cast_table) {
+      if (cast == from->id) {
+        return CONVERT_EXPLICIT;
+      }
+    }
+  }
+
   return CONVERT_PROHIBITED;
 }
 std::string Type::to_string() const {

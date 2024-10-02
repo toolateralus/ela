@@ -398,6 +398,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     
     int iter_ty = -1;
     if (auto info = dynamic_cast<StructTypeInfo*>(t->info)) {
+      // TODO: add a way to use the value_semantic thing with custom iterators.
       Symbol* begin = info->scope->lookup("begin");
       Symbol* end = info->scope->lookup("end");
       if (begin && end && begin->type_id == end->type_id) {
@@ -409,6 +410,15 @@ std::any TypeVisitor::visit(ASTFor *node) {
       throw_error("cannot iterate with a range based for loop over a non collection type.", ERROR_FAILURE, node->source_range);
     } else {
       iter_ty = t->get_element_type();
+    }
+    
+    // Take a pointer to the type.
+    // This probably won't work well with custom iterators.
+    if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
+      auto type = get_type(iter_ty);
+      auto ext = type->extensions;
+      ext.extensions.push_back(TYPE_EXT_POINTER);
+      iter_ty = find_type_id(type->base, ext);
     }
     
     context.current_scope->insert(iden->value.value, iter_ty);

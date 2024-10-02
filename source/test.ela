@@ -563,18 +563,27 @@ CustomIteratorStruct :: struct {
   }
 }
 
+#test ptr_iter_range_base :: () {
+  s8[] array = {0,1,2,3};
+  int n;
+  for *v; array {
+    assert("", n == *v);
+    ++n;
+  }
+}
+
 #test test_custom_iterator :: () {
   CustomIteratorStruct iter;
   int n;
   for k; iter {
     assert("iterator value failed to equal 0", k == 0);
-    ++n;
+    n++;
   }
   assert("failed to iterate the appropriate number of times", n == 10);
 }
 
 #test test_string :: () {
-  string my_string = #make(string, "Xaryu Baryu");
+  string my_string = "Xaryu Baryu";
   assert("string length failed to equal expected value", my_string.length == 11);
 }
 

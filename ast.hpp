@@ -207,6 +207,13 @@ struct ASTBreak : ASTStatement {
 struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
+
+enum ValueSemantic {
+  VALUE_SEMANTIC_COPY,
+  VALUE_SEMANTIC_POINTER,
+  VALUE_SEMANTIC_MOVE, // todo: add a way to do this.
+}; 
+
 struct ASTFor : ASTStatement {
   enum ForType {
     RangeBased,
@@ -215,6 +222,7 @@ struct ASTFor : ASTStatement {
 
   union {
     struct {
+      ValueSemantic value_semantic;
       // TODO: add a way to use 'for v, idx in collection'
       ASTExpr *target;
       ASTExpr *collection;
