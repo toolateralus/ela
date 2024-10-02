@@ -17,6 +17,7 @@
 
 // TODO(Josh) 10/2/2024, 9:22:21 AM
 // Reduce this code size. It ends up taking up the majority of the parsing code.
+// Eventually, the ones that are really solid and used frequently could be reimplemented as keywords.
 void Parser::init_directive_routines() {
   // #include
   // Just like C's include, just paste a text file right above where the include
@@ -398,7 +399,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
       return result;
     }
   }
-  throw_error(std::format("failed to call unknown directive routine: {}", identifier),
+  throw_error(std::format("failed to call unknown directive routine, or an expression routine was used as a statement, or vice versa: {}", identifier),
       ERROR_FAILURE, range);
 }
 

@@ -165,6 +165,7 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
   }
   return {};
 }
+
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
   auto type = context.current_scope->get_type(id);
@@ -216,10 +217,12 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
+
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
   
+  // special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
     left = right; 
     if (auto iden = dynamic_cast<ASTIdentifier*>(node->left)) {
@@ -249,15 +252,20 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   node->resolved_type = left;
   return left;
 }
+
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
-  auto conversion_rule =
-      type_conversion_rule(context.current_scope->get_type(operand_ty), context.current_scope->get_type(bool_type()));
-  auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
-                      conversion_rule != CONVERT_EXPLICIT);
+  
+  // Convert to boolean if implicitly possible, for ! expressions
+  {
+    auto conversion_rule =
+        type_conversion_rule(context.current_scope->get_type(operand_ty), context.current_scope->get_type(bool_type()));
+    auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
+                        conversion_rule != CONVERT_EXPLICIT);
 
-  if (node->op.type == TType::Not && can_convert) {
-    return bool_type();
+    if (node->op.type == TType::Not && can_convert) {
+      return bool_type();
+    }
   }
 
   if (node->op.type == TType::And) {
@@ -273,6 +281,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   return operand_ty;
 }
+
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = context.current_scope->lookup(node->value.value);
   if (symbol)

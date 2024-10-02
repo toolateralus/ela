@@ -674,7 +674,6 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
   return {};
 }
 
-
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   use_header();
