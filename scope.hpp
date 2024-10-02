@@ -1,7 +1,9 @@
 #pragma once
 
+#include "error.hpp"
 #include "type.hpp"
 #include <jstl/memory/arena.hpp>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -23,12 +25,65 @@ struct Symbol {
   bool type_alias;
 };
 
+
 struct Scope {
   // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flagsor something.
   bool is_struct_or_union_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
-  Scope *parent = nullptr;
+  std::set<int> types;
+  inline int find_type_id(const std::string &name, const TypeExt &ext) {
+    auto base_id = global_find_type_id(name, {});
+    auto id = global_find_type_id(name, ext);
+    
+    if (!types.contains(id) && types.contains(base_id)) {
+      // a type with new extensions got created, so we just add it to this scope.
+      types.insert(id);
+      return id;
+    }
+    
+    if (types.contains(id)) return id;
+    
+    if (parent) {
+      auto id = parent->find_type_id(name, ext);
+      if (id != -1)
+        return id;
+    }
+    
+    return -1;
+  }
+  inline int find_type_id(const std::string &name, const FunctionTypeInfo &info,
+                 const TypeExt &ext) {
+    auto base_id = global_find_type_id(name, info, {});
+    auto id = global_find_type_id(name, info, ext);
+     if (!types.contains(id) && types.contains(base_id)) {
+      // a type with new extensions got created, so we just add it to this scope.
+      types.insert(id);
+      return id;
+    }
+    
+    if (types.contains(id)) return id;
+    
+    if (parent) {
+      auto id = parent->find_type_id(name, ext);
+      if (id != -1)
+        return id;
+    }
+    
+    if (types.contains(id)) return id;
+    return -1;
+  }
+  inline Type* get_type(int id) const {
+    if (types.contains(id))
+      return global_get_type(id);
+    
+    if (parent) {
+      return parent->get_type(id);
+    }
+    // TODO: we should probably throw more information. this is basically nothing and you'd never be able to find where this happened
+    throw_error(std::format("Use of undeclared type"), ERROR_FAILURE, {});
+  }
   
+  Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {
   }
   inline void insert(const std::string &name, int type_id, bool is_type_alias = false) {
