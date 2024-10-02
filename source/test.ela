@@ -100,6 +100,28 @@ Array :: struct {
   Node[10] ptr;
 }
 
+IHaveAMethod :: struct {
+  method :: () -> float32 {
+      return 0.0;
+  }
+  parameter_method :: (float32 x) -> float32 {
+      return x;
+  }
+}
+
+#flags Banana :: enum  {
+  Unripe,
+  Ripe,
+  Overripe,
+  Rotten,
+}
+
+MyEnum :: enum {
+  Some,
+  Other,
+  Value = 100 * 2,
+}
+
 // Keep this at the top otherwise it messesup the output formatting in the middle
 #test test_printf :: () {
   char* s = "Hello i am a string";
@@ -430,37 +452,15 @@ something :: (float32 f) -> float32 {
   assert("failed to down cast", small == (big % 256));
 }
 
-IHaveAMethod :: struct {
-  method :: () -> float32 {
-      return 0.0;
-  }
-  parameter_method :: (float32 x) -> float32 {
-      return x;
-  }
-}
-
 #test test_method :: () {
   IHaveAMethod owner;
   assert("failed to get 0.0 from method.", owner.method() == 0.0);
   assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }
 
-#flags Banana :: enum  {
-  Unripe,
-  Ripe,
-  Overripe,
-  Rotten,
-}
-
 #test test_enum_flags :: () {
   flags := Banana.Unripe | Banana.Overripe;
   assert("flags & Banana.Unripe failed.", (flags & Banana.Unripe) != 0);
-}
-
-MyEnum :: enum {
-  Some,
-  Other,
-  Value = 100 * 2,
 }
 
 // TODO(Josh) 10/1/2024, 10:08:18 AM :: we need to allow declarations of variables with their enum type.
