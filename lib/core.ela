@@ -6,9 +6,31 @@
 
 #foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
 #foreign memset :: (void *dest, int c, u64 n) -> void*;
+
 #foreign strlen :: (char *str) -> int;
 #foreign strcmp :: (char *str1, char *str2) -> int;
 #foreign strcat :: (char *dest, char *src) -> char*;
+
 #foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
 #foreign sprintf :: (u8 *buffer, char *format, ...) -> int;
 #foreign printf :: (char *format, ...) -> int;
+
+#foreign strncmp :: (char *str, char *str2, int len) -> int;
+
+#foreign isalnum :: (int c) -> int;
+#foreign isalpha :: (int c) -> int;
+#foreign isspace :: (int c) -> int;
+#foreign isdigit :: (int c) -> int;
+#foreign islower :: (int c) -> int;
+#foreign isupper :: (int c) -> int;
+#foreign isprint :: (int c) -> int;
+#foreign ispunct :: (int c) -> int;
+
+str_starts_with :: (char *str, char *substr) -> bool {
+  if str == null || substr == null { return false; }
+  str_len := strlen(str);
+  substr_len := strlen(substr);
+  if str_len < substr_len { return false; }
+  if str_len == substr_len && strcmp(str, substr) == 0 { return true;  }
+  return strncmp(str, substr, substr_len) == 0;
+}

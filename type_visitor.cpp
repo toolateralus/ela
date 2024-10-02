@@ -306,7 +306,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return float32_type();
   case ASTLiteral::RawString:
   case ASTLiteral::String:
-    return string_type();
+    return charptr_type();
     break;
   case ASTLiteral::Bool:
     return bool_type();
@@ -391,14 +391,27 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
     auto t = get_type(type);
+    auto iden = static_cast<ASTIdentifier *>(v.target);
     
-    if (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array()) {
+    // Todo: check for begin and end or some related iterator functions in structs before we allow that.
+    // Right now we'll just allow it.
+    
+    int iter_ty = -1;
+    if (auto info = dynamic_cast<StructTypeInfo*>(t->info)) {
+      Symbol* begin = info->scope->lookup("begin");
+      Symbol* end = info->scope->lookup("end");
+      if (begin && end && begin->type_id == end->type_id) {
+        iter_ty = begin->type_id;
+      } else {
+        throw_error("Can only iterate over structs you define 'begin' and 'end' on. They must both be defined, and must both return the same type.", ERROR_FAILURE, node->source_range);
+      }
+    } else if (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array()) {
       throw_error("cannot iterate with a range based for loop over a non collection type.", ERROR_FAILURE, node->source_range);
+    } else {
+      iter_ty = t->get_element_type();
     }
     
-    auto element_ty = t->get_element_type();
-    auto iden = static_cast<ASTIdentifier *>(v.target);
-    context.current_scope->insert(iden->value.value, element_ty);
+    context.current_scope->insert(iden->value.value, iter_ty);
     v.target->accept(this);
   } break;
   case ASTFor::CStyle: {
@@ -482,6 +495,14 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = get_type(left);
+  
+  // TODO: remove this hack to get array length
+  if (left_ty->extensions.is_array()) {
+    auto right = dynamic_cast<ASTIdentifier*>(node->right);
+    if (right && right->value.value == "length") {
+      return s32_type();
+    }
+  }
   
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {

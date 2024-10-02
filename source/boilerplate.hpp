@@ -1,4 +1,3 @@
-#include <algorithm>
 #include <cstdint>
 #include <cstddef>
 
@@ -19,38 +18,102 @@ using u8 = uint8_t;
 extern "C" int printf(const char *format, ...);
 
 #include <initializer_list>
+#include <algorithm>
 
 // TODO: implement this actually, where this will represent all dynamic arrays in the language, such as int[].
 // int[32] is still a C fixed buffer.
 template <class T> struct _array {
-  T *m_data = nullptr;
-  int m_length = 0;
+  T *data = nullptr;
+  int length = 0;
   _array() {}
   T &operator [](int n){
-    return m_data[n];
+    return data[n];
   }
   T &operator [](int n) const{
-    return m_data[n];
+    return data[n];
   }
   explicit operator void*() {
-    return m_data;
+    return data;
   }
   explicit operator T*() {
-    return m_data;
+    return data;
   }
   _array(std::initializer_list<T> list) {
-    m_data = new T[list.size()];
-    std::copy(list.begin(), list.end(), m_data);
-    m_length = list.size();
+    data = new T[list.size()];
+    std::copy(list.begin(), list.end(), data);
+    length = list.size();
   }
   ~_array() {
-    if (m_data)
-      delete[] m_data;
+    if (data)
+      delete[] data;
   }
-  T *begin() const { return m_data; }
-  T *end() const { return &m_data[m_length]; }
+  T *begin() const { return data; }
+  T *end() const { return data + length; }
 };
 
+// For now, we'll just use a simple null terminated string.
+struct string  {
+  char *data = nullptr;
+  int length = 0;
+  string() {
+    
+  }
+  string(char *str) {
+    if (str == nullptr) {
+      return;
+    }
+    length = 0;
+    while (str[length] != '\0') {
+      ++length;
+    }
+    data = new char[length + 1];
+    data[length] = '\0';
+    std::copy(str, str + length, data);
+  }
+  ~string() {
+    if (data)
+      delete[] data;
+  }  
+  char &operator[](int n) {
+    return data[n];
+  }
+  explicit operator char*(){
+    return data;
+  }
+  string(const string &other) {
+    if (other.data) {
+      length = other.length;
+      data = new char[length + 1];
+      std::copy(other.data, other.data + length, data);
+      data[length] = '\0';
+    }
+  }
+  string &operator=(const string &other) {
+    if (this != &other) {
+      delete[] data;
+      if (other.data) {
+        length = other.length;
+        data = new char[length + 1];
+        std::copy(other.data, other.data + length, data);
+        data[length] = '\0';
+      } else {
+        data = nullptr;
+        length = 0;
+      }
+    }
+    return *this;
+  }
+  auto begin() {
+    return data;
+  }
+  auto end() {
+    return data + length;
+  }
+};
+
+
+// TODO(Josh) 10/2/2024, 8:27:34 AM
+// Reimplement runtime type reflection
 struct Type;
 struct Field {
   const char * name;

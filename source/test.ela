@@ -10,7 +10,7 @@ Vector2 :: struct {
 Vector3 :: struct {
   Vector2 vec2;
   float32 z;
-} 
+}
 
 Node :: struct {
   Node *next;
@@ -91,25 +91,25 @@ Array :: struct {
 
 #test test_comp_assign :: () {
   s32 deref = 1;
-  deref += deref; 
+  deref += deref;
   assert("+=", deref == 2);
   deref -= deref;
   assert("-=", deref == 0);
-  deref *= deref; 
+  deref *= deref;
   assert("*=)", deref == 0);
   deref = 2;
   deref /= deref;
   assert("/=", deref == 1);
   deref = 2;
-  deref %= deref; 
+  deref %= deref;
   assert("%=", deref == 0);
   deref &= deref;
   assert("&=", deref == 0);
-  deref |= deref; 
+  deref |= deref;
   assert("|=", deref == 0);
   deref ^= deref;
   assert("^=", deref == 0);
-  deref <<= deref; 
+  deref <<= deref;
   assert("<<=", deref == 0);
   deref >>= deref;
   assert(">>=", deref == 0);
@@ -136,7 +136,7 @@ Array :: struct {
   assert("left and right should be true", result_bool == true);
   result_bool = left || right;
   assert("left or right should be true", result_bool == true);
-  
+
   result = left + right;
   assert("left + right should be 2", result == 2);
   result = left - right;
@@ -191,7 +191,7 @@ many_params :: (float32 a, b, c, d = 1.0) -> float32 {
 }
 
 mul_params :: (float32 n, f) -> float32 {
-  return n * f; 
+  return n * f;
 }
 
 #test test_param :: () {
@@ -199,8 +199,8 @@ mul_params :: (float32 n, f) -> float32 {
   assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0) == 8.0);
 }
 
-returns :: () -> s32  { 
-  return 1; 
+returns :: () -> s32  {
+  return 1;
 }
 
 #test test_implicit_numerical_casting :: () {
@@ -209,13 +209,13 @@ returns :: () -> s32  {
   u32 u3 = u2;
   u64 u4 = u3;
   assert("unable to upcast successfully", u4 == u1);
-  
+
   s8 s1;
   s16 s2 = s1;
   s32 s3 = s2;
   s64 s4 = s3;
   assert("unable to upcast successfully", s1 == s4);
-  
+
   float f;
   float64 f1 = f;
   assert("unable to upcast successfully", f == f1);
@@ -285,7 +285,7 @@ something :: (float32 f) -> float32 {
   Array a;
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
-  
+
   Node n;
   a.ptr[0].next = &n;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
@@ -304,7 +304,7 @@ something :: (float32 f) -> float32 {
   node.next = malloc(sizeof(Node));
   Node other;
   node.next.next = &other;
-  
+
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
 }
@@ -319,12 +319,12 @@ something :: (float32 f) -> float32 {
   }
 
   int[] array;
-  
+
   for k; array {
-      k = k;
+    k = k;
   }
   for k; array {
-      k = k;
+    k = k;
   }
 }
 
@@ -418,7 +418,7 @@ MyEnum :: enum {
   // See the comment in `test_aliasing`
   // to see more about aliasing.
   // it's basically entirely broken, in other ways than described as well.
-  
+
   // #alias VoidFunction :: void();
   // VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
   // for s32 i; i < 10; ++i {
@@ -430,10 +430,10 @@ MyEnum :: enum {
   assert("aliasing a list of function pointers failed.", false);
 }
 #test test_aliasing :: () {
-  // TODO(Josh) 10/1/2024, 10:06:31 AM 
+  // TODO(Josh) 10/1/2024, 10:06:31 AM
   // We still can't do this because instantiating int_ptr
   // gives us an int not an int*.
-  
+
   // #alias int_ptr :: int*;
   // int* v = malloc(sizeof(int));
   // other := #make(int_ptr, v);
@@ -451,7 +451,7 @@ XaryuStruct :: struct {
   arr[0] = 10;
   arr[0] += 10;
   assert("comp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
-  
+
   XaryuStruct[1] xarbars;
   xarbars[0].f = 10.0;
   xarbars[0].f += 10.0;
@@ -498,12 +498,12 @@ _Vec2 :: union {
     int z;
   };
   int[3] values;
-  
+
   method :: (int n) {
     assert("union equality check in method failed", n == x && n == y && n == z);
     assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
   }
-  
+
   something :: () -> #self {
     return #make(#self);
   }
@@ -512,7 +512,7 @@ _Vec2 :: union {
     y = _y;
     z = _z;
   }
-  
+
   #ctor :: () {
     memset(#make(void*, values), 0, sizeof(int) * 3);
     x=0;
@@ -520,7 +520,7 @@ _Vec2 :: union {
     z=0;
     //printf();
   }
-  
+
   #dtor :: () {
     printf("%d, %d, %d", x, y, z);
   }
@@ -549,3 +549,46 @@ _Vec2 :: union {
   assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
   delete (vec, vec1);
 }
+
+CustomIteratorStruct :: struct {
+  int *value = malloc(sizeof(int) * 10);
+  begin :: () -> int * {
+    return value;
+  }
+  end :: () -> int * {
+    return value + 10;
+  }
+  #dtor :: () {
+    free(value);
+  }
+}
+
+#test test_custom_iterator :: () {
+  CustomIteratorStruct iter;
+  int n;
+  for k; iter {
+    assert("iterator value failed to equal 0", k == 0);
+    ++n;
+  }
+  assert("failed to iterate the appropriate number of times", n == 10);
+}
+
+#test test_string :: () {
+  string my_string = #make(string, "Xaryu Baryu");
+  assert("string length failed to equal expected value", my_string.length == 11);
+}
+
+
+/*
+#test test_array :: () {
+  // TODO: put a lot more work into init lists, right now they only really work
+  // for dynamic ararys.
+  s8[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  assert("array length failed to equal expected value", array.length == 11);
+}*/
+
+
+/*
+#test test_any :: () {
+  Any something = 10;
+}*/

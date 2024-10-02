@@ -564,6 +564,23 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   
   auto op = ".";
   
+  // Todo: this probably wont work properly. like
+  // int* [] v;
+  // v.length; will fail because it will use ->
+  if (left_ty->extensions.is_pointer()) 
+    op = "->";
+ 
+  // TODO: remove this hack to get array length
+  if (left_ty->extensions.is_array()) {
+    auto right = dynamic_cast<ASTIdentifier*>(node->right);
+    if (right && right->value.value == "length") {
+      node->left->accept(this);
+      (*ss) << op;
+      node->right->accept(this);
+      return {};
+    }
+  }
+  
   if (left_ty->is_kind(TYPE_ENUM)) {
     (*ss) << left_ty->base << "::";
     node->right->accept(this);
@@ -571,8 +588,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   }
 
   
-  if (left_ty->extensions.is_pointer()) 
-    op = "->";
+  
   
   if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
     throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,

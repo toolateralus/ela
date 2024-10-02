@@ -143,7 +143,6 @@ bool get_compilation_flag(const std::string &flag) {
 }
 
 Context::Context() {
-  
   // define some default functions that may or may not be macros.
   {
     // CLEANUP(Josh) Fix this? if there is a way. Perhaps we want C style macros, as unsafe and annoying to debug they are. 9/30/2024, 9:30:29 AM
@@ -151,7 +150,7 @@ Context::Context() {
     // there's no way to do this in language currently, as they're macros
     FunctionTypeInfo assert_info{};
     assert_info.return_type = void_type();
-    assert_info.parameter_types[0] = string_type();
+    assert_info.parameter_types[0] = charptr_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
     current_scope->insert("assert", find_type_id("void(char *, bool)", assert_info, {}));
@@ -164,17 +163,25 @@ Context::Context() {
     root_scope = current_scope;  
   }
   
-  // define types used for reflection, which are currently half implemented due to ineffeciency.
+  // define types used for reflection, which are currently half implemented due to ineffectiveness.
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto type_id = create_struct_type("Type", type_scope);
     auto field_id = create_struct_type("Field", field_scope);
     type_scope->insert("id", s32_type());
-    type_scope->insert("name", string_type());
+    type_scope->insert("name", charptr_type());
     type_scope->insert("fields", find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}}));
-    field_scope->insert("name", string_type());
+    field_scope->insert("name", charptr_type());
     field_scope->insert("type", find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}}));
   }
   
+  // string struct, stores length info.
+  // same as array.
+  {
+    auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto type_id = create_struct_type("string", str_scope);
+    str_scope->insert("data", charptr_type());
+    str_scope->insert("length", s32_type());
+  }
 }

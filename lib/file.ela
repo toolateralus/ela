@@ -1,4 +1,18 @@
+#import core;
+
 _IO_FILE :: struct;
+#alias FILE :: _IO_FILE;
+
+s32 EOF=-1;
+
+SeekPosition :: enum {
+  // Seek from beginning of file.
+  Begin,
+  // Seek from current position.
+  Current,
+  // Seek from end of file.
+  End,
+}
 
 #foreign fread :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
 #foreign fwrite :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
@@ -9,15 +23,24 @@ _IO_FILE :: struct;
 #foreign fclose :: (_IO_FILE *file) -> void;
 #foreign fgetc :: (_IO_FILE *file) -> u8;
 #foreign putc :: (u8 ch, _IO_FILE *file) -> void;
-
 #foreign fprintf :: (_IO_FILE *stream, char *format, ...) -> int;
+#foreign fflush :: (FILE *f);
 
-s32 EOF=-1;
-// Seek from beginning of file.
-u32 SEEK_SET=0	
-// Seek from current position.
-u32 SEEK_CUR=1	
-// Seek from end of file.
-u32 SEEK_END=2	
+file_get_length :: (FILE *file) -> u32 {
+  fseek(file, 0, SeekPosition.End);
+  len := ftell(file);
+  fseek(file, 0, SeekPosition.Begin);
+  return #make(u32, len);
+}
 
-
+file_read_to_string :: (FILE *file, u32* len) -> char * {
+  *len = file_get_length(file);
+  char *str = malloc(sizeof(char) * *len);
+  index := 0;
+  char c;
+  while (c = fgetc(file)) != EOF {
+    str[index] = c;
+    ++index;
+  }
+  return str;
+}

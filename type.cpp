@@ -212,12 +212,25 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
       to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
-
       if (numerical_type_safe_to_upcast(from, to))
         return CONVERT_IMPLICIT;
       return CONVERT_EXPLICIT;
     }
   }
+  
+  // allow pointer arithmetic
+  if (from->is_kind(TYPE_SCALAR) && from->extensions.is_pointer(-1) &&
+       to->is_kind(TYPE_SCALAR) && type_is_numerical(to) 
+       && to->extensions.has_no_extensions()) {
+    return CONVERT_IMPLICIT;
+  }
+  
+  // cast all numerical types and pointers too booleans implicitly for if statements
+  // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow this in conditional statements.
+  if ((type_is_numerical(from) || from->extensions.is_pointer()) && to->id == bool_type()) {
+    return CONVERT_IMPLICIT;
+  }
+  
 
   // TODO: probably want to fix this. right now we have C style pointer casting:
   // any two pointers of the same depth can cast implicitly
@@ -440,7 +453,7 @@ int s64_type() {
   static int type = find_type_id("s64", {});
   return type;
 }
-int string_type() {
+int charptr_type() {
   static int type = find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }

@@ -352,13 +352,16 @@ void Parser::init_directive_routines() {
       .identifier = "self",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
+        ASTType* type;
         if (parser->current_union_decl) {
-          return parser->current_union_decl.get()->type;
+          type = parser->current_union_decl.get()->type;
+        } else if (parser->current_struct_decl) {
+          type = parser->current_struct_decl.get()->type;
+        } else {
+          throw_error("can only use #self in unions and structs to get the type name of the current declaring type", ERROR_FAILURE, {});
         }
-        if (parser->current_struct_decl) {
-          return parser->current_struct_decl.get()->type;
-        }
-        throw_error("can only use #self in unions and structs to get the type name of the current declaring type", ERROR_FAILURE, {});
+        parser->parse_type_extensions(type);
+        return type;        
       }
     });
   }
@@ -948,18 +951,15 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
     Precedence token_precedence = get_operator_precedence(peek());
-    
     if (token_precedence == PRECEDENCE_ASSIGNMENT && peek().type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (iden) {
         context.current_scope->insert(iden->value.value, -1);
       }
     }
-    
     if (token_precedence <= precedence) {
       break;
     }
-    
     auto op = eat();
     auto right = parse_expr(token_precedence);
     auto binexpr = ast_alloc<ASTBinExpr>();
@@ -971,7 +971,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   end_node(left, range);
   return left;
 }
-
 ASTExpr *Parser::parse_unary() {
   auto range = begin_node();
   if (peek().type == TType::Add || peek().type == TType::Sub ||

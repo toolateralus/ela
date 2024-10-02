@@ -299,7 +299,7 @@ int s64_type();
 int float32_type();
 
 // char *
-int string_type();
+int charptr_type();
 
 int find_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
