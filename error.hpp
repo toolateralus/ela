@@ -115,12 +115,11 @@ static void throw_warning(const std::string message, const SourceRange &source_r
   ss << format_source_location(source_range, severity);
   const auto token_str = ss.str();
 
-  // TODO: do something more sophisticated here. for now in early dev, just throw on all errors.
   switch (severity) {
   case ERROR_INFO:
   case ERROR_WARNING:
-    // TODO: for warnings and infos, we don't want a [[noreturn]], but for failures and critical errors, we do.
-    // We should just have seperate functions for this stuff.
+    // this should never happen
+    throw std::runtime_error("Do not use throw_error for warning and infos!");
   case ERROR_FAILURE:
   case ERROR_CRITICAL:
     throw std::runtime_error(token_str);

@@ -163,7 +163,7 @@ void init_type_system() {
   // Other
   {
     // Other
-    // todo: alias these.
+    // todo: alias these, don't generate new types.
     create_type(TYPE_SCALAR, "float", get_scalar_type_info(TYPE_FLOAT, 4));
     create_type(TYPE_SCALAR, "int", get_scalar_type_info(TYPE_S32, 4, true));
 
@@ -275,7 +275,6 @@ std::string Type::to_string() const {
   case TYPE_ENUM: {
     return base;
   }
-  // TODO(Josh) 10/1/2024, 12:45:29 PM determine if this is correct.
   case TYPE_UNION:
     return base;
   }
@@ -358,7 +357,6 @@ std::string Type::to_cpp_string() const {
   }
   case TYPE_ENUM:
     return base;
-  // TODO(Josh) 10/1/2024, 12:45:29 PM determine if this is correct.
   case TYPE_UNION:
     return extensions.to_cpp_string(this->base);;
   }

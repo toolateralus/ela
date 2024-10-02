@@ -21,6 +21,13 @@ extern "C" int printf(const char *format, ...);
 #include <initializer_list>
 #include <algorithm>
 
+// TODO: implement this. not sure how we want to approach it.
+// template <class T> struct Any {
+//   T value;
+//   template <class U> Any(U&& v) : value(std::forward<U>(v)) {}
+//   template <class U> operator U() { return static_cast<U>(value); }
+// };
+
 // TODO: implement this actually, where this will represent all dynamic arrays in the language, such as int[].
 // int[32] is still a C fixed buffer.
 template <class T> struct _array {

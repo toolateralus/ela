@@ -1,0 +1,1 @@
+cloc --no3 --by-file *.cpp *.hpp

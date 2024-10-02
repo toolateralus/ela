@@ -14,10 +14,6 @@
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 
-
-// TODO: we need a way to declare and use function types from in language.
-// if we want to have first class functions and function pointers.
-
 #ifndef MAX_NUM_TYPES
 #define MAX_NUM_TYPES 1000
 #endif
@@ -95,7 +91,6 @@ enum UnionKind {
   UNION_IS_SUM_TYPE = 1,
 };
 
-// TODO: make it so array types are not scalars. It makes no darn sense.
 struct TypeExt {
   // this stores things like * and [], [20] etc.
   std::vector<TypeExtEnum> extensions{};

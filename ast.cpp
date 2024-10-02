@@ -374,30 +374,11 @@ void Parser::init_directive_routines() {
       .identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        
         parser->expect(TType::DoubleColon);
         auto decl = parser->parse_struct_declaration(get_anonymous_struct_name());
         auto t = get_type(decl->type->resolved_type);
         auto info = static_cast<StructTypeInfo*>(t->info);
         info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
-        // auto iden = parser->expect(TType::Identifier);
-        // make a field and set its corresponding type.
-        // auto field = ast_alloc<ASTDeclaration>();
-        // field->type = ast_alloc<ASTType>();
-        // field->type->extension_info = t->extensions;
-        // field->type->base = t->base;
-        // TODO: validate whether we need this or not. field->type->flags = info->flags;
-        // add constructor as field value
-        // {
-        //   auto maker = ast_alloc<ASTMake>();
-        //   maker->kind = MAKE_CTOR;
-        //   maker->arguments = ast_alloc<ASTArguments>();
-        //   maker->type_arg = field->type;
-        //   field->value = maker;
-        // }
-        
-        // // insert the field into the union.
-        // parser->current_union_decl.get()->fields.push_back(field);
         return decl;
       }
     });
@@ -689,10 +670,6 @@ ASTStatement *Parser::parse_statement() {
     throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), ERROR_FAILURE, range);
   }
 
-
-  // TODO: We should make it more clear where and how this failed. Right now, we
-  // get an unexpected token with no info when we use a non-existent type etc
-
   throw_error(std::format("Unexpected token when parsing statement: {}.. This "
                           "is likely an undefined type.",
                           tok.value),
@@ -976,7 +953,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->structs = structs;
   node->scope = block->scope;
   
-  // TODO(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
+  // CLEANUP(JOSH): do we even need to store ASTType*'s on these type declaration nodes?
   node->type->resolved_type = create_union_type(name.value, block->scope, UNION_IS_NORMAL);
   end_node(node, range);
   return node;
@@ -1040,8 +1017,6 @@ ASTExpr *Parser::parse_postfix() {
   while (peek().type == TType::Dot || peek().type == TType::LBrace ||
          peek().type == TType::LParen) {
 
-    // TODO: make it so we don't have to have a name to call a function
-    // This is ambitious but might be nice.
     if (peek().type == TType::LParen) {
       auto identifier = dynamic_cast<ASTIdentifier *>(left);
       if (identifier && peek().type == TType::LParen) {

@@ -592,8 +592,13 @@ CustomIteratorStruct :: struct {
   // for dynamic ararys.
   int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
-}
 
+  // TODO: we need to fix this.
+  // This throws C++ errors during compilation
+  // because initializer lists have strangely strict typing
+  // compared to normal narrowing rules.
+  // bool[] arr = {0,1,2,3,4,5};
+}
 
 /*
 #test test_any :: () {

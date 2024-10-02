@@ -5,6 +5,7 @@
 #include "type.hpp"
 
 #include "visitor.hpp"
+#include <cstdlib>
 #include <jstl/containers/vector.hpp>
 #include <unordered_map>
 
@@ -45,13 +46,13 @@ int main(int argc, char *argv[]) {
     compile_command = CompileCommand(argc, argv);
     compile_command.print();
     init_type_system();
-    compile_command.compile();
+    auto result = compile_command.compile();
     if (compile_command.has_flag("sanitize")) {
       if (report_unfreed_allocations()) {
         return 1;
       }
     }
-    
+    return result != 0;
   } catch (const std::exception &e) {
     fprintf(stderr, "\e[31m%s\e[0m\n", e.what());
     return 1;
@@ -71,7 +72,7 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
   return root;
 }
-void CompileCommand::emit_code(ASTProgram *root, Context &context) {
+int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   
   lower.begin();
   TypeVisitor type_visitor{context};
@@ -118,24 +119,27 @@ void CompileCommand::emit_code(ASTProgram *root, Context &context) {
                      
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
   cpp.begin();
-  system(compilation_string.c_str());
+  auto result = system(compilation_string.c_str());
+  printf("compiler return %d\n", result);
   cpp.end("compiling and linking cpp");
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);
     std::filesystem::remove(header_output_path);
   }
   std::filesystem::current_path(original_path);
+  return result;
 }
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
   return it != flags.end() && it->second;
 }
-void CompileCommand::compile() {
+int CompileCommand::compile() {
   Lexer lexer;
   Context context;
   ASTProgram *root = process_ast(context);
-  emit_code(root, context);
+  auto result = emit_code(root, context);
   print_metrics();
+  return result;
 }
 
 bool get_compilation_flag(const std::string &flag) {

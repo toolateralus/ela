@@ -393,9 +393,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto t = get_type(type);
     auto iden = static_cast<ASTIdentifier *>(v.target);
     
-    // Todo: check for begin and end or some related iterator functions in structs before we allow that.
-    // Right now we'll just allow it.
-    
     int iter_ty = -1;
     if (auto info = dynamic_cast<StructTypeInfo*>(t->info)) {
       // TODO: add a way to use the value_semantic thing with custom iterators.
@@ -516,7 +513,6 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
-    // TODO: make type->info not nullable. it should never be null.
     auto info = static_cast<EnumTypeInfo*>(left_ty->info);
     auto iden = dynamic_cast<ASTIdentifier*>(node->right);
     

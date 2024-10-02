@@ -587,14 +587,11 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   
   auto op = ".";
   
-  // Todo: this probably wont work properly. like
-  // int* [] v;
-  // v.length; will fail because it will use ->
-  if (left_ty->extensions.is_pointer()) 
+  if (!left_ty->extensions.extensions.empty() && left_ty->extensions.extensions.back()==TYPE_EXT_POINTER) 
     op = "->";
  
   // TODO: remove this hack to get array length
-  if (left_ty->extensions.is_array()) {
+  if (!left_ty->extensions.extensions.empty() && left_ty->extensions.extensions.back()==TYPE_EXT_ARRAY) {
     auto right = dynamic_cast<ASTIdentifier*>(node->right);
     if (right && right->value.value == "length") {
       node->left->accept(this);
@@ -609,9 +606,6 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
     node->right->accept(this);
     return {};
   }
-
-  
-  
   
   if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
     throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,
@@ -646,9 +640,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   return {};
 }
 
-
 std::any EmitVisitor::visit(ASTMake *node) {
-  // TODO: make this robust to casting all types, copy construction only right now :: 2024-09-29 13:34:16
   auto type = get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {

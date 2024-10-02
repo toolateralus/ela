@@ -139,9 +139,9 @@ struct CompileCommand {
     return ss.str();
   }
   ASTProgram *process_ast(Context &context);
-  void emit_code(ASTProgram *root, Context &context);
+  int emit_code(ASTProgram *root, Context &context);
   bool has_flag(const std::string &flag) const;
-  void compile();
+  int compile();
 };
 
 extern CompileCommand compile_command;

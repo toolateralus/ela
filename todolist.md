@@ -1,7 +1,5 @@
 ## TODO List
 
-Add pointer arithmetic capabilities. ptr + integer;
-
 
 Add a offsetof() or #offset() or something like that
 `#offset(Vector2, x);`
