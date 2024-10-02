@@ -2,6 +2,6 @@
 /bin
 /compile_commands.json
 /objs
-
+/.cloc_diff.txt
 output
 
