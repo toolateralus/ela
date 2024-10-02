@@ -352,7 +352,7 @@ void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   // creates a constexpr auto function = []() -> return_type { ... };
   // these are alwyas constexpr because we do not do closure objects, nor do we have the ability to check that right now.
   // TODO: we could have an option for like #closure to just use & and hope that it works fine. It should work fine
-  (*ss) << indent() <<  "constexpr auto " << node->name.value << " = []";   
+  (*ss) << indent() <<  "auto " << node->name.value << " = [&]";   
   node->params->accept(this);
   (*ss) << " -> ";
   node->return_type->accept(this);

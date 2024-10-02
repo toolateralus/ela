@@ -6,7 +6,6 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
-#include "nullable.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include <cassert>
@@ -187,7 +186,6 @@ void Parser::init_directive_routines() {
          }});
   }
 
-  // TODO: fix this up. temporarily disabled. 2024-09-29 12:50:41
   // #type
   // get a 'Type *' struct ptr to reflect on a given type.
   // has .fields and .size only currently

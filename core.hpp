@@ -13,6 +13,30 @@
 #define MB(n) (n * 1024 * 1024)
 #define GB(n) (n * 1024 * 1024 * 1024)
 
+// simple pointer wrapper that expresses intent about whether a pointer is optional or not
+// without a nasty allocating wrapper like std::optional (which is also annoying to type)
+template<class T>
+struct Nullable {
+  Nullable() {}
+  Nullable(T *ptr) : ptr(ptr) {}
+  T *ptr {};
+  T *get() const {
+    return ptr;
+  }
+  void set(T *ptr) {
+    this->ptr = ptr;
+  }
+  operator bool() const {
+    return ptr;
+  }
+  bool is_null() const {
+    return ptr == nullptr;
+  }
+  bool is_not_null() const {
+    return ptr != nullptr;
+  }
+};
+
 struct ASTProgram;
 struct Context;
 
@@ -171,7 +195,6 @@ struct SourceRange {
 }
 };
 
-
 static std::string get_source_filename(const SourceRange &range) {
   auto tokens = range.get_tokens();
   if (tokens.empty()) {
@@ -184,9 +207,7 @@ static std::string get_source_filename(const SourceRange &range) {
 
 struct Defer {
   const std::function<void()> func;
-  Defer(const std::function<void()> &&func) : func(func){
-    
-  } 
+  Defer(const std::function<void()> &&func) : func(func) {}
   ~Defer() {
     func();
   }

@@ -210,6 +210,9 @@ Context::Context() {
     auto type = global_get_type(i);
     root_scope->types.insert(i);
   }
+  
+  // TODO fix segfault when accessing this table from in-language.
+  root_scope->insert("_type_info", global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {-1}}));
 }
 
 std::string Scope::get_function_typename(ASTFunctionDeclaration *decl) {

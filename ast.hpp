@@ -2,7 +2,6 @@
 
 #include "core.hpp"
 #include "lex.hpp"
-#include "nullable.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 

@@ -576,7 +576,7 @@ std::string Type::to_type_struct(Context &context) {
 
   context.type_info_strings.push_back(
       std::format("_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }}", id, 
-                  id, base, fields_ss.str()));
+                  id, to_string(), fields_ss.str()));
 
   return std::format("_type_info[{}]", this->id);
 }
