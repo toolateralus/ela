@@ -288,6 +288,7 @@ struct ASTInitializerList : ASTExpr {
 
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
+  int element_type;
   ASTType* type;
   std::vector<std::pair<std::string, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;

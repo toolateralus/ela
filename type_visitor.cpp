@@ -336,20 +336,35 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-
-    auto n = std::stoll(node->value);
+    
+    int base = 10;
+    
+    if (node->value.starts_with("0x")) {
+      base = 0;
+    } 
+    if (node->value.starts_with("0b")) {
+      node->value = node->value.substr(2, node->value.length());
+      base = 2;
+    }
+    
+    auto n = std::strtoll(node->value.c_str(), nullptr, base);
+    
     if (n > std::numeric_limits<int32_t>::max() ||
         n < std::numeric_limits<int32_t>::min()) {
+      printf("for value: %s, returning s64\n", node->value.c_str());
       return s64_type();
     }
     if (n > std::numeric_limits<int16_t>::max() ||
         n < std::numeric_limits<int16_t>::min()) {
+      printf("for value: %s, returning s32\n", node->value.c_str());
       return s32_type();
     }
     if (n > std::numeric_limits<int8_t>::max() ||
         n < std::numeric_limits<int8_t>::min()) {
+      printf("for value: %s, returning s16\n", node->value.c_str());
       return s16_type();
     }
+    printf("for value: %s, returning s8\n", node->value.c_str());
     return s8_type();
   }
   case ASTLiteral::Float:
@@ -744,6 +759,8 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
       base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
+  int largest_type = s8_type();
+  int largest_type_size = 1;
   for (const auto &[key, value] : node->key_values) {
     if (value.is_not_null()) {
       if (node->is_flags) {
@@ -752,12 +769,27 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
                     ERROR_FAILURE, node->source_range);
       }
       auto expr = value.get();
-      auto type = int_from_any(value.get()->accept(this));
-      validate_type_compatability(type, s32_type(), node->source_range,
+      auto id = int_from_any(value.get()->accept(this));
+      
+      auto type = ctx.scope->get_type(id);
+      
+      if (!type->is_kind(TYPE_SCALAR) || !type->extensions.has_no_extensions()) {
+        throw_error("Cannot have non integral types in enums got: " + type->to_string(), ERROR_FAILURE, node->source_range);
+      }
+      
+      auto info = static_cast<ScalarTypeInfo*>(type->info);
+      
+      if (info->size > largest_type_size) {
+        largest_type = id;
+        largest_type_size = info->size;
+      }
+      
+      validate_type_compatability(id, s64_type(), node->source_range,
                                   "expected: {}, got : {}",
                                   "Cannot have non-integral types in enums");
     }
   }
+  node->element_type = largest_type;
   return {};
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {

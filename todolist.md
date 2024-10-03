@@ -1,5 +1,12 @@
 ## TODO List
 
+// TODO(Josh) 10/3/2024, 11:00:56 AM
+// We need to fix aliasing. We can't alias functions with parameters,
+// I thought i fixed this but i guess nto.
+// TODO taking a function pointer to an overloaded function is a pretty complex issue and I'm not sure
+// how we want to approach it. Right now I just basically ignore the issue.
+// however doing som := &something; will cause errors in C++ and thats unacceptable.
+
 To search for all info comments in the source just use vscodes regex search with
 `TODO|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG`
 

@@ -785,7 +785,6 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   use_header();
-
   std::string iden;
   if (node->is_flags) {
     iden = "enum ";
@@ -796,9 +795,8 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     // That is annoying behaviour i dislike from C++
     iden = "enum ";
   }
-
-  (*ss) << iden << node->type->base << " : s32 "
-        << "{\n";
+  auto type = context.scope->get_type(node->element_type);
+  (*ss) << iden << node->type->base << " : " << type->base << "{\n";
   int i = 0;
   auto get_next_index = [&] {
     int value;
