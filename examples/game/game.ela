@@ -1,6 +1,6 @@
 #import core;
 
-#include "gl.ela";
+#import gl;
 
 #compiler_flags "-g";
 
@@ -20,7 +20,7 @@ Vertex :: struct {
   Vec2 normal;
   Vec2 uv;
   #ctor :: () {}
-  #ctor :: (Vec2 _position, _normal, Vec2 _uv) {
+  #ctor :: (Vec2 _position, _normal, _uv) {
     position = _position;
     normal = _normal;
     uv = _uv;
