@@ -842,6 +842,14 @@ vec3 :: union {
     y = _y;
     z = _z;
   }
+  #operator(+) :: (vec3 other) -> vec3 {
+    vec3 result;
+    result.x = x + other.x;
+    result.y = y + other.y;
+    result.z = z + other.z;
+    return result;
+  }
+
   #ctor :: (float value) {
     x = value;
     y = value;

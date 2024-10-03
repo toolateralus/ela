@@ -219,16 +219,7 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            parser->expect(TType::DoubleColon);
 
-           auto tname = [&] {
-             if (parser->current_struct_decl)
-               return Token({}, parser->current_struct_decl.get()->type->base,
-                            TType::Identifier, TFamily::Identifier);
-             else
-               return Token({}, parser->current_union_decl.get()->type->base,
-                            TType::Identifier, TFamily::Identifier);
-           }();
-
-           auto func_decl = parser->parse_function_declaration(tname);
+           auto func_decl = parser->parse_function_declaration(get_unique_identifier());
            func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
 
            return func_decl;
@@ -239,18 +230,7 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            parser->expect(TType::DoubleColon);
-
-           auto tname = [&] {
-             if (parser->current_struct_decl)
-               return Token({}, parser->current_struct_decl.get()->type->base,
-                            TType::Identifier, TFamily::Identifier);
-             else
-               return Token({}, parser->current_union_decl.get()->type->base,
-                            TType::Identifier, TFamily::Identifier);
-           }();
-
-           auto func_decl = parser->parse_function_declaration(tname);
-
+           auto func_decl = parser->parse_function_declaration(get_unique_identifier());
            func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
            return func_decl;
          }});
@@ -845,12 +825,14 @@ ASTParamsDecl *Parser::parse_parameters() {
       continue;
     }
     auto next = peek();
+    
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (!type || ctx.scope->find_type_id(next.value, {}) != -1) {
+    if (next.type == TType::Directive || !type || ctx.scope->find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
+    
     auto name = expect(TType::Identifier).value;
 
     auto param = ast_alloc<ASTParamDecl>();

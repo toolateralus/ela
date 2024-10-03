@@ -332,7 +332,6 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;
-
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
@@ -872,8 +871,19 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   indentLevel++;
   context.set_scope(node->scope);
   emit_default_init = false;
+  
+  // DOCUMENT THIS: 
+  // we will always default-initialize the first field in a union type.
+  // this may not pan out, but ideally unions would only be used for stuff like vector3's and ASTnodes.
   for (const auto &field : node->fields) {
-    field->accept(this);
+    if (field == node->fields.front()) {
+      emit_default_init = true;
+      field->accept(this);
+      emit_default_init = false;
+    } else {
+      field->accept(this);
+    }
+    
     (*ss) << ";\n";
   }
   for (const auto &method : node->methods) {

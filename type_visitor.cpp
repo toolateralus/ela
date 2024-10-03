@@ -516,12 +516,6 @@ std::any TypeVisitor::visit(ASTCall *node) {
                 "variable. Constructors currently use #make(Type, ...) syntax.",
                 ERROR_FAILURE, node->source_range);
   }
-  
-   // TODO: this needs a really big rework.
-  // TODO: we gotta do type checking on parameters.
-  
-
-  
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);
 
@@ -776,39 +770,36 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
-  
   // TODO: determine if we even want operator overloading for subscript.
   // It seems to have highlighted type system issues, though so we can at least use it to debug why a dot expression
   // seems to propogate the root type to the right
-  if (true)
-  {
-    // TODO: this should be improved to handle [0,1,2,3] and [0..10];
-    // Perform call to operator overload for [];
-    if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
-        left_ty->extensions.has_no_extensions()) {
-      auto info = static_cast<StructTypeInfo *>(left_ty->info);
-      if (auto sym = info->scope->lookup("[")) {
-        if (sym->is_function()) {
-          // TODO: fix this. we have ambiguitty with how we do this
-          int t = -1;
-          if (sym->function_overload_types[0] == -1) {
-            t = sym->type_id;
-          } else {
-            t = sym->function_overload_types[0];
-          }
-          auto fun_ty = global_get_type(t);
-          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->info);
-          auto param_0 = fun_info->parameter_types[0];
-          validate_type_compatability(
-              subscript, fun_info->parameter_types[0], node->source_range,
-              "expected: {}, got: {}",
-              "invalid parameter type in subscript operator overload");
-          return fun_info->return_type;
+
+  // TODO: this should be improved to handle [0,1,2,3] and [0..10];
+  // Perform call to operator overload for [];
+  if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
+      left_ty->extensions.has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo *>(left_ty->info);
+    if (auto sym = info->scope->lookup("[")) {
+      if (sym->is_function()) {
+        // TODO: fix this. we have ambiguitty with how we do this
+        int t = -1;
+        if (sym->function_overload_types[0] == -1) {
+          t = sym->type_id;
+        } else {
+          t = sym->function_overload_types[0];
         }
-      } else
-        throw_error("couldn't find [] overload for struct type", ERROR_FAILURE,
-                    node->source_range);
-    }
+        auto fun_ty = global_get_type(t);
+        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->info);
+        auto param_0 = fun_info->parameter_types[0];
+        validate_type_compatability(
+            subscript, fun_info->parameter_types[0], node->source_range,
+            "expected: {}, got: {}",
+            "invalid parameter type in subscript operator overload");
+        return fun_info->return_type;
+      }
+    } else
+      throw_error("couldn't find [] overload for struct type", ERROR_FAILURE,
+                  node->source_range);
   } 
 
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
