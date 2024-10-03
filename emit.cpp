@@ -336,15 +336,27 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
+      
+      // See the todo below for why we need this.
+      bool cancelled = false;
       std::string init = "{";
       for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
-        auto ty = ctx.scope->get_type(elem);
+        //! BUG See the other type extension bug. For some reason we have to search the global type space for this. We should NEVER have to do that.
+        auto ty = global_get_type(elem);
+        // * We never emit initializers for these sub arrays.
+        // TODO: find a way to actually zero initialize all these fixed buffers without hacky lambdas everywhere.
+        if (ty->extensions.is_fixed_sized_array()) {
+          cancelled = true;
+          break;
+        }
         init += " " + ty->to_cpp_string() + "(),";
       }
-      init.pop_back();
-      init += "}";
-      (*ss) << init;
+      if (!cancelled) {
+        init.pop_back();
+        init += "}";
+        (*ss) << init;
+      }
     }
   } else if (type->is_kind(TYPE_FUNCTION) && type->extensions.is_pointer()) {
     auto type_str = type->to_cpp_string();
