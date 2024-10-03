@@ -4,10 +4,11 @@
 
 main :: () -> s8 {
   srand(time(null));
-  float[] *floats = new float[]({&1});
+  float[] *floats = new float[]({1});
   func :: () {
     delete(floats);
   }
+  
   int n;
   while true {
     for *f; *floats {
