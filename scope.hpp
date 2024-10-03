@@ -48,6 +48,8 @@ struct Symbol {
 
 struct ASTFunctionDeclaration;
 
+extern Scope * root_scope;
+
 struct Scope {
   // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flags or something.
   bool is_struct_or_union_scope = false;
@@ -66,7 +68,7 @@ struct Scope {
   std::string get_function_typename(ASTFunctionDeclaration *decl);
   int find_alias(const std::string name, const TypeExt &ext);
   int find_type_id(const std::string &name, const TypeExt &ext);
-  int find_type_id(const std::string &name, const FunctionTypeInfo &info,
+  int find_function_type_id(const std::string &name, const FunctionTypeInfo &info,
                    const TypeExt &ext);
                    
   Type *get_type(int id) const;
@@ -102,7 +104,7 @@ struct Context {
   std::vector<std::string> type_info_strings;
 
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-  Scope *root_scope;
+  
   Context();
 
   inline void set_scope(Scope *in_scope = nullptr) {

@@ -31,6 +31,18 @@
 #foreign isprint :: (int c) -> int;
 #foreign ispunct :: (int c) -> int;
 
+#foreign rand :: () -> int;
+#foreign srand :: (u32 seed) -> void;;
+#foreign time :: (void * value) -> int;
+
+Random :: enum {
+  Max = 2147483647,
+}
+
+randf :: () -> float {
+  return #make(float, rand()) / #make(float, Random.Max);
+}
+
 str_starts_with :: (char *str, char *substr) -> bool {
   if str == null || substr == null { return false; }
   str_len := strlen(str);

@@ -313,7 +313,7 @@ int charptr_type();
 
 
 
-int global_find_type_id(const std::string &, const FunctionTypeInfo &,
+int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
 
 int global_find_type_id(const std::string &, const TypeExt &);
@@ -333,3 +333,5 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 
 void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
+
+int get_pointer_to_type(int base);

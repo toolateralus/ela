@@ -134,7 +134,7 @@ void Parser::init_directive_routines() {
            Defer deferred = {
                [&] { parser->current_func_decl = last_func_decl; }};
 
-           if (parser->ctx.scope != parser->ctx.root_scope)
+           if (parser->ctx.scope != root_scope)
              throw_error(
                  std::format(
                      "cannot declare a non-top level foreign function:: {}",
@@ -1077,6 +1077,27 @@ ASTExpr *Parser::parse_unary() {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
+    
+    auto is_rvalue = dynamic_cast<ASTLiteral*>(expr) || dynamic_cast<ASTCall*>(expr);
+    
+    // don't need to do this if we already got one of the previous ones.
+    auto ctor = is_rvalue || [&]{ 
+      auto make = dynamic_cast<ASTMake*>(expr);
+      if (!make) {
+        return false;
+      }
+      
+      if (make && make->kind == MAKE_CTOR || make->kind == MAKE_COPY_CTOR) {
+        return true;
+      }
+      return false;
+    }();
+    
+    if ((is_rvalue || ctor) && (op.type == TType::And || op.type == TType::Mul)) {
+      end_node(nullptr, range);
+      throw_error("Cannot take the address of, or dereference a literal or 'rvalue'\nlike a function result or constructor result. It is a temporary value\nand would be invalid once this statement completed executing", ERROR_FAILURE, range);
+    }
+    
     unaryexpr->op = op;
     unaryexpr->operand = expr;
     end_node(unaryexpr, range);

@@ -104,7 +104,7 @@ struct EmitVisitor : VisitorBase {
   std::stringstream test_functions{};
 
   int indentLevel = 0;
-  Context &context;
+  Context &ctx;
 
   inline std::string get_code() const { return code.str(); }
   inline std::string get_header() const { return header.str(); }
@@ -133,7 +133,7 @@ struct EmitVisitor : VisitorBase {
   inline void use_code() { ss = &code; }
   inline void use_header() { ss = &header; }
   inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
-      : context(context), type_visitor(type_visitor) {
+      : ctx(context), type_visitor(type_visitor) {
     ss = &code;
   }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }

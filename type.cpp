@@ -24,7 +24,7 @@ std::string FunctionTypeInfo::to_string() const {
 
   return ss.str();
 }
-int global_find_type_id(const std::string &name, const FunctionTypeInfo &info,
+int global_find_function_type_id(const std::string &name, const FunctionTypeInfo &info,
                         const TypeExt &ext) {
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
@@ -717,4 +717,11 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
   default: 
     throw_error(std::format("Invalid operator overload {}", TTypeToString(type)), ERROR_FAILURE, range);
   }
+}
+
+int get_pointer_to_type(int base) {
+  auto type = global_get_type(base);  
+  auto extensions = type->extensions;
+  extensions.extensions.push_back({TYPE_EXT_POINTER});
+  return global_find_type_id(type->base, extensions);
 }

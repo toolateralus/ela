@@ -3,6 +3,7 @@
 #include "type.hpp"
 
 Context::Context() {
+  root_scope = scope;
   // define some default functions that may or may not be macros.
   {
     // We still define assert and sizeof manually here, because
@@ -12,14 +13,14 @@ Context::Context() {
     assert_info.parameter_types[0] = charptr_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
-    scope->insert("assert", global_find_type_id("void(char *, bool)", assert_info, {}), SYMBOL_IS_FUNCTION);
+    scope->insert("assert", global_find_function_type_id("void(char *, bool)", assert_info, {}), SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = global_find_type_id("s64", {});
     sizeof_info.is_varargs = true;
     // no other function will ever use this type. thats why we have a ?, because we have no first class types yet.
-    scope->insert("sizeof", global_find_type_id("s64(?)", sizeof_info, {}), SYMBOL_IS_FUNCTION);
-    root_scope = scope;  
+    scope->insert("sizeof", global_find_function_type_id("s64(?)", sizeof_info, {}), SYMBOL_IS_FUNCTION);
+    
   }
   
   // define types used for reflection, which are currently half implemented due to ineffectiveness.
@@ -86,70 +87,51 @@ std::string Scope::get_function_typename(ASTFunctionDeclaration *decl) {
   return ss.str();
 }
 
-int Scope::find_type_id(const std::string &name, const FunctionTypeInfo &info,
+int Scope::find_function_type_id(const std::string &name, const FunctionTypeInfo &info,
                         const TypeExt &ext) {
-
   if (global_type_aliases.contains(name)) {
     return find_alias(name, ext);
   }
-
-  auto base_id = global_find_type_id(name, info, {});
-  auto id = global_find_type_id(name, info, ext);
-
-  // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types
-  // declared in our scope. Fix the discord here, We shouldn't have to do
-  // this.
-  // Although, this might be fine, as it avoids us for searching for the most
-  // common types always.
-  if (!types.contains(id)) {
-    types.insert(id);
-    return id;
-  }
-
-  if (types.contains(id))
-    return id;
-
-  if (parent) {
-    auto id = parent->find_type_id(name, ext);
-    if (id != -1)
-      return id;
-  }
-
-  if (types.contains(id))
-    return id;
-  return -1;
+  auto id =  global_find_function_type_id(name, info, ext);
+  root_scope->types.insert(id);
+  return id;
 }
 int Scope::find_type_id(const std::string &name, const TypeExt &ext) {
   if (global_type_aliases.contains(name)) {
     return find_alias(name, ext);
   }
-
-  auto base_id = global_find_type_id(name, {});
   auto id = global_find_type_id(name, ext);
-
+  if (types.contains(id))
+    return id;
+  auto base_id = global_find_type_id(name, {});
+  
+  // this is likely for a newly created type that just extends an existing type that lives in the root scope.
+  // such as a function or method that instantiates a float* where there have been no float* in the rest of the program yet,
+  if (base_id != -1 && id == -1 && root_scope->types.contains(base_id)) {
+    id = global_find_type_id(name, ext);
+    root_scope->types.insert(id);
+    return id;
+  }
+  
+  // a type (possibly our local type) with new extensions got created, so we just add it to this
+  // scope.
   if (!types.contains(id) && types.contains(base_id)) {
-    // a type with new extensions got created, so we just add it to this
-    // scope.
     types.insert(id);
     return id;
   }
-
-  if (types.contains(id))
-    return id;
-
+  
   if (parent) {
     auto id = parent->find_type_id(name, ext);
     if (id != -1)
       return id;
   }
-
+  
   return -1;
 }
 int Scope::find_alias(const std::string name, const TypeExt &ext) {
   for (const auto &[symname, sym] : symbols) {
     if (symname != name)
       continue;
-
     auto type = global_get_type(sym.type_id);
     if (type->extensions.equals({})) {
       return type->id;
@@ -176,15 +158,20 @@ int Scope::find_alias(const std::string name, const TypeExt &ext) {
   }
   return -1;
 }
-Type *Scope::get_type(int id) const {
-  if (types.contains(id))
-    return global_get_type(id);
 
+Type *Scope::get_type(int id) const {
+  if (types.contains(id)) return global_get_type(id);
   if (parent) {
     return parent->get_type(id);
   }
+  
+  // !BUG: This makes no sense, yet this fixes a segfault that's happening.
+  // if (!parent) {
+  //   return global_get_type(id);
+  // }
   return nullptr;
 }
+
 int Scope::create_struct_type(const std::string &name, Scope *scope) {
   auto type = ::global_create_struct_type(name, scope);
   types.insert(type);

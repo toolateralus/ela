@@ -29,6 +29,9 @@ std::unordered_map<std::string, int> global_type_aliases;
 // the same for this
 jstl::Arena ast_arena{MB(10)};
 
+// TODO: remove me, we want file scopes.
+Scope * root_scope;
+
 CompileCommand compile_command;
 
 std::vector<ASTAllocate*> allocation_info;
@@ -121,7 +124,7 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
   cpp.begin();
   auto result = system(compilation_string.c_str());
-  printf("compiler return %d\n", result);
+  printf("compiler returned %d\n", result);
   cpp.end("compiling and linking cpp");
   if (!has_flag("s")) {
     std::filesystem::remove(output_path);

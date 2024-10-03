@@ -394,12 +394,12 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {
   case ASTAllocate::New: {
-    auto ptr_type = context.scope->get_type(node->type.get()->resolved_type);
+    auto ptr_type = ctx.scope->get_type(node->type.get()->resolved_type);
     (*ss) << "new ";
     auto ext = ptr_type->extensions;
     ext.extensions.pop_back();
-    auto nonptr = context.scope->find_type_id(ptr_type->base, ext);
-    auto nonptr_ty = context.scope->get_type(nonptr);
+    auto nonptr = ctx.scope->find_type_id(ptr_type->base, ext);
+    auto nonptr_ty = ctx.scope->get_type(nonptr);
     auto str = nonptr_ty->to_cpp_string();
     (*ss) << str;
     if (!node->arguments) {

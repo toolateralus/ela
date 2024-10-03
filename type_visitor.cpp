@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -83,7 +84,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     info.params_len++;
   }
 
-  auto type_id = ctx.scope->find_type_id(
+  auto type_id = ctx.scope->find_function_type_id(
       ctx.scope->get_function_typename(node), info, {});
 
   auto sym = ctx.scope->lookup(node->name.value);
@@ -258,6 +259,11 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   if (type && type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions()) {
     auto info = static_cast<StructTypeInfo*>(type->info);
     if (auto sym = info->scope->lookup(node->op.value)) {
+      auto enclosing_scope = ctx.scope;
+      ctx.set_scope(info->scope);
+      Defer _([&](){
+        ctx.set_scope(enclosing_scope);
+      });
       if (sym->is_function()) {
         // TODO: fix this. we have ambiguitty with how we do this
         int t = -1;
@@ -266,7 +272,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = global_get_type(t);
+        auto fun_ty = ctx.scope->get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
@@ -331,6 +337,11 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->extensions.has_no_extensions()) {
     auto info = static_cast<StructTypeInfo*>(left_ty->info);
     if (auto sym = info->scope->lookup(node->op.value)) {
+      auto enclosing_scope = ctx.scope;
+      ctx.set_scope(info->scope);
+      Defer _([&](){
+        ctx.set_scope(enclosing_scope);
+      });
       if (sym->is_function()) {
         // TODO: fix this. we have ambiguitty with how we do this
         int t = -1;
@@ -339,7 +350,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = global_get_type(t);
+        auto fun_ty = ctx.scope->get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
         return fun_info->return_type;
       }
@@ -437,6 +448,11 @@ std::any TypeVisitor::visit(ASTCall *node) {
   if (type->is_kind(TYPE_STRUCT)) {
     auto info = static_cast<StructTypeInfo*>(type->info);
     if (auto sym = info->scope->lookup("(")) {
+      auto enclosing_scope = ctx.scope;
+      ctx.set_scope(info->scope);
+      Defer _([&](){
+        ctx.set_scope(enclosing_scope);
+      });
       if (sym->is_function()) {
         // TODO: fix this. we have ambiguitty with how we do this
         int t = -1;
@@ -445,7 +461,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = global_get_type(t);
+        auto fun_ty = ctx.scope->get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
         if (fun_info->params_len != arg_tys.size())
           throw_error("Invalid number of arguments for call operator overload", ERROR_FAILURE, node->source_range);
@@ -489,6 +505,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     if (!found_exact_match && !found_implicit_match) {
       std::vector<std::string> names;
       for (auto n : arg_tys) {
+        // Here we use global get type just because we're dumping an error and it doesn't matter.
         names.push_back(global_get_type(n)->to_string());
       }
       throw_error(std::format("No function overload for provided argument signature found.. got : {}", names), ERROR_FAILURE, node->source_range);
@@ -573,13 +590,32 @@ std::any TypeVisitor::visit(ASTFor *node) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
-    auto t = ctx.scope->get_type(type);
+    
+    // !BUG 
+    // For some reason this is returning null for float *;
+    // if we just added extensions to a type, and it already exists in the root scope,
+    // that newly created type should get propogated to the root scope
+    
+    // NOTE: i did that, and i STILL cannot get the type from the enclosing scope aka ctx.scope.
+    // Right now im just using global_get_type, but this should absolutely not have to be the case
+    // and this must be fixed.
+    
+    auto t = global_get_type(type);
+    
+    // !BUG THIS MUST BE UNCOMMENTED ONCE WE FIND THE SOURCE OF THE BUG
+    // auto t = ctx.scope->get_type(type);
+    
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
+    if (!t) {
+      throw_error("Internal compiler error: element type was null in range based for loop", ERROR_CRITICAL, node->source_range);
+    }
+
     int iter_ty = -1;
-    auto info = dynamic_cast<StructTypeInfo *>(t->info);
-    if (info &&
+    
+    if (t->is_kind(TYPE_STRUCT) &&
         (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array())) {
+        auto info = dynamic_cast<StructTypeInfo *>(t->info);
       // TODO: add a way to use the value_semantic thing with custom
       // iterators.
       Symbol *begin = info->scope->lookup("begin");
@@ -705,6 +741,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     if (right && right->value.value == "length") {
       return s32_type();
     }
+    if (right && right->value.value == "data") {
+      return get_pointer_to_type(left_ty->get_element_type());
+    }
   }
   
   // Get enum variant
@@ -780,6 +819,11 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
       left_ty->extensions.has_no_extensions()) {
     auto info = static_cast<StructTypeInfo *>(left_ty->info);
     if (auto sym = info->scope->lookup("[")) {
+      auto enclosing_scope = ctx.scope;
+      ctx.set_scope(info->scope);
+      Defer _([&](){
+        ctx.set_scope(enclosing_scope);
+      });
       if (sym->is_function()) {
         // TODO: fix this. we have ambiguitty with how we do this
         int t = -1;
@@ -788,7 +832,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = global_get_type(t);
+        auto fun_ty = ctx.scope->get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->info);
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(

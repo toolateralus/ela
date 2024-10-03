@@ -561,7 +561,7 @@ struct Parser {
     }
     
     auto type_name = ctx.scope->get_type(info.return_type)->to_string() + ss.str();
-    return_type->resolved_type = ctx.scope->find_type_id(type_name, info, {});
+    return_type->resolved_type = ctx.scope->find_function_type_id(type_name, info, {});
     return_type->base = type_name;
     return_type->extension_info = {};
 
