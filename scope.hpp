@@ -26,6 +26,11 @@ struct Symbol {
   std::string name;
   // if this is a type alias, this
   // is the type that this identifier points to.
+  
+  // TODO: get rid of this visible field, make it private.
+  // Add a get_type_id() and ahve it return the appropriate type, 
+  // based on something that we can have function overload callees pass in,
+  // like a parameter signature or something
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
   

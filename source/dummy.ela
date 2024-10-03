@@ -1,9 +1,15 @@
 #import core;
 
+something :: (int n) {
+  println($"{n}");
+}
+something :: (float n) {
+  println($"{n}");
+}
+
 main :: () {
-  string x;
-  printf("%s\n", x.data);
-  
-  // boo := 10;
-  // println($"Hi {boo}");
+  float f;
+  int i;
+  something(f);
+  something(i);
 }

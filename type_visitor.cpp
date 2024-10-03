@@ -5,9 +5,11 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include <any>
+#include <cassert>
 #include <format>
 #include <jstl/containers/vector.hpp>
 #include <limits>
+#include <ranges>
 #include <string>
 #include <vector>
 
@@ -87,7 +89,8 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   auto sym = ctx.scope->lookup(node->name.value);
   
   // TODO: don't ignore constructors and destructors.
-  if (sym && ((sym->flags & SYMBOL_HAS_OVERLOADS) != 0) && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
+  if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
+    sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = ctx.scope->get_type(overload_type_id);
       
@@ -102,12 +105,14 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     }
     sym->function_overload_types.push_back(type_id);
   } else  {
+    // TODO(Josh) 10/3/2024, 10:36:56 AM
+    // Fix this jank
+    
     // insert function
     ctx.scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
+    auto sym = ctx.scope->lookup(node->name.value);
+    sym->function_overload_types.push_back(type_id);
   }
-
-
-  
 
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     return {};
@@ -368,8 +373,36 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
-
-  auto type = ctx.scope->get_type(symbol->type_id);
+  
+  Type *type;
+  // Find a suitable function overload to call.
+  if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
+    bool found_match = false;
+    int match_idx = -1;
+    // todo: fix this, enumerate is slow as balls.
+    for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
+      auto ovrld_ty = ctx.scope->get_type(overload);
+      auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->info);
+      for (int j = 0; j < info->params_len; ++j) {
+        // TODO: probably could match these better than just comparing typeids.
+        // such as allowing implicit conversions to still take place.
+        if (j >= arg_tys.size()) goto didnt_match;
+        if (arg_tys[j] != info->parameter_types[j]) goto didnt_match;
+      }
+      found_match = true;
+      match_idx = i;
+      break;
+      didnt_match:
+    }
+    if (!found_match) {
+      throw_error("No function overload for provided argument signature found", ERROR_FAILURE, node->source_range);
+    }
+    type = ctx.scope->get_type(symbol->function_overload_types[match_idx]);
+    assert(type != nullptr);
+  } else {
+    type = ctx.scope->get_type(symbol->type_id);
+  }
+  
   auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->info);
 
   // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
