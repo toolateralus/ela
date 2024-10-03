@@ -14,14 +14,30 @@
 
 extern jstl::Arena scope_arena;
 
+enum SymbolFlags {
+  SYMBOL_IS_VARIABLE = 1 << 0,
+  SYMBOL_IS_FUNCTION = 1 << 1,
+  SYMBOL_IS_TYPE_ALIAS = 1 << 2,
+};
+
 struct Symbol {
   // the identifier.
   std::string name;
   // if this is a type alias, this
   // is the type that this identifier points to.
   int type_id;
-  // is this a type alias?
-  bool type_alias;
+  int flags = SYMBOL_IS_VARIABLE;
+  
+  std::vector<std::vector<int>> parameter_signatures;
+  
+  bool is_type_alias() const {
+    return (flags & SYMBOL_IS_TYPE_ALIAS) != 0;
+  }
+  
+  bool is_function() const {
+    return (flags & SYMBOL_IS_FUNCTION) != 0;
+  }
+  
 };
 
 struct ASTFunctionDeclaration;
@@ -36,7 +52,7 @@ struct Scope {
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
   
   inline void create_type_alias(const std::string &alias, int type) {
-    insert(alias, type, true);
+    insert(alias, type, SYMBOL_IS_TYPE_ALIAS);
     global_type_aliases[alias] = type;
   }
   
@@ -57,7 +73,7 @@ struct Scope {
   int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
                   const TypeExt &extensions);
   
-  void insert(const std::string &name, int type_id, bool is_type_alias = false);
+  void insert(const std::string &name, int type_id, int flags = SYMBOL_IS_VARIABLE);
   Symbol *lookup(const std::string &name);
   void erase(const std::string &name);
 

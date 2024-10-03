@@ -320,9 +320,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
-
   auto type = context.current_scope->get_type(node->type->resolved_type);
-
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;

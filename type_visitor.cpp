@@ -1,6 +1,7 @@
 #include "ast.hpp"
 #include "error.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include <any>
@@ -84,7 +85,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       context.current_scope->get_function_typename(node), info, {});
 
   // insert function
-  context.current_scope->insert(node->name.value, type_id);
+  context.current_scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
 
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     return {};

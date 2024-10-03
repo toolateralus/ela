@@ -1,7 +1,5 @@
 #import core;
 
-
 main :: () {
-  n1 := 0
-  n := $"{n1 + 2}";
+  println("Hi");
 }

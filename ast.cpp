@@ -333,7 +333,7 @@ void Parser::init_directive_routines() {
            auto aliased_type = parser->parse_type();
            auto id = parser->context.current_scope->find_type_id(
                aliased_type->base, aliased_type->extension_info);
-           parser->context.current_scope->insert(name.value, id, true);
+           parser->context.current_scope->insert(name.value, id, SYMBOL_IS_TYPE_ALIAS);
            return ast_alloc<ASTNoop>();
          }});
   }

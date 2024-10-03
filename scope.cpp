@@ -11,13 +11,13 @@ Context::Context() {
     assert_info.parameter_types[0] = charptr_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
-    current_scope->insert("assert", global_find_type_id("void(char *, bool)", assert_info, {}));
+    current_scope->insert("assert", global_find_type_id("void(char *, bool)", assert_info, {}), SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = global_find_type_id("s64", {});
     sizeof_info.is_varargs = true;
     // no other function will ever use this type. thats why we have a ?, because we have no first class types yet.
-    current_scope->insert("sizeof", global_find_type_id("s64(?)", sizeof_info, {}));
+    current_scope->insert("sizeof", global_find_type_id("s64(?)", sizeof_info, {}), SYMBOL_IS_FUNCTION);
     root_scope = current_scope;  
   }
   
@@ -207,9 +207,10 @@ int Scope::create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   types.insert(type);
   return type;
 }
-void Scope::insert(const std::string &name, int type_id, bool is_type_alias) {
-  symbols[name] = Symbol{name, type_id, is_type_alias};
-  if (is_type_alias) {
+void Scope::insert(const std::string &name, int type_id, int flags) {
+  auto sym = Symbol{name, type_id, flags};
+  symbols[name] = sym; 
+  if (sym.is_type_alias()) {
     global_type_aliases.insert({name, type_id});
   }
 }
@@ -225,14 +226,14 @@ void Scope::erase(const std::string &name) { symbols.erase(name); }
 
 void Scope::on_scope_enter() {
   for (const auto &[id, sym] : symbols) {
-    if (sym.type_alias) {
+    if (sym.is_type_alias()) {
       global_type_aliases.insert({id, sym.type_id});
     }
   }
 }
 void Scope::on_scope_exit() {
   for (const auto &[id, sym] : symbols) {
-    if (sym.type_alias) {
+    if (sym.is_type_alias()) {
       auto pointed_to = global_get_type(sym.type_id);
       auto it = global_type_aliases.find(sym.name);
       if (it != global_type_aliases.end())
