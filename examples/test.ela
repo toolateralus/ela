@@ -1,0 +1,24 @@
+#import core;
+
+#alias void_fn :: void()*;
+
+main :: () -> s8 {
+  srand(time(null));
+  float[] *floats = new float[]({&1});
+  func :: () {
+    delete(floats);
+  }
+  int n;
+  while true {
+    for *f; *floats {
+      *f = 2.0 * * f;
+      if *f > 1000.0 {
+        println($"finished in {n} iterations");
+        return 0;
+      }
+    }
+    n++;
+  }
+  println($"finished in {n} iterations");
+  return 0;
+}

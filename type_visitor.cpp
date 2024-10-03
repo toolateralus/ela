@@ -548,7 +548,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   for (int i = 0; i < info->params_len; ++i) {
 
-    // BUG: default parameters evade type checking
+    // !BUG: default parameters evade type checking
     if (arg_tys.size() <= i) {
       continue;
     }
@@ -591,8 +591,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
     
-    // !BUG 
-    // For some reason this is returning null for float *;
+    // !BUG  For some reason this is returning null for float *;
     // if we just added extensions to a type, and it already exists in the root scope,
     // that newly created type should get propogated to the root scope
     
@@ -600,6 +599,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     // Right now im just using global_get_type, but this should absolutely not have to be the case
     // and this must be fixed.
     
+    // !BUG REMOVE THIS
     auto t = global_get_type(type);
     
     // !BUG THIS MUST BE UNCOMMENTED ONCE WE FIND THE SOURCE OF THE BUG
