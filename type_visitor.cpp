@@ -14,7 +14,7 @@ void validate_type_compatability(
     const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
   auto from_t = global_get_type(from);
-  auto to_t =   global_get_type(to);
+  auto to_t = global_get_type(to);
   auto conv_rule = type_conversion_rule(from_t, to_t);
   if (to != from &&
       (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
@@ -42,7 +42,8 @@ std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
-  return node->resolved_type = context.current_scope->find_type_id(node->base, node->extension_info);
+  return node->resolved_type = context.current_scope->find_type_id(
+             node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
   for (auto &statement : node->statements) {
@@ -61,13 +62,13 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   info.params_len = 0;
   info.default_params = 0;
   info.meta_type = node->meta_type;
-  
+
   auto name = node->name.value;
-  
+
   info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
 
   auto params = node->params->params;
-  
+
   for (const auto &param : params) {
     if (param->default_value.is_not_null())
       info.default_params++;
@@ -78,8 +79,9 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
-  
-  auto type_id = context.current_scope->find_type_id(context.current_scope->get_function_typename(node), info, {});
+
+  auto type_id = context.current_scope->find_type_id(
+      context.current_scope->get_function_typename(node), info, {});
 
   // insert function
   context.current_scope->insert(node->name.value, type_id);
@@ -157,25 +159,33 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
   auto type = context.current_scope->get_type(id);
-  
+
   if (type->extensions.is_fixed_sized_array()) {
-    throw_warning("using a fixed array as a function parameter: note, this casts the length information off and gets passed as as pointer. Consider using a dynamic array", node->source_range);
+    throw_warning("using a fixed array as a function parameter: note, this "
+                  "casts the length information off and gets passed as as "
+                  "pointer. Consider using a dynamic array",
+                  node->source_range);
     if (node->default_value.is_not_null()) {
-      throw_error("Cannot currently use default parameters for fixed buffer pointers. Also, length information gets casted off. consider using a dynamic array", ERROR_WARNING, node->source_range);
+      throw_error("Cannot currently use default parameters for fixed buffer "
+                  "pointers. Also, length information gets casted off. "
+                  "consider using a dynamic array",
+                  ERROR_WARNING, node->source_range);
     }
-    
+
     // cast the fixed sized array to a base*.
     {
       auto extensions = type->extensions;
-      auto it = std::find(extensions.extensions.begin(), extensions.extensions.end(), TYPE_EXT_ARRAY);
+      auto it = std::find(extensions.extensions.begin(),
+                          extensions.extensions.end(), TYPE_EXT_ARRAY);
       extensions.extensions.erase(it);
       extensions.array_sizes.erase(extensions.array_sizes.begin() + 1);
-      extensions.extensions.insert(extensions.extensions.begin(), TYPE_EXT_POINTER);
-      node->type->resolved_type = context.current_scope->find_type_id(type->base, extensions);
+      extensions.extensions.insert(extensions.extensions.begin(),
+                                   TYPE_EXT_POINTER);
+      node->type->resolved_type =
+          context.current_scope->find_type_id(type->base, extensions);
     }
-    
   }
-  
+
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     validate_type_compatability(
@@ -198,6 +208,11 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
 
   auto symbol = context.current_scope->lookup(node->name.value);
   symbol->type_id = node->type->resolved_type;
+  
+  if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
+    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.value), ERROR_FAILURE, node->source_range);
+  }
+  
   return {};
 }
 std::any TypeVisitor::visit(ASTExprStatement *node) {
@@ -207,16 +222,18 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
-  
+
   // special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
-    left = right; 
-    if (auto iden = dynamic_cast<ASTIdentifier*>(node->left)) {
-      context.current_scope->insert(iden->value.value, left); 
+    left = right;
+    if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
+      context.current_scope->insert(iden->value.value, left);
     }
   }
-  
-  // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have their operands type checked, but right now that would involve casting scalars to each other, which makes no  sense.
+
+  // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have their
+  // operands type checked, but right now that would involve casting scalars to
+  // each other, which makes no  sense.
   if (node->op.is_relational()) {
     node->resolved_type = bool_type();
     return bool_type();
@@ -226,25 +243,31 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     auto conv_rule_0 = type_conversion_rule(left_t, right_t);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t);
     // TODO(Josh) 10/1/2024, 3:07:47 PM
-    // validate that this is what we want. Before, it was too strict, now it feels like its too loose.
-    // also, we should probably do specific type checking based on the operator, we still need some sort of table.
-    if (((conv_rule_0 == CONVERT_PROHIBITED) && (conv_rule_1 == CONVERT_PROHIBITED)) || ((conv_rule_0 == CONVERT_EXPLICIT) && (conv_rule_1 == CONVERT_EXPLICIT))) {
-      throw_error(std::format("Type error in binary expression: cannot convert between {} and {}",
-              left_t->to_string(), right_t->to_string()),
-          ERROR_FAILURE, node->source_range);
+    // validate that this is what we want. Before, it was too strict, now it
+    // feels like its too loose. also, we should probably do specific type
+    // checking based on the operator, we still need some sort of table.
+    if (((conv_rule_0 == CONVERT_PROHIBITED) &&
+         (conv_rule_1 == CONVERT_PROHIBITED)) ||
+        ((conv_rule_0 == CONVERT_EXPLICIT) &&
+         (conv_rule_1 == CONVERT_EXPLICIT))) {
+      throw_error(std::format("Type error in binary expression: cannot convert "
+                              "between {} and {}",
+                              left_t->to_string(), right_t->to_string()),
+                  ERROR_FAILURE, node->source_range);
     }
   }
-  
+
   node->resolved_type = left;
   return left;
 }
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
-  
+
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule =
-        type_conversion_rule(context.current_scope->get_type(operand_ty), context.current_scope->get_type(bool_type()));
+        type_conversion_rule(context.current_scope->get_type(operand_ty),
+                             context.current_scope->get_type(bool_type()));
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                         conversion_rule != CONVERT_EXPLICIT);
 
@@ -276,21 +299,22 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
         ERROR_FAILURE, node->source_range);
   }
 }
+
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-    
+
     auto n = std::stoll(node->value);
     if (n > std::numeric_limits<int32_t>::max() ||
-      n < std::numeric_limits<int32_t>::min()) {
+        n < std::numeric_limits<int32_t>::min()) {
       return s64_type();
     }
     if (n > std::numeric_limits<int16_t>::max() ||
-      n < std::numeric_limits<int16_t>::min()) {
+        n < std::numeric_limits<int16_t>::min()) {
       return s32_type();
     }
     if (n > std::numeric_limits<int8_t>::max() ||
-      n < std::numeric_limits<int8_t>::min()) {
+        n < std::numeric_limits<int8_t>::min()) {
       return s16_type();
     }
     return s8_type();
@@ -305,8 +329,12 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     return bool_type();
   case ASTLiteral::Null:
     return voidptr_type();
+  case ASTLiteral::InterpolatedString: {
+    return global_find_type_id("string", {});
+  }
   }
 }
+
 std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = context.current_scope->lookup(node->name.value);
 
@@ -319,18 +347,22 @@ std::any TypeVisitor::visit(ASTCall *node) {
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   auto type = context.current_scope->get_type(symbol->type_id);
-  auto fn_ty_info = dynamic_cast<FunctionTypeInfo*>(type->info);
-  
-  // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors without
-  // this function syntax, using #make(Type, ...) is really clunky and annoying;
-  
+  auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->info);
+
+  // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
+  // without this function syntax, using #make(Type, ...) is really clunky
+  // and annoying;
+
   if (!type || !fn_ty_info) {
-    throw_error("Unable to call function: {} did not refer to a function typed variable. Constructors currently use #make(Type, ...) syntax.", ERROR_FAILURE, node->source_range);
+    throw_error("Unable to call function: {} did not refer to a function typed "
+                "variable. Constructors currently use #make(Type, ...) syntax.",
+                ERROR_FAILURE, node->source_range);
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);
 
-  if (!info->is_varargs && (arg_tys.size() > info->params_len ||
+  if (!info->is_varargs &&
+      (arg_tys.size() > info->params_len ||
        arg_tys.size() < info->params_len - info->default_params)) {
     throw_error(
         std::format("Function call '{}' has incorrect number of arguments. "
@@ -340,12 +372,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
   }
 
   for (int i = 0; i < info->params_len; ++i) {
-    
+
     // BUG: default parameters evade type checking
     if (arg_tys.size() <= i) {
       continue;
     }
-    
+
     validate_type_compatability(
         arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
@@ -385,24 +417,32 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto type = int_from_any(v.collection->accept(this));
     auto t = context.current_scope->get_type(type);
     auto iden = static_cast<ASTIdentifier *>(v.target);
-    
+
     int iter_ty = -1;
-    auto info = dynamic_cast<StructTypeInfo*>(t->info);
-    if (info && (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array())) {
-      // TODO: add a way to use the value_semantic thing with custom iterators.
-      Symbol* begin = info->scope->lookup("begin");
-      Symbol* end = info->scope->lookup("end");
+    auto info = dynamic_cast<StructTypeInfo *>(t->info);
+    if (info &&
+        (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array())) {
+      // TODO: add a way to use the value_semantic thing with custom
+      // iterators.
+      Symbol *begin = info->scope->lookup("begin");
+      Symbol *end = info->scope->lookup("end");
       if (begin && end && begin->type_id == end->type_id) {
         iter_ty = begin->type_id;
       } else {
-        throw_error("Can only iterate over structs you define 'begin' and 'end' on. They must both be defined, and must both return the same type.", ERROR_FAILURE, node->source_range);
+        throw_error("Can only iterate over structs you define 'begin' and "
+                    "'end' on. They must both be defined, and must both "
+                    "return the same type.",
+                    ERROR_FAILURE, node->source_range);
       }
-    } else if (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array()) {
-      throw_error("cannot iterate with a range based for loop over a non collection type.", ERROR_FAILURE, node->source_range);
+    } else if (!t->extensions.is_array() &&
+               !t->extensions.is_fixed_sized_array()) {
+      throw_error("cannot iterate with a range based for loop over a non "
+                  "collection type.",
+                  ERROR_FAILURE, node->source_range);
     } else {
       iter_ty = t->get_element_type();
     }
-    
+
     // Take a pointer to the type.
     // This probably won't work well with custom iterators.
     if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
@@ -411,7 +451,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
       ext.extensions.push_back(TYPE_EXT_POINTER);
       iter_ty = context.current_scope->find_type_id(type->base, ext);
     }
-    
+
     context.current_scope->insert(iden->value.value, iter_ty);
     v.target->accept(this);
   } break;
@@ -426,8 +466,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
-  // we add fall through here because we dont know if this will get excecuted
-  // since we cant evaluate the condition to know
+  // we add fall through here because we dont know if this will get
+  // excecuted since we cant evaluate the condition to know
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
@@ -466,8 +506,8 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
-  // we add fall through here because we dont know if this will get excecuted
-  // since we cant evaluate the condition to know
+  // we add fall through here because we dont know if this will get
+  // excecuted since we cant evaluate the condition to know
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
@@ -488,62 +528,69 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     method->accept(this);
   }
 
-  
   context.exit_scope();
   return {};
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = context.current_scope->get_type(left);
-  
+
   if (!left_ty) {
-    throw_error("Internal Compiler Error: un-typed variable on lhs of dot expression?", ERROR_FAILURE, node->source_range);
+    throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
+                "expression?",
+                ERROR_FAILURE, node->source_range);
   }
-  
+
   // TODO: remove this hack to get array length
   if (left_ty->extensions.is_array()) {
-    auto right = dynamic_cast<ASTIdentifier*>(node->right);
+    auto right = dynamic_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
       return s32_type();
     }
   }
-  
+
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
-    auto info = static_cast<EnumTypeInfo*>(left_ty->info);
-    auto iden = dynamic_cast<ASTIdentifier*>(node->right);
-    
+    auto info = static_cast<EnumTypeInfo *>(left_ty->info);
+    auto iden = dynamic_cast<ASTIdentifier *>(node->right);
+
     if (!iden) {
-      throw_error("cannot use a dot expression with a non identifer on the right hand side when referring to a enum.", ERROR_FAILURE, node->source_range);
+      throw_error("cannot use a dot expression with a non identifer on the "
+                  "right hand side when referring to a enum.",
+                  ERROR_FAILURE, node->source_range);
     }
-    
+
     auto name = iden->value.value;
-    
+
     bool found = false;
-    for (const auto &key: info->keys) {
+    for (const auto &key : info->keys) {
       if (name == key) {
         found = true;
         break;
       }
     }
-    
+
     if (!found) {
-      throw_error("failed to find key in enum type.", ERROR_FAILURE, node->source_range);
+      throw_error("failed to find key in enum type.", ERROR_FAILURE,
+                  node->source_range);
     }
-    
-    // TODO(Josh) Add a way to support more than just s32 types from enums. Ideally, we could even use const char* etc. 9/30/2024, 11:53:45 AM
+
+    // TODO(Josh) Add a way to support more than just s32 types from enums.
+    // Ideally, we could even use const char* etc. 9/30/2024, 11:53:45 AM
     return s32_type();
   }
 
   if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
-    throw_error(std::format("cannot use dot expr on non-struct currently, got {}", left_ty->to_string()), ERROR_FAILURE,
-                node->source_range);
+    throw_error(
+        std::format("cannot use dot expr on non-struct currently, got {}",
+                    left_ty->to_string()),
+        ERROR_FAILURE, node->source_range);
   }
-  
+
   Scope *scope;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->info)) {
     scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo*>(left_ty->info)) {
+  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->info)) {
     scope = info->scope;
   }
 
@@ -552,12 +599,12 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (prev_parent && !previous_scope->is_struct_or_union_scope) {
     scope->parent = previous_scope;
   }
-  
+
   // TODO: see above.
   context.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
   context.set_scope(previous_scope);
-  
+
   if (prev_parent && !previous_scope->is_struct_or_union_scope) {
     scope->parent = prev_parent;
   }
@@ -570,7 +617,6 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = context.current_scope->get_type(left);
 
-  
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
                             left_ty->to_string()),
@@ -599,26 +645,38 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   int type = -1;
   for (const auto &expr : node->expressions) {
     auto t = int_from_any(expr->accept(this));
-    if (type == -1) type = t;
-    else validate_type_compatability(t, type, node->source_range, "expected: {}, got {}", "initializer list had different types in one or many expressions");
+    if (type == -1)
+      type = t;
+    else
+      validate_type_compatability(t, type, node->source_range,
+                                  "expected: {}, got {}",
+                                  "initializer list had different types in "
+                                  "one or many expressions");
   }
   if (type == -1) {
-    throw_error("Cannot have an empty initializer list currently. to be implemented.", ERROR_FAILURE, node->source_range);
+    throw_error("Cannot have an empty initializer list currently. to be "
+                "implemented.",
+                ERROR_FAILURE, node->source_range);
   }
-  
+
   auto base = context.current_scope->get_type(type);
   // (int)node->expressions.size();
-  return context.current_scope->find_type_id(base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = { -1 }});
+  return context.current_scope->find_type_id(
+      base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
-  for (const auto &[key, value]: node->key_values) {
+  for (const auto &[key, value] : node->key_values) {
     if (value.is_not_null()) {
       if (node->is_flags) {
-        throw_error("You shouldn't use a #flags enum to generate auto flags, and also use non-default values.", ERROR_FAILURE, node->source_range);
+        throw_error("You shouldn't use a #flags enum to generate auto "
+                    "flags, and also use non-default values.",
+                    ERROR_FAILURE, node->source_range);
       }
       auto expr = value.get();
       auto type = int_from_any(value.get()->accept(this));
-      validate_type_compatability(type, s32_type(), node->source_range, "expected: {}, got : {}", "Cannot have non-integral types in enums");
+      validate_type_compatability(type, s32_type(), node->source_range,
+                                  "expected: {}, got : {}",
+                                  "Cannot have non-integral types in enums");
     }
   }
   return {};
@@ -626,18 +684,18 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   // we store this ast just to type check the stuff.
   context.set_scope(node->scope);
-  
+
   // do this first.
   for (const auto &_struct : node->structs) {
-    for (const auto &field: _struct->fields) {
+    for (const auto &field : _struct->fields) {
       field->accept(this);
       node->scope->insert(field->name.value, field->type->resolved_type);
     }
   }
-  for (const auto &field: node->fields) {
-    field->accept(this);  
+  for (const auto &field : node->fields) {
+    field->accept(this);
   }
-  for (const auto &method: node->methods) {
+  for (const auto &method : node->methods) {
     method->accept(this);
   }
   context.exit_scope();
@@ -648,23 +706,25 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   // Do something here. This is probably bad,
   // but this shouldn't be used as an expression really.
   if (node->kind == ASTAllocate::Delete) {
-    if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) {
-      throw_error("invalid delete statement: you need at least one argument", ERROR_FAILURE, node->source_range);
+    if (node->arguments.is_null() ||
+        node->arguments.get()->arguments.size() < 1) {
+      throw_error("invalid delete statement: you need at least one argument",
+                  ERROR_FAILURE, node->source_range);
     }
-    // TODO(Josh) 10/1/2024, 4:40:04 PM This won't quite work, as the allocations aren't directly tied to the 
-    // delete. We try to delete the delete node, not the alloc node.
-    // we need to somehow lookup the source scope and variable, and then erase that.
-    // erase_allocation(node);
+    // TODO(Josh) 10/1/2024, 4:40:04 PM This won't quite work, as the
+    // allocations aren't directly tied to the delete. We try to delete the
+    // delete node, not the alloc node. we need to somehow lookup the source
+    // scope and variable, and then erase that. erase_allocation(node);
     return void_type();
   }
-  
+
   auto type = int_from_any(node->type.get()->accept(this));
   // just type check them, no need to return
-  // we should probably type check parameters for a constructor 
+  // we should probably type check parameters for a constructor
   // but we need a seperate system for that
   if (node->arguments)
     node->arguments.get()->accept(this);
-  
+
   auto t = context.current_scope->get_type(type);
   return node->type.get()->resolved_type = t->id;
 }

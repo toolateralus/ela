@@ -33,6 +33,11 @@ struct Scope {
   std::unordered_map<std::string, Symbol> symbols;
   std::set<int> types;
 
+  inline void create_type_alias(const std::string &alias, int type) {
+    insert(alias, type, true);
+    global_type_aliases[alias] = type;
+  }
+
   // we try to find an alias that we own or our parents own.
   inline int find_alias(const std::string name, const TypeExt &ext) {
     for (const auto &[symname, sym] : symbols) {

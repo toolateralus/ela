@@ -35,6 +35,7 @@ std::vector<ASTAllocate*> allocation_info;
 
 std::vector<Token> all_tokens;
 
+std::unordered_set<std::string> import_set;
 /*
   #########################
   ### PROVIDING EXTERNS ###

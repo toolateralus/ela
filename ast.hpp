@@ -12,6 +12,7 @@
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
+#include <unordered_set>
 #include <vector>
 
 enum {
@@ -25,6 +26,7 @@ template <class T> T *ast_alloc(size_t n = 1) {
 }
 
 struct VisitorBase;
+extern std::unordered_set<std::string> import_set;
 
 // TODO: add an enum member in the base that says what type this node is,
 // so we can be more performant and just static_cast<T*> instead of
@@ -131,9 +133,11 @@ struct ASTLiteral : ASTExpr {
     Float,
     String,
     RawString,
+    InterpolatedString,
     Bool,
     Null,
   } tag;
+  std::vector<ASTExpr*> interpolated_values {};
   std::string value;
   std::any accept(VisitorBase *visitor) override;
 };

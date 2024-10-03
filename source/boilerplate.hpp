@@ -1,6 +1,5 @@
 #include <cstdint>
 #include <cstddef>
-#include <type_traits>
 
 using float64 = double;
 using u64 = size_t;
@@ -17,6 +16,10 @@ using s8 = int8_t;
 using u8 = uint8_t;
 
 extern "C" int printf(const char *format, ...);
+
+#undef RAND_MAX
+#undef assert
+
 
 #include <initializer_list>
 #include <algorithm>
@@ -88,6 +91,7 @@ struct string  {
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
+  
   ~string() {
     if (data)
       delete[] data;
@@ -128,7 +132,6 @@ struct string  {
     return data + length;
   }
 };
-
 
 // TODO(Josh) 10/2/2024, 8:27:34 AM
 // Reimplement runtime type reflection

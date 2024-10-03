@@ -288,6 +288,7 @@ int global_create_union_type(const std::string &name, Scope *scope, UnionKind ki
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
 
+// helpers to get scalar types for fast comparison
 int voidptr_type();
 int bool_type();
 int void_type();
@@ -295,10 +296,19 @@ int s8_type();
 int s16_type();
 int s32_type();
 int s64_type();
+int int_type();
+int u8_type();
+int u16_type();
+int u32_type();
+int u64_type();
+int float64_type();
+int float_type();
 int float32_type();
 
 // char *
 int charptr_type();
+
+
 
 int global_find_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);

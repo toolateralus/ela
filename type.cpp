@@ -421,7 +421,6 @@ int global_create_struct_type(const std::string &name, Scope *scope) {
   num_types++;
   return type->id;
 }
-
 int global_create_union_type(const std::string &name, Scope *scope,
                              UnionKind kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
@@ -471,44 +470,6 @@ int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
-int voidptr_type() {
-  static int type = global_find_type_id(
-      "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
-  return type;
-}
-int bool_type() {
-  static int type = global_find_type_id("bool", {});
-  return type;
-}
-int void_type() {
-  static int type = global_find_type_id("void", {});
-  return type;
-}
-int s8_type() {
-  static int type = global_find_type_id("s8", {});
-  return type;
-}
-int s16_type() {
-  static int type = global_find_type_id("s16", {});
-  return type;
-}
-int s32_type() {
-  static int type = global_find_type_id("s32", {});
-  return type;
-}
-int s64_type() {
-  static int type = global_find_type_id("s64", {});
-  return type;
-}
-int charptr_type() {
-  static int type =
-      global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
-  return type;
-}
-int float32_type() {
-  static int type = global_find_type_id("float32", {});
-  return type;
-}
 int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
@@ -548,10 +509,12 @@ std::string Type::to_type_struct(Context &context) {
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
-      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-        << std::format(".type = {}",
-                        context.current_scope->get_type(sym.type_id)
-                            ->to_type_struct(context)) << " }";
+      auto t = global_get_type(sym.type_id);
+      if (!t) {
+        throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", ERROR_FAILURE, {});
+      }
+      
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", " << std::format(".type = {}", t->to_type_struct(context)) << " }";
       ++it;
       if (it < count) {
         fields_ss << ", ";
@@ -580,7 +543,6 @@ std::string Type::to_type_struct(Context &context) {
 
   return std::format("_type_info[{}]", this->id);
 }
-
 std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
@@ -595,11 +557,78 @@ std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
   ss << ")";
   return ss.str();
 }
-
 Token get_anonymous_struct_name() {
   static int num = 0;
   auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
                    TFamily::Identifier);
   num++;
   return tok;
+}
+
+
+int voidptr_type() {
+  static int type = global_find_type_id(
+      "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
+  return type;
+}
+int bool_type() {
+  static int type = global_find_type_id("bool", {});
+  return type;
+}
+int void_type() {
+  static int type = global_find_type_id("void", {});
+  return type;
+}
+int u8_type() {
+  static int type = global_find_type_id("u8", {});
+  return type;
+}
+int u16_type() {
+  static int type = global_find_type_id("u16", {});
+  return type;
+}
+int u32_type() {
+  static int type = global_find_type_id("u32", {});
+  return type;
+}
+int u64_type() {
+  static int type = global_find_type_id("u64", {});
+  return type;
+}
+int s8_type() {
+  static int type = global_find_type_id("s8", {});
+  return type;
+}
+int s16_type() {
+  static int type = global_find_type_id("s16", {});
+  return type;
+}
+int s32_type() {
+  static int type = global_find_type_id("s32", {});
+  return type;
+}
+int s64_type() {
+  static int type = global_find_type_id("s64", {});
+  return type;
+}
+int int_type() {
+  static int type = global_find_type_id("int", {});
+  return type;
+}
+int charptr_type() {
+  static int type =
+      global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
+  return type;
+}
+int float32_type() {
+  static int type = global_find_type_id("float32", {});
+  return type;
+}
+int float64_type() {
+  static int type = global_find_type_id("float64", {});
+  return type;
+}
+int float_type() {
+  static int type = global_find_type_id("float", {});
+  return type;
 }

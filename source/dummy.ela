@@ -1,11 +1,7 @@
 #import core;
 
-Xaryu :: struct {
-  float f;
-  float f1;
-  int x2;
-}
 
 main :: () {
-  
+  n1 := 0
+  n := $"{n1 + 2}";
 }

@@ -81,6 +81,7 @@ enum struct TType {
   Union,
   New,
   Delete,
+  Dollar,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -160,6 +161,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompXor);
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
+    TTYPE_CASE(Dollar);
   }
   return "Unknown";
 }
@@ -231,6 +233,11 @@ struct Token {
 
 struct Lexer {
   struct State {
+    
+    bool operator ==(const Lexer::State &other) const {
+      return other.input == input;
+    }
+    
     State(const std::string &input, size_t file_idx, size_t input_len)
         : input(input), file_idx(file_idx), input_len(input_len) {}
 
@@ -241,7 +248,12 @@ struct Lexer {
     size_t line = 1;
     size_t file_idx{};
     size_t input_len{};
-
+    
+    
+    static State from_string(const std::string &input) {
+      return State(input, 0, input.length());
+    }
+    
     static State from_file(const std::string &input,
                            const std::string &filename) {
       auto canonical = std::filesystem::canonical(filename);
@@ -283,6 +295,7 @@ struct Lexer {
       
 
   const std::unordered_map<std::string, TType> operators{
+      {"$", TType::Dollar},
       {":=", TType::ColonEquals },
       {"...", TType::Varargs},  {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},

@@ -593,3 +593,19 @@ something :: (float32 f) -> float32 {
   int_ptr* other1 = pp;
   assert("alias failed to equal pointed to type field.", pp == other1);
 }
+
+Xaryu :: struct {
+  int value;
+  to_string :: () -> char * {
+    return "XarBar";
+  }
+}
+
+#test test_string_interpolation :: () {
+  Xaryu xarbar;
+  string interp = $"{xarbar.to_string()}";
+  assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
+  interp = $"{(1 + 1) * 2}";
+  println($"Interpolated value {interp}");
+  assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
+}
