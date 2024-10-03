@@ -86,9 +86,11 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 
   auto sym = ctx.scope->lookup(node->name.value);
   
-  if (sym && (sym->flags & SYMBOL_HAS_OVERLOADS) != 0) {
+  // TODO: don't ignore constructors and destructors.
+  if (sym && ((sym->flags & SYMBOL_HAS_OVERLOADS) != 0) && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = ctx.scope->get_type(overload_type_id);
+      
       auto this_type = ctx.scope->get_type(type_id);
       // TODO: verify that we even want to use this function.
       // It might not do the fine grained equality check that we need on the parameter and return types.
