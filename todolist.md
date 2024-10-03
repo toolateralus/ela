@@ -1,5 +1,8 @@
 ## TODO List
 
+To search for all info comments in the source just use vscodes regex search with
+`TODO|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG`
+
 --- Important ---
 We desperately need to refactor the way we resolve symbols, 
 And we need function overloading and such. This is key to enabling things like calling constructors without #make, 

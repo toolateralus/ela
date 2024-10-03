@@ -1137,11 +1137,9 @@ ASTExpr *Parser::parse_primary() {
     auto str = expect(TType::String);
     auto node = ast_alloc<ASTLiteral>();
     node->tag = ASTLiteral::InterpolatedString;
-
     auto lexer_state = Lexer::State::from_string(str.value);
     states.push_back(lexer_state);
     std::vector<ASTExpr *> exprs;
-
     fill_buffer_if_needed();
     while (lexer_state == states.back() && peek().type != TType::Eof) {
       if (peek().type == TType::LCurly) {
@@ -1151,11 +1149,9 @@ ASTExpr *Parser::parse_primary() {
         eat();
       }
     }
-
     if (states.back() == lexer_state) {
       states.pop_back();
     }
-
     auto pos = 0;
     while (pos < str.value.length()) {
       if (str.value[pos] == '{') {
@@ -1169,9 +1165,6 @@ ASTExpr *Parser::parse_primary() {
         ++pos;
       }
     }
-    
-    std::cout << "parsed interp string : " << str.value << "..end\n";
-
     node->value = str.value;
     node->interpolated_values = exprs;
     end_node(node, range);

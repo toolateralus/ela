@@ -29,179 +29,40 @@ struct ASTFunctionDeclaration;
 struct Scope {
   // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flags or something.
   bool is_struct_or_union_scope = false;
-  
   std::unordered_map<std::string, Symbol> symbols;
   std::set<int> types;
-
+  
+  Scope *parent = nullptr;
+  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
+  
   inline void create_type_alias(const std::string &alias, int type) {
     insert(alias, type, true);
     global_type_aliases[alias] = type;
   }
-
-  // we try to find an alias that we own or our parents own.
-  inline int find_alias(const std::string name, const TypeExt &ext) {
-    for (const auto &[symname, sym] : symbols) {
-      if (symname != name)
-        continue;
-
-      auto type = global_get_type(sym.type_id);
-      if (type->extensions.equals({})) {
-        return type->id;
-      } else {
-        auto new_exts = type->extensions;
-        auto in_exts = ext;
-        for (const auto &ext_ : in_exts.extensions) {
-          if (ext_ == TYPE_EXT_ARRAY) {
-            auto back = in_exts.array_sizes.back();
-            in_exts.array_sizes.pop_back();
-            new_exts.array_sizes.push_back(back);
-            new_exts.extensions.push_back(TYPE_EXT_ARRAY);
-          } else {
-            new_exts.extensions.push_back(TYPE_EXT_POINTER);
-          }
-        }
-        auto new_id = global_find_type_id(name, new_exts);
-        types.insert(new_id);
-        return new_id;
-      }
-    }
-    if (parent) {
-      return parent->find_alias(name, ext);
-    }
-    return -1;
-  }
-
-  inline int find_type_id(const std::string &name, const TypeExt &ext) {
-    if (global_type_aliases.contains(name)) {
-      return find_alias(name, ext);
-    }
-
-    auto base_id = global_find_type_id(name, {});
-    auto id = global_find_type_id(name, ext);
-
-    if (!types.contains(id) && types.contains(base_id)) {
-      // a type with new extensions got created, so we just add it to this
-      // scope.
-      types.insert(id);
-      return id;
-    }
-
-    if (types.contains(id))
-      return id;
-
-    if (parent) {
-      auto id = parent->find_type_id(name, ext);
-      if (id != -1)
-        return id;
-    }
-
-    return -1;
-  }
-  inline int find_type_id(const std::string &name, const FunctionTypeInfo &info,
-                          const TypeExt &ext) {
-
-    if (global_type_aliases.contains(name)) {
-      return find_alias(name, ext);
-    }
-
-    auto base_id = global_find_type_id(name, info, {});
-    auto id = global_find_type_id(name, info, ext);
-
-    // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types
-    // declared in our scope. Fix the discord here, We shouldn't have to do
-    // this.
-    // Although, this might be fine, as it avoids us for searching for the most common types always.
-    if (!types.contains(id)) {
-      types.insert(id);
-      return id;
-    }
-
-    if (types.contains(id))
-      return id;
-
-    if (parent) {
-      auto id = parent->find_type_id(name, ext);
-      if (id != -1)
-        return id;
-    }
-
-    if (types.contains(id))
-      return id;
-    return -1;
-  }
-  inline Type *get_type(int id) const {
-    if (types.contains(id))
-      return global_get_type(id);
-
-    if (parent) {
-      return parent->get_type(id);
-    }
-    return nullptr;
-  }
-
-  int create_struct_type(const std::string &name, Scope *scope) {
-    auto type = ::global_create_struct_type(name, scope);
-    types.insert(type);
-    return type;
-  }
-
-  int create_union_type(const std::string &name, Scope *scope, UnionKind kind) {
-    auto type = ::global_create_union_type(name, scope, kind);
-    types.insert(type);
-    return type;
-  }
-
+  
+  // TODO: verify we need a copy of this
   std::string get_function_typename(ASTFunctionDeclaration *decl);
-
+  int find_alias(const std::string name, const TypeExt &ext);
+  int find_type_id(const std::string &name, const TypeExt &ext);
+  int find_type_id(const std::string &name, const FunctionTypeInfo &info,
+                   const TypeExt &ext);
+                   
+  Type *get_type(int id) const;
+  int create_struct_type(const std::string &name, Scope *scope);
+  int create_union_type(const std::string &name, Scope *scope, UnionKind kind);
   int create_enum_type(const std::string &name,
-                       const std::vector<std::string> &keys, bool is_flags) {
-    auto type = ::global_create_enum_type(name, keys, is_flags);
-    types.insert(type);
-    return type;
-  }
+                       const std::vector<std::string> &keys, bool is_flags);
+  
+  
   int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
-                  const TypeExt &extensions) {
-    auto type = ::global_create_type(kind, name, info, extensions);
-    types.insert(type);
-    return type;
-  }
+                  const TypeExt &extensions);
+  
+  void insert(const std::string &name, int type_id, bool is_type_alias = false);
+  Symbol *lookup(const std::string &name);
+  void erase(const std::string &name);
 
-  Scope *parent = nullptr;
-  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
-  inline void insert(const std::string &name, int type_id,
-                     bool is_type_alias = false) {
-    symbols[name] = Symbol{name, type_id, is_type_alias};
-    if (is_type_alias) {
-      global_type_aliases.insert({name, type_id});
-    }
-  }
-  inline Symbol *lookup(const std::string &name) {
-    if (symbols.find(name) != symbols.end()) {
-      return &symbols[name];
-    } else if (parent) {
-      return parent->lookup(name);
-    }
-    return nullptr;
-  }
-  inline void erase(const std::string &name) { symbols.erase(name); }
-
-  inline void on_scope_enter() {
-    for (const auto &[id, sym] : symbols) {
-      if (sym.type_alias) {
-        global_type_aliases.insert({id, sym.type_id});
-      }
-    }
-  }
-  inline void on_scope_exit() {
-    for (const auto &[id, sym] : symbols) {
-      if (sym.type_alias) {
-        auto pointed_to = global_get_type(sym.type_id);
-        auto it = global_type_aliases.find(sym.name);
-        if (it != global_type_aliases.end())
-          global_type_aliases.erase(it);
-      }
-    }
-  }
+  void on_scope_enter();
+  void on_scope_exit();
 };
 
 static Scope *create_child(Scope *parent) {
