@@ -32,7 +32,7 @@ extern std::unordered_set<std::string> import_set;
 // so we can be more performant and just static_cast<T*> instead of
 // dynamic_cast<T*>;
 // TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
-// this way we can use things before theyre defined, prune unused code, etc.
+// this way we can use functions and type declarations before theyre defined, prune unused code, etc.
 struct ASTNode {
   SourceRange source_range{};
   virtual ~ASTNode() = default;
@@ -378,6 +378,7 @@ struct ASTNoop : ASTStatement {
 
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
+  std::any visit(ASTNoop *noop) { return {}; }                                 \
   virtual std::any visit(ASTProgram *node) = 0;                                \
   virtual std::any visit(ASTBlock *node) = 0;                                  \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                               \

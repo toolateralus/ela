@@ -13,7 +13,7 @@
 #include <set>
 #include <unordered_set>
 
-// TODO(Josh) 10/2/2024, 9:22:21 AM
+// CLEANUP(Josh) 10/2/2024, 9:22:21 AM
 // Reduce this code size. It ends up taking up the majority of the parsing code.
 // Eventually, the ones that are really solid and used frequently could be
 // reimplemented as keywords.
@@ -70,7 +70,7 @@ void Parser::init_directive_routines() {
   // #read
   // Read a file into a string at compile time. Nice for embedding resources
   // into your program.
-  // TODO: add a binary mode, where its just an array of chars or something.
+  // FEATURE: add a binary mode, where its just an array of chars or something.
   {
     directive_routines.push_back(
         {.identifier = "read",
@@ -94,7 +94,7 @@ void Parser::init_directive_routines() {
   // #test
   // declare a test function. Only gets compiled into --test builds, and
   // produces a test main, a builtin test suite.
-  // TODO: add categories and extra naming stuff to these. would be nice for
+  // FEATURE: add categories and extra naming stuff to these. would be nice for
   // filtering etc.
   {
     directive_routines.push_back(
@@ -964,8 +964,8 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   auto scope = block->scope;
 
-  // TODO: remove this if we find a way to extract the anonymous types defined
-  // in the scope etc.
+  // right now we just export anonymous types to the enclosing scope.
+  // This shouldn't really be a problem, since you never know the name anyway
   for (const auto &type : scope->types) {
     context.current_scope->types.insert(type);
   }

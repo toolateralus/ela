@@ -192,6 +192,7 @@ void init_type_system() {
   }
 }
 constexpr int get_type_unresolved() { return Type::invalid_id; }
+
 constexpr bool type_is_numerical(const Type *t) {
   auto info = dynamic_cast<ScalarTypeInfo *>(t->info);
   if (!info)
@@ -215,6 +216,13 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   }
   return from_info->size <= to_info->size;
 }
+
+// CLEANUP(Josh) 10/3/2024, 9:25:36 AM
+// This could be significantly improved for readability
+// PERFORMANCE(Josh) 10/3/2024, 9:25:51 AM
+// Doing linear searches over the types a ton of times might get slower for large programs.
+// However per 500 lines of unit tsting which creates a wide variety of types, we only really get
+// like 50-100 types total, so a hash map is not really going to pay off that much probably.
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("type was null when checking type conversion rules",
@@ -287,6 +295,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   return CONVERT_PROHIBITED;
 }
+
 std::string Type::to_string() const {
   switch (kind) {
   case TYPE_STRUCT:
@@ -338,12 +347,14 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   }
   return false;
 }
+
 bool Type::equals(const std::string &name,
                   const TypeExt &type_extensions) const {
   if (!names_match_or_alias(name))
     return false;
   return type_extensions == this->extensions;
 }
+
 bool TypeExt::equals(const TypeExt &other) const {
   if (extensions.size() != other.extensions.size())
     return false;
@@ -357,6 +368,7 @@ bool TypeExt::equals(const TypeExt &other) const {
       return false;
   return true;
 }
+
 std::string Type::to_cpp_string() const {
   switch (kind) {
   case TYPE_SCALAR:
@@ -433,7 +445,6 @@ int global_create_union_type(const std::string &name, Scope *scope,
   num_types++;
   return type->id;
 }
-
 int global_create_enum_type(const std::string &name,
                             const std::vector<std::string> &keys,
                             bool is_flags) {
@@ -470,6 +481,21 @@ int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
+std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
+  std::stringstream ss;
+  auto return_type = decl->return_type;
+  ss << global_get_type(return_type->resolved_type)->to_string();
+  ss << "(";
+  for (const auto &param : decl->params->params) {
+    ss << global_get_type(param->type->resolved_type)->to_string();
+    if (param != decl->params->params.back()) {
+      ss << ", ";
+    }
+  }
+  ss << ")";
+  return ss.str();
+}
+
 int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
@@ -479,8 +505,9 @@ int Type::get_element_type() const {
   extensions.array_sizes.pop_back();
   return global_find_type_id(base, extensions);
 }
-// TODO: re-implement this with a much better, non flipped up design. 2024-09-29
-// 12:26:42
+
+// TODO(Josh) 10/3/2024, 9:26:51 AM
+// Move this somewhere more appropriate, we're generating C++ code in the type system.
 std::string Type::to_type_struct(Context &context) {
   static bool *type_cache = [] {
     auto arr = new bool[MAX_NUM_TYPES];
@@ -543,20 +570,6 @@ std::string Type::to_type_struct(Context &context) {
 
   return std::format("_type_info[{}]", this->id);
 }
-std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
-  std::stringstream ss;
-  auto return_type = decl->return_type;
-  ss << global_get_type(return_type->resolved_type)->to_string();
-  ss << "(";
-  for (const auto &param : decl->params->params) {
-    ss << global_get_type(param->type->resolved_type)->to_string();
-    if (param != decl->params->params.back()) {
-      ss << ", ";
-    }
-  }
-  ss << ")";
-  return ss.str();
-}
 Token get_anonymous_struct_name() {
   static int num = 0;
   auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
@@ -564,7 +577,6 @@ Token get_anonymous_struct_name() {
   num++;
   return tok;
 }
-
 
 int voidptr_type() {
   static int type = global_find_type_id(

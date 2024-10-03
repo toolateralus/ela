@@ -160,10 +160,13 @@ std::any EmitVisitor::visit(ASTCall *node) {
 std::any EmitVisitor::visit(ASTLiteral *node) {
   if (node->tag == ASTLiteral::InterpolatedString) {
     if (node->value.empty()) {
+      throw_warning("using an empty interpolated string causes memory leaks right now.", node->source_range);
       (*ss) << "string(\"\")"; // TODO: fix this. this will cause memory leaks.
       return {};
     }
     if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
+      // TODO: fix this restriction. Really, instead of defining strlen and sprintf in core, we can just define them in the runtime and have
+      // definitions implemented by the compiler in the type and symbol systems.
       throw_error("You must '#import core' before you use interpolated strings "
                   "temporarily, due to a dependency on sprintf.",
                   ERROR_FAILURE, node->source_range);
@@ -439,11 +442,8 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
 }
 
 void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
-  // creates a constexpr auto function = []() -> return_type { ... };
-  // these are alwyas constexpr because we do not do closure objects, nor do we
-  // have the ability to check that right now.
-  // TODO: we could have an option for like #closure to just use & and hope that
-  // it works fine. It should work fine
+  // Right now we just always do a closure on local lambda functions.
+  // This probably isn't desirable for simple in-out functions
   (*ss) << indent() << "auto " << node->name.value << " = [&]";
   node->params->accept(this);
   (*ss) << " -> ";
@@ -694,7 +694,8 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
       left_ty->extensions.extensions.back() == TYPE_EXT_POINTER)
     op = "->";
 
-  // TODO: remove this hack to get array length
+  // TODO: remove this hack to get array length, or at least make a nicer system for getting 
+  // properties of builtin types that aren't considered structs by the langauge.
   if (!left_ty->extensions.extensions.empty() &&
       left_ty->extensions.extensions.back() == TYPE_EXT_ARRAY) {
     auto right = dynamic_cast<ASTIdentifier *>(node->right);
@@ -792,6 +793,9 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     iden = "enum ";
   } else {
     // TODO: use enum struct to prevent naming conflicts?
+    // Really, instead of that, we can just not use a C enum and just declare constants prefixed with the type name,
+    // so that each type can have unique identifiers without needing to explicitly cast to integer when used as flags.
+    // That is annoying behaviour i dislike from C++
     iden = "enum ";
   }
 

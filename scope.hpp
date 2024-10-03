@@ -110,6 +110,7 @@ struct Scope {
     // TODO(Josh) 10/2/2024, 11:12:40 AM  We always insert function types
     // declared in our scope. Fix the discord here, We shouldn't have to do
     // this.
+    // Although, this might be fine, as it avoids us for searching for the most common types always.
     if (!types.contains(id)) {
       types.insert(id);
       return id;

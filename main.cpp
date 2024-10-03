@@ -150,7 +150,6 @@ bool get_compilation_flag(const std::string &flag) {
 Context::Context() {
   // define some default functions that may or may not be macros.
   {
-    // CLEANUP(Josh) Fix this? if there is a way. Perhaps we want C style macros, as unsafe and annoying to debug they are. 9/30/2024, 9:30:29 AM
     // We still define assert and sizeof manually here, because
     // there's no way to do this in language currently, as they're macros
     FunctionTypeInfo assert_info{};
@@ -206,7 +205,7 @@ Context::Context() {
     str_scope->insert("length", s32_type());
   }
   
-  // add the base types for all of the primitives.  
+  // add the base types for all of the primitives to the root scope.
   for (int i = 0; i < num_types; ++i) {
     auto type = global_get_type(i);
     root_scope->types.insert(i);

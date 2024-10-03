@@ -12,8 +12,6 @@ struct VisitorBase {
   };
   int visitor_flags = FLAG_NO_STATE;
   virtual ~VisitorBase() = default;
-  // TODO(Josh) 10/1/2024, 12:46:32 PM move into the macro
-  std::any visit(ASTNoop *noop) { return {}; }
   DECLARE_VISIT_BASE_METHODS()
 };
 
