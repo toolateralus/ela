@@ -798,48 +798,6 @@ check_error :: (char* location) {
   }
 }
 
-mat4 :: union {
-  float[16] values;
-  #anon :: struct {
-    float M00;
-    float M01;
-    float M02;
-    float M03;
-    float M10;
-    float M11;
-    float M12;
-    float M13;
-    float M20;
-    float M21;
-    float M22;
-    float M23;
-    float M30;
-    float M31;
-    float M32;
-    float M33;
-  };
-}
-
-mat4_identity :: () -> mat4 {
-  mat4 matrix;
-  matrix.M00 = 1.0;
-  matrix.M01 = 0.0;
-  matrix.M02 = 0.0;
-  matrix.M03 = 0.0;
-  matrix.M10 = 0.0;
-  matrix.M11 = 1.0;
-  matrix.M12 = 0.0;
-  matrix.M13 = 0.0;
-  matrix.M20 = 0.0;
-  matrix.M21 = 0.0;
-  matrix.M22 = 1.0;
-  matrix.M23 = 0.0;
-  matrix.M30 = 0.0;
-  matrix.M31 = 0.0;
-  matrix.M32 = 0.0;
-  matrix.M33 = 1.0;
-  return matrix;
-}
 vec4 :: union {
   float[4] values;
   #anon :: struct {
@@ -891,6 +849,18 @@ vec3 :: union {
   }
 }
 
+vec3_normalize :: (vec3 v) -> vec3 {
+
+}
+vec3_cross :: (vec3 v) -> vec3 {
+
+}
+
+vec3_dot :: (vec3 v) -> vec3 {
+
+}
+
+
 vec3_one :: () -> vec3 {
   return #make(vec3, 1.0);
 }
@@ -924,6 +894,85 @@ vec2_zero :: () -> vec2 {
   return #make(vec2, 0.0);
 }
 
+
+mat4 :: union {
+  float[16] values;
+  #anon :: struct {
+    float M00;
+    float M01;
+    float M02;
+    float M03;
+    float M10;
+    float M11;
+    float M12;
+    float M13;
+    float M20;
+    float M21;
+    float M22;
+    float M23;
+    float M30;
+    float M31;
+    float M32;
+    float M33;
+  };
+}
+
+// mat4_translation :: (float x, y, z) -> mat4 {
+//   mat4 matrix = mat4_identity();
+//   matrix.M30 = x;
+//   matrix.M31 = y;
+//   matrix.M32 = z;
+//   return matrix;
+// }
+
+// mat4_scale :: (float x, y, z) -> mat4 {
+//   mat4 matrix = mat4_identity();
+//   matrix.M00 = x;
+//   matrix.M11 = y;
+//   matrix.M22 = z;
+//   return matrix;
+// }
+
+// mat4_look_at :: (vec3 eye, center, up) -> mat4 {
+//   vec3 f = normalize(center - eye);
+//   vec3 s = normalize(cross(f, up));
+//   vec3 u = cross(s, f);
+//   mat4 matrix = mat4_identity();
+//   matrix.M00 = s.x;
+//   matrix.M01 = s.y;
+//   matrix.M02 = s.z;
+//   matrix.M10 = u.x;
+//   matrix.M11 = u.y;
+//   matrix.M12 = u.z;
+//   matrix.M20 = -f.x;
+//   matrix.M21 = -f.y;
+//   matrix.M22 = -f.z;
+//   matrix.M30 = -dot(s, eye);
+//   matrix.M31 = -dot(u, eye);
+//   matrix.M32 = dot(f, eye);
+//   return matrix;
+// }
+
+// mat4_identity :: () -> mat4 {
+//   mat4 matrix;
+//   matrix.M00 = 1.0;
+//   matrix.M01 = 0.0;
+//   matrix.M02 = 0.0;
+//   matrix.M03 = 0.0;
+//   matrix.M10 = 0.0;
+//   matrix.M11 = 1.0;
+//   matrix.M12 = 0.0;
+//   matrix.M13 = 0.0;
+//   matrix.M20 = 0.0;
+//   matrix.M21 = 0.0;
+//   matrix.M22 = 1.0;
+//   matrix.M23 = 0.0;
+//   matrix.M30 = 0.0;
+//   matrix.M31 = 0.0;
+//   matrix.M32 = 0.0;
+//   matrix.M33 = 1.0;
+//   return matrix;
+// }
 
 Shader :: struct {
   u32 handle;

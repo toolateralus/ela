@@ -251,6 +251,29 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
+  auto type = ctx.scope->get_type(left);
+  
+  // TODO: this needs a really big rework.
+  // TODO: we gotta do type checking on parameters.
+  if (type && type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo*>(type->info);
+    if (auto sym = info->scope->lookup(node->op.value)) {
+      if (sym->is_function()) {
+        // TODO: fix this. we have ambiguitty with how we do this
+        int t = -1;
+        if (sym->function_overload_types[0] == -1) {
+          t = sym->type_id;
+        } else {
+          t = sym->function_overload_types[0];
+        }
+        auto fun_ty = global_get_type(t);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        auto param_0 = fun_info->parameter_types[0];
+        validate_type_compatability(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
+        return fun_info->return_type;
+      }
+    }
+  }
 
   // special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
@@ -292,6 +315,37 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
+  if (node->op.type == TType::And) {
+    auto ty = ctx.scope->get_type(operand_ty);
+    auto extensions = ty->extensions;
+    extensions.extensions.push_back(TYPE_EXT_POINTER);
+    return ctx.scope->find_type_id(ty->base, extensions);
+  }
+
+  if (node->op.type == TType::Mul) {
+    return remove_one_pointer_ext(operand_ty, node->source_range);
+  }
+
+
+  auto left_ty = ctx.scope->get_type(operand_ty);
+  if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->extensions.has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo*>(left_ty->info);
+    if (auto sym = info->scope->lookup(node->op.value)) {
+      if (sym->is_function()) {
+        // TODO: fix this. we have ambiguitty with how we do this
+        int t = -1;
+        if (sym->function_overload_types[0] == -1) {
+          t = sym->type_id;
+        } else {
+          t = sym->function_overload_types[0];
+        }
+        auto fun_ty = global_get_type(t);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        return fun_info->return_type;
+      }
+    } else throw_error(std::format("couldn't find {} overload for struct type", node->op.value), ERROR_FAILURE, node->source_range);
+  }
+
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule =
@@ -303,17 +357,6 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
     if (node->op.type == TType::Not && can_convert) {
       return bool_type();
     }
-  }
-
-  if (node->op.type == TType::And) {
-    auto ty = ctx.scope->get_type(operand_ty);
-    auto extensions = ty->extensions;
-    extensions.extensions.push_back(TYPE_EXT_POINTER);
-    return ctx.scope->find_type_id(ty->base, extensions);
-  }
-
-  if (node->op.type == TType::Mul) {
-    return remove_one_pointer_ext(operand_ty, node->source_range);
   }
 
   return operand_ty;
@@ -387,7 +430,33 @@ std::any TypeVisitor::visit(ASTCall *node) {
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
   
-  Type *type;
+  Type *type = ctx.scope->get_type(symbol->type_id);
+  
+  // TODO: again, we probably don't need functor objects, theyre fancy and unneccesary.
+  // Perform call to operator overload for ();
+  if (type->is_kind(TYPE_STRUCT)) {
+    auto info = static_cast<StructTypeInfo*>(type->info);
+    if (auto sym = info->scope->lookup("(")) {
+      if (sym->is_function()) {
+        // TODO: fix this. we have ambiguitty with how we do this
+        int t = -1;
+        if (sym->function_overload_types[0] == -1) {
+          t = sym->type_id;
+        } else {
+          t = sym->function_overload_types[0];
+        }
+        auto fun_ty = global_get_type(t);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        if (fun_info->params_len != arg_tys.size())
+          throw_error("Invalid number of arguments for call operator overload", ERROR_FAILURE, node->source_range);
+        for (int i = 0; i < fun_info->params_len; ++i) {
+          validate_type_compatability(arg_tys[i], fun_info->parameter_types[i], node->source_range, "expected: {}, got: {}", "invalid parameter type in call operator overload");
+        }
+        return fun_info->return_type;
+      }
+    } else throw_error("couldn't find call '()' overload for struct type", ERROR_FAILURE, node->source_range);
+  }
+  
   // Find a suitable function overload to call.
   if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
     bool found_exact_match = false;
@@ -435,6 +504,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     type = ctx.scope->get_type(symbol->type_id);
   }
   
+  
   auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->info);
 
   // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
@@ -446,6 +516,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
                 "variable. Constructors currently use #make(Type, ...) syntax.",
                 ERROR_FAILURE, node->source_range);
   }
+  
+   // TODO: this needs a really big rework.
+  // TODO: we gotta do type checking on parameters.
+  
+
+  
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);
 
@@ -699,6 +775,41 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = ctx.scope->get_type(left);
+
+  
+  // TODO: determine if we even want operator overloading for subscript.
+  // It seems to have highlighted type system issues, though so we can at least use it to debug why a dot expression
+  // seems to propogate the root type to the right
+  if (true)
+  {
+    // TODO: this should be improved to handle [0,1,2,3] and [0..10];
+    // Perform call to operator overload for [];
+    if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
+        left_ty->extensions.has_no_extensions()) {
+      auto info = static_cast<StructTypeInfo *>(left_ty->info);
+      if (auto sym = info->scope->lookup("[")) {
+        if (sym->is_function()) {
+          // TODO: fix this. we have ambiguitty with how we do this
+          int t = -1;
+          if (sym->function_overload_types[0] == -1) {
+            t = sym->type_id;
+          } else {
+            t = sym->function_overload_types[0];
+          }
+          auto fun_ty = global_get_type(t);
+          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->info);
+          auto param_0 = fun_info->parameter_types[0];
+          validate_type_compatability(
+              subscript, fun_info->parameter_types[0], node->source_range,
+              "expected: {}, got: {}",
+              "invalid parameter type in subscript operator overload");
+          return fun_info->return_type;
+        }
+      } else
+        throw_error("couldn't find [] overload for struct type", ERROR_FAILURE,
+                    node->source_range);
+    }
+  } 
 
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",

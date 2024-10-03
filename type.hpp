@@ -35,7 +35,7 @@ enum ConversionRule {
   CONVERT_EXPLICIT,
 };
 
-Token get_anonymous_struct_name();
+Token get_unique_identifier();
 
 enum StructTypeFlags {
   STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
@@ -79,6 +79,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_CTOR = 1 << 3,
   FUNCTION_IS_DTOR = 1 << 4,
   FUNCTION_IS_VARARGS = 1 << 5,
+  FUNCTION_IS_OPERATOR = 1 << 6,
 };
 
 enum struct FunctionMetaType {
@@ -328,3 +329,5 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 
 // returns false for failure, else true and passed param signature as out.
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
+
+void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);

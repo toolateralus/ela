@@ -273,8 +273,9 @@ std::any EmitVisitor::visit(ASTIdentifier *node) {
 }
 
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
-  (*ss) << node->op.value;
+  (*ss) << '(' << node->op.value;
   node->operand->accept(this);
+  (*ss) << ")";
   return {};
 }
 
@@ -554,6 +555,29 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       throw_error("Cannot forward declare a constructor", ERROR_FAILURE,
                   node->source_range);
     }
+    node->block.get()->accept(this);
+    return {};
+  }
+    
+  if ((node->flags & FUNCTION_IS_OPERATOR) != 0) {
+    
+    auto op = node->name;
+    emit_warnings_or_errors_for_operator_overloads(op.type, node->source_range);
+    
+    if (op.type == TType::LParen) {
+      op.value = "()";
+    }
+    
+    if (op.type == TType::LBrace) {
+      op.value = "[]";
+    }
+    
+    if (op.type == TType::Dot) {
+      op.value = "->";
+    }
+    node->return_type->accept(this);
+    (*ss) << " operator " << op.value;
+    node->params->accept(this);
     node->block.get()->accept(this);
     return {};
   }

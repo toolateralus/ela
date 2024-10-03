@@ -4,6 +4,10 @@
 #foreign free :: (void *ptr) -> void;
 #foreign system :: (char* cmd) -> int;
 
+#foreign sqrt :: (float f) -> float;
+#foreign cos :: (float f) -> float;
+#foreign sin :: (float f) -> float;
+
 #foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
 #foreign memset :: (void *dest, int c, u64 n) -> void*;
 
@@ -65,3 +69,4 @@ string_substr :: (char *src, int start, end) -> string {
 println :: (string str) {
   printf("%s\n", #make(char*, str));
 }
+

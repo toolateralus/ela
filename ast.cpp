@@ -397,7 +397,7 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            parser->expect(TType::DoubleColon);
            auto decl =
-               parser->parse_struct_declaration(get_anonymous_struct_name());
+               parser->parse_struct_declaration(get_unique_identifier());
            auto t = parser->ctx.scope->get_type(
                decl->type->resolved_type);
            auto info = static_cast<StructTypeInfo *>(t->info);
@@ -405,6 +405,47 @@ void Parser::init_directive_routines() {
            return decl;
          }});
   }
+  
+  {
+    directive_routines.push_back({
+      .identifier = "operator",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto range = parser->begin_node();
+        parser->expect(TType::LParen);
+        auto op = parser->eat();
+        
+        // TODO: verify this works to overload ()
+        if (parser->peek().type == TType::RParen && parser->lookahead_buf()[1].type == TType::RParen) {
+          parser->eat();
+        } else if (parser->peek().type == TType::RBrace) {
+          parser->eat();
+        }
+        
+        parser->expect(TType::RParen);
+      
+        if (op.family != TFamily::Operator) {
+          parser->end_node(nullptr, range);
+          throw_error(std::format("Operator overload failed; {} was not a valid operator to overload", op.value), ERROR_FAILURE, range);
+        }
+        
+        parser->expect(TType::DoubleColon);
+        Token token;
+        
+        // Do we want to do it with the unique identifier?
+        auto func_decl = parser->parse_function_declaration(get_unique_identifier());
+        
+        func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
+        
+        // TODO: do we want to do this? we'll see as this progresses.
+        func_decl->name = op;
+        
+        return func_decl;
+      }
+    });
+    
+  }
+  
 }
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,

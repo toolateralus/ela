@@ -1,6 +1,8 @@
 #include "type.hpp"
 #include "ast.hpp"
+#include "core.hpp"
 #include "error.hpp"
+#include "lex.hpp"
 #include <sstream>
 
 std::string FunctionTypeInfo::to_string() const {
@@ -570,7 +572,7 @@ std::string Type::to_type_struct(Context &context) {
 
   return std::format("_type_info[{}]", this->id);
 }
-Token get_anonymous_struct_name() {
+Token get_unique_identifier() {
   static int num = 0;
   auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
                    TFamily::Identifier);
@@ -655,4 +657,64 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
     out.push_back(info->parameter_types[i]);
   }
   return true;
+}
+void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range) {
+  switch (type) {
+  case TType::Assign:
+  case TType::Range:
+  case TType::Comma:
+  case TType::Semi:
+  case TType::Varargs:
+  case TType::Directive:
+  case TType::ColonEquals:
+  case TType::New:
+  case TType::Delete:
+  case TType::Dollar:
+  case TType::RParen:
+  case TType::RBrace:
+    throw_error("Operator overload not allowed", ERROR_FAILURE, range);
+  case TType::Arrow:
+    throw_warning("Operator overload: Use '.' instead of '->'", range);
+    return;
+    
+  // Valid
+  case TType::Add:
+  case TType::Sub:
+  case TType::Mul:
+  case TType::Div:
+  case TType::Modulo:
+  case TType::Not:
+  case TType::BitwiseNot:
+  case TType::Or:
+  case TType::And:
+  case TType::SHL:
+  case TType::SHR:
+  case TType::Xor:
+  case TType::LogicalOr:
+  case TType::LogicalAnd:
+  case TType::LT:
+  case TType::GT:
+  case TType::EQ:
+  case TType::NEQ:
+  case TType::LE:
+  case TType::GE:
+  case TType::LParen:
+  case TType::LBrace:
+  case TType::Dot:
+  case TType::Increment:
+  case TType::Decrement:
+  case TType::CompAdd:
+  case TType::CompSub:
+  case TType::CompMul:
+  case TType::CompDiv:
+  case TType::CompMod:
+  case TType::CompAnd:
+  case TType::CompOr:
+  case TType::CompXor:
+  case TType::CompSHL:
+  case TType::CompSHR:
+    break;
+  default: 
+    throw_error(std::format("Invalid operator overload {}", TTypeToString(type)), ERROR_FAILURE, range);
+  }
 }

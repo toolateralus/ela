@@ -1,5 +1,6 @@
 #include "scope.hpp"
 #include "ast.hpp"
+#include "type.hpp"
 
 Context::Context() {
   // define some default functions that may or may not be macros.
@@ -57,6 +58,7 @@ Context::Context() {
     
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
+    str_scope->insert("[", s8_type());
   }
   
   // add the base types for all of the primitives to the root scope.
