@@ -336,9 +336,8 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-    
+    // TODO: this still seems to not always return the correct values.
     int base = 10;
-    
     if (node->value.starts_with("0x")) {
       base = 0;
     } 
@@ -346,25 +345,19 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
       node->value = node->value.substr(2, node->value.length());
       base = 2;
     }
-    
     auto n = std::strtoll(node->value.c_str(), nullptr, base);
-    
     if (n > std::numeric_limits<int32_t>::max() ||
         n < std::numeric_limits<int32_t>::min()) {
-      printf("for value: %s, returning s64\n", node->value.c_str());
       return s64_type();
     }
     if (n > std::numeric_limits<int16_t>::max() ||
         n < std::numeric_limits<int16_t>::min()) {
-      printf("for value: %s, returning s32\n", node->value.c_str());
       return s32_type();
     }
     if (n > std::numeric_limits<int8_t>::max() ||
         n < std::numeric_limits<int8_t>::min()) {
-      printf("for value: %s, returning s16\n", node->value.c_str());
       return s16_type();
     }
-    printf("for value: %s, returning s8\n", node->value.c_str());
     return s8_type();
   }
   case ASTLiteral::Float:
@@ -642,20 +635,17 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       return s32_type();
     }
   }
-
+  
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
     auto info = static_cast<EnumTypeInfo *>(left_ty->info);
     auto iden = dynamic_cast<ASTIdentifier *>(node->right);
-
     if (!iden) {
       throw_error("cannot use a dot expression with a non identifer on the "
                   "right hand side when referring to a enum.",
                   ERROR_FAILURE, node->source_range);
     }
-
     auto name = iden->value.value;
-
     bool found = false;
     for (const auto &key : info->keys) {
       if (name == key) {
@@ -663,12 +653,10 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
         break;
       }
     }
-
     if (!found) {
       throw_error("failed to find key in enum type.", ERROR_FAILURE,
                   node->source_range);
     }
-
     // TODO(Josh) Add a way to support more than just s32 types from enums.
     // Ideally, we could even use const char* etc. 9/30/2024, 11:53:45 AM
     return s32_type();
@@ -759,7 +747,7 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
       base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
-  int largest_type = s8_type();
+  int largest_type = s32_type();
   int largest_type_size = 1;
   for (const auto &[key, value] : node->key_values) {
     if (value.is_not_null()) {

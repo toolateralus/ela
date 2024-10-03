@@ -706,7 +706,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   }
 
   if (left_ty->is_kind(TYPE_ENUM)) {
-    (*ss) << left_ty->base << "::";
+    (*ss) << left_ty->base << '_';
     node->right->accept(this);
     return {};
   }
@@ -809,8 +809,10 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     return value;
   };
   int n = 0;
+  
+  auto type_name = node->type->base;
   for (const auto &[key, value] : node->key_values) {
-    (*ss) << key;
+    (*ss) << type_name << '_' << key;
     (*ss) << " = ";
     if (value.is_not_null()) {
       value.get()->accept(this);
