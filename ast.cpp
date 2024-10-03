@@ -129,7 +129,7 @@ void Parser::init_directive_routines() {
            Defer deferred = {
                [&] { parser->current_func_decl = last_func_decl; }};
 
-           if (parser->context.current_scope != parser->context.root_scope)
+           if (parser->ctx.scope != parser->ctx.root_scope)
              throw_error(
                  std::format(
                      "cannot declare a non-top level foreign function:: {}",
@@ -314,7 +314,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto enum_decl = parser->parse_enum_declaration(name);
            enum_decl->is_flags = true;
-           auto type = parser->context.current_scope->get_type(
+           auto type = parser->ctx.scope->get_type(
                enum_decl->type->resolved_type);
            auto info = static_cast<EnumTypeInfo *>(type->info);
            info->is_flags = true;
@@ -331,9 +331,9 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           auto id = parser->context.current_scope->find_type_id(
+           auto id = parser->ctx.scope->find_type_id(
                aliased_type->base, aliased_type->extension_info);
-           parser->context.current_scope->insert(name.value, id, SYMBOL_IS_TYPE_ALIAS);
+           parser->ctx.scope->insert(name.value, id, SYMBOL_IS_TYPE_ALIAS);
            return ast_alloc<ASTNoop>();
          }});
   }
@@ -358,8 +358,8 @@ void Parser::init_directive_routines() {
              parser->eat();
            }
 
-           auto type = parser->context.current_scope->get_type(
-               parser->context.current_scope->find_type_id(asttype.value, {}));
+           auto type = parser->ctx.scope->get_type(
+               parser->ctx.scope->find_type_id(asttype.value, {}));
            auto string = ast_alloc<ASTLiteral>();
            string->tag = ASTLiteral::String;
            string->value = type->to_string();
@@ -398,7 +398,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto decl =
                parser->parse_struct_declaration(get_anonymous_struct_name());
-           auto t = parser->context.current_scope->get_type(
+           auto t = parser->ctx.scope->get_type(
                decl->type->resolved_type);
            auto info = static_cast<StructTypeInfo *>(t->info);
            info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
@@ -515,7 +515,7 @@ ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
 
-  if (context.current_scope->find_type_id(tok.value, {}) != -1) {
+  if (ctx.scope->find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -566,12 +566,12 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    if (context.current_scope->find_type_id(tok.value, {}) != -1) {
+    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
 
       auto decl = parse_declaration();
       node->value.c_style.decl = decl;
-      context.current_scope->erase(decl->name.value);
+      ctx.scope->erase(decl->name.value);
 
       expect(TType::Semi);
       node->value.c_style.condition = parse_expr();
@@ -593,9 +593,9 @@ ASTStatement *Parser::parse_statement() {
     }
     node->block = parse_block();
     if (node->tag == ASTFor::CStyle) {
-      context.set_scope(node->block->scope);
-      context.current_scope->insert(node->value.c_style.decl->name.value, -1);
-      context.exit_scope();
+      ctx.set_scope(node->block->scope);
+      ctx.scope->insert(node->value.c_style.decl->name.value, -1);
+      ctx.exit_scope();
     }
     end_node(node, range);
     return node;
@@ -698,11 +698,11 @@ ASTStatement *Parser::parse_statement() {
                 range);
   }
 
-  if (context.current_scope->lookup(tok.value)) {
+  if (ctx.scope->lookup(tok.value)) {
     throw_error(std::format("Unexpected variable {}", tok.value), ERROR_FAILURE,
                 range);
   }
-  if (context.current_scope->find_type_id(tok.value, {}) == -1) {
+  if (ctx.scope->find_type_id(tok.value, {}) == -1) {
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),
         ERROR_FAILURE, range);
@@ -726,25 +726,25 @@ ASTDeclaration *Parser::parse_declaration() {
   }
 
   end_node(decl, range);
-  if (context.current_scope->lookup(iden.value)) {
+  if (ctx.scope->lookup(iden.value)) {
     throw_error(std::format("re-definition of '{}'", iden.value), ERROR_FAILURE,
                 decl->source_range);
   }
-  context.current_scope->insert(iden.value, -1);
+  ctx.scope->insert(iden.value, -1);
   return decl;
 }
 ASTBlock *Parser::parse_block() {
   auto range = begin_node();
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
-  context.set_scope();
+  ctx.set_scope();
   while (not_eof() && peek().type != TType::RCurly) {
     block->statements.push_back(parse_statement());
     if (semicolon())
       eat();
   }
   expect(TType::RCurly);
-  block->scope = context.exit_scope();
+  block->scope = ctx.exit_scope();
   end_node(block, range);
   return block;
 }
@@ -758,18 +758,21 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto last_func_decl = current_func_decl;
   current_func_decl = function;
 
-  const auto isnt_ctor_or_dtor =
-      current_struct_decl.is_not_null() &&
-      current_struct_decl.get()->type->base != name.value;
-
-  if (context.current_scope->lookup(name.value) && isnt_ctor_or_dtor) {
-    throw_error(std::format("re-definition of function '{}'", name.value),
-                ERROR_FAILURE, {});
-  }
-
-  // to allow for recursion
-  context.current_scope->insert(name.value, -1);
+  // TODO: we don't need this if we have proper function overloading. Leaving it here though.
+  // const auto isnt_ctor_or_dtor =
+  //     current_struct_decl.is_not_null() &&
+  //     current_struct_decl.get()->type->base != name.value;
+  
   function->params = parse_parameters();
+  
+  auto sym = ctx.scope->lookup(name.value);
+  if (sym) {
+    sym->flags |= SYMBOL_HAS_OVERLOADS;  
+  } else {
+    // to allow for recursion
+    ctx.scope->insert(name.value, -1);
+  }
+  
   function->name = name;
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
@@ -804,7 +807,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (!type || context.current_scope->find_type_id(next.value, {}) != -1) {
+    if (!type || ctx.scope->find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
     auto name = expect(TType::Identifier).value;
@@ -895,7 +898,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys.push_back(key);
     keys_set.insert(key);
   }
-  node->type->resolved_type = context.current_scope->create_enum_type(
+  node->type->resolved_type = ctx.scope->create_enum_type(
       node->type->base, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
@@ -907,7 +910,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   current_struct_decl = decl;
 
   // fwd declare the type.
-  auto type_id = context.current_scope->create_struct_type(name.value, {});
+  auto type_id = ctx.scope->create_struct_type(name.value, {});
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
@@ -934,7 +937,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
     decl->scope = block->scope;
   } else {
-    Type *t = context.current_scope->get_type(type_id);
+    Type *t = ctx.scope->get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->info);
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
@@ -967,7 +970,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   // right now we just export anonymous types to the enclosing scope.
   // This shouldn't really be a problem, since you never know the name anyway
   for (const auto &type : scope->types) {
-    context.current_scope->types.insert(type);
+    ctx.scope->types.insert(type);
   }
 
   // TODO: fix this up, this is a mess.
@@ -980,7 +983,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     } else if (auto struct_decl =
                    dynamic_cast<ASTStructDeclaration *>(statement)) {
       auto type =
-          context.current_scope->get_type(struct_decl->type->resolved_type);
+          ctx.scope->get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->info);
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         ;
@@ -1005,7 +1008,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   // CLEANUP(JOSH): do we even need to store ASTType*'s on these type
   // declaration nodes?
-  node->type->resolved_type = context.current_scope->create_union_type(
+  node->type->resolved_type = ctx.scope->create_union_type(
       name.value, block->scope, UNION_IS_NORMAL);
   end_node(node, range);
   return node;
@@ -1020,7 +1023,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         peek().type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (iden) {
-        context.current_scope->insert(iden->value.value, -1);
+        ctx.scope->insert(iden->value.value, -1);
       }
     }
     if (token_precedence <= precedence) {
@@ -1188,7 +1191,7 @@ ASTExpr *Parser::parse_primary() {
     auto range = begin_node();
     auto name = tok.value;
 
-    if (context.current_scope->find_type_id(tok.value, {}) != -1) {
+    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
       return parse_type();
     }
     eat();

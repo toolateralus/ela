@@ -18,6 +18,7 @@ enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_IS_TYPE_ALIAS = 1 << 2,
+  SYMBOL_HAS_OVERLOADS = 1 << 3,
 };
 
 struct Symbol {
@@ -28,7 +29,7 @@ struct Symbol {
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
   
-  std::vector<std::vector<int>> parameter_signatures;
+  std::vector<int> function_overload_types;
   
   bool is_type_alias() const {
     return (flags & SYMBOL_IS_TYPE_ALIAS) != 0;
@@ -95,24 +96,24 @@ struct Context {
   // to be emitted to cpp.
   std::vector<std::string> type_info_strings;
 
-  Scope *current_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Scope *root_scope;
   Context();
 
-  inline void set_scope(Scope *scope = nullptr) {
-    if (!scope) {
-      scope = create_child(current_scope);
+  inline void set_scope(Scope *in_scope = nullptr) {
+    if (!in_scope) {
+      in_scope = create_child(scope);
     }
-    current_scope = scope;
+    scope = in_scope;
     scope->on_scope_enter();
-    // printf("entering scope: %p\n", current_scope);
-  }
-  inline Scope *exit_scope() {
-    auto scope = current_scope;
-    if (current_scope) {
-      current_scope->on_scope_exit();
-      current_scope = current_scope->parent;
+}
+
+inline Scope *exit_scope() {
+    auto old_scope = scope;
+    if (scope) {
+      scope->on_scope_exit();
+      scope = scope->parent;
     }
-    return scope;
-  }
+    return old_scope;
+}
 };

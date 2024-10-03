@@ -20,7 +20,7 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   ss << indent() << "Block {\n";
 
   ss << indent() << "flags: " << block_flags_to_string(node->flags) << '\n';
-  auto type = context.current_scope->get_type(node->return_type);
+  auto type = context.scope->get_type(node->return_type);
   if (type)
     ss << indent() << "type: " << type->to_string() << '\n';
 
@@ -42,9 +42,9 @@ std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
   
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
-  auto sym = context.current_scope->lookup(node->name.value);
+  auto sym = context.scope->lookup(node->name.value);
   
-  ss << indent() << "type: " << context.current_scope->get_type(sym->type_id)->to_string() << '\n';
+  ss << indent() << "type: " << context.scope->get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
   
   if (node->block.is_not_null()) {
@@ -119,7 +119,7 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 }
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
-    auto type = context.current_scope->get_type(node->resolved_type);
+    auto type = context.scope->get_type(node->resolved_type);
     ss << "type: " << node->resolved_type << ", " << type->base
        << type->extensions.to_string();
     return {};
@@ -144,7 +144,7 @@ std::any SerializeVisitor::visit(ASTArguments *node) {
 }
 std::any SerializeVisitor::visit(ASTCall *node) {
   ss << indent() << "Call " << node->name.value
-     << " type: " << context.current_scope->get_type(node->type)->to_string() << " {\n";
+     << " type: " << context.scope->get_type(node->type)->to_string() << " {\n";
   indentLevel++;
   visit(node->arguments);
   indentLevel--;
@@ -243,7 +243,7 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   
-  auto t = context.current_scope->get_type(node->type->resolved_type);
+  auto t = context.scope->get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(t->info);
   
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
@@ -395,12 +395,12 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {
   case ASTAllocate::New: {
-    auto ptr_type = context.current_scope->get_type(node->type.get()->resolved_type);
+    auto ptr_type = context.scope->get_type(node->type.get()->resolved_type);
     (*ss) << "new ";
     auto ext = ptr_type->extensions;
     ext.extensions.pop_back();
-    auto nonptr = context.current_scope->find_type_id(ptr_type->base, ext);
-    auto nonptr_ty = context.current_scope->get_type(nonptr);
+    auto nonptr = context.scope->find_type_id(ptr_type->base, ext);
+    auto nonptr_ty = context.scope->get_type(nonptr);
     auto str = nonptr_ty->to_cpp_string();
     (*ss) << str;
     if (!node->arguments) {

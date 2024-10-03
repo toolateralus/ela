@@ -541,7 +541,7 @@ struct Parser {
     return_type->extension_info = extension_info;
     
     FunctionTypeInfo info{};
-    info.return_type = context.current_scope->find_type_id(return_type->base, return_type->extension_info);
+    info.return_type = ctx.scope->find_type_id(return_type->base, return_type->extension_info);
 
     auto param_types = parse_parameter_types();
     std::ostringstream ss;
@@ -550,8 +550,8 @@ struct Parser {
     {
       ss << "(";
       for (size_t i = 0; i < param_types.size(); ++i) {
-        info.parameter_types[i] = context.current_scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
-        ss << context.current_scope->get_type(info.parameter_types[i])->to_string();
+        info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
+        ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
         if (i != param_types.size() - 1) {
           ss << ", ";
         }
@@ -559,8 +559,8 @@ struct Parser {
       ss << ")";
     }
     
-    auto type_name = context.current_scope->get_type(info.return_type)->to_string() + ss.str();
-    return_type->resolved_type = context.current_scope->find_type_id(type_name, info, {});
+    auto type_name = ctx.scope->get_type(info.return_type)->to_string() + ss.str();
+    return_type->resolved_type = ctx.scope->find_type_id(type_name, info, {});
     return_type->base = type_name;
     return_type->extension_info = {};
 
@@ -596,7 +596,7 @@ struct Parser {
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
       : states({Lexer::State::from_file(contents, filename)}),
-        context(context) {
+        ctx(context) {
     init_directive_routines();
     fill_buffer_if_needed();
     // for (int i = lookahead_buf().size(); i < 8; ++i) {
@@ -604,7 +604,7 @@ struct Parser {
     // }
   }
   
-  Context &context;
+  Context &ctx;
   Lexer lexer{};
   std::vector<Lexer::State> states;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;

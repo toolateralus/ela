@@ -644,3 +644,15 @@ int float_type() {
   static int type = global_find_type_id("float", {});
   return type;
 }
+
+bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
+  out.clear();
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    return false;
+  }
+  auto info = static_cast<FunctionTypeInfo *>(type->info);
+  for (int i = 0; i < info->params_len; ++i) {
+    out.push_back(info->parameter_types[i]);
+  }
+  return true;
+}

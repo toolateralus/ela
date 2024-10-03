@@ -11,14 +11,14 @@ Context::Context() {
     assert_info.parameter_types[0] = charptr_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
-    current_scope->insert("assert", global_find_type_id("void(char *, bool)", assert_info, {}), SYMBOL_IS_FUNCTION);
+    scope->insert("assert", global_find_type_id("void(char *, bool)", assert_info, {}), SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = global_find_type_id("s64", {});
     sizeof_info.is_varargs = true;
     // no other function will ever use this type. thats why we have a ?, because we have no first class types yet.
-    current_scope->insert("sizeof", global_find_type_id("s64(?)", sizeof_info, {}), SYMBOL_IS_FUNCTION);
-    root_scope = current_scope;  
+    scope->insert("sizeof", global_find_type_id("s64(?)", sizeof_info, {}), SYMBOL_IS_FUNCTION);
+    root_scope = scope;  
   }
   
   // define types used for reflection, which are currently half implemented due to ineffectiveness.

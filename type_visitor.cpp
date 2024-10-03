@@ -43,7 +43,7 @@ std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
-  return node->resolved_type = context.current_scope->find_type_id(
+  return node->resolved_type = ctx.scope->find_type_id(
              node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
@@ -69,7 +69,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
 
   auto params = node->params->params;
-
+  
   for (const auto &param : params) {
     if (param->default_value.is_not_null())
       info.default_params++;
@@ -81,11 +81,31 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     info.params_len++;
   }
 
-  auto type_id = context.current_scope->find_type_id(
-      context.current_scope->get_function_typename(node), info, {});
+  auto type_id = ctx.scope->find_type_id(
+      ctx.scope->get_function_typename(node), info, {});
 
-  // insert function
-  context.current_scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
+  auto sym = ctx.scope->lookup(node->name.value);
+  
+  if (sym && (sym->flags & SYMBOL_HAS_OVERLOADS) != 0) {
+    for (const auto overload_type_id : sym->function_overload_types) {
+      auto type = ctx.scope->get_type(overload_type_id);
+      auto this_type = ctx.scope->get_type(type_id);
+      // TODO: verify that we even want to use this function.
+      // It might not do the fine grained equality check that we need on the parameter and return types.
+      // Maybe it will sinec that info is encoded into function type name.s
+      if (type->equals(this_type->base, this_type->extensions)) { 
+        throw_error(std::format("re-definition of function '{}'", node->name.value),
+                ERROR_FAILURE, {});
+      }
+    }
+    sym->function_overload_types.push_back(type_id);
+  } else  {
+    // insert function
+    ctx.scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
+  }
+
+
+  
 
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     return {};
@@ -124,7 +144,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 }
 
 std::any TypeVisitor::visit(ASTBlock *node) {
-  context.set_scope(node->scope);
+  ctx.set_scope(node->scope);
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
   for (auto &statement : node->statements) {
@@ -148,7 +168,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
 
   node->flags = block_cf.flags;
   node->return_type = block_cf.type;
-  context.exit_scope();
+  ctx.exit_scope();
   return block_cf;
 }
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
@@ -159,7 +179,7 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 }
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
-  auto type = context.current_scope->get_type(id);
+  auto type = ctx.scope->get_type(id);
 
   if (type->extensions.is_fixed_sized_array()) {
     throw_warning("using a fixed array as a function parameter: note, this "
@@ -183,7 +203,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
       extensions.extensions.insert(extensions.extensions.begin(),
                                    TYPE_EXT_POINTER);
       node->type->resolved_type =
-          context.current_scope->find_type_id(type->base, extensions);
+          ctx.scope->find_type_id(type->base, extensions);
     }
   }
 
@@ -207,7 +227,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
         std::format("declaration: {}", node->name.value));
   }
 
-  auto symbol = context.current_scope->lookup(node->name.value);
+  auto symbol = ctx.scope->lookup(node->name.value);
   symbol->type_id = node->type->resolved_type;
   
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
@@ -228,7 +248,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   if (node->op.type == TType::ColonEquals) {
     left = right;
     if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
-      context.current_scope->insert(iden->value.value, left);
+      ctx.scope->insert(iden->value.value, left);
     }
   }
 
@@ -239,8 +259,8 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     node->resolved_type = bool_type();
     return bool_type();
   } else {
-    auto left_t = context.current_scope->get_type(left);
-    auto right_t = context.current_scope->get_type(right);
+    auto left_t = ctx.scope->get_type(left);
+    auto right_t = ctx.scope->get_type(right);
     auto conv_rule_0 = type_conversion_rule(left_t, right_t);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t);
     // TODO(Josh) 10/1/2024, 3:07:47 PM
@@ -267,8 +287,8 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule =
-        type_conversion_rule(context.current_scope->get_type(operand_ty),
-                             context.current_scope->get_type(bool_type()));
+        type_conversion_rule(ctx.scope->get_type(operand_ty),
+                             ctx.scope->get_type(bool_type()));
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                         conversion_rule != CONVERT_EXPLICIT);
 
@@ -278,10 +298,10 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   }
 
   if (node->op.type == TType::And) {
-    auto ty = context.current_scope->get_type(operand_ty);
+    auto ty = ctx.scope->get_type(operand_ty);
     auto extensions = ty->extensions;
     extensions.extensions.push_back(TYPE_EXT_POINTER);
-    return context.current_scope->find_type_id(ty->base, extensions);
+    return ctx.scope->find_type_id(ty->base, extensions);
   }
 
   if (node->op.type == TType::Mul) {
@@ -291,7 +311,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
-  auto symbol = context.current_scope->lookup(node->value.value);
+  auto symbol = ctx.scope->lookup(node->value.value);
   if (symbol)
     return symbol->type_id;
   else {
@@ -337,7 +357,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
 }
 
 std::any TypeVisitor::visit(ASTCall *node) {
-  auto symbol = context.current_scope->lookup(node->name.value);
+  auto symbol = ctx.scope->lookup(node->name.value);
 
   if (!symbol) {
     throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
@@ -347,7 +367,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
-  auto type = context.current_scope->get_type(symbol->type_id);
+  auto type = ctx.scope->get_type(symbol->type_id);
   auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->info);
 
   // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
@@ -400,7 +420,7 @@ std::any TypeVisitor::visit(ASTReturn *node) {
   if (node->expression.is_not_null()) {
     type = int_from_any(node->expression.get()->accept(this));
   } else {
-    type = context.current_scope->find_type_id("void", {});
+    type = ctx.scope->find_type_id("void", {});
   }
   return ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
@@ -411,12 +431,12 @@ std::any TypeVisitor::visit(ASTBreak *node) {
   return ControlFlow{BLOCK_FLAGS_BREAK, -1};
 }
 std::any TypeVisitor::visit(ASTFor *node) {
-  context.set_scope(node->block->scope);
+  ctx.set_scope(node->block->scope);
   switch (node->tag) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
-    auto t = context.current_scope->get_type(type);
+    auto t = ctx.scope->get_type(type);
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
     int iter_ty = -1;
@@ -447,13 +467,13 @@ std::any TypeVisitor::visit(ASTFor *node) {
     // Take a pointer to the type.
     // This probably won't work well with custom iterators.
     if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
-      auto type = context.current_scope->get_type(iter_ty);
+      auto type = ctx.scope->get_type(iter_ty);
       auto ext = type->extensions;
       ext.extensions.push_back(TYPE_EXT_POINTER);
-      iter_ty = context.current_scope->find_type_id(type->base, ext);
+      iter_ty = ctx.scope->find_type_id(type->base, ext);
     }
 
-    context.current_scope->insert(iden->value.value, iter_ty);
+    ctx.scope->insert(iden->value.value, iter_ty);
     v.target->accept(this);
   } break;
   case ASTFor::CStyle: {
@@ -463,7 +483,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     v.increment->accept(this);
   } break;
   }
-  context.exit_scope();
+  ctx.exit_scope();
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
@@ -513,14 +533,14 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   return control_flow;
 }
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
-  auto type = context.current_scope->get_type(node->type->resolved_type);
+  auto type = ctx.scope->get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info);
   info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
   }
 
-  context.set_scope(node->scope);
+  ctx.set_scope(node->scope);
 
   for (auto decl : node->fields) {
     decl->accept(this);
@@ -529,12 +549,12 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     method->accept(this);
   }
 
-  context.exit_scope();
+  ctx.exit_scope();
   return {};
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
-  auto left_ty = context.current_scope->get_type(left);
+  auto left_ty = ctx.scope->get_type(left);
 
   if (!left_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
@@ -595,16 +615,16 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     scope = info->scope;
   }
 
-  auto previous_scope = context.current_scope;
+  auto previous_scope = ctx.scope;
   auto prev_parent = scope->parent;
   if (prev_parent && !previous_scope->is_struct_or_union_scope) {
     scope->parent = previous_scope;
   }
 
   // TODO: see above.
-  context.set_scope(scope);
+  ctx.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
-  context.set_scope(previous_scope);
+  ctx.set_scope(previous_scope);
 
   if (prev_parent && !previous_scope->is_struct_or_union_scope) {
     scope->parent = prev_parent;
@@ -616,7 +636,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
-  auto left_ty = context.current_scope->get_type(left);
+  auto left_ty = ctx.scope->get_type(left);
 
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
@@ -660,9 +680,9 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
                 ERROR_FAILURE, node->source_range);
   }
 
-  auto base = context.current_scope->get_type(type);
+  auto base = ctx.scope->get_type(type);
   // (int)node->expressions.size();
-  return context.current_scope->find_type_id(
+  return ctx.scope->find_type_id(
       base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
@@ -684,7 +704,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   // we store this ast just to type check the stuff.
-  context.set_scope(node->scope);
+  ctx.set_scope(node->scope);
 
   // do this first.
   for (const auto &_struct : node->structs) {
@@ -699,7 +719,7 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   for (const auto &method : node->methods) {
     method->accept(this);
   }
-  context.exit_scope();
+  ctx.exit_scope();
   return {};
 }
 std::any TypeVisitor::visit(ASTAllocate *node) {
@@ -726,6 +746,6 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   if (node->arguments)
     node->arguments.get()->accept(this);
 
-  auto t = context.current_scope->get_type(type);
+  auto t = ctx.scope->get_type(type);
   return node->type.get()->resolved_type = t->id;
 }

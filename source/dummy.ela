@@ -1,5 +1,9 @@
 #import core;
 
 main :: () {
-  println("Hi");
+  string x;
+  printf("%s\n", x.data);
+  
+  // boo := 10;
+  // println($"Hi {boo}");
 }

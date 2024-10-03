@@ -63,5 +63,5 @@ string_substr :: (char *src, int start, end) -> string {
 }
 
 println :: (string str) {
-  printf("%s\n", str.data);
+  printf("%s\n", #make(char*, str));
 }

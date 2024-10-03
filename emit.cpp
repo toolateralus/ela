@@ -139,11 +139,11 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  auto type = context.current_scope->get_type(node->resolved_type);
+  auto type = context.scope->get_type(node->resolved_type);
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
-    (*ss) << context.current_scope->get_type(pointed_to_ty)
+    (*ss) << context.scope->get_type(pointed_to_ty)
                  ->to_type_struct(context);
     return {};
   }
@@ -174,7 +174,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
 
     std::string str;
     auto get_format_str = [&](int type_id) {
-      auto type = context.current_scope->get_type(type_id);
+      auto type = context.scope->get_type(type_id);
       
       // We assume that if we get this far with compiling this interpolated string,
       // then we've already asserted that this struct has a to_string();
@@ -226,7 +226,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
           << "\",";
     for (const auto &value : node->interpolated_values) {
       auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-      auto type = context.current_scope->get_type(type_id);
+      auto type = context.scope->get_type(type_id);
       if (type->base == "string" && type->extensions.has_no_extensions()) {
         value->accept(this);
         (*ss) << ".data";
@@ -290,7 +290,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) << node->op.value;
 
   if (node->op.type == TType::Assign) {
-    auto type = context.current_scope->get_type(node->resolved_type);
+    auto type = context.scope->get_type(node->resolved_type);
     auto isptr = type->extensions.is_pointer(1);
     if (isptr)
       (*ss) << "(" << type->to_cpp_string() << ")";
@@ -312,7 +312,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
-  auto type = context.current_scope->get_type(node->type->resolved_type);
+  auto type = context.scope->get_type(node->type->resolved_type);
   auto isptr = type->extensions.is_pointer(1);
   if (isptr)
     (*ss) << "(" << type->to_cpp_string() << ")";
@@ -320,7 +320,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
-  auto type = context.current_scope->get_type(node->type->resolved_type);
+  auto type = context.scope->get_type(node->type->resolved_type);
   if (type->extensions.is_fixed_sized_array()) {
     auto type_str = type->extensions.to_string();
     (*ss) << type->base << ' ' << node->name.value << type_str;
@@ -331,7 +331,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       std::string init = "{";
       for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
-        auto ty = context.current_scope->get_type(elem);
+        auto ty = context.scope->get_type(elem);
         init += " " + ty->to_cpp_string() + "(),";
       }
       init.pop_back();
@@ -372,7 +372,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
-  auto type = context.current_scope->get_type(node->type->resolved_type);
+  auto type = context.scope->get_type(node->type->resolved_type);
   node->type->accept(this);
   (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
@@ -496,7 +496,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     return {};
   }
 
-  auto symbol = context.current_scope->lookup(node->name.value);
+  auto symbol = context.scope->lookup(node->name.value);
 
   // for #foreign declarations
   if (node->meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
@@ -505,8 +505,8 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   }
 
   // local function
-  if (!context.current_scope->is_struct_or_union_scope &&
-      context.current_scope != context.root_scope &&
+  if (!context.scope->is_struct_or_union_scope &&
+      context.scope != context.root_scope &&
       (node->flags & FUNCTION_IS_METHOD) == 0) {
     emit_local_function(node);
     return {};
@@ -640,7 +640,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
-  auto type = context.current_scope->get_type(node->type->resolved_type);
+  auto type = context.scope->get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->info);
 
   current_struct_decl = node;
@@ -684,7 +684,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto left = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_ty = context.current_scope->get_type(left);
+  auto left_ty = context.scope->get_type(left);
 
   auto op = ".";
 
@@ -725,7 +725,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
     scope = info->scope;
   }
 
-  auto previous_scope = context.current_scope;
+  auto previous_scope = context.scope;
 
   auto prev_parent = scope->parent;
   if (prev_parent && !previous_scope->is_struct_or_union_scope) {
@@ -747,7 +747,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTMake *node) {
-  auto type = context.current_scope->get_type(node->type_arg->resolved_type);
+  auto type = context.scope->get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
       throw_error("cannot create a pointer currently with #make. it only casts "

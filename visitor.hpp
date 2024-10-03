@@ -53,8 +53,8 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  TypeVisitor(Context &context) : context(context) {}
-  Context &context;
+  TypeVisitor(Context &context) : ctx(context) {}
+  Context &ctx;
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTProgram *node) override;
