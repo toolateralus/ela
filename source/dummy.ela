@@ -1,15 +1,22 @@
-#import core;
+ #import core;
 
 something :: (int n) {
-  println($"{n}");
+  //println($"{n}");
 }
-something :: (float n) {
+
+something :: () {
+  int n;
   println($"{n}");
 }
 
+// TODO(Josh) 10/3/2024, 11:00:56 AM
+// We need to fix aliasing. We can't alias functions with parameters,
+// I thought i fixed this but i guess nto.
+
+#alias Something :: void()*;
+
 main :: () {
-  float f;
-  int i;
-  something(f);
-  something(i);
+  Something som = &something;
+
+  som();
 }

@@ -43,8 +43,7 @@ std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
   auto sym = context.scope->lookup(node->name.value);
-  
-  ss << indent() << "type: " << context.scope->get_type(sym->type_id)->to_string() << '\n';
+  //ss << indent() << "type: " << context.scope->get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
   
   if (node->block.is_not_null()) {

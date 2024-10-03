@@ -104,6 +104,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       }
     }
     sym->function_overload_types.push_back(type_id);
+    sym->type_id = type_id;
   } else  {
     // TODO(Josh) 10/3/2024, 10:36:56 AM
     // Fix this jank
@@ -319,8 +320,12 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   auto symbol = ctx.scope->lookup(node->value.value);
-  if (symbol)
+  if (symbol) {
+    // if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
+    //   throw_warning()
+    // }
     return symbol->type_id;
+  }
   else {
     throw_error(
         std::format("Use of undeclared identifier '{}'", node->value.value),
@@ -377,8 +382,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
   Type *type;
   // Find a suitable function overload to call.
   if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
-    bool found_match = false;
-    int match_idx = -1;
+    bool found_exact_match = false;
+    int exact_match_idx = -1;
+    
+    bool found_implicit_match = false;
+    int implicit_match_idx = -1;
+    
     // todo: fix this, enumerate is slow as balls.
     for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
       auto ovrld_ty = ctx.scope->get_type(overload);
@@ -386,19 +395,33 @@ std::any TypeVisitor::visit(ASTCall *node) {
       for (int j = 0; j < info->params_len; ++j) {
         // TODO: probably could match these better than just comparing typeids.
         // such as allowing implicit conversions to still take place.
-        if (j >= arg_tys.size()) goto didnt_match;
-        if (arg_tys[j] != info->parameter_types[j]) goto didnt_match;
+        if (j >= arg_tys.size() && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
+        auto conversion_rule = type_conversion_rule(ctx.scope->get_type(arg_tys[j]), ctx.scope->get_type(info->parameter_types[j]));
+        if (conversion_rule == CONVERT_EXPLICIT && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
+        if (conversion_rule == CONVERT_IMPLICIT && !(info->is_varargs || info->default_params > 0)) {
+          found_implicit_match = true;
+          implicit_match_idx = i;
+        }
       }
-      found_match = true;
-      match_idx = i;
+      found_exact_match = true;
+      exact_match_idx = i;
       break;
       didnt_match:
     }
-    if (!found_match) {
-      throw_error("No function overload for provided argument signature found", ERROR_FAILURE, node->source_range);
+    if (!found_exact_match && !found_implicit_match) {
+      std::vector<std::string> names;
+      for (auto n : arg_tys) {
+        names.push_back(global_get_type(n)->to_string());
+      }
+      throw_error(std::format("No function overload for provided argument signature found.. got : {}", names), ERROR_FAILURE, node->source_range);
     }
-    type = ctx.scope->get_type(symbol->function_overload_types[match_idx]);
-    assert(type != nullptr);
+    if (found_exact_match) {
+      type = ctx.scope->get_type(symbol->function_overload_types[exact_match_idx]);
+      assert(type != nullptr);
+    } else {
+      type = ctx.scope->get_type(symbol->function_overload_types[implicit_match_idx]);
+      assert(type != nullptr);
+    }
   } else {
     type = ctx.scope->get_type(symbol->type_id);
   }

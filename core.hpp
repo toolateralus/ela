@@ -212,3 +212,22 @@ struct Defer {
     func();
   }
 };
+
+
+template <class T> struct std::formatter<std::vector<T>> {
+  constexpr auto parse(std::format_parse_context &context) {
+    return context.begin();
+  }
+  auto format(const std::vector<T> &sVal, std::format_context &context) const {
+    auto out = context.out();
+    out = std::format_to(out, "[");
+    for (auto it = sVal.begin(); it != sVal.end(); ++it) {
+      if (it != sVal.begin()) {
+        out = std::format_to(out, ", ");
+      }
+      out = std::format_to(out, "{}", *it);
+    }
+    out = std::format_to(out, "]");
+    return out;
+  }
+};
