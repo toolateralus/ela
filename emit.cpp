@@ -147,7 +147,8 @@ std::any EmitVisitor::visit(ASTType *node) {
                  ->to_type_struct(context);
     return {};
   }
-  (*ss) << type->to_cpp_string();
+  auto type_string = type->to_cpp_string();
+  (*ss) << type_string;
   return {};
 }
 
@@ -792,6 +793,7 @@ std::any EmitVisitor::visit(ASTMake *node) {
   }
   return {};
 }
+
 std::any EmitVisitor::visit(ASTSubscript *node) {
   node->left->accept(this);
   (*ss) << '[';

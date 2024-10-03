@@ -4,6 +4,7 @@
 #foreign free :: (void *ptr) -> void;
 #foreign system :: (char* cmd) -> int;
 
+#foreign isinf :: (float arg) -> bool;
 #foreign sqrt :: (float f) -> float;
 #foreign cos :: (float f) -> float;
 #foreign sin :: (float f) -> float;

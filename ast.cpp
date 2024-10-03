@@ -33,7 +33,12 @@ void Parser::init_directive_routines() {
                 ERROR_CRITICAL, {});
           }
           std::stringstream ss;
+          if (import_set.contains(filename)) {
+            return nullptr;
+          }
+          
           std::ifstream isftr(filename);
+          import_set.insert(filename);
           ss << isftr.rdbuf();
           parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
           parser->fill_buffer_if_needed();

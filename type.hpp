@@ -164,8 +164,10 @@ struct TypeExt {
         array_sizes.pop_back();
         if (size == -1) {
           std::string current = ss.str();
-          ss.str("_array<" + current + ">");
-        } else {
+          ss.str("");
+          ss.clear();
+          ss << "_array<" << current << ">";
+        }else {
           ss << "[" << size << "]";
         }
       }

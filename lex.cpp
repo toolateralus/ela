@@ -49,7 +49,6 @@ void Lexer::get_token(State &state) {
       pos += 2;
       continue;
     }
-    
 
     size_t col = lines == 0 ? pos : pos / lines;
     SourceLocation location{state.line, state.col, state.file_idx};

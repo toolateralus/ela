@@ -798,7 +798,7 @@ check_error :: (char* location) {
   }
 }
 
-vec4 :: union {
+Vec4 :: union {
   float[4] values;
   #anon :: struct {
     float x;
@@ -819,22 +819,63 @@ vec4 :: union {
     z = value;
     w = value;
   }
+
+  #operator(+) :: (#self other) -> #self {
+    other.x += x;
+    other.y += y;
+    other.z += z;
+    other.w += w;
+    return other;
+  }
+
+  #operator(*) :: (#self other) -> #self {
+    other.x *= x;
+    other.y *= y;
+    other.z *= z;
+    other.w *= w;
+    return other;
+  }
+
+  #operator(/) :: (#self other) -> #self {
+    other.x /= x;
+    other.y /= y;
+    other.z /= z;
+    other.w /= w;
+    return other;
+  }
+
+  #operator(-) :: (#self other) -> #self {
+    other.x -= x;
+    other.y -= y;
+    other.z -= z;
+    other.w -= w;
+    return other;
+  }
+
+  sqr_mag :: () -> float {
+    return x * x + y * y + z * z + w * w;
+  }
 }
 
-vec4_one :: () -> vec4 {
-  return #make(vec4, 1.0);
+Vec4_one :: () -> Vec4 {
+  return #make(Vec4, 1.0);
 }
 
-vec4_zero :: () -> vec4 {
-  return #make(vec4, 0.0);
+Vec4_zero :: () -> Vec4 {
+  return #make(Vec4, 0.0);
 }
 
-vec3 :: union {
+Vec3 :: union {
   float[3] values;
   #anon :: struct {
     float x;
     float y;
     float z;
+  }
+  #ctor :: (float value) {
+    x = value;
+    y = value;
+    z = value;
   }
   #ctor :: () {}
   #ctor :: (float _x, _y, _z) {
@@ -842,42 +883,49 @@ vec3 :: union {
     y = _y;
     z = _z;
   }
-  #operator(+) :: (vec3 other) -> vec3 {
-    vec3 result;
-    result.x = x + other.x;
-    result.y = y + other.y;
-    result.z = z + other.z;
-    return result;
+
+  #operator(+) :: (#self other) -> #self {
+    other.x += x;
+    other.y += y;
+    other.z += z;
+    return other;
   }
 
-  #ctor :: (float value) {
-    x = value;
-    y = value;
-    z = value;
+  #operator(*) :: (#self other) -> #self {
+    other.x *= x;
+    other.y *= y;
+    other.z *= z;
+    return other;
+  }
+
+  #operator(/) :: (#self other) -> #self {
+    other.x /= x;
+    other.y /= y;
+    other.z /= z;
+    return other;
+  }
+
+  #operator(-) :: (#self other) -> #self {
+    other.x -= x;
+    other.y -= y;
+    other.z -= z;
+    return other;
+  }
+
+  sqr_mag :: () -> float {
+    return x * x + y * y + z * z;
   }
 }
 
-vec3_normalize :: (vec3 v) -> vec3 {
-
-}
-vec3_cross :: (vec3 v) -> vec3 {
-
+Vec3_one :: () -> Vec3 {
+  return #make(Vec3, 1.0);
 }
 
-vec3_dot :: (vec3 v) -> vec3 {
-
+Vec3_zero :: () -> Vec3 {
+  return #make(Vec3, 0.0);
 }
 
-
-vec3_one :: () -> vec3 {
-  return #make(vec3, 1.0);
-}
-
-vec3_zero :: () -> vec3 {
-  return #make(vec3, 0.0);
-}
-
-vec2 :: union {
+Vec2 :: union {
   float[2] values;
   #anon :: struct {
     float x;
@@ -892,14 +940,41 @@ vec2 :: union {
     x = value;
     y = value;
   }
+  #operator(+) :: (#self other) -> #self {
+    other.x += x;
+    other.y += y;
+    return other;
+  }
+
+  #operator(*) :: (#self other) -> #self {
+    other.x *= x;
+    other.y *= y;
+    return other;
+  }
+
+  #operator(/) :: (#self other) -> #self {
+    other.x /= x;
+    other.y /= y;
+    return other;
+  }
+
+  #operator(-) :: (#self other) -> #self {
+    other.x -= x;
+    other.y -= y;
+    return other;
+  }
+
+  sqr_mag :: () -> float {
+    return x * x + y * y;
+  }
 }
 
-vec2_one :: () -> vec2 {
-  return #make(vec2, 1.0);
+Vec2_one :: () -> Vec2 {
+  return #make(Vec2, 1.0);
 }
 
-vec2_zero :: () -> vec2 {
-  return #make(vec2, 0.0);
+Vec2_zero :: () -> Vec2 {
+  return #make(Vec2, 0.0);
 }
 
 
@@ -925,62 +1000,26 @@ mat4 :: union {
   };
 }
 
-// mat4_translation :: (float x, y, z) -> mat4 {
-//   mat4 matrix = mat4_identity();
-//   matrix.M30 = x;
-//   matrix.M31 = y;
-//   matrix.M32 = z;
-//   return matrix;
-// }
-
-// mat4_scale :: (float x, y, z) -> mat4 {
-//   mat4 matrix = mat4_identity();
-//   matrix.M00 = x;
-//   matrix.M11 = y;
-//   matrix.M22 = z;
-//   return matrix;
-// }
-
-// mat4_look_at :: (vec3 eye, center, up) -> mat4 {
-//   vec3 f = normalize(center - eye);
-//   vec3 s = normalize(cross(f, up));
-//   vec3 u = cross(s, f);
-//   mat4 matrix = mat4_identity();
-//   matrix.M00 = s.x;
-//   matrix.M01 = s.y;
-//   matrix.M02 = s.z;
-//   matrix.M10 = u.x;
-//   matrix.M11 = u.y;
-//   matrix.M12 = u.z;
-//   matrix.M20 = -f.x;
-//   matrix.M21 = -f.y;
-//   matrix.M22 = -f.z;
-//   matrix.M30 = -dot(s, eye);
-//   matrix.M31 = -dot(u, eye);
-//   matrix.M32 = dot(f, eye);
-//   return matrix;
-// }
-
-// mat4_identity :: () -> mat4 {
-//   mat4 matrix;
-//   matrix.M00 = 1.0;
-//   matrix.M01 = 0.0;
-//   matrix.M02 = 0.0;
-//   matrix.M03 = 0.0;
-//   matrix.M10 = 0.0;
-//   matrix.M11 = 1.0;
-//   matrix.M12 = 0.0;
-//   matrix.M13 = 0.0;
-//   matrix.M20 = 0.0;
-//   matrix.M21 = 0.0;
-//   matrix.M22 = 1.0;
-//   matrix.M23 = 0.0;
-//   matrix.M30 = 0.0;
-//   matrix.M31 = 0.0;
-//   matrix.M32 = 0.0;
-//   matrix.M33 = 1.0;
-//   return matrix;
-// }
+mat4_identity :: () -> mat4 {
+  mat4 matrix;
+  matrix.M00 = 1.0;
+  matrix.M01 = 0.0;
+  matrix.M02 = 0.0;
+  matrix.M03 = 0.0;
+  matrix.M10 = 0.0;
+  matrix.M11 = 1.0;
+  matrix.M12 = 0.0;
+  matrix.M13 = 0.0;
+  matrix.M20 = 0.0;
+  matrix.M21 = 0.0;
+  matrix.M22 = 1.0;
+  matrix.M23 = 0.0;
+  matrix.M30 = 0.0;
+  matrix.M31 = 0.0;
+  matrix.M32 = 0.0;
+  matrix.M33 = 1.0;
+  return matrix;
+}
 
 Shader :: struct {
   u32 handle;
@@ -1002,7 +1041,7 @@ Shader :: struct {
     }
   }
 
-  set_vec4 :: (char *name, vec4 *v) {
+  set_Vec4 :: (char *name, Vec4 *v) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform4fv(index, 1, #make(float*, v.values));
@@ -1010,7 +1049,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_vec3 :: (char *name, vec3 *v) {
+  set_Vec3 :: (char *name, Vec3 *v) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform3fv(index, 1, #make(float*, v.values));
@@ -1018,7 +1057,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_vec2 :: (char *name, vec2 *v) {
+  set_Vec2 :: (char *name, Vec2 *v) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform2fv(index, 1, #make(float*, v.values));
