@@ -254,6 +254,13 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     // TODO: search for a pattern '__()__' for example, that doesn't exist at
     // all in the string. we can generate this based on the state of the string.
     (*ss) << std::format("R\"__({})__\"", node->value);
+  } else if (node->tag == ASTLiteral::Float) {
+    if (std::any_cast<int>(node->accept(&type_visitor)) != float64_type()) {
+      (*ss) << node->value << "f";
+    } else {
+      (*ss) << node->value;
+    }
+    
   } else {
     (*ss) << node->value;
   }

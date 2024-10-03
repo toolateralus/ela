@@ -90,7 +90,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   
   // TODO: don't ignore constructors and destructors.
   if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
-    sym->flags |= SYMBOL_HAS_OVERLOADS;
+    if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = ctx.scope->get_type(overload_type_id);
       
@@ -398,6 +398,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     
     // todo: fix this, enumerate is slow as balls.
     for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
+      auto name = node->name.value;
       auto ovrld_ty = ctx.scope->get_type(overload);
       auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->info);
       for (int j = 0; j < info->params_len; ++j) {
@@ -409,7 +410,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         if (conversion_rule == CONVERT_IMPLICIT && !(info->is_varargs || info->default_params > 0)) {
           found_implicit_match = true;
           implicit_match_idx = i;
-        }
+        } else if (conversion_rule != CONVERT_NONE_NEEDED) goto didnt_match;
       }
       found_exact_match = true;
       exact_match_idx = i;

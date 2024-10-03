@@ -609,3 +609,26 @@ Xaryu :: struct {
   println($"Interpolated value {interp}");
   assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
 }
+
+
+
+overloaded :: (int n) -> int {
+  return n;
+}
+
+overloaded :: (float f) -> float {
+  return f;
+}
+
+overloaded :: (Xaryu xaryu) -> Xaryu {
+  return xaryu;
+}
+
+#test test_function_overloads :: () {
+  assert("overload with integer arg failed to call", strcmp((#type overloaded(10)).name, "int") == 0);
+  assert("overload with float arg failed to call", strcmp((#type overloaded(12.5)).name, "float") == 0);
+  Xaryu xaryu;
+  xaryu.value = 100;
+  assert("overload with float arg failed to call", strcmp((#type overloaded(xaryu)).name, "Xaryu") == 0);
+}
+
