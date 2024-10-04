@@ -258,6 +258,7 @@ ConversionRule type_conversion_rule(const Type *, const Type *);
 
 // helpers to get scalar types for fast comparison
 int voidptr_type();
+int char_type();
 int bool_type();
 int void_type();
 int s8_type();
@@ -352,8 +353,6 @@ struct Type {
   TypeInfo *get_info() const {
     return info;
   }
-
-  //TODO: add helper functions for casting the info's? its a lot of code all over.
 
   private:
   std::string base;

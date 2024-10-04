@@ -1,83 +1,15 @@
-#foreign fabs :: (float f) -> float;
-#foreign abs :: (int n) -> int;
 #foreign malloc :: (u64 nbytes) -> void*;
 #foreign free :: (void *ptr) -> void;
 #foreign system :: (char* cmd) -> int;
 
-#foreign isinf :: (float arg) -> bool;
-#foreign sqrt :: (float f) -> float;
-#foreign cos :: (float f) -> float;
-#foreign sin :: (float f) -> float;
-
 #foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
 #foreign memset :: (void *dest, int c, u64 n) -> void*;
 
-#foreign strlen :: (char *str) -> int;
-#foreign strcmp :: (char *str1, char *str2) -> int;
-#foreign strcat :: (char *dest, char *src) -> char*;
-
-#foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
-#foreign sprintf :: (u8 *buffer, char *format, ...) -> int;
 #foreign printf :: (char *format, ...) -> int;
 
-#foreign strncmp :: (char *str, char *str2, int len) -> int;
-
-#foreign isalnum :: (int c) -> int;
-#foreign isalpha :: (int c) -> int;
-#foreign isspace :: (int c) -> int;
-#foreign isdigit :: (int c) -> int;
-#foreign islower :: (int c) -> int;
-#foreign isupper :: (int c) -> int;
-#foreign isprint :: (int c) -> int;
-#foreign ispunct :: (int c) -> int;
-
-#foreign rand :: () -> int;
-#foreign srand :: (u32 seed) -> void;;
 #foreign time :: (void * value) -> int;
+#foreign exit :: (int code);
 
-Random :: enum {
-  Max = 2147483647,
-}
-
-randf :: () -> float {
-  return #make(float, rand()) / #make(float, Random.Max);
-}
-
-str_starts_with :: (char *str, char *substr) -> bool {
-  if str == null || substr == null { return false; }
-  str_len := strlen(str);
-  substr_len := strlen(substr);
-  if str_len < substr_len { return false; }
-  if str_len == substr_len && strcmp(str, substr) == 0 { return true;  }
-  return strncmp(str, substr, substr_len) == 0;
-}
-
-string_ends_with :: (char *str, char *pattern) -> bool {
-  if !str || !pattern {
-    return false;
-  }
-  len := strlen(str);
-  patlen := strlen(pattern);
-  if len < patlen {
-    return false;
-  }
-  return strncmp(str + (len - patlen), pattern, patlen) == 0;
-}
-
-string_substr :: (char *src, int start, end) -> string {
-  if !src {
-    return #make(string, null);
-  }
-  len := strlen(src);
-  if (start > end) { return #make(string, null); }
-  if (len < end - start) { return #make(string, null); }
-  char * dest = malloc(sizeof(char) * (end - start) + 1);
-  memcpy(dest, src + start, end - start);
-  dest[(end - start)] = "\0"[0];
-  v := #make(string, dest);
-  free(dest);
-  return v;
-}
 
 println :: (string str) {
   printf("%s\n", #make(char*, str));

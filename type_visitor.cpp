@@ -14,7 +14,7 @@
 #include <string>
 #include <vector>
 
-void validate_type_compatability(
+void assert_types_can_cast_or_equal(
     const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
   auto from_t = global_get_type(from);
@@ -27,12 +27,13 @@ void validate_type_compatability(
                  source_range);
   }
 }
-const auto check_return_type_consistency(int &return_type, int new_type,
+
+const auto assert_return_type_is_valid(int &return_type, int new_type,
                                          ASTNode *node) {
   if (return_type == -1) {
     return_type = new_type;
   } else if (new_type != -1 && new_type != return_type) {
-    validate_type_compatability(new_type, return_type, node->source_range,
+    assert_types_can_cast_or_equal(new_type, return_type, node->source_range,
                                 "Expected: {}, Found: {}",
                                 "Inconsistent return types in block.");
   }
@@ -42,7 +43,7 @@ static inline int int_from_any(const std::any &any) {
   return std::any_cast<int>(any);
 }
 
-// TODO(Josh) 10/4/2024, 1:39:21 PM Wow this is an eyesore. There has to be a way to clean this dang thing up
+// CLEANUP(Josh) 10/4/2024, 1:39:21 PM Wow this is an eyesore. There has to be a way to clean this dang thing up
 // either returns the correct type that this init list will get casted to, or 
 // throws an error.
 // node->types_are_homogenous is pretty loose: it states that these types are either the same, or implicitly convertible to each other.
@@ -76,7 +77,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
         break;
       }
       if (!sym.is_function()) {
-        validate_type_compatability(node->types[i], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for struct");
+        assert_types_can_cast_or_equal(node->types[i], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for struct");
       }
       i++;
     }
@@ -88,7 +89,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
     // search for the first field member and type check against it.
     for (const auto &[name, sym] : info->scope->symbols) {
       if (!sym.is_function()) {
-        validate_type_compatability(node->types[0], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for union");
+        assert_types_can_cast_or_equal(node->types[0], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for union");
         break;
       }
     }
@@ -102,8 +103,7 @@ std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
-  return node->resolved_type = global_find_type_id(
-             node->base, node->extension_info);
+  return node->resolved_type = global_find_type_id(node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
   for (auto &statement : node->statements) {
@@ -145,16 +145,12 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 
   auto sym = ctx.scope->lookup(node->name.value);
   
-  // TODO: don't ignore constructors and destructors.
   if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
     if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = global_get_type(overload_type_id);
       
       auto this_type = global_get_type(type_id);
-      // TODO: verify that we even want to use this function.
-      // It might not do the fine grained equality check that we need on the parameter and return types.
-      // Maybe it will sinec that info is encoded into function type name.s
       auto visited = std::unordered_set<const Type*>();
       if (type->equals(this_type->get_base(), this_type->get_ext(), visited)) { 
         throw_error(std::format("re-definition of function '{}'", node->name.value),
@@ -164,10 +160,8 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     sym->function_overload_types.push_back(type_id);
     sym->type_id = type_id;
   } else  {
-    // TODO(Josh) 10/3/2024, 10:36:56 AM
-    // Fix this jank
-    
-    // insert function
+    // always insert the first function declarations as the 0th overloaded type,
+    // because we can tell when a fucntion has been overloaded when this array's size is > 1
     ctx.scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
     auto sym = ctx.scope->lookup(node->name.value);
     sym->function_overload_types.push_back(type_id);
@@ -202,13 +196,12 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
                 node->source_range);
   }
 
-  validate_type_compatability(control_flow.type, info.return_type,
+  assert_types_can_cast_or_equal(control_flow.type, info.return_type,
                               node->source_range,
                               "invalid function return type: {} {}",
                               std::format("function: {}", node->name.value));
   return {};
 }
-
 std::any TypeVisitor::visit(ASTBlock *node) {
   ctx.set_scope(node->scope);
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
@@ -224,7 +217,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
       auto stmnt_cf = std::any_cast<ControlFlow>(result);
       block_cf.flags |= stmnt_cf.flags;
       if ((stmnt_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
-        check_return_type_consistency(block_cf.type, stmnt_cf.type, node);
+        assert_return_type_is_valid(block_cf.type, stmnt_cf.type, node);
       }
       if ((stmnt_cf.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
         block_cf.flags &= ~BLOCK_FLAGS_FALL_THROUGH;
@@ -237,7 +230,6 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   ctx.exit_scope();
   return block_cf;
 }
-
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
@@ -275,20 +267,19 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
-    validate_type_compatability(
+    assert_types_can_cast_or_equal(
         expr_type, node->type->resolved_type, node->source_range,
         "invalid parameter declaration; expected: {} got: {}",
         std::format("parameter: {}", node->name));
   }
   return {};
 }
-
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   if (node->value.is_not_null()) {
     declaring_or_assigning_type = node->type->resolved_type;
     auto expr_type = int_from_any(node->value.get()->accept(this));
-    validate_type_compatability(
+    assert_types_can_cast_or_equal(
         expr_type, node->type->resolved_type, node->source_range,
         "invalid declaration types. expected: {}, got {}",
         std::format("declaration: {}", node->name.value));
@@ -300,7 +291,6 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.value), node->source_range);
   }
-  
   return {};
 }
 std::any TypeVisitor::visit(ASTExprStatement *node) {
@@ -310,11 +300,14 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
   
-  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) declaring_or_assigning_type = left;
+  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) 
+    declaring_or_assigning_type = left;
   
   auto right = int_from_any(node->right->accept(this));
   auto type = global_get_type(left);
   
+  // CLEANUP(Josh) 10/4/2024, 2:00:49 PM
+  // We copy pasted this code like in 5 places, and a lot of the stuff is just identical.
   // TODO: this needs a really big rework.
   // TODO: we gotta do type checking on parameters.
   if (type && type->is_kind(TYPE_STRUCT) && type->get_ext().has_no_extensions()) {
@@ -336,12 +329,17 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
         auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
-        validate_type_compatability(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
+        assert_types_can_cast_or_equal(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
         return fun_info->return_type;
       }
     }
   }
 
+  // CLEANUP(Josh) 10/4/2024, 1:59:20 PM
+  // These really shouldn't be a part of the expression hierarchy,
+  // Same with assignment. Not only will this refuse to compile to C++,
+  // it also makes 0 sense.
+  
   // special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
     left = right;
@@ -366,10 +364,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     auto right_t = global_get_type(right);
     auto conv_rule_0 = type_conversion_rule(left_t, right_t);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t);
-    // TODO(Josh) 10/1/2024, 3:07:47 PM
-    // validate that this is what we want. Before, it was too strict, now it
-    // feels like its too loose. also, we should probably do specific type
-    // checking based on the operator, we still need some sort of table.
+
     if (((conv_rule_0 == CONVERT_PROHIBITED) &&
          (conv_rule_1 == CONVERT_PROHIBITED)) ||
         ((conv_rule_0 == CONVERT_EXPLICIT) &&
@@ -455,7 +450,8 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-    // TODO: this still seems to not always return the correct values.
+    // !BUG: this still seems to not always return the correct values.
+    // Although almost always it is correct, and maybe it is always correct.
     int base = 10;
     if (node->value.starts_with("0x")) {
       base = 0;
@@ -492,6 +488,9 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   case ASTLiteral::InterpolatedString: {
     return global_find_type_id("string", {});
   }
+  case ASTLiteral::Char:
+    return char_type();
+    break;
   }
 }
 std::any TypeVisitor::visit(ASTCall *node) {
@@ -530,7 +529,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         if (fun_info->params_len != arg_tys.size())
           throw_error("Invalid number of arguments for call operator overload", node->source_range);
         for (int i = 0; i < fun_info->params_len; ++i) {
-          validate_type_compatability(arg_tys[i], fun_info->parameter_types[i], node->source_range, "expected: {}, got: {}", "invalid parameter type in call operator overload");
+          assert_types_can_cast_or_equal(arg_tys[i], fun_info->parameter_types[i], node->source_range, "expected: {}, got: {}", "invalid parameter type in call operator overload");
         }
         return fun_info->return_type;
       }
@@ -545,14 +544,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
     bool found_implicit_match = false;
     int implicit_match_idx = -1;
     
-    // todo: fix this, enumerate is slow as balls.
+    // CLEANUP: fix this, enumerate is slow as balls.
     for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
       auto name = node->name.value;
       auto ovrld_ty = global_get_type(overload);
       auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->get_info());
       for (int j = 0; j < info->params_len; ++j) {
-        // TODO: probably could match these better than just comparing typeids.
-        // such as allowing implicit conversions to still take place.
         if (j >= arg_tys.size() && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
         auto conversion_rule = type_conversion_rule(global_get_type(arg_tys[j]), global_get_type(info->parameter_types[j]));
         if (conversion_rule == CONVERT_EXPLICIT && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
@@ -588,7 +585,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   
   auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->get_info());
 
-  // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
+  // FEATURE(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
   // without this function syntax, using #make(Type, ...) is really clunky
   // and annoying;
 
@@ -617,7 +614,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
       continue;
     }
 
-    validate_type_compatability(
+    assert_types_can_cast_or_equal(
         arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
         std::format("parameter: {} of function: {}", i, node->name.value));
@@ -629,7 +626,8 @@ std::any TypeVisitor::visit(ASTCall *node) {
 std::any TypeVisitor::visit(ASTArguments *node) {
   std::vector<int> argument_types;
   for (auto arg : node->arguments) {
-    // TODO: We need to have a way to get the expected types of the parameters of the function we're visiting for here  so that we can implicitly convert initializer lists to the correct type here
+    // TODO: We need to have a way to get the expected types of the parameters of the function we're visiting for here 
+    // so that we can implicitly convert initializer lists to the correct type here
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;
@@ -694,7 +692,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
     // Take a pointer to the type.
     // This probably won't work well with custom iterators.
     if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
-      //! ALONG WITH ALL THE OTHER GLOBAL TYPE BUGS, THIS ONE WILL BE SOLVED. ONCE WE FIND A SOLUTION TO THER ROOT OF THE PROBLEM FOR WHICH IS UNKNOWN
       auto type = global_get_type(iter_ty);
       auto ext = type->get_ext();
       ext.extensions.push_back(TYPE_EXT_POINTER);
@@ -722,7 +719,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 }
 std::any TypeVisitor::visit(ASTIf *node) {
   auto cond_ty = int_from_any(node->condition->accept(this));
-  validate_type_compatability(
+  assert_types_can_cast_or_equal(
       cond_ty, bool_type(), node->source_range, "expected: {}, got {}",
       "if statement condition was not convertible to boolean");
 
@@ -732,7 +729,7 @@ std::any TypeVisitor::visit(ASTIf *node) {
     auto else_cf = std::any_cast<ControlFlow>(_else->accept(this));
     control_flow.flags |= else_cf.flags;
     if ((else_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
-      check_return_type_consistency(control_flow.type, else_cf.type, node);
+      assert_return_type_is_valid(control_flow.type, else_cf.type, node);
     }
   } else {
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
@@ -841,8 +838,10 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       throw_error("failed to find key in enum type.",
                   node->source_range);
     }
-    // TODO(Josh) Add a way to support more than just s32 types from enums.
-    // Ideally, we could even use const char* etc. 9/30/2024, 11:53:45 AM
+    
+    // TODO: put the element_type from the ASTEnumDeclaration into the
+    // type info so that we can return that instead of assuming its s32.
+    // that would help us be safer about typing.
     return s32_type();
   }
 
@@ -883,12 +882,9 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = global_get_type(left);
 
-  // TODO: determine if we even want operator overloading for subscript.
-  // It seems to have highlighted type system issues, though so we can at least use it to debug why a dot expression
-  // seems to propogate the root type to the right
-
-  // TODO: this should be improved to handle [0,1,2,3] and [0..10];
-  // Perform call to operator overload for [];
+  /// CLEANUP(Josh) 10/4/2024, 2:18:42 PM
+  // delete the subscript operator, call operator, and various other operators we may not want in the languaeg.
+  // We want to keep it simple, and having 100-200 lines of code dedicated to things that are never used is not conducive to that prospect.
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
       left_ty->get_ext().has_no_extensions()) {
     auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
@@ -909,7 +905,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
         auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
-        validate_type_compatability(
+        assert_types_can_cast_or_equal(
             subscript, fun_info->parameter_types[0], node->source_range,
             "expected: {}, got: {}",
             "invalid parameter type in subscript operator overload");
@@ -944,7 +940,6 @@ std::any TypeVisitor::visit(ASTMake *node) {
   }
   return type;
 }
-
 std::any TypeVisitor::visit(ASTInitializerList *node) {
   
   int last_type = -1;
@@ -971,7 +966,6 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   }
   return assert_type_can_be_assigned_from_init_list(node, declaring_or_assigning_type);
 }
-
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   int largest_type = s32_type();
   int largest_type_size = 1;
@@ -998,7 +992,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
         largest_type_size = info->size;
       }
       
-      validate_type_compatability(id, s64_type(), node->source_range,
+      assert_types_can_cast_or_equal(id, s64_type(), node->source_range,
                                   "expected: {}, got : {}",
                                   "Cannot have non-integral types in enums");
     }
@@ -1006,7 +1000,6 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   node->element_type = largest_type;
   return {};
 }
-
 std::any TypeVisitor::visit(ASTAllocate *node) {
   // TODO(Josh) 10/1/2024, 3:27:53 PM
   // Do something here. This is probably bad,

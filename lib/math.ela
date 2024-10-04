@@ -1,0 +1,16 @@
+#foreign fabs :: (float f) -> float;
+#foreign abs :: (int n) -> int;
+#foreign isinf :: (float arg) -> bool;
+#foreign sqrt :: (float f) -> float;
+#foreign cos :: (float f) -> float;
+#foreign sin :: (float f) -> float;
+#foreign rand :: () -> int;
+#foreign srand :: (u32 seed) -> void;
+
+Random :: enum {
+  Max = 2147483647,
+}
+
+randf :: () -> float {
+  return #make(float, rand()) / #make(float, Random.Max);
+}

@@ -215,6 +215,21 @@ void Parser::init_directive_routines() {
          }});
   }
 
+  {
+    directive_routines.push_back({
+      .identifier = "char",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        parser->expect(TType::String);
+        auto node = ast_alloc<ASTLiteral>();
+        node->tag = ASTLiteral::Char;
+        node->value = node->value;
+        return node;
+      }
+    });
+    
+  }
+
   // #ctor and #dtor
   {
     directive_routines.push_back(
@@ -371,7 +386,6 @@ void Parser::init_directive_routines() {
         parser->expect(TType::LParen);
         auto op = parser->eat();
         
-        // TODO: verify this works to overload ()
         if (parser->peek().type == TType::RParen && parser->lookahead_buf()[1].type == TType::RParen) {
           parser->eat();
         } else if (parser->peek().type == TType::RBrace) {
@@ -393,7 +407,6 @@ void Parser::init_directive_routines() {
         
         func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
         
-        // TODO: do we want to do this? we'll see as this progresses.
         func_decl->name = op;
         
         return func_decl;
@@ -490,8 +503,6 @@ ASTProgram *Parser::parse() {
       auto identifer = expect(TType::Identifier).value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
       if (result.is_not_null()) {
-        // todo: add a flag so we don't have to trust our routine is corerct,
-        // we can just read node->KIND_STATEMENT etc
         auto statement = static_cast<ASTStatement *>(result.get());
         if (statement) {
           program->statements.push_back(statement);
@@ -756,11 +767,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto last_func_decl = current_func_decl;
   current_func_decl = function;
 
-  // TODO: we don't need this if we have proper function overloading. Leaving it here though.
-  // const auto isnt_ctor_or_dtor =
-  //     current_struct_decl.is_not_null() &&
-  //     current_struct_decl.get()->type->get_base() != name.value;
-  
   function->params = parse_parameters();
   
   auto sym = ctx.scope->lookup(name.value);
@@ -974,7 +980,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   auto scope = block->scope;
 
-  // TODO: fix this up, this is a mess.
+  // CLEANUP: fix this up, this is a mess.
   for (auto &statement : block->statements) {
     if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
       fields.push_back(field);
@@ -987,7 +993,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
           global_get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        ;
         throw_error(
             "can only use #anon struct declarations within union types.",
              node->source_range);

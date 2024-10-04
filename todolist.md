@@ -8,7 +8,7 @@
 // however doing som := &something; will cause errors in C++ and thats unacceptable.
 
 To search for all info comments in the source just use vscodes regex search with
-`TODO|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG`
+`TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
 --- Important ---
 We desperately need to refactor the way we resolve symbols, 

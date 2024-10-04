@@ -1,5 +1,11 @@
 #compiler_flags "-g";
 
+// @CooperPilot help pls
+
+/* 
+  * This has been really hard for me to solve. I've turned the aliasing system on its head three times
+  * trying to get it better but it's still just not worked out 
+*/
 
 /*
   *- - - - BUG 0 - - - - -*
@@ -26,7 +32,6 @@
   ? }
 
 */
-
 
 /* 
   *- - - - BUG 1 - - - - -*

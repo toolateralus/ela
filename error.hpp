@@ -12,7 +12,6 @@ struct Error;
 #define MAX_ERRORS 100
 #endif
 
-// TODO(Josh) Use warnings more and add a way to report the non-critical errors at end of compilation. 9/30/2024, 10:22:07 AM
 static Error *error_table[MAX_ERRORS];
 static int num_errors = 0;
 

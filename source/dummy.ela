@@ -1,8 +1,23 @@
-#compiler_flags "-g";
+#foreign dlopen :: (char *filename, int flags) -> void*;
+#foreign dlclose :: (void* handle) -> int;
+#foreign dlsym :: (void* handle, char* symbol) -> void*;
+#foreign dlerror :: () -> char *;
 
-#alias Int :: int*;
+Rtld :: enum {
+  Lazy = 0x00001,
+  Now = 0x00002,
+  Binding_mask = 0x3,
+  Noload = 0x00004,
+  Deepbind = 0x00008,
+  Global = 0x00100,
+  Local = 0x00000,
+  Nodelete = 0x01000,
+}
+
+#alias function :: void()*;
 
 main :: () {
-  Int* n;
-  int** n1 = n;
+  handle := dlopen("test.so", Rtld.Now);
+  function sym = dlsym(handle, "print_info");
+  sym();
 }

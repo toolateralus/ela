@@ -165,7 +165,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
   if (node->tag == ASTLiteral::InterpolatedString) {
     if (node->value.empty()) {
       throw_warning("using an empty interpolated string causes memory leaks right now.", node->source_range);
-      (*ss) << "string(\"\")"; // TODO: fix this. this will cause memory leaks.
+      (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
       return {};
     }
     if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
@@ -265,6 +265,8 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
       (*ss) << node->value;
     }
     
+  } else if (node->tag == ASTLiteral::Char) {
+    (*ss) << '\'' << std::atoi(node->value.c_str()) << '\'';
   } else {
     (*ss) << node->value;
   }
@@ -324,11 +326,13 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 }
 
 // TODO: remove me, add explicit casting, at least for non-void pointers.
-// I don't mind implicit casting to void*
+// I don't mind implicit casting to void*/u8*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
-  auto isptr = type->get_ext().is_pointer(1);
-  if (isptr)
+  
+  if (type->is_alias) {
+    (*ss) << "(" << type->get_base() << ")";
+  } else if (type->get_ext().is_pointer(1))
     (*ss) << "(" << type->to_cpp_string() << ")";
 }
 
@@ -342,12 +346,10 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
       
-      // See the todo below for why we need this.
       bool cancelled = false;
       std::string init = "{";
       for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
-        //! BUG See the other type extension bug. For some reason we have to search the global type space for this. We should NEVER have to do that.
         auto ty = global_get_type(elem);
         // * We never emit initializers for these sub arrays.
         // TODO: find a way to actually zero initialize all these fixed buffers without hacky lambdas everywhere.
@@ -856,10 +858,6 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   if (node->is_flags) {
     iden = "enum ";
   } else {
-    // TODO: use enum struct to prevent naming conflicts?
-    // Really, instead of that, we can just not use a C enum and just declare constants prefixed with the type name,
-    // so that each type can have unique identifiers without needing to explicitly cast to integer when used as flags.
-    // That is annoying behaviour i dislike from C++
     iden = "enum ";
   }
   auto type = global_get_type(node->element_type);

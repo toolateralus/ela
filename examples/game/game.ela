@@ -65,9 +65,7 @@ run_game :: () -> s8 {
   glClearColor(0.0, intensity, intensity, 1.0);
   glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
   glfwSwapInterval(1);
-  // TODO: future:
-  // use a polymorphic function to take any Vertex type and use CTTI/RTTI to
-  // build buffers based on field order and size and offset etc.
+
   {
     // xaryu's banana
     glGenBuffers(1, &ebo);

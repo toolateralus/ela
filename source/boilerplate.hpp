@@ -195,8 +195,8 @@ struct Type {
   _array<Field*> fields;
 };
 
-#define TESTING
 #ifdef TESTING
+
 #define assert(message, condition)                                             \
   if (!(condition))                                                            \
     throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n", #condition,       \

@@ -48,7 +48,6 @@ enum BlockFlags {
   BLOCK_FLAGS_BREAK = 1 << 3,
 };
 
-// CLEANUP(Josh) Probably rename me 9/30/2024, 10:18:10 AM
 struct ControlFlow {
   int flags;
   int type;
@@ -134,6 +133,7 @@ struct ASTLiteral : ASTExpr {
     String,
     RawString,
     InterpolatedString,
+    Char,
     Bool,
     Null,
   } tag;
@@ -214,7 +214,7 @@ struct ASTContinue : ASTStatement {
 enum ValueSemantic {
   VALUE_SEMANTIC_COPY,
   VALUE_SEMANTIC_POINTER,
-  VALUE_SEMANTIC_MOVE, // todo: add a way to do this.
+  VALUE_SEMANTIC_MOVE, // FEATURE: add a way to do this.
 }; 
 
 struct ASTFor : ASTStatement {
@@ -226,7 +226,7 @@ struct ASTFor : ASTStatement {
   union {
     struct {
       ValueSemantic value_semantic;
-      // TODO: add a way to use 'for v, idx in collection'
+      // FEATURE: add a way to use 'for v, idx in collection'
       ASTExpr *target;
       ASTExpr *collection;
     } range_based;

@@ -5,11 +5,6 @@
 #include <string>
 #include <unordered_map>
 
-// TODO(Josh) Add scope flags? so we can tell stuff like executing, declaring,
-// possibly returns, breaks, continues, etc.
-// TODO(cont.) executing would be an executing body like if, func, declaring
-// would be things like struct declarations, etc.
-// Would this even help?
 
 extern jstl::Arena scope_arena;
 enum SymbolFlags {
@@ -22,10 +17,13 @@ struct Symbol {
   std::string name;
   // if this is a type alias, this
   // is the type that this identifier points to.
+  
   // TODO: get rid of this visible field, make it private.
   // Add a get_type_id() and ahve it return the appropriate type,
   // based on something that we can have function overload callees pass in,
   // like a parameter signature or something
+  // Right now theres a ton of super ugly ass code that just gets the typeid or the first overloaded type, which
+  // will certainly cause problems. especially with operator function overloading.
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
 
@@ -36,8 +34,7 @@ struct Symbol {
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
-  // TODO(Josh) 10/1/2024, 1:03:34 PM Replace this with a set of flags or
-  // something.
+
   bool is_struct_or_union_scope = false;
   std::unordered_map<std::string, Symbol> symbols;
 

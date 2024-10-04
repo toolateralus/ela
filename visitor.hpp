@@ -122,7 +122,7 @@ struct EmitVisitor : VisitorBase {
     if (loc != last_loc) {
       auto filename = get_source_filename(node->source_range);
 
-      // TODO: figure out why this is sometimes empty.
+      // !BUG: figure out why this is sometimes empty.
       if (filename.empty()) {
         return;
       }

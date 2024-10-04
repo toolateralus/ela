@@ -435,6 +435,7 @@ int Type::get_element_type() const {
 // TODO(Josh) 10/3/2024, 9:26:51 AM
 // Move this somewhere more appropriate, we're generating C++ code in the type
 // system.
+
 std::string Type::to_type_struct(Context &context) {
   static bool *type_cache = [] {
     auto arr = new bool[MAX_NUM_TYPES];
@@ -509,6 +510,11 @@ Token get_unique_identifier() {
   return tok;
 }
 
+int char_type() {
+  static int type = global_find_type_id(
+      "char", {});
+  return type;
+}
 int voidptr_type() {
   static int type = global_find_type_id(
       "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
@@ -749,7 +755,7 @@ void init_type_system() {
   // Other
   {
     // Other
-    // todo: alias these, don't generate new types.
+    // CLEANUP: alias these, don't generate new types.
     global_create_type(TYPE_SCALAR, "float",
                        get_scalar_type_info(TYPE_FLOAT, 4));
     global_create_type(TYPE_SCALAR, "int",

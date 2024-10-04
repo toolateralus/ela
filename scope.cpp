@@ -61,7 +61,7 @@ Context::Context() {
     str_scope->insert("[", s8_type());
   }
   
-  // TODO fix segfault when accessing this table from in-language.
+  // !BUG fix segfault when accessing this table from in-language.
   root_scope->insert("_type_info", global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {-1}}));
 }
 
