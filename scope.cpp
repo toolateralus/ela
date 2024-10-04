@@ -53,7 +53,7 @@ Context::Context() {
     auto type_id = global_create_struct_type("string", str_scope);
     auto type = global_get_type(type_id);
     
-    static_cast<StructTypeInfo*>(type->info)->implicit_cast_table = {
+    static_cast<StructTypeInfo*>(type->get_info())->implicit_cast_table = {
       charptr_type(),
     };
     
@@ -133,10 +133,10 @@ int Scope::find_alias(const std::string name, const TypeExt &ext) {
     if (symname != name)
       continue;
     auto type = global_get_type(sym.type_id);
-    if (type->extensions.equals({})) {
+    if (type->get_ext().equals({})) {
       return type->id;
     } else {
-      auto new_exts = type->extensions;
+      auto new_exts = type->get_ext();
       auto in_exts = ext;
       for (const auto &ext_ : in_exts.extensions) {
         if (ext_ == TYPE_EXT_ARRAY) {

@@ -140,6 +140,8 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = ctx.scope->get_type(node->resolved_type);
+  
+  // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
@@ -147,6 +149,7 @@ std::any EmitVisitor::visit(ASTType *node) {
                  ->to_type_struct(ctx);
     return {};
   }
+  
   auto type_string = type->to_cpp_string();
   (*ss) << type_string;
   return {};
@@ -185,10 +188,10 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
         return "%s";
       }
       if (type->id == charptr_type() ||
-          (type->base == "string" && type->extensions.has_no_extensions())) {
+          (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
         return "%s";
       }
-      if (type->extensions.is_pointer()) {
+      if (type->get_ext().is_pointer()) {
         return "%p";
       }
       if (type->is_kind(TYPE_SCALAR)) {
@@ -230,11 +233,11 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     for (const auto &value : node->interpolated_values) {
       auto type_id = std::any_cast<int>(value->accept(&type_visitor));
       auto type = ctx.scope->get_type(type_id);
-      if (type->base == "string" && type->extensions.has_no_extensions()) {
+      if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
         value->accept(this);
         (*ss) << ".data";
       } else if (type->is_kind(TYPE_STRUCT)) {
-        auto info = static_cast<StructTypeInfo *>(type->info);
+        auto info = static_cast<StructTypeInfo *>(type->get_info());
         if (info->scope->lookup("to_string")) {
           value->accept(this);
           (*ss) << ".to_string()";
@@ -304,7 +307,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     auto type = ctx.scope->get_type(node->resolved_type);
-    auto isptr = type->extensions.is_pointer(1);
+    auto isptr = type->get_ext().is_pointer(1);
     if (isptr)
       (*ss) << "(" << type->to_cpp_string() << ")";
   }
@@ -326,7 +329,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // I don't mind implicit casting to void*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = ctx.scope->get_type(node->type->resolved_type);
-  auto isptr = type->extensions.is_pointer(1);
+  auto isptr = type->get_ext().is_pointer(1);
   if (isptr)
     (*ss) << "(" << type->to_cpp_string() << ")";
 }
@@ -334,9 +337,9 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = ctx.scope->get_type(node->type->resolved_type);
-  if (type->extensions.is_fixed_sized_array()) {
-    auto type_str = type->extensions.to_string();
-    (*ss) << type->base << ' ' << node->name.value << type_str;
+  if (type->get_ext().is_fixed_sized_array()) {
+    auto type_str = type->get_ext().to_string();
+    (*ss) << type->get_base() << ' ' << node->name.value << type_str;
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
@@ -344,13 +347,13 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       // See the todo below for why we need this.
       bool cancelled = false;
       std::string init = "{";
-      for (int i = 0; i < type->extensions.array_sizes[0]; ++i) {
+      for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
         //! BUG See the other type extension bug. For some reason we have to search the global type space for this. We should NEVER have to do that.
         auto ty = global_get_type(elem);
         // * We never emit initializers for these sub arrays.
         // TODO: find a way to actually zero initialize all these fixed buffers without hacky lambdas everywhere.
-        if (ty->extensions.is_fixed_sized_array()) {
+        if (ty->get_ext().is_fixed_sized_array()) {
           cancelled = true;
           break;
         }
@@ -362,7 +365,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
         (*ss) << init;
       }
     }
-  } else if (type->is_kind(TYPE_FUNCTION) && type->extensions.is_pointer()) {
+  } else if (type->is_kind(TYPE_FUNCTION) && type->get_ext().is_pointer()) {
     auto type_str = type->to_cpp_string();
     std::string name = node->name.value;
 
@@ -688,7 +691,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = ctx.scope->get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(type->info);
+  auto info = static_cast<StructTypeInfo *>(type->get_info());
 
   current_struct_decl = node;
 
@@ -735,13 +738,13 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 
   auto op = ".";
 
-  if (!left_ty->extensions.extensions.empty() &&
-      left_ty->extensions.extensions.back() == TYPE_EXT_POINTER)
+  if (!left_ty->get_ext().extensions.empty() &&
+      left_ty->get_ext().extensions.back() == TYPE_EXT_POINTER)
     op = "->";
 
   // TODO: remove this hack to get array length, or at least make a nicer system for getting 
   // properties of builtin types that aren't considered structs by the langauge.
-  if (left_ty->extensions.is_array() && !left_ty->extensions.is_fixed_sized_array()) {
+  if (left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array()) {
     auto right = dynamic_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
       node->left->accept(this);
@@ -758,7 +761,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   }
 
   if (left_ty->is_kind(TYPE_ENUM)) {
-    (*ss) << left_ty->base << '_';
+    (*ss) << left_ty->get_base() << '_';
     node->right->accept(this);
     return {};
   }
@@ -771,9 +774,9 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   }
 
   Scope *scope;
-  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->info)) {
+  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->info)) {
+  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
   }
 
@@ -849,7 +852,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     iden = "enum ";
   }
   auto type = ctx.scope->get_type(node->element_type);
-  (*ss) << iden << node->type->base << " : " << type->base << "{\n";
+  (*ss) << iden << node->type->base << " : " << type->get_base() << "{\n";
   int i = 0;
   auto get_next_index = [&] {
     int value;

@@ -119,8 +119,8 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
     auto type = context.scope->get_type(node->resolved_type);
-    ss << "type: " << node->resolved_type << ", " << type->base
-       << type->extensions.to_string();
+    ss << "type: " << node->resolved_type << ", " << type->get_base()
+       << type->get_ext().to_string();
     return {};
   }
   ss << node->base;
@@ -243,7 +243,7 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   
   auto t = context.scope->get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo*>(t->info);
+  auto info = static_cast<StructTypeInfo*>(t->get_info());
   
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
   
@@ -396,9 +396,9 @@ std::any EmitVisitor::visit(ASTAllocate *node) {
   case ASTAllocate::New: {
     auto ptr_type = ctx.scope->get_type(node->type.get()->resolved_type);
     (*ss) << "new ";
-    auto ext = ptr_type->extensions;
+    auto ext = ptr_type->get_ext();
     ext.extensions.pop_back();
-    auto nonptr = ctx.scope->find_type_id(ptr_type->base, ext);
+    auto nonptr = ctx.scope->find_type_id(ptr_type->get_base(), ext);
     auto nonptr_ty = ctx.scope->get_type(nonptr);
     auto str = nonptr_ty->to_cpp_string();
     (*ss) << str;

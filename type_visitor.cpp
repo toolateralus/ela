@@ -50,7 +50,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
   auto type = global_get_type(declaring_type);
   //!BUG This fails to accurately type check sub initializers. Also, we may want to implement sub initializers for struct types
   // and check those too
-  if (node->types_are_homogenous && (type->extensions.is_array() || type->extensions.is_fixed_sized_array())) {
+  if (node->types_are_homogenous && (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array())) {
     for (const auto [i, expr] : node->expressions | std::ranges::views::enumerate) {
       if (auto sub_init = dynamic_cast<ASTInitializerList*>(expr)) {
         assert_type_can_be_assigned_from_init_list(sub_init, node->types[i]);
@@ -58,18 +58,18 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
     }
     return declaring_type;
   }
-  if (!type->extensions.has_no_extensions()) {
+  if (!type->get_ext().has_no_extensions()) {
     throw_error("Unable to construct type from initializer list", node->source_range);
   }
   if (type->is_kind(TYPE_SCALAR)) {
     // this is just a plain scalar type, such as an int.
   } else if (type->is_kind(TYPE_STRUCT)) {
-    auto info = static_cast<StructTypeInfo*>(type->info);
+    auto info = static_cast<StructTypeInfo*>(type->get_info());
     if (info->scope->fields_count() < node->types.size()) {
       throw_error("excess elements provided in initializer list.", node->source_range);
     }
     
-    printf("got %d fields from struct %s\n", info->scope->fields_count(), type->base.c_str());
+    printf("got %d fields from struct %s\n", info->scope->fields_count(), type->get_base().c_str());
     printf("there are %ld fields in the init list\n", node->types.size());
     
     // search for fields within the range of the types provided.
@@ -84,7 +84,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
       i++;
     }
   } else if (type->is_kind(TYPE_UNION)) {
-    auto info = static_cast<UnionTypeInfo*>(type->info);
+    auto info = static_cast<UnionTypeInfo*>(type->get_info());
     if (node->types.size() > 1) {
       throw_error("You can only initialize one field of a union with an initializer list", node->source_range);
     }
@@ -158,7 +158,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       // TODO: verify that we even want to use this function.
       // It might not do the fine grained equality check that we need on the parameter and return types.
       // Maybe it will sinec that info is encoded into function type name.s
-      if (type->equals(this_type->base, this_type->extensions)) { 
+      if (type->equals(this_type->get_base(), this_type->get_ext())) { 
         throw_error(std::format("re-definition of function '{}'", node->name.value),
                  {});
       }
@@ -239,6 +239,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   ctx.exit_scope();
   return block_cf;
 }
+
 std::any TypeVisitor::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
@@ -249,7 +250,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
   auto type = ctx.scope->get_type(id);
   
-  if (type->extensions.is_fixed_sized_array()) {
+  if (type->get_ext().is_fixed_sized_array()) {
     throw_warning("using a fixed array as a function parameter: note, this "
                   "casts the length information off and gets passed as as "
                   "pointer. Consider using a dynamic array",
@@ -262,7 +263,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 
     // cast the fixed sized array to a base*.
     {
-      auto extensions = type->extensions;
+      auto extensions = type->get_ext();
       auto it = std::find(extensions.extensions.begin(),
                           extensions.extensions.end(), TYPE_EXT_ARRAY);
       extensions.extensions.erase(it);
@@ -270,7 +271,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
       extensions.extensions.insert(extensions.extensions.begin(),
                                    TYPE_EXT_POINTER);
       node->type->resolved_type =
-          ctx.scope->find_type_id(type->base, extensions);
+          ctx.scope->find_type_id(type->get_base(), extensions);
     }
   }
 
@@ -318,8 +319,8 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   
   // TODO: this needs a really big rework.
   // TODO: we gotta do type checking on parameters.
-  if (type && type->is_kind(TYPE_STRUCT) && type->extensions.has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo*>(type->info);
+  if (type && type->is_kind(TYPE_STRUCT) && type->get_ext().has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo*>(type->get_info());
     if (auto sym = info->scope->lookup(node->op.value)) {
       auto enclosing_scope = ctx.scope;
       ctx.set_scope(info->scope);
@@ -335,7 +336,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
           t = sym->function_overload_types[0];
         }
         auto fun_ty = ctx.scope->get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
         return fun_info->return_type;
@@ -390,9 +391,9 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   if (node->op.type == TType::And) {
     auto ty = ctx.scope->get_type(operand_ty);
-    auto extensions = ty->extensions;
+    auto extensions = ty->get_ext();
     extensions.extensions.push_back(TYPE_EXT_POINTER);
-    return ctx.scope->find_type_id(ty->base, extensions);
+    return ctx.scope->find_type_id(ty->get_base(), extensions);
   }
 
   if (node->op.type == TType::Mul) {
@@ -401,8 +402,8 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
 
   auto left_ty = ctx.scope->get_type(operand_ty);
-  if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->extensions.has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo*>(left_ty->info);
+  if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo*>(left_ty->get_info());
     if (auto sym = info->scope->lookup(node->op.value)) {
       auto enclosing_scope = ctx.scope;
       ctx.set_scope(info->scope);
@@ -418,7 +419,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
           t = sym->function_overload_types[0];
         }
         auto fun_ty = ctx.scope->get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         return fun_info->return_type;
       }
     } else throw_error(std::format("couldn't find {} overload for struct type", node->op.value), node->source_range);
@@ -511,7 +512,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   // TODO: again, we probably don't need functor objects, theyre fancy and unneccesary.
   // Perform call to operator overload for ();
   if (type->is_kind(TYPE_STRUCT)) {
-    auto info = static_cast<StructTypeInfo*>(type->info);
+    auto info = static_cast<StructTypeInfo*>(type->get_info());
     if (auto sym = info->scope->lookup("(")) {
       auto enclosing_scope = ctx.scope;
       ctx.set_scope(info->scope);
@@ -527,7 +528,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
           t = sym->function_overload_types[0];
         }
         auto fun_ty = ctx.scope->get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
+        auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         if (fun_info->params_len != arg_tys.size())
           throw_error("Invalid number of arguments for call operator overload", node->source_range);
         for (int i = 0; i < fun_info->params_len; ++i) {
@@ -550,7 +551,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
       auto name = node->name.value;
       auto ovrld_ty = ctx.scope->get_type(overload);
-      auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->info);
+      auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->get_info());
       for (int j = 0; j < info->params_len; ++j) {
         // TODO: probably could match these better than just comparing typeids.
         // such as allowing implicit conversions to still take place.
@@ -587,7 +588,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   }
   
   
-  auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->info);
+  auto fn_ty_info = dynamic_cast<FunctionTypeInfo *>(type->get_info());
 
   // TODO(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
   // without this function syntax, using #make(Type, ...) is really clunky
@@ -681,8 +682,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
     int iter_ty = -1;
     
     if (t->is_kind(TYPE_STRUCT) &&
-        (!t->extensions.is_array() && !t->extensions.is_fixed_sized_array())) {
-        auto info = dynamic_cast<StructTypeInfo *>(t->info);
+        (!t->get_ext().is_array() && !t->get_ext().is_fixed_sized_array())) {
+        auto info = dynamic_cast<StructTypeInfo *>(t->get_info());
       // TODO: add a way to use the value_semantic thing with custom
       // iterators.
       Symbol *begin = info->scope->lookup("begin");
@@ -695,8 +696,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
                     "return the same type.",
                      node->source_range);
       }
-    } else if (!t->extensions.is_array() &&
-               !t->extensions.is_fixed_sized_array()) {
+    } else if (!t->get_ext().is_array() &&
+               !t->get_ext().is_fixed_sized_array()) {
       throw_error("cannot iterate with a range based for loop over a non "
                   "collection type.",
                    node->source_range);
@@ -709,9 +710,9 @@ std::any TypeVisitor::visit(ASTFor *node) {
     if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
       //! ALONG WITH ALL THE OTHER GLOBAL TYPE BUGS, THIS ONE WILL BE SOLVED. ONCE WE FIND A SOLUTION TO THER ROOT OF THE PROBLEM FOR WHICH IS UNKNOWN
       auto type = global_get_type(iter_ty);
-      auto ext = type->extensions;
+      auto ext = type->get_ext();
       ext.extensions.push_back(TYPE_EXT_POINTER);
-      iter_ty = ctx.scope->find_type_id(type->base, ext);
+      iter_ty = ctx.scope->find_type_id(type->get_base(), ext);
     }
 
     ctx.scope->insert(iden->value.value, iter_ty);
@@ -775,7 +776,7 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 }
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = ctx.scope->get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(type->info);
+  auto info = static_cast<StructTypeInfo *>(type->get_info());
   info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
@@ -804,7 +805,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
 
   // TODO: remove this hack to get array length
-  if (left_ty->extensions.is_array()) {
+  if (left_ty->get_ext().is_array()) {
     auto right = dynamic_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
       return s32_type();
@@ -816,7 +817,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
-    auto info = static_cast<EnumTypeInfo *>(left_ty->info);
+    auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
     auto iden = dynamic_cast<ASTIdentifier *>(node->right);
     if (!iden) {
       throw_error("cannot use a dot expression with a non identifer on the "
@@ -848,9 +849,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
 
   Scope *scope;
-  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->info)) {
+  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->info)) {
+  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
   }
 
@@ -884,8 +885,8 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   // TODO: this should be improved to handle [0,1,2,3] and [0..10];
   // Perform call to operator overload for [];
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
-      left_ty->extensions.has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo *>(left_ty->info);
+      left_ty->get_ext().has_no_extensions()) {
+    auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
     if (auto sym = info->scope->lookup("[")) {
       auto enclosing_scope = ctx.scope;
       ctx.set_scope(info->scope);
@@ -901,7 +902,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
           t = sym->function_overload_types[0];
         }
         auto fun_ty = ctx.scope->get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->info);
+        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(
             subscript, fun_info->parameter_types[0], node->source_range,
@@ -914,13 +915,13 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
                   node->source_range);
   } 
 
-  if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
+  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
                             left_ty->to_string()),
                  node->source_range);
   }
 
-  if (left_ty->extensions.is_array()) {
+  if (left_ty->get_ext().is_array()) {
     auto element_id = left_ty->get_element_type();
     return element_id;
   } else {
@@ -981,11 +982,11 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
       
       auto type = ctx.scope->get_type(id);
       
-      if (!type->is_kind(TYPE_SCALAR) || !type->extensions.has_no_extensions()) {
+      if (!type->is_kind(TYPE_SCALAR) || !type->get_ext().has_no_extensions()) {
         throw_error("Cannot have non integral types in enums got: " + type->to_string(), node->source_range);
       }
       
-      auto info = static_cast<ScalarTypeInfo*>(type->info);
+      auto info = static_cast<ScalarTypeInfo*>(type->get_info());
       
       if (info->size > largest_type_size) {
         largest_type = id;

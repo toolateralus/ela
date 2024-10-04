@@ -28,6 +28,12 @@ extern Type *type_table[MAX_NUM_TYPES];
 extern int num_types;
 extern jstl::Arena type_arena;
 
+// used for emitting typedefs
+extern std::unordered_map<std::string, int> global_typedefs;
+
+// used for actually aliasing types.
+extern std::unordered_map<std::string, int> global_type_aliases;
+
 enum ConversionRule {
   CONVERT_PROHIBITED,
   CONVERT_NONE_NEEDED,
@@ -223,60 +229,8 @@ struct StructTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
-// active aliases. alias -> pointed to type_id
-extern std::unordered_map<std::string, int> global_type_aliases;
 
-struct Type {
-  const int id = invalid_id;
-
-  // probably have a better default than this.
-  const TypeKind kind = TYPE_SCALAR;
-  std::string base;
-  TypeInfo *info;
-  TypeExt extensions;
-
-  bool equals(const std::string &name, const TypeExt &type_extensions) const;
-
-  bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
-
-  inline bool names_match_or_alias(const std::string &name) const {
-    return has_alias(name) || this->base == name;
-  }
-
-  inline bool has_alias(const std::string &in_alias) const {
-    return global_type_aliases.contains(in_alias) && global_type_aliases[in_alias] == id;
-  }
-
-  Type(){};
-  Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
-  Type(const Type &) = delete;
-  Type &operator=(const Type &) = delete;
-  Type(Type &&) = delete;
-  Type &operator=(Type &&) = delete;
-  bool operator==(const Type &type) const;
-  bool is_kind(const TypeKind kind) const { return this->kind == kind; }
-  std::string to_string() const;
-  std::string to_cpp_string() const;
-  std::string to_type_struct(Context &context);
-
-  // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
-  int get_element_type() const;
-  constexpr static int invalid_id = -1;
-};
-
-struct ASTFunctionDeclaration;
-std::string global_get_function_typename(ASTFunctionDeclaration *);
-
-template <class T> T *type_alloc(size_t n = 1) {
-  auto mem = type_arena.allocate(sizeof(T) * n);
-  return new (mem) T();
-}
-
-static Type *global_get_type(const int id) {
-  [[unlikely]] if (id < 0)
-    return nullptr;
-  return type_table[id];
-}
+Type *global_get_type(const int id);
 
 int global_create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
                 const TypeExt & = {});
@@ -310,8 +264,6 @@ int float32_type();
 // char *
 int charptr_type();
 
-
-
 int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
 
@@ -334,3 +286,101 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
 
 int get_pointer_to_type(int base);
+
+
+struct Type {
+  const int id = invalid_id;
+
+  // probably have a better default than this.
+  const TypeKind kind = TYPE_SCALAR;
+  
+  bool is_alias = false;
+  int alias_id;
+  
+  std::string& get_base() {
+    if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->base;
+    }
+    return base;
+  }
+  std::string const & get_base() const {
+     if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->base;
+    }
+    return base;
+  }
+  TypeExt& get_ext() {
+     if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->extensions;
+    }
+    return extensions;
+  }
+  TypeExt const& get_ext() const {
+     if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->extensions;
+    }
+    return extensions;
+  }
+  TypeInfo *&get_info() {
+     if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->info;
+    }
+    return info;
+  }
+  TypeInfo * const & get_info() const {
+     if (is_alias) {
+      auto type = global_get_type(alias_id);
+      return type->info;
+    }
+    return info;
+  }
+  
+  //TODO: add helper functions for casting the info's? its a lot of code all over.
+  
+  private:
+  std::string base;
+  TypeExt extensions;
+  TypeInfo *info;
+  public:
+
+  bool equals(const std::string &name, const TypeExt &type_extensions) const;
+
+  bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
+
+  inline bool names_match_or_alias(const std::string &name) const {
+    return has_alias(name) || this->get_base() == name;
+  }
+
+  inline bool has_alias(const std::string &in_alias) const {
+    return global_type_aliases.contains(in_alias) && global_type_aliases[in_alias] == id;
+  }
+
+  Type(){};
+  Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
+  Type(const Type &) = delete;
+  Type &operator=(const Type &) = delete;
+  Type(Type &&) = delete;
+  Type &operator=(Type &&) = delete;
+  bool operator==(const Type &type) const;
+  bool is_kind(const TypeKind kind) const { return this->kind == kind; }
+  std::string to_string() const;
+  std::string to_cpp_string() const;
+  std::string to_type_struct(Context &context);
+
+  // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
+  int get_element_type() const;
+  constexpr static int invalid_id = -1;
+};
+
+struct ASTFunctionDeclaration;
+std::string global_get_function_typename(ASTFunctionDeclaration *);
+
+template <class T> T *type_alloc(size_t n = 1) {
+  auto mem = type_arena.allocate(sizeof(T) * n);
+  return new (mem) T();
+}

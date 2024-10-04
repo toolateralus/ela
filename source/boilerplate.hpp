@@ -36,11 +36,31 @@ extern "C" int printf(const char *format, ...);
 template <class T> struct _array {
   T *data = nullptr;
   int length = 0;
-  _array() {}
-  T &operator [](int n){
+  int capacity = 1;
+  _array() {
+    data = new T[capacity];
+  }
+  T &operator [](int n) {
     return data[n];
   }
-  T &operator [](int n) const{
+  _array(const _array& other) {
+    length = other.length;
+    capacity = other.capacity;
+    data = new T[capacity];
+    std::copy(other.data, other.data + length, data);
+  }
+  _array(int length) {
+    capacity = length * 1.5f;
+    this->length = length;
+    data = new T[length];
+  } 
+  _array(T* array, int len) {
+    length = len;
+    capacity = len;
+    data = new T[capacity];
+    std::copy(array, array + length, data);
+  }
+  T &operator [](int n) const {
     return data[n];
   }
   explicit operator void*() {
@@ -49,7 +69,6 @@ template <class T> struct _array {
   explicit operator T*() {
     return data;
   }
-  
   template<class From> requires std::is_convertible_v<From, T>
   operator _array<From>() {
     _array<From> result;
@@ -58,11 +77,11 @@ template <class T> struct _array {
     std::copy(data, data + length, result.data);
     return result;
   }
-  
   _array(std::initializer_list<T> list) {
-    data = new T[list.size()];
-    std::copy(list.begin(), list.end(), data);
     length = list.size();
+    capacity = length;
+    data = new T[capacity];
+    std::copy(list.begin(), list.end(), data);
   }
   ~_array() {
     if (data)
@@ -70,6 +89,35 @@ template <class T> struct _array {
   }
   T *begin() const { return data; }
   T *end() const { return data + length; }
+  void push(const T& value) {
+    if (length >= capacity) {
+      reserve(capacity * 2);
+    }
+    data[length++] = value;
+  }
+  T* pop() {
+    if (length > 0) {
+      auto value = data[length];
+      --length;
+      return value;
+    }
+    return nullptr;
+  }
+  void resize(int new_size) {
+    if (new_size > capacity) {
+      reserve(new_size);
+    }
+    length = new_size;
+  }
+  void reserve(int new_capacity) {
+    if (new_capacity > capacity) {
+      T* new_data = new T[new_capacity];
+      std::copy(data, data + length, new_data);
+      delete[] data;
+      data = new_data;
+      capacity = new_capacity;
+    }
+  }
 };
 
 // For now, we'll just use a simple null terminated string.

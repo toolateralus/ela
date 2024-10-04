@@ -7,7 +7,7 @@
 
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
-  ss << global_get_type(return_type)->base;
+  ss << global_get_type(return_type)->get_base();
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = global_get_type(parameter_types[i]);
@@ -30,8 +30,8 @@ int global_find_function_type_id(const std::string &name, const FunctionTypeInfo
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
     const Type *type = type_table[i];
-    if (name == type->base && type->type_info_equals(&info, TYPE_FUNCTION) &&
-        ext.equals(type->extensions)) {
+    if (name == type->get_base() && type->type_info_equals(&info, TYPE_FUNCTION) &&
+        ext.equals(type->get_ext())) {
       return type->id;
     }
   }
@@ -46,21 +46,21 @@ int global_find_type_id(const std::string &name,
   // such as #alias intptr :: int*, where int* hasn't been used yet.
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    if (type->has_alias(name) && type->extensions == type_extensions) {
+    if (type->has_alias(name) && type->get_ext() == type_extensions) {
       return type->id;
-    } else if (type->has_alias(name) && type->extensions != type_extensions) {
-      return global_create_type(type->kind, type->base, type->info,
+    } else if (type->has_alias(name) && type->get_ext() != type_extensions) {
+      return global_create_type(type->kind, type->get_base(), type->get_info(),
                                 type_extensions);
     }
   }
 
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    auto base = type->base;
+    auto base = type->get_base();
 
     if (type_extensions.has_no_extensions()) {
       if (type->names_match_or_alias(name) &&
-          type->extensions.has_no_extensions()) {
+          type->get_ext().has_no_extensions()) {
         return type->id;
       }
     }
@@ -75,7 +75,7 @@ int global_find_type_id(const std::string &name,
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
     if (tinfo->names_match_or_alias(name) &&
-        tinfo->extensions.has_no_extensions()) {
+        tinfo->get_ext().has_no_extensions()) {
       base_id = tinfo->id;
       break;
     }
@@ -83,7 +83,7 @@ int global_find_type_id(const std::string &name,
   if (base_id != -1) {
     auto t = global_get_type(base_id);
     if (!t->has_alias(name))
-      return global_create_type((TypeKind)t->kind, name, t->info,
+      return global_create_type((TypeKind)t->kind, name, t->get_info(),
                                 type_extensions);
   }
 
@@ -92,49 +92,49 @@ int global_find_type_id(const std::string &name,
 std::string get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
-  if (type->base == "s64")
+  if (type->get_base() == "s64")
     name = "int64_t";
-  else if (type->base == "s32")
+  else if (type->get_base() == "s32")
     name = "int32_t";
-  else if (type->base == "s16")
+  else if (type->get_base() == "s16")
     name = "int16_t";
-  else if (type->base == "s8")
+  else if (type->get_base() == "s8")
     name = "int8_t";
-  else if (type->base == "u64")
+  else if (type->get_base() == "u64")
     name = "size_t";
-  else if (type->base == "u32")
+  else if (type->get_base() == "u32")
     name = "uint32_t";
-  else if (type->base == "u16")
+  else if (type->get_base() == "u16")
     name = "uint16_t";
-  else if (type->base == "char" && type->extensions.is_pointer(1))
+  else if (type->get_base() == "char" && type->get_ext().is_pointer(1))
     name = "const char";
-  else if (type->base == "u8" && type->extensions.is_pointer(1))
+  else if (type->get_base() == "u8" && type->get_ext().is_pointer(1))
     name = "char";
-  else if (type->base == "u8")
+  else if (type->get_base() == "u8")
     name = "uint8_t";
-  else if (type->base == "float32")
+  else if (type->get_base() == "float32")
     name = "float";
-  else if (type->base == "float64")
+  else if (type->get_base() == "float64")
     name = "double";
-  else if (type->base == "float")
+  else if (type->get_base() == "float")
     name = "float";
-  else if (type->base == "int")
+  else if (type->get_base() == "int")
     name = "int";
-  else if (type->base == "char")
+  else if (type->get_base() == "char")
     name = "char";
-  else if (type->base == "bool")
+  else if (type->get_base() == "bool")
     name = "bool";
-  else if (type->base == "void")
+  else if (type->get_base() == "void")
     name = "void";
   else {
     return type->to_cpp_string();
   }
 
-  if (type->extensions.has_no_extensions()) {
+  if (type->get_ext().has_no_extensions()) {
     return name;
   }
 
-  return type->extensions.to_cpp_string(name);
+  return type->get_ext().to_cpp_string(name);
 }
 ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
                                      bool is_integral = false) {
@@ -196,7 +196,7 @@ void init_type_system() {
 constexpr int get_type_unresolved() { return Type::invalid_id; }
 
 constexpr bool type_is_numerical(const Type *t) {
-  auto info = dynamic_cast<ScalarTypeInfo *>(t->info);
+  auto info = dynamic_cast<ScalarTypeInfo *>(t->get_info());
   if (!info)
     return false;
 
@@ -210,8 +210,8 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
 
-  auto from_info = static_cast<ScalarTypeInfo *>(from->info);
-  auto to_info = static_cast<ScalarTypeInfo *>(to->info);
+  auto from_info = static_cast<ScalarTypeInfo *>(from->get_info());
+  auto to_info = static_cast<ScalarTypeInfo *>(to->get_info());
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
@@ -238,8 +238,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
-  if (from->is_kind(TYPE_SCALAR) && from->extensions.has_no_extensions() &&
-      to->is_kind(TYPE_SCALAR) && to->extensions.has_no_extensions()) {
+  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() &&
+      to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
       if (numerical_type_safe_to_upcast(from, to))
         return CONVERT_IMPLICIT;
@@ -248,9 +248,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   }
 
   // allow pointer arithmetic
-  if (from->is_kind(TYPE_SCALAR) && from->extensions.is_pointer(-1) &&
+  if (from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer(-1) &&
       to->is_kind(TYPE_SCALAR) && type_is_numerical(to) &&
-      to->extensions.has_no_extensions()) {
+      to->get_ext().has_no_extensions()) {
     return CONVERT_IMPLICIT;
   }
 
@@ -258,21 +258,21 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // statements
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow
   // this in conditional statements.
-  if ((type_is_numerical(from) || from->extensions.is_pointer()) &&
+  if ((type_is_numerical(from) || from->get_ext().is_pointer()) &&
       to->id == bool_type()) {
     return CONVERT_IMPLICIT;
   }
 
   // TODO: probably want to fix this. right now we have C style pointer casting:
   // any two pointers of the same depth can cast implicitly
-  if (from->extensions.is_pointer(1) && to->extensions.is_pointer(1)) {
+  if (from->get_ext().is_pointer(1) && to->get_ext().is_pointer(1)) {
     return CONVERT_IMPLICIT;
   }
 
   // search structs for their cast tables.
   // Not super useful
   if (to->kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(to->info);
+    auto info = static_cast<StructTypeInfo *>(to->get_info());
     for (const auto &cast : info->implicit_cast_table) {
       if (cast == from->id) {
         return CONVERT_IMPLICIT;
@@ -287,11 +287,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   // if the type extensions are equal, return the conversion rule for the bases.
   // this allows int[] to cast to s8[] etc;
-  if (!from->extensions.has_no_extensions() &&
-      !to->extensions.has_no_extensions() &&
-      from->extensions.equals(to->extensions)) {
-    auto from_base = global_get_type(global_find_type_id(from->base, {}));
-    auto to_base = global_get_type(global_find_type_id(to->base, {}));
+  if (!from->get_ext().has_no_extensions() &&
+      !to->get_ext().has_no_extensions() &&
+      from->get_ext().equals(to->get_ext())) {
+    auto from_base = global_get_type(global_find_type_id(from->get_base(), {}));
+    auto to_base = global_get_type(global_find_type_id(to->get_base(), {}));
     return type_conversion_rule(from_base, to_base);
   }
 
@@ -328,7 +328,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
     return false;
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
-    auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
+    auto sinfo = static_cast<const FunctionTypeInfo *>(this->get_info());
 
     if (finfo->is_varargs != sinfo->is_varargs) {
       return false;
@@ -354,7 +354,7 @@ bool Type::equals(const std::string &name,
                   const TypeExt &type_extensions) const {
   if (!names_match_or_alias(name))
     return false;
-  return type_extensions == this->extensions;
+  return type_extensions == this->get_ext();
 }
 
 bool TypeExt::equals(const TypeExt &other) const {
@@ -375,12 +375,12 @@ std::string Type::to_cpp_string() const {
   switch (kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
-    return extensions.to_cpp_string(this->base);
+    return extensions.to_cpp_string(this->get_base());
   case TYPE_FUNCTION: {
     // TODO: make it so we don't just presume every func type is a func ptr.
     // I have no idea how we'll do that
     // This is a HOT mess.
-    auto info = static_cast<FunctionTypeInfo *>(this->info);
+    auto info = static_cast<FunctionTypeInfo *>(this->get_info());
     auto ret = global_get_type(info->return_type)->to_cpp_string();
     std::string params = "(" + extensions.to_string() + ")(";
     for (int i = 0; i < info->params_len; ++i) {
@@ -395,14 +395,14 @@ std::string Type::to_cpp_string() const {
   case TYPE_ENUM:
     return base;
   case TYPE_UNION:
-    return extensions.to_cpp_string(this->base);
+    return extensions.to_cpp_string(this->get_base());
     ;
   }
 }
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);
   int ptr_depth = 0;
-  for (const auto &ext : ty->extensions.extensions) {
+  for (const auto &ext : ty->get_ext().extensions) {
     if (ext == TYPE_EXT_POINTER)
       ptr_depth++;
   }
@@ -414,7 +414,7 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
 
   bool pointer_removed = false;
   std::vector<TypeExtEnum> extensions{};
-  for (const auto &ext : ty->extensions.extensions) {
+  for (const auto &ext : ty->get_ext().extensions) {
     if (!pointer_removed && ext == TYPE_EXT_POINTER) {
       pointer_removed = true;
     } else {
@@ -422,16 +422,16 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
     }
   }
   return global_find_type_id(
-      ty->base, TypeExt{.extensions = extensions,
-                        .array_sizes = ty->extensions.array_sizes});
+      ty->get_base(), TypeExt{.extensions = extensions,
+                        .array_sizes = ty->get_ext().array_sizes});
 }
 int global_create_struct_type(const std::string &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
-  type->base = name;
+  type->get_base() = name;
   auto info = type_alloc<StructTypeInfo>();
   info->scope = scope;
-  type->info = info;
+  type->get_info() = info;
   num_types++;
   return type->id;
 }
@@ -439,11 +439,11 @@ int global_create_union_type(const std::string &name, Scope *scope,
                              UnionKind kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
   type_table[num_types] = type;
-  type->base = name;
+  type->get_base() = name;
   auto info = type_alloc<UnionTypeInfo>();
   info->kind = kind;
   info->scope = scope;
-  type->info = info;
+  type->get_info() = info;
   num_types++;
   return type->id;
 }
@@ -453,12 +453,12 @@ int global_create_enum_type(const std::string &name,
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
   type_table[num_types] = type;
-  type->base = name;
+  type->get_base() = name;
 
   auto info = new (type_alloc<EnumTypeInfo>()) EnumTypeInfo();
   info->is_flags = is_flags;
   info->keys = keys;
-  type->info = info;
+  type->get_info() = info;
 
   num_types += 1;
   return type->id;
@@ -466,10 +466,10 @@ int global_create_enum_type(const std::string &name,
 int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
                        const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
-  type->info = info;
-  type->extensions = extensions;
+  type->get_info() = info;
+  type->get_ext() = extensions;
 
-  type->base = name;
+  type->get_base() = name;
 
   if (type->id > MAX_NUM_TYPES) {
     throw_error("Max types exceeded", {});
@@ -502,7 +502,7 @@ int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
   }
-  auto extensions = this->extensions;
+  auto extensions = this->get_ext();
   extensions.extensions.pop_back();
   extensions.array_sizes.pop_back();
   return global_find_type_id(base, extensions);
@@ -523,7 +523,7 @@ std::string Type::to_type_struct(Context &context) {
 
   std::stringstream fields_ss;
   if (kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(this->info);
+    auto info = static_cast<StructTypeInfo *>(this->get_info());
     
     if (info->scope->symbols.empty()) {
       fields_ss << "_type_info[" << id << "] = new Type {"
@@ -652,7 +652,7 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   if (!type->is_kind(TYPE_FUNCTION)) {
     return false;
   }
-  auto info = static_cast<FunctionTypeInfo *>(type->info);
+  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
   for (int i = 0; i < info->params_len; ++i) {
     out.push_back(info->parameter_types[i]);
   }
@@ -721,7 +721,13 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 
 int get_pointer_to_type(int base) {
   auto type = global_get_type(base);  
-  auto extensions = type->extensions;
+  auto extensions = type->get_ext();
   extensions.extensions.push_back({TYPE_EXT_POINTER});
-  return global_find_type_id(type->base, extensions);
+  return global_find_type_id(type->get_base(), extensions);
+}
+
+Type *global_get_type(const int id) {
+  [[unlikely]] if (id < 0)
+    return nullptr;
+  return type_table[id];
 }

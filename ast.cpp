@@ -298,14 +298,17 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto enum_decl = parser->parse_enum_declaration(name);
            enum_decl->is_flags = true;
-           auto type = parser->ctx.scope->get_type(
-               enum_decl->type->resolved_type);
-           auto info = static_cast<EnumTypeInfo *>(type->info);
+           auto type = parser->ctx.scope->get_type(enum_decl->type->resolved_type);
+           auto info = static_cast<EnumTypeInfo *>(type->get_info());
            info->is_flags = true;
            return enum_decl;
          }});
   }
 
+  // !BUG Code generation for aliases is completely broken, and this is partly due to how we do this. 
+  // The alias could just be typedef'd in C++ so that we could use function pointers, but instead we get declarations like `void(*sm)() = (void(*)())something;`
+  // which is completely invalid c++ code.
+  
   // #alias for making type aliases. #alias NewName :: OldName;
   {
     directive_routines.push_back(
@@ -315,41 +318,12 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           auto id = parser->ctx.scope->find_type_id(
-               aliased_type->base, aliased_type->extension_info);
+           auto id = parser->ctx.scope->find_type_id(aliased_type->base, aliased_type->extension_info);
+           auto type = global_get_type(id);
+           
            parser->ctx.scope->insert(name.value, id, SYMBOL_IS_TYPE_ALIAS);
            return ast_alloc<ASTNoop>();
-         }});
-  }
-
-  // #typename, get the name of a type as a string.
-
-  // Currently this is useless. This needs to be an ast node and needs to be
-  // later processed into a string literal because we can only use this on
-  // resolved symbols and types, which are nonexistent
-  {
-    directive_routines.push_back(
-        {.identifier = "typename",
-         .kind = DIRECTIVE_KIND_EXPRESSION,
-         .run = [](Parser *parser) -> Nullable<ASTNode> {
-           if (parser->peek().type == TType::LParen) {
-             parser->eat();
-           }
-
-           auto asttype = parser->expect(TType::Identifier);
-
-           if (parser->peek().type == TType::RParen) {
-             parser->eat();
-           }
-
-           auto type = parser->ctx.scope->get_type(
-               parser->ctx.scope->find_type_id(asttype.value, {}));
-           auto string = ast_alloc<ASTLiteral>();
-           string->tag = ASTLiteral::String;
-           string->value = type->to_string();
-
-           return string;
-         }});
+        }});
   }
 
   // #self, return the type of the current declaring struct or union
@@ -384,7 +358,7 @@ void Parser::init_directive_routines() {
                parser->parse_struct_declaration(get_unique_identifier());
            auto t = parser->ctx.scope->get_type(
                decl->type->resolved_type);
-           auto info = static_cast<StructTypeInfo *>(t->info);
+           auto info = static_cast<StructTypeInfo *>(t->get_info());
            info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
            return decl;
          }});
@@ -786,7 +760,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   // TODO: we don't need this if we have proper function overloading. Leaving it here though.
   // const auto isnt_ctor_or_dtor =
   //     current_struct_decl.is_not_null() &&
-  //     current_struct_decl.get()->type->base != name.value;
+  //     current_struct_decl.get()->type->get_base() != name.value;
   
   function->params = parse_parameters();
   
@@ -965,7 +939,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     decl->scope = block->scope;
   } else {
     Type *t = ctx.scope->get_type(type_id);
-    auto info = static_cast<StructTypeInfo *>(t->info);
+    auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
 
@@ -1011,7 +985,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
                    dynamic_cast<ASTStructDeclaration *>(statement)) {
       auto type =
           ctx.scope->get_type(struct_decl->type->resolved_type);
-      auto info = static_cast<StructTypeInfo *>(type->info);
+      auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         ;
         throw_error(

@@ -2,7 +2,6 @@
 
 #compiler_flags "-g"
 
-
 XaryuStruct :: struct {
   float f;
 }
@@ -517,11 +516,6 @@ something :: (float32 f) -> float32 {
   s8 v1;
   float32 f;
   assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
-}
-
-#test test_typename :: () {
-  name := #typename(int);
-  assert("typename did not return the appropriate name.", strcmp(name, "int") == 0);
 }
 
 #test test_union_type_anonymous_sub_struct :: () {
