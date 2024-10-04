@@ -6,7 +6,12 @@ Struct :: struct {
   int c;
 };
 
+Union :: union {
+  float[6] floats;
+}
+
 main :: () {
   float[16] floats = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
   Struct str = {0, 1, 2};
+  Union un = {0,1,2,3,4,5};
 }
