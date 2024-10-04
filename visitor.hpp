@@ -53,6 +53,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
+  int declaring_or_assigning_type = -1;
   TypeVisitor(Context &context) : ctx(context) {}
   Context &ctx;
   std::string getIndent();

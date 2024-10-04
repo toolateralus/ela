@@ -1,0 +1,12 @@
+
+
+Struct :: struct {
+  int a;
+  int b;
+  int c;
+};
+
+main :: () {
+  float[16] floats = {0.0, 0.0, 0.0, 0.0, 0.0, 0.0};
+  Struct str = {0, 1, 2};
+}

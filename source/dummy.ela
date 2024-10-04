@@ -1,5 +1,19 @@
-#import core
+#import core;
 
-main :: () {
-  float[4][4] floats;
+main :: () -> s8 {
+  float[][] floats;
+
+  i := 0.0;
+  for *f; floats {
+    *f = #make(float[], {1 * i, 2 * i, 3 * i, 4 * i});
+    ++i;
+  }
+
+  for *f; floats {
+    for f1; f {
+      println($"{f1}");
+    }
+  }
+
+  return 0;
 }

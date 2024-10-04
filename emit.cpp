@@ -175,7 +175,9 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
 
     std::string str;
     auto get_format_str = [&](int type_id) {
-      auto type = ctx.scope->get_type(type_id);
+      
+      //!BUG FIX THIS SCOPED TYPE SYSTEM PROBLEM!
+      auto type = global_get_type(type_id);
       
       // We assume that if we get this far with compiling this interpolated string,
       // then we've already asserted that this struct has a to_string();
@@ -283,7 +285,9 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
-    (*ss) << "auto ";
+    auto id = std::any_cast<int>(node->right->accept(&type_visitor));
+    auto type = ctx.scope->get_type(id);
+    (*ss) << type->to_cpp_string() << ' ';
     node->left->accept(this);
     (*ss) << " = ";
     node->right->accept(this);

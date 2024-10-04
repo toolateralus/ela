@@ -189,7 +189,7 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
   auto type = ctx.scope->get_type(id);
-
+  
   if (type->extensions.is_fixed_sized_array()) {
     throw_warning("using a fixed array as a function parameter: note, this "
                   "casts the length information off and gets passed as as "
@@ -229,6 +229,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
   if (node->value.is_not_null()) {
+    declaring_or_assigning_type = node->type->resolved_type;
     auto expr_type = int_from_any(node->value.get()->accept(this));
     validate_type_compatability(
         expr_type, node->type->resolved_type, node->source_range,
@@ -251,6 +252,9 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
 }
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
+  
+  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) declaring_or_assigning_type = left;
+  
   auto right = int_from_any(node->right->accept(this));
   auto type = ctx.scope->get_type(left);
   
@@ -284,6 +288,11 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   // special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
     left = right;
+    
+    if (right == void_type()) {
+      throw_error("Cannot assign a variable of type 'void'", ERROR_FAILURE, node->source_range);
+    }
+    
     if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
       ctx.scope->insert(iden->value.value, left);
     }
@@ -386,7 +395,6 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
         ERROR_FAILURE, node->source_range);
   }
 }
-
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
@@ -429,7 +437,6 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
   }
 }
-
 std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = ctx.scope->lookup(node->name.value);
 
@@ -565,6 +572,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 std::any TypeVisitor::visit(ASTArguments *node) {
   std::vector<int> argument_types;
   for (auto arg : node->arguments) {
+    // TODO: We need to have a way to get the expected types of the parameters of the function we're visiting for here  so that we can implicitly convert initializer lists to the correct type here
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;
@@ -572,6 +580,7 @@ std::any TypeVisitor::visit(ASTArguments *node) {
 std::any TypeVisitor::visit(ASTReturn *node) {
   int type;
   if (node->expression.is_not_null()) {
+    // TODO: we should know the return type of the function we're visiting here so we can coerce initializer lists
     type = int_from_any(node->expression.get()->accept(this));
   } else {
     type = ctx.scope->find_type_id("void", {});
@@ -640,7 +649,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
     // Take a pointer to the type.
     // This probably won't work well with custom iterators.
     if (v.value_semantic == VALUE_SEMANTIC_POINTER) {
-      auto type = ctx.scope->get_type(iter_ty);
+      //! ALONG WITH ALL THE OTHER GLOBAL TYPE BUGS, THIS ONE WILL BE SOLVED. ONCE WE FIND A SOLUTION TO THER ROOT OF THE PROBLEM FOR WHICH IS UNKNOWN
+      auto type = global_get_type(iter_ty);
       auto ext = type->extensions;
       ext.extensions.push_back(TYPE_EXT_POINTER);
       iter_ty = ctx.scope->find_type_id(type->base, ext);
@@ -870,6 +880,10 @@ std::any TypeVisitor::visit(ASTMake *node) {
   }
   return type;
 }
+
+// TODO: make it so initializer lists can contain more than one type,
+// so we can use it for complex initialization of structs without constructors.
+// also maybe we want {.member = value, .member1 = value1} kind of syntax. 
 std::any TypeVisitor::visit(ASTInitializerList *node) {
   int type = -1;
   for (const auto &expr : node->expressions) {
@@ -889,10 +903,24 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   }
 
   auto base = ctx.scope->get_type(type);
-  // (int)node->expressions.size();
-  return ctx.scope->find_type_id(
+  
+  auto dynamic_arr_ty = ctx.scope->find_type_id(
       base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
+      
+  // TODO: make this more robust to struct initializer lists etc.
+  if (declaring_or_assigning_type != dynamic_arr_ty) {
+    auto type = ctx.scope->get_type(declaring_or_assigning_type);
+    if (type->is_kind(TYPE_STRUCT)) {
+      // TODO: do some type checking to make sure that the initializer list fits in the struct.
+      // This may contain nested initializers, and we should probably make a seperate system just to
+      // deduce whether this is possible or not so we don't have to clunky up a ton of this visitor.
+      // For now I'll just assert that the number of members and their types match the initializer list.
+    }
+    return declaring_or_assigning_type;
+  }
+  return dynamic_arr_ty;
 }
+
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   int largest_type = s32_type();
   int largest_type_size = 1;
