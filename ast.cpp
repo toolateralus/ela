@@ -1285,6 +1285,21 @@ ASTExpr *Parser::parse_primary() {
   case TType::LParen: {
     auto range = begin_node();
     eat(); // consume '('
+    
+    // for (Type)expr;
+    if (global_find_type_id(peek().value, {}) != -1) {
+      // CLEANUP: We probably don't wanna use ASTMake for so many things,
+      // but for now it's okay.
+      auto type = parse_type();
+      auto node = ast_alloc<ASTMake>();
+      expect(TType::RParen);
+      node->type_arg = type;
+      node->kind = MAKE_CAST;
+      node->arguments = ast_alloc<ASTArguments>();
+      node->arguments->arguments.push_back(parse_expr());
+      return node;
+    }
+    
     auto expr = parse_expr();
     if (peek().type != TType::RParen) {
       throw_error("Expected ')'",

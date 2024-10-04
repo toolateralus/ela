@@ -843,3 +843,9 @@ InitListStruct :: struct {
       assert("Fixed struct array element mismatch", strArr1[i].c == expected_strArr1[i].c);
     }
 }
+
+#test test_cast :: () {
+  int n = 10;
+  float f = (float)n;
+  assert("Cast failed", f == 10.0);
+}
