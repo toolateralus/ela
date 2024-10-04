@@ -1,14 +1,16 @@
 #import dlfcn;
 #import core;
 
-// Not a compile time error but a runtime error.
-// This some_function type will equal 'void()*', the parameters just get completely discarded.
-
 #alias some_function :: void(int)*;
 
+something :: (int n) {
+  println($"{n}");
+}
+
 main :: () {
-  Type *type = #type some_function;
-  if strcmp(type.name, "void(int)*") != 0 {
-    println($"expected void(int)*, got {type.name}");
-  }
+  // !BUG Adding extensions to atype alias still freaking fails.
+  // #alias some_function :: void(int);
+  // some_function* some = &something;  
+  some_function some = &something;  
+  some(10);
 }

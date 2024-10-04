@@ -334,6 +334,16 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
+           
+           if (aliased_type->resolved_type != -1) {
+              auto type = global_get_type(aliased_type->resolved_type);
+              if (type->is_kind(TYPE_FUNCTION)) {
+                auto id = global_find_function_type_id(aliased_type->base, *static_cast<FunctionTypeInfo*>(type->get_info()), aliased_type->extension_info);
+                global_create_type_alias(id , name.value);
+                return ast_alloc<ASTNoop>();
+              }
+           }
+           
            auto id = global_find_type_id(aliased_type->base, aliased_type->extension_info);
            global_create_type_alias(id, name.value);
            return ast_alloc<ASTNoop>();
@@ -501,6 +511,7 @@ ASTType *Parser::parse_type() {
   end_node(node, range);
   return node;
 }
+
 ASTProgram *Parser::parse() {
   auto range = begin_node();
   auto program = ast_alloc<ASTProgram>();

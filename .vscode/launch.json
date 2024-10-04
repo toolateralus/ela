@@ -10,7 +10,7 @@
       "request": "launch",
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["undeclared.ela"],
+      "args": ["fn_ptr_cast.ela"],
       "cwd": "${workspaceFolder}/repro"
     },
     {

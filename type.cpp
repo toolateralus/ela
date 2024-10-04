@@ -155,6 +155,16 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
+  if (global_type_alias_map.contains(from->get_base())) {
+    auto pointed_to = global_get_type(global_get_type(global_type_alias_map[from->get_base()])->alias_id);
+    return type_conversion_rule(pointed_to, to);
+  }
+  
+  if (global_type_alias_map.contains(to->get_base())) {
+    auto pointed_to = global_get_type(global_get_type(global_type_alias_map[to->get_base()])->alias_id);
+    return type_conversion_rule(from, pointed_to);
+  }
+
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
@@ -304,6 +314,11 @@ std::string Type::to_cpp_string() const {
   case TYPE_STRUCT:
     return extensions.to_cpp_string(this->get_base());
   case TYPE_FUNCTION: {
+    
+    if (is_alias) {
+      return base;
+    }
+    
     // TODO: make it so we don't just presume every func type is a func ptr.
     // I have no idea how we'll do that
     // This is a HOT mess.

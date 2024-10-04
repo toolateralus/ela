@@ -553,6 +553,7 @@ struct Parser {
       ss << "(";
       for (size_t i = 0; i < param_types.size(); ++i) {
         info.parameter_types[i] = global_find_type_id(param_types[i]->base, param_types[i]->extension_info);
+        info.params_len++;
         ss << global_get_type(info.parameter_types[i])->to_string();
         if (i != param_types.size() - 1) {
           ss << ", ";
@@ -560,6 +561,8 @@ struct Parser {
       }
       ss << ")";
     }
+    
+    printf("parameter types for function type: %s\n", ss.str().c_str());
     
     auto type_name = global_get_type(info.return_type)->to_string() + ss.str();
     return_type->resolved_type = global_find_function_type_id(type_name, info, {});

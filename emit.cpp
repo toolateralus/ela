@@ -365,23 +365,6 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
         (*ss) << init;
       }
     }
-  } else if (type->is_kind(TYPE_FUNCTION) && type->get_ext().is_pointer()) {
-    auto type_str = type->to_cpp_string();
-    std::string name = node->name.value;
-
-    size_t pos = type_str.find_last_of('*');
-    if (pos != std::string::npos) {
-      type_str.insert(pos + 1, name);
-    }
-    (*ss) << type_str;
-    space();
-    if (node->value.is_not_null()) {
-      (*ss) << " = ";
-      cast_pointers_implicit(node);
-      node->value.get()->accept(this);
-    } else {
-      (*ss) << "{}";
-    }
   } else {
     node->type->accept(this);
     space();
