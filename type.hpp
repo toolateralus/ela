@@ -157,7 +157,6 @@ struct TypeExt {
     std::vector<int> array_sizes = this->array_sizes;
     std::stringstream ss;
     ss << base;
-
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         auto size = array_sizes.back();
