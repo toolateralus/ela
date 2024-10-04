@@ -5,21 +5,21 @@ classified 15 files      15 unique files.
 -------------------------------------------------------------------------------
 File                             blank        comment           code
 -------------------------------------------------------------------------------
-ast.cpp                            120             72           1208
-type_visitor.cpp                    93             68            771
-emit.cpp                           107             38            757
-type.cpp                            59             43            618
-ast.hpp                             74             25            517
+ast.cpp                            124             73           1204
+type_visitor.cpp                   108             82            849
+emit.cpp                           115             43            781
+type.cpp                            71             53            681
+ast.hpp                             74             25            518
 visitor.cpp                         32             15            377
+type.hpp                            67             16            308
 lex.hpp                             32              0            295
-type.hpp                            60             11            262
 core.hpp                            24              2            207
-scope.cpp                           27             18            200
-visitor.hpp                         12              4            166
-lex.cpp                             17              0            162
-main.cpp                            23             14            111
-error.hpp                           17              2            108
-scope.hpp                           25             19             80
+visitor.hpp                         12              4            167
+lex.cpp                             16              0            162
+main.cpp                            24             15            111
+error.hpp                           14              1             96
+scope.hpp                           14             17             63
+scope.cpp                           15             11             62
 -------------------------------------------------------------------------------
-SUM:                               722            331           5839
+SUM:                               742            357           5881
 -------------------------------------------------------------------------------

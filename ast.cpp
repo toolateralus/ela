@@ -865,6 +865,9 @@ ASTCall *Parser::parse_call(const Token &name) {
   return call;
 }
 
+// CLEANUP(Josh) 10/4/2024, 1:32:37 PM
+// Do we want to just have a generic ASTTypeDeclaration or something since these share so much behaviour?
+// Especailly structs and unions.
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
   auto range = begin_node();
@@ -970,12 +973,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   block->scope->is_struct_or_union_scope = true;
 
   auto scope = block->scope;
-
-  // right now we just export anonymous types to the enclosing scope.
-  // This shouldn't really be a problem, since you never know the name anyway
-  for (const auto &type : scope->types) {
-    ctx.scope->types.insert(type);
-  }
 
   // TODO: fix this up, this is a mess.
   for (auto &statement : block->statements) {
