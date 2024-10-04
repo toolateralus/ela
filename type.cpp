@@ -315,13 +315,20 @@ std::string Type::to_cpp_string() const {
     return extensions.to_cpp_string(this->get_base());
   case TYPE_FUNCTION: {
     
+    // !BUG if this type has extensions on top of the alias this will never emit the correct type signature.
     if (is_alias) {
       return base;
     }
     
-    // TODO: make it so we don't just presume every func type is a func ptr.
-    // I have no idea how we'll do that
-    // This is a HOT mess.
+    
+    
+    // CLEANUP(Josh) 10/4/2024, 7:35:45 PM
+    // *Just completely get rid of this and force the user to only ever use type aliases for function types.
+    // *Trying to juggle anything else is nonsesne ebcause youd never do
+    // *void(*sym)() = &main
+    
+    // TODO(Josh) 10/4/2024, 7:36:26 PM
+    // Remove this horrible mess
     auto info = static_cast<FunctionTypeInfo *>(this->get_info());
     auto ret = global_get_type(info->return_type)->to_cpp_string();
     std::string params = "(" + extensions.to_string() + ")(";
