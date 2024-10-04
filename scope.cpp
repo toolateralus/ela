@@ -1,6 +1,8 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+#include <dlfcn.h>
+
 Context::Context() {
   root_scope = scope;
   // define some default functions that may or may not be macros.
@@ -49,6 +51,8 @@ Context::Context() {
   // string struct, stores length info.
   {
     auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    str_scope->parent = root_scope;
+    
     auto type_id = global_create_struct_type("string", str_scope);
     auto type = global_get_type(type_id);
     

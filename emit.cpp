@@ -796,8 +796,11 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto previous_scope = ctx.scope;
 
   auto prev_parent = scope->parent;
-  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+  bool root = !within_dot_expression;
+  
+  if (prev_parent && root) {
     scope->parent = previous_scope;
+    within_dot_expression = true;
   }
 
   node->left->accept(this);
@@ -807,7 +810,8 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   node->right->accept(this);
   ctx.set_scope(previous_scope);
 
-  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+  if (prev_parent && root) {
+    within_dot_expression = false;    
     scope->parent = prev_parent;
   }
 

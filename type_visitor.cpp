@@ -851,6 +851,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
                     left_ty->to_string()),
          node->source_range);
   }
+  
 
   Scope *scope;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
@@ -861,16 +862,22 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
   auto previous_scope = ctx.scope;
   auto prev_parent = scope->parent;
-  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+  
+  bool root = !within_dot_expression;
+  
+  if (prev_parent && root) {
     scope->parent = previous_scope;
+    within_dot_expression = true;
   }
 
   // TODO: see above.
   ctx.set_scope(scope);
+  
   int type = int_from_any(node->right->accept(this));
   ctx.set_scope(previous_scope);
 
-  if (prev_parent && !previous_scope->is_struct_or_union_scope) {
+  if (prev_parent && root) {
+    within_dot_expression = false;
     scope->parent = prev_parent;
   }
   return type;
@@ -1027,3 +1034,4 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
 }
+

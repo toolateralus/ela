@@ -53,6 +53,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
+  bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
   TypeVisitor(Context &context) : ctx(context) {}
   Context &ctx;
@@ -89,6 +90,7 @@ struct TypeVisitor : VisitorBase {
 };
 
 struct EmitVisitor : VisitorBase {
+  bool within_dot_expression = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;

@@ -7,6 +7,45 @@
 #foreign rand :: () -> int;
 #foreign srand :: (u32 seed) -> void;
 
+min :: (int a, b) -> int {
+  if a > b  {
+    return b;
+  }
+  return a;
+}
+
+max :: (int a, b) -> int {
+  if a > b  {
+    return a;
+  }
+  return b;
+}
+
+min :: (float a, b) -> float {
+  if a > b  {
+    return b;
+  }
+  return a;
+}
+
+max :: (float a, b) -> float {
+  if a > b  {
+    return a;
+  }
+  return b;
+}
+
+clamp :: (float v, min, max) -> float {
+  if v < min { return min; }
+  if v > max { return max; }
+  return v;
+}
+
+clamp :: (float *v, float min, max) {
+  if *v < min { *v = min; }
+  if *v > max { *v = max; }
+}
+
 Random :: enum {
   Max = 2147483647,
 }
