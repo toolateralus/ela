@@ -958,7 +958,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   // we store this ast just to type check the stuff.
   ctx.set_scope(node->scope);
-
+  node->scope->types.insert(node->type->resolved_type);
   // do this first.
   for (const auto &_struct : node->structs) {
     for (const auto &field : _struct->fields) {
