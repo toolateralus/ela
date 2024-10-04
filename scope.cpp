@@ -158,10 +158,7 @@ Context::Context() {
 //     return parent->get_type(id);
 //   }
   
-//   // !BUG: This makes no sense, yet this fixes a segfault that's happening.
-//   // if (!parent) {
-//   //   return global_get_type(id);
-//   // }
+
 //   return nullptr;
 // }
 

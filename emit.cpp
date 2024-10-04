@@ -178,7 +178,6 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
 
     std::string str;
     auto get_format_str = [&](int type_id) {
-      //!BUG FIX THIS SCOPED TYPE SYSTEM PROBLEM!
       auto type = global_get_type(type_id);
       
       // We assume that if we get this far with compiling this interpolated string,

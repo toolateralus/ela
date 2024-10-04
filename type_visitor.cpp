@@ -658,20 +658,8 @@ std::any TypeVisitor::visit(ASTFor *node) {
   case ASTFor::RangeBased: {
     auto v = node->value.range_based;
     auto type = int_from_any(v.collection->accept(this));
-    
-    // !BUG  For some reason this is returning null for float *;
-    // if we just added extensions to a type, and it already exists in the root scope,
-    // that newly created type should get propogated to the root scope
-    
-    // NOTE: i did that, and i STILL cannot get the type from the enclosing scope aka ctx.scope.
-    // Right now im just using global_get_type, but this should absolutely not have to be the case
-    // and this must be fixed.
-    
-    // !BUG REMOVE THIS
+
     auto t = global_get_type(type);
-    
-    // !BUG THIS MUST BE UNCOMMENTED ONCE WE FIND THE SOURCE OF THE BUG
-    // auto t = global_get_type(type);
     
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
