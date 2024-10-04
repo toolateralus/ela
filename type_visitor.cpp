@@ -42,6 +42,7 @@ static inline int int_from_any(const std::any &any) {
   return std::any_cast<int>(any);
 }
 
+// TODO(Josh) 10/4/2024, 1:39:21 PM Wow this is an eyesore. There has to be a way to clean this dang thing up
 // either returns the correct type that this init list will get casted to, or 
 // throws an error.
 // node->types_are_homogenous is pretty loose: it states that these types are either the same, or implicitly convertible to each other.
@@ -68,10 +69,6 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
     if (info->scope->fields_count() < node->types.size()) {
       throw_error("excess elements provided in initializer list.", node->source_range);
     }
-    
-    printf("got %d fields from struct %s\n", info->scope->fields_count(), type->get_base().c_str());
-    printf("there are %ld fields in the init list\n", node->types.size());
-    
     // search for fields within the range of the types provided.
     int i = 0;
     for (const auto &[name, sym] : info->scope->symbols) {
