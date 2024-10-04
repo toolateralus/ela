@@ -158,7 +158,8 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       // TODO: verify that we even want to use this function.
       // It might not do the fine grained equality check that we need on the parameter and return types.
       // Maybe it will sinec that info is encoded into function type name.s
-      if (type->equals(this_type->get_base(), this_type->get_ext())) { 
+      auto visited = std::unordered_set<const Type*>();
+      if (type->equals(this_type->get_base(), this_type->get_ext(), visited)) { 
         throw_error(std::format("re-definition of function '{}'", node->name.value),
                  {});
       }

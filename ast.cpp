@@ -699,6 +699,7 @@ ASTStatement *Parser::parse_statement() {
     throw_error(std::format("Unexpected variable {}", tok.value),
                 range);
   }
+  
   if (global_find_type_id(tok.value, {}) == -1) {
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),

@@ -9,6 +9,7 @@
 #include <string.h>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <vector>
 
 #include <jstl/containers/vector.hpp>
@@ -29,7 +30,7 @@ extern int num_types;
 extern jstl::Arena type_arena;
 
 // used for emitting typedefs
-extern std::unordered_map<std::string, int> global_typedefs;
+extern std::unordered_map<std::string, int> global_type_alias_map;
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -125,6 +126,20 @@ struct TypeExt {
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
+  
+  TypeExt append(const TypeExt& to_append) const {
+    auto these = *this;
+    int sizes_i = 0;
+    for (auto ext : to_append.extensions) {
+      if (ext == TYPE_EXT_ARRAY) {
+        these.array_sizes.push_back(to_append.array_sizes[sizes_i]);
+        sizes_i++;
+      }
+      these.extensions.push_back(ext);
+    }
+    return these;
+  } 
+  
 
   inline bool is_array() const { return !array_sizes.empty(); }
 
@@ -292,34 +307,49 @@ struct Type {
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
 
+  // this type is aliasing another type
   bool is_alias = false;
+  // this is the type that this type aliases.
   int alias_id;
+  
+  // this type has other types that refer to me as an alias.
+  bool has_aliases = false;
+  // these are the types that refer to me as an alias
+  std::vector<int> aliases;
+  
+  bool has_alias(const std::string &name) const {
+    if (!has_aliases) return false;
+    for (const auto &alias: aliases) {
+      auto type = global_get_type(alias);
+      if (type->get_base() == name) {
+        return true;
+      }
+    }
+    return false;
+  }
 
-  std::string& get_base() {
-    // if (is_alias) {
-    //   auto type = global_get_type(alias_id);
-    //   return type->base;
-    // }
+  void set_base(const std::string &base) {
+    this->base = base;
+  }
+  void set_ext(const TypeExt &ext) {
+    this->extensions = ext;
+  }
+  void set_info(TypeInfo *info) {
+    this->info = info;
+  }
+  std::string const get_base() const {
     return base;
   }
-  std::string const & get_base() const {
-    // if (is_alias) {
-    //   auto type = global_get_type(alias_id);
-    //   return type->base;
-    // }
-    return base;
+  TypeExt const get_ext() const {
+    if (is_alias) {
+      auto type = global_get_type(alias_id);
+      auto exts = type->extensions;
+      return exts.append(extensions);
+    }
+    return extensions;
   }
-  TypeExt& get_ext() {
 
-    return extensions;
-  }
-  TypeExt const& get_ext() const {
-    return extensions;
-  }
-  TypeInfo *&get_info() {
-    return info;
-  }
-  TypeInfo * const & get_info() const {
+  TypeInfo *get_info() const {
     return info;
   }
 
@@ -331,7 +361,7 @@ struct Type {
   TypeInfo *info;
   public:
 
-  bool equals(const std::string &name, const TypeExt &type_extensions) const;
+  bool equals(const std::string &name, const TypeExt &type_extensions, std::unordered_set<const Type*> &visited) const;
 
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   Type(){};

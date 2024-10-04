@@ -653,10 +653,11 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
   use_header();
   
-  for (const auto &[name, aliased_type] : global_typedefs) {
+  for (const auto &[name, aliased_type] : global_type_alias_map) {
     (*ss) << "using " << name << " = "; 
     auto type = global_get_type(aliased_type);
-    (*ss) << type->to_cpp_string();
+    auto points_to = global_get_type(type->alias_id);
+    (*ss) << points_to->to_cpp_string();
     (*ss) << ";\n";
   }
   

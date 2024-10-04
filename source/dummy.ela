@@ -1,11 +1,8 @@
 #compiler_flags "-g";
 
-#alias Something :: int;
-#alias Void :: void()*;
+#alias Int :: int*;
 
 main :: () {
-  Void v = main;
-  
-  Something s = 10;
-  int n = s;
+  Int* n;
+  int** n1 = n;
 }
