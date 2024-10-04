@@ -1,6 +1,4 @@
 #import core;
-#import string;
-#import math;
 
 #compiler_flags "-g"
 

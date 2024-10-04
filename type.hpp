@@ -84,6 +84,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_DTOR = 1 << 4,
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
+  FUNCTION_IS_EXPORTED= 1 << 7,
 };
 
 enum struct FunctionMetaType {

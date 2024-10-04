@@ -1,35 +1,14 @@
 #import dlfcn;
+#import core;
 
-/*
-  *- - - - BUG 0 - - - - -*
-  ----                 ----
-  *--- Compiler error: ---*
-  ----                 ----
+// Not a compile time error but a runtime error.
+// This some_function type will equal 'void()*', the parameters just get completely discarded.
 
-  !Error:
-  ? clang++ -std=c++23 -L/usr/local/lib -Wno-writable-strings -Wno-parentheses-equality -Wno-c99-designator fn_ptr_cast.cpp -o fn_ptr_cast 
-  ? fn_ptr_cast.cpp:10:35: error: expected expression
-  ?  10 |   void(*sym)()  = (function)void(*)()(dlsym(handle, "print_info"));
-  ?     |                                   ^
-  ? 1 error generated.
-  ? compiler returned 256
-*/
-
-/* 
- * Clearly our casting of function pointers and aliases leaves much to be desired.
- * We have to use the alias name instead of the actual type, and we really should disallow using
- * function pointers without having a type alias for them, it's really gnarly and hard to mangle.
- 
- * If we do allow 
- ?  void()* func = &main;
- * or whatever, we will need a lot of work with how these types get used in the backend. 
-*/
-
-
-#alias function :: void()*;
+#alias some_function :: void(int)*;
 
 main :: () {
-  handle := dlopen("test.so", Rtld.Now);
-  function sym = #make(function, dlsym(handle, "print_info"));
-  sym();
+  Type *type = #type some_function;
+  if strcmp(type.name, "void(int)*") != 0 {
+    println($"expected void(int)*, got {type.name}");
+  }
 }

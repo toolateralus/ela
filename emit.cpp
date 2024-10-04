@@ -455,9 +455,16 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   if ((node->flags & FUNCTION_IS_METHOD) != 0) {
     return;
   }
+  
 
   emit_default_args = true;
   use_header();
+  
+  if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
+    (*ss) << "extern \"C\" ";
+  }
+
+  
   node->return_type->accept(this);
   (*ss) << ' ' << node->name.value << ' ';
   node->params->accept(this);
@@ -599,6 +606,10 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     node->params->accept(this);
     node->block.get()->accept(this);
     return {};
+  }
+
+  if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
+    (*ss) << "extern \"C\" ";
   }
 
   // we override main's return value to allow compilation without explicitly

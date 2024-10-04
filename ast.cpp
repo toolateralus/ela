@@ -150,6 +150,7 @@ void Parser::init_directive_routines() {
              function->return_type = parser->parse_type();
            }
            function->meta_type = FunctionMetaType::FUNCTION_TYPE_FOREIGN;
+           
            parser->expect(TType::Semi);
 
            parser->end_node(function, range);
@@ -377,6 +378,7 @@ void Parser::init_directive_routines() {
          }});
   }
   
+  // #operator, for operator overloads.
   {
     directive_routines.push_back({
       .identifier = "operator",
@@ -414,6 +416,23 @@ void Parser::init_directive_routines() {
     });
     
   }
+  
+  // #export, for exporting a non-mangled name to a dll or C library primarily.
+  // Equivalent to marking a function extern "C" in C++.
+  {
+    directive_routines.push_back({
+      .identifier = "export",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto name = parser->expect(TType::Identifier);
+        parser->expect(TType::DoubleColon);
+        auto func_decl = parser->parse_function_declaration(name);
+        func_decl->flags |= FUNCTION_IS_EXPORTED;
+        return func_decl;
+      }
+    });
+  }
+  
   
 }
 
