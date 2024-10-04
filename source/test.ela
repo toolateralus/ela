@@ -804,19 +804,18 @@ OperatorOverloadTest :: struct {
   assert("Right shift assignment operator overload failed",     opstr1.value == 0);
 }
 
-
 InitListStruct :: struct {
   int a; int b; int c;
 }
-
 #test test_initializer_lists :: () {
     int scalar = {0};
-  
     int[] arr = {0, 1, 2};
     int[3] fixed = {0, 1, 2};
-    
     InitListStruct str = {0, 0, 0};
-    InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    
+    //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
+    // InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    InitListStruct[] strArr = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
     InitListStruct[3] strArr1 = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
     int[] expected_arr = {0, 1, 2};

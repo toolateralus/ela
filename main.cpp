@@ -116,10 +116,9 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.flush();
   output.close();
 
-  std::string extra_flags = "-lc " + compilation_flags;
+  std::string extra_flags = "" + compilation_flags;
 
-  auto compilation_string = std::format("clang++ -std=c++23 -Wno-writable-strings -Wno-parentheses-equality -Wno-c99-designator {} {} -o {}", extra_flags,
-                     output_path.string(), binary_path.string());
+  auto compilation_string = std::format("clang++ -std=c++23 -L/usr/local/lib -Wno-writable-strings -Wno-parentheses-equality -Wno-c99-designator {} -o {} {}", output_path.string(), binary_path.string(), extra_flags);
                      
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
   cpp.begin();
