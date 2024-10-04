@@ -978,7 +978,7 @@ Vec2_zero :: () -> Vec2 {
 }
 
 
-mat4 :: union {
+Mat4 :: union {
   float[16] values;
   #anon :: struct {
     float M00;
@@ -998,10 +998,60 @@ mat4 :: union {
     float M32;
     float M33;
   };
+  #operator(*) :: (#self other) -> #self {
+    matrix := #make(#self);
+    matrix.M00 = M00 * other.M00 + M01 * other.M10 + M02 * other.M20 + M03 * other.M30;
+    matrix.M01 = M00 * other.M01 + M01 * other.M11 + M02 * other.M21 + M03 * other.M31;
+    matrix.M02 = M00 * other.M02 + M01 * other.M12 + M02 * other.M22 + M03 * other.M32;
+    matrix.M03 = M00 * other.M03 + M01 * other.M13 + M02 * other.M23 + M03 * other.M33;
+    
+    matrix.M10 = M10 * other.M00 + M11 * other.M10 + M12 * other.M20 + M13 * other.M30;
+    matrix.M11 = M10 * other.M01 + M11 * other.M11 + M12 * other.M21 + M13 * other.M31;
+    matrix.M12 = M10 * other.M02 + M11 * other.M12 + M12 * other.M22 + M13 * other.M32;
+    matrix.M13 = M10 * other.M03 + M11 * other.M13 + M12 * other.M23 + M13 * other.M33;
+    
+    matrix.M20 = M20 * other.M00 + M21 * other.M10 + M22 * other.M20 + M23 * other.M30;
+    matrix.M21 = M20 * other.M01 + M21 * other.M11 + M22 * other.M21 + M23 * other.M31;
+    matrix.M22 = M20 * other.M02 + M21 * other.M12 + M22 * other.M22 + M23 * other.M32;
+    matrix.M23 = M20 * other.M03 + M21 * other.M13 + M22 * other.M23 + M23 * other.M33;
+    
+    matrix.M30 = M30 * other.M00 + M31 * other.M10 + M32 * other.M20 + M33 * other.M30;
+    matrix.M31 = M30 * other.M01 + M31 * other.M11 + M32 * other.M21 + M33 * other.M31;
+    matrix.M32 = M30 * other.M02 + M31 * other.M12 + M32 * other.M22 + M33 * other.M32;
+    matrix.M33 = M30 * other.M03 + M31 * other.M13 + M32 * other.M23 + M33 * other.M33;
+    return matrix;
+  }
+  scale :: (float factor) -> #self {
+    matrix := #make(#self);
+    matrix.M00 = M00 * factor;
+    matrix.M01 = M01 * factor;
+    matrix.M02 = M02 * factor;
+    matrix.M03 = M03 * factor;
+    matrix.M10 = M10 * factor;
+    matrix.M11 = M11 * factor;
+    matrix.M12 = M12 * factor;
+    matrix.M13 = M13 * factor;
+    matrix.M20 = M20 * factor;
+    matrix.M21 = M21 * factor;
+    matrix.M22 = M22 * factor;
+    matrix.M23 = M23 * factor;
+    matrix.M30 = M30 * factor;
+    matrix.M31 = M31 * factor;
+    matrix.M32 = M32 * factor;
+    matrix.M33 = M33 * factor;
+    return matrix;
+  }
+  determinant :: () -> float {
+    float r0 = M00 * (M11 * (M22 * M33 - M23 * M32) - M12 * (M21 * M33 - M23 * M31) + M13 * (M21 * M32 - M22 * M31));
+    float r1 = M01 * (M10 * (M22 * M33 - M23 * M32) - M12 * (M20 * M33 - M23 * M30) + M13 * (M20 * M32 - M22 * M30));
+    float r2 = M02 * (M10 * (M21 * M33 - M23 * M31) - M11 * (M20 * M33 - M23 * M30) + M13 * (M20 * M31 - M21 * M30));
+    float r3 = M03 * (M10 * (M21 * M32 - M22 * M31) - M11 * (M20 * M32 - M22 * M30) + M12 * (M20 * M31 - M21 * M30));
+    return r0 - r1 + r2 - r3;
+  }
 }
 
-mat4_identity :: () -> mat4 {
-  mat4 matrix;
+Mat4_identity :: () -> Mat4 {
+  Mat4 matrix;
   matrix.M00 = 1.0;
   matrix.M01 = 0.0;
   matrix.M02 = 0.0;
@@ -1032,7 +1082,7 @@ Shader :: struct {
   #dtor :: () {
     glDeleteProgram(handle);
   }
-  set_mat4 :: (char *name, mat4 *v) {
+  set_Mat4 :: (char *name, Mat4 *v) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, #make(float*, v.values));

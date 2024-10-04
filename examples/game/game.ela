@@ -92,7 +92,7 @@ run_game :: () -> s8 {
 
   shader.use();
   Vec2 modelPosition;
-  viewProjectionMatrix := mat4_identity();
+  viewProjectionMatrix := Mat4_identity();
 
   is_key_down :: (int key) -> bool  {
     state := glfwGetKey(window.handle, key);
@@ -116,7 +116,7 @@ run_game :: () -> s8 {
   while !window.should_close() {
     window.clear();
     if is_key_down(Key.ESCAPE) { break; }
-    shader.set_mat4("viewProjectionMatrix", &viewProjectionMatrix);
+    shader.set_Mat4("viewProjectionMatrix", &viewProjectionMatrix);
     shader.set_Vec2("modelPosition", &modelPosition);
     take_input(&modelPosition);
     glDrawArrays(GL.TRIANGLES, 0, vertexCount);
@@ -128,6 +128,6 @@ run_game :: () -> s8 {
 }
 
 main :: ()  {
-  matrix := mat4_identity();
+  matrix := Mat4_identity();
   run_game();
 }
