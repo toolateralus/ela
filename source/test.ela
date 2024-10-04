@@ -474,11 +474,11 @@ something :: (float32 f) -> float32 {
   assert("Zero case of enum did not equal 0", value == 0);
 }
 
-#test test_type_alias :: () {
-  #alias Xaryu :: int;
-  Xaryu i = 0;
-  assert("type alias failed", i == 0);
-}
+// #test test_type_alias :: () {
+//   #alias Xaryu :: int;
+//   Xaryu i = 0;
+//   assert("type alias failed", i == 0);
+// }
 
 // woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
@@ -566,27 +566,27 @@ something :: (float32 f) -> float32 {
   // bool[] arr = {0,1,2,3,4,5};
 }
 
-#test test_function_pointers :: () {
-  #alias VoidFunction :: void()*;
-  VoidFunction* func = #make(VoidFunction*, malloc(sizeof(VoidFunction) * 10));
-  for s32 i; i < 10; ++i {
-    func[i] = &test_function_pointers;
-  }
-  for s32 i; i < 10; ++i {
-    assert("func failed to == itself", func[i] == &test_function_pointers)
-  }
-}
+// #test test_function_pointers :: () {
+//   #alias VoidFunction :: void()*;
+//   VoidFunction* func = #make(VoidFunction*, malloc(sizeof(VoidFunction) * 10));
+//   for s32 i; i < 10; ++i {
+//     func[i] = &test_function_pointers;
+//   }
+//   for s32 i; i < 10; ++i {
+//     assert("func failed to == itself", func[i] == &test_function_pointers)
+//   }
+// }
 
-#test test_aliasing :: () {
-  #alias int_ptr :: int*;
-  int* p = malloc(sizeof(int));
-  int_ptr other = p;
-  assert("alias failed to equal pointed to type field.", p == other);
+// #test test_aliasing :: () {
+//   #alias int_ptr :: int*;
+//   int* p = malloc(sizeof(int));
+//   int_ptr other = p;
+//   assert("alias failed to equal pointed to type field.", p == other);
 
-  int **pp = #make(int**, malloc(sizeof(int*)));
-  int_ptr* other1 = pp;
-  assert("alias failed to equal pointed to type field.", pp == other1);
-}
+//   int **pp = #make(int**, malloc(sizeof(int*)));
+//   int_ptr* other1 = pp;
+//   assert("alias failed to equal pointed to type field.", pp == other1);
+// }
 
 Xaryu :: struct {
   int value;

@@ -41,29 +41,8 @@ int global_find_function_type_id(const std::string &name, const FunctionTypeInfo
 int global_find_type_id(const std::string &name,
                         const TypeExt &type_extensions) {
 
-  // linear search with extensions failed: for aliased types,
-  // we may need to create a type with a non 'name' name.
-  // such as #alias intptr :: int*, where int* hasn't been used yet.
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    if (type->has_alias(name) && type->get_ext() == type_extensions) {
-      return type->id;
-    } else if (type->has_alias(name) && type->get_ext() != type_extensions) {
-      return global_create_type(type->kind, type->get_base(), type->get_info(),
-                                type_extensions);
-    }
-  }
-
-  for (int i = 0; i < num_types; ++i) {
-    auto type = type_table[i];
-    auto base = type->get_base();
-
-    if (type_extensions.has_no_extensions()) {
-      if (type->names_match_or_alias(name) &&
-          type->get_ext().has_no_extensions()) {
-        return type->id;
-      }
-    }
     if (type->equals(name, type_extensions))
       return type->id;
   }
@@ -74,7 +53,7 @@ int global_find_type_id(const std::string &name,
   int base_id = -1;
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
-    if (tinfo->names_match_or_alias(name) &&
+    if (tinfo->get_base() == name &&
         tinfo->get_ext().has_no_extensions()) {
       base_id = tinfo->id;
       break;
@@ -82,9 +61,8 @@ int global_find_type_id(const std::string &name,
   }
   if (base_id != -1) {
     auto t = global_get_type(base_id);
-    if (!t->has_alias(name))
-      return global_create_type((TypeKind)t->kind, name, t->get_info(),
-                                type_extensions);
+    return global_create_type((TypeKind)t->kind, name, t->get_info(),
+                              type_extensions);
   }
 
   return -1;
@@ -352,7 +330,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 
 bool Type::equals(const std::string &name,
                   const TypeExt &type_extensions) const {
-  if (!names_match_or_alias(name))
+  if (get_base() != name)
     return false;
   return type_extensions == this->get_ext();
 }
@@ -730,4 +708,18 @@ Type *global_get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
   return type_table[id];
+}
+
+int global_create_type_alias(int aliased_type, const std::string &name) {
+  auto aliased = global_get_type(aliased_type);
+  auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
+  type_table[num_types] = type;
+  type->get_base() = name;
+  type->get_ext() = aliased->get_ext();
+  type->get_info() = aliased->get_info();
+  type->is_alias = true;
+  type->alias_id = aliased_type;
+  num_types++;
+  global_typedefs[name] = aliased_type;
+  return type->id;
 }

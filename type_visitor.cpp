@@ -78,7 +78,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
       if (i >= node->types.size()) {
         break;
       }
-      if (!sym.is_function() && !sym.is_type_alias()) {
+      if (!sym.is_function()) {
         validate_type_compatability(node->types[i], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for struct");
       }
       i++;
@@ -90,7 +90,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
     }
     // search for the first field member and type check against it.
     for (const auto &[name, sym] : info->scope->symbols) {
-      if (!sym.is_function() && !sym.is_type_alias()) {
+      if (!sym.is_function()) {
         validate_type_compatability(node->types[0], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for union");
         break;
       }
@@ -105,7 +105,7 @@ std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
-  return node->resolved_type = ctx.scope->find_type_id(
+  return node->resolved_type = global_find_type_id(
              node->base, node->extension_info);
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
@@ -143,8 +143,8 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     info.params_len++;
   }
 
-  auto type_id = ctx.scope->find_function_type_id(
-      ctx.scope->get_function_typename(node), info, {});
+  auto type_id = global_find_function_type_id(
+      global_get_function_typename(node), info, {});
 
   auto sym = ctx.scope->lookup(node->name.value);
   
@@ -152,9 +152,9 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
     if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
-      auto type = ctx.scope->get_type(overload_type_id);
+      auto type = global_get_type(overload_type_id);
       
-      auto this_type = ctx.scope->get_type(type_id);
+      auto this_type = global_get_type(type_id);
       // TODO: verify that we even want to use this function.
       // It might not do the fine grained equality check that we need on the parameter and return types.
       // Maybe it will sinec that info is encoded into function type name.s
@@ -248,7 +248,7 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 }
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
-  auto type = ctx.scope->get_type(id);
+  auto type = global_get_type(id);
   
   if (type->get_ext().is_fixed_sized_array()) {
     throw_warning("using a fixed array as a function parameter: note, this "
@@ -271,7 +271,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
       extensions.extensions.insert(extensions.extensions.begin(),
                                    TYPE_EXT_POINTER);
       node->type->resolved_type =
-          ctx.scope->find_type_id(type->get_base(), extensions);
+          global_find_type_id(type->get_base(), extensions);
     }
   }
 
@@ -315,7 +315,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) declaring_or_assigning_type = left;
   
   auto right = int_from_any(node->right->accept(this));
-  auto type = ctx.scope->get_type(left);
+  auto type = global_get_type(left);
   
   // TODO: this needs a really big rework.
   // TODO: we gotta do type checking on parameters.
@@ -335,7 +335,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = ctx.scope->get_type(t);
+        auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(right, param_0, node->source_range, "expected, {}, got {}", "invalid call to operator overload");
@@ -364,8 +364,8 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     node->resolved_type = bool_type();
     return bool_type();
   } else {
-    auto left_t = ctx.scope->get_type(left);
-    auto right_t = ctx.scope->get_type(right);
+    auto left_t = global_get_type(left);
+    auto right_t = global_get_type(right);
     auto conv_rule_0 = type_conversion_rule(left_t, right_t);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t);
     // TODO(Josh) 10/1/2024, 3:07:47 PM
@@ -390,10 +390,10 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
   if (node->op.type == TType::And) {
-    auto ty = ctx.scope->get_type(operand_ty);
+    auto ty = global_get_type(operand_ty);
     auto extensions = ty->get_ext();
     extensions.extensions.push_back(TYPE_EXT_POINTER);
-    return ctx.scope->find_type_id(ty->get_base(), extensions);
+    return global_find_type_id(ty->get_base(), extensions);
   }
 
   if (node->op.type == TType::Mul) {
@@ -401,7 +401,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   }
 
 
-  auto left_ty = ctx.scope->get_type(operand_ty);
+  auto left_ty = global_get_type(operand_ty);
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions()) {
     auto info = static_cast<StructTypeInfo*>(left_ty->get_info());
     if (auto sym = info->scope->lookup(node->op.value)) {
@@ -418,7 +418,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = ctx.scope->get_type(t);
+        auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         return fun_info->return_type;
       }
@@ -428,8 +428,8 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule =
-        type_conversion_rule(ctx.scope->get_type(operand_ty),
-                             ctx.scope->get_type(bool_type()));
+        type_conversion_rule(global_get_type(operand_ty),
+                             global_get_type(bool_type()));
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                         conversion_rule != CONVERT_EXPLICIT);
 
@@ -507,7 +507,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
   
-  Type *type = ctx.scope->get_type(symbol->type_id);
+  Type *type = global_get_type(symbol->type_id);
   
   // TODO: again, we probably don't need functor objects, theyre fancy and unneccesary.
   // Perform call to operator overload for ();
@@ -527,7 +527,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = ctx.scope->get_type(t);
+        auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->get_info());
         if (fun_info->params_len != arg_tys.size())
           throw_error("Invalid number of arguments for call operator overload", node->source_range);
@@ -550,13 +550,13 @@ std::any TypeVisitor::visit(ASTCall *node) {
     // todo: fix this, enumerate is slow as balls.
     for (const auto &[i, overload]: symbol->function_overload_types | std::ranges::views::enumerate) {
       auto name = node->name.value;
-      auto ovrld_ty = ctx.scope->get_type(overload);
+      auto ovrld_ty = global_get_type(overload);
       auto info = static_cast<FunctionTypeInfo*>(ovrld_ty->get_info());
       for (int j = 0; j < info->params_len; ++j) {
         // TODO: probably could match these better than just comparing typeids.
         // such as allowing implicit conversions to still take place.
         if (j >= arg_tys.size() && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
-        auto conversion_rule = type_conversion_rule(ctx.scope->get_type(arg_tys[j]), ctx.scope->get_type(info->parameter_types[j]));
+        auto conversion_rule = type_conversion_rule(global_get_type(arg_tys[j]), global_get_type(info->parameter_types[j]));
         if (conversion_rule == CONVERT_EXPLICIT && !(info->is_varargs || info->default_params > 0)) goto didnt_match;
         if (conversion_rule == CONVERT_IMPLICIT && !(info->is_varargs || info->default_params > 0)) {
           found_implicit_match = true;
@@ -577,14 +577,14 @@ std::any TypeVisitor::visit(ASTCall *node) {
       throw_error(std::format("No function overload for provided argument signature found.. got : {}", names), node->source_range);
     }
     if (found_exact_match) {
-      type = ctx.scope->get_type(symbol->function_overload_types[exact_match_idx]);
+      type = global_get_type(symbol->function_overload_types[exact_match_idx]);
       assert(type != nullptr);
     } else {
-      type = ctx.scope->get_type(symbol->function_overload_types[implicit_match_idx]);
+      type = global_get_type(symbol->function_overload_types[implicit_match_idx]);
       assert(type != nullptr);
     }
   } else {
-    type = ctx.scope->get_type(symbol->type_id);
+    type = global_get_type(symbol->type_id);
   }
   
   
@@ -642,7 +642,7 @@ std::any TypeVisitor::visit(ASTReturn *node) {
     // TODO: we should know the return type of the function we're visiting here so we can coerce initializer lists
     type = int_from_any(node->expression.get()->accept(this));
   } else {
-    type = ctx.scope->find_type_id("void", {});
+    type = global_find_type_id("void", {});
   }
   return ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
@@ -671,7 +671,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto t = global_get_type(type);
     
     // !BUG THIS MUST BE UNCOMMENTED ONCE WE FIND THE SOURCE OF THE BUG
-    // auto t = ctx.scope->get_type(type);
+    // auto t = global_get_type(type);
     
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
@@ -712,7 +712,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
       auto type = global_get_type(iter_ty);
       auto ext = type->get_ext();
       ext.extensions.push_back(TYPE_EXT_POINTER);
-      iter_ty = ctx.scope->find_type_id(type->get_base(), ext);
+      iter_ty = global_find_type_id(type->get_base(), ext);
     }
 
     ctx.scope->insert(iden->value.value, iter_ty);
@@ -775,7 +775,7 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   return control_flow;
 }
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
-  auto type = ctx.scope->get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
   info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
@@ -796,7 +796,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   auto left = int_from_any(node->left->accept(this));
-  auto left_ty = ctx.scope->get_type(left);
+  auto left_ty = global_get_type(left);
 
   if (!left_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
@@ -876,7 +876,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 std::any TypeVisitor::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
-  auto left_ty = ctx.scope->get_type(left);
+  auto left_ty = global_get_type(left);
 
   // TODO: determine if we even want operator overloading for subscript.
   // It seems to have highlighted type system issues, though so we can at least use it to debug why a dot expression
@@ -901,7 +901,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
         } else {
           t = sym->function_overload_types[0];
         }
-        auto fun_ty = ctx.scope->get_type(t);
+        auto fun_ty = global_get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
         auto param_0 = fun_info->parameter_types[0];
         validate_type_compatability(
@@ -980,7 +980,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
       auto expr = value.get();
       auto id = int_from_any(value.get()->accept(this));
       
-      auto type = ctx.scope->get_type(id);
+      auto type = global_get_type(id);
       
       if (!type->is_kind(TYPE_SCALAR) || !type->get_ext().has_no_extensions()) {
         throw_error("Cannot have non integral types in enums got: " + type->to_string(), node->source_range);
@@ -1045,6 +1045,6 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   if (node->arguments)
     node->arguments.get()->accept(this);
 
-  auto t = ctx.scope->get_type(type);
+  auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
 }

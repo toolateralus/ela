@@ -26,8 +26,6 @@ jstl::Arena scope_arena{MB(10)};
 
 std::unordered_map<std::string, int> global_typedefs;
 
-std::unordered_map<std::string, int> global_type_aliases;
-
 // the same for this
 jstl::Arena ast_arena{MB(10)};
 

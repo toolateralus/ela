@@ -1,0 +1,11 @@
+#compiler_flags "-g";
+
+#alias Something :: int;
+#alias Void :: void()*;
+
+main :: () {
+  Void v = main;
+  
+  Something s = 10;
+  int n = s;
+}

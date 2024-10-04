@@ -31,9 +31,6 @@ extern jstl::Arena type_arena;
 // used for emitting typedefs
 extern std::unordered_map<std::string, int> global_typedefs;
 
-// used for actually aliasing types.
-extern std::unordered_map<std::string, int> global_type_aliases;
-
 enum ConversionRule {
   CONVERT_PROHIBITED,
   CONVERT_NONE_NEEDED,
@@ -222,10 +219,10 @@ struct UnionTypeInfo : TypeInfo {
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
-  
+
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
-  
+
   virtual std::string to_string() const override { return ""; }
 };
 
@@ -287,61 +284,47 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 
 int get_pointer_to_type(int base);
 
+int global_create_type_alias(int aliased_type, const std::string &name);
 
 struct Type {
   const int id = invalid_id;
 
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
-  
+
   bool is_alias = false;
   int alias_id;
-  
+
   std::string& get_base() {
-    if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->base;
-    }
+    // if (is_alias) {
+    //   auto type = global_get_type(alias_id);
+    //   return type->base;
+    // }
     return base;
   }
   std::string const & get_base() const {
-     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->base;
-    }
+    // if (is_alias) {
+    //   auto type = global_get_type(alias_id);
+    //   return type->base;
+    // }
     return base;
   }
   TypeExt& get_ext() {
-     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->extensions;
-    }
+
     return extensions;
   }
   TypeExt const& get_ext() const {
-     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->extensions;
-    }
     return extensions;
   }
   TypeInfo *&get_info() {
-     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->info;
-    }
     return info;
   }
   TypeInfo * const & get_info() const {
-     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      return type->info;
-    }
     return info;
   }
-  
+
   //TODO: add helper functions for casting the info's? its a lot of code all over.
-  
+
   private:
   std::string base;
   TypeExt extensions;
@@ -351,16 +334,8 @@ struct Type {
   bool equals(const std::string &name, const TypeExt &type_extensions) const;
 
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
-
-  inline bool names_match_or_alias(const std::string &name) const {
-    return has_alias(name) || this->get_base() == name;
-  }
-
-  inline bool has_alias(const std::string &in_alias) const {
-    return global_type_aliases.contains(in_alias) && global_type_aliases[in_alias] == id;
-  }
-
   Type(){};
+
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   Type(const Type &) = delete;
   Type &operator=(const Type &) = delete;

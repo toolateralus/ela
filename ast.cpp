@@ -298,7 +298,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto enum_decl = parser->parse_enum_declaration(name);
            enum_decl->is_flags = true;
-           auto type = parser->ctx.scope->get_type(enum_decl->type->resolved_type);
+           auto type = global_get_type(enum_decl->type->resolved_type);
            auto info = static_cast<EnumTypeInfo *>(type->get_info());
            info->is_flags = true;
            return enum_decl;
@@ -318,10 +318,8 @@ void Parser::init_directive_routines() {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
            auto aliased_type = parser->parse_type();
-           auto id = parser->ctx.scope->find_type_id(aliased_type->base, aliased_type->extension_info);
-           auto type = global_get_type(id);
-           
-           parser->ctx.scope->insert(name.value, id, SYMBOL_IS_TYPE_ALIAS);
+           auto id = global_find_type_id(aliased_type->base, aliased_type->extension_info);
+           global_create_type_alias(id, name.value);
            return ast_alloc<ASTNoop>();
         }});
   }
@@ -356,7 +354,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto decl =
                parser->parse_struct_declaration(get_unique_identifier());
-           auto t = parser->ctx.scope->get_type(
+           auto t = global_get_type(
                decl->type->resolved_type);
            auto info = static_cast<StructTypeInfo *>(t->get_info());
            info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
@@ -514,7 +512,7 @@ ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
 
-  if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+  if (global_find_type_id(tok.value, {}) != -1) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -565,7 +563,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+    if (global_find_type_id(tok.value, {}) != -1) {
       node->tag = ASTFor::CStyle;
 
       auto decl = parse_declaration();
@@ -701,7 +699,7 @@ ASTStatement *Parser::parse_statement() {
     throw_error(std::format("Unexpected variable {}", tok.value),
                 range);
   }
-  if (ctx.scope->find_type_id(tok.value, {}) == -1) {
+  if (global_find_type_id(tok.value, {}) == -1) {
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),
          range);
@@ -807,7 +805,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (next.type == TType::Directive || !type || ctx.scope->find_type_id(next.value, {}) != -1) {
+    if (next.type == TType::Directive || !type || global_find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
     
@@ -899,7 +897,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys.push_back(key);
     keys_set.insert(key);
   }
-  node->type->resolved_type = ctx.scope->create_enum_type(
+  node->type->resolved_type = global_create_enum_type(
       node->type->base, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
@@ -911,7 +909,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   current_struct_decl = decl;
 
   // fwd declare the type.
-  auto type_id = ctx.scope->create_struct_type(name.value, {});
+  auto type_id = global_create_struct_type(name.value, {});
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
@@ -938,7 +936,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
     decl->scope = block->scope;
   } else {
-    Type *t = ctx.scope->get_type(type_id);
+    Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
@@ -984,7 +982,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     } else if (auto struct_decl =
                    dynamic_cast<ASTStructDeclaration *>(statement)) {
       auto type =
-          ctx.scope->get_type(struct_decl->type->resolved_type);
+          global_get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         ;
@@ -1009,7 +1007,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   // CLEANUP(JOSH): do we even need to store ASTType*'s on these type
   // declaration nodes?
-  node->type->resolved_type = ctx.scope->create_union_type(
+  node->type->resolved_type = global_create_union_type(
       name.value, block->scope, UNION_IS_NORMAL);
   end_node(node, range);
   return node;
@@ -1213,7 +1211,7 @@ ASTExpr *Parser::parse_primary() {
     auto range = begin_node();
     auto name = tok.value;
 
-    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+    if (global_find_type_id(tok.value, {}) != -1) {
       return parse_type();
     }
     eat();

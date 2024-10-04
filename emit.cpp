@@ -139,13 +139,13 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  auto type = ctx.scope->get_type(node->resolved_type);
+  auto type = global_get_type(node->resolved_type);
   
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
-    (*ss) << ctx.scope->get_type(pointed_to_ty)
+    (*ss) << global_get_type(pointed_to_ty)
                  ->to_type_struct(ctx);
     return {};
   }
@@ -178,7 +178,6 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
 
     std::string str;
     auto get_format_str = [&](int type_id) {
-      
       //!BUG FIX THIS SCOPED TYPE SYSTEM PROBLEM!
       auto type = global_get_type(type_id);
       
@@ -232,7 +231,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
           << "\",";
     for (const auto &value : node->interpolated_values) {
       auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-      auto type = ctx.scope->get_type(type_id);
+      auto type = global_get_type(type_id);
       if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
         value->accept(this);
         (*ss) << ".data";
@@ -289,7 +288,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
-    auto type = ctx.scope->get_type(id);
+    auto type = global_get_type(id);
     (*ss) << type->to_cpp_string() << ' ';
     node->left->accept(this);
     (*ss) << " = ";
@@ -306,7 +305,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) << node->op.value;
 
   if (node->op.type == TType::Assign) {
-    auto type = ctx.scope->get_type(node->resolved_type);
+    auto type = global_get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer(1);
     if (isptr)
       (*ss) << "(" << type->to_cpp_string() << ")";
@@ -328,7 +327,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
-  auto type = ctx.scope->get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   auto isptr = type->get_ext().is_pointer(1);
   if (isptr)
     (*ss) << "(" << type->to_cpp_string() << ")";
@@ -336,7 +335,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
-  auto type = ctx.scope->get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   if (type->get_ext().is_fixed_sized_array()) {
     auto type_str = type->get_ext().to_string();
     (*ss) << type->get_base() << ' ' << node->name.value << type_str;
@@ -399,7 +398,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
-  auto type = ctx.scope->get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   node->type->accept(this);
   (*ss) << ' ' << node->name;
   if (node->default_value.is_not_null() && emit_default_args) {
@@ -653,6 +652,18 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
   header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
 
+  use_header();
+  
+  for (const auto &[name, aliased_type] : global_typedefs) {
+    (*ss) << "using " << name << " = "; 
+    auto type = global_get_type(aliased_type);
+    (*ss) << type->to_cpp_string();
+    (*ss) << ";\n";
+  }
+  
+  use_code();
+  
+
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
@@ -690,7 +701,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
-  auto type = ctx.scope->get_type(node->type->resolved_type);
+  auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
 
   current_struct_decl = node;
@@ -734,7 +745,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto left = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_ty = ctx.scope->get_type(left);
+  auto left_ty = global_get_type(left);
 
   auto op = ".";
 
@@ -802,7 +813,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTMake *node) {
-  auto type = ctx.scope->get_type(node->type_arg->resolved_type);
+  auto type = global_get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
       throw_error("cannot create a pointer currently with #make. it only casts "
@@ -851,7 +862,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     // That is annoying behaviour i dislike from C++
     iden = "enum ";
   }
-  auto type = ctx.scope->get_type(node->element_type);
+  auto type = global_get_type(node->element_type);
   (*ss) << iden << node->type->base << " : " << type->get_base() << "{\n";
   int i = 0;
   auto get_next_index = [&] {
