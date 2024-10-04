@@ -1,0 +1,56 @@
+#compiler_flags "-g";
+
+
+/*
+  *- - - - BUG 0 - - - - -*
+  ----                 ----
+  *--- Compiler error: ---*
+  ----                 ----
+
+  !Error:
+  ?        declaration: ptrptr
+  ?invalid declaration types. expected: IntPtr*, got int**
+  --------------------------------------------------------------------------------
+  ? /home/josh/source/c++/ela/repro/alias.ela:13:1
+  --------------------------------------------------------------------------------
+  ? >> IntPtr * ptrptr = # make ( int * * , null )  <<
+
+  --------       ---------
+  *------- code: --------*
+  --------       ---------
+
+  ? #alias IntPtr :: int*;
+  
+  ? main :: () {
+  ?  IntPtr *ptrptr = #make(int**, null);
+  ? }
+
+*/
+
+
+/* 
+  *- - - - BUG 1 - - - - -*
+  ----                 ----
+  *--- Compiler error: ---*
+  ----                 ----
+
+  !Error:
+  ?        declaration: v
+  ? invalid declaration types. expected: void()*, got void()*
+  --------------------------------------------------------------------------------
+  ? /home/josh/source/c++/ela/repro/alias.ela:15:1
+  --------------------------------------------------------------------------------
+  ? >> Void v = & main  <<
+
+
+  --------       ---------
+  -------- code: ---------
+  --------       ---------
+
+  ? #alias Void :: void()*;
+
+  ? main :: () {
+  ?   Void v = &main;
+  ? } 
+
+*/

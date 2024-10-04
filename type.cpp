@@ -61,6 +61,19 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
 int global_find_function_type_id(const std::string &name,
                                  const FunctionTypeInfo &info,
                                  const TypeExt &ext) {
+                                  
+  if (global_type_alias_map.contains(name)) {
+    auto alias = global_type_alias_map[name];
+    if (ext.has_no_extensions())
+      return alias;
+    else {
+      auto base_type = global_get_type(alias);
+      return global_create_type((TypeKind)base_type->kind,
+                                base_type->get_base(), base_type->get_info(),
+                                ext);
+    }
+  }
+                                  
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;

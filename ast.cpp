@@ -921,7 +921,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   if (!semicolon()) {
     auto block = parse_block();
     block->scope->is_struct_or_union_scope = true;
-
     for (const auto &statement : block->statements) {
       if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
         decl->fields.push_back(field);
@@ -934,13 +933,15 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
              statement->source_range);
       }
     }
-
     decl->scope = block->scope;
   } else {
     Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
   }
+  
+  auto info = static_cast<StructTypeInfo*>(global_get_type(type_id)->get_info());
+  info->scope = decl->scope;
 
   current_struct_decl = nullptr;
   end_node(decl, range);
@@ -954,6 +955,9 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->type = ast_alloc<ASTType>();
   node->type->base = name.value;
 
+  auto type_id = node->type->resolved_type = global_create_union_type(
+      name.value, nullptr, UNION_IS_NORMAL);
+      
   Defer _([&] { current_union_decl = nullptr; });
 
   auto range = begin_node();
@@ -1006,10 +1010,11 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->structs = structs;
   node->scope = block->scope;
 
-  // CLEANUP(JOSH): do we even need to store ASTType*'s on these type
-  // declaration nodes?
-  node->type->resolved_type = global_create_union_type(
-      name.value, block->scope, UNION_IS_NORMAL);
+  auto type = global_get_type(type_id);
+  auto info = static_cast<UnionTypeInfo*>(type->get_info());
+  
+  info->scope = scope;
+
   end_node(node, range);
   return node;
 }

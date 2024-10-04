@@ -766,13 +766,10 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
-  info->scope = node->scope;
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
     return {};
   }
-
   ctx.set_scope(node->scope);
-
   for (auto decl : node->fields) {
     decl->accept(this);
   }
@@ -780,6 +777,28 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     method->accept(this);
   }
 
+  ctx.exit_scope();
+  return {};
+}
+std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
+  
+  // we store this ast just to type check the stuff.
+  ctx.set_scope(node->scope);
+  
+  // do this first.
+  for (const auto &_struct : node->structs) {
+    for (const auto &field : _struct->fields) {
+      field->accept(this);
+      node->scope->insert(field->name.value, field->type->resolved_type);
+    }
+  }
+  for (const auto &field : node->fields) {
+    field->accept(this);
+  }
+  for (const auto &method : node->methods) {
+    method->accept(this);
+  }
+  
   ctx.exit_scope();
   return {};
 }
@@ -990,26 +1009,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   node->element_type = largest_type;
   return {};
 }
-std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
-  // we store this ast just to type check the stuff.
-  ctx.set_scope(node->scope);
-  node->scope->types.insert(node->type->resolved_type);
-  // do this first.
-  for (const auto &_struct : node->structs) {
-    for (const auto &field : _struct->fields) {
-      field->accept(this);
-      node->scope->insert(field->name.value, field->type->resolved_type);
-    }
-  }
-  for (const auto &field : node->fields) {
-    field->accept(this);
-  }
-  for (const auto &method : node->methods) {
-    method->accept(this);
-  }
-  ctx.exit_scope();
-  return {};
-}
+
 std::any TypeVisitor::visit(ASTAllocate *node) {
   // TODO(Josh) 10/1/2024, 3:27:53 PM
   // Do something here. This is probably bad,
