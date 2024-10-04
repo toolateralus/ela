@@ -77,6 +77,16 @@ struct Scope {
   int create_enum_type(const std::string &name,
                        const std::vector<std::string> &keys, bool is_flags);
   
+  // Non function, non type alias fields that belong to a scope. Variables basically.
+  int fields_count() const {
+    auto fields = 0;
+    for (const auto &[name, sym]: symbols) {
+      if (!sym.is_function() && !sym.is_type_alias())
+        fields++;
+    }
+    return fields;
+  }
+    
   
   int create_type(TypeKind kind, const std::string &name, TypeInfo *info,
                   const TypeExt &extensions);
@@ -106,6 +116,8 @@ struct Context {
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   
   Context();
+
+  
 
   inline void set_scope(Scope *in_scope = nullptr) {
     if (!in_scope) {

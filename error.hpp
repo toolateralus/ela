@@ -20,16 +20,14 @@ enum ErrorSeverity {
   ERROR_INFO,
   ERROR_WARNING,
   ERROR_FAILURE,
-  ERROR_CRITICAL,
 };
 
 struct Error {
-  Error(const std::string &message, const ErrorSeverity severity,
+  Error(const std::string &message,
         const SourceRange source_range)
-      : message(message), severity(severity), source_range(source_range) {}
+      : message(message), source_range(source_range) {}
 
   const std::string message = "";
-  const ErrorSeverity severity = ERROR_INFO;
   const SourceRange source_range{};
 };
 
@@ -67,7 +65,6 @@ static std::string format_source_location(const SourceRange &source_range, Error
         code_color = "\e[1;33m"; // Bold Cyan
         break;
     case ERROR_FAILURE:
-    case ERROR_CRITICAL:
         color = "\e[31m"; // Red
         code_color = "\e[1;31m"; // Bold red
         break;
@@ -98,30 +95,17 @@ static void throw_warning(const std::string message, const SourceRange &source_r
 }
 
 [[noreturn]] static void throw_error(const std::string &message,
-                                     const ErrorSeverity severity,
                                      const SourceRange &source_range) {
   if (num_errors >= MAX_ERRORS) {
     throw std::runtime_error("Maximum number of errors exceeded");
   }
-
   auto errid = num_errors++;
   auto memory = (Error *)error_arena.allocate(sizeof(Error));
-  error_table[errid] = new (memory) Error(message, severity, source_range);
-
+  error_table[errid] = new (memory) Error(message, source_range);
   std::stringstream ss;
   auto span = source_range.get_tokens();
-
   ss << "\e[31m" << "Error:\n\t" << message << "\e[0m\n";
-  ss << format_source_location(source_range, severity);
+  ss << format_source_location(source_range, ERROR_FAILURE);
   const auto token_str = ss.str();
-  switch (severity) {
-  case ERROR_INFO:
-  case ERROR_WARNING:
-    // this should never happen
-    throw std::runtime_error("Do not use throw_error for warning and infos!");
-  case ERROR_FAILURE:
-  case ERROR_CRITICAL:
-    throw std::runtime_error(token_str);
-    break;
-  }
+  throw std::runtime_error(token_str);
 }

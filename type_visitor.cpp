@@ -24,7 +24,7 @@ void validate_type_compatability(
       (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(message + '\n' +
                     std::format(format, to_t->to_string(), from_t->to_string()),
-                ERROR_FAILURE, source_range);
+                 source_range);
   }
 }
 const auto check_return_type_consistency(int &return_type, int new_type,
@@ -40,6 +40,65 @@ const auto check_return_type_consistency(int &return_type, int new_type,
 
 static inline int int_from_any(const std::any &any) {
   return std::any_cast<int>(any);
+}
+
+// either returns the correct type that this init list will get casted to, or 
+// throws an error.
+// node->types_are_homogenous is pretty loose: it states that these types are either the same, or implicitly convertible to each other.
+// that may not be enough to satisfy the C++ type system when it's strangely strict in some places more than others
+int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int declaring_type) {
+  auto type = global_get_type(declaring_type);
+  //!BUG This fails to accurately type check sub initializers. Also, we may want to implement sub initializers for struct types
+  // and check those too
+  if (node->types_are_homogenous && (type->extensions.is_array() || type->extensions.is_fixed_sized_array())) {
+    for (const auto [i, expr] : node->expressions | std::ranges::views::enumerate) {
+      if (auto sub_init = dynamic_cast<ASTInitializerList*>(expr)) {
+        assert_type_can_be_assigned_from_init_list(sub_init, node->types[i]);
+      }
+    }
+    return declaring_type;
+  }
+  if (!type->extensions.has_no_extensions()) {
+    throw_error("Unable to construct type from initializer list", node->source_range);
+  }
+  if (type->is_kind(TYPE_SCALAR)) {
+    // this is just a plain scalar type, such as an int.
+  } else if (type->is_kind(TYPE_STRUCT)) {
+    auto info = static_cast<StructTypeInfo*>(type->info);
+    if (info->scope->fields_count() < node->types.size()) {
+      throw_error("excess elements provided in initializer list.", node->source_range);
+    }
+    
+    printf("got %d fields from struct %s\n", info->scope->fields_count(), type->base.c_str());
+    printf("there are %ld fields in the init list\n", node->types.size());
+    
+    // search for fields within the range of the types provided.
+    int i = 0;
+    for (const auto &[name, sym] : info->scope->symbols) {
+      if (i >= node->types.size()) {
+        break;
+      }
+      if (!sym.is_function() && !sym.is_type_alias()) {
+        validate_type_compatability(node->types[i], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for struct");
+      }
+      i++;
+    }
+  } else if (type->is_kind(TYPE_UNION)) {
+    auto info = static_cast<UnionTypeInfo*>(type->info);
+    if (node->types.size() > 1) {
+      throw_error("You can only initialize one field of a union with an initializer list", node->source_range);
+    }
+    // search for the first field member and type check against it.
+    for (const auto &[name, sym] : info->scope->symbols) {
+      if (!sym.is_function() && !sym.is_type_alias()) {
+        validate_type_compatability(node->types[0], sym.type_id, node->source_range, "{}, {}", "Invalid types in initializer list for union");
+        break;
+      }
+    }
+  } else {
+    throw_error("Unable to construct type from initializer list", node->source_range);
+  }
+  return declaring_type;
 }
 
 std::any TypeVisitor::visit(ASTType *node) {
@@ -101,7 +160,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       // Maybe it will sinec that info is encoded into function type name.s
       if (type->equals(this_type->base, this_type->extensions)) { 
         throw_error(std::format("re-definition of function '{}'", node->name.value),
-                ERROR_FAILURE, {});
+                 {});
       }
     }
     sym->function_overload_types.push_back(type_id);
@@ -130,18 +189,18 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
              is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
 
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
-    throw_error("Keyword \"continue\" must be in a loop.", ERROR_FAILURE,
+    throw_error("Keyword \"continue\" must be in a loop.",
                 node->source_range);
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0) {
-    throw_error("Keyword \"break\" must be in a loop.", ERROR_FAILURE,
+    throw_error("Keyword \"break\" must be in a loop.",
                 node->source_range);
   }
 
   if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 &&
       info.return_type != void_type() && !(is_ctor || is_dtor)) {
-    throw_error("Not all code paths return a value.", ERROR_FAILURE,
+    throw_error("Not all code paths return a value.",
                 node->source_range);
   }
 
@@ -196,10 +255,9 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
                   "pointer. Consider using a dynamic array",
                   node->source_range);
     if (node->default_value.is_not_null()) {
-      throw_error("Cannot currently use default parameters for fixed buffer "
+      throw_warning("Cannot currently use default parameters for fixed buffer "
                   "pointers. Also, length information gets casted off. "
-                  "consider using a dynamic array",
-                  ERROR_WARNING, node->source_range);
+                  "consider using a dynamic array", node->source_range);
     }
 
     // cast the fixed sized array to a base*.
@@ -241,7 +299,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   symbol->type_id = node->type->resolved_type;
   
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
-    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.value), ERROR_FAILURE, node->source_range);
+    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.value), node->source_range);
   }
   
   return {};
@@ -290,7 +348,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     left = right;
     
     if (right == void_type()) {
-      throw_error("Cannot assign a variable of type 'void'", ERROR_FAILURE, node->source_range);
+      throw_error("Cannot assign a variable of type 'void'", node->source_range);
     }
     
     if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
@@ -320,7 +378,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
       throw_error(std::format("Type error in binary expression: cannot convert "
                               "between {} and {}",
                               left_t->to_string(), right_t->to_string()),
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
   }
 
@@ -363,7 +421,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
         return fun_info->return_type;
       }
-    } else throw_error(std::format("couldn't find {} overload for struct type", node->op.value), ERROR_FAILURE, node->source_range);
+    } else throw_error(std::format("couldn't find {} overload for struct type", node->op.value), node->source_range);
   }
 
   // Convert to boolean if implicitly possible, for ! expressions
@@ -392,7 +450,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   else {
     throw_error(
         std::format("Use of undeclared identifier '{}'", node->value.value),
-        ERROR_FAILURE, node->source_range);
+         node->source_range);
   }
 }
 std::any TypeVisitor::visit(ASTLiteral *node) {
@@ -442,7 +500,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   if (!symbol) {
     throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
-                ERROR_FAILURE, node->source_range);
+                 node->source_range);
   }
 
   std::vector<int> arg_tys =
@@ -471,13 +529,13 @@ std::any TypeVisitor::visit(ASTCall *node) {
         auto fun_ty = ctx.scope->get_type(t);
         auto fun_info = static_cast<FunctionTypeInfo*>(fun_ty->info);
         if (fun_info->params_len != arg_tys.size())
-          throw_error("Invalid number of arguments for call operator overload", ERROR_FAILURE, node->source_range);
+          throw_error("Invalid number of arguments for call operator overload", node->source_range);
         for (int i = 0; i < fun_info->params_len; ++i) {
           validate_type_compatability(arg_tys[i], fun_info->parameter_types[i], node->source_range, "expected: {}, got: {}", "invalid parameter type in call operator overload");
         }
         return fun_info->return_type;
       }
-    } else throw_error("couldn't find call '()' overload for struct type", ERROR_FAILURE, node->source_range);
+    } else throw_error("couldn't find call '()' overload for struct type", node->source_range);
   }
   
   // Find a suitable function overload to call.
@@ -515,7 +573,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         // Here we use global get type just because we're dumping an error and it doesn't matter.
         names.push_back(global_get_type(n)->to_string());
       }
-      throw_error(std::format("No function overload for provided argument signature found.. got : {}", names), ERROR_FAILURE, node->source_range);
+      throw_error(std::format("No function overload for provided argument signature found.. got : {}", names), node->source_range);
     }
     if (found_exact_match) {
       type = ctx.scope->get_type(symbol->function_overload_types[exact_match_idx]);
@@ -538,7 +596,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   if (!type || !fn_ty_info) {
     throw_error("Unable to call function: {} did not refer to a function typed "
                 "variable. Constructors currently use #make(Type, ...) syntax.",
-                ERROR_FAILURE, node->source_range);
+                 node->source_range);
   }
 
   auto info = dynamic_cast<const FunctionTypeInfo *>(fn_ty_info);
@@ -550,7 +608,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         std::format("Function call '{}' has incorrect number of arguments. "
                     "Expected: {}, Found: {}",
                     node->name.value, info->params_len, arg_tys.size()),
-        ERROR_FAILURE, node->source_range);
+         node->source_range);
   }
 
   for (int i = 0; i < info->params_len; ++i) {
@@ -617,7 +675,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
     if (!t) {
-      throw_error("Internal compiler error: element type was null in range based for loop", ERROR_CRITICAL, node->source_range);
+      throw_error("Internal compiler error: element type was null in range based for loop", node->source_range);
     }
 
     int iter_ty = -1;
@@ -635,13 +693,13 @@ std::any TypeVisitor::visit(ASTFor *node) {
         throw_error("Can only iterate over structs you define 'begin' and "
                     "'end' on. They must both be defined, and must both "
                     "return the same type.",
-                    ERROR_FAILURE, node->source_range);
+                     node->source_range);
       }
     } else if (!t->extensions.is_array() &&
                !t->extensions.is_fixed_sized_array()) {
       throw_error("cannot iterate with a range based for loop over a non "
                   "collection type.",
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     } else {
       iter_ty = t->get_element_type();
     }
@@ -742,7 +800,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (!left_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
                 "expression?",
-                ERROR_FAILURE, node->source_range);
+                 node->source_range);
   }
 
   // TODO: remove this hack to get array length
@@ -763,7 +821,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     if (!iden) {
       throw_error("cannot use a dot expression with a non identifer on the "
                   "right hand side when referring to a enum.",
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
     auto name = iden->value.value;
     bool found = false;
@@ -774,7 +832,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       }
     }
     if (!found) {
-      throw_error("failed to find key in enum type.", ERROR_FAILURE,
+      throw_error("failed to find key in enum type.",
                   node->source_range);
     }
     // TODO(Josh) Add a way to support more than just s32 types from enums.
@@ -786,7 +844,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     throw_error(
         std::format("cannot use dot expr on non-struct currently, got {}",
                     left_ty->to_string()),
-        ERROR_FAILURE, node->source_range);
+         node->source_range);
   }
 
   Scope *scope;
@@ -811,7 +869,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     scope->parent = prev_parent;
   }
   return type;
-  throw_error("unable to resolve dot expression type.", ERROR_FAILURE,
+  throw_error("unable to resolve dot expression type.",
               node->source_range);
 }
 std::any TypeVisitor::visit(ASTSubscript *node) {
@@ -852,14 +910,14 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
         return fun_info->return_type;
       }
     } else
-      throw_error("couldn't find [] overload for struct type", ERROR_FAILURE,
+      throw_error("couldn't find [] overload for struct type",
                   node->source_range);
   } 
 
   if (!left_ty->extensions.is_array() && !left_ty->extensions.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}",
                             left_ty->to_string()),
-                ERROR_FAILURE, node->source_range);
+                 node->source_range);
   }
 
   if (left_ty->extensions.is_array()) {
@@ -875,50 +933,37 @@ std::any TypeVisitor::visit(ASTMake *node) {
     node->arguments->accept(this);
   }
   if (type == -1) {
-    throw_error("Cannot make non existent type", ERROR_FAILURE,
+    throw_error("Cannot make non existent type",
                 node->source_range);
   }
   return type;
 }
 
-// TODO: make it so initializer lists can contain more than one type,
-// so we can use it for complex initialization of structs without constructors.
-// also maybe we want {.member = value, .member1 = value1} kind of syntax. 
 std::any TypeVisitor::visit(ASTInitializerList *node) {
-  int type = -1;
-  for (const auto &expr : node->expressions) {
-    auto t = int_from_any(expr->accept(this));
-    if (type == -1)
-      type = t;
-    else
-      validate_type_compatability(t, type, node->source_range,
-                                  "expected: {}, got {}",
-                                  "initializer list had different types in "
-                                  "one or many expressions");
+  
+  int last_type = -1;
+  for (const auto &expr : node->expressions)  {
+    int type = int_from_any(expr->accept(this));
+    
+    if (last_type == -1) {
+      last_type = type;
+    } else if (last_type != type) {
+      auto rule =  type_conversion_rule(global_get_type(type), global_get_type(last_type));
+      if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
+        node->types_are_homogenous = false;
+      }
+    }
+    node->types.push_back(type);
   }
-  if (type == -1) {
+  
+  // TODO: assert that type can be default constructed.
+  // for now this is just an error
+  if (node->types.empty()) {
     throw_error("Cannot have an empty initializer list currently. to be "
                 "implemented.",
-                ERROR_FAILURE, node->source_range);
+                 node->source_range);
   }
-
-  auto base = ctx.scope->get_type(type);
-  
-  auto dynamic_arr_ty = ctx.scope->find_type_id(
-      base->base, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {-1}});
-      
-  // TODO: make this more robust to struct initializer lists etc.
-  if (declaring_or_assigning_type != dynamic_arr_ty) {
-    auto type = ctx.scope->get_type(declaring_or_assigning_type);
-    if (type->is_kind(TYPE_STRUCT)) {
-      // TODO: do some type checking to make sure that the initializer list fits in the struct.
-      // This may contain nested initializers, and we should probably make a seperate system just to
-      // deduce whether this is possible or not so we don't have to clunky up a ton of this visitor.
-      // For now I'll just assert that the number of members and their types match the initializer list.
-    }
-    return declaring_or_assigning_type;
-  }
-  return dynamic_arr_ty;
+  return assert_type_can_be_assigned_from_init_list(node, declaring_or_assigning_type);
 }
 
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
@@ -929,7 +974,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
       if (node->is_flags) {
         throw_error("You shouldn't use a #flags enum to generate auto "
                     "flags, and also use non-default values.",
-                    ERROR_FAILURE, node->source_range);
+                     node->source_range);
       }
       auto expr = value.get();
       auto id = int_from_any(value.get()->accept(this));
@@ -937,7 +982,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
       auto type = ctx.scope->get_type(id);
       
       if (!type->is_kind(TYPE_SCALAR) || !type->extensions.has_no_extensions()) {
-        throw_error("Cannot have non integral types in enums got: " + type->to_string(), ERROR_FAILURE, node->source_range);
+        throw_error("Cannot have non integral types in enums got: " + type->to_string(), node->source_range);
       }
       
       auto info = static_cast<ScalarTypeInfo*>(type->info);
@@ -983,7 +1028,7 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
     if (node->arguments.is_null() ||
         node->arguments.get()->arguments.size() < 1) {
       throw_error("invalid delete statement: you need at least one argument",
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
     // TODO(Josh) 10/1/2024, 4:40:04 PM This won't quite work, as the
     // allocations aren't directly tied to the delete. We try to delete the

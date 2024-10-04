@@ -29,8 +29,7 @@ void Parser::init_directive_routines() {
           auto filename = parser->expect(TType::String).value;
           if (!std::filesystem::exists(filename)) {
             throw_error(
-                std::format("Couldn't find included file: {}", filename),
-                ERROR_CRITICAL, {});
+                std::format("Couldn't find included file: {}", filename), {});
           }
           std::stringstream ss;
           if (import_set.contains(filename)) {
@@ -84,7 +83,7 @@ void Parser::init_directive_routines() {
            auto filename = parser->expect(TType::String).value;
            if (!std::filesystem::exists(filename)) {
              throw_error(std::format("Couldn't find 'read' file: {}", filename),
-                         ERROR_CRITICAL, {});
+                          {});
            }
            std::stringstream ss;
            std::ifstream isftr(filename);
@@ -139,7 +138,7 @@ void Parser::init_directive_routines() {
                  std::format(
                      "cannot declare a non-top level foreign function:: {}",
                      name.value),
-                 ERROR_CRITICAL, range);
+                  range);
 
            parser->expect(TType::DoubleColon);
            function->params = parser->parse_parameters();
@@ -183,7 +182,7 @@ void Parser::init_directive_routines() {
            if (!std::filesystem::exists(filename)) {
              throw_error(
                  std::format("Couldn't find imported module: {}", filename),
-                 ERROR_CRITICAL, {});
+                  {});
            }
            std::stringstream ss;
            std::ifstream isftr(filename);
@@ -255,7 +254,7 @@ void Parser::init_directive_routines() {
            if (!type_arg) {
              parser->end_node(type, range);
              throw_error("Expect a type as the first argument in a #make call.",
-                         ERROR_FAILURE, range);
+                          range);
            }
            args->arguments.erase(args->arguments.begin());
            auto make = ast_alloc<ASTMake>();
@@ -269,7 +268,7 @@ void Parser::init_directive_routines() {
            }
            if (type_arg->extension_info.is_fixed_sized_array()) {
              throw_error("Cannot use #make on fixed array types.",
-                         ERROR_FAILURE, range);
+                          range);
            }
            return make;
          }});
@@ -367,7 +366,7 @@ void Parser::init_directive_routines() {
            } else {
              throw_error("can only use #self in unions and structs to get the "
                          "type name of the current declaring type",
-                         ERROR_FAILURE, {});
+                          {});
            }
            parser->parse_type_extensions(type);
            return type;
@@ -411,7 +410,7 @@ void Parser::init_directive_routines() {
       
         if (op.family != TFamily::Operator) {
           parser->end_node(nullptr, range);
-          throw_error(std::format("Operator overload failed; {} was not a valid operator to overload", op.value), ERROR_FAILURE, range);
+          throw_error(std::format("Operator overload failed; {} was not a valid operator to overload", op.value), range);
         }
         
         parser->expect(TType::DoubleColon);
@@ -449,7 +448,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
       std::format("failed to call unknown directive routine, or an expression "
                   "routine was used as a statement, or vice versa: {}",
                   identifier),
-      ERROR_FAILURE, range);
+       range);
 }
 
 // TODO(Josh) 10/1/2024, 10:04:12 AM
@@ -464,7 +463,7 @@ ASTType *Parser::parse_type() {
     if (!type) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
-                  ERROR_FAILURE, range);
+                   range);
     }
     return type;
   }
@@ -555,7 +554,7 @@ ASTStatement *Parser::parse_statement() {
       throw_error(
           std::format("Directive '{}' did not return a valid statement node",
                       tok.value),
-          ERROR_CRITICAL, range);
+           range);
     }
     end_node(statement, range);
     return statement;
@@ -695,7 +694,7 @@ ASTStatement *Parser::parse_statement() {
     } else {
       throw_error("invalid :: statement, expected '(' (for a function), "
                   "'struct', or 'enum",
-                  ERROR_FAILURE, range);
+                   range);
     }
   } else if (lookahead_buf()[1].type == TType::Increment ||
              lookahead_buf()[1].type == TType::Decrement) {
@@ -710,34 +709,34 @@ ASTStatement *Parser::parse_statement() {
   if (tok.family == TFamily::Operator) {
     throw_error(std::format("Unexpected operator: {} '{}'",
                             TTypeToString(tok.type), tok.value),
-                ERROR_FAILURE, range);
+                 range);
   }
 
   if (tok.family == TFamily::Literal) {
     throw_error(std::format("Unexpected literal: {} .. {}", tok.value,
                             TTypeToString(tok.type)),
-                ERROR_FAILURE, range);
+                 range);
   }
 
   if (tok.family == TFamily::Keyword) {
-    throw_error(std::format("Unexpected keyword: {}", tok.value), ERROR_FAILURE,
+    throw_error(std::format("Unexpected keyword: {}", tok.value),
                 range);
   }
 
   if (ctx.scope->lookup(tok.value)) {
-    throw_error(std::format("Unexpected variable {}", tok.value), ERROR_FAILURE,
+    throw_error(std::format("Unexpected variable {}", tok.value),
                 range);
   }
   if (ctx.scope->find_type_id(tok.value, {}) == -1) {
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),
-        ERROR_FAILURE, range);
+         range);
   }
 
   throw_error(std::format("Unexpected token when parsing statement: {}.. This "
                           "is likely an undefined type.",
                           tok.value),
-              ERROR_CRITICAL, range);
+               range);
 }
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
@@ -753,7 +752,7 @@ ASTDeclaration *Parser::parse_declaration() {
 
   end_node(decl, range);
   if (ctx.scope->lookup(iden.value)) {
-    throw_error(std::format("re-definition of '{}'", iden.value), ERROR_FAILURE,
+    throw_error(std::format("re-definition of '{}'", iden.value),
                 decl->source_range);
   }
   ctx.scope->insert(iden.value, -1);
@@ -824,7 +823,7 @@ ASTParamsDecl *Parser::parse_parameters() {
       if (!current_func_decl) {
         throw_error("Cannot use varargs outside of a function declaration. "
                     "Only use this for #foreign functions.",
-                    ERROR_FAILURE, range);
+                     range);
       }
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
@@ -921,7 +920,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   for (const auto &[key, value] : node->key_values) {
     if (keys_set.contains(key)) {
       throw_error(std::format("redefinition of enum variant: {}", key),
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
     keys.push_back(key);
     keys_set.insert(key);
@@ -959,7 +958,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",
-            ERROR_FAILURE, statement->source_range);
+             statement->source_range);
       }
     }
 
@@ -1017,7 +1016,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
         ;
         throw_error(
             "can only use #anon struct declarations within union types.",
-            ERROR_FAILURE, node->source_range);
+             node->source_range);
       }
       structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
@@ -1025,7 +1024,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       }
     } else {
       throw_error("Non method/field declarations not allowed in union",
-                  ERROR_FAILURE, range);
+                   range);
     }
   }
 
@@ -1095,7 +1094,7 @@ ASTExpr *Parser::parse_unary() {
     
     if ((is_rvalue || ctor) && (op.type == TType::And || op.type == TType::Mul)) {
       end_node(nullptr, range);
-      throw_error("Cannot take the address of, or dereference a literal or 'rvalue'\nlike a function result or constructor result. It is a temporary value\nand would be invalid once this statement completed executing", ERROR_FAILURE, range);
+      throw_error("Cannot take the address of, or dereference a literal or 'rvalue'\nlike a function result or constructor result. It is a temporary value\nand would be invalid once this statement completed executing", range);
     }
     
     unaryexpr->op = op;
@@ -1308,7 +1307,7 @@ ASTExpr *Parser::parse_primary() {
     eat(); // consume '('
     auto expr = parse_expr();
     if (peek().type != TType::RParen) {
-      throw_error("Expected ')'", ERROR_FAILURE,
+      throw_error("Expected ')'",
                   SourceRange{token_idx - 5, token_idx});
     }
     eat(); // consume ')'
@@ -1318,7 +1317,7 @@ ASTExpr *Parser::parse_primary() {
   default: {
     throw_error(std::format("Invalid primary expression. Token: {}, Type: {}",
                             tok.value, TTypeToString(tok.type)),
-                ERROR_FAILURE, {token_idx - 5, token_idx});
+                 {token_idx - 5, token_idx});
     return nullptr;
   }
   }
@@ -1352,7 +1351,7 @@ Token Parser::expect(TType type) {
     SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
                             TTypeToString(peek().type), peek().value),
-                ERROR_CRITICAL, range);
+                 range);
   }
   return eat();
 }
@@ -1369,7 +1368,7 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
     } else {
       throw_error("Invalid directive in expression: directives in "
                   "expressions must return a value.",
-                  ERROR_FAILURE,
+                  
                   {std::max(token_idx - 5, int64_t()),
                    std::max(token_idx + 5, int64_t())});
     }

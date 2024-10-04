@@ -281,7 +281,8 @@ struct ASTStructDeclaration : ASTStatement {
 // TODO(Josh) 10/1/2024, 10:33:12 AM Refactor the way this works to allow better typing and more flexibility with this. It really only works 
 // for a couple types right now.
 struct ASTInitializerList : ASTExpr {
-  ASTType *type;
+  bool types_are_homogenous = true;
+  std::vector<int> types;
   std::vector<ASTExpr*> expressions;
   std::any accept(VisitorBase *visitor) override;
 };

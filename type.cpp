@@ -228,7 +228,7 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("type was null when checking type conversion rules",
-                ERROR_CRITICAL, {});
+                 {});
   }
 
   // same exact type. no cast needed.
@@ -408,7 +408,7 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   }
 
   if (ptr_depth == 0) {
-    throw_error("cannot dereference a non-pointer type.", ERROR_FAILURE,
+    throw_error("cannot dereference a non-pointer type.",
                 source_range);
   }
 
@@ -472,11 +472,11 @@ int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   type->base = name;
 
   if (type->id > MAX_NUM_TYPES) {
-    throw_error("Max types exceeded", ERROR_CRITICAL, {});
+    throw_error("Max types exceeded", {});
   }
   if (type_table[type->id]) {
     throw_error("type system created a type with the same ID twice",
-                ERROR_CRITICAL, {});
+                 {});
   }
 
   type_table[type->id] = type;
@@ -540,7 +540,7 @@ std::string Type::to_type_struct(Context &context) {
       auto &[name, sym] = tuple;
       auto t = global_get_type(sym.type_id);
       if (!t) {
-        throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", ERROR_FAILURE, {});
+        throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
       }
       
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", " << std::format(".type = {}", t->to_type_struct(context)) << " }";
@@ -672,7 +672,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
   case TType::Dollar:
   case TType::RParen:
   case TType::RBrace:
-    throw_error("Operator overload not allowed", ERROR_FAILURE, range);
+    throw_error("Operator overload not allowed", range);
   case TType::Arrow:
     throw_warning("Operator overload: Use '.' instead of '->'", range);
     return;
@@ -715,7 +715,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
   case TType::CompSHR:
     break;
   default: 
-    throw_error(std::format("Invalid operator overload {}", TTypeToString(type)), ERROR_FAILURE, range);
+    throw_error(std::format("Invalid operator overload {}", TTypeToString(type)), range);
   }
 }
 

@@ -170,7 +170,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
       // definitions implemented by the compiler in the type and symbol systems.
       throw_error("You must '#import core' before you use interpolated strings "
                   "temporarily, due to a dependency on sprintf.",
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
 
     std::string str;
@@ -206,7 +206,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
           return "%d";
         }
       }
-      throw_error("Cannot deduce a format specifier for interpolated string", ERROR_FAILURE, node->source_range);
+      throw_error("Cannot deduce a format specifier for interpolated string", node->source_range);
     };
 
     auto replace_next_brace_pair = [&](std::string &in,
@@ -471,7 +471,7 @@ void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   (*ss) << " -> ";
   node->return_type->accept(this);
   if (node->block.is_null()) {
-    throw_error("local function cannot be #foreign", ERROR_FAILURE,
+    throw_error("local function cannot be #foreign",
                 node->source_range);
   }
   node->block.get()->accept(this);
@@ -479,7 +479,7 @@ void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
 
 void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name.value == "main") {
-    throw_error("main function cannot be foreign", ERROR_CRITICAL,
+    throw_error("main function cannot be foreign",
                 node->source_range);
   }
 
@@ -542,7 +542,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     (*ss) << '~' << name;
     node->params->accept(this);
     if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE,
+      throw_error("Cannot forward declare a constructor",
                   node->source_range);
     }
     node->block.get()->accept(this);
@@ -568,7 +568,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     }
 
     if (!node->block) {
-      throw_error("Cannot forward declare a constructor", ERROR_FAILURE,
+      throw_error("Cannot forward declare a constructor",
                   node->source_range);
     }
     node->block.get()->accept(this);
@@ -767,7 +767,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
     throw_error(
         std::format("cannot use dot expr on non-struct currently, got {}",
                     left_ty->to_string()),
-        ERROR_FAILURE, node->source_range);
+         node->source_range);
   }
 
   Scope *scope;
@@ -804,7 +804,7 @@ std::any EmitVisitor::visit(ASTMake *node) {
     if (node->arguments->arguments.empty()) {
       throw_error("cannot create a pointer currently with #make. it only casts "
                   "pointers.",
-                  ERROR_FAILURE, node->source_range);
+                   node->source_range);
     }
     (*ss) << "(" << type->to_cpp_string() << ")";
     node->arguments->arguments[0]->accept(this);
