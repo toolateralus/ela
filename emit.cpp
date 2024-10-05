@@ -44,7 +44,6 @@ std::any EmitVisitor::visit(ASTIf *node) {
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
   }
-
   return {};
 }
 
