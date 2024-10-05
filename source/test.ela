@@ -604,7 +604,9 @@ Xaryu :: struct {
   assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
 }
 
-
+overloaded :: (int n, y) -> int {
+  return n * y;
+}
 
 overloaded :: (int n) -> int {
   return n;
@@ -624,6 +626,14 @@ overloaded :: (Xaryu xaryu) -> Xaryu {
   Xaryu xaryu;
   xaryu.value = 100;
   assert("overload with float arg failed to call", strcmp((#type overloaded(xaryu)).name, "Xaryu") == 0);
+  
+  //! Bug? maybe its fine
+  // if an overloaded function has a different number of parameters,
+  // and its like (int, int)
+  // and we pass it (float, float)
+  // it fails to call, and claims wrong number of parameters, because it began searching with the first
+  // function that had a float argument at the beginning.
+  assert("overload with different number of parameters failed", overloaded(1, 2) == 2);
 }
 
 OperatorOverloadTest :: struct {

@@ -508,6 +508,7 @@ int Type::get_element_type() const {
   return global_find_type_id(base, extensions);
 }
 
+// used for anonymous structs etc.
 Token get_unique_identifier() {
   static int num = 0;
   auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
@@ -599,6 +600,10 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   }
   return true;
 }
+
+// TODO(Josh) 10/5/2024, 10:04:29 AM
+// This should be a lot more strict. We can't define assignment operators because in C++ it requires a reference.
+// a lot of these operators should be banned too, we don't need () for example, it just creates a bunch of complexity.
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range) {
   switch (type) {
