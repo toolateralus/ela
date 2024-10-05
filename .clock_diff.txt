@@ -8,18 +8,18 @@ File                             blank        comment           code
 ast.cpp                            132             69           1247
 type_visitor.cpp                   105             78            854
 emit.cpp                           121             37            777
-type.cpp                            75             57            702
-ast.hpp                             75             24            521
+type.cpp                            76             48            695
+ast.hpp                             71             26            520
 visitor.cpp                         32             15            377
 type.hpp                            67             15            318
 lex.hpp                             32              0            295
 core.hpp                            24              2            207
+lex.cpp                             19              0            170
 visitor.hpp                         12              4            169
-lex.cpp                             16              0            162
 main.cpp                            24             15            111
 error.hpp                           14              0             96
 scope.cpp                           15             12             77
 scope.hpp                           11             12             62
 -------------------------------------------------------------------------------
-SUM:                               755            340           5975
+SUM:                               755            333           5975
 -------------------------------------------------------------------------------

@@ -134,9 +134,14 @@ void Lexer::get_token(State &state) {
         c = input[pos];
       }
 
-      while (pos < len &&
+      while (pos < len && 
              (std::isdigit(c) || c == '.' || (is_hex && std::isxdigit(c)) ||
-              (is_bin && (c == '0' || c == '1')))) {
+              (is_bin && (c == '0' || c == '1')) || c == '_')) {
+        if (c == '_') {
+          pos++;
+          c = input[pos];
+        }
+                
         if (c == '.') {
           if (is_float) {
             auto str = token.str();
@@ -152,6 +157,12 @@ void Lexer::get_token(State &state) {
         token.put(c);
         pos++;
         c = input[pos];
+        
+        if (c == '_') {
+          pos++;
+          c = input[pos];
+        }
+        
       }
       auto value = token.str();
       

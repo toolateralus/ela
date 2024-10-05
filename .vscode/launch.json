@@ -26,7 +26,7 @@
       "request": "launch",
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["dummy.ela", "--s", "--verbose"],
+      "args": ["dummy.ela", "--s", "--sanitize"],
       "cwd": "${workspaceFolder}/source"
     },
     {

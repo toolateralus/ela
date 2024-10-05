@@ -857,3 +857,8 @@ InitListStruct :: struct {
   float f = (float)n;
   assert("Cast failed", f == 10.0);
 }
+
+#test test_underscores_in_number_literals :: () {
+  int n = 1_000_000;
+  assert("number literal with underscores failed to equal expected value", n == 1000000)
+}

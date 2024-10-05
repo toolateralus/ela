@@ -772,7 +772,16 @@ ASTDeclaration *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value),
                 decl->source_range);
   }
+  
   ctx.scope->insert(iden.value, -1);
+  
+  if (decl->value.get()) {
+    if (auto alloc = dynamic_cast<ASTAllocate*>(decl->value.get())) {
+      auto symbol = ctx.scope->lookup(iden.value);
+      insert_allocation(alloc,symbol, ctx.scope);
+    }
+  }
+  
   return decl;
 }
 ASTBlock *Parser::parse_block() {
@@ -1074,7 +1083,14 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     auto binexpr = ast_alloc<ASTBinExpr>();
     binexpr->left = left;
     binexpr->right = right;
-    binexpr->op = op;
+    binexpr->op = op;    
+    if (op.type == TType::ColonEquals) {
+      auto iden = dynamic_cast<ASTIdentifier *>(left);
+      if (auto alloc = dynamic_cast<ASTAllocate*>(right)) {
+        auto symbol = ctx.scope->lookup(iden->value.value);
+        insert_allocation(alloc,symbol, ctx.scope);
+      }
+    }
     left = binexpr;
   }
   end_node(left, range);
@@ -1136,9 +1152,12 @@ ASTExpr *Parser::parse_postfix() {
 
     if (peek().type == TType::LParen) {
       auto identifier = dynamic_cast<ASTIdentifier *>(left);
-      if (identifier && peek().type == TType::LParen) {
+      if (identifier) {
         auto tok = identifier->value;
         left = parse_call(tok);
+      } else {
+        end_node(nullptr, range);
+        throw_error("failed to call a non-identifier.", range);
       }
     } else if (peek().type == TType::Dot) {
       eat();
@@ -1181,7 +1200,6 @@ ASTExpr *Parser::parse_primary() {
       allow_function_type_parsing = true;
       type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
       node->type = type;
-      insert_allocation(node);
     }
 
     Nullable<ASTArguments> args = nullptr;
@@ -1419,30 +1437,32 @@ Token Parser::peek() const {
   }
   return states.back().lookahead_buffer.front();
 }
-void insert_allocation(ASTAllocate *in_alloc) {
-  for (auto &alloc : allocation_info)
-    if (alloc == in_alloc) {
-      return;
-    }
-  allocation_info.push_back(in_alloc);
+void insert_allocation(ASTAllocate *in_alloc, Symbol* symbol, Scope* scope) {
+  allocation_info.push_back({ 
+    .alloc = in_alloc,
+    .symbol = symbol,
+    .scope = scope,
+  });
 }
 bool report_unfreed_allocations() {
   bool had_unfreed = !allocation_info.empty();
-
   for (const auto &info : allocation_info) {
-    if (info) {
-      auto formatted_str =
-          format_source_location(info->source_range, ERROR_FAILURE);
-      std::cerr
-          << "\e[31mUnfreed Allocation:\e[0m\n"; // Red color for the header
-      std::cerr << "\e[33mAllocation:\e[0m " << formatted_str << "\n";
-      std::cerr << "\e[90m" << std::string(80, '-')
-                << "\e[0m\n"; // Gray color for separator
-    }
+    auto formatted_str =
+        format_source_location(info.alloc->source_range, ERROR_FAILURE);
+    std::cerr
+        << "\e[31mUnfreed Allocation:\e[0m\n"; // Red color for the header
+    std::cerr << "\e[33mAllocation:\e[0m " << formatted_str << "\n";
+    std::cerr << "\e[90m" << std::string(80, '-')
+              << "\e[0m\n"; // Gray color for separator
   }
   return had_unfreed;
 }
-void erase_allocation(ASTAllocate *allocation) {
-  allocation_info.erase(
-      std::find(allocation_info.begin(), allocation_info.end(), allocation));
+
+void erase_allocation(Symbol* symbol, Scope* scope) {
+  for (auto it = allocation_info.begin(); it != allocation_info.end(); ++it) {
+    if (it->scope == scope && it->symbol == symbol) {
+      allocation_info.erase(it);
+      return;
+    }
+  }
 }

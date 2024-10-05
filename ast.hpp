@@ -15,6 +15,7 @@
 #include <unordered_set>
 #include <vector>
 
+// this could be a simple boolean.
 enum {
   ASTTYPE_EMIT_OBJECT,
 };
@@ -26,6 +27,8 @@ template <class T> T *ast_alloc(size_t n = 1) {
 }
 
 struct VisitorBase;
+
+// used to prevent double includes.
 extern std::unordered_set<std::string> import_set;
 
 // TODO: add an enum member in the base that says what type this node is,
@@ -86,6 +89,7 @@ struct ASTType : ASTExpr {
   int flags = -1;
   Nullable<ASTExpr> pointing_to;
   int resolved_type = Type::invalid_id;
+  
   static ASTType *get_void() {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
@@ -278,8 +282,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-// TODO(Josh) 10/1/2024, 10:33:12 AM Refactor the way this works to allow better typing and more flexibility with this. It really only works 
-// for a couple types right now.
+
 struct ASTInitializerList : ASTExpr {
   bool types_are_homogenous = true;
   std::vector<int> types;
@@ -329,15 +332,16 @@ struct ASTAllocate : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct AllocationInfo {
-  Symbol *symbol;
-  ASTAllocate* allocation;
+struct Allocation {
+  ASTAllocate* alloc;
+  Symbol* symbol;
+  Scope* scope;
 };
 
-extern std::vector<ASTAllocate*> allocation_info;
+extern std::vector<Allocation> allocation_info;
 
-void insert_allocation(ASTAllocate *allocation);
-void erase_allocation(ASTAllocate *allocation);
+void insert_allocation(ASTAllocate *in_alloc, Symbol* symbol, Scope* scope);
+void erase_allocation(Symbol* symbol, Scope*scope);
 
 bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
@@ -424,7 +428,8 @@ struct DirectiveRoutine {
   std::function<Nullable<ASTNode>(Parser *parser)> run;
 };
 
-
+// VERIFY(Josh) 10/5/2024, 10:33:32 AM
+// make sure that this precedence scheme makes sense.
 enum Precedence {
   PRECEDENCE_LOWEST,
   PRECEDENCE_ASSIGNMENT,    // =, :=
@@ -575,7 +580,6 @@ struct Parser {
     return return_type;
   }
   
-  
   Nullable<ASTNode> process_directive(DirectiveKind kind,
                                       const std::string &identifier);
   void init_directive_routines();
@@ -587,10 +591,6 @@ struct Parser {
 
   inline std::deque<Token>& lookahead_buf() { return states.back().lookahead_buffer; }
   
-  
-
-
-
   Token eat();
   Token expect(TType type);
   Token peek() const;
@@ -605,9 +605,6 @@ struct Parser {
         ctx(context) {
     init_directive_routines();
     fill_buffer_if_needed();
-    // for (int i = lookahead_buf().size(); i < 8; ++i) {
-    //   lexer.get_token(states.back());
-    // }
   }
   
   Context &ctx;

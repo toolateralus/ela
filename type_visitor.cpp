@@ -1008,19 +1008,20 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTAllocate *node) {
-  // TODO(Josh) 10/1/2024, 3:27:53 PM
-  // Do something here. This is probably bad,
-  // but this shouldn't be used as an expression really.
   if (node->kind == ASTAllocate::Delete) {
     if (node->arguments.is_null() ||
         node->arguments.get()->arguments.size() < 1) {
       throw_error("invalid delete statement: you need at least one argument",
                    node->source_range);
     }
-    // TODO(Josh) 10/1/2024, 4:40:04 PM This won't quite work, as the
-    // allocations aren't directly tied to the delete. We try to delete the
-    // delete node, not the alloc node. we need to somehow lookup the source
-    // scope and variable, and then erase that. erase_allocation(node);
+    
+    for (const auto &arg: node->arguments.get()->arguments) {
+      if (auto iden = dynamic_cast<ASTIdentifier*>(arg)) {
+        erase_allocation(ctx.scope->lookup(iden->value.value), ctx.scope);
+      }
+      
+    }
+    
     return void_type();
   }
 
