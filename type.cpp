@@ -51,10 +51,6 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   aliased->has_aliases = true;
   aliased->aliases.push_back(type->id);
 
-  printf("Created type alias: %s ('%s') for type %s\n",
-         type->get_base().c_str(), type->to_string().c_str(),
-         aliased->to_string().c_str());
-
   return type->id;
 }
 int global_find_function_type_id(const std::string &name,

@@ -298,6 +298,9 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            auto string = parser->expect(TType::String).value;
+           if (string == "-g") {
+            compile_command.flags[string] = true;
+           }
            compile_command.add_compilation_flags(string);
            return nullptr;
          }});

@@ -562,8 +562,6 @@ struct Parser {
       ss << ")";
     }
     
-    printf("parameter types for function type: %s\n", ss.str().c_str());
-    
     auto type_name = global_get_type(info.return_type)->to_string() + ss.str();
     return_type->resolved_type = global_find_function_type_id(type_name, info, {});
     return_type->base = type_name;
