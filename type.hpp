@@ -300,7 +300,7 @@ int remove_one_pointer_ext(int, const SourceRange &);
 
 void init_type_system();
 
-constexpr bool type_is_numerical(const Type *t);
+bool type_is_numerical(const Type *t);
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 
 // returns false for failure, else true and passed param signature as out.

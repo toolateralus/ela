@@ -82,20 +82,12 @@ int global_find_function_type_id(const std::string &name,
   auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
+
+// PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
+// We might want to upgrade to a hash map at a certain number of types or something.
+// I think the linear search is fine but this is certainly one of the slowest functions in the compiler.
 int global_find_type_id(const std::string &name,
                         const TypeExt &type_extensions) {
-  
-  // !BUG ----------------------------------------------------------------------------------------------------------------------------                        
-  // !BUG: We really need a way to fix this alias system. I have tried relentlessly and am just thorougly lost as to how we can do it.
-  // * Either we can't locate the type with extensions,
-  // * Or if we add extensions on top of the base extensions, we fail to get the extra extensions on top of the base ones.
-  // * like #alias IntPtr = int*;
-  // * int ** other;
-  // * then IntPtr *ptr = other;
-  // * Fails because int * != int **.
-  // * However if  you don't add extensions to an alias it seems to work?
-  // !BUG ----------------------------------------------------------------------------------------------------------------------------
-  
   if (global_type_alias_map.contains(name)) {
     auto alias = global_type_alias_map[name];
     if (type_extensions.has_no_extensions())
@@ -307,6 +299,8 @@ bool TypeExt::equals(const TypeExt &other) const {
   return true;
 }
 
+// CLEANUP(Josh) 10/5/2024, 9:57:02 AM
+// This should be in the emit visitor not here.
 std::string Type::to_cpp_string() const {
   if (is_alias) {
     return base;
@@ -319,14 +313,6 @@ std::string Type::to_cpp_string() const {
     if (!extensions.has_no_extensions()) {
       return extensions.to_cpp_string(this->get_base());
     }
-    // !BUG if this type has extensions on top of the alias this will never emit the correct type signature.
-    // CLEANUP(Josh) 10/4/2024, 7:35:45 PM
-    // *Just completely get rid of this and force the user to only ever use type aliases for function types.
-    // *Trying to juggle anything else is nonsesne ebcause youd never do
-    // *void(*sym)() = &main
-    
-    // TODO(Josh) 10/4/2024, 7:36:26 PM
-    // Remove this horrible mess
     auto info = static_cast<FunctionTypeInfo *>(this->get_info());
     auto ret = global_get_type(info->return_type)->to_cpp_string();
     std::string params = "(";
@@ -345,6 +331,77 @@ std::string Type::to_cpp_string() const {
     return extensions.to_cpp_string(this->get_base());
   }
 }
+
+// CLEANUP(Josh) 10/5/2024, 9:57:02 AM
+// This should be in the emit visitor not here.
+std::string Type::to_type_struct(Context &context) {
+  static bool *type_cache = [] {
+    auto arr = new bool[MAX_NUM_TYPES];
+    memset(arr, false, MAX_NUM_TYPES);
+    return arr;
+  }();
+
+  if (type_cache[this->id]) {
+    return std::format("_type_info[{}]", this->id);
+  }
+
+  std::stringstream fields_ss;
+  if (kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(this->get_info());
+
+    if (info->scope->symbols.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    fields_ss << "{";
+
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+      auto t = global_get_type(sym.type_id);
+      if (!t) {
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
+      }
+
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                << std::format(".type = {}", t->to_type_struct(context))
+                << " }";
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else {
+
+    // new Type { .id = id,
+    // .name = "name"
+    // }
+
+    fields_ss << "_type_info[" << id << "] = new Type {"
+              << ".id = " << id << ",\n"
+              << ".name = \"" << to_string() << "\"}";
+
+    context.type_info_strings.push_back(fields_ss.str());
+    return std::string("_type_info[") + std::to_string(id) + "]";
+  }
+
+  type_cache[this->id] = true;
+
+  context.type_info_strings.push_back(std::format(
+      "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }}",
+      id, id, to_string(), fields_ss.str()));
+
+  return std::format("_type_info[{}]", this->id);
+}
+
+
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);
   int ptr_depth = 0;
@@ -451,76 +508,6 @@ int Type::get_element_type() const {
   return global_find_type_id(base, extensions);
 }
 
-// TODO(Josh) 10/3/2024, 9:26:51 AM
-// Move this somewhere more appropriate, we're generating C++ code in the type
-// system.
-
-std::string Type::to_type_struct(Context &context) {
-  static bool *type_cache = [] {
-    auto arr = new bool[MAX_NUM_TYPES];
-    memset(arr, false, MAX_NUM_TYPES);
-    return arr;
-  }();
-
-  if (type_cache[this->id]) {
-    return std::format("_type_info[{}]", this->id);
-  }
-
-  std::stringstream fields_ss;
-  if (kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(this->get_info());
-
-    if (info->scope->symbols.empty()) {
-      fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << to_string() << "\","
-                << ".id = " << id << "}";
-      context.type_info_strings.push_back(fields_ss.str());
-      return std::string("_type_info[") + std::to_string(id) + "]";
-    }
-    fields_ss << "{";
-
-    int count = info->scope->symbols.size();
-    int it = 0;
-    for (const auto &tuple : info->scope->symbols) {
-      auto &[name, sym] = tuple;
-      auto t = global_get_type(sym.type_id);
-      if (!t) {
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      }
-
-      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                << std::format(".type = {}", t->to_type_struct(context))
-                << " }";
-      ++it;
-      if (it < count) {
-        fields_ss << ", ";
-      }
-    }
-    fields_ss << "}";
-  } else {
-
-    // new Type { .id = id,
-    // .name = "name"
-    // }
-
-    fields_ss << "_type_info[" << id << "] = new Type {"
-              << ".id = " << id << ",\n"
-              << ".name = \"" << to_string() << "\"}";
-
-    context.type_info_strings.push_back(fields_ss.str());
-    return std::string("_type_info[") + std::to_string(id) + "]";
-  }
-
-  type_cache[this->id] = true;
-
-  context.type_info_strings.push_back(std::format(
-      "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }}",
-      id, id, to_string(), fields_ss.str()));
-
-  return std::format("_type_info[{}]", this->id);
-}
 Token get_unique_identifier() {
   static int num = 0;
   auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier,
@@ -730,7 +717,7 @@ std::string get_cpp_scalar_type(int id) {
 
   return type->get_ext().to_cpp_string(name);
 }
-ScalarTypeInfo *get_scalar_type_info(ScalarType type, size_t size,
+ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
                                      bool is_integral = false) {
   auto info = ast_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
@@ -742,33 +729,33 @@ void init_type_system() {
   // Signed integers
   {
     global_create_type(TYPE_SCALAR, "s64",
-                       get_scalar_type_info(TYPE_S64, 8, true));
+                       create_scalar_type_info(TYPE_S64, 8, true));
     global_create_type(TYPE_SCALAR, "s32",
-                       get_scalar_type_info(TYPE_S32, 4, true));
+                       create_scalar_type_info(TYPE_S32, 4, true));
     global_create_type(TYPE_SCALAR, "s16",
-                       get_scalar_type_info(TYPE_S16, 2, true));
+                       create_scalar_type_info(TYPE_S16, 2, true));
     global_create_type(TYPE_SCALAR, "s8",
-                       get_scalar_type_info(TYPE_S16, 1, true));
+                       create_scalar_type_info(TYPE_S16, 1, true));
   }
 
   // Unsigned integers
   {
     global_create_type(TYPE_SCALAR, "u64",
-                       get_scalar_type_info(TYPE_U64, 8, true));
+                       create_scalar_type_info(TYPE_U64, 8, true));
     global_create_type(TYPE_SCALAR, "u32",
-                       get_scalar_type_info(TYPE_U32, 4, true));
+                       create_scalar_type_info(TYPE_U32, 4, true));
     global_create_type(TYPE_SCALAR, "u16",
-                       get_scalar_type_info(TYPE_U16, 2, true));
+                       create_scalar_type_info(TYPE_U16, 2, true));
     global_create_type(TYPE_SCALAR, "u8",
-                       get_scalar_type_info(TYPE_U16, 1, true));
+                       create_scalar_type_info(TYPE_U16, 1, true));
   }
 
   // Floats
   {
     global_create_type(TYPE_SCALAR, "float32",
-                       get_scalar_type_info(TYPE_FLOAT, 4));
+                       create_scalar_type_info(TYPE_FLOAT, 4));
     global_create_type(TYPE_SCALAR, "float64",
-                       get_scalar_type_info(TYPE_DOUBLE, 8));
+                       create_scalar_type_info(TYPE_DOUBLE, 8));
   }
 
   // Other
@@ -776,40 +763,37 @@ void init_type_system() {
     // Other
     // CLEANUP: alias these, don't generate new types.
     global_create_type(TYPE_SCALAR, "float",
-                       get_scalar_type_info(TYPE_FLOAT, 4));
+                       create_scalar_type_info(TYPE_FLOAT, 4));
     global_create_type(TYPE_SCALAR, "int",
-                       get_scalar_type_info(TYPE_S32, 4, true));
+                       create_scalar_type_info(TYPE_S32, 4, true));
 
     global_create_type(TYPE_SCALAR, "char",
-                       get_scalar_type_info(TYPE_U8, 1, true));
+                       create_scalar_type_info(TYPE_U8, 1, true));
     global_create_type(TYPE_SCALAR, "bool",
-                       get_scalar_type_info(TYPE_BOOL, 1, true));
-    global_create_type(TYPE_SCALAR, "void", get_scalar_type_info(TYPE_VOID, 0));
+                       create_scalar_type_info(TYPE_BOOL, 1, true));
+    global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
   }
 }
-constexpr int get_type_unresolved() { return Type::invalid_id; }
-
-constexpr bool type_is_numerical(const Type *t) {
-  auto info = dynamic_cast<ScalarTypeInfo *>(t->get_info());
-  if (!info)
-    return false;
-
-  auto scalar = info->scalar_type;
-  return scalar == TYPE_S8 || scalar == TYPE_S16 || scalar == TYPE_S32 ||
-         scalar == TYPE_S64 || scalar == TYPE_U8 || scalar == TYPE_U16 ||
-         scalar == TYPE_U32 || scalar == TYPE_U64 || scalar == TYPE_FLOAT ||
-         scalar == TYPE_DOUBLE;
+bool type_is_numerical(const Type *t) {
+  if (!t->is_kind(TYPE_SCALAR)) return false;
+  return t->id == char_type() || t->id == float_type() || t->id == int_type() || t->id == s8_type() || t->id == s16_type() || t->id == s32_type() ||
+         t->id == s64_type() || t->id == u8_type() || t->id == u16_type() ||
+         t->id == u32_type() || t->id == u64_type() || t->id == float32_type() ||
+         t->id == float64_type();
 }
+
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
 
   auto from_info = static_cast<ScalarTypeInfo *>(from->get_info());
   auto to_info = static_cast<ScalarTypeInfo *>(to->get_info());
+  
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
   }
+  
   return from_info->size <= to_info->size;
 }
 
