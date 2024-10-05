@@ -312,19 +312,18 @@ bool TypeExt::equals(const TypeExt &other) const {
 }
 
 std::string Type::to_cpp_string() const {
+  if (is_alias) {
+    return base;
+  }
   switch (kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
     return extensions.to_cpp_string(this->get_base());
   case TYPE_FUNCTION: {
-    
-    // !BUG if this type has extensions on top of the alias this will never emit the correct type signature.
-    if (is_alias) {
-      return base;
+    if (!extensions.has_no_extensions()) {
+      return extensions.to_cpp_string(this->get_base());
     }
-    
-    
-    
+    // !BUG if this type has extensions on top of the alias this will never emit the correct type signature.
     // CLEANUP(Josh) 10/4/2024, 7:35:45 PM
     // *Just completely get rid of this and force the user to only ever use type aliases for function types.
     // *Trying to juggle anything else is nonsesne ebcause youd never do
@@ -334,7 +333,7 @@ std::string Type::to_cpp_string() const {
     // Remove this horrible mess
     auto info = static_cast<FunctionTypeInfo *>(this->get_info());
     auto ret = global_get_type(info->return_type)->to_cpp_string();
-    std::string params = "(" + extensions.to_string() + ")(";
+    std::string params = "(";
     for (int i = 0; i < info->params_len; ++i) {
       params += global_get_type(info->parameter_types[i])->to_cpp_string();
       if (i != info->params_len - 1) {
@@ -348,7 +347,6 @@ std::string Type::to_cpp_string() const {
     return base;
   case TYPE_UNION:
     return extensions.to_cpp_string(this->get_base());
-    ;
   }
 }
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {

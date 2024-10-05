@@ -7,22 +7,23 @@
   ----                 ----
 
   !Error:
-  ?        declaration: v
-  ? invalid declaration types. expected: void()*, got void()*
-  --------------------------------------------------------------------------------
-  ? /home/josh/source/c++/ela/repro/alias.ela:15:1
-  --------------------------------------------------------------------------------
-  ? >> Void v = & main  <<
+  In file included from alias.cpp:1:
+  ./alias.hpp:2:20: error: expected ';' after alias declaration
+      2 | using Void = void()*;
+        |                    ^
+        |                    ;
+  alias.cpp:4:8: error: illegal initializer (only variables can be initialized)
+      4 |   Void v {};
+        | 
 
 
   --------       ---------
   -------- code: ---------
   --------       ---------
 
-  ? #alias Void :: void()*;
+  #alias Void :: void()*;
 
-  ? main :: () {
-  ?   Void v = &main;
-  ? } 
-
+  main :: () {
+    Void v;
+  } 
 */
