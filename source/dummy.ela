@@ -1,8 +1,20 @@
-push :: ($T[] array, $T value) {
+// push :: ($T[] array, $T value) {
   
-}
+// }
+
+// main :: () {
+//   int*[] array;
+//   int* v;
+//   push(array, v);
+  
+//   int[] arr1;
+//   int v1;
+//   push(arr1, v1);
+// }
+
 
 main :: () {
-  int[] array;
-  push(array, 10);
+  #alias int_ptr :: int*;
+  int* p;
+  int_ptr other = p;
 }

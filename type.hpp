@@ -366,6 +366,9 @@ struct Type {
     }
     return extensions;
   }
+  TypeExt const get_ext_no_compound() const {
+    return extensions;
+  }
 
   TypeInfo *get_info() const {
     return info;

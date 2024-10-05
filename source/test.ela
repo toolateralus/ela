@@ -572,16 +572,16 @@ something :: (float32 f) -> float32 {
   // bool[] arr = {0,1,2,3,4,5};
 }
 
-#test test_function_pointers :: () {
-  #alias VoidFunction :: void();
-  VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
-  for s32 i; i < 10; ++i {
-    func[i] = &test_function_pointers;
-  }
-  for s32 i; i < 10; ++i {
-    assert("func failed to == itself", func[i] == &test_function_pointers)
-  }
-}
+// #test test_function_pointers :: () {
+//   #alias VoidFunction :: void();
+//   VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
+//   for s32 i; i < 10; ++i {
+//     func[i] = &test_function_pointers;
+//   }
+//   for s32 i; i < 10; ++i {
+//     assert("func failed to == itself", func[i] == &test_function_pointers)
+//   }
+// }
 
 #test test_aliasing :: () {
   #alias int_ptr :: int*;

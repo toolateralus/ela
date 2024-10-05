@@ -139,7 +139,9 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
+  
   auto type = global_get_type(node->resolved_type);
+  
   
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
@@ -329,10 +331,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // I don't mind implicit casting to void*/u8*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
-  
-  if (type->is_alias) {
-    (*ss) << "(" << type->get_base() << ")";
-  } else if (type->get_ext().is_pointer(1))
+  if (type->get_ext().is_pointer(1))
     (*ss) << "(" << type->to_cpp_string() << ")";
 }
 
@@ -521,6 +520,13 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     return {};
   }
 
+  if ((node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+    auto variants = node->polymorphic_types;
+    for (const auto variant: variants) {
+      auto variant_fun_ty = global_get_type(variant);
+    }
+  }
+
   // local function
   if (!ctx.scope->is_struct_or_union_scope &&
       ctx.scope != root_scope &&
@@ -611,8 +617,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   if (node->block.is_not_null())
     node->block.get()->accept(this);
 
-  // emit a forward declaration in the header to allow use-before-defined.
-  // main is not forward declared.
+  // main functions do not get forward declared.
   if (node->name.value != "main") {
     emit_forward_declaration(node);
   }
@@ -649,13 +654,13 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
   use_header();
   
-  for (const auto &[name, aliased_type] : global_type_alias_map) {
-    (*ss) << "using " << name << " = "; 
-    auto type = global_get_type(aliased_type);
-    auto points_to = global_get_type(type->alias_id);
-    (*ss) << points_to->to_cpp_string();
-    (*ss) << ";\n";
-  }
+  // for (const auto &[name, aliased_type] : global_type_alias_map) {
+  //   (*ss) << "using " << name << " = "; 
+  //   auto type = global_get_type(aliased_type);
+  //   auto points_to = global_get_type(type->alias_id);
+  //   (*ss) << points_to->to_cpp_string();
+  //   (*ss) << ";\n";
+  // }
   
   use_code();
   

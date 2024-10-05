@@ -306,18 +306,26 @@ bool TypeExt::equals(const TypeExt &other) const {
 // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
 // This should be in the emit visitor not here.
 std::string Type::to_cpp_string() const {
-  if (is_alias) {
-    return base;
+  auto base_no_ext = global_find_type_id(get_base(), {});
+  auto base_type = global_get_type(base_no_ext);
+  
+  Type* type = (Type*)this;
+  if (base_type->is_alias) {
+    base_type = global_get_type(base_type->alias_id);
+    auto old_ext = base_type->get_ext().append(get_ext_no_compound());
+    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
+    type = global_get_type(new_id);
   }
+
   switch (kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
-    return extensions.to_cpp_string(this->get_base());
+    return type->extensions.to_cpp_string(type->get_base());
   case TYPE_FUNCTION: {
-    if (!extensions.has_no_extensions()) {
-      return extensions.to_cpp_string(this->get_base());
+    if (!type->extensions.has_no_extensions()) {
+      return type->extensions.to_cpp_string(type->get_base());
     }
-    auto info = static_cast<FunctionTypeInfo *>(this->get_info());
+    auto info = static_cast<FunctionTypeInfo *>(type->get_info());
     auto ret = global_get_type(info->return_type)->to_cpp_string();
     std::string params = "(";
     for (int i = 0; i < info->params_len; ++i) {
@@ -330,9 +338,9 @@ std::string Type::to_cpp_string() const {
     return ret + params;
   }
   case TYPE_ENUM:
-    return base;
+    return type->base;
   case TYPE_UNION:
-    return extensions.to_cpp_string(this->get_base());
+    return type->extensions.to_cpp_string(type->get_base());
   }
 }
 
