@@ -430,14 +430,17 @@ enum Precedence {
   PRECEDENCE_ASSIGNMENT,    // =, :=
   PRECEDENCE_LOGICALOR,     // ||
   PRECEDENCE_LOGICALAND,    // &&
+  PRECEDENCE_EQUALITY,      // ==, !=
   PRECEDENCE_BITWISEOR,     // |
   PRECEDENCE_BITWISEXOR,    // ^
   PRECEDENCE_BITWISEAND,    // &
-  PRECEDENCE_EQUALITY,      // ==, !=
   PRECEDENCE_RELATIONAL,    // <, >, <=, >=
   PRECEDENCE_SHIFT,         // <<, >>
   PRECEDENCE_ADDITIVE,      // +, -
   PRECEDENCE_MULTIPLICATIVE // *, /, %
+  // these aren't handled here, but this is the continuation
+  // unary
+  // posfix 
 };
 
 static inline Precedence get_operator_precedence(Token token) {
