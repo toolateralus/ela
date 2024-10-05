@@ -82,6 +82,7 @@ enum struct TType {
   New,
   Delete,
   Dollar,
+  Then,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -90,6 +91,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Then);
     TTYPE_CASE(Union);
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
@@ -233,11 +235,11 @@ struct Token {
 
 struct Lexer {
   struct State {
-    
-    bool operator ==(const Lexer::State &other) const {
+
+    bool operator==(const Lexer::State &other) const {
       return other.input == input;
     }
-    
+
     State(const std::string &input, size_t file_idx, size_t input_len)
         : input(input), file_idx(file_idx), input_len(input_len) {}
 
@@ -248,12 +250,11 @@ struct Lexer {
     size_t line = 1;
     size_t file_idx{};
     size_t input_len{};
-    
-    
+
     static State from_string(const std::string &input) {
       return State(input, 0, input.length());
     }
-    
+
     static State from_file(const std::string &input,
                            const std::string &filename) {
       auto canonical = std::filesystem::canonical(filename);
@@ -275,28 +276,19 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> keywords{
-      {"union", TType::Union},
-      {"enum", TType::Enum},
-      {"return", TType::Return},
-      {"break", TType::Break},
-      {"continue", TType::Continue},
+      {"then", TType::Then},     {"union", TType::Union},
+      {"enum", TType::Enum},     {"return", TType::Return},
+      {"break", TType::Break},   {"continue", TType::Continue},
 
-      {"for", TType::For},
-      {"while", TType::While},
-      {"if", TType::If},
-      {"else", TType::Else},
-      {"struct", TType::Struct},
-      {"true", TType::True},
-      {"false", TType::False},
-      {"null", TType::Null},
-      {"new", TType::New},
-      {"delete", TType::Delete},
-      };
-      
+      {"for", TType::For},       {"while", TType::While},
+      {"if", TType::If},         {"else", TType::Else},
+      {"struct", TType::Struct}, {"true", TType::True},
+      {"false", TType::False},   {"null", TType::Null},
+      {"new", TType::New},       {"delete", TType::Delete},
+  };
 
   const std::unordered_map<std::string, TType> operators{
-      {"$", TType::Dollar},
-      {":=", TType::ColonEquals },
+      {"$", TType::Dollar},     {":=", TType::ColonEquals},
       {"...", TType::Varargs},  {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},
       {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},
@@ -321,7 +313,7 @@ struct Lexer {
       {"*=", TType::CompMul},   {"/=", TType::CompDiv},
       {"%=", TType::CompMod},   {"&=", TType::CompAnd},
       {"|=", TType::CompOr},    {"^=", TType::CompXor},
-      {"<<=", TType::CompSHL},  {">>=", TType::CompSHR}};
+    {"<<=", TType::CompSHL},  {">>=", TType::CompSHR}};
 
   void get_token(State &state);
 };

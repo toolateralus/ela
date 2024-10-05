@@ -655,7 +655,15 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTIf>();
     node->condition = parse_expr();
-    node->block = parse_block();
+    
+    if (peek().type == TType::Then) {
+      eat();
+      node->block = ast_alloc<ASTBlock>();
+      node->block->scope = create_child(ctx.scope);
+      node->block->statements = {parse_statement()};
+    } else {
+      node->block = parse_block();
+    }
 
     if (peek().type == TType::Else) {
       eat();
