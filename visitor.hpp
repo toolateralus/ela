@@ -53,6 +53,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
+  bool ignore_polymorphic_functions = true;
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
   TypeVisitor(Context &context) : ctx(context) {}
@@ -71,6 +72,8 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTIdentifier *node) override;
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
+  void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys,
+                 Type *&type);
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;

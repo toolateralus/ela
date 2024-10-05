@@ -1,6 +1,8 @@
-
+push :: ($T[] array, $T value) {
+  
+}
 
 main :: () {
-  sym := new int;
-  delete(sym);
+  int[] array;
+  push(array, 10);
 }

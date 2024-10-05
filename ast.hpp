@@ -86,9 +86,11 @@ struct ASTExpr : ASTNode {};
 struct ASTType : ASTExpr {
   std::string base;
   TypeExt extension_info{};
-  int flags = -1;
-  Nullable<ASTExpr> pointing_to;
   int resolved_type = Type::invalid_id;
+  
+  // special info for reflection
+  Nullable<ASTExpr> pointing_to;
+  int flags = -1;
   
   static ASTType *get_void() {
     static ASTType *type = [] {
@@ -151,6 +153,7 @@ struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
   std::string name;
+  bool is_type_param = false;
   std::any accept(VisitorBase *visitor) override;
 };
 struct ASTParamsDecl : ASTStatement {
@@ -165,6 +168,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   Nullable<ASTBlock> block;
   Token name;
   ASTType *return_type;
+  std::vector<int> polymorphic_types;
   std::any accept(VisitorBase *visitor) override;
 };
 struct ASTArguments : ASTNode {

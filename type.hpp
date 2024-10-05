@@ -87,6 +87,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
   FUNCTION_IS_EXPORTED= 1 << 7,
+  FUNCTION_IS_POLYMORPHIC = 1 << 8,
 };
 
 enum struct FunctionMetaType {
@@ -214,13 +215,17 @@ struct TypeInfo {
 };
 
 struct FunctionTypeInfo : TypeInfo {
-  FunctionTypeInfo() { memset(parameter_types, -1, 256); }
+  FunctionTypeInfo() { 
+    memset(parameter_types, -1, 256 * sizeof(int));
+  }
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
   int default_params = 0; // number of default params, always trailing.
   bool is_varargs = false;
+
+  bool is_polymorphic = false;
 
   // defined in cpp file
   virtual std::string to_string() const override;

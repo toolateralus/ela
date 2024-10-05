@@ -12,25 +12,18 @@ enum SymbolFlags {
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_HAS_OVERLOADS = 1 << 3,
 };
+
+struct ASTNode;
+
 struct Symbol {
-  // the identifier.
   std::string name;
-  // if this is a type alias, this
-  // is the type that this identifier points to.
-  
-  // TODO: get rid of this visible field, make it private.
-  // Add a get_type_id() and ahve it return the appropriate type,
-  // based on something that we can have function overload callees pass in,
-  // like a parameter signature or something
-  // Right now theres a ton of super ugly ass code that just gets the typeid or the first overloaded type, which
-  // will certainly cause problems. especially with operator function overloading.
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
-
   std::vector<int> function_overload_types;
-
+  Nullable<ASTNode> declaring_node;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
+
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
@@ -59,9 +52,10 @@ struct Scope {
   void erase(const std::string &name);
   
   std::vector<int> aliases;
-  void create_type_alias(int aliased, const std::string& name) {
+  int create_type_alias(int aliased, const std::string& name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
+    return id;
   }
   void on_scope_enter() {
     for (const auto &alias: aliases) {

@@ -18,6 +18,7 @@
 // Eventually, the ones that are really solid and used frequently could be
 // reimplemented as keywords.
 void Parser::init_directive_routines() {
+  
   // #include
   // Just like C's include, just paste a text file right above where the include
   // is used. Not a pre processor!
@@ -552,6 +553,7 @@ ASTProgram *Parser::parse() {
   end_node(program, range);
   return program;
 }
+
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
@@ -755,6 +757,7 @@ ASTStatement *Parser::parse_statement() {
                           tok.value),
                range);
 }
+
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -784,6 +787,7 @@ ASTDeclaration *Parser::parse_declaration() {
   
   return decl;
 }
+
 ASTBlock *Parser::parse_block() {
   auto range = begin_node();
   expect(TType::LCurly);
@@ -799,6 +803,7 @@ ASTBlock *Parser::parse_block() {
   end_node(block, range);
   return block;
 }
+
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
@@ -811,12 +816,15 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   function->params = parse_parameters();
   
+  // TODO: make it so this doesn't do a lookup through parents and just looks for enclosing scope.
   auto sym = ctx.scope->lookup(name.value);
   if (sym) {
     sym->flags |= SYMBOL_HAS_OVERLOADS;  
   } else {
     // to allow for recursion
     ctx.scope->insert(name.value, -1);
+    auto sym = ctx.scope->lookup(name.value);
+    sym->declaring_node = function;
   }
   
   function->name = name;
@@ -829,6 +837,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->block = parse_block();
   end_node(function, range);
   current_func_decl = last_func_decl;
+  
   return function;
 }
 
@@ -836,9 +845,20 @@ ASTParamsDecl *Parser::parse_parameters() {
   auto range = begin_node();
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
-  ASTType *type;
+  ASTType *type = nullptr;
   while (peek().type != TType::RParen) {
     auto subrange = begin_node();
+    
+    // VERIFY(Josh) 10/5/2024, 1:35:11 PM
+    // This may be a point of failure for template parameters.
+    
+    bool is_type_param = false;
+    if (peek().type == TType::Dollar) {
+      eat();
+      current_func_decl.get()->flags |= FUNCTION_IS_POLYMORPHIC;
+      is_type_param = true;
+    }
+    
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
@@ -854,7 +874,8 @@ ASTParamsDecl *Parser::parse_parameters() {
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (next.type == TType::Directive || !type || global_find_type_id(next.value, {}) != -1) {
+    if (is_type_param || next.type == TType::Directive || 
+        !type || global_find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
     
@@ -863,6 +884,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     auto param = ast_alloc<ASTParamDecl>();
     param->type = type;
     param->name = name;
+    param->is_type_param = is_type_param;
 
     if (peek().type == TType::Assign) {
       eat();

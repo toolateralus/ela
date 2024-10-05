@@ -510,7 +510,6 @@ something :: (float32 f) -> float32 {
 // int[] arr;
 
 
-
 #test test_union_type :: () {
   Union test_union;
   test_union.a = 10;
@@ -743,9 +742,6 @@ OperatorOverloadTest :: struct {
   #operator(>=) :: (OperatorOverloadTest something) -> bool {
     return value >= something.value;
   }
-  #operator(()) :: () -> char * {
-    return "Hi";
-  }
   #operator([]) :: (int n) -> int {
     int base = 10;
     return n + base;
@@ -785,7 +781,6 @@ OperatorOverloadTest :: struct {
   assert("Less than or equal operator overload failed",         opstr1 <= opstr2 == false);
   assert("Greater than operator overload failed",               opstr1 > opstr2 == true);
   assert("Greater than or equal operator overload failed",      opstr1 >= opstr2 == true);
-  assert("Call operator didn't return 'Hi'",                    strcmp(opstr1(), "Hi") == 0);
   assert("Subscript operator didn't return '30'",               opstr1[20] == 30);
 }
 #test test_comp_assign_overloads :: () {
