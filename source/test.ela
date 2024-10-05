@@ -577,16 +577,16 @@ something :: (float32 f) -> float32 {
 //   }
 // }
 
-// #test test_aliasing :: () {
-//   #alias int_ptr :: int*;
-//   int* p = malloc(sizeof(int));
-//   int_ptr other = p;
-//   assert("alias failed to equal pointed to type field.", p == other);
+#test test_aliasing :: () {
+  #alias int_ptr :: int*;
+  int* p = malloc(sizeof(int));
+  int_ptr other = p;
+  assert("alias failed to equal pointed to type field.", p == other);
 
-//   int **pp = #make(int**, malloc(sizeof(int*)));
-//   int_ptr* other1 = pp;
-//   assert("alias failed to equal pointed to type field.", pp == other1);
-// }
+  int **pp = #make(int**, malloc(sizeof(int*)));
+  int_ptr* other1 = pp;
+  assert("alias failed to equal pointed to type field.", pp == other1);
+}
 
 Xaryu :: struct {
   int value;

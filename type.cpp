@@ -41,8 +41,7 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
   type_table[num_types] = type;
   type->set_base(name);
-  type->set_ext(aliased->get_ext());
-  type->set_info( aliased->get_info());
+  type->set_info(aliased->get_info());
   type->is_alias = true;
   type->alias_id = aliased_type;
 
@@ -155,14 +154,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
-  if (global_type_alias_map.contains(from->get_base())) {
-    auto pointed_to = global_get_type(global_get_type(global_type_alias_map[from->get_base()])->alias_id);
-    return type_conversion_rule(pointed_to, to);
+  if (from->is_alias) {
+    auto aliasType = global_get_type(global_type_alias_map[from->get_base()]);
+    auto pointed_to = global_get_type(aliasType->alias_id);
+    auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), from->get_ext()));
+    return type_conversion_rule(fullType, to);
   }
   
-  if (global_type_alias_map.contains(to->get_base())) {
-    auto pointed_to = global_get_type(global_get_type(global_type_alias_map[to->get_base()])->alias_id);
-    return type_conversion_rule(from, pointed_to);
+  if (to->is_alias) {
+    auto aliasType = global_get_type(global_type_alias_map[to->get_base()]);
+    auto pointed_to = global_get_type(aliasType->alias_id);
+    auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), to->get_ext()));
+    return type_conversion_rule(from, fullType);
   }
 
   // implicitly upcast integer and float types.
@@ -219,9 +222,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // this allows int[] to cast to s8[] etc;
   if (!from->get_ext().has_no_extensions() &&
       !to->get_ext().has_no_extensions() &&
-      from->get_ext().equals(to->get_ext())) {
-    auto from_base = global_get_type(global_find_type_id(from->get_base(), {}));
-    auto to_base = global_get_type(global_find_type_id(to->get_base(), {}));
+      from->get_ext().extensions.back() == to->get_ext().extensions.back()) {
+    auto from_base = global_get_type(global_find_type_id(from->get_base(), from->get_ext().without_back()));
+    auto to_base = global_get_type(global_find_type_id(to->get_base(), to->get_ext().without_back()));
     return type_conversion_rule(from_base, to_base);
   }
 

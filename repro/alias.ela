@@ -1,38 +1,5 @@
 #compiler_flags "-g";
 
-// @CooperPilot help pls
-
-/* 
-  * This has been really hard for me to solve. I've turned the aliasing system on its head three times
-  * trying to get it better but it's still just not worked out 
-*/
-
-/*
-  *- - - - BUG 0 - - - - -*
-  ----                 ----
-  *--- Compiler error: ---*
-  ----                 ----
-
-  !Error:
-  ?        declaration: ptrptr
-  ?invalid declaration types. expected: IntPtr*, got int**
-  --------------------------------------------------------------------------------
-  ? /home/josh/source/c++/ela/repro/alias.ela:13:1
-  --------------------------------------------------------------------------------
-  ? >> IntPtr * ptrptr = # make ( int * * , null )  <<
-
-  --------       ---------
-  *------- code: --------*
-  --------       ---------
-
-  ? #alias IntPtr :: int*;
-  
-  ? main :: () {
-  ?  IntPtr *ptrptr = #make(int**, null);
-  ? }
-
-*/
-
 /* 
   *- - - - BUG 1 - - - - -*
   ----                 ----

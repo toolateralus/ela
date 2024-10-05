@@ -139,7 +139,16 @@ struct TypeExt {
       these.extensions.push_back(ext);
     }
     return these;
-  } 
+  }  
+
+  TypeExt without_back() const {
+    auto these = *this;
+    if (these.extensions.back() == TYPE_EXT_ARRAY) {
+      these.array_sizes.pop_back();
+    }
+    these.extensions.pop_back();
+    return these;
+  }
   
 
   inline bool is_array() const { return !array_sizes.empty(); }
