@@ -628,7 +628,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
         auto &param = params[i];
         if (param->is_type_param) {
           type_alias_map[param->type->base] = fun_info->parameter_types[i];
-          param->type->resolved_type = global_find_type_id(param->type->base, param->type->extension_info);
+          param->accept(&type_visitor);
         }
       }
       // emit the new function

@@ -3,7 +3,13 @@ push :: ($T[] array, $T value) {
 }
 
 main :: () {
-  int*[] array;
-  int* v;
-  push(array, v);
+  int*[] array0;
+  int* v0;
+  int*[] array1;
+  int* v1;
+  float*[] array2;
+  float* v2;
+  push(array0, v0);
+  push(array1, v1);
+  push(array2, v2);
 }

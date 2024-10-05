@@ -5,6 +5,7 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
+#include <algorithm>
 #include <any>
 #include <cassert>
 #include <format>
@@ -118,8 +119,8 @@ std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
-  return node->resolved_type =
-             global_find_type_id(node->base, node->extension_info);
+  node->resolved_type = global_find_type_id(node->base, node->extension_info);
+  return node->resolved_type;
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
   for (auto &statement : node->statements) {
@@ -645,8 +646,11 @@ std::any TypeVisitor::visit(ASTCall *node) {
       }
       
       auto return_type_id = node->type = info.return_type = int_from_any(func_decl->return_type->accept(this));
+      
       auto type_id = global_find_function_type_id(global_get_function_typename(func_decl), info, {});
-      func_decl->polymorphic_types.push_back(type_id);
+      if (std::ranges::find(func_decl->polymorphic_types, type_id) == func_decl->polymorphic_types.end()) {
+        func_decl->polymorphic_types.push_back(type_id);
+      }
       
       // erase the aliases we just created to emit this function
       for (const auto &alias: type_args_aliased) {

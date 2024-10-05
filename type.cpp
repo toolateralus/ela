@@ -51,9 +51,6 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
 
   aliased->has_aliases = true;
   aliased->aliases.push_back(type->id);
-
-  // always store a global copy so the backend can emit code for it.
-  type_alias_map[name] = type->id;
   
   return type->id;
 }
@@ -100,7 +97,7 @@ int global_find_type_id(const std::string &name,
       auto base_type = global_get_type(alias);
       return global_create_type((TypeKind)base_type->kind,
                                 base_type->get_base(), base_type->get_info(),
-                                type_extensions);
+                                base_type->get_ext_no_compound().append(type_extensions));
     }
   }
   for (int i = 0; i < num_types; ++i) {
