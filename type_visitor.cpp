@@ -626,9 +626,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
             param_ext = param_ext.without_back();
           }
           auto pointed_to = global_find_type_id(arg_type->get_base(), arg_ext);
-          auto alias_id = global_create_type_alias(pointed_to, params[i]->type->base);
+          auto param = params[i];
+          auto alias_id = global_create_type_alias(pointed_to, param->type->base);
+          type_args_aliased.insert(alias_id);
           assert_types_can_cast_or_equal(pointed_to, alias_id, node->source_range, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
           info.parameter_types[i] = pointed_to;
+          info.params_len++;
           params[i]->accept(this);
           continue;
         }
@@ -636,6 +639,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
         if (arg_tys.size() <= i) {
           continue;
         }
+        info.params_len++;
         info.parameter_types[i] = int_from_any(func_decl->params->params[i]->accept(this));
         assert_types_can_cast_or_equal(arg_tys[i], info.parameter_types[i], node->source_range, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
       }
@@ -647,7 +651,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
       // erase the aliases we just created to emit this function
       for (const auto &alias: type_args_aliased) {
         auto name = global_get_type(alias)->get_base();
-        global_type_alias_map.erase(name);
+        type_alias_map.erase(name);
       }
       
       return return_type_id;

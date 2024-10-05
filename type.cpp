@@ -53,7 +53,7 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   aliased->aliases.push_back(type->id);
 
   // always store a global copy so the backend can emit code for it.
-  global_type_alias_map[name] = type->id;
+  type_alias_map[name] = type->id;
   
   return type->id;
 }
@@ -310,7 +310,7 @@ std::string Type::to_cpp_string() const {
   auto base_type = global_get_type(base_no_ext);
   
   Type* type = (Type*)this;
-  if (base_type->is_alias) {
+  if (type->is_alias || base_type->is_alias) {
     base_type = global_get_type(base_type->alias_id);
     auto old_ext = base_type->get_ext().append(get_ext_no_compound());
     auto new_id = global_find_type_id(base_type->get_base(), old_ext);

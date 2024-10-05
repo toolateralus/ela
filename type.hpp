@@ -30,8 +30,8 @@ extern int num_types;
 extern jstl::Arena type_arena;
 
 // used for emitting typedefs
+
 extern std::unordered_map<std::string, int> type_alias_map;
-extern std::unordered_map<std::string, int> global_type_alias_map;
 
 
 enum ConversionRule {
