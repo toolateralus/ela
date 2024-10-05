@@ -1,0 +1,27 @@
+
+
+
+/* 
+
+  Iniitializer lists have backwards type checking.
+
+  !Error:
+  ?        Invalid types in initializer list for struct
+  
+  ? void*, s8
+  --------------------------------------------------------------------------------
+  ? /home/josh/source/c++/ela/repro/init_list.ela:10:1
+  --------------------------------------------------------------------------------
+  ? >> { 0 , null }  <<
+  ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+*/
+
+Something :: struct {
+  int a;
+  void *ptr;
+}
+
+
+main :: () {
+  Something s = {0};
+}

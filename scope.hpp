@@ -36,6 +36,8 @@ extern Scope *root_scope;
 struct Scope {
 
   bool is_struct_or_union_scope = false;
+  
+  std::vector<std::string> ordered_symbols;
   std::unordered_map<std::string, Symbol> symbols;
 
   Scope *parent = nullptr;

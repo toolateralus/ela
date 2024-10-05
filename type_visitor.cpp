@@ -72,7 +72,8 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
     }
     // search for fields within the range of the types provided.
     int i = 0;
-    for (const auto &[name, sym] : info->scope->symbols) {
+    for (const auto &name : info->scope->ordered_symbols) {
+      auto sym = info->scope->symbols[name];
       if (i >= node->types.size()) {
         break;
       }
@@ -952,7 +953,6 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
   int last_type = -1;
   for (const auto &expr : node->expressions)  {
     int type = int_from_any(expr->accept(this));
-    
     if (last_type == -1) {
       last_type = type;
     } else if (last_type != type) {
