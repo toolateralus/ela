@@ -503,6 +503,13 @@ something :: (float32 f) -> float32 {
 //   }
 // }
 
+// function :: ($T[] a, $T value) {
+  
+// }
+
+// int[] arr;
+
+
 
 #test test_union_type :: () {
   Union test_union;

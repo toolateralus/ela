@@ -57,6 +57,25 @@ struct Scope {
               int flags = SYMBOL_IS_VARIABLE);
   Symbol *lookup(const std::string &name);
   void erase(const std::string &name);
+  
+  std::vector<int> aliases;
+  void create_type_alias(int aliased, const std::string& name) {
+    auto id = global_create_type_alias(aliased, name);
+    aliases.push_back(id);
+  }
+  void on_scope_enter() {
+    for (const auto &alias: aliases) {
+      auto type = global_get_type(alias);
+      type_alias_map[type->get_base()] = alias;
+    }
+  }
+  void on_scope_exit() {
+    for (const auto &alias: aliases) {
+      auto type = global_get_type(alias);
+      type_alias_map.erase(type->get_base());
+    }
+  }
+  
 };
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -74,12 +93,14 @@ struct Context {
       in_scope = create_child(scope);
     }
     scope = in_scope;
+    scope->on_scope_enter();
   }
   inline Scope *exit_scope() {
     auto old_scope = scope;
     if (scope) {
       scope = scope->parent;
     }
+    scope->on_scope_exit();
     return old_scope;
   }
 };

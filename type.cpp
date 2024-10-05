@@ -33,9 +33,10 @@ Type *global_get_type(const int id) {
 int global_create_type_alias(int aliased_type, const std::string &name) {
 
   // this type alias already exists so just return the type.
-  if (global_type_alias_map.contains(name)) {
-    return global_type_alias_map[name];
+  if (type_alias_map.contains(name)) {
+    return type_alias_map[name];
   }
+  
 
   auto aliased = global_get_type(aliased_type);
   auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
@@ -46,19 +47,22 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   type->alias_id = aliased_type;
 
   num_types++;
-  global_type_alias_map[name] = type->id;
+  type_alias_map[name] = type->id;
 
   aliased->has_aliases = true;
   aliased->aliases.push_back(type->id);
 
+  // always store a global copy so the backend can emit code for it.
+  global_type_alias_map[name] = type->id;
+  
   return type->id;
 }
 int global_find_function_type_id(const std::string &name,
                                  const FunctionTypeInfo &info,
                                  const TypeExt &ext) {
                                   
-  if (global_type_alias_map.contains(name)) {
-    auto alias = global_type_alias_map[name];
+  if (type_alias_map.contains(name)) {
+    auto alias = type_alias_map[name];
     if (ext.has_no_extensions())
       return alias;
     else {
@@ -88,8 +92,8 @@ int global_find_function_type_id(const std::string &name,
 // I think the linear search is fine but this is certainly one of the slowest functions in the compiler.
 int global_find_type_id(const std::string &name,
                         const TypeExt &type_extensions) {
-  if (global_type_alias_map.contains(name)) {
-    auto alias = global_type_alias_map[name];
+  if (type_alias_map.contains(name)) {
+    auto alias = type_alias_map[name];
     if (type_extensions.has_no_extensions())
       return alias;
     else {
@@ -143,14 +147,14 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return CONVERT_NONE_NEEDED;
 
   if (from->is_alias) {
-    auto aliasType = global_get_type(global_type_alias_map[from->get_base()]);
+    auto aliasType = global_get_type(type_alias_map[from->get_base()]);
     auto pointed_to = global_get_type(aliasType->alias_id);
     auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), from->get_ext()));
     return type_conversion_rule(fullType, to);
   }
   
   if (to->is_alias) {
-    auto aliasType = global_get_type(global_type_alias_map[to->get_base()]);
+    auto aliasType = global_get_type(type_alias_map[to->get_base()]);
     auto pointed_to = global_get_type(aliasType->alias_id);
     auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), to->get_ext()));
     return type_conversion_rule(from, fullType);
