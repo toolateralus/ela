@@ -431,10 +431,10 @@ enum Precedence {
   PRECEDENCE_LOGICALOR,     // ||
   PRECEDENCE_LOGICALAND,    // &&
   PRECEDENCE_EQUALITY,      // ==, !=
+  PRECEDENCE_RELATIONAL,    // <, >, <=, >=
   PRECEDENCE_BITWISEOR,     // |
   PRECEDENCE_BITWISEXOR,    // ^
   PRECEDENCE_BITWISEAND,    // &
-  PRECEDENCE_RELATIONAL,    // <, >, <=, >=
   PRECEDENCE_SHIFT,         // <<, >>
   PRECEDENCE_ADDITIVE,      // +, -
   PRECEDENCE_MULTIPLICATIVE // *, /, %
