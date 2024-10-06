@@ -359,55 +359,57 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
+void EmitVisitor::get_declaration_type_signature_and_identifier(ASTDeclaration *&node, Type *&type) {
+  {
+    std::stringstream tss;
+    std::vector<Nullable<ASTExpr>> array_sizes = type->get_ext().array_sizes;
+    tss << type->get_base();
+
+    if (!type->get_ext().is_fixed_sized_array()) {
+      tss << node->name.value << ' ';
+    }
+
+    bool emitted_iden = false;
+    for (const auto ext : type->get_ext().extensions) {
+      if (ext == TYPE_EXT_ARRAY) {
+        auto size = array_sizes.back();
+        array_sizes.pop_back();
+        if (size.is_null()) {
+          std::string current = tss.str();
+          tss.str("");
+          tss.clear();
+          tss << "_array<" << current << ">";
+        } else {
+          auto old = this->ss;
+          this->ss = &tss;
+          if (!emitted_iden) {
+            emitted_iden = true;
+            tss << ' ' << node->name.value;
+          }
+          tss << "[";
+          size.get()->accept(this);
+          tss << "]";
+          this->ss = old;
+        }
+      }
+      if (ext == TYPE_EXT_POINTER) {
+        tss << "*";
+      }
+    }
+    (*ss) << tss.str();
+  }
+}
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
   if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
       !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
-    // (*ss) << "const ";
+    (*ss) << "const ";
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    {
-      std::stringstream tss;
-      std::vector<Nullable<ASTExpr>> array_sizes = type->get_ext().array_sizes;
-      tss << type->get_base();
-      
-      if (!type->get_ext().is_fixed_sized_array()) {
-        tss << node->name.value << ' ';
-      }
-      
-      bool emitted_iden = false;
-      for (const auto ext : type->get_ext().extensions) {
-        if (ext == TYPE_EXT_ARRAY) {
-          auto size = array_sizes.back();
-          array_sizes.pop_back();
-          if (size.is_null()) {
-            std::string current = tss.str();
-            tss.str("");
-            tss.clear();
-            tss << "_array<" << current << ">";
-          } else {
-            auto old = this->ss;
-            this->ss = &tss;
-            if (!emitted_iden) {
-              emitted_iden = true;
-              tss << ' ' << node->name.value;
-            }
-            tss << "[";
-            size.get()->accept(this);
-            tss << "]";
-            this->ss = old;
-          }
-        }
-        if (ext == TYPE_EXT_POINTER) {
-          tss << "*";
-        }
-      }
-      printf("%s\n", tss.str().c_str());
-      (*ss) << tss.str();
-    }
+    get_declaration_type_signature_and_identifier(node, type);
 
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
@@ -576,6 +578,14 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 
       if (is_copy_ctor) {
         (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
+        node->block.get()->accept(this);
+        (*ss) << ";\n";
+        (*ss) << name;
+        (*ss) << "(const " << name << " &" << node->params->params[0]->name << ")";
+        node->block.get()->accept(this);
+        (*ss) << ";\n";
+        return;
+        
       } else {
         node->params->accept(this);
       }
@@ -607,6 +617,11 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       node->return_type->accept(this);
       (*ss) << " operator " << op.value;
       node->params->accept(this);
+      
+      if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
+        (*ss) << " const ";
+      }
+      
       node->block.get()->accept(this);
       return;
     }
@@ -614,6 +629,8 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
       (*ss) << "extern \"C\" ";
     }
+    
+    
     // we override main's return value to allow compilation without explicitly
     // returning int from main.
     if (node->name.value == "main") {
@@ -625,6 +642,12 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     // emit parameter signature && name.
     (*ss) << " " + node->name.value;
     node->params->accept(this);
+    
+    if ((node->flags & FUNCTION_IS_METHOD) != 0) {
+      if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
+        (*ss) << " const ";
+      }
+    }
 
     // the function's block would only be null in a #foreign function
     if (node->block.is_not_null())

@@ -88,6 +88,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_OPERATOR = 1 << 6,
   FUNCTION_IS_EXPORTED= 1 << 7,
   FUNCTION_IS_POLYMORPHIC = 1 << 8,
+  FUNCTION_IS_MUTATING = 1 << 9,
 };
 
 enum struct FunctionMetaType {

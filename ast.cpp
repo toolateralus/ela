@@ -430,6 +430,10 @@ void Parser::init_directive_routines() {
            auto func_decl =
                parser->parse_function_declaration(get_unique_identifier());
 
+            if (op.is_comp_assign() || op.type == TType::Increment || op.type == TType::Decrement) {
+              func_decl->flags |= FUNCTION_IS_MUTATING;
+            }
+
            func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
 
            func_decl->name = op;
@@ -838,6 +842,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   function->name = name;
+
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();

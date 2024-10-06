@@ -115,6 +115,8 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
   return declaring_type;
 }
 
+
+
 std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
@@ -129,11 +131,22 @@ std::any TypeVisitor::visit(ASTProgram *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
+  auto last_decl = current_func_decl;
+  current_func_decl = node;
+  Defer _([&]{
+    current_func_decl = last_decl;
+  });
+  
+  if (ctx.scope->is_struct_or_union_scope) {
+    node->flags |= FUNCTION_IS_METHOD;
+  }
+  
   if (ignore_polymorphic_functions &&
       (node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
     return {};
   }
 
+  
   node->return_type->accept(this);
   node->params->accept(this);
 
@@ -388,7 +401,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     }
   }
 
-  if (node->op.type == TType::Assign) {
+  if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
     report_mutated_if_iden(node->left);
   }
 
@@ -430,6 +443,11 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   if (node->op.type == TType::Mul) {
     return remove_one_pointer_ext(operand_ty, node->source_range);
+  }
+
+
+  if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
+    report_mutated_if_iden(node->operand);
   }
 
   auto left_ty = global_get_type(operand_ty);
@@ -877,6 +895,13 @@ std::any TypeVisitor::visit(ASTWhile *node) {
   return control_flow;
 }
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+  auto last_decl = current_struct_decl;
+  current_struct_decl = node;
+  Defer _([&]{
+    current_struct_decl = last_decl;
+  });
+    
+  
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
@@ -894,7 +919,11 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
-
+  auto last_decl = current_union_decl;
+  current_union_decl = node;
+  Defer _([&]{
+    current_union_decl = last_decl;
+  });
   // we store this ast just to type check the stuff.
   ctx.set_scope(node->scope);
 
@@ -1156,6 +1185,19 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
 void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
   if (auto iden = dynamic_cast<ASTIdentifier *>(node)) {
     ctx.scope->report_symbol_mutated(iden->value.value);
+    Scope * enclosing_scope = nullptr;
+    if (auto str = current_struct_decl.get()) {
+      auto type = global_get_type(str->type->resolved_type);
+      auto info = static_cast<StructTypeInfo*>(type->get_info());
+      enclosing_scope = info->scope;
+    } else if (auto str = current_union_decl.get()) {
+      auto type = global_get_type(str->type->resolved_type);
+      auto info = static_cast<UnionTypeInfo*>(type->get_info());
+      enclosing_scope = info->scope;
+    }
+    if (current_func_decl && enclosing_scope && enclosing_scope->lookup(iden->value.value)) {
+      current_func_decl.get()->flags |= FUNCTION_IS_MUTATING;
+    }
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     report_mutated_if_iden(dot->left);
   } else if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {

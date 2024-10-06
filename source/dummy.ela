@@ -1,4 +1,12 @@
-main :: ()  {
-  int n = 0;
-  int[n + 1] array;
+
+something :: struct {
+  int n;
+  method :: () -> int {
+    n += 1;
+    return n;
+  }
+}
+
+main :: () {
+  
 }

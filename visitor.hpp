@@ -57,6 +57,10 @@ struct TypeVisitor : VisitorBase {
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
   
+  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
+  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
+  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  
   void report_mutated_if_iden(ASTExpr *node);
   
   TypeVisitor(Context &context) : ctx(context) {}
@@ -181,6 +185,7 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
+  void get_declaration_type_signature_and_identifier(ASTDeclaration *&node, Type *&type);
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
   std ::any visit(ASTBinExpr *node) override;
