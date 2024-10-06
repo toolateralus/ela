@@ -177,7 +177,7 @@ void EmitVisitor::interpolate_string(ASTLiteral* node) {
     std::string str;
     auto get_format_str = [&](int type_id) {
       auto type = global_get_type(type_id);
-
+      type = global_get_type(type->get_true_type());
       if (type->is_kind(TYPE_STRUCT)) {
         return "%s";
       }
@@ -204,7 +204,7 @@ void EmitVisitor::interpolate_string(ASTLiteral* node) {
           return "%d";
         }
       }
-      throw_error("Cannot deduce a format specifier for interpolated string",
+      throw_error(std::format("Cannot deduce a format specifier for interpolated string. type: {}", type->to_string()),
                   node->source_range);
     };
 
@@ -350,6 +350,7 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
+  
   if (type->get_ext().is_fixed_sized_array()) {
     auto type_str = type->get_ext().to_string();
     (*ss) << type->get_base() << ' ' << node->name.value << type_str;
@@ -632,19 +633,21 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       auto fun_info =
           static_cast<FunctionTypeInfo *>(variant_fun_ty->get_info());
           
-      // Redeclare the type aliases for stuff like $T or whatever the fruck
       auto &params = node->params->params;
       for (int i = 0; i < fun_info->params_len; ++i) {
         auto &param = params[i];
         if (param->is_type_param) {
           type_alias_map[param->type->base] = fun_info->parameter_types[i];
-          param->accept(&type_visitor);
         }
       }
       
       if (node->has_polymorphic_return_type) {
         type_alias_map[node->return_type->base] = fun_info->return_type;
       }
+      
+      type_visitor.ignore_polymorphic_functions = false;
+      node->accept(&type_visitor);
+      type_visitor.ignore_polymorphic_functions = true;
       
       // emit the new function
       emit_various_function_declarations();

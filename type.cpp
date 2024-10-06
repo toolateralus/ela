@@ -25,11 +25,13 @@ std::string FunctionTypeInfo::to_string() const {
 
   return ss.str();
 }
+
 Type *global_get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
   return type_table[id];
 }
+
 int global_create_type_alias(int aliased_type, const std::string &name) {
 
   // this type alias already exists so just return the type.

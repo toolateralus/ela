@@ -1,10 +1,15 @@
-#import core;
+#import core; 
 
-add :: ($T a, b) -> $T {
-  return a + b;
+add :: ($T a, b, int limit) -> $T {
+  T c;
+  local :: () -> T {
+    return #make(T);
+  }
+  if limit > 0 { return add(a + b + local(), b, limit - 1); }
+  else { return a + b + local(); }
 }
 
 main :: ()  {
-  i := add(1, 2);
-  i := add(1.0, 2.0);
+  i := add(1, 1, 100);
+  println($"{i}");
 }

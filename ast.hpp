@@ -156,10 +156,12 @@ struct ASTParamDecl : ASTNode {
   bool is_type_param = false;
   std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   bool has_polymorphic_return_type = false;
@@ -172,6 +174,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   std::vector<int> polymorphic_types;
   std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
 

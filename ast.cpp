@@ -858,7 +858,20 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     function->return_type = parse_type();
   }
 
+  if ((function->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+    for (const auto &param : function->params->params) {
+      type_alias_map[param->type->base] = -2;
+    }
+  }
+
   function->block = parse_block();
+  
+  if ((function->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+    for (const auto &param : function->params->params) {
+      type_alias_map.erase(param->type->base);
+    }
+  }
+  
   end_node(function, range);
   current_func_decl = last_func_decl;
   return function;

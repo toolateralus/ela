@@ -5,21 +5,21 @@ classified 15 files      15 unique files.
 -------------------------------------------------------------------------------
 File                             blank        comment           code
 -------------------------------------------------------------------------------
-ast.cpp                            132             69           1247
-type_visitor.cpp                   105             78            854
-emit.cpp                           121             37            777
-type.cpp                            76             48            695
-ast.hpp                             71             26            520
-visitor.cpp                         32             15            377
-type.hpp                            67             15            318
-lex.hpp                             32              0            295
+ast.cpp                            138             75           1306
+type_visitor.cpp                   115             81            946
+emit.cpp                           126             44            815
+type.cpp                            78             45            712
+ast.hpp                             72             27            524
+visitor.cpp                         33             15            377
+type.hpp                            72             16            337
+lex.hpp                             30              0            289
 core.hpp                            24              2            207
+visitor.hpp                         15              4            176
 lex.cpp                             19              0            170
-visitor.hpp                         12              4            169
-main.cpp                            24             15            111
+main.cpp                            27             15            111
 error.hpp                           14              0             96
+scope.hpp                           17              4             91
 scope.cpp                           15             12             77
-scope.hpp                           11             12             62
 -------------------------------------------------------------------------------
-SUM:                               755            333           5975
+SUM:                               795            340           6234
 -------------------------------------------------------------------------------
