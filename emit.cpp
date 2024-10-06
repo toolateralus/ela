@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 #include <functional>
@@ -148,7 +149,7 @@ std::any EmitVisitor::visit(ASTType *node) {
     return {};
   }
 
-  auto type_string = type->to_cpp_string();
+  auto type_string = to_cpp_string(type);
   (*ss) << type_string;
   return {};
 }
@@ -159,98 +160,105 @@ std::any EmitVisitor::visit(ASTCall *node) {
   return {};
 }
 
-void EmitVisitor::interpolate_string(ASTLiteral* node) {
-  
-    if (node->value.empty()) {
-      throw_warning(
-          "using an empty interpolated string causes memory leaks right now.",
-          node->source_range);
-      (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
-      return;
-    }
-    if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
-      throw_error("You must '#import core' before you use interpolated strings "
-                  "temporarily, due to a dependency on sprintf.",
-                  node->source_range);
-    }
+void EmitVisitor::interpolate_string(ASTLiteral *node) {
+  if (node->value.empty()) {
+    throw_warning(
+        "using an empty interpolated string causes memory leaks right now.",
+        node->source_range);
+    (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
+    return;
+  }
 
-    std::string str;
-    auto get_format_str = [&](int type_id) {
-      auto type = global_get_type(type_id);
-      type = global_get_type(type->get_true_type());
-      if (type->is_kind(TYPE_STRUCT)) {
-        return "%s";
-      }
-      if (type->id == charptr_type() || (type->get_base() == "string" &&
-                                         type->get_ext().has_no_extensions())) {
-        return "%s";
-      }
-      if (type->get_ext().is_pointer()) {
-        return "%p";
-      }
-      if (type->is_kind(TYPE_SCALAR)) {
-        if (type->id == s8_type() || type->id == s16_type() ||
-            type->id == s32_type() || type->id == u8_type() ||
-            type->id == u16_type() || type->id == u32_type() ||
-            type->id == int_type()) {
-          return "%d";
-        } else if (type->id == s64_type() || type->id == u64_type()) {
-          return "%ld";
-        } else if (type->id == float_type() || type->id == float32_type()) {
-          return "%f";
-        } else if (type->id == float64_type()) {
-          return "%lf";
-        } else if (type->id == bool_type()) {
-          return "%d";
-        }
-      }
-      throw_error(std::format("Cannot deduce a format specifier for interpolated string. type: {}", type->to_string()),
-                  node->source_range);
-    };
+  if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
+    throw_error("You must '#import core' before you use interpolated strings "
+                "temporarily, due to a dependency on sprintf.",
+                node->source_range);
+  }
 
-    auto replace_next_brace_pair = [&](std::string &in,
-                                       const std::string &replacement) {
-      size_t start = in.find('{');
-      if (start != std::string::npos) {
-        size_t end = in.find('}', start);
-        if (end != std::string::npos) {
-          in.replace(start, end - start + 1, replacement);
-        }
-      }
-    };
+  std::string str;
+  auto get_format_str = [&](int type_id) {
+    auto type = global_get_type(type_id);
+    type = global_get_type(type->get_true_type());
 
-    for (const auto &value : node->interpolated_values) {
-      auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-      std::string format_specifier = get_format_str(type_id);
-      replace_next_brace_pair(node->value, format_specifier);
+    if (type->is_kind(TYPE_STRUCT)) {
+      return "%s";
     }
-    (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << node->value
-          << "\",";
-    for (const auto &value : node->interpolated_values) {
-      auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-      auto type = global_get_type(type_id);
-      if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+    if (type->id == charptr_type() ||
+        (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
+      return "%s";
+    }
+    if (type->get_ext().is_pointer()) {
+      return "%p";
+    }
+    if (type->is_kind(TYPE_SCALAR)) {
+      if (type->id == s8_type() || type->id == s16_type() ||
+          type->id == s32_type() || type->id == u8_type() ||
+          type->id == u16_type() || type->id == u32_type() ||
+          type->id == int_type()) {
+        return "%d";
+      } else if (type->id == s64_type() || type->id == u64_type()) {
+        return "%ld";
+      } else if (type->id == float_type() || type->id == float32_type()) {
+        return "%f";
+      } else if (type->id == float64_type()) {
+        return "%lf";
+      } else if (type->id == bool_type()) {
+        return "%d";
+      }
+    }
+    throw_error(std::format("Cannot deduce a format specifier for interpolated "
+                            "string. type: {}",
+                            type->to_string()),
+                node->source_range);
+  };
+
+  auto replace_next_brace_pair = [&](std::string &in,
+                                     const std::string &replacement) {
+    auto start = in.find('{');
+    if (start != std::string::npos) {
+      auto end = in.find('}', start);
+      if (end != std::string::npos) {
+        in.replace(start, end - start + 1, replacement);
+      }
+    }
+  };
+
+  for (const auto &value : node->interpolated_values) {
+    auto type_id = std::any_cast<int>(value->accept(&type_visitor));
+    std::string format_specifier = get_format_str(type_id);
+    replace_next_brace_pair(node->value, format_specifier);
+  }
+
+  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \""
+        << node->value << "\",";
+
+  for (const auto &value : node->interpolated_values) {
+    auto type_id = std::any_cast<int>(value->accept(&type_visitor));
+    auto type = global_get_type(type_id);
+    if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+      value->accept(this);
+      (*ss) << ".data";
+    } else if (type->is_kind(TYPE_STRUCT)) {
+      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      if (info->scope->lookup("to_string")) {
         value->accept(this);
-        (*ss) << ".data";
-      } else if (type->is_kind(TYPE_STRUCT)) {
-        auto info = static_cast<StructTypeInfo *>(type->get_info());
-        if (info->scope->lookup("to_string")) {
-          value->accept(this);
-          (*ss) << ".to_string()";
-        }
-      } else {
-        value->accept(this);
+        (*ss) << ".to_string()";
       }
-      if (value != node->interpolated_values.back()) {
-        (*ss) << ", ";
-      }
+    } else {
+      value->accept(this);
     }
-    (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
-             "strlen(buf); return str; }()";
+    if (value != node->interpolated_values.back()) {
+      (*ss) << ", ";
+    }
+  }
+
+  (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
+           "strlen(buf); return str; }()";
 }
 
 std::any EmitVisitor::visit(ASTLiteral *node) {
-  auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))->to_string();
+  auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))
+                  ->to_string();
   std::string output;
   switch (node->tag) {
   case ASTLiteral::InterpolatedString: {
@@ -302,9 +310,13 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
+    // TODO: fix this
+    // if (node->right->is_constexpr()) {
+    //   (*ss) << "const";
+    // }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
     auto type = global_get_type(id);
-    (*ss) << type->to_cpp_string() << ' ';
+    (*ss) << to_cpp_string(type) << ' ';
     node->left->accept(this);
     (*ss) << " = ";
     node->right->accept(this);
@@ -323,7 +335,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     auto type = global_get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer(1);
     if (isptr)
-      (*ss) << "(" << type->to_cpp_string() << ")";
+      (*ss) << "(" << to_cpp_string(type) << ")";
   }
 
   space();
@@ -344,13 +356,17 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
   if (type->get_ext().is_pointer(1))
-    (*ss) << "(" << type->to_cpp_string() << ")";
+    (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
-  
+  auto symbol = ctx.scope->local_lookup(node->name.value);
+  if ((symbol->flags & SYMBOL_WAS_MUTATED) == 0 && !ctx.scope->is_struct_or_union_scope) {
+    (*ss) << "constexpr ";
+  }
+
   if (type->get_ext().is_fixed_sized_array()) {
     auto type_str = type->get_ext().to_string();
     (*ss) << type->get_base() << ' ' << node->name.value << type_str;
@@ -370,7 +386,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
           cancelled = true;
           break;
         }
-        init += " " + ty->to_cpp_string() + "(),";
+        init += " " + to_cpp_string(ty) + "(),";
       }
       if (!cancelled) {
         init.pop_back();
@@ -424,26 +440,6 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
 
   (*ss) << ")";
   return {};
-}
-
-static bool should_emit_function(EmitVisitor *visitor,
-                                 ASTFunctionDeclaration *node, bool test_flag) {
-  // if we're not testing, don't emit for test functions
-  if (!test_flag && node->flags & FUNCTION_IS_TEST) {
-    return false;
-  }
-  // generate a test based on this function pointer.
-  if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "__COMPILER_GENERATED_TEST(\""
-                            << node->name.value << "\", " << node->name.value
-                            << "),";
-    visitor->num_tests++;
-  }
-  // dont emit a main if we're in test mode.
-  if (test_flag && node->name.value == "main") {
-    return false;
-  }
-  return true;
 }
 
 void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
@@ -508,7 +504,6 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
-    
     // local function
     if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope &&
         (node->flags & FUNCTION_IS_METHOD) == 0) {
@@ -601,7 +596,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       emit_forward_declaration(node);
     }
   };
-  
+
   emit_line_directive(node);
 
   auto last_func_decl = current_func_decl;
@@ -624,7 +619,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     emit_foreign_function(node);
     return {};
   }
-  
+
   // emit a bunch of polymorphic funcz
   if ((node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
     auto variants = node->polymorphic_types;
@@ -632,7 +627,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       auto variant_fun_ty = global_get_type(variant);
       auto fun_info =
           static_cast<FunctionTypeInfo *>(variant_fun_ty->get_info());
-          
+
       auto &params = node->params->params;
       for (int i = 0; i < fun_info->params_len; ++i) {
         auto &param = params[i];
@@ -640,29 +635,28 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
           type_alias_map[param->type->base] = fun_info->parameter_types[i];
         }
       }
-      
+
       if (node->has_polymorphic_return_type) {
         type_alias_map[node->return_type->base] = fun_info->return_type;
       }
-      
+
       type_visitor.ignore_polymorphic_functions = false;
       node->accept(&type_visitor);
       type_visitor.ignore_polymorphic_functions = true;
-      
+
       // emit the new function
       emit_various_function_declarations();
-      
+
       // delete teh dam aliasez
       for (int i = 0; i < fun_info->params_len; ++i) {
         if (node->params->params[i]->is_type_param) {
           type_alias_map.erase(node->params->params[i]->type->base);
         }
       }
-      
+
       if (node->has_polymorphic_return_type) {
         type_alias_map.erase(node->return_type->base);
       }
-      
     }
   } else {
     emit_various_function_declarations();
@@ -695,27 +689,13 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
   const auto testing = get_compilation_flag("test");
-
   header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
-
-  use_header();
-
-  // for (const auto &[name, aliased_type] : global_type_alias_map) {
-  //   (*ss) << "using " << name << " = ";
-  //   auto type = global_get_type(aliased_type);
-  //   auto points_to = global_get_type(type->alias_id);
-  //   (*ss) << points_to->to_cpp_string();
-  //   (*ss) << ";\n";
-  // }
-
   use_code();
-
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
     newline();
   }
-
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
@@ -727,16 +707,12 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
     code << "__TEST_RUNNER_MAIN;";
   }
-
   // Emit runtime reflection type info for requested types
   {
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
-      printf("\e[1;13m%s\n", str.c_str());
       type_info << str << ";\n";
     }
-    printf("\e[1;33m%s\n", type_info.str().c_str());
-    
     header << std::format("static Type** _type_info = []{{ Type **_type_info = "
                           "new Type*[{}]; {}; return _type_info; }}();",
                           num_types, type_info.str());
@@ -872,10 +848,10 @@ std::any EmitVisitor::visit(ASTMake *node) {
                   "pointers.",
                   node->source_range);
     }
-    (*ss) << "(" << type->to_cpp_string() << ")";
+    (*ss) << "(" << to_cpp_string(type) << ")";
     node->arguments->arguments[0]->accept(this);
   } else if (node->kind == MAKE_CTOR || node->kind == MAKE_COPY_CTOR) {
-    (*ss) << type->to_cpp_string();
+    (*ss) << to_cpp_string(type);
     node->arguments->accept(this);
   }
   return {};
@@ -985,4 +961,171 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   ctx.exit_scope();
   (*ss) << "};\n";
   return {};
+}
+
+std::any EmitVisitor::visit(ASTAllocate *node) {
+  switch (node->kind) {
+  case ASTAllocate::New: {
+    auto ptr_type = global_get_type(node->type.get()->resolved_type);
+    (*ss) << "new ";
+    auto ext = ptr_type->get_ext();
+    ext.extensions.pop_back();
+    auto nonptr = global_find_type_id(ptr_type->get_base(), ext);
+    auto nonptr_ty = global_get_type(nonptr);
+    auto str = to_cpp_string(nonptr_ty);
+    (*ss) << str;
+    if (!node->arguments) {
+      (*ss) << "()";
+    } else {
+      node->arguments.get()->accept(this);
+    }
+  } break;
+  case ASTAllocate::Delete:
+    auto args = node->arguments.get()->arguments;
+    for (const auto &arg : args) {
+      (*ss) << "delete ";
+      arg->accept(this);
+      (*ss) << ";\n" << indent();
+      arg->accept(this);
+      (*ss) << " = nullptr";
+      (*ss) << ";\n" << indent();
+    }
+    break;
+  }
+  return {};
+}
+
+bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
+                                       ASTFunctionDeclaration *node,
+                                       bool test_flag) {
+  // if we're not testing, don't emit for test functions
+  if (!test_flag && node->flags & FUNCTION_IS_TEST) {
+    return false;
+  }
+  // generate a test based on this function pointer.
+  if (test_flag && node->flags & FUNCTION_IS_TEST) {
+    visitor->test_functions << "__COMPILER_GENERATED_TEST(\""
+                            << node->name.value << "\", " << node->name.value
+                            << "),";
+    visitor->num_tests++;
+  }
+  // dont emit a main if we're in test mode.
+  if (test_flag && node->name.value == "main") {
+    return false;
+  }
+  return true;
+}
+
+std::string EmitVisitor::to_cpp_string(const TypeExt &ext,
+                                              const std::string &base) {
+  std::vector<Nullable<ASTExpr>> array_sizes = ext.array_sizes;
+  std::stringstream ss;
+  ss << base;
+  for (const auto ext : ext.extensions) {
+    if (ext == TYPE_EXT_ARRAY) {
+      auto size = array_sizes.back();
+      array_sizes.pop_back();
+      if (size.is_null()) {
+        std::string current = ss.str();
+        ss.str("");
+        ss.clear();
+        ss << "_array<" << current << ">";
+      } else {
+        auto old = this->ss;
+        this->ss = &ss;
+        ss << "[";
+        size.get()->accept(this);
+        ss << "]";
+        this->ss = old;
+      }
+    }
+    if (ext == TYPE_EXT_POINTER) {
+      ss << "*";
+    }
+  }
+  return ss.str();
+}
+
+std::string EmitVisitor::get_cpp_scalar_type(int id) {
+  auto type = global_get_type(id);
+  std::string name = "";
+  if (type->get_base() == "s64")
+    name = "int64_t";
+  else if (type->get_base() == "s32")
+    name = "int32_t";
+  else if (type->get_base() == "s16")
+    name = "int16_t";
+  else if (type->get_base() == "s8")
+    name = "int8_t";
+  else if (type->get_base() == "u64")
+    name = "size_t";
+  else if (type->get_base() == "u32")
+    name = "uint32_t";
+  else if (type->get_base() == "u16")
+    name = "uint16_t";
+  else if (type->get_base() == "char" && type->get_ext().is_pointer(1))
+    name = "const char";
+  else if (type->get_base() == "u8" && type->get_ext().is_pointer(1))
+    name = "char";
+  else if (type->get_base() == "u8")
+    name = "uint8_t";
+  else if (type->get_base() == "float32")
+    name = "float";
+  else if (type->get_base() == "float64")
+    name = "double";
+  else if (type->get_base() == "float")
+    name = "float";
+  else if (type->get_base() == "int")
+    name = "int";
+  else if (type->get_base() == "char")
+    name = "char";
+  else if (type->get_base() == "bool")
+    name = "bool";
+  else if (type->get_base() == "void")
+    name = "void";
+  else {
+    return to_cpp_string(type);
+  }
+
+  if (type->get_ext().has_no_extensions()) {
+    return name;
+  }
+
+  return to_cpp_string(type->get_ext(), name);
+}
+
+std::string EmitVisitor::to_cpp_string(Type *type) {
+  auto base_no_ext = global_find_type_id(type->get_base(), {});
+  auto base_type = global_get_type(base_no_ext);
+  if (type->is_alias || base_type->is_alias) {
+    base_type = global_get_type(base_type->alias_id);
+    auto old_ext = base_type->get_ext().append(type->get_ext_no_compound());
+    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
+    type = global_get_type(new_id);
+  }
+  switch (type->kind) {
+  case TYPE_SCALAR:
+  case TYPE_STRUCT:
+    return to_cpp_string(type->get_ext(), type->get_base());
+  case TYPE_FUNCTION: {
+    if (!type->get_ext().has_no_extensions()) {
+      return to_cpp_string(type->get_ext(), type->get_base());
+    }
+    auto info = static_cast<FunctionTypeInfo *>(type->get_info());
+    auto ret = to_cpp_string(global_get_type(info->return_type));
+    std::string params = "(";
+    for (int i = 0; i < info->params_len; ++i) {
+      params += to_cpp_string(global_get_type(info->parameter_types[i]));
+      if (i != info->params_len - 1) {
+        params += ", ";
+      }
+    }
+    params += ")";
+    return ret + params;
+  }
+  case TYPE_ENUM:
+    return type->get_base();
+  case TYPE_UNION:
+    return to_cpp_string(type->get_ext(), type->get_base());
+  }
 }

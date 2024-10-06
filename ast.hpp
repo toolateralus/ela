@@ -82,7 +82,11 @@ struct ASTProgram : ASTNode {
   std::any accept(VisitorBase *visitor) override;
 };
 
-struct ASTExpr : ASTNode {};
+struct ASTExpr : ASTNode {
+  bool m_is_const_expr = false;
+  bool is_constexpr() const;
+};
+
 struct ASTType : ASTExpr {
   std::string base;
   TypeExt extension_info{};
@@ -283,13 +287,15 @@ struct ASTSubscript : ASTExpr {
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
-
+  
+  // generic parameters like integers and types.
+  Nullable<ASTParamsDecl> generic_parameters;
+  
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
 
   std::any accept(VisitorBase *visitor) override;
 };
-
 
 struct ASTInitializerList : ASTExpr {
   bool types_are_homogenous = true;
@@ -542,11 +548,11 @@ struct Parser {
       } else if (peek().type == TType::LBrace) {
         type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
         expect(TType::LBrace);
-        if (peek().type == TType::Integer) {
-          auto integer = expect(TType::Integer);
-          type->extension_info.array_sizes.push_back(std::stoi(integer.value));
+        if (peek().type != TType::RBrace) {
+          auto integer = parse_expr();
+          type->extension_info.array_sizes.push_back(integer);
         } else {
-          type->extension_info.array_sizes.push_back(-1);
+          type->extension_info.array_sizes.push_back(nullptr);
         }
         expect(TType::RBrace);
       }

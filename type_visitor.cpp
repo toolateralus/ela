@@ -341,28 +341,30 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   // identical.
   // TODO: this needs a really big rework.
   // TODO: we gotta do type checking on parameters.
-  if (type && type->is_kind(TYPE_STRUCT) &&
-      type->get_ext().has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo *>(type->get_info());
-    if (auto sym = info->scope->lookup(node->op.value)) {
-      auto enclosing_scope = ctx.scope;
-      ctx.set_scope(info->scope);
-      Defer _([&]() { ctx.set_scope(enclosing_scope); });
-      if (sym->is_function()) {
-        // TODO: fix this. we have ambiguitty with how we do this
-        int t = -1;
-        if (sym->function_overload_types[0] == -1) {
-          t = sym->type_id;
-        } else {
-          t = sym->function_overload_types[0];
+  {
+    if (type && type->is_kind(TYPE_STRUCT) &&
+        type->get_ext().has_no_extensions()) {
+      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      if (auto sym = info->scope->lookup(node->op.value)) {
+        auto enclosing_scope = ctx.scope;
+        ctx.set_scope(info->scope);
+        Defer _([&]() { ctx.set_scope(enclosing_scope); });
+        if (sym->is_function()) {
+          // TODO: fix this. we have ambiguitty with how we do this
+          int t = -1;
+          if (sym->function_overload_types[0] == -1) {
+            t = sym->type_id;
+          } else {
+            t = sym->function_overload_types[0];
+          }
+          auto fun_ty = global_get_type(t);
+          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
+          auto param_0 = fun_info->parameter_types[0];
+          assert_types_can_cast_or_equal(right, param_0, node->source_range,
+                                         "expected, {}, got {}",
+                                         "invalid call to operator overload");
+          return fun_info->return_type;
         }
-        auto fun_ty = global_get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
-        auto param_0 = fun_info->parameter_types[0];
-        assert_types_can_cast_or_equal(right, param_0, node->source_range,
-                                       "expected, {}, got {}",
-                                       "invalid call to operator overload");
-        return fun_info->return_type;
       }
     }
   }
@@ -384,6 +386,11 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
       ctx.scope->insert(iden->value.value, left);
     }
+  }
+
+  if (node->op.type == TType::Assign) {
+    auto iden = dynamic_cast<ASTIdentifier*>(node->left);
+    ctx.scope->report_symbol_mutated(iden->value.value);
   }
 
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have their
@@ -468,14 +475,13 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
   if (global_find_type_id(node->value.value, {}) != -1) {
-    throw_error("Invalid identifier: a type exists with that name.", node->source_range);
+    throw_error("Invalid identifier: a type exists with that name.",
+                node->source_range);
   }
-  
+
   auto symbol = ctx.scope->lookup(node->value.value);
   if (symbol) {
-    // if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
-    //   throw_warning()
-    // }
+    node->m_is_const_expr = (symbol->flags & SYMBOL_WAS_MUTATED) == 0;
     return symbol->type_id;
   } else {
     throw_error(
@@ -522,6 +528,9 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   case ASTLiteral::Null:
     return voidptr_type();
   case ASTLiteral::InterpolatedString: {
+    for (const auto &arg : node->interpolated_values) {
+      arg->accept(this);
+    }
     return global_find_type_id("string", {});
   }
   case ASTLiteral::Char:
@@ -530,7 +539,9 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 
-int TypeVisitor::generate_polymorphic_function(ASTCall *node, ASTFunctionDeclaration *func_decl, std::vector<int> arg_tys) {
+int TypeVisitor::generate_polymorphic_function(
+    ASTCall *node, ASTFunctionDeclaration *func_decl,
+    std::vector<int> arg_tys) {
   std::unordered_set<int> type_args_aliased;
   FunctionTypeInfo info{};
 
@@ -569,7 +580,7 @@ int TypeVisitor::generate_polymorphic_function(ASTCall *node, ASTFunctionDeclara
     if (arg_tys.size() <= i) {
       continue;
     }
-    
+
     info.params_len++;
     info.parameter_types[i] =
         int_from_any(func_decl->params->params[i]->accept(this));
@@ -579,9 +590,10 @@ int TypeVisitor::generate_polymorphic_function(ASTCall *node, ASTFunctionDeclara
         std::format("parameter: {} of function: {}", i, node->name.value));
   }
 
-  for (const auto &param: func_decl->params->params) {
+  for (const auto &param : func_decl->params->params) {
     if (func_decl->block.is_not_null())
-      func_decl->block.get()->scope->insert(param->name, param->type->resolved_type);
+      func_decl->block.get()->scope->insert(param->name,
+                                            param->type->resolved_type);
   }
 
   auto return_type_id = node->type = info.return_type =
@@ -589,7 +601,7 @@ int TypeVisitor::generate_polymorphic_function(ASTCall *node, ASTFunctionDeclara
 
   auto type_id = global_find_function_type_id(
       global_get_function_typename(func_decl), info, {});
-      
+
   if (std::ranges::find(func_decl->polymorphic_types, type_id) ==
       func_decl->polymorphic_types.end()) {
     func_decl->polymorphic_types.push_back(type_id);
@@ -680,9 +692,10 @@ std::any TypeVisitor::visit(ASTCall *node) {
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   Type *type = global_get_type(symbol->type_id);
-  
+
   if (!type && symbol->declaring_node.is_not_null()) {
-    auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+    auto func_decl =
+        dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     if (func_decl && (func_decl->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
       return generate_polymorphic_function(node, func_decl, arg_tys);
     }

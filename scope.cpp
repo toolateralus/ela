@@ -45,7 +45,7 @@ Context::Context() {
     // Field* []
     auto field_arr = global_find_type_id(
         "Field", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
-                  .array_sizes = {-1}});
+                  .array_sizes = {nullptr}});
     // Field*
     auto field_ptr =
         global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}});
@@ -80,8 +80,9 @@ Context::Context() {
       "_type_info",
       global_find_type_id("Type",
                           {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
-                           .array_sizes = {-1}}));
+                           .array_sizes = {nullptr}}));
 }
+
 
 void Scope::insert(const std::string &name, int type_id, int flags) {
   auto sym = Symbol{name, type_id, flags};

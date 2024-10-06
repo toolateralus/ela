@@ -1,15 +1,4 @@
-#import core; 
-
-add :: ($T a, b, int limit) -> $T {
-  T c;
-  local :: () -> T {
-    return #make(T);
-  }
-  if limit > 0 { return add(a + b + local(), b, limit - 1); }
-  else { return a + b + local(); }
-}
-
 main :: ()  {
-  i := add(1, 1, 100);
-  println($"{i}");
+  int n = 0;
+  int[n + 1] array;
 }

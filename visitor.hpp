@@ -72,8 +72,8 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTIdentifier *node) override;
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
-  void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys,
-                 Type *&type);
+  void find_function_overload(ASTCall *&node, Symbol *&symbol,
+                              std::vector<int> &arg_tys, Type *&type);
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
@@ -91,9 +91,8 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
   int generate_polymorphic_function(ASTCall *node,
-                                     ASTFunctionDeclaration *func_decl,
-                                     std::vector<int> arg_tys);
-  
+                                    ASTFunctionDeclaration *func_decl,
+                                    std::vector<int> arg_tys);
 };
 
 struct EmitVisitor : VisitorBase {
@@ -155,13 +154,23 @@ struct EmitVisitor : VisitorBase {
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
   inline void space() { (*ss) << ' '; }
-  void interpolate_string(ASTLiteral* node);
+  void interpolate_string(ASTLiteral *node);
   void emit_local_function(ASTFunctionDeclaration *node);
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
-  
-  
+
+  bool should_emit_function(EmitVisitor *visitor, ASTFunctionDeclaration *node,
+                            bool test_flag);
+
+  std::string to_cpp_string(const TypeExt &ext, const std::string &base);
+
+  // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
+  // This should be in the emit visitor not here.
+  std::string to_cpp_string(Type *type);
+
+  std::string get_cpp_scalar_type(int id);
+
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;
@@ -191,5 +200,4 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
-
 };

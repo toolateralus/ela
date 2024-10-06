@@ -391,35 +391,3 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
   return {};
 }
 
-std::any EmitVisitor::visit(ASTAllocate *node) {
-  switch (node->kind) {
-  case ASTAllocate::New: {
-    auto ptr_type = global_get_type(node->type.get()->resolved_type);
-    (*ss) << "new ";
-    auto ext = ptr_type->get_ext();
-    ext.extensions.pop_back();
-    auto nonptr = global_find_type_id(ptr_type->get_base(), ext);
-    auto nonptr_ty = global_get_type(nonptr);
-    auto str = nonptr_ty->to_cpp_string();
-    (*ss) << str;
-    if (!node->arguments) {
-      (*ss) << "()";
-    } else {
-      node->arguments.get()->accept(this);
-    }
-  } break;
-  case ASTAllocate::Delete:
-    auto args = node->arguments.get()->arguments;
-    for (const auto &arg : args) {
-      (*ss) << "delete "; 
-      arg->accept(this);
-      (*ss) << ";\n" << indent();
-      arg->accept(this);
-      (*ss) << " = nullptr";
-      (*ss) << ";\n" << indent();
-    }
-    break;
-  }
-  return {};
-}
-

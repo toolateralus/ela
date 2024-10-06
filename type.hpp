@@ -100,12 +100,14 @@ enum UnionKind {
   UNION_IS_SUM_TYPE = 1,
 };
 
+struct ASTExpr;
+
 struct TypeExt {
   // this stores things like * and [], [20] etc.
   std::vector<TypeExtEnum> extensions{};
   // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
   // array size.
-  std::vector<int> array_sizes{};
+  std::vector<Nullable<ASTExpr>> array_sizes{};
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       for (const auto ext : extensions) {
@@ -130,7 +132,6 @@ struct TypeExt {
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
-  
   TypeExt append(const TypeExt& to_append) const {
     auto these = *this;
     int sizes_i = 0;
@@ -143,7 +144,6 @@ struct TypeExt {
     }
     return these;
   }  
-
   TypeExt without_back() const {
     auto these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
@@ -152,27 +152,18 @@ struct TypeExt {
     these.extensions.pop_back();
     return these;
   }
-  
-
   inline bool is_array() const { return !array_sizes.empty(); }
 
-  inline bool is_fixed_sized_array() const {
-    for (const auto &ext : array_sizes) {
-      if (ext != -1) {
-        return true;
-      }
-    }
-    return false;
-  }
+  bool is_fixed_sized_array() const;
 
   inline std::string to_string() const {
     std::stringstream ss;
-    std::vector<int> array_sizes = this->array_sizes;
+    std::vector<Nullable<ASTExpr>> array_sizes = this->array_sizes;
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         auto size = array_sizes.back();
         array_sizes.pop_back();
-        if (size == -1)
+        if (size.is_null())
           ss << "[]";
         else {
           ss << "[" << size << "]";
@@ -184,29 +175,7 @@ struct TypeExt {
     }
     return ss.str();
   }
-  inline std::string to_cpp_string(const std::string &base) const {
-    std::vector<int> array_sizes = this->array_sizes;
-    std::stringstream ss;
-    ss << base;
-    for (const auto ext : extensions) {
-      if (ext == TYPE_EXT_ARRAY) {
-        auto size = array_sizes.back();
-        array_sizes.pop_back();
-        if (size == -1) {
-          std::string current = ss.str();
-          ss.str("");
-          ss.clear();
-          ss << "_array<" << current << ">";
-        }else {
-          ss << "[" << size << "]";
-        }
-      }
-      if (ext == TYPE_EXT_POINTER) {
-        ss << "*";
-      }
-    }
-    return ss.str();
-  }
+  
 };
 
 struct TypeInfo {
@@ -297,8 +266,6 @@ int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
 
 int global_find_type_id(const std::string &, const TypeExt &);
-
-std::string get_cpp_scalar_type(int);
 
 struct Token;
 
@@ -407,7 +374,7 @@ struct Type {
   bool operator==(const Type &type) const;
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
-  std::string to_cpp_string() const;
+  
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;

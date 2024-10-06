@@ -495,11 +495,11 @@ ASTType *Parser::parse_type() {
     if (peek().type == TType::LBrace) {
       extension_info.extensions.push_back(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
-      if (peek().type == TType::Integer) {
-        auto integer = expect(TType::Integer);
-        extension_info.array_sizes.push_back(std::stoi(integer.value));
+      if (peek().type != TType::RBrace) {
+        auto integer = parse_expr();
+        extension_info.array_sizes.push_back(integer);
       } else {
-        extension_info.array_sizes.push_back(-1);
+        extension_info.array_sizes.push_back(nullptr);
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {
@@ -813,7 +813,6 @@ ASTBlock *Parser::parse_block() {
   end_node(block, range);
   return block;
 }
-
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
@@ -876,7 +875,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   current_func_decl = last_func_decl;
   return function;
 }
-
 ASTParamsDecl *Parser::parse_parameters() {
   auto range = begin_node();
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
@@ -1014,8 +1012,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
+  
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
+
+  if (peek().type == TType::LParen) {
+    decl->generic_parameters = parse_parameters();
+  }
 
   // fwd declare the type.
   auto type_id = global_create_struct_type(name.value, {});
@@ -1144,6 +1147,8 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->left = left;
     binexpr->right = right;
     binexpr->op = op;
+    binexpr->m_is_const_expr = left->is_constexpr() && right->is_constexpr();
+    
     if (op.type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (auto alloc = dynamic_cast<ASTAllocate *>(right)) {
@@ -1151,6 +1156,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         insert_allocation(alloc, symbol, ctx.scope);
       }
     }
+    
     left = binexpr;
   }
   end_node(left, range);
@@ -1530,3 +1536,5 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
     }
   }
 }
+
+bool ASTExpr::is_constexpr() const { return dynamic_cast<const ASTLiteral *>(this) || m_is_const_expr; }

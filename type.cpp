@@ -3,6 +3,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
+#include "scope.hpp"
 #include <sstream>
 #include <unordered_set>
 
@@ -298,46 +299,7 @@ bool TypeExt::equals(const TypeExt &other) const {
   return true;
 }
 
-// CLEANUP(Josh) 10/5/2024, 9:57:02 AM
-// This should be in the emit visitor not here.
-std::string Type::to_cpp_string() const {
-  auto base_no_ext = global_find_type_id(get_base(), {});
-  auto base_type = global_get_type(base_no_ext);
-  
-  Type* type = (Type*)this;
-  if (type->is_alias || base_type->is_alias) {
-    base_type = global_get_type(base_type->alias_id);
-    auto old_ext = base_type->get_ext().append(get_ext_no_compound());
-    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
-    type = global_get_type(new_id);
-  }
 
-  switch (kind) {
-  case TYPE_SCALAR:
-  case TYPE_STRUCT:
-    return type->extensions.to_cpp_string(type->get_base());
-  case TYPE_FUNCTION: {
-    if (!type->extensions.has_no_extensions()) {
-      return type->extensions.to_cpp_string(type->get_base());
-    }
-    auto info = static_cast<FunctionTypeInfo *>(type->get_info());
-    auto ret = global_get_type(info->return_type)->to_cpp_string();
-    std::string params = "(";
-    for (int i = 0; i < info->params_len; ++i) {
-      params += global_get_type(info->parameter_types[i])->to_cpp_string();
-      if (i != info->params_len - 1) {
-        params += ", ";
-      }
-    }
-    params += ")";
-    return ret + params;
-  }
-  case TYPE_ENUM:
-    return type->base;
-  case TYPE_UNION:
-    return type->extensions.to_cpp_string(type->get_base());
-  }
-}
 
 std::string Type::to_string() const {
   auto base_no_ext = global_find_type_id(get_base(), {});
@@ -385,7 +347,6 @@ std::string to_type_struct(Type* type, Context &context) {
   std::stringstream fields_ss;
   if (type->kind == TYPE_STRUCT) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
-
     if (info->scope->symbols.empty()) {
       fields_ss << "_type_info[" << id << "] = new Type {"
                 << ".name = \"" << type->to_string() << "\","
@@ -400,12 +361,7 @@ std::string to_type_struct(Type* type, Context &context) {
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
       auto t = global_get_type(sym.type_id);
-      if (!t) {
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      }
-
+      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
                 << std::format(".type = {}", to_type_struct(t, context))
                 << " }";
@@ -419,7 +375,6 @@ std::string to_type_struct(Type* type, Context &context) {
     fields_ss << "_type_info[" << id << "] = new Type {"
               << ".id = " << id << ",\n"
               << ".name = \"" << type->to_string() << "\"}";
-
     context.type_info_strings.push_back(fields_ss.str());
     return std::string("_type_info[") + std::to_string(id) + "]";
   }
@@ -708,53 +663,6 @@ int get_pointer_to_type(int base) {
   return global_find_type_id(type->get_base(), extensions);
 }
 
-std::string get_cpp_scalar_type(int id) {
-  auto type = global_get_type(id);
-  std::string name = "";
-  if (type->get_base() == "s64")
-    name = "int64_t";
-  else if (type->get_base() == "s32")
-    name = "int32_t";
-  else if (type->get_base() == "s16")
-    name = "int16_t";
-  else if (type->get_base() == "s8")
-    name = "int8_t";
-  else if (type->get_base() == "u64")
-    name = "size_t";
-  else if (type->get_base() == "u32")
-    name = "uint32_t";
-  else if (type->get_base() == "u16")
-    name = "uint16_t";
-  else if (type->get_base() == "char" && type->get_ext().is_pointer(1))
-    name = "const char";
-  else if (type->get_base() == "u8" && type->get_ext().is_pointer(1))
-    name = "char";
-  else if (type->get_base() == "u8")
-    name = "uint8_t";
-  else if (type->get_base() == "float32")
-    name = "float";
-  else if (type->get_base() == "float64")
-    name = "double";
-  else if (type->get_base() == "float")
-    name = "float";
-  else if (type->get_base() == "int")
-    name = "int";
-  else if (type->get_base() == "char")
-    name = "char";
-  else if (type->get_base() == "bool")
-    name = "bool";
-  else if (type->get_base() == "void")
-    name = "void";
-  else {
-    return type->to_cpp_string();
-  }
-
-  if (type->get_ext().has_no_extensions()) {
-    return name;
-  }
-
-  return type->get_ext().to_cpp_string(name);
-}
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
                                      bool is_integral = false) {
   auto info = ast_alloc<ScalarTypeInfo>();
@@ -835,3 +743,11 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   return from_info->size <= to_info->size;
 }
 
+bool TypeExt::is_fixed_sized_array() const {
+  for (const auto &ext : array_sizes) {
+    if (ext.is_not_null()) {
+      return true;
+    }
+  }
+  return false;
+}

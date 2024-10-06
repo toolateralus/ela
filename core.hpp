@@ -17,6 +17,7 @@
 // without a nasty allocating wrapper like std::optional (which is also annoying to type)
 template<class T>
 struct Nullable {
+  ~Nullable() = default;
   Nullable() {}
   Nullable(T *ptr) : ptr(ptr) {}
   T *ptr {};

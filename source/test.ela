@@ -1,7 +1,5 @@
 #import core;
 
-#compiler_flags "-g"
-
 XaryuStruct :: struct {
   float f;
 }

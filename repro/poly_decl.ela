@@ -1,26 +1,16 @@
-#import core;
+#import core; 
 
-/* 
-  !Error:
-  ?        Use of an undeclared type or identifier: T
-  --------------------------------------------------------------------------------
-  ? /home/josh/source/c++/ela/source/dummy.ela:3:1
-  --------------------------------------------------------------------------------
-  ? >> T {  <<
-*/
-
-/* 
-  * The problem is that we use global_find_type_id() at the peeking token to decide if something is a declaration
-  * This problem happens at parse time, which should never be concerned with whether types exist or not.
-*/
-
-add :: ($T a, b) -> $T {
-  T d;
-  return a + b;
+factorial :: ($T n) -> $T {
+  if n == 0 {
+    return 1;
+  } else { return n * factorial(n - 1); }
 }
 
+/* 
+  This fails because factorial never gets emitted when used in an interpolated string. 
+  Strange!
+*/
+
 main :: ()  {
-  i := add(1, 2);
-  x := add(1.0, 2.0);
-  println($"{i} {x}");
+  println($"{factorial(5)}");
 }

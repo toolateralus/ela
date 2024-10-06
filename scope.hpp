@@ -4,14 +4,13 @@
 #include <jstl/memory/arena.hpp>
 #include <string>
 #include <unordered_map>
-#include <variant>
-
 
 extern jstl::Arena scope_arena;
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_HAS_OVERLOADS = 1 << 3,
+  SYMBOL_WAS_MUTATED = 1 << 4,
 };
 
 struct ASTNode;
@@ -25,11 +24,13 @@ struct Symbol {
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
 
-
-
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
+
+  void report_symbol_mutated(const std::string &name) {
+    symbols[name].flags |= SYMBOL_WAS_MUTATED;
+  }
 
   bool is_struct_or_union_scope = false;
   
