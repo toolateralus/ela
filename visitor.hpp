@@ -90,6 +90,10 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
+  int generate_polymorphic_function(ASTCall *node,
+                                     ASTFunctionDeclaration *func_decl,
+                                     std::vector<int> arg_tys);
+  
 };
 
 struct EmitVisitor : VisitorBase {
@@ -185,4 +189,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
+
 };

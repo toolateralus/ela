@@ -422,3 +422,4 @@ std::any EmitVisitor::visit(ASTAllocate *node) {
   }
   return {};
 }
+

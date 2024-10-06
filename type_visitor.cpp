@@ -525,6 +525,76 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     break;
   }
 }
+
+int TypeVisitor::generate_polymorphic_function(
+    ASTCall *node, ASTFunctionDeclaration *func_decl,
+    std::vector<int> arg_tys) {
+  std::unordered_set<int> type_args_aliased;
+  FunctionTypeInfo info{};
+
+  for (int i = 0; i < func_decl->params->params.size(); ++i) {
+    auto scope = func_decl->block.get()->scope;
+    auto params = func_decl->params->params;
+
+    if (params[i]->is_type_param) {
+      auto param_ext = params[i]->type->extension_info;
+      auto arg_type = global_get_type(arg_tys[i]);
+      auto arg_ext = arg_type->get_ext();
+      while (!param_ext.has_no_extensions()) {
+        if (arg_ext.has_no_extensions()) {
+          throw_error("TODO: a better error here.", node->source_range);
+        }
+        if (arg_ext.extensions.back() != param_ext.extensions.back()) {
+          throw_error("TODO: a better error here.", node->source_range);
+        }
+        arg_ext = arg_ext.without_back();
+        param_ext = param_ext.without_back();
+      }
+      auto pointed_to = global_find_type_id(arg_type->get_base(), arg_ext);
+      auto param = params[i];
+      auto alias_id = global_create_type_alias(pointed_to, param->type->base);
+      type_args_aliased.insert(alias_id);
+      assert_types_can_cast_or_equal(
+          pointed_to, alias_id, node->source_range,
+          "invalid argument types. expected: {}, got: {}",
+          std::format("parameter: {} of function: {}", i, node->name.value));
+      info.parameter_types[i] = pointed_to;
+      info.params_len++;
+      params[i]->accept(this);
+      continue;
+    }
+    // !BUG: default parameters evade type checking
+    if (arg_tys.size() <= i) {
+      continue;
+    }
+    info.params_len++;
+    info.parameter_types[i] =
+        int_from_any(func_decl->params->params[i]->accept(this));
+    assert_types_can_cast_or_equal(
+        arg_tys[i], info.parameter_types[i], node->source_range,
+        "invalid argument types. expected: {}, got: {}",
+        std::format("parameter: {} of function: {}", i, node->name.value));
+  }
+
+  auto return_type_id = node->type = info.return_type =
+      int_from_any(func_decl->return_type->accept(this));
+
+  auto type_id = global_find_function_type_id(
+      global_get_function_typename(func_decl), info, {});
+  if (std::ranges::find(func_decl->polymorphic_types, type_id) ==
+      func_decl->polymorphic_types.end()) {
+    func_decl->polymorphic_types.push_back(type_id);
+  }
+
+  // erase the aliases we just created to emit this function
+  for (const auto &alias : type_args_aliased) {
+    auto name = global_get_type(alias)->get_base();
+    type_alias_map.erase(name);
+  }
+
+  return return_type_id;
+}
+
 void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
                                          std::vector<int> &arg_tys,
                                          Type *&type) {
@@ -605,60 +675,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   if (!type && symbol->declaring_node.is_not_null()) {
     auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     if (func_decl && (func_decl->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
-      std::unordered_set<int> type_args_aliased;
-      FunctionTypeInfo info {};
-      
-      for (int i = 0; i < func_decl->params->params.size(); ++i) {
-        auto scope = func_decl->block.get()->scope;
-        auto params = func_decl->params->params;
-
-        if (params[i]->is_type_param) {
-          auto param_ext = params[i]->type->extension_info;
-          auto arg_type = global_get_type(arg_tys[i]);
-          auto arg_ext = arg_type->get_ext();
-          while (!param_ext.has_no_extensions()) {
-            if (arg_ext.has_no_extensions()) {
-              throw_error("TODO: a better error here.", node->source_range);
-            }
-            if (arg_ext.extensions.back() != param_ext.extensions.back()) {
-              throw_error("TODO: a better error here.", node->source_range);
-            }
-            arg_ext = arg_ext.without_back();
-            param_ext = param_ext.without_back();
-          }
-          auto pointed_to = global_find_type_id(arg_type->get_base(), arg_ext);
-          auto param = params[i];
-          auto alias_id = global_create_type_alias(pointed_to, param->type->base);
-          type_args_aliased.insert(alias_id);
-          assert_types_can_cast_or_equal(pointed_to, alias_id, node->source_range, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
-          info.parameter_types[i] = pointed_to;
-          info.params_len++;
-          params[i]->accept(this);
-          continue;
-        }
-        // !BUG: default parameters evade type checking
-        if (arg_tys.size() <= i) {
-          continue;
-        }
-        info.params_len++;
-        info.parameter_types[i] = int_from_any(func_decl->params->params[i]->accept(this));
-        assert_types_can_cast_or_equal(arg_tys[i], info.parameter_types[i], node->source_range, "invalid argument types. expected: {}, got: {}", std::format("parameter: {} of function: {}", i, node->name.value));
-      }
-      
-      auto return_type_id = node->type = info.return_type = int_from_any(func_decl->return_type->accept(this));
-      
-      auto type_id = global_find_function_type_id(global_get_function_typename(func_decl), info, {});
-      if (std::ranges::find(func_decl->polymorphic_types, type_id) == func_decl->polymorphic_types.end()) {
-        func_decl->polymorphic_types.push_back(type_id);
-      }
-      
-      // erase the aliases we just created to emit this function
-      for (const auto &alias: type_args_aliased) {
-        auto name = global_get_type(alias)->get_base();
-        type_alias_map.erase(name);
-      }
-      
-      return return_type_id;
+      return generate_polymorphic_function(node, func_decl, arg_tys);
     }
   }
 
