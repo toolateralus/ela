@@ -299,7 +299,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
         "invalid parameter declaration; expected: {} got: {}",
         std::format("parameter: {}", node->name));
   }
-  return {};
+  return id;
 }
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
@@ -467,6 +467,10 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
+  if (global_find_type_id(node->value.value, {}) != -1) {
+    throw_error("Invalid identifier: a type exists with that name.", node->source_range);
+  }
+  
   auto symbol = ctx.scope->lookup(node->value.value);
   if (symbol) {
     // if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
@@ -526,9 +530,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 
-int TypeVisitor::generate_polymorphic_function(
-    ASTCall *node, ASTFunctionDeclaration *func_decl,
-    std::vector<int> arg_tys) {
+int TypeVisitor::generate_polymorphic_function(ASTCall *node, ASTFunctionDeclaration *func_decl, std::vector<int> arg_tys) {
   std::unordered_set<int> type_args_aliased;
   FunctionTypeInfo info{};
 
@@ -567,6 +569,7 @@ int TypeVisitor::generate_polymorphic_function(
     if (arg_tys.size() <= i) {
       continue;
     }
+    
     info.params_len++;
     info.parameter_types[i] =
         int_from_any(func_decl->params->params[i]->accept(this));
@@ -576,11 +579,17 @@ int TypeVisitor::generate_polymorphic_function(
         std::format("parameter: {} of function: {}", i, node->name.value));
   }
 
+  for (const auto &param: func_decl->params->params) {
+    if (func_decl->block.is_not_null())
+      func_decl->block.get()->scope->insert(param->name, param->type->resolved_type);
+  }
+
   auto return_type_id = node->type = info.return_type =
       int_from_any(func_decl->return_type->accept(this));
 
   auto type_id = global_find_function_type_id(
       global_get_function_typename(func_decl), info, {});
+      
   if (std::ranges::find(func_decl->polymorphic_types, type_id) ==
       func_decl->polymorphic_types.end()) {
     func_decl->polymorphic_types.push_back(type_id);
@@ -716,6 +725,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   node->type = info->return_type;
   return info->return_type;
 }
+
 std::any TypeVisitor::visit(ASTArguments *node) {
   std::vector<int> argument_types;
   for (auto arg : node->arguments) {

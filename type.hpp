@@ -258,7 +258,6 @@ struct StructTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
-
 Type *global_get_type(const int id);
 
 int global_create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
@@ -321,6 +320,21 @@ int global_create_type_alias(int aliased_type, const std::string &name);
 
 struct Type {
   const int id = invalid_id;
+
+  // if this is an alias or something just get the actual real true type.
+  int get_true_type() {
+    auto base_no_ext = global_find_type_id(get_base(), {});
+    auto base_type = global_get_type(base_no_ext);
+    Type* type = (Type*)this;
+    while (type && type->is_alias || base_type->is_alias) {
+      base_type = global_get_type(base_type->alias_id);
+      auto old_ext = base_type->get_ext().append(get_ext_no_compound());
+      auto new_id = global_find_type_id(base_type->get_base(), old_ext);
+      type = global_get_type(new_id);
+    }
+    return type->id;
+  }
+
 
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
@@ -394,12 +408,13 @@ struct Type {
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
   std::string to_cpp_string() const;
-  std::string to_type_struct(Context &context);
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;
   constexpr static int invalid_id = -1;
 };
+
+std::string to_type_struct(Type *type, Context& context);
 
 struct ASTFunctionDeclaration;
 std::string global_get_function_typename(ASTFunctionDeclaration *);

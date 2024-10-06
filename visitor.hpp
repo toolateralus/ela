@@ -155,17 +155,19 @@ struct EmitVisitor : VisitorBase {
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
   inline void space() { (*ss) << ' '; }
-
+  void interpolate_string(ASTLiteral* node);
   void emit_local_function(ASTFunctionDeclaration *node);
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
+  void cast_pointers_implicit(ASTDeclaration *&node);
+  
+  
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-  void cast_pointers_implicit(ASTDeclaration *&node);
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
   std ::any visit(ASTBinExpr *node) override;

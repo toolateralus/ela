@@ -1,0 +1,29 @@
+#import core;
+
+/* 
+  !Error:
+  ?        Cannot assign a variable of type 'void'
+  --------------------------------------------------------------------------------
+  ? /home/josh/source/c++/ela/source/dummy.ela:11:1
+  --------------------------------------------------------------------------------
+  ? >> i := add ( 1 , 2 )  << 
+*/
+
+/* 
+* we need to make the overload system and the polymorphic function call system use the same machinery
+* otherwise the overloaded functions will always take precedence over polymorphic procedures.
+*/
+
+add :: ($T a, b) -> $T {
+  return a + b;
+}
+
+add :: (int a, b) {
+  
+}
+
+main :: ()  {
+  i := add(1, 2);
+  f := add(1.0, 12.0);
+  printf("%d,\n%f\n", i, f);
+}

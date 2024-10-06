@@ -1,0 +1,6 @@
+
+main :: () {
+  Type *int = #type int;
+  
+  
+}

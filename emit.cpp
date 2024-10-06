@@ -4,7 +4,6 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
-#include <cstdlib>
 #include <functional>
 #include <jstl/containers/vector.hpp>
 #include <sstream>
@@ -145,7 +144,7 @@ std::any EmitVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
-    (*ss) << global_get_type(pointed_to_ty)->to_type_struct(ctx);
+    (*ss) << to_type_struct(global_get_type(pointed_to_ty), ctx);
     return {};
   }
 
@@ -160,19 +159,16 @@ std::any EmitVisitor::visit(ASTCall *node) {
   return {};
 }
 
-std::any EmitVisitor::visit(ASTLiteral *node) {
-  if (node->tag == ASTLiteral::InterpolatedString) {
+void EmitVisitor::interpolate_string(ASTLiteral* node) {
+  
     if (node->value.empty()) {
       throw_warning(
           "using an empty interpolated string causes memory leaks right now.",
           node->source_range);
       (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
-      return {};
+      return;
     }
     if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
-      // TODO: fix this restriction. Really, instead of defining strlen and
-      // sprintf in core, we can just define them in the runtime and have
-      // definitions implemented by the compiler in the type and symbol systems.
       throw_error("You must '#import core' before you use interpolated strings "
                   "temporarily, due to a dependency on sprintf.",
                   node->source_range);
@@ -182,8 +178,6 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     auto get_format_str = [&](int type_id) {
       auto type = global_get_type(type_id);
 
-      // We assume that if we get this far with compiling this interpolated
-      // string, then we've already asserted that this struct has a to_string();
       if (type->is_kind(TYPE_STRUCT)) {
         return "%s";
       }
@@ -230,7 +224,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
       std::string format_specifier = get_format_str(type_id);
       replace_next_brace_pair(node->value, format_specifier);
     }
-    (*ss) << "[&] { char* buf = new char[1024];\nsprintf(buf, \"" << node->value
+    (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << node->value
           << "\",";
     for (const auto &value : node->interpolated_values) {
       auto type_id = std::any_cast<int>(value->accept(&type_visitor));
@@ -253,27 +247,43 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     }
     (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
              "strlen(buf); return str; }()";
-    return {};
-  } else if (node->tag == ASTLiteral::Null) {
-    (*ss) << "nullptr";
-  } else if (node->tag == ASTLiteral::String) {
-    (*ss) << std::format("\"{}\"", node->value);
-  } else if (node->tag == ASTLiteral::RawString) {
-    // TODO: search for a pattern '__()__' for example, that doesn't exist at
-    // all in the string. we can generate this based on the state of the string.
-    (*ss) << std::format("R\"__({})__\"", node->value);
-  } else if (node->tag == ASTLiteral::Float) {
-    if (std::any_cast<int>(node->accept(&type_visitor)) != float64_type()) {
-      (*ss) << node->value << "f";
-    } else {
-      (*ss) << node->value;
-    }
+}
 
-  } else if (node->tag == ASTLiteral::Char) {
-    (*ss) << '\'' << std::atoi(node->value.c_str()) << '\'';
-  } else {
-    (*ss) << node->value;
+std::any EmitVisitor::visit(ASTLiteral *node) {
+  auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))->to_string();
+  std::string output;
+  switch (node->tag) {
+  case ASTLiteral::InterpolatedString: {
+    interpolate_string(node);
+    return {};
   }
+  case ASTLiteral::Null:
+    (*ss) << "(std::nullptr_t)nullptr";
+    return {};
+  case ASTLiteral::String:
+    output = std::format("\"{}\"", node->value);
+    break;
+  case ASTLiteral::RawString:
+    output = std::format("R\"__({})__\"", node->value);
+    break;
+  case ASTLiteral::Float:
+    if (std::any_cast<int>(node->accept(&type_visitor)) != float64_type()) {
+      output = node->value + "f";
+    } else {
+      output = node->value;
+    }
+    break;
+  case ASTLiteral::Char:
+    output = '\'' + std::to_string(std::atoi(node->value.c_str())) + '\'';
+    break;
+  case ASTLiteral::Integer:
+    output = node->value;
+    break;
+  case ASTLiteral::Bool:
+    output = node->value;
+    break;
+  }
+  (*ss) << '(' << type << ')' << output;
   return {};
 }
 
@@ -497,6 +507,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
+    
     // local function
     if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope &&
         (node->flags & FUNCTION_IS_METHOD) == 0) {
@@ -630,6 +641,11 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
           param->accept(&type_visitor);
         }
       }
+      
+      if (node->has_polymorphic_return_type) {
+        type_alias_map[node->return_type->base] = fun_info->return_type;
+      }
+      
       // emit the new function
       emit_various_function_declarations();
       
@@ -639,6 +655,11 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
           type_alias_map.erase(node->params->params[i]->type->base);
         }
       }
+      
+      if (node->has_polymorphic_return_type) {
+        type_alias_map.erase(node->return_type->base);
+      }
+      
     }
   } else {
     emit_various_function_declarations();
@@ -708,11 +729,11 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   {
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
-      type_info << str;
-      if (str != ctx.type_info_strings.back()) {
-        type_info << ", ";
-      }
+      printf("\e[1;13m%s\n", str.c_str());
+      type_info << str << ";\n";
     }
+    printf("\e[1;33m%s\n", type_info.str().c_str());
+    
     header << std::format("static Type** _type_info = []{{ Type **_type_info = "
                           "new Type*[{}]; {}; return _type_info; }}();",
                           num_types, type_info.str());

@@ -37,7 +37,6 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
     return type_alias_map[name];
   }
   
-
   auto aliased = global_get_type(aliased_type);
   auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
   type_table[num_types] = type;
@@ -45,13 +44,10 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   type->set_info(aliased->get_info());
   type->is_alias = true;
   type->alias_id = aliased_type;
-
   num_types++;
   type_alias_map[name] = type->id;
-
   aliased->has_aliases = true;
   aliased->aliases.push_back(type->id);
-  
   return type->id;
 }
 int global_find_function_type_id(const std::string &name,
@@ -341,26 +337,56 @@ std::string Type::to_cpp_string() const {
   }
 }
 
+std::string Type::to_string() const {
+  auto base_no_ext = global_find_type_id(get_base(), {});
+  auto base_type = global_get_type(base_no_ext);
+  
+  Type* type = (Type*)this;
+  if (type->is_alias || base_type->is_alias) {
+    base_type = global_get_type(base_type->alias_id);
+    auto old_ext = base_type->get_ext().append(get_ext_no_compound());
+    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
+    type = global_get_type(new_id);
+  }
+  
+  switch (kind) {
+  case TYPE_STRUCT:
+  case TYPE_SCALAR:
+    return type->base + type->extensions.to_string();
+  case TYPE_FUNCTION:
+    return type->info->to_string() + type->extensions.to_string();
+    break;
+  case TYPE_ENUM: {
+    return type->base;
+  }
+  case TYPE_UNION:
+    return type->base;
+  }
+}
+
 // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
 // This should be in the emit visitor not here.
-std::string Type::to_type_struct(Context &context) {
+std::string to_type_struct(Type* type, Context &context) {
+  auto id = type->get_true_type();
+  type = global_get_type(id);
+  
   static bool *type_cache = [] {
     auto arr = new bool[MAX_NUM_TYPES];
     memset(arr, false, MAX_NUM_TYPES);
     return arr;
   }();
 
-  if (type_cache[this->id]) {
-    return std::format("_type_info[{}]", this->id);
+  if (type_cache[id]) {
+    return std::format("_type_info[{}]", id);
   }
 
   std::stringstream fields_ss;
-  if (kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(this->get_info());
+  if (type->kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(type->get_info());
 
     if (info->scope->symbols.empty()) {
       fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << to_string() << "\","
+                << ".name = \"" << type->to_string() << "\","
                 << ".id = " << id << "}";
       context.type_info_strings.push_back(fields_ss.str());
       return std::string("_type_info[") + std::to_string(id) + "]";
@@ -379,7 +405,7 @@ std::string Type::to_type_struct(Context &context) {
       }
 
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                << std::format(".type = {}", t->to_type_struct(context))
+                << std::format(".type = {}", to_type_struct(t, context))
                 << " }";
       ++it;
       if (it < count) {
@@ -388,26 +414,22 @@ std::string Type::to_type_struct(Context &context) {
     }
     fields_ss << "}";
   } else {
-
-    // new Type { .id = id,
-    // .name = "name"
-    // }
-
     fields_ss << "_type_info[" << id << "] = new Type {"
               << ".id = " << id << ",\n"
-              << ".name = \"" << to_string() << "\"}";
+              << ".name = \"" << type->to_string() << "\"}";
 
     context.type_info_strings.push_back(fields_ss.str());
     return std::string("_type_info[") + std::to_string(id) + "]";
   }
 
-  type_cache[this->id] = true;
-
+  
+  type_cache[id] = true;
+  
   context.type_info_strings.push_back(std::format(
-      "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }}",
-      id, id, to_string(), fields_ss.str()));
+      "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }};",
+      id, id, type->to_string(), fields_ss.str()));
 
-  return std::format("_type_info[{}]", this->id);
+  return std::format("_type_info[{}]", id);
 }
 
 
@@ -811,18 +833,3 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   return from_info->size <= to_info->size;
 }
 
-std::string Type::to_string() const {
-  switch (kind) {
-  case TYPE_STRUCT:
-  case TYPE_SCALAR:
-    return base + extensions.to_string();
-  case TYPE_FUNCTION:
-    return info->to_string() + extensions.to_string();
-    break;
-  case TYPE_ENUM: {
-    return base;
-  }
-  case TYPE_UNION:
-    return base;
-  }
-}
