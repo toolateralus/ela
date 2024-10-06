@@ -88,7 +88,9 @@ std::any EmitVisitor::visit(ASTFor *node) {
     space();
     v.increment->accept(this);
   };
-
+  
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
   switch (node->tag) {
   case ASTFor::RangeBased:
@@ -100,6 +102,7 @@ std::any EmitVisitor::visit(ASTFor *node) {
   }
   (*ss) << ")";
   node->block->accept(this);
+  ctx.set_scope(old_scope);
   return {};
 }
 
@@ -301,9 +304,14 @@ std::any EmitVisitor::visit(ASTIdentifier *node) {
 }
 
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
-  (*ss) << '(' << node->op.value;
+  if (node->op.type == TType::Sub) {
+    auto type = global_get_type(std::any_cast<int>(node->operand->accept(&type_visitor)))->to_string();
+    (*ss) << '(' << type << ')';
+  }
+  // (*ss) << '(' << node->op.value;
+  (*ss) << node->op.value;
   node->operand->accept(this);
-  (*ss) << ")";
+  // (*ss) << ")";
   return {};
 }
 
@@ -682,9 +690,9 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     return {};
   }
 
-  // emit a bunch of polymorphic funcz
+  // emit a bunch of generic funcz
   if ((node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
-    auto variants = node->polymorphic_types;
+    auto variants = node->generic_types;
     for (const auto variant : variants) {
       auto variant_fun_ty = global_get_type(variant);
       auto fun_info =
@@ -698,13 +706,13 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
         }
       }
 
-      if (node->has_polymorphic_return_type) {
+      if (node->has_generic_return_type) {
         type_alias_map[node->return_type->base] = fun_info->return_type;
       }
 
-      type_visitor.ignore_polymorphic_functions = false;
+      type_visitor.ignore_generic_functions = false;
       node->accept(&type_visitor);
-      type_visitor.ignore_polymorphic_functions = true;
+      type_visitor.ignore_generic_functions = true;
 
       // emit the new function
       emit_various_function_declarations();
@@ -716,7 +724,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
         }
       }
 
-      if (node->has_polymorphic_return_type) {
+      if (node->has_generic_return_type) {
         type_alias_map.erase(node->return_type->base);
       }
     }
@@ -1170,7 +1178,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   case TYPE_STRUCT:
     return to_cpp_string(type->get_ext(), type->get_base());
   case TYPE_FUNCTION: {
-    if (!type->get_ext().has_no_extensions()) {
+    if (type->get_ext().has_extensions()) {
       return to_cpp_string(type->get_ext(), type->get_base());
     }
     auto info = static_cast<FunctionTypeInfo *>(type->get_info());

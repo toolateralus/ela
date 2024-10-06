@@ -208,8 +208,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   // if the type extensions are equal, return the conversion rule for the bases.
   // this allows int[] to cast to s8[] etc;
-  if (!from->get_ext().has_no_extensions() &&
-      !to->get_ext().has_no_extensions() &&
+  if (from->get_ext().has_extensions() &&
+      to->get_ext().has_extensions() &&
       from->get_ext().extensions.back() == to->get_ext().extensions.back()) {
     auto from_base = global_get_type(global_find_type_id(from->get_base(), from->get_ext().without_back()));
     auto to_base = global_get_type(global_find_type_id(to->get_base(), to->get_ext().without_back()));
@@ -259,30 +259,12 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 
 bool Type::equals(const std::string &name, const TypeExt &type_extensions,
                   std::unordered_set<const Type *> &visited) const {
-  if (visited.contains(this)) {
+  auto id = get_true_type();
+  auto type = global_get_type(id);
+  if (type->get_base() != name)
     return false;
-  }
-  visited.insert(this);
-
-  if (has_aliases) {
-    for (const auto &alias : aliases) {
-      auto alias_ty = global_get_type(alias);
-      if (alias_ty->equals(name, type_extensions, visited)) {
-        return true;
-      }
-    }
-  }
-
-  if (is_alias) {
-    auto alias_ty = global_get_type(alias_id);
-    if (alias_ty->equals(name, type_extensions, visited)) {
-      return true;
-    }
-  }
-
-  if (get_base() != name)
-    return false;
-  return type_extensions == this->get_ext();
+  
+  return type_extensions == type->get_ext();
 }
 
 bool TypeExt::equals(const TypeExt &other) const {

@@ -1,15 +1,9 @@
 #import core;
-something :: struct {
-  int n = 1;
-  method :: () -> int {
-    if n || n {
-      printf("hi\n");
-    }
-    return n;
-  }
+
+Array :: struct ($T, int N) {
+  T[N] values;
 }
 
 main :: () {
-  something s;
-  s.method();
+  Array<int, 10>;
 }

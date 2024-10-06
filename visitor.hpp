@@ -53,7 +53,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  bool ignore_polymorphic_functions = true;
+  bool ignore_generic_functions = true;
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
   
@@ -97,7 +97,7 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
-  int generate_polymorphic_function(ASTCall *node,
+  int generate_generic_function(ASTCall *node,
                                     ASTFunctionDeclaration *func_decl,
                                     std::vector<int> arg_tys);
 };

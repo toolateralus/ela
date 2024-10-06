@@ -133,6 +133,9 @@ struct TypeExt {
   inline bool has_no_extensions() const {
     return extensions.size() == 0 && array_sizes.size() == 0;
   }
+  inline bool has_extensions() const {
+    return !has_no_extensions();
+  }
   TypeExt append(const TypeExt& to_append) const {
     auto these = *this;
     int sizes_i = 0;
@@ -195,7 +198,7 @@ struct FunctionTypeInfo : TypeInfo {
   int default_params = 0; // number of default params, always trailing.
   bool is_varargs = false;
 
-  bool is_polymorphic = false;
+  bool is_generic = false;
 
   // defined in cpp file
   virtual std::string to_string() const override;
@@ -290,8 +293,13 @@ struct Type {
   const int id = invalid_id;
 
   // if this is an alias or something just get the actual real true type.
-  int get_true_type() {
-    auto base_no_ext = global_find_type_id(get_base(), {});
+  int get_true_type() const {
+    auto base_no_ext = id;
+    
+    if (extensions.has_extensions()) {
+      base_no_ext = global_find_type_id(get_base(), {});
+    }
+    
     auto base_type = global_get_type(base_no_ext);
     Type* type = (Type*)this;
     while (type && type->is_alias || base_type->is_alias) {

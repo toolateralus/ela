@@ -13,7 +13,6 @@
 #include <set>
 #include <unordered_set>
 
-
 // CLEANUP(Josh) 10/2/2024, 9:22:21 AM
 // Reduce this code size. It ends up taking up the majority of the parsing code.
 // Eventually, the ones that are really solid and used frequently could be
@@ -430,9 +429,10 @@ void Parser::init_directive_routines() {
            auto func_decl =
                parser->parse_function_declaration(get_unique_identifier());
 
-            if (op.is_comp_assign() || op.type == TType::Increment || op.type == TType::Decrement) {
-              func_decl->flags |= FUNCTION_IS_MUTATING;
-            }
+           if (op.is_comp_assign() || op.type == TType::Increment ||
+               op.type == TType::Decrement) {
+             func_decl->flags |= FUNCTION_IS_MUTATING;
+           }
 
            func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
 
@@ -772,12 +772,12 @@ ASTDeclaration *Parser::parse_declaration() {
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
   decl->type = parse_type();
   auto iden = eat();
-  
+
   if (global_find_type_id(iden.value, {}) != -1) {
     end_node(nullptr, range);
     throw_error("Invalid identifier: a type exists with that name,", range);
   }
-  
+
   decl->name = iden;
   if (peek().type == TType::Assign) {
     eat();
@@ -843,22 +843,21 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   function->name = name;
 
-
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
   } else {
     expect(TType::Arrow);
-    // polymorphic return type, -> $T
+    // generic return type, -> $T
     if (peek().type == TType::Dollar) {
-      function->has_polymorphic_return_type = true;
+      function->has_generic_return_type = true;
       if ((function->flags & FUNCTION_IS_POLYMORPHIC) == 0) {
         end_node(function, range);
-        throw_error("You can't have a polymorphic return type without "
-                    "polymorphic parameter types currently.",
+        throw_error("You can't have a generic return type without "
+                    "generic parameter types currently.",
                     function->source_range);
       }
       eat();
-    } 
+    }
     function->return_type = parse_type();
   }
 
@@ -869,13 +868,13 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   function->block = parse_block();
-  
+
   if ((function->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
     for (const auto &param : function->params->params) {
       type_alias_map.erase(param->type->base);
     }
   }
-  
+
   end_node(function, range);
   current_func_decl = last_func_decl;
   return function;
@@ -1017,7 +1016,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
-  
+
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
@@ -1153,7 +1152,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->right = right;
     binexpr->op = op;
     binexpr->m_is_const_expr = left->is_constexpr() && right->is_constexpr();
-    
+
     if (op.type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (auto alloc = dynamic_cast<ASTAllocate *>(right)) {
@@ -1161,7 +1160,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         insert_allocation(alloc, symbol, ctx.scope);
       }
     }
-    
+
     left = binexpr;
   }
   end_node(left, range);
@@ -1542,4 +1541,6 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
   }
 }
 
-bool ASTExpr::is_constexpr() const { return dynamic_cast<const ASTLiteral *>(this) || m_is_const_expr; }
+bool ASTExpr::is_constexpr() const {
+  return dynamic_cast<const ASTLiteral *>(this) || m_is_const_expr;
+}

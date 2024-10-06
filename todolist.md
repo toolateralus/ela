@@ -34,7 +34,7 @@ Add a offsetof() or #offset() or something like that
 
 - **Add union types, with an optional tagged union.**
 - **Add a way to use initializer lists with fixed arrays.**
-- **Add polymorphic functions & types.**
+- **Add generic functions & types.**
 - **Add the ability to cast initializer lists to an appropriate struct type, implicitly.**
   - Example: `func :: (Vec2 ..) {}` and `func({0, 0});`
 - **Fix casting bug where we can't cast an initializer list of float literals (float32) to `float[]`.**
@@ -60,7 +60,7 @@ Add a offsetof() or #offset() or something like that
   - Ranges, slicing. `0..10, 0..len+1, arr[0..5]`;
   - constexpr stuff. `#const some_expression := 100 * 2` , or just a bitcode interpreter for ctfe.
   - Compile time reflection
-  - polymorphic types. Like C++ templates, but less obnoxious.
+  - generic types. Like C++ templates, but less obnoxious.
   
 ## stuff that needs work now
 - `#make` needs a ton of work, and it should not be the only way to construct objects.
@@ -70,7 +70,7 @@ Add a offsetof() or #offset() or something like that
 
 **the entire compiler backend should get a cleanup pass all over. lot's of bloated code that's not neccesary**
   We should define a better structure and focus on certain phases at a time. If we have deferred symbol resolution later,
-  this would cleanup that process a lot, same with generics or polymorphic functions etc.
+  this would cleanup that process a lot, same with generics or generic functions etc.
   
 ## Typing:
 - Right now any single depth pointer can cast to any pointer of equal depth. This resembes C's weak typing and is highly undesirable.

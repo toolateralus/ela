@@ -862,3 +862,16 @@ InitListStruct :: struct {
   int n = 1_000_000;
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }
+
+generic_a :: ($T a, $T b) -> $T {
+  return a + b;
+}
+
+// !BUG
+// Calling a generic function twice with the same types causes a redefinition
+#test test_generic_functions :: () {
+  //assert("generic function failed to return a + b", generic_a(1, 1) == 2);
+  assert("generic function failed to return a + b", generic_a(1, 1) == 2);
+  assert("generic function failed to return a + b", generic_a(-1, -1) == -2);
+  assert("generic function failed to return a + b", generic_a(1.5, 1.5) == 3.0);
+}

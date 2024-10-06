@@ -168,14 +168,14 @@ struct ASTParamsDecl : ASTStatement {
 
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
-  bool has_polymorphic_return_type = false;
   // extern, normal etc.
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
   Token name;
   ASTType *return_type;
-  std::vector<int> polymorphic_types;
+  bool has_generic_return_type = false;
+  std::vector<int> generic_types;
   std::any accept(VisitorBase *visitor) override;
 };
 

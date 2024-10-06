@@ -10,8 +10,8 @@
 */
 
 /* 
-* we need to make the overload system and the polymorphic function call system use the same machinery
-* otherwise the overloaded functions will always take precedence over polymorphic procedures.
+* we need to make the overload system and the generic function call system use the same machinery
+* otherwise the overloaded functions will always take precedence over generic procedures.
 */
 
 add :: ($T a, b) -> $T {

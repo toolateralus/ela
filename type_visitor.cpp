@@ -66,7 +66,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     }
     return declaring_type;
   }
-  if (!type->get_ext().has_no_extensions()) {
+  if (type->get_ext().has_extensions()) {
     throw_error("Unable to construct type from initializer list",
                 node->source_range);
   }
@@ -141,7 +141,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     node->flags |= FUNCTION_IS_METHOD;
   }
   
-  if (ignore_polymorphic_functions &&
+  if (ignore_generic_functions &&
       (node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
     return {};
   }
@@ -555,7 +555,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 
-int TypeVisitor::generate_polymorphic_function(
+int TypeVisitor::generate_generic_function(
     ASTCall *node, ASTFunctionDeclaration *func_decl,
     std::vector<int> arg_tys) {
   std::unordered_set<int> type_args_aliased;
@@ -613,14 +613,15 @@ int TypeVisitor::generate_polymorphic_function(
   }
 
   auto return_type_id = node->type = info.return_type =
-      int_from_any(func_decl->return_type->accept(this));
+      global_get_type(int_from_any(func_decl->return_type->accept(this)))->get_true_type();
 
   auto type_id = global_find_function_type_id(
       global_get_function_typename(func_decl), info, {});
 
-  if (std::ranges::find(func_decl->polymorphic_types, type_id) ==
-      func_decl->polymorphic_types.end()) {
-    func_decl->polymorphic_types.push_back(type_id);
+  if (std::ranges::find(func_decl->generic_types, type_id) ==
+      func_decl->generic_types.end()) {
+    printf("Generating a new generic function id=%d %s\n", type_id, global_get_type(type_id)->to_string().c_str());
+    func_decl->generic_types.push_back(type_id);
   }
 
   // erase the aliases we just created to emit this function
@@ -709,11 +710,10 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   Type *type = global_get_type(symbol->type_id);
 
-  if (!type && symbol->declaring_node.is_not_null()) {
-    auto func_decl =
-        dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+  if (symbol->declaring_node.is_not_null()) {
+    auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     if (func_decl && (func_decl->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
-      return generate_polymorphic_function(node, func_decl, arg_tys);
+      return generate_generic_function(node, func_decl, arg_tys);
     }
   }
 
@@ -721,6 +721,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   // Find a suitable function overload to call.
   find_function_overload(node, symbol, arg_tys, type);
+  
   auto info = dynamic_cast<FunctionTypeInfo *>(type->get_info());
 
   if (!type || !info) {
@@ -1132,7 +1133,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
 
       auto type = global_get_type(id);
 
-      if (!type->is_kind(TYPE_SCALAR) || !type->get_ext().has_no_extensions()) {
+      if (!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions()) {
         throw_error("Cannot have non integral types in enums got: " +
                         type->to_string(),
                     node->source_range);
