@@ -434,6 +434,10 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
+  if (node->op.type == TType::Increment || node->op.type == TType::Decrement || node->op.type == TType::And || node->op.type == TType::Mul) {
+    report_mutated_if_iden(node->operand);
+  }
+
   if (node->op.type == TType::And) {
     auto ty = global_get_type(operand_ty);
     auto extensions = ty->get_ext();
@@ -443,11 +447,6 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   if (node->op.type == TType::Mul) {
     return remove_one_pointer_ext(operand_ty, node->source_range);
-  }
-
-
-  if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
-    report_mutated_if_iden(node->operand);
   }
 
   auto left_ty = global_get_type(operand_ty);

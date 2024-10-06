@@ -1,12 +1,15 @@
-
+#import core;
 something :: struct {
-  int n;
+  int n = 1;
   method :: () -> int {
-    n += 1;
+    if n || n {
+      printf("hi\n");
+    }
     return n;
   }
 }
 
 main :: () {
-  
+  something s;
+  s.method();
 }
