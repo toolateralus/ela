@@ -4,6 +4,7 @@
 #include <jstl/memory/arena.hpp>
 #include <string>
 #include <unordered_map>
+#include <variant>
 
 
 extern jstl::Arena scope_arena;
@@ -23,6 +24,8 @@ struct Symbol {
   Nullable<ASTNode> declaring_node;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
+
+
 
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
@@ -49,6 +52,15 @@ struct Scope {
   void insert(const std::string &name, int type_id,
               int flags = SYMBOL_IS_VARIABLE);
   Symbol *lookup(const std::string &name);
+  
+  // TODO: this is probably bad because it will allocate even if it saves on hashing.
+  Symbol *local_lookup(const std::string &name) {
+    if (symbols.contains(name)) {
+      return &symbols[name];
+    }
+    return nullptr;
+  }
+  
   void erase(const std::string &name);
   
   std::vector<int> aliases;

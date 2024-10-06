@@ -782,7 +782,7 @@ ASTDeclaration *Parser::parse_declaration() {
   }
 
   end_node(decl, range);
-  if (ctx.scope->lookup(iden.value)) {
+  if (ctx.scope->local_lookup(iden.value)) {
     throw_error(std::format("re-definition of '{}'", iden.value),
                 decl->source_range);
   }
@@ -813,6 +813,7 @@ ASTBlock *Parser::parse_block() {
   end_node(block, range);
   return block;
 }
+
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
@@ -862,6 +863,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   current_func_decl = last_func_decl;
   return function;
 }
+
 ASTParamsDecl *Parser::parse_parameters() {
   auto range = begin_node();
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
@@ -1113,6 +1115,10 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         peek().type == TType::ColonEquals) {
       auto iden = dynamic_cast<ASTIdentifier *>(left);
       if (iden) {
+        if (ctx.scope->local_lookup(iden->value.value)) {
+          end_node(nullptr, range);
+          throw_error("redefinition of a variable.", range);
+        }
         ctx.scope->insert(iden->value.value, -1);
       }
     }
