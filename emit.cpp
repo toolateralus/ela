@@ -363,13 +363,52 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
-  if ((symbol->flags & SYMBOL_WAS_MUTATED) == 0 && !ctx.scope->is_struct_or_union_scope) {
-    (*ss) << "constexpr ";
+  if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
+      !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
+    // (*ss) << "const ";
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    auto type_str = type->get_ext().to_string();
-    (*ss) << type->get_base() << ' ' << node->name.value << type_str;
+    {
+      std::stringstream tss;
+      std::vector<Nullable<ASTExpr>> array_sizes = type->get_ext().array_sizes;
+      tss << type->get_base();
+      
+      if (!type->get_ext().is_fixed_sized_array()) {
+        tss << node->name.value << ' ';
+      }
+      
+      bool emitted_iden = false;
+      for (const auto ext : type->get_ext().extensions) {
+        if (ext == TYPE_EXT_ARRAY) {
+          auto size = array_sizes.back();
+          array_sizes.pop_back();
+          if (size.is_null()) {
+            std::string current = tss.str();
+            tss.str("");
+            tss.clear();
+            tss << "_array<" << current << ">";
+          } else {
+            auto old = this->ss;
+            this->ss = &tss;
+            if (!emitted_iden) {
+              emitted_iden = true;
+              tss << ' ' << node->name.value;
+            }
+            tss << "[";
+            size.get()->accept(this);
+            tss << "]";
+            this->ss = old;
+          }
+        }
+        if (ext == TYPE_EXT_POINTER) {
+          tss << "*";
+        }
+      }
+      printf("%s\n", tss.str().c_str());
+      (*ss) << tss.str();
+    }
+
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
@@ -1017,7 +1056,7 @@ bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
 }
 
 std::string EmitVisitor::to_cpp_string(const TypeExt &ext,
-                                              const std::string &base) {
+                                       const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = ext.array_sizes;
   std::stringstream ss;
   ss << base;

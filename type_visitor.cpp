@@ -389,8 +389,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   }
 
   if (node->op.type == TType::Assign) {
-    auto iden = dynamic_cast<ASTIdentifier*>(node->left);
-    ctx.scope->report_symbol_mutated(iden->value.value);
+    report_mutated_if_iden(node->left);
   }
 
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have their
@@ -1152,4 +1151,14 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
 
   auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
+}
+
+void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
+  if (auto iden = dynamic_cast<ASTIdentifier *>(node)) {
+    ctx.scope->report_symbol_mutated(iden->value.value);
+  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
+    report_mutated_if_iden(dot->left);
+  } else if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
+    report_mutated_if_iden(subscript->left);
+  }
 }

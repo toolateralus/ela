@@ -56,6 +56,9 @@ struct TypeVisitor : VisitorBase {
   bool ignore_polymorphic_functions = true;
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
+  
+  void report_mutated_if_iden(ASTExpr *node);
+  
   TypeVisitor(Context &context) : ctx(context) {}
   Context &ctx;
   std::string getIndent();
@@ -100,7 +103,8 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
-
+  
+  
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;

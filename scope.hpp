@@ -24,12 +24,17 @@ struct Symbol {
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
 
+
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
 
   void report_symbol_mutated(const std::string &name) {
-    symbols[name].flags |= SYMBOL_WAS_MUTATED;
+    if (symbols.contains(name))
+      symbols[name].flags |= SYMBOL_WAS_MUTATED;
+    else if (parent) {
+      parent->report_symbol_mutated(name);
+    }
   }
 
   bool is_struct_or_union_scope = false;
