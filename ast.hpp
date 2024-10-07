@@ -70,11 +70,11 @@ struct ASTNode {
   SourceRange source_range{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
-  virtual ASTNodeType get_node_type() = 0;
+  virtual ASTNodeType get_node_type() const = 0;
 };
 
 struct ASTStatement : ASTNode {
-  virtual ASTNodeType get_node_type() = 0;
+  virtual ASTNodeType get_node_type() const = 0;
 };
 
 enum BlockFlags {
@@ -108,7 +108,7 @@ struct ASTBlock : ASTStatement {
   Scope *scope;
   std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_BLOCK;
   }
 };
@@ -116,7 +116,7 @@ struct ASTBlock : ASTStatement {
 struct ASTProgram : ASTNode {
   std::vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_PROGRAM;
   }
 };
@@ -124,7 +124,7 @@ struct ASTProgram : ASTNode {
 struct ASTExpr : ASTNode {
   bool m_is_const_expr = false;
   bool is_constexpr() const;
-  virtual ASTNodeType get_node_type() = 0;
+  virtual ASTNodeType get_node_type() const = 0;
 };
 
 struct ASTType : ASTExpr {
@@ -136,7 +136,7 @@ struct ASTType : ASTExpr {
   Nullable<ASTExpr> pointing_to;
   int flags = -1;
   
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_TYPE;
   }
   static ASTType *get_void() {
@@ -154,7 +154,7 @@ struct ASTType : ASTExpr {
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_EXPR_STATEMENT;
   }
 };
@@ -165,7 +165,7 @@ struct ASTDeclaration : ASTStatement {
   ASTType *type;
   Nullable<ASTExpr> value;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_DECLARATION;
   }
 };
@@ -175,7 +175,7 @@ struct ASTBinExpr : ASTExpr {
   Token op;
   int resolved_type;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_BIN_EXPR;
   }
 };
@@ -183,14 +183,14 @@ struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_UNARY_EXPR;
   }
 };
 struct ASTIdentifier : ASTExpr {
   Token value;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_IDENTIFIER;
   }
 };
@@ -208,7 +208,7 @@ struct ASTLiteral : ASTExpr {
   std::vector<ASTExpr*> interpolated_values {};
   std::string value;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_LITERAL;
   }
 };
@@ -220,7 +220,7 @@ struct ASTParamDecl : ASTNode {
   std::string name;
   bool is_type_param = false;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_PARAM_DECL;
   }
 };
@@ -228,7 +228,7 @@ struct ASTParamDecl : ASTNode {
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_PARAMS_DECL;
   }
 };
@@ -244,7 +244,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   bool has_generic_return_type = false;
   std::vector<int> generic_types;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_FUNCTION_DECLARATION;
   }
 };
@@ -252,7 +252,7 @@ struct ASTFunctionDeclaration : ASTStatement {
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_ARGUMENTS;
   }
 };
@@ -270,7 +270,7 @@ struct ASTMake : ASTExpr {
   ASTType *type_arg;
   ASTArguments *arguments;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_MAKE;
   }
 };
@@ -279,7 +279,7 @@ struct ASTCall : ASTExpr {
   ASTArguments *arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_CALL;
   }
 };
@@ -288,7 +288,7 @@ struct ASTDotExpr : ASTExpr {
   ASTExpr *right;
   ASTType *type;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_DOT_EXPR;
   }
 };
@@ -300,19 +300,19 @@ struct ASTDotExpr : ASTExpr {
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_RETURN;
   }
 };
 struct ASTBreak : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_BREAK;
   }
 };
 struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_CONTINUE;
   }
 };
@@ -345,7 +345,7 @@ struct ASTFor : ASTStatement {
   ASTBlock *block;
 
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_FOR;
   }
 };
@@ -356,7 +356,7 @@ struct ASTIf : ASTStatement {
   ASTBlock *block;
   Nullable<ASTElse> _else; // just an else.
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_IF;
   }
 };
@@ -365,7 +365,7 @@ struct ASTElse : ASTStatement {
   Nullable<ASTIf> _if; // conditional else.
   Nullable<ASTBlock> block;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_ELSE;
   }
 };
@@ -374,7 +374,7 @@ struct ASTWhile : ASTStatement {
   Nullable<ASTExpr> condition;
   ASTBlock *block;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_WHILE;
   }
 };
@@ -383,7 +383,7 @@ struct ASTSubscript : ASTExpr {
   ASTExpr *left;
   ASTExpr *subscript;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_SUBSCRIPT;
   }
 };
@@ -409,7 +409,7 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::any accept(VisitorBase *visitor) override;
   
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_STRUCT_DECLARATION;
   }
 };
@@ -419,7 +419,7 @@ struct ASTInitializerList : ASTExpr {
   std::vector<int> types;
   std::vector<ASTExpr*> expressions;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_INITIALIZER_LIST;
   }
 };
@@ -430,7 +430,7 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTType* type;
   std::vector<std::pair<std::string, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_ENUM_DECLARATION;
   }
 };
@@ -444,7 +444,7 @@ struct ASTUnionDeclaration : ASTStatement {
   std::vector<ASTFunctionDeclaration*> methods;
   std::vector<ASTStructDeclaration*> structs;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_UNION_DECLARATION;
   }
 };
@@ -458,7 +458,7 @@ struct ASTAllocate : ASTExpr {
     Delete,
   } kind;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_ALLOCATE;
   }
 };
@@ -476,7 +476,7 @@ void erase_allocation(Symbol* symbol, Scope*scope);
 
 bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
-  ASTNodeType get_node_type() override {
+  ASTNodeType get_node_type() const override {
     return AST_NODE_NOOP;
   }
   std::any accept(VisitorBase *visitor) override;

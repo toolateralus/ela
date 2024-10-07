@@ -6,7 +6,6 @@
 #include "type.hpp"
 #include <algorithm>
 #include <cassert>
-#include <cstdio>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -267,12 +266,12 @@ void Parser::init_directive_routines() {
            auto range = parser->begin_node();
            auto args = parser->parse_arguments();
            auto type = args->arguments[0];
-           auto type_arg = dynamic_cast<ASTType *>(type);
-           if (!type_arg) {
+           if (type->get_node_type() != AST_NODE_TYPE) {
              parser->end_node(type, range);
              throw_error("Expect a type as the first argument in a #make call.",
                          range);
            }
+           auto type_arg = static_cast<ASTType *>(type);
            args->arguments.erase(args->arguments.begin());
            auto make = ast_alloc<ASTMake>();
            make->type_arg = type_arg;
@@ -488,12 +487,13 @@ ASTType *Parser::parse_type() {
 
   // parse #self types.
   if (peek().type == TType::Directive) {
-    auto type = dynamic_cast<ASTType *>(try_parse_directive_expr().get());
-    if (!type) {
+    auto expr = try_parse_directive_expr().get();
+    if (expr->get_node_type() != AST_NODE_TYPE) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
                   range);
     }
+    auto type = static_cast<ASTType *>(expr);
     return type;
   }
   auto base = eat().value;
@@ -690,9 +690,9 @@ ASTStatement *Parser::parse_statement() {
       eat();
       auto node_else = ast_alloc<ASTElse>();
       if (peek().type == TType::If) {
-        auto inner_if = dynamic_cast<ASTIf *>(parse_statement());
-        assert(inner_if != NULL);
-        node_else->_if = inner_if;
+        auto inner_if = parse_statement();
+        assert(inner_if->get_node_type() == AST_NODE_IF);
+        node_else->_if = static_cast<ASTIf *>(inner_if);
       } else {
         node_else->block = parse_block();
       }
@@ -810,11 +810,9 @@ ASTDeclaration *Parser::parse_declaration() {
 
   ctx.scope->insert(iden.value, -1);
 
-  if (decl->value.get()) {
-    if (auto alloc = dynamic_cast<ASTAllocate *>(decl->value.get())) {
-      auto symbol = ctx.scope->lookup(iden.value);
-      insert_allocation(alloc, symbol, ctx.scope);
-    }
+  if (decl->value.get() && decl->value.get()->get_node_type() ==  AST_NODE_ALLOCATE) {
+    auto symbol = ctx.scope->lookup(iden.value);
+    insert_allocation(static_cast<ASTAllocate *>(decl->value.get()), symbol, ctx.scope);
   }
 
   return decl;
@@ -1061,11 +1059,10 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     auto block = parse_block();
     block->scope->is_struct_or_union_scope = true;
     for (const auto &statement : block->statements) {
-      if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
-        decl->fields.push_back(field);
-      } else if (auto fn_decl =
-                     dynamic_cast<ASTFunctionDeclaration *>(statement)) {
-        decl->methods.push_back(fn_decl);
+      if (statement->get_node_type() == AST_NODE_DECLARATION) {
+        decl->fields.push_back(static_cast<ASTDeclaration*>(statement));
+      } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+        decl->methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",
@@ -1118,13 +1115,12 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto scope = block->scope;
 
   for (auto &statement : block->statements) {
-    if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
-      fields.push_back(field);
-    } else if (auto method =
-                   dynamic_cast<ASTFunctionDeclaration *>(statement)) {
-      methods.push_back(method);
-    } else if (auto struct_decl =
-                   dynamic_cast<ASTStructDeclaration *>(statement)) {
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+      fields.push_back(static_cast<ASTDeclaration *>(statement));
+    } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
+    } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
@@ -1160,16 +1156,17 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
     Precedence token_precedence = get_operator_precedence(peek());
-    if (token_precedence == PRECEDENCE_ASSIGNMENT &&
-        peek().type == TType::ColonEquals) {
-      auto iden = dynamic_cast<ASTIdentifier *>(left);
-      if (iden) {
-        if (ctx.scope->local_lookup(iden->value.value)) {
-          end_node(nullptr, range);
-          throw_error("redefinition of a variable.", range);
-        }
-        ctx.scope->insert(iden->value.value, -1);
+    if (token_precedence == PRECEDENCE_ASSIGNMENT && peek().type == TType::ColonEquals) {
+      if (left->get_node_type() != AST_NODE_IDENTIFIER) {
+        end_node(left, range);
+        throw_error("Cannot use type inference assignment ':=' on non-identifiers.", range);
       }
+      auto iden = static_cast<ASTIdentifier *>(left);
+      if (ctx.scope->local_lookup(iden->value.value)) {
+        end_node(nullptr, range);
+        throw_error("redefinition of a variable.", range);
+      }
+      ctx.scope->insert(iden->value.value, -1);
     }
     if (token_precedence <= precedence) {
       break;
@@ -1182,12 +1179,11 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->op = op;
     binexpr->m_is_const_expr = left->is_constexpr() && right->is_constexpr();
 
-    if (op.type == TType::ColonEquals) {
-      auto iden = dynamic_cast<ASTIdentifier *>(left);
-      if (auto alloc = dynamic_cast<ASTAllocate *>(right)) {
-        auto symbol = ctx.scope->lookup(iden->value.value);
-        insert_allocation(alloc, symbol, ctx.scope);
-      }
+    if (op.type == TType::ColonEquals && left->get_node_type() == AST_NODE_IDENTIFIER && right->get_node_type() == AST_NODE_ALLOCATE) {
+      auto iden = static_cast<ASTIdentifier *>(left);
+      auto alloc = static_cast<ASTAllocate *>(right);
+      auto symbol = ctx.scope->lookup(iden->value.value);
+      insert_allocation(alloc, symbol, ctx.scope);
     }
 
     left = binexpr;
@@ -1205,16 +1201,14 @@ ASTExpr *Parser::parse_unary() {
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
 
-    auto is_rvalue =
-        dynamic_cast<ASTLiteral *>(expr) || dynamic_cast<ASTCall *>(expr);
+    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || expr->get_node_type() == AST_NODE_CALL;
 
     // don't need to do this if we already got one of the previous ones.
     auto ctor = is_rvalue || [&] {
-      auto make = dynamic_cast<ASTMake *>(expr);
-      if (!make) {
+      if (expr->get_node_type() != AST_NODE_MAKE) {
         return false;
       }
-
+      auto make = static_cast<ASTMake *>(expr);
       if (make && make->kind == MAKE_CTOR || make->kind == MAKE_COPY_CTOR) {
         return true;
       }
@@ -1256,8 +1250,8 @@ ASTExpr *Parser::parse_postfix() {
          peek().type == TType::LParen) {
 
     if (peek().type == TType::LParen) {
-      auto identifier = dynamic_cast<ASTIdentifier *>(left);
-      if (identifier) {
+      if (left->get_node_type() == AST_NODE_IDENTIFIER) {
+        auto identifier = static_cast<ASTIdentifier *>(left);
         auto tok = identifier->value;
         left = parse_call(tok);
       } else {
@@ -1571,7 +1565,7 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
 }
 
 bool ASTExpr::is_constexpr() const {
-  return dynamic_cast<const ASTLiteral *>(this) || m_is_const_expr;
+  return get_node_type() == AST_NODE_LITERAL|| m_is_const_expr;
 }
 
 std::vector<GenericParameter> Parser::parse_generic_parameters() {

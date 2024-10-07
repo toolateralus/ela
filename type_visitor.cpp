@@ -58,8 +58,8 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array())) {
     for (const auto [i, expr] :
          node->expressions | std::ranges::views::enumerate) {
-      if (auto sub_init = dynamic_cast<ASTInitializerList *>(expr)) {
-        assert_type_can_be_assigned_from_init_list(sub_init, node->types[i]);
+      if (expr->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+        assert_type_can_be_assigned_from_init_list(static_cast<ASTInitializerList *>(expr), node->types[i]);
       }
     }
     return declaring_type;
@@ -203,12 +203,11 @@ std::any TypeVisitor::visit(ASTBlock *node) {
 
   for (auto &statement : node->statements) {
     auto result = statement->accept(this);
-    if (dynamic_cast<ASTBlock *>(statement) ||
-        dynamic_cast<ASTIf *>(statement) || dynamic_cast<ASTFor *>(statement) ||
-        dynamic_cast<ASTWhile *>(statement) ||
-        dynamic_cast<ASTReturn *>(statement) ||
-        dynamic_cast<ASTContinue *>(statement) ||
-        dynamic_cast<ASTBreak *>(statement)) {
+    ASTNodeType node_type = statement->get_node_type();
+    if (node_type == AST_NODE_BLOCK || node_type == AST_NODE_IF || 
+        node_type == AST_NODE_FOR || node_type == AST_NODE_WHILE || 
+        node_type == AST_NODE_RETURN || node_type == AST_NODE_CONTINUE || 
+        node_type == AST_NODE_BREAK) {
       auto stmnt_cf = std::any_cast<ControlFlow>(result);
       block_cf.flags |= stmnt_cf.flags;
       if ((stmnt_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
@@ -349,8 +348,8 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
                   node->source_range);
     }
 
-    if (auto iden = dynamic_cast<ASTIdentifier *>(node->left)) {
-      ctx.scope->insert(iden->value.value, left);
+    if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
+      ctx.scope->insert(static_cast<ASTIdentifier *>(node->left)->value.value, left);
     }
   }
 
@@ -662,7 +661,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   Type *type = global_get_type(symbol->type_id);
   
   if (symbol->declaring_node.is_not_null()) {
-    auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+    auto func_decl = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     if (func_decl && (func_decl->flags & FUNCTION_IS_GENERIC) != 0) {
       return generate_generic_function(node, func_decl, arg_tys);
     }
@@ -930,8 +929,8 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   }
 
   // TODO: remove this hack to get array length
-  if (left_ty->get_ext().is_array()) {
-    auto right = dynamic_cast<ASTIdentifier *>(node->right);
+  if (left_ty->get_ext().is_array() && node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+    auto right = static_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
       return s32_type();
     }
@@ -946,12 +945,13 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
     auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
-    auto iden = dynamic_cast<ASTIdentifier *>(node->right);
-    if (!iden) {
+    
+    if (node->right->get_node_type() != AST_NODE_IDENTIFIER) {
       throw_error("cannot use a dot expression with a non identifer on the "
                   "right hand side when referring to a enum.",
                   node->source_range);
     }
+    auto iden = static_cast<ASTIdentifier *>(node->right);
     auto name = iden->value.value;
     bool found = false;
     for (const auto &key : info->keys) {
@@ -1134,8 +1134,8 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
     if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) 
       throw_error("invalid delete statement: you need at least one argument", node->source_range);
     for (const auto &arg : node->arguments.get()->arguments) 
-      if (auto iden = dynamic_cast<ASTIdentifier *>(arg))
-        erase_allocation(ctx.scope->lookup(iden->value.value), ctx.scope);
+      if (arg->get_node_type() == AST_NODE_IDENTIFIER)
+        erase_allocation(ctx.scope->lookup(static_cast<ASTIdentifier *>(arg)->value.value), ctx.scope);
     return void_type();
   }
   // just type check them, no need to return
@@ -1150,7 +1150,8 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
 }
 
 void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
-  if (auto iden = dynamic_cast<ASTIdentifier *>(node)) {
+  if (node->get_node_type() == AST_NODE_IDENTIFIER) {
+    auto iden = static_cast<ASTIdentifier *>(node);
     ctx.scope->report_symbol_mutated(iden->value.value);
     Scope * enclosing_scope = nullptr;
     if (auto str = current_struct_decl.get()) {
@@ -1165,9 +1166,11 @@ void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
     if (current_func_decl && enclosing_scope && enclosing_scope->lookup(iden->value.value)) {
       current_func_decl.get()->flags |= FUNCTION_IS_MUTATING;
     }
-  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
+  } else if (node->get_node_type() == AST_NODE_DOT_EXPR) {
+    auto dot = static_cast<ASTDotExpr *>(node);
     report_mutated_if_iden(dot->left);
-  } else if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
+  } else if (node->get_node_type() == AST_NODE_SUBSCRIPT) {
+    auto subscript = static_cast<ASTSubscript *>(node);
     report_mutated_if_iden(subscript->left);
   }
 }

@@ -741,7 +741,7 @@ std::any EmitVisitor::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
   for (const auto &statement : node->statements) {
-    if (dynamic_cast<ASTDeclaration *>(statement)) {
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
 
@@ -875,18 +875,20 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   // the langauge.
   if (left_ty->get_ext().is_array() &&
       !left_ty->get_ext().is_fixed_sized_array()) {
-    auto right = dynamic_cast<ASTIdentifier *>(node->right);
-    if (right && right->value.value == "length") {
-      node->left->accept(this);
-      (*ss) << op;
-      node->right->accept(this);
-      return {};
-    }
-    if (right && right->value.value == "data") {
-      node->left->accept(this);
-      (*ss) << op;
-      node->right->accept(this);
-      return {};
+    if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+      auto right = static_cast<ASTIdentifier *>(node->right);
+      if (right->value.value == "length") {
+        node->left->accept(this);
+        (*ss) << op;
+        node->right->accept(this);
+        return {};
+      }
+      if (right->value.value == "data") {
+        node->left->accept(this);
+        (*ss) << op;
+        node->right->accept(this);
+        return {};
+      }
     }
   }
 
