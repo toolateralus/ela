@@ -896,3 +896,28 @@ generic_calling_generic :: ($T v) -> $T {
   //! See bug 1.1 :: 
   //! generic_calling_generic(10);
 }
+
+
+#test test_array_concat_operator :: () {
+  int[] array;
+  array ~= 10;
+  assert("concat operator failed", array.length == 1);
+}
+
+#test test_array_pop_operator :: () {
+  int[] array;
+  for s32 i; i < 100; ++i {
+    array ~= 10;
+  }
+  int n;
+  for s32 i; i < 100; ++i{
+    n = ~array;
+  }
+  assert("", array.length == 0 && n == 10);
+}
+
+#test test_array_erase_operator :: () {
+  int[] array;
+  array ~= 10;
+  array ~ 10;
+}

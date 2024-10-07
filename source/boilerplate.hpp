@@ -1,5 +1,5 @@
-#include <cstdint>
 #include <cstddef>
+#include <cstdint>
 
 using float64 = double;
 using u64 = size_t;
@@ -20,9 +20,8 @@ extern "C" int printf(const char *format, ...);
 #undef RAND_MAX
 #undef assert
 
-
-#include <initializer_list>
 #include <algorithm>
+#include <initializer_list>
 
 // TODO: implement this. not sure how we want to approach it.
 // template <class T> struct Any {
@@ -31,19 +30,15 @@ extern "C" int printf(const char *format, ...);
 //   template <class U> operator U() { return static_cast<U>(value); }
 // };
 
-// TODO: implement this actually, where this will represent all dynamic arrays in the language, such as int[].
-// int[32] is still a C fixed buffer.
+// TODO: implement this actually, where this will represent all dynamic arrays
+// in the language, such as int[]. int[32] is still a C fixed buffer.
 template <class T> struct _array {
   T *data = nullptr;
   int length = 0;
   int capacity = 1;
-  _array() {
-    data = new T[capacity];
-  }
-  T &operator [](int n) {
-    return data[n];
-  }
-  _array(const _array& other) {
+  _array() { data = new T[capacity]; }
+  T &operator[](int n) { return data[n]; }
+  _array(const _array &other) {
     length = other.length;
     capacity = other.capacity;
     data = new T[capacity];
@@ -53,23 +48,27 @@ template <class T> struct _array {
     capacity = length * 1.5f;
     this->length = length;
     data = new T[length];
-  } 
-  _array(T* array, int len) {
+  }
+  _array(T *array, int len) {
     length = len;
     capacity = len;
     data = new T[capacity];
     std::copy(array, array + length, data);
   }
-  T &operator [](int n) const {
-    return data[n];
+
+  void erase(const T &value) {
+    auto it = std::find(begin(), end(), value);
+    if (it != end()) {
+      std::move(it + 1, end(), it);
+      --length;
+    }
   }
-  explicit operator void*() {
-    return data;
-  }
-  explicit operator T*() {
-    return data;
-  }
-  template<class From> requires std::is_convertible_v<From, T>
+
+  T &operator[](int n) const { return data[n]; }
+  explicit operator void *() { return data; }
+  explicit operator T *() { return data; }
+  template <class From>
+    requires std::is_convertible_v<From, T>
   operator _array<From>() {
     _array<From> result;
     result.length = length;
@@ -89,19 +88,19 @@ template <class T> struct _array {
   }
   T *begin() const { return data; }
   T *end() const { return data + length; }
-  void push(const T& value) {
+  void push(const T &value) {
     if (length >= capacity) {
       reserve(capacity * 2);
     }
     data[length++] = value;
   }
-  T* pop() {
+  T pop() {
     if (length > 0) {
-      auto value = data[length];
+      auto value = data[length - 1];
       --length;
       return value;
     }
-    return nullptr;
+    return T();
   }
   void resize(int new_size) {
     if (new_size > capacity) {
@@ -111,7 +110,7 @@ template <class T> struct _array {
   }
   void reserve(int new_capacity) {
     if (new_capacity > capacity) {
-      T* new_data = new T[new_capacity];
+      T *new_data = new T[new_capacity];
       std::copy(data, data + length, new_data);
       delete[] data;
       data = new_data;
@@ -121,12 +120,10 @@ template <class T> struct _array {
 };
 
 // For now, we'll just use a simple null terminated string.
-struct string  {
+struct string {
   char *data = nullptr;
   int length = 0;
-  string() {
-    
-  }
+  string() {}
   string(char *str) {
     if (str == nullptr) {
       return;
@@ -139,24 +136,20 @@ struct string  {
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
-  
-  string(char *begin, char* end) {
+
+  string(char *begin, char *end) {
     length = std::distance(begin, end);
     data = new char[length + 1];
     std::copy(begin, end, data);
     data[length] = '\0';
   }
-  
+
   ~string() {
     if (data)
       delete[] data;
-  }  
-  char &operator[](int n) {
-    return data[n];
   }
-  explicit operator char*(){
-    return data;
-  }
+  char &operator[](int n) { return data[n]; }
+  explicit operator char *() { return data; }
   string(const string &other) {
     if (other.data) {
       length = other.length;
@@ -180,85 +173,81 @@ struct string  {
     }
     return *this;
   }
-  auto begin() {
-    return data;
-  }
-  auto end() {
-    return data + length;
-  }
+  auto begin() { return data; }
+  auto end() { return data + length; }
 };
 
 struct Type;
 struct Field {
-  const char * name;
+  const char *name;
   Type *type;
 };
 
 struct Type {
   int id;
-  const char * name;
-  _array<Field*> fields;
+  const char *name;
+  _array<Field *> fields;
 };
 
 #ifdef TESTING
 
 #define assert(message, condition)                                             \
   if (!(condition))                                                            \
-    throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n", #condition,       \
-           #message);                                                           \
+    throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n",   \
+                           #condition, #message);
 
-  extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
-  extern "C" int strcpy(const char *, char *);
-  extern "C" int strlen(const char *);
-  struct __test_exception {
-    const char *m_what;
+extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
+extern "C" int strcpy(const char *, char *);
+extern "C" int strlen(const char *);
+struct __test_exception {
+  const char *m_what;
 
-    template<typename ...Args>
-    __test_exception(const char *fmt, Args&&... args) {
-        char buf[1024];
-        snprintf(buf, sizeof(buf), fmt, args...);
-        m_what = new char[strlen(buf) + 1];
-        strcpy(const_cast<char*>(m_what), buf);
-    }
+  template <typename... Args>
+  __test_exception(const char *fmt, Args &&...args) {
+    char buf[1024];
+    snprintf(buf, sizeof(buf), fmt, args...);
+    m_what = new char[strlen(buf) + 1];
+    strcpy(const_cast<char *>(m_what), buf);
+  }
 
-    ~__test_exception() {
-        delete[] m_what;
-    }
+  ~__test_exception() { delete[] m_what; }
 
-    const char* what() const {
-        return m_what;
-    }
+  const char *what() const { return m_what; }
 };
-  struct __COMPILER_GENERATED_TEST {
-    __COMPILER_GENERATED_TEST() {}
-    __COMPILER_GENERATED_TEST(const char *name, void (*function)())
-        : name(name), function(function) {}
-    const char *name;
-    void (*function)();
-    bool run() const {
+struct __COMPILER_GENERATED_TEST {
+  __COMPILER_GENERATED_TEST() {}
+  __COMPILER_GENERATED_TEST(const char *name, void (*function)())
+      : name(name), function(function) {}
+  const char *name;
+  void (*function)();
+  bool run() const {
 
-      printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
-      try {
-        function();
-        printf("\033[1;32m[passed]\033[0m\n");
-        return true;
-      } catch (__test_exception &e) {
-        printf("\033[1;31m[failed]\033[0m\n");
-        printf("%s", e.what());
-        return false;
-      }
+    printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
+    try {
+      function();
+      printf("\033[1;32m[passed]\033[0m\n");
+      return true;
+    } catch (__test_exception &e) {
+      printf("\033[1;31m[failed]\033[0m\n");
+      printf("%s", e.what());
+      return false;
     }
-  };
-
+  }
+};
 
 #define __TEST_RUNNER_MAIN                                                     \
   int main() {                                                                 \
-    int failed = 0;\
-    int passed = 0;\
+    int failed = 0;                                                            \
+    int passed = 0;                                                            \
     for (const auto &test : tests) {                                           \
-      if (test.run()) passed++; else failed++;                                                               \
+      if (test.run())                                                          \
+        passed++;                                                              \
+      else                                                                     \
+        failed++;                                                              \
     }                                                                          \
-    printf("Test run complete!\n\033[1;31mfailed: %d, \033[1;32mpassed: %d\033[0m\n", failed, passed);\
+    printf("Test run complete!\n\033[1;31mfailed: %d, \033[1;32mpassed: "      \
+           "%d\033[0m\n",                                                      \
+           failed, passed);                                                    \
   }
 #else
 #endif

@@ -617,7 +617,7 @@ ASTStatement *Parser::parse_statement() {
     return statement;
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
-             tok.type == TType::Delete || tok.type == TType::LParen) {
+             tok.type == TType::Delete || tok.type == TType::LParen || tok.type == TType::Erase) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
@@ -1186,6 +1186,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       }
       ctx.scope->insert(iden->value.value, -1);
     }
+    
     if (token_precedence <= precedence) {
       break;
     }
@@ -1683,6 +1684,8 @@ static Precedence get_operator_precedence(Token token) {
   switch (type) {
   case TType::Assign:
   case TType::ColonEquals:
+  case TType::Concat: // this is for appending to arrays
+  case TType::Erase: // this is for erase elements for arrays
     return PRECEDENCE_ASSIGNMENT;
   case TType::LogicalOr:
     return PRECEDENCE_LOGICALOR;

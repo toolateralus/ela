@@ -69,7 +69,9 @@ enum struct TType {
   CompXor,
   CompSHL,
   CompSHR,
-
+  Concat,
+  Erase,
+  
   True,
   False,
   Null,
@@ -92,6 +94,8 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Then);
+    TTYPE_CASE(Erase);
+    TTYPE_CASE(Concat);
     TTYPE_CASE(Union);
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
@@ -213,7 +217,7 @@ struct Token {
            type == TType::CompMul || type == TType::CompDiv ||
            type == TType::CompMod || type == TType::CompAnd ||
            type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR;
+           type == TType::CompSHL || type == TType::CompSHR || type == TType::Concat || type == TType::Erase;
   }
 
   Token() {}
@@ -288,6 +292,7 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> operators{
+      {"~=", TType::Concat},    {"~~", TType::Erase},
       {"$", TType::Dollar},     {":=", TType::ColonEquals},
       {"...", TType::Varargs},  {"#", TType::Directive},
       {".", TType::Dot},        {"!", TType::Not},

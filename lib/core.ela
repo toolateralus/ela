@@ -1,6 +1,8 @@
-#foreign malloc :: (u64 nbytes) -> void*;
-#foreign free :: (void *ptr) -> void;
 #foreign system :: (char* cmd) -> int;
+
+#foreign free :: (void *ptr) -> void;
+#foreign malloc :: (u64 nbytes) -> void*;
+#foreign realloc :: (void* ptr, u64 size) -> void*;
 
 #foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
 #foreign memset :: (void *dest, int c, u64 n) -> void*;

@@ -17,6 +17,7 @@
 
 
 static inline int int_from_any(const std::any &any) { return std::any_cast<int>(any); }
+
 void assert_types_can_cast_or_equal(
     const int from, const int to, const SourceRange &source_range,
     std::format_string<std::string, std::string> format, std::string message) {
@@ -776,7 +777,18 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
   auto right = int_from_any(node->right->accept(this));
   auto type = global_get_type(left);
-
+  
+  // array remove operator.
+  if (node->op.type == TType::Erase) {
+    report_mutated_if_iden(node->left);
+    if (!type->get_ext().is_array()) {
+      throw_error("Cannot use concat operator on a non-array", node->source_range);
+    }
+    auto element_ty = type->get_element_type();
+    assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}", "invalid type in array concatenation expression");
+    return element_ty;
+  }
+  
   // CLEANUP(Josh) 10/4/2024, 2:00:49 PM
   // We copy pasted this code like in 5 places, and a lot of the stuff is just
   // identical.
@@ -825,6 +837,18 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
       ctx.scope->insert(static_cast<ASTIdentifier *>(node->left)->value.value, left);
     }
+  }
+
+
+  // TODO: add a remove operator for arrays too.
+  if (node->op.type == TType::Concat) {
+    report_mutated_if_iden(node->left);
+    if (!type->get_ext().is_array()) {
+      throw_error("Cannot use concat operator on a non-array", node->source_range);
+    }
+    auto element_ty = type->get_element_type();
+    assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}", "invalid type in array concatenation expression");
+    return void_type();
   }
 
   if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
@@ -877,6 +901,11 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
 
   // unary operator overload.
   auto left_ty = global_get_type(operand_ty);
+  
+  if (left_ty->get_ext().is_array() && node->op.type == TType::BitwiseNot) {
+    return left_ty->get_element_type();
+  }
+  
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
       left_ty->get_ext().has_no_extensions()) {
     auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
