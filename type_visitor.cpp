@@ -931,6 +931,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   // TODO: remove this hack to get array length
   if (left_ty->get_ext().is_array() && node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
+    if (right && right->value.value == "capacity") {
+      return s32_type();
+    }
     if (right && right->value.value == "length") {
       return s32_type();
     }
@@ -994,6 +997,10 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     within_dot_expression = true;
   }
 
+  // TODO: we need to check if the function * if it is a function * that we're calling is const or not.
+  // If it's not const, we report mutated.
+  // However, for now, we just report mutation on any dot expression, which is dumb.
+  report_mutated_if_iden(node->left);
   ctx.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
   ctx.set_scope(previous_scope);

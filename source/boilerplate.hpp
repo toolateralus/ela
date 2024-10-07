@@ -79,7 +79,7 @@ template <class T> struct _array {
   }
   _array(std::initializer_list<T> list) {
     length = list.size();
-    capacity = length;
+    capacity = length * 1.5f;
     data = new T[capacity];
     std::copy(list.begin(), list.end(), data);
   }
@@ -138,6 +138,13 @@ struct string  {
     data = new char[length + 1];
     data[length] = '\0';
     std::copy(str, str + length, data);
+  }
+  
+  string(char *begin, char* end) {
+    length = std::distance(begin, end);
+    data = new char[length + 1];
+    std::copy(begin, end, data);
+    data[length] = '\0';
   }
   
   ~string() {

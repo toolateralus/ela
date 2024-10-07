@@ -72,6 +72,7 @@ Context::Context() {
 
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
+    str_scope->insert("capacity", s32_type());
     str_scope->insert("[", s8_type());
   }
 

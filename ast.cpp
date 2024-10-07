@@ -216,15 +216,16 @@ void Parser::init_directive_routines() {
          }});
   }
 
+  // #char
   {
     directive_routines.push_back(
         {.identifier = "char",
          .kind = DIRECTIVE_KIND_EXPRESSION,
          .run = [](Parser *parser) -> Nullable<ASTNode> {
-           parser->expect(TType::String);
+           auto string = parser->expect(TType::String).value;
            auto node = ast_alloc<ASTLiteral>();
            node->tag = ASTLiteral::Char;
-           node->value = node->value;
+           node->value = string;
            return node;
          }});
   }

@@ -1,0 +1,14 @@
+
+array_realloc::($T[] *array) {
+  array.capacity = array.length * 1.5;
+  new_data := malloc(sizeof(T) * array.capacity);
+  memcpy(new_data, array.data, sizeof(T) * array.length);
+  free(array.data);
+}
+
+main :: () {
+  int[] some_array;
+  
+  // ! Compiler just segfaults because somehow we get an internal type that has array extensions but it has no array size.
+  array_realloc(&some_alloc);
+}

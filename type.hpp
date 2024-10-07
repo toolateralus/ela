@@ -162,7 +162,7 @@ struct TypeExt {
 
   inline std::string to_string() const {
     std::stringstream ss;
-    std::vector<Nullable<ASTExpr>> array_sizes = this->array_sizes;
+    auto array_sizes = this->array_sizes;
     for (const auto ext : extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         auto size = array_sizes.back();

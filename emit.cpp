@@ -283,7 +283,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     }
     break;
   case ASTLiteral::Char:
-    output = '\'' + std::to_string(std::atoi(node->value.c_str())) + '\'';
+    output = '\'' + node->value + '\'';
     break;
   case ASTLiteral::Integer:
     output = node->value;
@@ -318,9 +318,10 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
-    if (node->right->is_constexpr()) {
-      (*ss) << "const ";
-    }
+    // !BUG this is annoying and causes problems
+    // if (node->left->is_constexpr()) {
+    //   (*ss) << "const ";
+    // }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
     auto type = global_get_type(id);
     (*ss) << to_cpp_string(type) << ' ';
@@ -418,11 +419,9 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 
   if (type->get_ext().is_fixed_sized_array()) {
     get_declaration_type_signature_and_identifier(node, type);
-
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
-    } else if (emit_default_init) {
-
+    } else if (emit_default_init && !type->get_ext().is_pointer()) {
       bool cancelled = false;
       std::string init = "{";
       for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
@@ -744,9 +743,7 @@ std::any EmitVisitor::visit(ASTBlock *node) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
-
     statement->accept(this);
-
     semicolon();
     newline();
   }
@@ -873,22 +870,25 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   // TODO: remove this hack to get array length, or at least make a nicer system
   // for getting properties of builtin types that aren't considered structs by
   // the langauge.
-  if (left_ty->get_ext().is_array() &&
-      !left_ty->get_ext().is_fixed_sized_array()) {
-    if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-      auto right = static_cast<ASTIdentifier *>(node->right);
-      if (right->value.value == "length") {
-        node->left->accept(this);
-        (*ss) << op;
-        node->right->accept(this);
-        return {};
-      }
-      if (right->value.value == "data") {
-        node->left->accept(this);
-        (*ss) << op;
-        node->right->accept(this);
-        return {};
-      }
+  if (left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() && node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+    auto right = static_cast<ASTIdentifier *>(node->right);
+    if (right->value.value == "length") {
+      node->left->accept(this);
+      (*ss) << op;
+      node->right->accept(this);
+      return {};
+    }
+    if (right->value.value == "data") {
+      node->left->accept(this);
+      (*ss) << op;
+      node->right->accept(this);
+      return {};
+    }
+    if (right->value.value == "capacity") {
+      node->left->accept(this);
+      (*ss) << op;
+      node->right->accept(this);
+      return {};
     }
   }
 

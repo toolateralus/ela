@@ -1,5 +1,7 @@
 #import core;
 
+#compiler_flags "-g"
+
 XaryuStruct :: struct {
   float f;
 }
@@ -561,6 +563,10 @@ something :: (float32 f) -> float32 {
 #test test_array :: () {
   int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
+  
+  // we can always expect the capacity to equal length * 1.5f if we havent mutated it ourselves.
+  assert("array capacity failed to equal expected value", array.capacity == 16);
+  
   // !BUG: we need to fix this.
   // !This throws C++ errors during compilation
   // !because initializer lists have strangely strict typing

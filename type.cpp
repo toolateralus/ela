@@ -259,7 +259,6 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 
 bool Type::equals(const std::string &name, const TypeExt &type_extensions,
                   std::unordered_set<const Type *> &visited) const {
-  auto id = get_true_type();
   auto type = global_get_type(id);
   if (type->get_base() != name)
     return false;
@@ -327,7 +326,59 @@ std::string to_type_struct(Type* type, Context &context) {
   }
 
   std::stringstream fields_ss;
-  if (type->kind == TYPE_STRUCT) {
+  if (type->kind == TYPE_UNION) {
+    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    if (info->scope->symbols.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << type->to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    fields_ss << "{";
+
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+      auto t = global_get_type(sym.type_id);
+      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                << std::format(".type = {}", to_type_struct(t, context))
+                << " }";
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else if (type->kind == TYPE_ENUM) {
+    auto info = static_cast<EnumTypeInfo *>(type->get_info());
+    if (info->keys.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << type->to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    
+    fields_ss << "{";
+
+    int count = info->keys.size();
+    int it = 0;
+    for (const auto &name : info->keys) {
+      auto t = global_get_type(s32_type());
+      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                << std::format(".type = {}", to_type_struct(t, context))
+                << " }";
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else if (type->kind == TYPE_STRUCT) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
     if (info->scope->symbols.empty()) {
       fields_ss << "_type_info[" << id << "] = new Type {"

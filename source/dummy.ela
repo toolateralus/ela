@@ -1,6 +1,30 @@
-Array :: struct<$T, int N> {
-  
+#import core;
+
+array_realloc::($T[] *array) {
+  array.capacity = array.length * 1.5;
+  new_data := malloc(sizeof(T) * array.capacity);
+  memcpy(new_data, array.data, sizeof(T) * array.length);
+  free(array.data);
 }
+
+// array_push :: ($T[] *array, $T value) {
+//   println($"{(#type array).name} {(#type value).name}");
+  
+//   int* capacity = &array.capacity;
+//   int* length = &array.length;
+//   data := &array.data;
+  
+//   if *length >= *capacity {
+    
+//   }
+//   *data[*length] = value;
+//   *length = *length + 1;
+// }
+
+
 main :: () {
-  Array<int, 10> array;
+  int[] ints;
+  int n = 100;
+  // array_push(&ints, n);
+  array_realloc(&ints);
 }

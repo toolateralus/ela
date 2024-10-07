@@ -1,0 +1,16 @@
+
+
+array_push :: ($T[] *array, $T value) {
+  capacity := &array.capacity;
+  length := &array.length;
+  data := &array.data;
+
+  if *length >= *capacity {
+    *capacity = *length * 1.5f;
+    old_data := data;
+    new_data := malloc(sizeof(T) * *capacity);
+    memcpy(*new_data, *old_data, sizeof(T) * *length);
+    free(old_data);
+    *data = new_data;
+  }
+}
