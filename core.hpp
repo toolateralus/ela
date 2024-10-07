@@ -174,8 +174,7 @@ bool get_compilation_flag(const std::string &flag);
 extern std::vector<Token> all_tokens;
 
 struct SourceRange {
-  
-  
+
   inline bool empty() const {
     return begin < 0 || end < 0 ||
            begin > end ||

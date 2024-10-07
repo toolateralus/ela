@@ -319,7 +319,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
     if (node->right->is_constexpr()) {
-      (*ss) << "const";
+      (*ss) << "const ";
     }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
     auto type = global_get_type(id);

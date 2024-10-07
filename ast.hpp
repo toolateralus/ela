@@ -31,18 +31,51 @@ struct VisitorBase;
 // used to prevent double includes.
 extern std::unordered_set<std::string> import_set;
 
-// TODO: add an enum member in the base that says what type this node is,
-// so we can be more performant and just static_cast<T*> instead of
-// dynamic_cast<T*>;
+enum ASTNodeType {
+  AST_NODE_PROGRAM,
+  AST_NODE_BLOCK,
+  AST_NODE_FUNCTION_DECLARATION,
+  AST_NODE_PARAMS_DECL,
+  AST_NODE_PARAM_DECL,
+  AST_NODE_DECLARATION,
+  AST_NODE_EXPR_STATEMENT,
+  AST_NODE_BIN_EXPR,
+  AST_NODE_UNARY_EXPR,
+  AST_NODE_IDENTIFIER,
+  AST_NODE_LITERAL,
+  AST_NODE_TYPE,
+  AST_NODE_CALL,
+  AST_NODE_ARGUMENTS,
+  AST_NODE_RETURN,
+  AST_NODE_CONTINUE,
+  AST_NODE_BREAK,
+  AST_NODE_FOR,
+  AST_NODE_IF,
+  AST_NODE_ELSE,
+  AST_NODE_WHILE,
+  AST_NODE_STRUCT_DECLARATION,
+  AST_NODE_DOT_EXPR,
+  AST_NODE_SUBSCRIPT,
+  AST_NODE_MAKE,
+  AST_NODE_INITIALIZER_LIST,
+  AST_NODE_ENUM_DECLARATION,
+  AST_NODE_UNION_DECLARATION,
+  AST_NODE_ALLOCATE,
+  AST_NODE_NOOP,
+};
+
 // TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
 // this way we can use functions and type declarations before theyre defined, prune unused code, etc.
 struct ASTNode {
   SourceRange source_range{};
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
+  virtual ASTNodeType get_node_type() = 0;
 };
 
-struct ASTStatement : ASTNode {};
+struct ASTStatement : ASTNode {
+  virtual ASTNodeType get_node_type() = 0;
+};
 
 enum BlockFlags {
   BLOCK_FLAGS_FALL_THROUGH = 1 << 0,
@@ -75,16 +108,23 @@ struct ASTBlock : ASTStatement {
   Scope *scope;
   std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_BLOCK;
+  }
 };
 
 struct ASTProgram : ASTNode {
   std::vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_PROGRAM;
+  }
 };
 
 struct ASTExpr : ASTNode {
   bool m_is_const_expr = false;
   bool is_constexpr() const;
+  virtual ASTNodeType get_node_type() = 0;
 };
 
 struct ASTType : ASTExpr {
@@ -96,6 +136,9 @@ struct ASTType : ASTExpr {
   Nullable<ASTExpr> pointing_to;
   int flags = -1;
   
+  ASTNodeType get_node_type() override {
+    return AST_NODE_TYPE;
+  }
   static ASTType *get_void() {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
@@ -111,6 +154,9 @@ struct ASTType : ASTExpr {
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_EXPR_STATEMENT;
+  }
 };
 
 // All of our declarations could inherit from a base declaration. I am not sure if that would be useful.
@@ -119,6 +165,9 @@ struct ASTDeclaration : ASTStatement {
   ASTType *type;
   Nullable<ASTExpr> value;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_DECLARATION;
+  }
 };
 struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
@@ -126,15 +175,24 @@ struct ASTBinExpr : ASTExpr {
   Token op;
   int resolved_type;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_BIN_EXPR;
+  }
 };
 struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_UNARY_EXPR;
+  }
 };
 struct ASTIdentifier : ASTExpr {
   Token value;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_IDENTIFIER;
+  }
 };
 struct ASTLiteral : ASTExpr {
   enum Tag {
@@ -150,6 +208,9 @@ struct ASTLiteral : ASTExpr {
   std::vector<ASTExpr*> interpolated_values {};
   std::string value;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_LITERAL;
+  }
 };
 
 // CLEANUP(Josh) 10/1/2024, 10:31:35 AM This node is entirely unneccesary, and pruning any node we don't need from the AST significantly reduces code complexity.
@@ -159,11 +220,17 @@ struct ASTParamDecl : ASTNode {
   std::string name;
   bool is_type_param = false;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_PARAM_DECL;
+  }
 };
 
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_PARAMS_DECL;
+  }
 };
 
 struct ASTFunctionDeclaration : ASTStatement {
@@ -177,12 +244,17 @@ struct ASTFunctionDeclaration : ASTStatement {
   bool has_generic_return_type = false;
   std::vector<int> generic_types;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_FUNCTION_DECLARATION;
+  }
 };
 
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
-
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_ARGUMENTS;
+  }
 };
 
 // we'll use this node for several things,
@@ -198,18 +270,27 @@ struct ASTMake : ASTExpr {
   ASTType *type_arg;
   ASTArguments *arguments;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_MAKE;
+  }
 };
 struct ASTCall : ASTExpr {
   Token name;
   ASTArguments *arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_CALL;
+  }
 };
 struct ASTDotExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   ASTType *type;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_DOT_EXPR;
+  }
 };
 
 // CLEANUP(Josh) 10/1/2024, 10:32:12 AM
@@ -219,12 +300,21 @@ struct ASTDotExpr : ASTExpr {
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_RETURN;
+  }
 };
 struct ASTBreak : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_BREAK;
+  }
 };
 struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_CONTINUE;
+  }
 };
 
 enum ValueSemantic {
@@ -255,6 +345,9 @@ struct ASTFor : ASTStatement {
   ASTBlock *block;
 
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_FOR;
+  }
 };
 
 struct ASTElse;
@@ -263,24 +356,36 @@ struct ASTIf : ASTStatement {
   ASTBlock *block;
   Nullable<ASTElse> _else; // just an else.
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_IF;
+  }
 };
 
 struct ASTElse : ASTStatement {
   Nullable<ASTIf> _if; // conditional else.
   Nullable<ASTBlock> block;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_ELSE;
+  }
 };
 
 struct ASTWhile : ASTStatement {
   Nullable<ASTExpr> condition;
   ASTBlock *block;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_WHILE;
+  }
 };
 
 struct ASTSubscript : ASTExpr {
   ASTExpr *left;
   ASTExpr *subscript;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_SUBSCRIPT;
+  }
 };
 
 struct GenericParameter {
@@ -303,6 +408,10 @@ struct ASTStructDeclaration : ASTStatement {
   std::vector<ASTFunctionDeclaration *> methods;
 
   std::any accept(VisitorBase *visitor) override;
+  
+  ASTNodeType get_node_type() override {
+    return AST_NODE_STRUCT_DECLARATION;
+  }
 };
 
 struct ASTInitializerList : ASTExpr {
@@ -310,6 +419,9 @@ struct ASTInitializerList : ASTExpr {
   std::vector<int> types;
   std::vector<ASTExpr*> expressions;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_INITIALIZER_LIST;
+  }
 };
 
 struct ASTEnumDeclaration : ASTStatement {
@@ -318,18 +430,9 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTType* type;
   std::vector<std::pair<std::string, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
-};
-
-
-struct Sum {
-  enum Tags {
-    SUM_TAG_1,
-    SUM_TAG_0,
-  } tag;
-  union Data {
-    int one;
-    int zero;
-  } data;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_ENUM_DECLARATION;
+  }
 };
 
 struct ASTUnionDeclaration : ASTStatement {
@@ -341,6 +444,9 @@ struct ASTUnionDeclaration : ASTStatement {
   std::vector<ASTFunctionDeclaration*> methods;
   std::vector<ASTStructDeclaration*> structs;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_UNION_DECLARATION;
+  }
 };
 
 struct ASTAllocate : ASTExpr {
@@ -352,6 +458,9 @@ struct ASTAllocate : ASTExpr {
     Delete,
   } kind;
   std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() override {
+    return AST_NODE_ALLOCATE;
+  }
 };
 
 struct Allocation {
@@ -367,6 +476,9 @@ void erase_allocation(Symbol* symbol, Scope*scope);
 
 bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
+  ASTNodeType get_node_type() override {
+    return AST_NODE_NOOP;
+  }
   std::any accept(VisitorBase *visitor) override;
 };
 
