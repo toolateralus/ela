@@ -181,8 +181,6 @@ struct string  {
   }
 };
 
-// TODO(Josh) 10/2/2024, 8:27:34 AM
-// Reimplement runtime type reflection
 struct Type;
 struct Field {
   const char * name;

@@ -324,10 +324,9 @@ void Parser::init_directive_routines() {
          }});
   }
 
-  // !BUG Code generation for aliases is completely broken, and this is partly
-  // due to how we do this. The alias could just be typedef'd in C++ so that we
-  // could use function pointers, but instead we get declarations like
-  // `void(*sm)() = (void(*)())something;` which is completely invalid c++ code.
+  // !BUG Aliases for function types are assumed to be broken. I forget what we
+  // changed during ! implementing generic functions, but it lead to this being
+  // impossible.
 
   // #alias for making type aliases. #alias NewName :: OldName;
   {
@@ -353,6 +352,12 @@ void Parser::init_directive_routines() {
 
            auto id = global_find_type_id(aliased_type->base,
                                          aliased_type->extension_info);
+
+           auto type = global_get_type(id);
+           
+           if (type->is_kind(TYPE_FUNCTION))
+             throw_error("Temporarily it is illegal to declare aliases to function types, as well as declare function pointers.", aliased_type->source_range);
+            
            parser->ctx.scope->create_type_alias(id, name.value);
            return ast_alloc<ASTNoop>();
          }});
@@ -491,7 +496,6 @@ ASTType *Parser::parse_type() {
     }
     return type;
   }
-
   auto base = eat().value;
   TypeExt extension_info;
 
@@ -511,6 +515,16 @@ ASTType *Parser::parse_type() {
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
+    } else if (peek().type == TType::LT) {
+      eat();
+      std::vector<ASTExpr *> generic_arguments;
+      while (peek().type != TType::GT) {
+        generic_arguments.push_back(parse_primary());
+        if (peek().type != TType::GT)
+          expect(TType::Comma);
+      }
+      expect(TType::GT);
+      extension_info.generic_arguments = generic_arguments;
     } else {
       break;
     }
@@ -829,9 +843,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   function->params = parse_parameters();
 
-  // TODO: make it so this doesn't do a lookup through parents and just looks
-  // for enclosing scope.
-  auto sym = ctx.scope->lookup(name.value);
+  auto sym = ctx.scope->local_lookup(name.value);
   if (sym) {
     sym->flags |= SYMBOL_HAS_OVERLOADS;
   } else {
@@ -850,7 +862,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     // generic return type, -> $T
     if (peek().type == TType::Dollar) {
       function->has_generic_return_type = true;
-      if ((function->flags & FUNCTION_IS_POLYMORPHIC) == 0) {
+      if ((function->flags & FUNCTION_IS_GENERIC) == 0) {
         end_node(function, range);
         throw_error("You can't have a generic return type without "
                     "generic parameter types currently.",
@@ -861,7 +873,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     function->return_type = parse_type();
   }
 
-  if ((function->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+  if ((function->flags & FUNCTION_IS_GENERIC) != 0) {
     for (const auto &param : function->params->params) {
       type_alias_map[param->type->base] = -2;
     }
@@ -869,7 +881,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   function->block = parse_block();
 
-  if ((function->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+  if ((function->flags & FUNCTION_IS_GENERIC) != 0) {
     for (const auto &param : function->params->params) {
       type_alias_map.erase(param->type->base);
     }
@@ -893,7 +905,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     bool is_type_param = false;
     if (peek().type == TType::Dollar) {
       eat();
-      current_func_decl.get()->flags |= FUNCTION_IS_POLYMORPHIC;
+      current_func_decl.get()->flags |= FUNCTION_IS_GENERIC;
       is_type_param = true;
     }
 
@@ -1020,8 +1032,17 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
-  if (peek().type == TType::LParen) {
-    decl->generic_parameters = parse_parameters();
+  if (peek().type == TType::LT) {
+    decl->generic_parameters = parse_generic_parameters();
+    for (const auto &param : decl->generic_parameters) {
+      if (param.is_named) {
+        ctx.scope->insert(
+            param.name,
+            global_find_type_id(param.type->base, param.type->extension_info));
+      } else {
+        type_alias_map[param.type->base] = 0;
+      }
+    }
   }
 
   // fwd declare the type.
@@ -1053,6 +1074,12 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
+  }
+
+  for (const auto &param : decl->generic_parameters) {
+    if (!param.is_named) {
+      type_alias_map.erase(param.type->base);
+    }
   }
 
   auto info =
@@ -1087,7 +1114,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   auto scope = block->scope;
 
-  // CLEANUP: fix this up, this is a mess.
   for (auto &statement : block->statements) {
     if (auto field = dynamic_cast<ASTDeclaration *>(statement)) {
       fields.push_back(field);
@@ -1543,4 +1569,26 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
 
 bool ASTExpr::is_constexpr() const {
   return dynamic_cast<const ASTLiteral *>(this) || m_is_const_expr;
+}
+
+std::vector<GenericParameter> Parser::parse_generic_parameters() {
+  expect(TType::LT);
+  std::vector<GenericParameter> params;
+  while (peek().type != TType::GT) {
+    params.emplace_back();
+    if (peek().type == TType::Dollar)
+      eat();
+
+    params.back().type = parse_type();
+
+    if (peek().type != TType::Comma && peek().type != TType::GT) {
+      params.back().name = expect(TType::Identifier).value;
+      params.back().is_named = true;
+    }
+    if (peek().type == TType::Comma) {
+      eat();
+    }
+  }
+  expect(TType::GT);
+  return params;
 }

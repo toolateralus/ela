@@ -172,11 +172,7 @@ struct EmitVisitor : VisitorBase {
                             bool test_flag);
 
   std::string to_cpp_string(const TypeExt &ext, const std::string &base);
-
-  // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
-  // This should be in the emit visitor not here.
   std::string to_cpp_string(Type *type);
-
   std::string get_cpp_scalar_type(int id);
 
   std::any visit(ASTStructDeclaration *node) override;

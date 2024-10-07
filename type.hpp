@@ -87,7 +87,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
   FUNCTION_IS_EXPORTED= 1 << 7,
-  FUNCTION_IS_POLYMORPHIC = 1 << 8,
+  FUNCTION_IS_GENERIC = 1 << 8,
   FUNCTION_IS_MUTATING = 1 << 9,
 };
 
@@ -106,9 +106,9 @@ struct ASTExpr;
 struct TypeExt {
   // this stores things like * and [], [20] etc.
   std::vector<TypeExtEnum> extensions{};
-  // for each type extension that is [], -1 == dynamic array, [n > 0] == fixed
-  // array size.
+  // for each type extension that is [], nullptr == dynamic array, [non-nullptr] == fixed array size.
   std::vector<Nullable<ASTExpr>> array_sizes{};
+  std::vector<ASTExpr*> generic_arguments{};
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       for (const auto ext : extensions) {

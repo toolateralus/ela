@@ -491,7 +491,7 @@ something :: (float32 f) -> float32 {
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
 
-// TODO(Josh) 10/1/2024, 1:20:30 PM
+// FEATURE(Josh) 10/1/2024, 1:20:30 PM
 // implement tagged unions once we have paramterized structs.
 // until we have that, this will be nearly pointless.
 // #tagged Union :: union {
@@ -559,15 +559,13 @@ something :: (float32 f) -> float32 {
 }
 
 #test test_array :: () {
-  // TODO: put a lot more work into init lists, right now they only really work
-  // for dynamic ararys.
   int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
-  // TODO: we need to fix this.
-  // This throws C++ errors during compilation
-  // because initializer lists have strangely strict typing
-  // compared to normal narrowing rules.
-  // bool[] arr = {0,1,2,3,4,5};
+  // !BUG: we need to fix this.
+  // !This throws C++ errors during compilation
+  // !because initializer lists have strangely strict typing
+  // !compared to normal narrowing rules.
+  // !bool[] arr = {0,1,2,3,4,5};
 }
 
 // #test test_function_pointers :: () {
@@ -751,8 +749,6 @@ OperatorOverloadTest :: struct {
   }
 }
 
-// TODO: fix operator precedence. If you un-parenthesis a lot of these expresssions,
-// it's revealed how our type system is totally failing on binary expressions.
 #test test_operator_overload :: () {
   OperatorOverloadTest opstr1;
   OperatorOverloadTest opstr2;
@@ -818,8 +814,8 @@ InitListStruct :: struct {
     InitListStruct str = {0, 0, 0};
     
     //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
-    // InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
-    InitListStruct[] strArr = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    //! This line causes it: InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    InitListStruct[] strArr = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
     InitListStruct[3] strArr1 = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
     int[] expected_arr = {0, 1, 2};
@@ -863,15 +859,26 @@ InitListStruct :: struct {
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }
 
-generic_a :: ($T a, $T b) -> $T {
+add :: ($T a, $T b) -> $T {
   return a + b;
 }
 
-// !BUG
-// Calling a generic function twice with the same types causes a redefinition
 #test test_generic_functions :: () {
-  //assert("generic function failed to return a + b", generic_a(1, 1) == 2);
-  assert("generic function failed to return a + b", generic_a(1, 1) == 2);
-  assert("generic function failed to return a + b", generic_a(-1, -1) == -2);
-  assert("generic function failed to return a + b", generic_a(1.5, 1.5) == 3.0);
+  //assert("generic function failed to return a + b", add(1, 1) == 2);
+  assert("add() failed to return a + b", add(1, 1) == 2);
+  assert("add() failed to return a + b", add(-1, add(-1, -0)) == -2);
+  assert("add() failed to return a + b", add(1.5, 1.5) == 3.0);
+}
+
+
+// Right now only constant struct parameters work, such as integers.
+GenericStruct :: struct<int N> {
+  int v = N;
+}
+
+#test test_generic_struct :: () {
+  GenericStruct<100> josh;
+  assert("", josh.v == 100);
+  // GenericStruct<200> josh1;
+  // assert("", josh.v == 200);
 }

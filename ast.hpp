@@ -230,7 +230,6 @@ struct ASTContinue : ASTStatement {
 enum ValueSemantic {
   VALUE_SEMANTIC_COPY,
   VALUE_SEMANTIC_POINTER,
-  VALUE_SEMANTIC_MOVE, // FEATURE: add a way to do this.
 }; 
 
 struct ASTFor : ASTStatement {
@@ -284,12 +283,21 @@ struct ASTSubscript : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct GenericParameter {
+  ASTType* type = nullptr;
+  bool is_named = false;
+  std::string name = "";
+  bool operator==(const GenericParameter &other) const {
+    return type == other.type && is_named == other.is_named && name == other.name;
+  }
+};
+
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
   
   // generic parameters like integers and types.
-  Nullable<ASTParamsDecl> generic_parameters;
+  std::vector<GenericParameter> generic_parameters;
   
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
@@ -521,7 +529,8 @@ struct Parser {
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
   ASTCall *parse_call(const Token &);
-  
+  std::vector<GenericParameter> parse_generic_parameters();
+
   // ASTType* parsing routines
   
   ASTType *parse_type();

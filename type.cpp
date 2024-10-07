@@ -272,12 +272,28 @@ bool TypeExt::equals(const TypeExt &other) const {
     return false;
   if (array_sizes.size() != other.array_sizes.size())
     return false;
+  if (generic_arguments.size() != other.generic_arguments.size()) {
+    return false;
+  }
   for (int i = 0; i < extensions.size(); ++i)
     if (extensions[i] != other.extensions[i])
       return false;
   for (int i = 0; i < array_sizes.size(); ++i)
     if (array_sizes[i] != other.array_sizes[i])
       return false;
+    
+  // !BUG this will never work comparing these pointers.
+  for (int i = 0; i < generic_arguments.size(); ++i) {
+    auto type_a = dynamic_cast<ASTType*>(generic_arguments[i]);
+    auto type_b = dynamic_cast<ASTType*>(other.generic_arguments[i]);
+    if (type_a && !type_b) return false;
+    if (type_b && !type_a) return false;
+    
+    // This wont work either.
+    if (type_a->resolved_type != type_b->resolved_type) {
+      return false;
+    }
+  }
   return true;
 }
 
@@ -370,7 +386,6 @@ std::string to_type_struct(Type* type, Context &context) {
 
   return std::format("_type_info[{}]", id);
 }
-
 
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);

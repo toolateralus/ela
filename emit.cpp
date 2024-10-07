@@ -73,8 +73,6 @@ std::any EmitVisitor::visit(ASTFor *node) {
       (*ss) << "++";
 
     } break;
-    case VALUE_SEMANTIC_MOVE:
-      break;
     }
   };
 
@@ -88,7 +86,7 @@ std::any EmitVisitor::visit(ASTFor *node) {
     space();
     v.increment->accept(this);
   };
-  
+
   auto old_scope = ctx.scope;
   ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
@@ -305,7 +303,9 @@ std::any EmitVisitor::visit(ASTIdentifier *node) {
 
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Sub) {
-    auto type = global_get_type(std::any_cast<int>(node->operand->accept(&type_visitor)))->to_string();
+    auto type = global_get_type(
+                    std::any_cast<int>(node->operand->accept(&type_visitor)))
+                    ->to_string();
     (*ss) << '(' << type << ')';
   }
   // (*ss) << '(' << node->op.value;
@@ -318,10 +318,9 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
 std::any EmitVisitor::visit(ASTBinExpr *node) {
   // type inference assignment.
   if (node->op.type == TType::ColonEquals) {
-    // TODO: fix this
-    // if (node->right->is_constexpr()) {
-    //   (*ss) << "const";
-    // }
+    if (node->right->is_constexpr()) {
+      (*ss) << "const";
+    }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
     auto type = global_get_type(id);
     (*ss) << to_cpp_string(type) << ' ';
@@ -367,7 +366,8 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-void EmitVisitor::get_declaration_type_signature_and_identifier(ASTDeclaration *&node, Type *&type) {
+void EmitVisitor::get_declaration_type_signature_and_identifier(
+    ASTDeclaration *&node, Type *&type) {
   {
     std::stringstream tss;
     std::vector<Nullable<ASTExpr>> array_sizes = type->get_ext().array_sizes;
@@ -589,11 +589,12 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
         node->block.get()->accept(this);
         (*ss) << ";\n";
         (*ss) << name;
-        (*ss) << "(const " << name << " &" << node->params->params[0]->name << ")";
+        (*ss) << "(const " << name << " &" << node->params->params[0]->name
+              << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
         return;
-        
+
       } else {
         node->params->accept(this);
       }
@@ -625,11 +626,11 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       node->return_type->accept(this);
       (*ss) << " operator " << op.value;
       node->params->accept(this);
-      
+
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
         (*ss) << " const ";
       }
-      
+
       node->block.get()->accept(this);
       return;
     }
@@ -637,8 +638,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
       (*ss) << "extern \"C\" ";
     }
-    
-    
+
     // we override main's return value to allow compilation without explicitly
     // returning int from main.
     if (node->name.value == "main") {
@@ -650,7 +650,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     // emit parameter signature && name.
     (*ss) << " " + node->name.value;
     node->params->accept(this);
-    
+
     if ((node->flags & FUNCTION_IS_METHOD) != 0) {
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
         (*ss) << " const ";
@@ -691,7 +691,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   }
 
   // emit a bunch of generic funcz
-  if ((node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+  if ((node->flags & FUNCTION_IS_GENERIC) != 0) {
     auto variants = node->generic_types;
     for (const auto variant : variants) {
       auto variant_fun_ty = global_get_type(variant);
@@ -807,6 +807,32 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
 
+  ctx.set_scope(node->scope);
+
+  if (!node->generic_parameters.empty()) {
+    auto emit = [&] {
+      for (const GenericParameter &param : node->generic_parameters) {
+        if (param.is_named) {
+          (*ss) << param.type->base;
+          (*ss) << " " << param.name;
+        } else {
+          (*ss) << "class ";
+          (*ss) << param.type->base;
+        }
+        if (param != node->generic_parameters.back()) (*ss) << ", ";
+      }
+    };
+
+    (*ss) << "template<";
+    emit();
+    (*ss) << ">\n";
+    use_header();
+    (*ss) << "template<";
+    emit();
+    (*ss) << ">\n";
+    use_code();
+  }
+
   if (!is_anonymous) {
     (*ss) << "struct " << node->type->base << "{\n";
     header << "struct " << node->type->base << ";\n";
@@ -815,7 +841,6 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   }
   indentLevel++;
 
-  ctx.set_scope(node->scope);
   for (const auto &decl : node->fields) {
     indented("");
     decl->accept(this);
@@ -991,7 +1016,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
-  // TODO(Josh) 10/1/2024, 12:58:56 PM  implement sum types
+  // FEATURE(Josh) 10/1/2024, 12:58:56 PM  implement sum types
   use_header();
   (*ss) << "union " << node->name.value << ";\n";
   use_code();
@@ -1165,18 +1190,14 @@ std::string EmitVisitor::get_cpp_scalar_type(int id) {
 }
 
 std::string EmitVisitor::to_cpp_string(Type *type) {
-  auto base_no_ext = global_find_type_id(type->get_base(), {});
-  auto base_type = global_get_type(base_no_ext);
-  if (type->is_alias || base_type->is_alias) {
-    base_type = global_get_type(base_type->alias_id);
-    auto old_ext = base_type->get_ext().append(type->get_ext_no_compound());
-    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
-    type = global_get_type(new_id);
-  }
+  type = global_get_type(type->get_true_type());
+  
+  auto output = std::string{};
   switch (type->kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
-    return to_cpp_string(type->get_ext(), type->get_base());
+    output= to_cpp_string(type->get_ext(), type->get_base());
+    break;
   case TYPE_FUNCTION: {
     if (type->get_ext().has_extensions()) {
       return to_cpp_string(type->get_ext(), type->get_base());
@@ -1191,11 +1212,29 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
       }
     }
     params += ")";
-    return ret + params;
+    output= ret + params;
+    break;
   }
   case TYPE_ENUM:
-    return type->get_base();
+    output= type->get_base();
+    break;
   case TYPE_UNION:
-    return to_cpp_string(type->get_ext(), type->get_base());
+    output= to_cpp_string(type->get_ext(), type->get_base());
+    break;
   }
+  auto args = type->get_ext().generic_arguments;
+  if (!args.empty()) {
+    std::stringstream ss;
+    auto old = this->ss;
+    this->ss = &ss;
+    ss << "<";
+    for (const auto &arg: args) {
+      arg->accept(this);
+      if (arg != args.back()) ss << ", ";
+    }
+    ss << ">";
+    this->ss = old;
+    output += ss.str();
+  }
+  return output;
 }

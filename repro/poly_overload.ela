@@ -1,15 +1,6 @@
 #import core;
 
 /* 
-  !Error:
-  ?        Cannot assign a variable of type 'void'
-  --------------------------------------------------------------------------------
-  ? /home/josh/source/c++/ela/source/dummy.ela:11:1
-  --------------------------------------------------------------------------------
-  ? >> i := add ( 1 , 2 )  << 
-*/
-
-/* 
 * we need to make the overload system and the generic function call system use the same machinery
 * otherwise the overloaded functions will always take precedence over generic procedures.
 */
@@ -18,12 +9,22 @@ add :: ($T a, b) -> $T {
   return a + b;
 }
 
-add :: (int a, b) {
-  
+add :: (int a, b) -> int {
+  return a;
 }
 
 main :: ()  {
+  // This ends up calling the generic function, not the other overload, which it should call the overload because the types
+  // match exactly.
   i := add(1, 2);
+  if i != 1 {
+    printf("\e[33m error, i != 1, got %d\n", i);
+  }
+  
+  // of course this calls the generic function.
   f := add(1.0, 12.0);
-  printf("%d,\n%f\n", i, f);
+  if f != 13.0 {
+    printf("\e[33m error, f != 13, got %f\n", f);
+  }
+  
 }

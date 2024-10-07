@@ -5,21 +5,21 @@ classified 15 files      15 unique files.
 -------------------------------------------------------------------------------
 File                             blank        comment           code
 -------------------------------------------------------------------------------
-ast.cpp                            138             75           1306
-type_visitor.cpp                   115             81            946
-emit.cpp                           126             44            815
-type.cpp                            78             45            712
-ast.hpp                             72             27            524
-visitor.cpp                         33             15            377
-type.hpp                            72             16            337
+ast.cpp                            147             75           1368
+emit.cpp                           139             42           1062
+type_visitor.cpp                   115             79            980
+type.cpp                            74             45            632
+ast.hpp                             77             28            537
+visitor.cpp                         32             15            346
+type.hpp                            72             15            314
 lex.hpp                             30              0            289
-core.hpp                            24              2            207
-visitor.hpp                         15              4            176
+core.hpp                            24              2            208
+visitor.hpp                         20              6            186
 lex.cpp                             19              0            170
 main.cpp                            27             15            111
+scope.hpp                           16              4             98
 error.hpp                           14              0             96
-scope.hpp                           17              4             91
-scope.cpp                           15             12             77
+scope.cpp                           16             12             77
 -------------------------------------------------------------------------------
-SUM:                               795            340           6234
+SUM:                               822            338           6474
 -------------------------------------------------------------------------------

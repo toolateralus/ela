@@ -1,9 +1,6 @@
-#import core;
-
-Array :: struct ($T, int N) {
-  T[N] values;
+Array :: struct<$T, int N> {
+  
 }
-
 main :: () {
-  Array<int, 10>;
+  Array<int, 10> array;
 }

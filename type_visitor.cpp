@@ -40,9 +40,7 @@ const auto assert_return_type_is_valid(int &return_type, int new_type,
   }
 };
 
-static inline int int_from_any(const std::any &any) {
-  return std::any_cast<int>(any);
-}
+static inline int int_from_any(const std::any &any) { return std::any_cast<int>(any); }
 
 // CLEANUP(Josh) 10/4/2024, 1:39:21 PM Wow this is an eyesore. There has to be a
 // way to clean this dang thing up either returns the correct type that this
@@ -115,37 +113,25 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
   return declaring_type;
 }
 
-
-
 std::any TypeVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
   }
   node->resolved_type = global_find_type_id(node->base, node->extension_info);
+  for (const auto &arg: node->extension_info.generic_arguments) arg->accept(this);
   return node->resolved_type;
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
-  for (auto &statement : node->statements) {
-    statement->accept(this);
-  }
+  for (auto &statement : node->statements) statement->accept(this);
   return {};
 }
 std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   auto last_decl = current_func_decl;
   current_func_decl = node;
-  Defer _([&]{
-    current_func_decl = last_decl;
-  });
+  Defer _([&]{ current_func_decl = last_decl; });
   
-  if (ctx.scope->is_struct_or_union_scope) {
-    node->flags |= FUNCTION_IS_METHOD;
-  }
-  
-  if (ignore_generic_functions &&
-      (node->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
-    return {};
-  }
-
+  if (ctx.scope->is_struct_or_union_scope) node->flags |= FUNCTION_IS_METHOD;
+  if (ignore_generic_functions && (node->flags & FUNCTION_IS_GENERIC) != 0) return {};
   
   node->return_type->accept(this);
   node->params->accept(this);
@@ -178,28 +164,21 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       global_get_function_typename(node), info, {});
 
   auto sym = ctx.scope->lookup(node->name.value);
-
-  if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) &&
-      (node->flags & FUNCTION_IS_DTOR) == 0) {
+  
+  // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
+  // This is ugly. It's for function overloading
+  if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
     if (sym->function_overload_types.size() >= 1)
       sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = global_get_type(overload_type_id);
-
       auto this_type = global_get_type(type_id);
       auto visited = std::unordered_set<const Type *>();
-      if (type->equals(this_type->get_base(), this_type->get_ext(), visited)) {
-        throw_error(
-            std::format("re-definition of function '{}'", node->name.value),
-            {});
-      }
+      if (type->equals(this_type->get_base(), this_type->get_ext(), visited)) throw_error(std::format("re-definition of function '{}'", node->name.value), {});
     }
     sym->function_overload_types.push_back(type_id);
     sym->type_id = type_id;
   } else {
-    // !BUG why the fr*ck do we have to do this otherwise it segfaults even
-    // though we inserted the function as -1 in the parser??
-
     // always insert the first function declarations as the 0th overloaded type,
     // because we can tell when a fucntion has been overloaded when this array's
     // size is > 1
@@ -208,37 +187,14 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     sym->function_overload_types.push_back(type_id);
     sym->declaring_node = node;
   }
-
-  if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
-    return {};
-  }
-
-  auto control_flow =
-      std::any_cast<ControlFlow>(node->block.get()->accept(this));
-  if (control_flow.type == -1) {
-    control_flow.type = void_type();
-  }
-
-  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0,
-             is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
-
-  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) {
-    throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
-  }
-
-  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0) {
-    throw_error("Keyword \"break\" must be in a loop.", node->source_range);
-  }
-
-  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 &&
-      info.return_type != void_type() && !(is_ctor || is_dtor)) {
-    throw_error("Not all code paths return a value.", node->source_range);
-  }
-
-  assert_types_can_cast_or_equal(control_flow.type, info.return_type,
-                                 node->source_range,
-                                 "invalid function return type: {} {}",
-                                 std::format("function: {}", node->name.value));
+  if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) return {};
+  auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
+  if (control_flow.type == -1) control_flow.type = void_type();
+  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0, is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
+  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0) throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
+  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0) throw_error("Keyword \"break\" must be in a loop.", node->source_range);
+  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && info.return_type != void_type() && !(is_ctor || is_dtor)) throw_error("Not all code paths return a value.", node->source_range);
+  assert_types_can_cast_or_equal(control_flow.type, info.return_type, node->source_range, "invalid function return type: {} {}", std::format("function: {}", node->name.value));
   return {};
 }
 std::any TypeVisitor::visit(ASTBlock *node) {
@@ -291,17 +247,15 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
                     node->source_range);
     }
 
-    // cast the fixed sized array to a base*.
+    // cast off the fixed size array and add a pointer to it,
+    // for s8[] to s8*
     {
-      auto extensions = type->get_ext();
-      auto it = std::find(extensions.extensions.begin(),
-                          extensions.extensions.end(), TYPE_EXT_ARRAY);
-      extensions.extensions.erase(it);
-      extensions.array_sizes.erase(extensions.array_sizes.begin() + 1);
-      extensions.extensions.insert(extensions.extensions.begin(),
-                                   TYPE_EXT_POINTER);
+      auto element = type->get_element_type();
+      auto element_t = global_get_type(element);
+      auto extensions = element_t->get_ext();
+      extensions.extensions.push_back(TYPE_EXT_POINTER);
       node->type->resolved_type =
-          global_find_type_id(type->get_base(), extensions);
+          global_find_type_id(element_t->get_base(), extensions);
     }
   }
 
@@ -316,6 +270,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 }
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
+  
   if (node->value.is_not_null()) {
     declaring_or_assigning_type = node->type->resolved_type;
     auto expr_type = int_from_any(node->value.get()->accept(this));
@@ -352,8 +307,6 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   // CLEANUP(Josh) 10/4/2024, 2:00:49 PM
   // We copy pasted this code like in 5 places, and a lot of the stuff is just
   // identical.
-  // TODO: this needs a really big rework.
-  // TODO: we gotta do type checking on parameters.
   {
     if (type && type->is_kind(TYPE_STRUCT) &&
         type->get_ext().has_no_extensions()) {
@@ -383,7 +336,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   }
 
   // CLEANUP(Josh) 10/4/2024, 1:59:20 PM
-  // These really shouldn't be a part of the expression hierarchy,
+  // These (= and :=) really shouldn't be a part of the expression hierarchy,
   // Same with assignment. Not only will this refuse to compile to C++,
   // it also makes 0 sense.
 
@@ -449,6 +402,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
     return remove_one_pointer_ext(operand_ty, node->source_range);
   }
 
+  // unary operator overload.
   auto left_ty = global_get_type(operand_ty);
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
       left_ty->get_ext().has_no_extensions()) {
@@ -508,8 +462,6 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
 std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
-    // !BUG: this still seems to not always return the correct values.
-    // Although almost always it is correct, and maybe it is always correct.
     int base = 10;
     if (node->value.starts_with("0x")) {
       base = 0;
@@ -555,9 +507,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 
-int TypeVisitor::generate_generic_function(
-    ASTCall *node, ASTFunctionDeclaration *func_decl,
-    std::vector<int> arg_tys) {
+int TypeVisitor::generate_generic_function(ASTCall *node, ASTFunctionDeclaration *func_decl, std::vector<int> arg_tys) {
   std::unordered_set<int> type_args_aliased;
   FunctionTypeInfo info{};
 
@@ -570,11 +520,12 @@ int TypeVisitor::generate_generic_function(
       auto arg_type = global_get_type(arg_tys[i]);
       auto arg_ext = arg_type->get_ext();
       while (!param_ext.has_no_extensions()) {
+        // TODO: Add better errors here. I don't really know what we'd say.
         if (arg_ext.has_no_extensions()) {
-          throw_error("TODO: a better error here.", node->source_range);
+          throw_error("Invalid argument in polymorphic function. Probably expected a T* or T[] but didn't get the right type", node->source_range);
         }
         if (arg_ext.extensions.back() != param_ext.extensions.back()) {
-          throw_error("TODO: a better error here.", node->source_range);
+          throw_error("Invalid argument in polymorphic function. Probably expected a T* or T[] but didn't get the right type.", node->source_range);
         }
         arg_ext = arg_ext.without_back();
         param_ext = param_ext.without_back();
@@ -709,26 +660,30 @@ std::any TypeVisitor::visit(ASTCall *node) {
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   Type *type = global_get_type(symbol->type_id);
-
+  
   if (symbol->declaring_node.is_not_null()) {
     auto func_decl = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
-    if (func_decl && (func_decl->flags & FUNCTION_IS_POLYMORPHIC) != 0) {
+    if (func_decl && (func_decl->flags & FUNCTION_IS_GENERIC) != 0) {
       return generate_generic_function(node, func_decl, arg_tys);
     }
   }
-
+  
+  // the type may be null for a generic function but the if statement above should always take care of that
+  // if that was the case.
   assert(type != nullptr);
+  
+  if (!type->is_kind(TYPE_FUNCTION)) {
+     throw_error("Unable to call function: {} did not refer to a function typed "
+                "variable. Constructors currently use #make(Type, ...) syntax.",
+                node->source_range);
+  }
+
 
   // Find a suitable function overload to call.
   find_function_overload(node, symbol, arg_tys, type);
   
-  auto info = dynamic_cast<FunctionTypeInfo *>(type->get_info());
+  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
 
-  if (!type || !info) {
-    throw_error("Unable to call function: {} did not refer to a function typed "
-                "variable. Constructors currently use #make(Type, ...) syntax.",
-                node->source_range);
-  }
 
   if (!info->is_varargs &&
       (arg_tys.size() > info->params_len ||
@@ -762,6 +717,7 @@ std::any TypeVisitor::visit(ASTArguments *node) {
     // TODO: We need to have a way to get the expected types of the parameters
     // of the function we're visiting for here so that we can implicitly
     // convert initializer lists to the correct type here
+    // * use declaring_or_assigning_type ...
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;
@@ -900,7 +856,6 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   Defer _([&]{
     current_struct_decl = last_decl;
   });
-    
   
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
@@ -908,11 +863,31 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
     return {};
   }
   ctx.set_scope(node->scope);
+  
+  if (!node->generic_parameters.empty()) {
+    for (const auto &param: node->generic_parameters) {
+      if (param.is_named) {
+        ctx.scope->insert(param.name, int_from_any(param.type->accept(this)));
+      } else {
+        type_alias_map[param.type->base] = -2;
+      }
+    }
+  }
+  
   for (auto decl : node->fields) {
     decl->accept(this);
   }
   for (auto method : node->methods) {
     method->accept(this);
+  }
+
+  
+  if (!node->generic_parameters.empty()) {
+    for (const auto &param: node->generic_parameters) {
+      if (!param.is_named) {
+        type_alias_map.erase(param.type->base);
+      }
+    }
   }
 
   ctx.exit_scope();
@@ -965,6 +940,9 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     }
   }
 
+  // CLEANUP(Josh) 10/7/2024, 8:48:23 AM
+  // We should have a way to do this for any type, so we can access subtypes,
+  // and static variables, however those don't currently exist. So this is kind of a FEATURE
   // Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
     auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
@@ -1016,9 +994,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     within_dot_expression = true;
   }
 
-  // TODO: see above.
   ctx.set_scope(scope);
-
   int type = int_from_any(node->right->accept(this));
   ctx.set_scope(previous_scope);
 
@@ -1092,7 +1068,6 @@ std::any TypeVisitor::visit(ASTMake *node) {
   return type;
 }
 std::any TypeVisitor::visit(ASTInitializerList *node) {
-
   int last_type = -1;
   for (const auto &expr : node->expressions) {
     int type = int_from_any(expr->accept(this));
@@ -1122,59 +1097,51 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   int largest_type = s32_type();
   int largest_type_size = 1;
   for (const auto &[key, value] : node->key_values) {
-    if (value.is_not_null()) {
-      if (node->is_flags) {
-        throw_error("You shouldn't use a #flags enum to generate auto "
-                    "flags, and also use non-default values.",
-                    node->source_range);
-      }
-      auto expr = value.get();
-      auto id = int_from_any(value.get()->accept(this));
-
-      auto type = global_get_type(id);
-
-      if (!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions()) {
-        throw_error("Cannot have non integral types in enums got: " +
-                        type->to_string(),
-                    node->source_range);
-      }
-
-      auto info = static_cast<ScalarTypeInfo *>(type->get_info());
-
-      if (info->size > largest_type_size) {
-        largest_type = id;
-        largest_type_size = info->size;
-      }
-
-      assert_types_can_cast_or_equal(id, s64_type(), node->source_range,
-                                     "expected: {}, got : {}",
-                                     "Cannot have non-integral types in enums");
+    if (value.is_null()) 
+      continue;
+    
+    if (node->is_flags) {
+      throw_error("You shouldn't use a #flags enum to generate auto "
+                  "flags, and also use non-default values.",
+                  node->source_range);
     }
+    
+    auto expr = value.get();
+    auto id = int_from_any(value.get()->accept(this));
+    auto type = global_get_type(id);
+    
+    if (!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions()) {
+      throw_error("Cannot have non integral types in enums got: " +
+                      type->to_string(),
+                  node->source_range);
+    }
+
+    auto info = static_cast<ScalarTypeInfo *>(type->get_info());
+    if (info->size > largest_type_size) {
+      largest_type = id;
+      largest_type_size = info->size;
+    }
+
+    assert_types_can_cast_or_equal(id, s64_type(), node->source_range,
+                                    "expected: {}, got : {}",
+                                    "Cannot have non-integral types in enums");
   }
   node->element_type = largest_type;
   return {};
 }
 std::any TypeVisitor::visit(ASTAllocate *node) {
   if (node->kind == ASTAllocate::Delete) {
-    if (node->arguments.is_null() ||
-        node->arguments.get()->arguments.size() < 1) {
-      throw_error("invalid delete statement: you need at least one argument",
-                  node->source_range);
-    }
-
-    for (const auto &arg : node->arguments.get()->arguments) {
-      if (auto iden = dynamic_cast<ASTIdentifier *>(arg)) {
+    if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1) 
+      throw_error("invalid delete statement: you need at least one argument", node->source_range);
+    for (const auto &arg : node->arguments.get()->arguments) 
+      if (auto iden = dynamic_cast<ASTIdentifier *>(arg))
         erase_allocation(ctx.scope->lookup(iden->value.value), ctx.scope);
-      }
-    }
-
     return void_type();
   }
-
-  auto type = int_from_any(node->type.get()->accept(this));
   // just type check them, no need to return
   // we should probably type check parameters for a constructor
   // but we need a seperate system for that
+  auto type = int_from_any(node->type.get()->accept(this));
   if (node->arguments)
     node->arguments.get()->accept(this);
 

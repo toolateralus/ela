@@ -59,7 +59,6 @@ struct Scope {
               int flags = SYMBOL_IS_VARIABLE);
   Symbol *lookup(const std::string &name);
   
-  // TODO: this is probably bad because it will allocate even if it saves on hashing.
   Symbol *local_lookup(const std::string &name) {
     if (symbols.contains(name)) {
       return &symbols[name];
@@ -95,6 +94,7 @@ static Scope *create_child(Scope *parent) {
   return scope;
 }
 struct Context {
+  
   // TODO: clean this system up so we don't have to generate c++ code in the type system.
   // Would be much more preferable to have something that's flexible to various backends.
   std::vector<std::string> type_info_strings;
