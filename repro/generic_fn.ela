@@ -1,9 +1,0 @@
-#import array;
-
-#compiler_flags "-g"
-
-main :: () {
-  s8[] some_array;
-  for s32 i; i < 100; ++i { array_push(&some_array, 100); }
-  for v ; some_array { printf("%d\n", v); }
-}
