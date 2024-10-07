@@ -588,18 +588,21 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       if (op.type == TType::LParen) {
         op.value = "()";
       }
-
       if (op.type == TType::LBrace) {
         op.value = "[]";
       }
-
       if (op.type == TType::Dot) {
         op.value = "->";
       }
       node->return_type->accept(this);
       (*ss) << " operator " << op.value;
-      node->params->accept(this);
-
+      
+      if (op.type == TType::Increment || op.type == TType::Decrement) {
+        (*ss) << "(int)";
+      } else {
+        node->params->accept(this);
+      }
+      
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
         (*ss) << " const ";
       }
