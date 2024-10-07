@@ -1222,19 +1222,20 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     output= to_cpp_string(type->get_ext(), type->get_base());
     break;
   }
-  auto args = type->get_ext().generic_arguments;
-  if (!args.empty()) {
-    std::stringstream ss;
-    auto old = this->ss;
-    this->ss = &ss;
-    ss << "<";
-    for (const auto &arg: args) {
-      arg->accept(this);
-      if (arg != args.back()) ss << ", ";
-    }
-    ss << ">";
-    this->ss = old;
-    output += ss.str();
-  }
+  // TODO: re-implement generic structs.
+  // auto args = type->get_ext().generic_arguments;
+  // if (!args.empty()) {
+  //   std::stringstream ss;
+  //   auto old = this->ss;
+  //   this->ss = &ss;
+  //   ss << "<";
+  //   for (const auto &arg: args) {
+  //     arg->accept(this);
+  //     if (arg != args.back()) ss << ", ";
+  //   }
+  //   ss << ">";
+  //   this->ss = old;
+  //   output += ss.str();
+  // }
   return output;
 }

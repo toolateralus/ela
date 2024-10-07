@@ -515,17 +515,20 @@ ASTType *Parser::parse_type() {
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
-    } else if (peek().type == TType::LT) {
-      eat();
-      std::vector<ASTExpr *> generic_arguments;
-      while (peek().type != TType::GT) {
-        generic_arguments.push_back(parse_primary());
-        if (peek().type != TType::GT)
-          expect(TType::Comma);
-      }
-      expect(TType::GT);
-      extension_info.generic_arguments = generic_arguments;
-    } else {
+    } 
+    else if (peek().type == TType::LT) {
+      end_node(nullptr, range);
+      throw_error("Generic structs are not yet implemented.", range);
+      // eat();
+      // std::vector<ASTExpr *> generic_arguments;
+      // while (peek().type != TType::GT) {
+      //   generic_arguments.push_back(parse_primary());
+      //   if (peek().type != TType::GT)
+      //     expect(TType::Comma);
+      // }
+      // expect(TType::GT);
+      
+    }else {
       break;
     }
   }

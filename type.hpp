@@ -108,7 +108,7 @@ struct TypeExt {
   std::vector<TypeExtEnum> extensions{};
   // for each type extension that is [], nullptr == dynamic array, [non-nullptr] == fixed array size.
   std::vector<Nullable<ASTExpr>> array_sizes{};
-  std::vector<ASTExpr*> generic_arguments{};
+  
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       for (const auto ext : extensions) {

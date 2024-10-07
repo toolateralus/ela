@@ -871,14 +871,15 @@ add :: ($T a, $T b) -> $T {
 }
 
 
-// Right now only constant struct parameters work, such as integers.
-GenericStruct :: struct<int N> {
-  int v = N;
-}
+// ! I decided to stop implementing generic structs and unions because the backend needs to get cleaned up a ton before this
+// ! is a good idea
+// GenericStruct :: struct<int N> {
+//   int v = N;
+// }
 
-#test test_generic_struct :: () {
-  GenericStruct<100> josh;
-  assert("", josh.v == 100);
-  // GenericStruct<200> josh1;
-  // assert("", josh.v == 200);
-}
+// #test test_generic_struct :: () {
+//   GenericStruct<100> josh;
+//   assert("", josh.v == 100);
+//   GenericStruct<200> josh1;
+//   assert("", josh.v == 200);
+// }

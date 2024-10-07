@@ -118,7 +118,7 @@ std::any TypeVisitor::visit(ASTType *node) {
     node->pointing_to.get()->accept(this);
   }
   node->resolved_type = global_find_type_id(node->base, node->extension_info);
-  for (const auto &arg: node->extension_info.generic_arguments) arg->accept(this);
+  // for (const auto &arg: node->extension_info.generic_arguments) arg->accept(this);
   return node->resolved_type;
 }
 std::any TypeVisitor::visit(ASTProgram *node) {
