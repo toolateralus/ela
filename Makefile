@@ -1,11 +1,11 @@
 COMPILER := clang++
-COMPILER_FLAGS := -std=c++23 -g -DMAX_NUM_TYPES=2000
+COMPILER_FLAGS := -std=c++23 -g -DMAX_NUM_TYPES=2000 -Iinclude
 LD_FLAGS := 
 OBJ_DIR := objs
 BIN_DIR := bin
 
-SRCS := $(filter-out output.cpp, $(wildcard *.cpp))
-OBJS := $(patsubst %.cpp,$(OBJ_DIR)/%.o,$(SRCS))
+SRCS := $(filter-out output.cpp, $(wildcard src/*.cpp))
+OBJS := $(patsubst src/%.cpp,$(OBJ_DIR)/%.o,$(SRCS))
 all: directories ela
 
 directories:
@@ -14,7 +14,7 @@ directories:
 ela: $(OBJS)
 	$(COMPILER) $(COMPILER_FLAGS) -o $(BIN_DIR)/$@ $^ $(LD_FLAGS)
 
-$(OBJ_DIR)/%.o: %.cpp
+$(OBJ_DIR)/%.o: src/%.cpp
 	mkdir -p $(@D)
 	$(COMPILER) $(COMPILER_FLAGS) -c $< -o $@
 

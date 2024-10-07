@@ -582,47 +582,7 @@ enum Precedence {
   // posfix 
 };
 
-static inline Precedence get_operator_precedence(Token token) {
-  if (token.is_comp_assign()) {
-    return PRECEDENCE_ASSIGNMENT;
-  }
-  auto type = token.type;
-  switch (type) {
-    case TType::Assign:
-    case TType::ColonEquals:
-      return PRECEDENCE_ASSIGNMENT;
-    case TType::LogicalOr:
-      return PRECEDENCE_LOGICALOR;
-    case TType::LogicalAnd:
-      return PRECEDENCE_LOGICALAND;
-    case TType::Or:
-      return PRECEDENCE_BITWISEOR;
-    case TType::Xor:
-      return PRECEDENCE_BITWISEXOR;
-    case TType::And:
-      return PRECEDENCE_BITWISEAND;
-    case TType::EQ:
-    case TType::NEQ:
-      return PRECEDENCE_EQUALITY;
-    case TType::LT:
-    case TType::GT:
-    case TType::LE:
-    case TType::GE:
-      return PRECEDENCE_RELATIONAL;
-    case TType::SHL:
-    case TType::SHR:
-      return PRECEDENCE_SHIFT;
-    case TType::Add:
-    case TType::Sub:
-      return PRECEDENCE_ADDITIVE;
-    case TType::Mul:
-    case TType::Div:
-    case TType::Modulo:
-      return PRECEDENCE_MULTIPLICATIVE;
-    default:
-      return PRECEDENCE_LOWEST;
-  }
-}
+static Precedence get_operator_precedence(Token token);
 
 struct Parser {
   bool allow_function_type_parsing = true;
@@ -646,75 +606,11 @@ struct Parser {
   // ASTType* parsing routines
   
   ASTType *parse_type();
-  std::vector<ASTType *> parse_parameter_types() {
-    std::vector<ASTType *> param_types;
-    expect(TType::LParen);
-    while (peek().type != TType::RParen) {
-      auto param_type = parse_type();
-      param_types.push_back(param_type);
-      if (peek().type == TType::Comma) {
-        expect(TType::Comma);
-      } else {
-        break;
-      }
-    }
-    expect(TType::RParen);
-    return param_types;
-  }
-  void parse_type_extensions(ASTType *type) {
-    while (peek().type == TType::Mul || peek().type == TType::LBrace) {
-      if (peek().type == TType::Mul) {
-        eat();
-        type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
-      } else if (peek().type == TType::LBrace) {
-        type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
-        expect(TType::LBrace);
-        if (peek().type != TType::RBrace) {
-          auto integer = parse_expr();
-          type->extension_info.array_sizes.push_back(integer);
-        } else {
-          type->extension_info.array_sizes.push_back(nullptr);
-        }
-        expect(TType::RBrace);
-      }
-    }
-  }
-  
-  ASTType *parse_function_type(const std::string &base, TypeExt extension_info) {
-    auto return_type = ast_alloc<ASTType>();
-    return_type->base = base;
-    return_type->extension_info = extension_info;
-    
-    FunctionTypeInfo info{};
-    info.return_type = global_find_type_id(return_type->base, return_type->extension_info);
+  std::vector<ASTType *> parse_parameter_types();
+  void parse_type_extensions(ASTType *type);
 
-    auto param_types = parse_parameter_types();
-    std::ostringstream ss;
-    
-    // convert parameter types to a string
-    {
-      ss << "(";
-      for (size_t i = 0; i < param_types.size(); ++i) {
-        info.parameter_types[i] = global_find_type_id(param_types[i]->base, param_types[i]->extension_info);
-        info.params_len++;
-        ss << global_get_type(info.parameter_types[i])->to_string();
-        if (i != param_types.size() - 1) {
-          ss << ", ";
-        }
-      }
-      ss << ")";
-    }
-    
-    auto type_name = global_get_type(info.return_type)->to_string() + ss.str();
-    return_type->resolved_type = global_find_function_type_id(type_name, info, {});
-    return_type->base = type_name;
-    return_type->extension_info = {};
+  ASTType *parse_function_type(const std::string &base, TypeExt extension_info);
 
-    parse_type_extensions(return_type);
-
-    return return_type;
-  }
-  
   Nullable<ASTNode> process_directive(DirectiveKind kind,
                                       const std::string &identifier);
   void init_directive_routines();

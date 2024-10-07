@@ -79,6 +79,7 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
   return root;
 }
+
 int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   
   lower.begin();
@@ -135,10 +136,12 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   std::filesystem::current_path(original_path);
   return result;
 }
+
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
   return it != flags.end() && it->second;
 }
+
 int CompileCommand::compile() {
   Lexer lexer;
   Context context;

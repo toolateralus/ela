@@ -309,8 +309,17 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
     (*ss) << '(' << type << ')';
   }
   // (*ss) << '(' << node->op.value;
-  (*ss) << node->op.value;
-  node->operand->accept(this);
+  
+  // we always do these as postfix unary since if we don't it's kinda undefined behaviour
+  // and it messes up unary expressions at the end of dot expressions
+  if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
+    node->operand->accept(this);  
+    (*ss) << node->op.value;
+  } else {
+    (*ss) << node->op.value;
+    node->operand->accept(this);
+  }
+  
   // (*ss) << ")";
   return {};
 }
@@ -408,6 +417,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
     (*ss) << tss.str();
   }
 }
+
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
@@ -457,39 +467,6 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   }
   return {};
 }
-
-std::any EmitVisitor::visit(ASTParamDecl *node) {
-  auto type = global_get_type(node->type->resolved_type);
-  node->type->accept(this);
-  (*ss) << ' ' << node->name;
-  if (node->default_value.is_not_null() && emit_default_args) {
-    (*ss) << " = ";
-    node->default_value.get()->accept(this);
-  }
-  return {};
-}
-
-std::any EmitVisitor::visit(ASTParamsDecl *node) {
-  (*ss) << "(";
-  int i = 0;
-  for (const auto &param : node->params) {
-    param->accept(this);
-    if (i != node->params.size() - 1) {
-      (*ss) << ", ";
-    }
-    ++i;
-  }
-
-  if (current_func_decl.is_not_null() &&
-      (current_func_decl.get()->flags & FUNCTION_IS_VARARGS) != 0) {
-    (*ss) << ", ...)";
-    return {};
-  }
-
-  (*ss) << ")";
-  return {};
-}
-
 void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
 
   if ((node->flags & FUNCTION_IS_METHOD) != 0) {
@@ -510,7 +487,6 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   use_code();
   emit_default_args = false;
 }
-
 void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   // Right now we just always do a closure on local lambda functions.
   // This probably isn't desirable for simple in-out functions
@@ -523,7 +499,6 @@ void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   }
   node->block.get()->accept(this);
 }
-
 void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name.value == "main") {
     throw_error("main function cannot be foreign", node->source_range);
@@ -549,7 +524,6 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 
   use_code();
 }
-
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
     // local function
@@ -733,61 +707,6 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 
   return {};
 }
-
-std::any EmitVisitor::visit(ASTBlock *node) {
-  emit_line_directive(node);
-  (*ss) << (" {\n");
-  indentLevel++;
-  ctx.set_scope(node->scope);
-  for (const auto &statement : node->statements) {
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
-      indented("");
-    }
-    statement->accept(this);
-    semicolon();
-    newline();
-  }
-  indentLevel--;
-  indented("}");
-  ctx.exit_scope();
-  return {};
-}
-
-std::any EmitVisitor::visit(ASTProgram *node) {
-  emit_line_directive(node);
-  const auto testing = get_compilation_flag("test");
-  header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
-  use_code();
-  for (const auto &statement : node->statements) {
-    statement->accept(this);
-    semicolon();
-    newline();
-  }
-  if (testing) {
-    auto test_init = test_functions.str();
-    if (test_init.ends_with(',')) {
-      test_init.pop_back();
-    }
-
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests,
-                        "{ " + test_init + " };");
-
-    code << "__TEST_RUNNER_MAIN;";
-  }
-  // Emit runtime reflection type info for requested types
-  {
-    std::stringstream type_info{};
-    for (const auto &str : ctx.type_info_strings) {
-      type_info << str << ";\n";
-    }
-    header << std::format("static Type** _type_info = []{{ Type **_type_info = "
-                          "new Type*[{}]; {}; return _type_info; }}();",
-                          num_types, type_info.str());
-  }
-
-  return {};
-}
-
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
@@ -854,6 +773,175 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   (*ss) << "};\n";
   indentLevel--;
+  return {};
+}
+std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
+  emit_line_directive(node);
+  use_header();
+  std::string iden;
+  if (node->is_flags) {
+    iden = "enum ";
+  } else {
+    iden = "enum ";
+  }
+  auto type = global_get_type(node->element_type);
+  (*ss) << iden << node->type->base << " : " << type->get_base() << "{\n";
+  int i = 0;
+  auto get_next_index = [&] {
+    int value;
+    if (node->is_flags) {
+      value = 1 << i;
+    } else {
+      value = i;
+    }
+    i++;
+    return value;
+  };
+  int n = 0;
+
+  auto type_name = node->type->base;
+  for (const auto &[key, value] : node->key_values) {
+    (*ss) << type_name << '_' << key;
+    (*ss) << " = ";
+    if (value.is_not_null()) {
+      value.get()->accept(this);
+    } else {
+      (*ss) << std::to_string(get_next_index());
+    }
+    if (n != node->key_values.size() - 1) {
+      (*ss) << ",\n";
+    }
+    n++;
+  }
+  (*ss) << "\n};";
+  use_code();
+  return {};
+}
+std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
+  // FEATURE(Josh) 10/1/2024, 12:58:56 PM  implement sum types
+  use_header();
+  (*ss) << "union " << node->name.value << ";\n";
+  use_code();
+
+  (*ss) << "union " << node->name.value << "{\n";
+  current_union_decl = node;
+  Defer _([&] { current_union_decl = nullptr; });
+  indentLevel++;
+  ctx.set_scope(node->scope);
+  emit_default_init = false;
+
+  // DOCUMENT THIS:
+  // we will always default-initialize the first field in a union type.
+  // this may not pan out, but ideally unions would only be used for stuff like
+  // vector3's and ASTnodes.
+  for (const auto &field : node->fields) {
+    if (field == node->fields.front()) {
+      emit_default_init = true;
+      field->accept(this);
+      emit_default_init = false;
+    } else {
+      field->accept(this);
+    }
+
+    (*ss) << ";\n";
+  }
+  for (const auto &method : node->methods) {
+    method->accept(this);
+    (*ss) << ";\n";
+  }
+  for (const auto &_struct : node->structs) {
+    _struct->accept(this);
+    (*ss) << ";\n";
+  }
+  emit_default_init = true;
+  indentLevel--;
+  ctx.exit_scope();
+  (*ss) << "};\n";
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTParamDecl *node) {
+  auto type = global_get_type(node->type->resolved_type);
+  node->type->accept(this);
+  (*ss) << ' ' << node->name;
+  if (node->default_value.is_not_null() && emit_default_args) {
+    (*ss) << " = ";
+    node->default_value.get()->accept(this);
+  }
+  return {};
+}
+std::any EmitVisitor::visit(ASTParamsDecl *node) {
+  (*ss) << "(";
+  int i = 0;
+  for (const auto &param : node->params) {
+    param->accept(this);
+    if (i != node->params.size() - 1) {
+      (*ss) << ", ";
+    }
+    ++i;
+  }
+
+  if (current_func_decl.is_not_null() &&
+      (current_func_decl.get()->flags & FUNCTION_IS_VARARGS) != 0) {
+    (*ss) << ", ...)";
+    return {};
+  }
+
+  (*ss) << ")";
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTBlock *node) {
+  emit_line_directive(node);
+  (*ss) << (" {\n");
+  indentLevel++;
+  ctx.set_scope(node->scope);
+  for (const auto &statement : node->statements) {
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+      indented("");
+    }
+    statement->accept(this);
+    semicolon();
+    newline();
+  }
+  indentLevel--;
+  indented("}");
+  ctx.exit_scope();
+  return {};
+}
+
+std::any EmitVisitor::visit(ASTProgram *node) {
+  emit_line_directive(node);
+  const auto testing = get_compilation_flag("test");
+  header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  use_code();
+  for (const auto &statement : node->statements) {
+    statement->accept(this);
+    semicolon();
+    newline();
+  }
+  if (testing) {
+    auto test_init = test_functions.str();
+    if (test_init.ends_with(',')) {
+      test_init.pop_back();
+    }
+
+    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests,
+                        "{ " + test_init + " };");
+
+    code << "__TEST_RUNNER_MAIN;";
+  }
+  // Emit runtime reflection type info for requested types
+  {
+    std::stringstream type_info{};
+    for (const auto &str : ctx.type_info_strings) {
+      type_info << str << ";\n";
+    }
+    header << std::format("static Type** _type_info = []{{ Type **_type_info = "
+                          "new Type*[{}]; {}; return _type_info; }}();",
+                          num_types, type_info.str());
+  }
+
   return {};
 }
 
@@ -974,91 +1062,6 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
   return {};
 }
 
-std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
-  emit_line_directive(node);
-  use_header();
-  std::string iden;
-  if (node->is_flags) {
-    iden = "enum ";
-  } else {
-    iden = "enum ";
-  }
-  auto type = global_get_type(node->element_type);
-  (*ss) << iden << node->type->base << " : " << type->get_base() << "{\n";
-  int i = 0;
-  auto get_next_index = [&] {
-    int value;
-    if (node->is_flags) {
-      value = 1 << i;
-    } else {
-      value = i;
-    }
-    i++;
-    return value;
-  };
-  int n = 0;
-
-  auto type_name = node->type->base;
-  for (const auto &[key, value] : node->key_values) {
-    (*ss) << type_name << '_' << key;
-    (*ss) << " = ";
-    if (value.is_not_null()) {
-      value.get()->accept(this);
-    } else {
-      (*ss) << std::to_string(get_next_index());
-    }
-    if (n != node->key_values.size() - 1) {
-      (*ss) << ",\n";
-    }
-    n++;
-  }
-  (*ss) << "\n};";
-  use_code();
-  return {};
-}
-
-std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
-  // FEATURE(Josh) 10/1/2024, 12:58:56 PM  implement sum types
-  use_header();
-  (*ss) << "union " << node->name.value << ";\n";
-  use_code();
-
-  (*ss) << "union " << node->name.value << "{\n";
-  current_union_decl = node;
-  Defer _([&] { current_union_decl = nullptr; });
-  indentLevel++;
-  ctx.set_scope(node->scope);
-  emit_default_init = false;
-
-  // DOCUMENT THIS:
-  // we will always default-initialize the first field in a union type.
-  // this may not pan out, but ideally unions would only be used for stuff like
-  // vector3's and ASTnodes.
-  for (const auto &field : node->fields) {
-    if (field == node->fields.front()) {
-      emit_default_init = true;
-      field->accept(this);
-      emit_default_init = false;
-    } else {
-      field->accept(this);
-    }
-
-    (*ss) << ";\n";
-  }
-  for (const auto &method : node->methods) {
-    method->accept(this);
-    (*ss) << ";\n";
-  }
-  for (const auto &_struct : node->structs) {
-    _struct->accept(this);
-    (*ss) << ";\n";
-  }
-  emit_default_init = true;
-  indentLevel--;
-  ctx.exit_scope();
-  (*ss) << "};\n";
-  return {};
-}
 
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {

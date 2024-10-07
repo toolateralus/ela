@@ -1,16 +1,36 @@
+#import core;
 
+array_realloc :: ($T[] *array) {
+  array.capacity = array.length * 1.5;
+  new_data := malloc(sizeof(T) * array.capacity);
+  memcpy((void*)new_data, (void*)array.data, sizeof(T) * array.length);
+  free((void*)array.data);
+  array.data = (T*)new_data;
+}
 
 array_push :: ($T[] *array, $T value) {
   capacity := &array.capacity;
   length := &array.length;
+  T** data = &array.data;
+
+  if *length >= *capacity 
+    then array_realloc(array);
+
+  slot := (data[*length]);
+  (*slot) = value;
+  *length += 1;
+}
+
+
+array_pop :: ($T[] *array) -> $T {
+  length := &array.length;
   data := &array.data;
 
-  if *length >= *capacity {
-    *capacity = *length * 1.5f;
-    old_data := data;
-    new_data := malloc(sizeof(T) * *capacity);
-    memcpy(*new_data, *old_data, sizeof(T) * *length);
-    free(old_data);
-    *data = new_data;
+  if *length == 0 {
+    printf("Error: popped an empty array");
+    exit(1);
   }
+
+  *length -= 1;
+  return (*data)[*length];
 }

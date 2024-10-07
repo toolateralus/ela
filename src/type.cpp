@@ -39,7 +39,7 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   if (type_alias_map.contains(name)) {
     return type_alias_map[name];
   }
-  
+
   auto aliased = global_get_type(aliased_type);
   auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
   type_table[num_types] = type;
@@ -56,7 +56,7 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
 int global_find_function_type_id(const std::string &name,
                                  const FunctionTypeInfo &info,
                                  const TypeExt &ext) {
-                                  
+
   if (type_alias_map.contains(name)) {
     auto alias = type_alias_map[name];
     if (ext.has_no_extensions())
@@ -68,7 +68,7 @@ int global_find_function_type_id(const std::string &name,
                                 ext);
     }
   }
-                                  
+
   for (int i = 0; i < num_types; ++i) {
     if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
@@ -84,8 +84,9 @@ int global_find_function_type_id(const std::string &name,
 }
 
 // PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
-// We might want to upgrade to a hash map at a certain number of types or something.
-// I think the linear search is fine but this is certainly one of the slowest functions in the compiler.
+// We might want to upgrade to a hash map at a certain number of types or
+// something. I think the linear search is fine but this is certainly one of the
+// slowest functions in the compiler.
 int global_find_type_id(const std::string &name,
                         const TypeExt &type_extensions) {
   if (type_alias_map.contains(name)) {
@@ -94,9 +95,10 @@ int global_find_type_id(const std::string &name,
       return alias;
     else {
       auto base_type = global_get_type(alias);
-      return global_create_type((TypeKind)base_type->kind,
-                                base_type->get_base(), base_type->get_info(),
-                                base_type->get_ext_no_compound().append(type_extensions));
+      return global_create_type(
+          (TypeKind)base_type->kind, base_type->get_base(),
+          base_type->get_info(),
+          base_type->get_ext_no_compound().append(type_extensions));
     }
   }
   for (int i = 0; i < num_types; ++i) {
@@ -145,14 +147,16 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->is_alias) {
     auto aliasType = global_get_type(type_alias_map[from->get_base()]);
     auto pointed_to = global_get_type(aliasType->alias_id);
-    auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), from->get_ext()));
+    auto fullType = global_get_type(
+        global_find_type_id(pointed_to->get_base(), from->get_ext()));
     return type_conversion_rule(fullType, to);
   }
-  
+
   if (to->is_alias) {
     auto aliasType = global_get_type(type_alias_map[to->get_base()]);
     auto pointed_to = global_get_type(aliasType->alias_id);
-    auto fullType = global_get_type(global_find_type_id(pointed_to->get_base(), to->get_ext()));
+    auto fullType = global_get_type(
+        global_find_type_id(pointed_to->get_base(), to->get_ext()));
     return type_conversion_rule(from, fullType);
   }
 
@@ -208,11 +212,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   // if the type extensions are equal, return the conversion rule for the bases.
   // this allows int[] to cast to s8[] etc;
-  if (from->get_ext().has_extensions() &&
-      to->get_ext().has_extensions() &&
+  if (from->get_ext().has_extensions() && to->get_ext().has_extensions() &&
       from->get_ext().extensions.back() == to->get_ext().extensions.back()) {
-    auto from_base = global_get_type(global_find_type_id(from->get_base(), from->get_ext().without_back()));
-    auto to_base = global_get_type(global_find_type_id(to->get_base(), to->get_ext().without_back()));
+    auto from_base = global_get_type(
+        global_find_type_id(from->get_base(), from->get_ext().without_back()));
+    auto to_base = global_get_type(
+        global_find_type_id(to->get_base(), to->get_ext().without_back()));
     return type_conversion_rule(from_base, to_base);
   }
 
@@ -262,7 +267,7 @@ bool Type::equals(const std::string &name, const TypeExt &type_extensions,
   auto type = global_get_type(id);
   if (type->get_base() != name)
     return false;
-  
+
   return type_extensions == type->get_ext();
 }
 
@@ -280,20 +285,18 @@ bool TypeExt::equals(const TypeExt &other) const {
   return true;
 }
 
-
-
 std::string Type::to_string() const {
   auto base_no_ext = global_find_type_id(get_base(), {});
   auto base_type = global_get_type(base_no_ext);
-  
-  Type* type = (Type*)this;
+
+  Type *type = (Type *)this;
   if (type->is_alias || base_type->is_alias) {
     base_type = global_get_type(base_type->alias_id);
     auto old_ext = base_type->get_ext().append(get_ext_no_compound());
     auto new_id = global_find_type_id(base_type->get_base(), old_ext);
     type = global_get_type(new_id);
   }
-  
+
   switch (kind) {
   case TYPE_STRUCT:
   case TYPE_SCALAR:
@@ -311,10 +314,10 @@ std::string Type::to_string() const {
 
 // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
 // This should be in the emit visitor not here.
-std::string to_type_struct(Type* type, Context &context) {
+std::string to_type_struct(Type *type, Context &context) {
   auto id = type->get_true_type();
   type = global_get_type(id);
-  
+
   static bool *type_cache = [] {
     auto arr = new bool[MAX_NUM_TYPES];
     memset(arr, false, MAX_NUM_TYPES);
@@ -342,7 +345,10 @@ std::string to_type_struct(Type* type, Context &context) {
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
       auto t = global_get_type(sym.type_id);
-      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
                 << std::format(".type = {}", to_type_struct(t, context))
                 << " }";
@@ -361,14 +367,17 @@ std::string to_type_struct(Type* type, Context &context) {
       context.type_info_strings.push_back(fields_ss.str());
       return std::string("_type_info[") + std::to_string(id) + "]";
     }
-    
+
     fields_ss << "{";
 
     int count = info->keys.size();
     int it = 0;
     for (const auto &name : info->keys) {
       auto t = global_get_type(s32_type());
-      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
                 << std::format(".type = {}", to_type_struct(t, context))
                 << " }";
@@ -394,7 +403,10 @@ std::string to_type_struct(Type* type, Context &context) {
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
       auto t = global_get_type(sym.type_id);
-      if (!t) throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
                 << std::format(".type = {}", to_type_struct(t, context))
                 << " }";
@@ -412,9 +424,8 @@ std::string to_type_struct(Type* type, Context &context) {
     return std::string("_type_info[") + std::to_string(id) + "]";
   }
 
-  
   type_cache[id] = true;
-  
+
   context.type_info_strings.push_back(std::format(
       "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }};",
       id, id, type->to_string(), fields_ss.str()));
@@ -522,10 +533,21 @@ int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
   }
+
   auto extensions = this->get_ext();
-  extensions.extensions.pop_back();
-  extensions.array_sizes.pop_back();
-  return global_find_type_id(base, extensions);
+  for (auto it = extensions.extensions.rbegin();
+       it != extensions.extensions.rend();) {
+    if (*it == TYPE_EXT_ARRAY) {
+      it = std::vector<TypeExtEnum>::reverse_iterator(
+          extensions.extensions.erase((it + 1).base()));
+      extensions.array_sizes.pop_back();
+      return global_find_type_id(base, extensions);
+    } else {
+      ++it;
+    }
+  }
+  
+  return id;
 }
 
 // used for anonymous structs etc.
@@ -538,8 +560,7 @@ Token get_unique_identifier() {
 }
 
 int char_type() {
-  static int type = global_find_type_id(
-      "char", {});
+  static int type = global_find_type_id("char", {});
   return type;
 }
 int voidptr_type() {
@@ -622,8 +643,10 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
 }
 
 // TODO(Josh) 10/5/2024, 10:04:29 AM
-// This should be a lot more strict. We can't define assignment operators because in C++ it requires a reference.
-// a lot of these operators should be banned too, we don't need () for example, it just creates a bunch of complexity.
+// This should be a lot more strict. We can't define assignment operators
+// because in C++ it requires a reference. a lot of these operators should be
+// banned too, we don't need () for example, it just creates a bunch of
+// complexity.
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range) {
   switch (type) {
@@ -696,7 +719,7 @@ int get_pointer_to_type(int base) {
 }
 
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
-                                     bool is_integral = false) {
+                                        bool is_integral = false) {
   auto info = ast_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
   info->size = size;
@@ -749,15 +772,18 @@ void init_type_system() {
                        create_scalar_type_info(TYPE_U8, 1, true));
     global_create_type(TYPE_SCALAR, "bool",
                        create_scalar_type_info(TYPE_BOOL, 1, true));
-    global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
+    global_create_type(TYPE_SCALAR, "void",
+                       create_scalar_type_info(TYPE_VOID, 0));
   }
 }
 bool type_is_numerical(const Type *t) {
-  if (!t->is_kind(TYPE_SCALAR)) return false;
-  return t->id == char_type() || t->id == float_type() || t->id == int_type() || t->id == s8_type() || t->id == s16_type() || t->id == s32_type() ||
+  if (!t->is_kind(TYPE_SCALAR))
+    return false;
+  return t->id == char_type() || t->id == float_type() || t->id == int_type() ||
+         t->id == s8_type() || t->id == s16_type() || t->id == s32_type() ||
          t->id == s64_type() || t->id == u8_type() || t->id == u16_type() ||
-         t->id == u32_type() || t->id == u64_type() || t->id == float32_type() ||
-         t->id == float64_type();
+         t->id == u32_type() || t->id == u64_type() ||
+         t->id == float32_type() || t->id == float64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
@@ -766,12 +792,12 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
 
   auto from_info = static_cast<ScalarTypeInfo *>(from->get_info());
   auto to_info = static_cast<ScalarTypeInfo *>(to->get_info());
-  
+
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {
     return false;
   }
-  
+
   return from_info->size <= to_info->size;
 }
 

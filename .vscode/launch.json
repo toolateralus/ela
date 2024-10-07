@@ -10,8 +10,16 @@
       "request": "launch",
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela"],
-      "cwd": "${workspaceFolder}/repro/lexer"
+      "args": ["generic_fn.ela", "--debug"],
+      "cwd": "${workspaceFolder}/repro"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug repro executable",
+      "program": "${workspaceFolder}/repro/generic_fn",
+      "args": [],
+      "cwd": "${workspaceFolder}/repro"
     },
     {
       "type": "lldb",

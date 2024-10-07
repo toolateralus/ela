@@ -1,6 +1,0 @@
-
-#import core;
-main :: () {
-  printf("%c", #char " ");
-  printf("%c", #char "a");
-}

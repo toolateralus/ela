@@ -1,14 +1,9 @@
+#import array;
 
-array_realloc::($T[] *array) {
-  array.capacity = array.length * 1.5;
-  new_data := malloc(sizeof(T) * array.capacity);
-  memcpy(new_data, array.data, sizeof(T) * array.length);
-  free(array.data);
-}
+#compiler_flags "-g"
 
 main :: () {
-  int[] some_array;
-  
-  // ! Compiler just segfaults because somehow we get an internal type that has array extensions but it has no array size.
-  array_realloc(&some_alloc);
+  s8[] some_array;
+  for s32 i; i < 100; ++i { array_push(&some_array, 100); }
+  for v ; some_array { printf("%d\n", v); }
 }
