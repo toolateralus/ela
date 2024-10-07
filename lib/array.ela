@@ -1,5 +1,7 @@
 #import core;
 
+#error "the array module is currently bugged, and entirely non-functional. Sorry!";
+
 array_realloc :: ($T[] *array) {
   array.capacity = array.length * 1.5;
   new_data := malloc(sizeof(T) * array.capacity);
@@ -20,7 +22,6 @@ array_push :: ($T[] *array, $T value) {
   (*slot) = value;
   *length += 1;
 }
-
 
 array_pop :: ($T[] *array) -> $T {
   length := &array.length;

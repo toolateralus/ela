@@ -869,23 +869,30 @@ add :: ($T a, $T b) -> $T {
   return a + b;
 }
 
+generic_test_1 :: ($T **arg1, $T value) -> $T {
+  return value;
+}
+generic_called_by_generic :: ($T v) -> $T {
+  return v;
+}
+generic_calling_generic :: ($T v) -> $T {
+  return generic_called_by_generic(v);
+} 
+
 #test test_generic_functions :: () {
   //assert("generic function failed to return a + b", add(1, 1) == 2);
   assert("add() failed to return a + b", add(1, 1) == 2);
   assert("add() failed to return a + b", add(-1, add(-1, -0)) == -2);
   assert("add() failed to return a + b", add(1.5, 1.5) == 3.0);
+  
+  //! Bug, this shouldnt work but it does because of both a failure of us type checking
+  //! generic arguments, and also C++ failing to have good casting rules.
+  // We should never be able to cast 10 to a boolean lol.
+  {
+    bool** j;
+    generic_test_1(j, 10);
+  }
+  
+  //! See bug 1.1 :: 
+  //! generic_calling_generic(10);
 }
-
-
-// ! I decided to stop implementing generic structs and unions because the backend needs to get cleaned up a ton before this
-// ! is a good idea
-// GenericStruct :: struct<int N> {
-//   int v = N;
-// }
-
-// #test test_generic_struct :: () {
-//   GenericStruct<100> josh;
-//   assert("", josh.v == 100);
-//   GenericStruct<200> josh1;
-//   assert("", josh.v == 200);
-// }

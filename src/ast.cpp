@@ -158,6 +158,23 @@ void Parser::init_directive_routines() {
          }});
   }
 
+  // #error, for throwing compiler errors.
+  {
+    directive_routines.push_back({
+      .identifier = "error",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) static {
+        auto error = parser->parse_primary();
+        if (error->get_node_type() != AST_NODE_LITERAL) {
+          throw_error("Can only throw a literal as a error", error->source_range);
+        }
+        auto literal = static_cast<ASTLiteral*>(error);
+        throw_error(literal->value, error->source_range);
+        return nullptr;
+      }
+    });
+  }
+
   // #import
   // Imports from usr/local/lib/ela by identifier and no file ext.
   {

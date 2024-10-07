@@ -55,6 +55,13 @@ array_pop :: ($T[] *array) -> $T {
   * }
   
   ? ---- CODE ----
+  
+  
+  * I suspect the issue is caused by the way the emitter is handling generic function calls.
+  * I think that once we emit the function call to the array_push, we've already visited and ignored the 
+  * function declaation for array_realloc, which didn't have any calls yet when we visited it, because it's body gets ignored
+  * until emit time. We need to be pre-visiting these calls somehow, I have no idea how. We should probably have a more
+  * comprehensive system for doing generics, maybe even a dedicated visitor. Or a resolver that works like a scheduler.
 */
 
 /*
@@ -83,6 +90,9 @@ array_pop :: ($T[] *array) -> $T {
   *   int[] array;
   *   array_push(&array, 100);
   * }
+  
+  * I suspect that this issue is caused by us inferring T from the first non-extended argument, which in this case it the 'value' parameter of 'array_push'
+  * whereas we really need to infer the type from the first ocurring usage of a particular generic parameter.
   
   ? ---- CODE ----
 */
