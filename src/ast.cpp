@@ -1060,19 +1060,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
-  if (peek().type == TType::LT) {
-    decl->generic_parameters = parse_generic_parameters();
-    for (const auto &param : decl->generic_parameters) {
-      if (param.is_named) {
-        ctx.scope->insert(
-            param.name,
-            global_find_type_id(param.type->base, param.type->extension_info));
-      } else {
-        type_alias_map[param.type->base] = 0;
-      }
-    }
-  }
-
   // fwd declare the type.
   auto type_id = global_create_struct_type(name.value, {});
 
@@ -1102,12 +1089,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
-  }
-
-  for (const auto &param : decl->generic_parameters) {
-    if (!param.is_named) {
-      type_alias_map.erase(param.type->base);
-    }
   }
 
   auto info =

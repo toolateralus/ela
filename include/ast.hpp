@@ -401,9 +401,6 @@ struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
   
-  // generic parameters like integers and types.
-  std::vector<GenericParameter> generic_parameters;
-  
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
 

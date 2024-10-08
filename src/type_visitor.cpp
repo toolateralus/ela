@@ -2,6 +2,7 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
+#include "resolver.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -287,20 +288,12 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
-    return {};
-  }
-  ctx.set_scope(node->scope);
   
-  if (!node->generic_parameters.empty()) {
-    for (const auto &param: node->generic_parameters) {
-      if (param.is_named) {
-        ctx.scope->insert(param.name, int_from_any(param.type->accept(this)));
-      } else {
-        type_alias_map[param.type->base] = -2;
-      }
-    }
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
+    return QUEUED_RESOLVED;
   }
+  
+  ctx.set_scope(node->scope);
   
   for (auto decl : node->fields) {
     decl->accept(this);
@@ -308,18 +301,9 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   for (auto method : node->methods) {
     method->accept(this);
   }
-
   
-  if (!node->generic_parameters.empty()) {
-    for (const auto &param: node->generic_parameters) {
-      if (!param.is_named) {
-        type_alias_map.erase(param.type->base);
-      }
-    }
-  }
-
   ctx.exit_scope();
-  return {};
+  return QUEUED_RESOLVED;
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   auto last_decl = current_union_decl;

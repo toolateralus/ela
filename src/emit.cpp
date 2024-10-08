@@ -750,30 +750,6 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   ctx.set_scope(node->scope);
 
-  if (!node->generic_parameters.empty()) {
-    auto emit = [&] {
-      for (const GenericParameter &param : node->generic_parameters) {
-        if (param.is_named) {
-          (*ss) << param.type->base;
-          (*ss) << " " << param.name;
-        } else {
-          (*ss) << "class ";
-          (*ss) << param.type->base;
-        }
-        if (param != node->generic_parameters.back()) (*ss) << ", ";
-      }
-    };
-
-    (*ss) << "template<";
-    emit();
-    (*ss) << ">\n";
-    use_header();
-    (*ss) << "template<";
-    emit();
-    (*ss) << ">\n";
-    use_code();
-  }
-
   if (!is_anonymous) {
     (*ss) << "struct " << node->type->base << "{\n";
     header << "struct " << node->type->base << ";\n";

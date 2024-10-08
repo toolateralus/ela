@@ -46,16 +46,17 @@ file_read_to_string :: (file: FILE*, len: u32*) -> char * {
   return str;
 }
 
-File :: struct {
-  file: FILE*;
-  #ctor :: (name: char*) {
-    file = fopen(name, "rw");
+file_read_to_string :: (filename: char *) -> char * {
+  file := fopen(filename, "r");
+  len := file_get_length(file);
+  str: char* = malloc(sizeof(char) * (len + 1));
+  index := 0;
+  c: char;
+  while ((c = fgetc(file)) != EOF) {
+    str[index] = c;
+    ++index;
   }
-  #dtor :: () {
-    fclose(file);
-  }
-  read :: () -> string {
-    len: u32;
-    return #make(string, file_read_to_string(file, &len));
-  }
+  str[index] = #char "\0";
+  fclose(file);
+  return str;
 }
