@@ -11,6 +11,7 @@ enum SymbolFlags {
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_HAS_OVERLOADS = 1 << 3,
   SYMBOL_WAS_MUTATED = 1 << 4,
+  SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
 };
 
 struct ASTNode;

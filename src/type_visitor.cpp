@@ -288,7 +288,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
   
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
     return {};
   }
   
@@ -404,7 +404,20 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   auto type_id = global_find_function_type_id(
       global_get_function_typename(node), info, {});
 
+
+  // TODO: we need to support fwd decls of overloaded functions
+  if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+    ctx.scope->insert(node->name.value, type_id);
+    auto sym = ctx.scope->lookup(node->name.value);
+    sym->flags |= SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION;
+    return {};
+  }
+
   auto sym = ctx.scope->lookup(node->name.value);
+  
+  if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
+    sym->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
+  }
   
   // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
   // This is ugly. It's for function overloading

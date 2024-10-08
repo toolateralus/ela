@@ -1,0 +1,12 @@
+
+Something :: struct;
+
+Something :: struct {
+  
+}
+
+forward :: (something : int) -> int;
+
+forward :: (something : int) -> int {
+  return 0;
+}

@@ -548,6 +548,12 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
+    
+    if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      emit_forward_declaration(node);
+      return;
+    }
+    
     // local function
     if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope &&
         (node->flags & FUNCTION_IS_METHOD) == 0) {
@@ -741,7 +747,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   Defer deferred([&] { current_struct_decl = nullptr; });
 
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     header << "struct " << node->type->base << ";\n";
     return {};
   }

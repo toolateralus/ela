@@ -871,6 +871,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->params = parse_parameters();
 
   auto sym = ctx.scope->local_lookup(name.value);
+  
   if (sym) {
     sym->flags |= SYMBOL_HAS_OVERLOADS;
   } else {
@@ -905,7 +906,14 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
       type_alias_map[param->type->base] = -2;
     }
   }
-
+  
+  if (peek().type == TType::Semi) {
+    function->flags |= FUNCTION_IS_FORWARD_DECLARED;
+    end_node(function, range);
+    current_func_decl = last_func_decl;
+    return function;
+  }
+  
   function->block = parse_block();
 
   if ((function->flags & FUNCTION_IS_GENERIC) != 0) {
@@ -980,6 +988,7 @@ ASTParamsDecl *Parser::parse_parameters() {
   end_node(params, range);
   return params;
 }
+
 ASTArguments *Parser::parse_arguments() {
   auto range = begin_node();
   auto args = ast_alloc<ASTArguments>();
@@ -1089,10 +1098,13 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
+    decl->is_fwd_decl = true;
   }
 
   auto info =
       static_cast<StructTypeInfo *>(global_get_type(type_id)->get_info());
+      
+  info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
 
   current_struct_decl = nullptr;
