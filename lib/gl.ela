@@ -4,55 +4,55 @@ GLFWwindow :: struct;
 
 #foreign glfwInit :: () -> bool;
 #foreign glfwTerminate :: ();
-#foreign glfwCreateWindow :: (int w, int h, char* t, void* v, void* v1) -> GLFWwindow*;
-#foreign glfwMakeContextCurrent :: (void* ctx);
-#foreign glfwWindowShouldClose :: (GLFWwindow *window) -> bool;
+#foreign glfwCreateWindow :: (w: int, h: int, t: char*, v: void*, v1: void*) -> GLFWwindow*;
+#foreign glfwMakeContextCurrent :: (ctx: void*);
+#foreign glfwWindowShouldClose :: (window: GLFWwindow*) -> bool;
 #foreign glfwPollEvents :: ();
-#foreign glfwSwapBuffers :: (GLFWwindow *window);
+#foreign glfwSwapBuffers :: (window: GLFWwindow*);
 #foreign glewInit :: () -> bool;
-#foreign glGenVertexArrays :: (int n, u32* arrays);
-#foreign glBindVertexArray :: (int array);
-#foreign glGenBuffers :: (int n_buf, u32* buf);
-#foreign glBindBuffer :: (int type, u32 buf);
-#foreign glBufferData :: (int target, s64 size, void* data, int usage);
-#foreign glEnableVertexAttribArray :: (int index);
-#foreign glVertexAttribPointer :: (int index, s64 size, int type, bool normalized, s64 stride, void* pointer);
-#foreign glDrawArrays :: (u32 mode, first, count);
-#foreign glClearColor :: (float red, green, blue, alpha);
-#foreign glClear :: (u32 mask);
+#foreign glGenVertexArrays :: (n: int, arrays: u32*);
+#foreign glBindVertexArray :: (array: int);
+#foreign glGenBuffers :: (n_buf: int, buf: u32*);
+#foreign glBindBuffer :: (type: int, buf: u32);
+#foreign glBufferData :: (target: int, size: s64, data: void*, usage: int);
+#foreign glEnableVertexAttribArray :: (index: int);
+#foreign glVertexAttribPointer :: (index: int, size: s64, type: int, normalized: bool, stride: s64, pointer: void*);
+#foreign glDrawArrays :: (mode: u32, first, count);
+#foreign glClearColor :: (red: float, green: float, blue: float, alpha: float);
+#foreign glClear :: (mask: u32);
 #foreign glGetError :: () -> int;
-#foreign glCreateShader :: (u32 type) -> u32;
-#foreign glShaderSource :: (u32 shader, int count, char** string, int* length);
-#foreign glCompileShader :: (u32 shader);
-#foreign glGetShaderiv :: (u32 shader, pname, int* params);
-#foreign glGetShaderInfoLog :: (u32 shader, int maxLength, int* length, char* infoLog);
+#foreign glCreateShader :: (type: u32) -> u32;
+#foreign glShaderSource :: (shader: u32, count: int, string: char**, length: int*);
+#foreign glCompileShader :: (shader: u32);
+#foreign glGetShaderiv :: (shader: u32, pname, params: int*);
+#foreign glGetShaderInfoLog :: (shader: u32, maxLength: int, length: int*, infoLog: char*);
 #foreign glCreateProgram :: () -> u32;
-#foreign glAttachShader :: (u32 program, shader);
-#foreign glLinkProgram :: (u32 program);
-#foreign glGetProgramiv :: (u32 program, pname, int* params);
-#foreign glGetProgramInfoLog :: (u32 program, int maxLength, int* length, char* infoLog);
-#foreign glUseProgram :: (u32 program);
-#foreign glDeleteShader :: (s32 shader);
-#foreign glDeleteProgram :: (s32 shader);
-#foreign glViewport :: (int x, y, int width, height);
+#foreign glAttachShader :: (program: u32, shader);
+#foreign glLinkProgram :: (program: u32);
+#foreign glGetProgramiv :: (program: u32, pname, params: int*);
+#foreign glGetProgramInfoLog :: (program: u32, maxLength: int, length: int*, infoLog: char*);
+#foreign glUseProgram :: (program: u32);
+#foreign glDeleteShader :: (shader: s32);
+#foreign glDeleteProgram :: (shader: s32);
+#foreign glViewport :: (x: int, y: int, width: int, height: int);
 
-#foreign glfwGetKey :: (GLFWwindow* window, int key) -> u32;
-#foreign glfwGetMouseButton :: (GLFWwindow* window, int button) -> u32;
-#foreign glfwGetCursorPos :: (GLFWwindow* window, float* xpos, ypos);
-#foreign glfwSetCursorPos :: (GLFWwindow* window, float xpos, ypos);
-#foreign glfwSetInputMode :: (GLFWwindow* window, int mode, value);
+#foreign glfwGetKey :: (window: GLFWwindow*, key: int) -> u32;
+#foreign glfwGetMouseButton :: (window: GLFWwindow*, button: int) -> u32;
+#foreign glfwGetCursorPos :: (window: GLFWwindow*, xpos: float*, ypos);
+#foreign glfwSetCursorPos :: (window: GLFWwindow*, xpos: float, ypos);
+#foreign glfwSetInputMode :: (window: GLFWwindow*, mode: int, value);
 
-#foreign glGetUniformLocation :: (u32 program, char* name) -> int;
-#foreign glUniform4fv :: (int location, count, float* value);
-#foreign glUniform3fv :: (int location, count, float* value);
-#foreign glUniform2fv :: (int location, count, float* value);
-#foreign glUniform1f :: (int location, float v0);
-#foreign glUniformMatrix4fv :: (int location, count, bool transpose, float* value);
-#foreign glfwSwapInterval :: (int interval);
+#foreign glGetUniformLocation :: (program: u32, name: char*) -> int;
+#foreign glUniform4fv :: (location: int, count, value: float*);
+#foreign glUniform3fv :: (location: int, count, value: float*);
+#foreign glUniform2fv :: (location: int, count, value: float*);
+#foreign glUniform1f :: (location: int, v0: float);
+#foreign glUniformMatrix4fv :: (location: int, count, transpose: bool, value: float*);
+#foreign glfwSwapInterval :: (interval: int);
 
-#foreign glEnable :: (int cap);
-#foreign glDisable :: (int cap);
-#foreign glIsEnabled :: (int cap) -> bool;
+#foreign glEnable :: (cap: int);
+#foreign glDisable :: (cap: int);
+#foreign glIsEnabled :: (cap: int) -> bool;
 
 GL :: enum {
  STATIC_DRAW = 35044,
@@ -729,17 +729,17 @@ Key :: enum {
   LAST = 348,
 }
 
-compile_shader :: (u32 kind, char *source) -> u32 {
-  u32 shader = glCreateShader(kind);
+compile_shader :: (kind: u32, source: char*) -> u32 {
+  shader: u32 = glCreateShader(kind);
   glShaderSource(shader, 1, &source, null);
   glCompileShader(shader);
 
-  int success;
+  success: int;
   glGetShaderiv(shader, GL.COMPILE_STATUS, &success);
   if success == 0 {
-    int length;
+    length: int;
     glGetShaderiv(shader, GL.INFO_LOG_LENGTH, &length);
-    char* info_log = malloc(sizeof(char*) * length);
+    info_log: char* = malloc(sizeof(char*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
     free(info_log);
@@ -748,25 +748,25 @@ compile_shader :: (u32 kind, char *source) -> u32 {
   return shader;
 }
 
-create_program :: (char* vert_source, char* frag_source) -> u32 {
-  u32 vertex_shader = compile_shader(GL.VERTEX_SHADER, vert_source);
-  u32 fragment_shader = compile_shader(GL.FRAGMENT_SHADER, frag_source);
+create_program :: (vert_source: char*, frag_source: char*) -> u32 {
+  vertex_shader: u32 = compile_shader(GL.VERTEX_SHADER, vert_source);
+  fragment_shader: u32 = compile_shader(GL.FRAGMENT_SHADER, frag_source);
 
   if vertex_shader == 0 || fragment_shader == 0 {
     return #make(u32, 0);
   }
 
-  u32 program = glCreateProgram();
+  program: u32 = glCreateProgram();
   glAttachShader(program, vertex_shader);
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
 
-  int success;
+  success: int;
   glGetProgramiv(program, GL.LINK_STATUS, &success);
   if success == 0 {
-    int length;
+    length: int;
     glGetProgramiv(program, GL.INFO_LOG_LENGTH, &length);
-    char* info_log = malloc(sizeof(char*) * length);
+    info_log: char* = malloc(sizeof(char*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
     free(info_log);
@@ -779,8 +779,8 @@ create_program :: (char* vert_source, char* frag_source) -> u32 {
   return program;
 }
 
-check_error :: (char* location) {
-  int err = glGetError();
+check_error :: (location: char*) {
+  err: int = glGetError();
   if err == GL.INVALID_ENUM {
     printf("error: %s, from: %s\n", "GL.INVALID_ENUM", location);
   } else if err == GL.INVALID_VALUE {
@@ -797,30 +797,29 @@ check_error :: (char* location) {
     printf("unknown gl error: %d, from: %s\n", err, location);
   }
 }
-
 Vec4 :: union {
-  float[4] values;
+  values: float[4] ;
   #anon :: struct {
-    float x;
-    float y;
-    float z;
-    float w;
+    x: float;
+    y: float;
+    z: float;
+    w: float;
   }
   #ctor :: () {}
-  #ctor :: (float _x, _y, _z, _w) {
+  #ctor :: (_x: float, _y: float, _z: float, _w: float) {
     x = _x;
     y = _y;
     z = _z;
     w = _w;
   }
-  #ctor :: (float value) {
+  #ctor :: (value: float) {
     x = value;
     y = value;
     z = value;
     w = value;
   }
 
-  #operator(+) :: (#self other) -> #self {
+  #operator(+) :: (other: #self) -> #self {
     other.x += x;
     other.y += y;
     other.z += z;
@@ -828,7 +827,7 @@ Vec4 :: union {
     return other;
   }
 
-  #operator(*) :: (#self other) -> #self {
+  #operator(*) :: (other: #self) -> #self {
     other.x *= x;
     other.y *= y;
     other.z *= z;
@@ -836,7 +835,7 @@ Vec4 :: union {
     return other;
   }
 
-  #operator(/) :: (#self other) -> #self {
+  #operator(/) :: (other: #self) -> #self {
     other.x /= x;
     other.y /= y;
     other.z /= z;
@@ -844,7 +843,7 @@ Vec4 :: union {
     return other;
   }
 
-  #operator(-) :: (#self other) -> #self {
+  #operator(-) :: (other: #self) -> #self {
     other.x -= x;
     other.y -= y;
     other.z -= z;
@@ -864,48 +863,47 @@ Vec4_one :: () -> Vec4 {
 Vec4_zero :: () -> Vec4 {
   return #make(Vec4, 0.0);
 }
-
 Vec3 :: union {
-  float[3] values;
+  values: float[3];
   #anon :: struct {
-    float x;
-    float y;
-    float z;
+    x: float;
+    y: float;
+    z: float;
   }
-  #ctor :: (float value) {
+  #ctor :: (value: float) {
     x = value;
     y = value;
     z = value;
   }
   #ctor :: () {}
-  #ctor :: (float _x, _y, _z) {
+  #ctor :: (_x: float, _y: float, _z: float) {
     x = _x;
     y = _y;
     z = _z;
   }
 
-  #operator(+) :: (#self other) -> #self {
+  #operator(+) :: (other: #self) -> #self {
     other.x += x;
     other.y += y;
     other.z += z;
     return other;
   }
 
-  #operator(*) :: (#self other) -> #self {
+  #operator(*) :: (other: #self) -> #self {
     other.x *= x;
     other.y *= y;
     other.z *= z;
     return other;
   }
 
-  #operator(/) :: (#self other) -> #self {
+  #operator(/) :: (other: #self) -> #self {
     other.x /= x;
     other.y /= y;
     other.z /= z;
     return other;
   }
 
-  #operator(-) :: (#self other) -> #self {
+  #operator(-) :: (other: #self) -> #self {
     other.x -= x;
     other.y -= y;
     other.z -= z;
@@ -924,41 +922,40 @@ Vec3_one :: () -> Vec3 {
 Vec3_zero :: () -> Vec3 {
   return #make(Vec3, 0.0);
 }
-
 Vec2 :: union {
-  float[2] values;
+  values: float[2];
   #anon :: struct {
-    float x;
-    float y;
+    x: float;
+    y: float;
   }
   #ctor :: () {}
-  #ctor :: (float _x, _y) {
+  #ctor :: (_x: float, _y: float) {
     x = _x;
     y = _y;
   }
-  #ctor :: (float value) {
+  #ctor :: (value: float) {
     x = value;
     y = value;
   }
-  #operator(+) :: (#self other) -> #self {
+  #operator(+) :: (other: #self) -> #self {
     other.x += x;
     other.y += y;
     return other;
   }
 
-  #operator(*) :: (#self other) -> #self {
+  #operator(*) :: (other: #self) -> #self {
     other.x *= x;
     other.y *= y;
     return other;
   }
 
-  #operator(/) :: (#self other) -> #self {
+  #operator(/) :: (other: #self) -> #self {
     other.x /= x;
     other.y /= y;
     return other;
   }
 
-  #operator(-) :: (#self other) -> #self {
+  #operator(-) :: (other: #self) -> #self {
     other.x -= x;
     other.y -= y;
     return other;
@@ -977,29 +974,28 @@ Vec2_zero :: () -> Vec2 {
   return #make(Vec2, 0.0);
 }
 
-
 Mat4 :: union {
-  float[16] values;
+  values: float[16];
   #anon :: struct {
-    float M00;
-    float M01;
-    float M02;
-    float M03;
-    float M10;
-    float M11;
-    float M12;
-    float M13;
-    float M20;
-    float M21;
-    float M22;
-    float M23;
-    float M30;
-    float M31;
-    float M32;
-    float M33;
+    M00: float;
+    M01: float;
+    M02: float;
+    M03: float;
+    M10: float;
+    M11: float;
+    M12: float;
+    M13: float;
+    M20: float;
+    M21: float;
+    M22: float;
+    M23: float;
+    M30: float;
+    M31: float;
+    M32: float;
+    M33: float;
   };
-  #operator(*) :: (#self other) -> #self {
-    matrix := #make(#self);
+  #operator(*) :: (other: #self) -> #self {
+    matrix: #self = #make(#self);
     matrix.M00 = M00 * other.M00 + M01 * other.M10 + M02 * other.M20 + M03 * other.M30;
     matrix.M01 = M00 * other.M01 + M01 * other.M11 + M02 * other.M21 + M03 * other.M31;
     matrix.M02 = M00 * other.M02 + M01 * other.M12 + M02 * other.M22 + M03 * other.M32;
@@ -1021,8 +1017,8 @@ Mat4 :: union {
     matrix.M33 = M30 * other.M03 + M31 * other.M13 + M32 * other.M23 + M33 * other.M33;
     return matrix;
   }
-  scale :: (float factor) -> #self {
-    matrix := #make(#self);
+  scale :: (factor: float) -> #self {
+    matrix: #self = #make(#self);
     matrix.M00 = M00 * factor;
     matrix.M01 = M01 * factor;
     matrix.M02 = M02 * factor;
@@ -1042,16 +1038,16 @@ Mat4 :: union {
     return matrix;
   }
   determinant :: () -> float {
-    float r0 = M00 * (M11 * (M22 * M33 - M23 * M32) - M12 * (M21 * M33 - M23 * M31) + M13 * (M21 * M32 - M22 * M31));
-    float r1 = M01 * (M10 * (M22 * M33 - M23 * M32) - M12 * (M20 * M33 - M23 * M30) + M13 * (M20 * M32 - M22 * M30));
-    float r2 = M02 * (M10 * (M21 * M33 - M23 * M31) - M11 * (M20 * M33 - M23 * M30) + M13 * (M20 * M31 - M21 * M30));
-    float r3 = M03 * (M10 * (M21 * M32 - M22 * M31) - M11 * (M20 * M32 - M22 * M30) + M12 * (M20 * M31 - M21 * M30));
+    r0: float = M00 * (M11 * (M22 * M33 - M23 * M32) - M12 * (M21 * M33 - M23 * M31) + M13 * (M21 * M32 - M22 * M31));
+    r1: float = M01 * (M10 * (M22 * M33 - M23 * M32) - M12 * (M20 * M33 - M23 * M30) + M13 * (M20 * M32 - M22 * M30));
+    r2: float = M02 * (M10 * (M21 * M33 - M23 * M31) - M11 * (M20 * M33 - M23 * M30) + M13 * (M20 * M31 - M21 * M30));
+    r3: float = M03 * (M10 * (M21 * M32 - M22 * M31) - M11 * (M20 * M32 - M22 * M30) + M12 * (M20 * M31 - M21 * M30));
     return r0 - r1 + r2 - r3;
   }
 }
 
 Mat4_identity :: () -> Mat4 {
-  Mat4 matrix;
+  matrix: Mat4;
   matrix.M00 = 1.0;
   matrix.M01 = 0.0;
   matrix.M02 = 0.0;
@@ -1070,19 +1066,18 @@ Mat4_identity :: () -> Mat4 {
   matrix.M33 = 1.0;
   return matrix;
 }
-
 Shader :: struct {
-  u32 handle;
+  handle: u32;
   use :: () {
     glUseProgram(handle);
   }
-  #ctor :: (char * vertexSource, char *fragSource) {
+  #ctor :: (vertexSource: char*, fragSource: char*) {
     handle = create_program(vertexSource, fragSource);
   }
   #dtor :: () {
     glDeleteProgram(handle);
   }
-  set_Mat4 :: (char *name, Mat4 *v) {
+  set_Mat4 :: (name: char*, v: Mat4*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, #make(float*, v.values));
@@ -1091,7 +1086,7 @@ Shader :: struct {
     }
   }
 
-  set_Vec4 :: (char *name, Vec4 *v) {
+  set_Vec4 :: (name: char*, v: Vec4*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform4fv(index, 1, #make(float*, v.values));
@@ -1099,7 +1094,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec3 :: (char *name, Vec3 *v) {
+  set_Vec3 :: (name: char*, v: Vec3*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform3fv(index, 1, #make(float*, v.values));
@@ -1107,7 +1102,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec2 :: (char *name, Vec2 *v) {
+  set_Vec2 :: (name: char*, v: Vec2*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform2fv(index, 1, #make(float*, v.values));
@@ -1115,7 +1110,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_float :: (char * name, float v) {
+  set_float :: (name: char*, v: float) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform1f(index, v);
@@ -1124,10 +1119,9 @@ Shader :: struct {
     }
   }
 }
-
 Window :: struct {
-  GLFWwindow *handle;
-  #ctor :: (int width, int height, char *title) {
+  handle: GLFWwindow*;
+  #ctor :: (width: int, height: int, title: char*) {
     if !glfwInit() {
       printf("Failed to initialize glfw\n");
       return;
@@ -1148,7 +1142,7 @@ Window :: struct {
   should_close :: () -> bool {
     return glfwWindowShouldClose(handle);
   }
-  present :: ()  {
+  present :: () {
     glfwSwapBuffers(handle);
     glfwPollEvents();
   }

@@ -3,14 +3,14 @@
 #compiler_flags "-g"
 
 XaryuStruct :: struct {
-  float f;
+  f: float ;
 }
 
 Union :: union {
-  int a;
-  int b;
-  int c;
-  method :: (int n) {
+  a: int;
+  b: int;
+  c: int;
+  method :: (n: int) {
     assert("union equality check in method failed", n == a && n == b && n == c);
   }
   #ctor :: () {
@@ -22,13 +22,13 @@ Union :: union {
 }
 _Vec2 :: union {
   #anon :: struct {
-    int x;
-    int y;
-    int z;
+    x: int;
+    y: int;
+    z: int;
   };
-  int[3] values;
+  values: int[3] ;
 
-  method :: (int n) {
+  method :: (n: int) {
     assert("union equality check in method failed", n == x && n == y && n == z);
     assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
   }
@@ -36,7 +36,8 @@ _Vec2 :: union {
   something :: () -> #self {
     return #make(#self);
   }
-  #ctor :: (int _x, _y, _z) {
+  
+  #ctor :: (_x : int, _y, _z) {
     x = _x;
     y = _y;
     z = _z;
@@ -56,7 +57,7 @@ _Vec2 :: union {
 }
 
 CustomIteratorStruct :: struct {
-  int *value = malloc(sizeof(int) * 10);
+  value: int* = malloc(sizeof(int) * 10);
   begin :: () -> int * {
     return value;
   }
@@ -69,11 +70,11 @@ CustomIteratorStruct :: struct {
 }
 
 Constructible :: struct {
-  float32 x;
-  #ctor :: (float32 _x) {
+  x: float32;
+  #ctor :: (_x: float32) {
       x = _x;
   }
-  #ctor :: (Constructible other) {
+  #ctor :: (other: Constructible) {
       x = other.x;
   }
   #ctor :: () {
@@ -82,28 +83,28 @@ Constructible :: struct {
 }
 
 Vector2 :: struct {
-  float32 x;
-  float32 y;
+  x: float32;
+  y: float32;
 }
 
 Vector3 :: struct {
-  Vector2 vec2;
-  float32 z;
+  vec2: Vector2;
+  z: float32;
 }
 
 Node :: struct {
-  Node *next;
+  next: Node*;
 }
 
 Array :: struct {
-  Node[10] ptr;
+  ptr: Node[10];
 }
 
 IHaveAMethod :: struct {
   method :: () -> float32 {
       return 0.0;
   }
-  parameter_method :: (float32 x) -> float32 {
+  parameter_method :: (x: float32) -> float32 {
       return x;
   }
 }
@@ -123,7 +124,7 @@ MyEnum :: enum {
 
 // Keep this at the top otherwise it messesup the output formatting in the middle
 #test test_printf :: () {
-  char* s = "Hello i am a string";
+  s: char*  = "Hello i am a string";
   printf("testing printing a string: %s\n", s);
   return;
 }
@@ -133,11 +134,11 @@ MyEnum :: enum {
 }
 
 #test test_for :: () {
-  for s32 i; i < 10; ++i {
+  for i: s32; i < 10; ++i {
       assert("i should be less than 10", i < 10);
       return;
   }
-  s32[] arr;
+  arr: s32[];
   for v; arr {
       assert("Unexpected case in array loop", false);
       return;
@@ -146,7 +147,7 @@ MyEnum :: enum {
 }
 
 #test test_while :: () {
-  bool b = true;
+  b: bool = true;
   while b {
       assert("while condition == true", b == true);
       return;
@@ -155,8 +156,8 @@ MyEnum :: enum {
 }
 
 #test test_if_1 :: () {
-  bool v = true;
-  bool hit = false;
+  v: bool = true;
+  hit: bool = false;
   if v {
       assert("v should be true", v == true);
       hit = true;
@@ -167,8 +168,8 @@ MyEnum :: enum {
 }
 
 #test test_if_2 :: () {
-  bool v = false;
-  bool hit = true;
+  v: bool = false;
+  hit: bool = true;
   if v {
       assert("Unexpected case", false);
   } else if !v {
@@ -178,8 +179,8 @@ MyEnum :: enum {
 }
 
 #test test_if_3 :: () {
-  bool v = false;
-  bool hit = true;
+  v: bool = false;
+  hit: bool = true;
   if v {
       assert("Unexpected case", false);
   } else if v {
@@ -191,7 +192,7 @@ MyEnum :: enum {
 }
 
 #test test_comp_assign :: () {
-  s32 deref = 1;
+  deref: s32 = 1;
   deref += deref;
   assert("+=", deref == 2);
   deref -= deref;
@@ -217,10 +218,10 @@ MyEnum :: enum {
 }
 
 #test test_operators :: () {
-  s32 left = 1;
-  s32 right = 1;
-  s32 result;
-  bool result_bool;
+  left: s32 = 1;
+  right: s32 = 1;
+  result: s32;
+  result_bool: bool;
   result_bool = left == right;
   assert("left should equal right", result_bool == true);
   result_bool = left != right;
@@ -261,10 +262,10 @@ MyEnum :: enum {
 }
 
 #test test_relational_results :: () {
-  bool test1 = (1 == 1 + 2) || 1 == 2;
-  bool test2 = (3 > 2) && (2 < 4);
-  bool test3 = !(5 <= 5) || (6 >= 6);
-  bool test4 = (7 != 8) && (9 == 9);
+  test1: bool = (1 == 1 + 2) || 1 == 2;
+  test2: bool = (3 > 2) && (2 < 4);
+  test3: bool = !(5 <= 5) || (6 >= 6);
+  test4: bool = (7 != 8) && (9 == 9);
   assert("test1 should be false", test1 == false);
   assert("test2 should be true", test2 == true);
   assert("test3 should be true", test3 == true);
@@ -272,26 +273,26 @@ MyEnum :: enum {
 }
 
 #test test_address_of :: () {
-  s32 v = 0;
-  s32* addr_of_v = &v;
+  v: s32 = 0;
+  addr_of_v: s32* = &v;
   assert("address of grabbed a non-null ptr", addr_of_v != null);
   v = *addr_of_v;
   assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
 
 #test test_malloc :: () {
-  s32* ptr = malloc(4);
+  ptr: s32* = malloc(4);
   assert("malloc'd pointer was null", ptr != null);
   free(ptr);
   ptr = null;
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: (float32 a, b, c, d = 1.0) -> float32 {
+many_params :: (a: float32, b, c, d = 1.0) -> float32 {
   return a * b * c * d;
 }
 
-mul_params :: (float32 n, f) -> float32 {
+mul_params :: (n: float32, f) -> float32 {
   return n * f;
 }
 
@@ -305,20 +306,20 @@ returns :: () -> s32  {
 }
 
 #test test_implicit_numerical_casting :: () {
-  u8 u1;
-  u16 u2 = u1;
-  u32 u3 = u2;
-  u64 u4 = u3;
+  u1: u8;
+  u2: u16 = u1;
+  u3: u32 = u2;
+  u4: u64 = u3;
   assert("unable to upcast successfully", u4 == u1);
 
-  s8 s1;
-  s16 s2 = s1;
-  s32 s3 = s2;
-  s64 s4 = s3;
+  s1: s8;
+  s2: s16 = s1;
+  s3: s32 = s2;
+  s4: s64 = s3;
   assert("unable to upcast successfully", s1 == s4);
 
-  float f;
-  float64 f1 = f;
+  f: float;
+  f1: float64 = f;
   assert("unable to upcast successfully", f == f1);
 }
 
@@ -327,20 +328,20 @@ returns :: () -> s32  {
 }
 
 #test test_struct_single_level :: () {
-  Vector2 v;
+  v: Vector2;
   assert("v.x != 0.0", v.x == 0.0);
   assert("v.y != 0.0", v.y == 0.0);
 }
 
 #test test_struct_nested_once :: () {
-  Vector3 v;
+  v: Vector3;
   assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
   assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
   assert("v.z != 0.0", v.z == 0.0);
 }
 
 #test test_struct_assign_member :: () {
-  Vector2 v;
+  v: Vector2;
   v.x = 10.0;
   v.y = 10.0;
   assert("assigning v.x = 10.0 failed", v.x == 10.0);
@@ -348,7 +349,7 @@ returns :: () -> s32  {
 }
 
 #test test_struct_assign_nested_member :: () {
-  Vector3 v;
+  v: Vector3;
   v.vec2.x = 1.0;
   v.vec2.y = 2.0;
   v.z = 3.0;
@@ -357,21 +358,21 @@ returns :: () -> s32  {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: (Vector2 v)  -> float32 {
+struct_as_param :: (v: Vector2)  -> float32 {
   return v.x;
 }
 
 #test test_struct_as_param :: () {
-  Vector2 v;
+  v: Vector2;
   assert("", struct_as_param(v) == 0.0);
 }
 
-something :: (float32 f) -> float32 {
+something :: (f: float32) -> float32 {
   return f;
 }
 
 #test test_struct_member_as_param :: () {
-  Vector2 v;
+  v: Vector2;
   assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 
@@ -383,27 +384,27 @@ something :: (float32 f) -> float32 {
 }
 
 #test test_chained_dot_subscript :: () {
-  Array a;
+  a: Array;
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
 
-  Node n;
+  n: Node ;
   a.ptr[0].next = &n;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
 #test test_subscript :: () {
-  s32[100] arr;
+  arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
-  int n;
+  n: int;
   ++n;
 }
 
 #test test_referencing_pointer :: () {
-  Node node;
+  node: Node;
   node.next = malloc(sizeof(Node));
-  Node other;
+  other: Node;
   node.next.next = &other;
 
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
@@ -412,14 +413,14 @@ something :: (float32 f) -> float32 {
 
 // testing conflicting definitons. expected: compiler error if failed.
 #test for_loop_2 :: () {
-  for int i; i < 10; ++i {
+  for i: int; i < 10; ++i {
       i = i;
   }
-  for int i; i < 10; ++i {
+  for i: int; i < 10; ++i {
       i = i;
   }
 
-  int[] array;
+  array: int[];
 
   for k; array {
     k = k;
@@ -435,24 +436,24 @@ something :: (float32 f) -> float32 {
 }
 
 #test test_copy_make :: () {
-  Constructible c;
-  Constructible c1 = #make(Constructible, c);
+  c: Constructible;
+  c1: Constructible = #make(Constructible, c);
   assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
 #test test_make :: () {
-  Constructible c = #make(Constructible, 10.0);
+  c: Constructible = #make(Constructible, 10.0);
   assert("failed to construct", c.x == 10.0);
 }
 
 #test test_make_cast :: () {
-  u16 big = #make(u16, 65365);
-  u8 small = #make(u8, big);
+  big: u16 = #make(u16, 65365);
+  small: u8 = #make(u8, big);
   assert("failed to down cast", small == (big % 256));
 }
 
 #test test_method :: () {
-  IHaveAMethod owner;
+  owner: IHaveAMethod ;
   assert("failed to get 0.0 from method.", owner.method() == 0.0);
   assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }
@@ -482,12 +483,12 @@ something :: (float32 f) -> float32 {
 
 // woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
-  float32[12] arr;
+  arr: float32[12];
   arr[0] = 10;
   arr[0] += 10;
   assert("comp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
 
-  XaryuStruct[1] xarbars;
+  xarbars:  XaryuStruct[1];
   xarbars[0].f = 10.0;
   xarbars[0].f += 10.0;
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
@@ -511,34 +512,34 @@ something :: (float32 f) -> float32 {
 
 
 #test test_union_type :: () {
-  Union test_union;
+  test_union: Union;
   test_union.a = 10;
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
   test_union.method(10);
 }
 
 #test test_two_way_implicit_conversion_bin_ops :: () {
-  s32 v;
-  s8 v1;
-  float32 f;
+  v: s32;
+  v1: s8;
+  f: float32;
   assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
 }
 
 #test test_union_type_anonymous_sub_struct :: () {
-  _Vec2 vec;
+  vec: _Vec2;
   vec.method(0); // this does the assertions
 }
 
 #test test_new :: () {
-  _Vec2 *vec = new _Vec2(10, 10, 10);
-  _Vec2 *vec1 = new _Vec2(10, 10, 10);
+  vec: _Vec2* = new _Vec2(10, 10, 10);
+  vec1: _Vec2* = new _Vec2(10, 10, 10);
   assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
   delete (vec, vec1);
 }
 
 #test ptr_iter_range_base :: () {
-  s8[] array = {0,1,2,3};
-  int n;
+  array: s8[] = {0,1,2,3};
+  n: int ;
   for *v; array {
     assert("", n == *v);
     ++n;
@@ -546,8 +547,8 @@ something :: (float32 f) -> float32 {
 }
 
 #test test_custom_iterator :: () {
-  CustomIteratorStruct iter;
-  int n;
+  iter: CustomIteratorStruct;
+  n: int;
   for k; iter {
     assert("iterator value failed to equal 0", k == 0);
     n++;
@@ -556,12 +557,12 @@ something :: (float32 f) -> float32 {
 }
 
 #test test_string :: () {
-  string my_string = "Xaryu Baryu";
+  my_string : string = "Xaryu Baryu";
   assert("string length failed to equal expected value", my_string.length == 11);
 }
 
 #test test_array :: () {
-  int[] array = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
   
   // we can always expect the capacity to equal length * 1.5f if we havent mutated it ourselves.
@@ -574,64 +575,53 @@ something :: (float32 f) -> float32 {
   // !bool[] arr = {0,1,2,3,4,5};
 }
 
-// #test test_function_pointers :: () {
-//   #alias VoidFunction :: void();
-//   VoidFunction** func = #make(VoidFunction**, malloc(sizeof(VoidFunction*) * 10));
-//   for s32 i; i < 10; ++i {
-//     func[i] = &test_function_pointers;
-//   }
-//   for s32 i; i < 10; ++i {
-//     assert("func failed to == itself", func[i] == &test_function_pointers)
-//   }
-// }
-
 #test test_aliasing :: () {
   #alias int_ptr :: int*;
-  int* p = malloc(sizeof(int));
-  int_ptr other = p;
+  p: int* = malloc(sizeof(int));
+  other: int_ptr  = p;
   assert("alias failed to equal pointed to type field.", p == other);
 
-  int **pp = #make(int**, malloc(sizeof(int*)));
-  int_ptr* other1 = pp;
+  pp: int** = #make(int**, malloc(sizeof(int*)));
+  other1: int_ptr* = pp;
   assert("alias failed to equal pointed to type field.", pp == other1);
 }
 
 Xaryu :: struct {
-  int value;
+  value: int;
   to_string :: () -> char * {
     return "XarBar";
   }
 }
 
 #test test_string_interpolation :: () {
-  Xaryu xarbar;
-  string interp = $"{xarbar.to_string()}";
+  xarbar: Xaryu;
+  interp: string = $"{xarbar.to_string()}";
   assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
   interp = $"{(1 + 1) * 2}";
   println($"Interpolated value {interp}");
   assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
 }
 
-overloaded :: (int n, y) -> int {
+overloaded :: (n: int , y) -> int {
   return n * y;
 }
 
-overloaded :: (int n) -> int {
+overloaded :: (n: int) -> int {
   return n;
 }
 
-overloaded :: (float f) -> float {
+overloaded :: (f: float ) -> float {
   return f;
 }
 
-overloaded :: (Xaryu xaryu) -> Xaryu {
+overloaded :: (xaryu: Xaryu ) -> Xaryu {
   return xaryu;
 }
 
 #test test_function_overloads :: () {
   assert("overload with integer arg failed to call", strcmp((#type overloaded(10)).name, "int") == 0);
   assert("overload with float arg failed to call", strcmp((#type overloaded(12.5)).name, "float") == 0);
-  Xaryu xaryu;
+  xaryu: Xaryu;
   xaryu.value = 100;
   assert("overload with float arg failed to call", strcmp((#type overloaded(xaryu)).name, "Xaryu") == 0);
   
@@ -645,78 +635,78 @@ overloaded :: (Xaryu xaryu) -> Xaryu {
 }
 
 OperatorOverloadTest :: struct {
-  int value = 0;
+  value: int = 0;
 
-  #operator(+) :: (OperatorOverloadTest something) -> int {
+  #operator(+) :: (something: OperatorOverloadTest) -> int {
     return value + something.value;
   }
-  #operator(-) :: (OperatorOverloadTest something) -> int {
+  #operator(-) :: (something: OperatorOverloadTest) -> int {
     return value - something.value;
   }
-  #operator(*) :: (OperatorOverloadTest something) -> int {
+  #operator(*) :: (something: OperatorOverloadTest) -> int {
     return value * something.value;
   }
-  #operator(/) :: (OperatorOverloadTest something) -> int {
+  #operator(/) :: (something: OperatorOverloadTest) -> int {
     return value / something.value;
   }
-  #operator(%) :: (OperatorOverloadTest something) -> int {
+  #operator(%) :: (something: OperatorOverloadTest) -> int {
     return value % something.value;
   }
-  #operator(&) :: (OperatorOverloadTest something) -> int {
+  #operator(&) :: (something: OperatorOverloadTest) -> int {
     return value & something.value;
   }
-  #operator(|) :: (OperatorOverloadTest something) -> int {
+  #operator(|) :: (something: OperatorOverloadTest) -> int {
     return value | something.value;
   }
-  #operator(^) :: (OperatorOverloadTest something) -> int {
+  #operator(^) :: (something: OperatorOverloadTest) -> int {
     return value ^ something.value;
   }
   #operator(~) :: () -> int {
     return ~value;
   }
-  #operator(<<) :: (OperatorOverloadTest something) -> int {
+  #operator(<<) :: (something: OperatorOverloadTest) -> int {
     return value << something.value;
   }
-  #operator(>>) :: (OperatorOverloadTest something) -> int {
+  #operator(>>) :: (something: OperatorOverloadTest) -> int {
     return value >> something.value;
   }
-  #operator(+=) :: (OperatorOverloadTest something) -> int {
+  #operator(+=) :: (something: OperatorOverloadTest) -> int {
     value += something.value;
     return value;
   }
-  #operator(-=) :: (OperatorOverloadTest something) -> int {
+  #operator(-=) :: (something: OperatorOverloadTest) -> int {
     value -= something.value;
     return value;
   }
-  #operator(*=) :: (OperatorOverloadTest something) -> int {
+  #operator(*=) :: (something: OperatorOverloadTest) -> int {
     value *= something.value;
     return value;
   }
-  #operator(/=) :: (OperatorOverloadTest something) -> int {
+  #operator(/=) :: (something: OperatorOverloadTest) -> int {
     value /= something.value;
     return value;
   }
-  #operator(%=) :: (OperatorOverloadTest something) -> int {
+  #operator(%=) :: (something: OperatorOverloadTest) -> int {
     value %= something.value;
     return value;
   }
-  #operator(&=) :: (OperatorOverloadTest something) -> int {
+  #operator(&=) :: (something: OperatorOverloadTest) -> int {
     value &= something.value;
     return value;
   }
-  #operator(|=) :: (OperatorOverloadTest something) -> int {
+  #operator(|=) :: (something: OperatorOverloadTest) -> int {
     value |= something.value;
     return value;
   }
-  #operator(^=) :: (OperatorOverloadTest something) -> int {
+  #operator(^=) :: (something: OperatorOverloadTest) -> int {
     value ^= something.value;
     return value;
   }
-  #operator(<<=) :: (OperatorOverloadTest something) -> int {
+  #operator(<<=) :: (something: OperatorOverloadTest) -> int {
     value <<= something.value;
     return value;
   }
-  #operator(>>=) :: (OperatorOverloadTest something) -> int {
+  #operator(>>=) :: (something: OperatorOverloadTest) -> int {
     value >>= something.value;
     return value;
   }
@@ -726,38 +716,38 @@ OperatorOverloadTest :: struct {
   #operator(--) :: () -> int {
     return --value;
   }
-  #operator(==) :: (OperatorOverloadTest something) -> bool {
+  #operator(==) :: (something: OperatorOverloadTest) -> bool {
     return value == something.value;
   }
-  #operator(!=) :: (OperatorOverloadTest something) -> bool {
+  #operator(!=) :: (something: OperatorOverloadTest) -> bool {
     return value != something.value;
   }
-  #operator(<) :: (OperatorOverloadTest something) -> bool {
+  #operator(<) :: (something: OperatorOverloadTest) -> bool {
     return value < something.value;
   }
-  #operator(<=) :: (OperatorOverloadTest something) -> bool {
+  #operator(<=) :: (something: OperatorOverloadTest) -> bool {
     return value <= something.value;
   }
-  #operator(>) :: (OperatorOverloadTest something) -> bool {
+  #operator(>) :: (something: OperatorOverloadTest) -> bool {
     return value > something.value;
   }
-  #operator(>=) :: (OperatorOverloadTest something) -> bool {
+  #operator(>=) :: (something: OperatorOverloadTest) -> bool {
     return value >= something.value;
   }
-  #operator([]) :: (int n) -> int {
-    int base = 10;
+  #operator([]) :: (n: int) -> int {
+    base: int = 10;
     return n + base;
   }
   to_string :: () -> char *  {
-    char * str = malloc(sizeof(char *) * 1);
+    str: char* = malloc(sizeof(char *) * 1);
     sprintf(str, "%d", value);
     return str;
   }
 }
 
 #test test_operator_overload :: () {
-  OperatorOverloadTest opstr1;
-  OperatorOverloadTest opstr2;
+  opstr1: OperatorOverloadTest;
+  opstr2: OperatorOverloadTest;
   opstr1.value = 10;
   opstr2.value = 5;
   assert("Addition operator overload failed",                   opstr1 + opstr2 == 15);
@@ -784,8 +774,8 @@ OperatorOverloadTest :: struct {
   assert("Subscript operator didn't return '30'",               opstr1[20] == 30);
 }
 #test test_comp_assign_overloads :: () {
-  OperatorOverloadTest opstr1;
-  OperatorOverloadTest opstr2;
+  opstr1: OperatorOverloadTest;
+  opstr2: OperatorOverloadTest;
   opstr1.value = 10;
   opstr2.value = 5;
   opstr1 += opstr2;
@@ -811,26 +801,28 @@ OperatorOverloadTest :: struct {
 }
 
 InitListStruct :: struct {
-  int a; int b; int c;
+  a: int;
+  b: int;
+  c: int;
 }
 #test test_initializer_lists :: () {
-    int scalar = {0};
-    int[] arr = {0, 1, 2};
-    int[3] fixed = {0, 1, 2};
-    InitListStruct str = {0, 0, 0};
+    scalar: int = {0};
+    arr: int[]  = {0, 1, 2};
+    fixed: int[3] = {0, 1, 2};
+    str: InitListStruct = {0, 0, 0};
     
     //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
     //! This line causes it: InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
-    InitListStruct[] strArr = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
-    InitListStruct[3] strArr1 = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
+    strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
-    int[] expected_arr = {0, 1, 2};
-    for s32 i; i < arr.length; i++ {
+    expected_arr: int[] = {0, 1, 2};
+    for i: s32; i < arr.length; i++ {
       assert("Array element mismatch", arr[i] == expected_arr[i]);
     }
 
-    int[3] expected_fixed = {0, 1, 2};
-    for s32 i; i < 3; i++ {
+    expected_fixed: int[3] = {0, 1, 2};
+    for i: s32; i < 3; i++ {
       assert("Fixed array element mismatch", fixed[i] == expected_fixed[i]);
     }
 
@@ -838,16 +830,16 @@ InitListStruct :: struct {
     assert("Struct element mismatch", str.b == 0);
     assert("Struct element mismatch", str.c == 0);
 
-    InitListStruct[] expected_strArr = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for s32 i; i < strArr.length; i++ {
+    expected_strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    for i: s32; i < strArr.length; i++ {
       assert("Struct array element mismatch", strArr[i].a == expected_strArr[i].a);
       assert("Struct array element mismatch", strArr[i].b == expected_strArr[i].b);
       assert("Struct array element mismatch", strArr[i].c == expected_strArr[i].c);
     }
 
     // Assertions for strArr1
-    InitListStruct[3] expected_strArr1 = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for s32 i; i < 3; i++ {
+    expected_strArr1: InitListStruct[3]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
+    for i: s32 ; i < 3; i++ {
       assert("Fixed struct array element mismatch", strArr1[i].a == expected_strArr1[i].a);
       assert("Fixed struct array element mismatch", strArr1[i].b == expected_strArr1[i].b);
       assert("Fixed struct array element mismatch", strArr1[i].c == expected_strArr1[i].c);
@@ -855,27 +847,27 @@ InitListStruct :: struct {
 }
 
 #test test_cast :: () {
-  int n = 10;
-  float f = (float)n;
+  n: int = 10;
+  f: float  = (float)n;
   assert("Cast failed", f == 10.0);
 }
 
 #test test_underscores_in_number_literals :: () {
-  int n = 1_000_000;
+  n: int = 1_000_000;
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }
 
-add :: ($T a, $T b) -> $T {
+add :: (a: $T, b: $T) -> $T {
   return a + b;
 }
 
-generic_test_1 :: ($T **arg1, $T value) -> $T {
+generic_test_1 :: (arg1: $T**, value: $T) -> $T {
   return value;
 }
-generic_called_by_generic :: ($T v) -> $T {
+generic_called_by_generic :: (v: $T) -> $T {
   return v;
 }
-generic_calling_generic :: ($T v) -> $T {
+generic_calling_generic :: (v: $T) -> $T {
   return generic_called_by_generic(v);
 } 
 
@@ -889,7 +881,7 @@ generic_calling_generic :: ($T v) -> $T {
   //! generic arguments, and also C++ failing to have good casting rules.
   // We should never be able to cast 10 to a boolean lol.
   {
-    bool** j;
+    j: bool**;
     generic_test_1(j, 10);
   }
   
@@ -899,25 +891,25 @@ generic_calling_generic :: ($T v) -> $T {
 
 
 #test test_array_concat_operator :: () {
-  int[] array;
+  array: int[];
   array ~= 10;
   assert("concat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: () {
-  int[] array;
-  for s32 i; i < 100; ++i {
+  array: int[];
+  for i: s32; i < 100; ++i {
     array ~= 10;
   }
-  int n;
-  for s32 i; i < 100; ++i{
+  n: int;
+  for i: s32; i < 100; ++i{
     n = ~array;
   }
   assert("pop operator failed", array.length == 0 && n == 10);
 }
 
 #test test_array_erase_operator :: () {
-  int[] array;
+  array: int[] ;
   array ~= 10;
   array ~~ 10;
   assert("failed to erase element from array with ~~", array.length == 0);

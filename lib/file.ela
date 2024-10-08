@@ -1,9 +1,9 @@
 #import core;
 
 _IO_FILE :: struct;
-#alias FILE :: _IO_FILE;
 
-s32 EOF=-1;
+#alias FILE :: _IO_FILE;
+EOF := -1;
 
 SeekPosition :: enum {
   // Seek from beginning of file.
@@ -14,30 +14,30 @@ SeekPosition :: enum {
   End,
 }
 
-#foreign fread :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
-#foreign fwrite :: (void *ptr, u64 size, u64 count, _IO_FILE *stream) -> u64;
-#foreign fseek :: (_IO_FILE *stream, s64 offset, s32 origin) -> int;
-#foreign ftell :: (_IO_FILE *stream) -> s64;
-#foreign rewind :: (_IO_FILE *stream) -> void;
-#foreign fopen :: (char *fname, char *flags) -> _IO_FILE *;
-#foreign fclose :: (_IO_FILE *file) -> void;
-#foreign fgetc :: (_IO_FILE *file) -> u8;
-#foreign putc :: (u8 ch, _IO_FILE *file) -> void;
-#foreign fprintf :: (_IO_FILE *stream, char *format, ...) -> int;
-#foreign fflush :: (FILE *f);
+#foreign fread :: (ptr: void *, size: u64, count: u64, stream: FILE *) -> u64;
+#foreign fwrite :: (ptr: void *, size: u64, count: u64, stream: FILE *) -> u64;
+#foreign fseek :: (stream: FILE *, offset: s64, origin: s32) -> int;
+#foreign ftell :: (stream: FILE *) -> s64;
+#foreign rewind :: (stream: FILE *) -> void;
+#foreign fopen :: (fname: char *, flags: char *) -> FILE *;
+#foreign fclose :: (file: FILE *) -> void;
+#foreign fgetc :: (file: FILE *) -> u8;
+#foreign putc :: (ch: u8, file: FILE *) -> void;
+#foreign fprintf :: (stream: FILE *, format: char *, ...) -> int;
+#foreign fflush :: (f: FILE *);
 
-file_get_length :: (FILE *file) -> u32 {
+file_get_length :: (file: FILE *) -> u32 {
   fseek(file, 0, SeekPosition.End);
   len := ftell(file);
   fseek(file, 0, SeekPosition.Begin);
   return #make(u32, len);
 }
 
-file_read_to_string :: (FILE *file, u32* len) -> char * {
+file_read_to_string :: (file: FILE*, len: u32*) -> char * {
   *len = file_get_length(file);
-  char *str = malloc(sizeof(char) * (*len + 1));
+  str: char* = malloc(sizeof(char) * (*len + 1));
   index := 0;
-  char c;
+  c: char ;
   while ((c = fgetc(file)) != EOF) {
     str[index] = c;
     ++index;
@@ -47,17 +47,15 @@ file_read_to_string :: (FILE *file, u32* len) -> char * {
 }
 
 File :: struct {
-  _IO_FILE* file;
-  #ctor :: (char * name) {
+  file: FILE*;
+  #ctor :: (name: char*) {
     file = fopen(name, "rw");
   }
   #dtor :: () {
     fclose(file);
   }
-  
   read :: () -> string {
-    u32 len;
+    len: u32;
     return #make(string, file_read_to_string(file, &len));
   }
-  
 }

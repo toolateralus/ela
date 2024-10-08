@@ -160,19 +160,19 @@ void Parser::init_directive_routines() {
 
   // #error, for throwing compiler errors.
   {
-    directive_routines.push_back({
-      .identifier = "error",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) static {
-        auto error = parser->parse_primary();
-        if (error->get_node_type() != AST_NODE_LITERAL) {
-          throw_error("Can only throw a literal as a error", error->source_range);
-        }
-        auto literal = static_cast<ASTLiteral*>(error);
-        throw_error(literal->value, error->source_range);
-        return nullptr;
-      }
-    });
+    directive_routines.push_back(
+        {.identifier = "error",
+         .kind = DIRECTIVE_KIND_STATEMENT,
+         .run = [](Parser *parser) static {
+           auto error = parser->parse_primary();
+           if (error->get_node_type() != AST_NODE_LITERAL) {
+             throw_error("Can only throw a literal as a error",
+                         error->source_range);
+           }
+           auto literal = static_cast<ASTLiteral *>(error);
+           throw_error(literal->value, error->source_range);
+           return nullptr;
+         }});
   }
 
   // #import
@@ -371,10 +371,13 @@ void Parser::init_directive_routines() {
                                          aliased_type->extension_info);
 
            auto type = global_get_type(id);
-           
+
            if (type->is_kind(TYPE_FUNCTION))
-             throw_error("Temporarily it is illegal to declare aliases to function types, as well as declare function pointers.", aliased_type->source_range);
-            
+             throw_error(
+                 "Temporarily it is illegal to declare aliases to function "
+                 "types, as well as declare function pointers.",
+                 aliased_type->source_range);
+
            parser->ctx.scope->create_type_alias(id, name.value);
            return ast_alloc<ASTNoop>();
          }});
@@ -533,8 +536,7 @@ ASTType *Parser::parse_type() {
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
-    } 
-    else if (peek().type == TType::LT) {
+    } else if (peek().type == TType::LT) {
       end_node(nullptr, range);
       throw_error("Generic structs are not yet implemented.", range);
       // eat();
@@ -545,8 +547,8 @@ ASTType *Parser::parse_type() {
       //     expect(TType::Comma);
       // }
       // expect(TType::GT);
-      
-    }else {
+
+    } else {
       break;
     }
   }
@@ -597,7 +599,8 @@ ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
 
-  if (global_find_type_id(tok.value, {}) != -1) {
+  if (tok.type == TType::Identifier &&
+      lookahead_buf()[1].type == TType::Colon) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -617,7 +620,8 @@ ASTStatement *Parser::parse_statement() {
     return statement;
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
-             tok.type == TType::Delete || tok.type == TType::LParen || tok.type == TType::Erase) {
+             tok.type == TType::Delete || tok.type == TType::LParen ||
+             tok.type == TType::Erase) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
@@ -648,7 +652,8 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    if (global_find_type_id(tok.value, {}) != -1) {
+    // TODO: add implict assignment here. like for i := 0; i < ...
+    if (lookahead_buf()[1].type == TType::Colon) {
       node->tag = ASTFor::CStyle;
 
       auto decl = parse_declaration();
@@ -805,8 +810,9 @@ ASTStatement *Parser::parse_statement() {
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
-  decl->type = parse_type();
   auto iden = eat();
+  expect(TType::Colon);
+  decl->type = parse_type();
 
   if (global_find_type_id(iden.value, {}) != -1) {
     end_node(nullptr, range);
@@ -828,9 +834,11 @@ ASTDeclaration *Parser::parse_declaration() {
 
   ctx.scope->insert(iden.value, -1);
 
-  if (decl->value.get() && decl->value.get()->get_node_type() ==  AST_NODE_ALLOCATE) {
+  if (decl->value.get() &&
+      decl->value.get()->get_node_type() == AST_NODE_ALLOCATE) {
     auto symbol = ctx.scope->lookup(iden.value);
-    insert_allocation(static_cast<ASTAllocate *>(decl->value.get()), symbol, ctx.scope);
+    insert_allocation(static_cast<ASTAllocate *>(decl->value.get()), symbol,
+                      ctx.scope);
   }
 
   return decl;
@@ -910,6 +918,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   current_func_decl = last_func_decl;
   return function;
 }
+
 ASTParamsDecl *Parser::parse_parameters() {
   auto range = begin_node();
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
@@ -917,16 +926,6 @@ ASTParamsDecl *Parser::parse_parameters() {
   ASTType *type = nullptr;
   while (peek().type != TType::RParen) {
     auto subrange = begin_node();
-
-    // VERIFY(Josh) 10/5/2024, 1:35:11 PM
-    // This may be a point of failure for template parameters.
-
-    bool is_type_param = false;
-    if (peek().type == TType::Dollar) {
-      eat();
-      current_func_decl.get()->flags |= FUNCTION_IS_GENERIC;
-      is_type_param = true;
-    }
 
     if (peek().type == TType::Varargs) {
       eat();
@@ -938,8 +937,19 @@ ASTParamsDecl *Parser::parse_parameters() {
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
+    
+    auto name = expect(TType::Identifier).value;
+    if (!type || peek().type == TType::Colon) expect(TType::Colon);
+    
     auto next = peek();
-
+    
+    bool is_type_param = false;
+    if (peek().type == TType::Dollar) {
+      eat();
+      current_func_decl.get()->flags |= FUNCTION_IS_GENERIC;
+      is_type_param = true;
+    }
+    
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
@@ -947,8 +957,6 @@ ASTParamsDecl *Parser::parse_parameters() {
         global_find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
-
-    auto name = expect(TType::Identifier).value;
 
     auto param = ast_alloc<ASTParamDecl>();
     param->type = type;
@@ -1079,9 +1087,10 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     block->scope->is_struct_or_union_scope = true;
     for (const auto &statement : block->statements) {
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        decl->fields.push_back(static_cast<ASTDeclaration*>(statement));
+        decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        decl->methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
+        decl->methods.push_back(
+            static_cast<ASTFunctionDeclaration *>(statement));
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",
@@ -1175,10 +1184,13 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
     Precedence token_precedence = get_operator_precedence(peek());
-    if (token_precedence == PRECEDENCE_ASSIGNMENT && peek().type == TType::ColonEquals) {
+    if (token_precedence == PRECEDENCE_ASSIGNMENT &&
+        peek().type == TType::ColonEquals) {
       if (left->get_node_type() != AST_NODE_IDENTIFIER) {
         end_node(left, range);
-        throw_error("Cannot use type inference assignment ':=' on non-identifiers.", range);
+        throw_error(
+            "Cannot use type inference assignment ':=' on non-identifiers.",
+            range);
       }
       auto iden = static_cast<ASTIdentifier *>(left);
       if (ctx.scope->local_lookup(iden->value.value)) {
@@ -1187,7 +1199,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       }
       ctx.scope->insert(iden->value.value, -1);
     }
-    
+
     if (token_precedence <= precedence) {
       break;
     }
@@ -1199,7 +1211,9 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->op = op;
     binexpr->m_is_const_expr = left->is_constexpr() && right->is_constexpr();
 
-    if (op.type == TType::ColonEquals && left->get_node_type() == AST_NODE_IDENTIFIER && right->get_node_type() == AST_NODE_ALLOCATE) {
+    if (op.type == TType::ColonEquals &&
+        left->get_node_type() == AST_NODE_IDENTIFIER &&
+        right->get_node_type() == AST_NODE_ALLOCATE) {
       auto iden = static_cast<ASTIdentifier *>(left);
       auto alloc = static_cast<ASTAllocate *>(right);
       auto symbol = ctx.scope->lookup(iden->value.value);
@@ -1221,7 +1235,8 @@ ASTExpr *Parser::parse_unary() {
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
 
-    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || expr->get_node_type() == AST_NODE_CALL;
+    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL ||
+                     expr->get_node_type() == AST_NODE_CALL;
 
     // don't need to do this if we already got one of the previous ones.
     auto ctor = is_rvalue || [&] {
@@ -1583,7 +1598,7 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
   }
 }
 bool ASTExpr::is_constexpr() const {
-  return get_node_type() == AST_NODE_LITERAL|| m_is_const_expr;
+  return get_node_type() == AST_NODE_LITERAL || m_is_const_expr;
 }
 std::vector<GenericParameter> Parser::parse_generic_parameters() {
   expect(TType::LT);
@@ -1686,7 +1701,7 @@ static Precedence get_operator_precedence(Token token) {
   case TType::Assign:
   case TType::ColonEquals:
   case TType::Concat: // this is for appending to arrays
-  case TType::Erase: // this is for erase elements for arrays
+  case TType::Erase:  // this is for erase elements for arrays
     return PRECEDENCE_ASSIGNMENT;
   case TType::LogicalOr:
     return PRECEDENCE_LOGICALOR;

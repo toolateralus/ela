@@ -1,8 +1,5 @@
-#import core;
+#import file;
 
-main :: () {
-  int[] array;
-  array ~= 10;
-  array ~~ 10;
-  printf("%d\n", array.length == 0);
+main :: (argc : int, argv : char**) {
+  
 }

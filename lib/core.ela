@@ -1,119 +1,118 @@
-#foreign system :: (char* cmd) -> int;
+#foreign system :: (cmd: char*) -> int;
 
-#foreign free :: (void *ptr) -> void;
-#foreign malloc :: (u64 nbytes) -> void*;
-#foreign realloc :: (void* ptr, u64 size) -> void*;
+#foreign free :: (ptr: void*) -> void;
+#foreign malloc :: (nbytes: u64) -> void*;
+#foreign realloc :: (ptr: void*, size: u64) -> void*;
 
-#foreign memcpy :: (void *dest, void *src, u64 n) -> void*;
-#foreign memset :: (void *dest, int c, u64 n) -> void*;
+#foreign memcpy :: (dest: void*, src: void*, n: u64) -> void*;
+#foreign memset :: (dest: void*, c: int, n: u64) -> void*;
 
-#foreign printf :: (char *format, ...) -> int;
+#foreign printf :: (format: char*, ...) -> int;
 
-#foreign time :: (void * value) -> int;
-#foreign exit :: (int code);
+#foreign time :: (value: void*) -> int;
+#foreign exit :: (code: int);
 
-#foreign strlen :: (char *str) -> int;
-#foreign strcmp :: (char *str1, char *str2) -> int;
-#foreign strcat :: (char *dest, char *src) -> char*;
-#foreign snprintf :: (u8 *buffer, u64 buffer_size, char *format, ...) -> int;
-#foreign sprintf :: (u8 *buffer, char *format, ...) -> int;
-#foreign strncmp :: (char *str, char *str2, int len) -> int;
-#foreign isalnum :: (int c) -> int;
-#foreign isalpha :: (int c) -> int;
-#foreign isspace :: (int c) -> int;
-#foreign isdigit :: (int c) -> int;
-#foreign islower :: (int c) -> int;
-#foreign isupper :: (int c) -> int;
-#foreign isprint :: (int c) -> int;
-#foreign ispunct :: (int c) -> int;
+#foreign strlen :: (str: char*) -> int;
+#foreign strcmp :: (str1: char*, str2: char*) -> int;
+#foreign strcat :: (dest: char*, src: char*) -> char*;
+#foreign snprintf :: (buffer: u8*, buffer_size: u64, format: char*, ...) -> int;
+#foreign sprintf :: (buffer: u8*, format: char*, ...) -> int;
+#foreign strncmp :: (str: char*, str2: char*, len: int) -> int;
+#foreign isalnum :: (c: int) -> int;
+#foreign isalpha :: (c: int) -> int;
+#foreign isspace :: (c: int) -> int;
+#foreign isdigit :: (c: int) -> int;
+#foreign islower :: (c: int) -> int;
+#foreign isupper :: (c: int) -> int;
+#foreign isprint :: (c: int) -> int;
+#foreign ispunct :: (c: int) -> int;
 
-#foreign atoi :: (char *v) -> int;
+#foreign atoi :: (v: char*) -> int;
 
-str_starts_with :: (char *str, char *substr) -> bool {
+str_starts_with :: (str: char*, substr: char*) -> bool {
   if str == null || substr == null { return false; }
-  str_len := strlen(str);
-  substr_len := strlen(substr);
+  str_len: int = strlen(str);
+  substr_len: int = strlen(substr);
   if str_len < substr_len { return false; }
   if str_len == substr_len && strcmp(str, substr) == 0 { return true;  }
   return strncmp(str, substr, substr_len) == 0;
 }
 
-string_ends_with :: (char *str, char *pattern) -> bool {
+string_ends_with :: (str: char*, pattern: char*) -> bool {
   if !str || !pattern {
     return false;
   }
-  len := strlen(str);
-  patlen := strlen(pattern);
+  len: int = strlen(str);
+  patlen: int = strlen(pattern);
   if len < patlen {
     return false;
   }
   return strncmp(str + (len - patlen), pattern, patlen) == 0;
 }
 
-string_substr :: (char *src, int start, end) -> string {
+string_substr :: (src: char*, start: int, end: int) -> string {
   if !src {
     return #make(string, null);
   }
-  len := strlen(src);
+  len: int = strlen(src);
   if (start > end) { return #make(string, null); }
   if (len < end - start) { return #make(string, null); }
-  char * dest = malloc(sizeof(char) * (end - start) + 1);
+  dest: char* = malloc(sizeof(char) * (end - start) + 1);
   memcpy(dest, src + start, end - start);
   dest[(end - start)] = 0;
-  v := #make(string, dest);
+  v: string = #make(string, dest);
   free(dest);
   return v;
 }
 
-println :: (string str) {
+println :: (str: string) {
   printf("%s\n", #make(char*, str));
 }
 
-
-#foreign fabs :: (float f) -> float;
-#foreign abs :: (int n) -> int;
-#foreign isinf :: (float arg) -> bool;
-#foreign sqrt :: (float f) -> float;
-#foreign cos :: (float f) -> float;
-#foreign sin :: (float f) -> float;
+#foreign fabs :: (f: float) -> float;
+#foreign abs :: (n: int) -> int;
+#foreign isinf :: (arg: float) -> bool;
+#foreign sqrt :: (f: float) -> float;
+#foreign cos :: (f: float) -> float;
+#foreign sin :: (f: float) -> float;
 #foreign rand :: () -> int;
-#foreign srand :: (u32 seed) -> void;
+#foreign srand :: (seed: u32) -> void;
 
-min :: (int a, b) -> int {
+min :: (a: int, b: int) -> int {
   if a > b  {
     return b;
   }
   return a;
 }
 
-max :: (int a, b) -> int {
+max :: (a: int, b: int) -> int {
   if a > b  {
     return a;
   }
   return b;
 }
 
-min :: (float a, b) -> float {
+min :: (a: float, b: float) -> float {
   if a > b  {
     return b;
   }
   return a;
 }
 
-max :: (float a, b) -> float {
+max :: (a: float, b: float) -> float {
   if a > b  {
     return a;
   }
   return b;
 }
 
-clamp :: (float v, min, max) -> float {
+clamp :: (v: float, min: float, max: float) -> float {
   if v < min { return min; }
   if v > max { return max; }
   return v;
 }
 
-clamp :: (float *v, float min, max) {
+clamp :: (v: float*, min: float, max: float) {
   if *v < min { *v = min; }
   if *v > max { *v = max; }
 }

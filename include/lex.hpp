@@ -71,7 +71,7 @@ enum struct TType {
   CompSHR,
   Concat,
   Erase,
-  
+
   True,
   False,
   Null,
@@ -85,6 +85,7 @@ enum struct TType {
   Delete,
   Dollar,
   Then,
+  Colon,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -93,6 +94,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Colon);
     TTYPE_CASE(Then);
     TTYPE_CASE(Erase);
     TTYPE_CASE(Concat);
@@ -217,7 +219,8 @@ struct Token {
            type == TType::CompMul || type == TType::CompDiv ||
            type == TType::CompMod || type == TType::CompAnd ||
            type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR || type == TType::Concat || type == TType::Erase;
+           type == TType::CompSHL || type == TType::CompSHR ||
+           type == TType::Concat || type == TType::Erase;
   }
 
   Token() {}
@@ -292,33 +295,33 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> operators{
-      {"~=", TType::Concat},    {"~~", TType::Erase},
-      {"$", TType::Dollar},     {":=", TType::ColonEquals},
-      {"...", TType::Varargs},  {"#", TType::Directive},
-      {".", TType::Dot},        {"!", TType::Not},
-      {"~", TType::BitwiseNot}, {"::", TType::DoubleColon},
-      {"->", TType::Arrow},     {"..", TType::Range},
-      {"+", TType::Add},        {"-", TType::Sub},
-      {"*", TType::Mul},        {"/", TType::Div},
-      {"%", TType::Modulo},     {"=", TType::Assign},
-      {",", TType::Comma},      {";", TType::Semi},
-      {"(", TType::LParen},     {")", TType::RParen},
-      {"{", TType::LCurly},     {"}", TType::RCurly},
-      {"|", TType::Or},         {"&", TType::And},
-      {"||", TType::LogicalOr}, {"&&", TType::LogicalAnd},
-      {"<<", TType::SHL},       {">>", TType::SHR},
-      {"^", TType::Xor},        {"<", TType::LT},
-      {">", TType::GT},         {"==", TType::EQ},
-      {"!=", TType::NEQ},       {"<=", TType::LE},
-      {">=", TType::GE},        {"[", TType::LBrace},
-      {"]", TType::RBrace},     {"++", TType::Increment},
-      {"--", TType::Decrement},
+      {":", TType::Colon},        {"~=", TType::Concat},
+      {"~~", TType::Erase},       {"$", TType::Dollar},
+      {":=", TType::ColonEquals}, {"...", TType::Varargs},
+      {"#", TType::Directive},    {".", TType::Dot},
+      {"!", TType::Not},          {"~", TType::BitwiseNot},
+      {"::", TType::DoubleColon}, {"->", TType::Arrow},
+      {"..", TType::Range},       {"+", TType::Add},
+      {"-", TType::Sub},          {"*", TType::Mul},
+      {"/", TType::Div},          {"%", TType::Modulo},
+      {"=", TType::Assign},       {",", TType::Comma},
+      {";", TType::Semi},         {"(", TType::LParen},
+      {")", TType::RParen},       {"{", TType::LCurly},
+      {"}", TType::RCurly},       {"|", TType::Or},
+      {"&", TType::And},          {"||", TType::LogicalOr},
+      {"&&", TType::LogicalAnd},  {"<<", TType::SHL},
+      {">>", TType::SHR},         {"^", TType::Xor},
+      {"<", TType::LT},           {">", TType::GT},
+      {"==", TType::EQ},          {"!=", TType::NEQ},
+      {"<=", TType::LE},          {">=", TType::GE},
+      {"[", TType::LBrace},       {"]", TType::RBrace},
+      {"++", TType::Increment},   {"--", TType::Decrement},
 
-      {"+=", TType::CompAdd},   {"-=", TType::CompSub},
-      {"*=", TType::CompMul},   {"/=", TType::CompDiv},
-      {"%=", TType::CompMod},   {"&=", TType::CompAnd},
-      {"|=", TType::CompOr},    {"^=", TType::CompXor},
-    {"<<=", TType::CompSHL},  {">>=", TType::CompSHR}};
+      {"+=", TType::CompAdd},     {"-=", TType::CompSub},
+      {"*=", TType::CompMul},     {"/=", TType::CompDiv},
+      {"%=", TType::CompMod},     {"&=", TType::CompAnd},
+      {"|=", TType::CompOr},      {"^=", TType::CompXor},
+      {"<<=", TType::CompSHL},    {">>=", TType::CompSHR}};
 
   void get_token(State &state);
 };
