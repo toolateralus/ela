@@ -35,12 +35,29 @@ file_get_length :: (FILE *file) -> u32 {
 
 file_read_to_string :: (FILE *file, u32* len) -> char * {
   *len = file_get_length(file);
-  char *str = malloc(sizeof(char) * *len);
+  char *str = malloc(sizeof(char) * (*len + 1));
   index := 0;
   char c;
-  while (c = fgetc(file)) != EOF {
+  while ((c = fgetc(file)) != EOF) {
     str[index] = c;
     ++index;
   }
+  str[index] = #char "\0";
   return str;
+}
+
+File :: struct {
+  _IO_FILE* file;
+  #ctor :: (char * name) {
+    file = fopen(name, "rw");
+  }
+  #dtor :: () {
+    fclose(file);
+  }
+  
+  read :: () -> string {
+    u32 len;
+    return #make(string, file_read_to_string(file, &len));
+  }
+  
 }

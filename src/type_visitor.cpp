@@ -705,7 +705,9 @@ std::any TypeVisitor::visit(ASTCall *node) {
   
   // the type may be null for a generic function but the if statement above should always take care of that
   // if that was the case.
-  assert(type != nullptr);
+  if (type == nullptr) {
+    throw_error("Internal compiler error: type was null when performing a call.", node->source_range);
+  }
   
   if (!type->is_kind(TYPE_FUNCTION)) {
      throw_error("Unable to call function: {} did not refer to a function typed "

@@ -308,8 +308,6 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
                     ->to_string();
     (*ss) << '(' << type << ')';
   }
-  // (*ss) << '(' << node->op.value;
- 
   auto left_type = std::any_cast<int>(node->operand->accept(&type_visitor));
   auto type = global_get_type(left_type);
   if (node->op.type == TType::BitwiseNot && type->get_ext().is_array()) {
@@ -317,7 +315,7 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
     (*ss) << ".pop()";
     return {};
   }
-  
+  (*ss) << '(';
   // we always do these as postfix unary since if we don't it's kinda undefined behaviour
   // and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
@@ -327,8 +325,7 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
     (*ss) << node->op.value;
     node->operand->accept(this);
   }
-  
-  // (*ss) << ")";
+  (*ss) << ")";
   return {};
 }
 

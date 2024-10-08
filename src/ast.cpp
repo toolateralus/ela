@@ -1003,6 +1003,7 @@ ASTCall *Parser::parse_call(const Token &name) {
   end_node(call, range);
   return call;
 }
+
 // CLEANUP(Josh) 10/4/2024, 1:32:37 PM
 // Do we want to just have a generic ASTTypeDeclaration or something since these
 // share so much behaviour? Especailly structs and unions.

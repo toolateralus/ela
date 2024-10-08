@@ -913,7 +913,7 @@ generic_calling_generic :: ($T v) -> $T {
   for s32 i; i < 100; ++i{
     n = ~array;
   }
-  assert("", array.length == 0 && n == 10);
+  assert("pop operator failed", array.length == 0 && n == 10);
 }
 
 #test test_array_erase_operator :: () {

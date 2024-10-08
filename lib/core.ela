@@ -27,6 +27,8 @@
 #foreign isprint :: (int c) -> int;
 #foreign ispunct :: (int c) -> int;
 
+#foreign atoi :: (char *v) -> int;
+
 str_starts_with :: (char *str, char *substr) -> bool {
   if str == null || substr == null { return false; }
   str_len := strlen(str);

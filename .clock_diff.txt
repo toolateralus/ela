@@ -5,14 +5,14 @@ classified 15 files      15 unique files.
 ----------------------------------------------------------------------------------
 File                                blank        comment           code
 ----------------------------------------------------------------------------------
-src/ast.cpp                           153             81           1467
-src/emit.cpp                          130             59           1060
-src/type_visitor.cpp                  113             86            983
+src/ast.cpp                           155             82           1484
+src/emit.cpp                          133             60           1081
+src/type_visitor.cpp                  119             88           1004
 src/type.cpp                           73             46            692
 include/ast.hpp                        70             24            555
 src/visitor.cpp                        32             15            346
 include/type.hpp                       73             15            313
-include/lex.hpp                        30              0            289
+include/lex.hpp                        30              0            294
 include/core.hpp                       23              2            208
 include/visitor.hpp                    18              4            186
 src/lex.cpp                            19              0            170
@@ -21,5 +21,5 @@ include/scope.hpp                      17              3             98
 include/error.hpp                      14              0             96
 src/scope.cpp                          16             12             78
 ----------------------------------------------------------------------------------
-SUM:                                  811            362           6652
+SUM:                                  822            366           6716
 ----------------------------------------------------------------------------------
