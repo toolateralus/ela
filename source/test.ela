@@ -449,7 +449,7 @@ something :: (f: float32) -> float32 {
 #test test_make_cast :: () {
   big: u16 = #make(u16, 65365);
   small: u8 = #make(u8, big);
-  assert("failed to down cast", small == (big % 256));
+  assert("failed to down cast", small == (big % 255));
 }
 
 #test test_method :: () {

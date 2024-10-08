@@ -400,7 +400,9 @@ struct GenericParameter {
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
+  
   bool is_fwd_decl = false;
+  bool is_extern = false;
   
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;

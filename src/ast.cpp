@@ -467,6 +467,7 @@ void Parser::init_directive_routines() {
          }});
   }
 
+  
   // #export, for exporting a non-mangled name to a dll or C library primarily.
   // Equivalent to marking a function extern "C" in C++.
   {
@@ -476,6 +477,11 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            auto name = parser->expect(TType::Identifier);
            parser->expect(TType::DoubleColon);
+           if (parser->peek().type == TType::Struct) {
+              auto decl = parser->parse_struct_declaration(name);
+              decl->is_extern = true;
+              return decl;
+           }
            auto func_decl = parser->parse_function_declaration(name);
            func_decl->flags |= FUNCTION_IS_EXPORTED;
            return func_decl;
@@ -1220,10 +1226,13 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 }
 ASTExpr *Parser::parse_unary() {
   auto range = begin_node();
+  
+  // bitwise not isa  unary expression because arrays use it as a pop operator, and sometimes
+  // you might want to ignore it's result.
   if (peek().type == TType::Add || peek().type == TType::Sub ||
       peek().type == TType::Not || peek().type == TType::BitwiseNot ||
       peek().type == TType::Increment || peek().type == TType::Decrement ||
-      peek().type == TType::Mul || peek().type == TType::And) {
+      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::BitwiseNot) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
@@ -1315,6 +1324,7 @@ ASTExpr *Parser::parse_primary() {
     return directive_expr.get();
   }
 
+  // special unary for allocation, new delete.
   if (tok.type == TType::New || tok.type == TType::Delete) {
     eat();
     ASTAllocate::Kind kind = tok.type == TType::New ? ASTAllocate::Kind::New

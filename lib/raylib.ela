@@ -1,0 +1,252 @@
+#compiler_flags "-lraylib -lm"
+
+Key :: enum {
+  Null            = 0,  
+  Apostrophe      = 39, 
+  Comma           = 44, 
+  Minus           = 45, 
+  Period          = 46, 
+  Slash           = 47, 
+  Zero            = 48, 
+  One             = 49, 
+  Two             = 50, 
+  Three           = 51, 
+  Four            = 52, 
+  Five            = 53, 
+  Six             = 54, 
+  Seven           = 55, 
+  Eight           = 56, 
+  Nine            = 57, 
+  Semicolon       = 59, 
+  Equal           = 61, 
+  A               = 65, 
+  B               = 66, 
+  C               = 67, 
+  D               = 68, 
+  E               = 69, 
+  F               = 70, 
+  G               = 71, 
+  H               = 72, 
+  I               = 73, 
+  J               = 74, 
+  K               = 75, 
+  L               = 76, 
+  M               = 77, 
+  N               = 78, 
+  O               = 79, 
+  P               = 80, 
+  Q               = 81, 
+  R               = 82, 
+  S               = 83, 
+  T               = 84, 
+  U               = 85, 
+  V               = 86, 
+  W               = 87, 
+  X               = 88, 
+  Y               = 89, 
+  Z               = 90, 
+  LeftBracket    = 91, 
+  Backslash       = 92, 
+  RightBracket   = 93, 
+  Grave           = 96, 
+  Space           = 32, 
+  Escape          = 256,
+  Enter           = 257,
+  Tab             = 258,
+  Backspace       = 259,
+  Insert          = 260,
+  Delete          = 261,
+  Right           = 262,
+  Left            = 263,
+  Down            = 264,
+  Up              = 265,
+  PageUp         = 266,
+  PageDown       = 267,
+  Home            = 268,
+  End             = 269,
+  CapsLock       = 280,
+  ScrollLock     = 281,
+  NumLock        = 282,
+  PrintScreen    = 283,
+  Pause           = 284,
+  F1              = 290,
+  F2              = 291,
+  F3              = 292,
+  F4              = 293,
+  F5              = 294,
+  F6              = 295,
+  F7              = 296,
+  F8              = 297,
+  F9              = 298,
+  F10             = 299,
+  F11             = 300,
+  F12             = 301,
+  LeftShift      = 340,
+  LeftControl    = 341,
+  LeftAlt        = 342,
+  LeftSuper      = 343,
+  RightShift     = 344,
+  RightControl   = 345,
+  RightAlt       = 346,
+  RightSuper     = 347,
+  Kb_menu         = 348,
+  Keypad0            = 320,
+  Keypad1            = 321,
+  Keypad2            = 322,
+  Keypad3            = 323,
+  Keypad4            = 324,
+  Keypad5            = 325,
+  Keypad6            = 326,
+  Keypad7            = 327,
+  Keypad8            = 328,
+  Keypad9            = 329,
+  KpDecimal      = 330,
+  KpDivide       = 331,
+  KpMultiply     = 332,
+  KpSubtract     = 333,
+  KpAdd          = 334,
+  KpEnter        = 335,
+  KpEqual        = 336,
+  Back            = 4,  
+  Menu            = 5,  
+  VolumeUp       = 24, 
+  VolumeDown     = 25  
+}
+
+Color :: struct {
+  r: u8;
+  g: u8;
+  b: u8;
+  a: u8;
+}
+
+Texture2D :: struct {
+  id: int;
+  width: int;
+  height: int;
+  mipmaps: int;
+  format: int;
+}
+
+Vector2 :: struct {
+  x: float;
+  y: float;
+}
+
+Rectangle :: struct {
+  x: float;
+  y: float;
+  width: float;
+  height: float;
+}
+
+Sound :: struct {
+  id: int;
+}
+
+Music :: struct {
+  id: int;
+  loopCount: int;
+  volume: float;
+  pitch: float;
+}
+
+WHITE: Color = { (u8)255, (u8)255, (u8)255, (u8)255 };
+BLACK: Color = { (u8)0, (u8)0, (u8)0, (u8)255 };
+RED: Color = { (u8)255, (u8)0, (u8)0, (u8)255 };
+GREEN: Color = { (u8)0, (u8)255, (u8)0, (u8)255 };
+BLUE: Color = { (u8)0, (u8)0, (u8)255, (u8)255 };
+YELLOW: Color = { (u8)255, (u8)255, (u8)0, (u8)255 };
+PURPLE: Color = { (u8)255, (u8)0, (u8)255, (u8)255 };
+ORANGE: Color = { (u8)255, (u8)165, (u8)0, (u8)255 };
+GRAY: Color = { (u8)128, (u8)128, (u8)128, (u8)255 };
+DARKGRAY: Color = { (u8)80, (u8)80, (u8)80, (u8)255 };
+LIGHTGRAY: Color = { (u8)200, (u8)200, (u8)200, (u8)255 };
+BROWN: Color = { (u8)165, (u8)42, (u8)42, (u8)255 };
+PINK: Color = { (u8)255, (u8)192, (u8)203, (u8)255 };
+LIME: Color = { (u8)0, (u8)255, (u8)0, (u8)255 };
+DARKGREEN: Color = { (u8)0, (u8)100, (u8)0, (u8)255 };
+SKYBLUE: Color = { (u8)135, (u8)206, (u8)235, (u8)255 };
+VIOLET: Color = { (u8)238, (u8)130, (u8)238, (u8)255 };
+GOLD: Color = { (u8)255, (u8)215, (u8)0, (u8)255 };
+BEIGE: Color = { (u8)245, (u8)245, (u8)220, (u8)255 };
+MAGENTA: Color = { (u8)255, (u8)0, (u8)255, (u8)255 };
+MAROON: Color = { (u8)128, (u8)0, (u8)0, (u8)255 };
+DARKBLUE: Color = { (u8)0, (u8)0, (u8)139, (u8)255 };
+DARKPURPLE: Color = { (u8)139, (u8)0, (u8)139, (u8)255 };
+DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
+
+
+
+#foreign Vector2Equals :: (v1: Vector2, v2: Vector2) -> bool;
+#foreign Vector2Add :: (v1: Vector2, v2: Vector2) -> Vector2;
+#foreign Vector2Subtract :: (v1: Vector2, v2: Vector2) -> Vector2;
+#foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
+#foreign Vector2Length :: (v: Vector2) -> float;
+#foreign Vector2DotProduct :: (v1: Vector2, v2: Vector2) -> float;
+#foreign Vector2Distance :: (v1: Vector2, v2: Vector2) -> float;
+#foreign Vector2Angle :: (v1: Vector2, v2: Vector2) -> float;
+#foreign Vector2Normalize :: (v: Vector2) -> Vector2;
+
+#foreign CheckCollisionRecs :: (rec1: Rectangle, rec2: Rectangle) -> bool;
+#foreign CheckCollisionCircles :: (center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
+#foreign CheckCollisionCircleRec :: (center: Vector2, radius: float, rec: Rectangle) -> bool;
+#foreign CheckCollisionPointRec :: (point: Vector2, rec: Rectangle) -> bool;
+#foreign CheckCollisionPointCircle :: (point: Vector2, center: Vector2, radius: float) -> bool;
+#foreign CheckCollisionPointTriangle :: (point: Vector2, p1: Vector2, p2: Vector2, p3: Vector2) -> bool;
+
+
+
+#foreign GetKeyPressed :: () -> int;
+#foreign GetScreenWidth :: () -> int;
+#foreign GetScreenHeight :: () -> int;
+#foreign GetMouseX :: () -> int;
+#foreign GetMouseY :: () -> int;
+#foreign GetMousePosition :: () -> Vector2;
+#foreign IsMouseButtonPressed :: (button: int) -> bool;
+#foreign IsMouseButtonDown :: (button: int) -> bool;
+#foreign IsMouseButtonReleased :: (button: int) -> bool;
+#foreign IsMouseButtonUp :: (button: int) -> bool;
+#foreign InitWindow :: (width: int, height: int, title: char*) -> void;
+#foreign WindowShouldClose :: () -> bool;
+#foreign CloseWindow :: () -> void;
+#foreign BeginDrawing :: () -> void;
+#foreign EndDrawing :: () -> void;
+#foreign ClearBackground :: (color: Color) -> void;
+#foreign DrawText :: (text: char*, posX: int, posY: int, fontSize: int, color: Color) -> void;
+#foreign IsKeyPressed :: (key: int) -> bool;
+#foreign IsKeyDown :: (key: int) -> bool;
+#foreign IsKeyReleased :: (key: int) -> bool;
+#foreign SetTargetFPS :: (fps: int) -> void;
+#foreign GetFPS :: () -> int;
+#foreign DrawFPS :: (posX: int, posY) -> void;
+#foreign DrawLine :: (startPosX: int, startPosY, endPosX, endPosY, color: Color) -> void;
+#foreign DrawCircle :: (centerX: int, centerY, radius: float, color: Color) -> void;
+#foreign DrawRectangle :: (posX: int, posY, width, height, color: Color) -> void;
+#foreign DrawTriangle :: (v1X: int, v1Y, v2X, v2Y, v3X, v3Y, color: Color) -> void;
+#foreign DrawPoly :: (centerX: int, centerY: int, sides: int, radius: float, rotation: float, color: Color) -> void;
+#foreign LoadTexture :: (fileName: char*) -> Texture2D;
+#foreign UnloadTexture :: (texture: Texture2D) -> void;
+#foreign DrawTexture :: (texture: Texture2D, posX: int, posY: int, tint: Color) -> void;
+#foreign DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
+#foreign DrawTextureRec :: (texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
+#foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
+#foreign LoadSound :: (fileName: char*) -> Sound;
+#foreign UnloadSound :: (sound: Sound) -> void;
+#foreign PlaySound :: (sound: Sound) -> void;
+#foreign StopSound :: (sound: Sound) -> void;
+#foreign PauseSound :: (sound: Sound) -> void;
+#foreign ResumeSound :: (sound: Sound) -> void;
+#foreign LoadMusicStream :: (fileName: char*) -> Music;
+#foreign UnloadMusicStream :: (music: Music) -> void;
+#foreign PlayMusicStream :: (music: Music) -> void;
+#foreign UpdateMusicStream :: (music: Music) -> void;
+#foreign StopMusicStream :: (music: Music) -> void;
+#foreign PauseMusicStream :: (music: Music) -> void;
+#foreign ResumeMusicStream :: (music: Music) -> void;
+#foreign SetMusicVolume :: (music: Music, volume: float) -> void;
+#foreign SetSoundVolume :: (sound: Sound, volume: float) -> void;
+#foreign InitAudioDevice :: () -> void;
+#foreign CloseAudioDevice :: () -> void;
+#foreign IsAudioDeviceReady :: () -> bool;
+#foreign SetMasterVolume :: (volume: float) -> void;

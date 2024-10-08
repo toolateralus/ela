@@ -121,8 +121,9 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.close();
 
   std::string extra_flags = "" + compilation_flags;
+  static std::string ignored_warnings = "-Wno-return-type-c-linkage -Wno-writable-strings -Wno-constant-logical-operand -Wno-parentheses-equality -Wno-c99-designator";
 
-  auto compilation_string = std::format("clang++ -std=c++23 -L/usr/local/lib -Wno-writable-strings -Wno-constant-logical-operand -Wno-parentheses-equality -Wno-c99-designator {} -o {} {}", output_path.string(), binary_path.string(), extra_flags);
+  auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} -o {} {}", ignored_warnings, output_path.string(), binary_path.string(), extra_flags);
                      
   printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
   cpp.begin();

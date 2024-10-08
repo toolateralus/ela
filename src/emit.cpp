@@ -748,6 +748,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   Defer deferred([&] { current_struct_decl = nullptr; });
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
+    if (node->is_extern) header << "extern \"C\" ";
     header << "struct " << node->type->base << ";\n";
     return {};
   }
@@ -757,6 +758,11 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   ctx.set_scope(node->scope);
 
   if (!is_anonymous) {
+    
+    if (node->is_extern) {
+      header << "extern \"C\" ";
+      (*ss) << "extern \"C\" ";
+    }
     (*ss) << "struct " << node->type->base << "{\n";
     header << "struct " << node->type->base << ";\n";
   } else {

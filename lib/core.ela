@@ -9,6 +9,8 @@
 
 #foreign printf :: (format: char*, ...) -> int;
 
+#foreign fmod :: (l: float, r: float) -> float;
+
 #foreign time :: (value: void*) -> int;
 #foreign exit :: (code: int);
 

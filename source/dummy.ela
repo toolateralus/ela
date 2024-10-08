@@ -1,5 +1,7 @@
 #import file;
+#import core;
 
-main :: (argc : int, argv : char**) {
-  
+main :: () {
+  n := 0;
+  println($"{(#type n).name}");
 }
