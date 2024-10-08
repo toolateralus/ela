@@ -2,7 +2,6 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
-#include "resolver.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -290,7 +289,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto info = static_cast<StructTypeInfo *>(type->get_info());
   
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0) {
-    return QUEUED_RESOLVED;
+    return {};
   }
   
   ctx.set_scope(node->scope);
@@ -303,7 +302,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   }
   
   ctx.exit_scope();
-  return QUEUED_RESOLVED;
+  return {};
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   auto last_decl = current_union_decl;
