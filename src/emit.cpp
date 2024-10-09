@@ -241,9 +241,14 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       (*ss) << ".data";
     } else if (type->is_kind(TYPE_STRUCT)) {
       auto info = static_cast<StructTypeInfo *>(type->get_info());
-      if (info->scope->lookup("to_string")) {
+      auto sym = info->scope->lookup("to_string");
+      if (sym) {
+        auto sym_ty = static_cast<FunctionTypeInfo*>(global_get_type(sym->type_id)->get_info());
+        auto return_ty = global_get_type(sym_ty->return_type);
         value->accept(this);
         (*ss) << ".to_string()";
+        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions())
+          (*ss) << ".data";
       }
     } else {
       value->accept(this);

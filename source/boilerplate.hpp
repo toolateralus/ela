@@ -1,8 +1,7 @@
-#include <cstddef>
 #include <cstdint>
 
 using float64 = double;
-using u64 = size_t;
+using u64 = uint64_t;
 using s64 = int64_t;
 
 using s32 = int32_t;

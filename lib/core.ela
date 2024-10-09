@@ -123,6 +123,10 @@ clamp :: (v: float*, min: float, max: float) {
   if *v > max { *v = max; }
 }
 
+lerp :: (a: float, b, t) -> float {
+  return (a * (1.0 - t)) + (b * t);
+}
+
 Random :: enum {
   Max = 2147483647,
 }
@@ -130,3 +134,14 @@ Random :: enum {
 randf :: () -> float {
   return #make(float, rand()) / #make(float, Random.Max);
 }
+
+// !BUG can't define this because it's a redefinition of timeval even though we're not including anything that contains it as far as I know.
+// #alias __time_t :: s64;
+// #alias __suseconds_t :: s64;
+
+// timeval :: struct {
+//   tv_sec: __time_t;
+//   tv_usec: __suseconds_t;
+// };
+
+// #foreign gettimeofday :: (tv : timeval*, timezone: void*) -> int;

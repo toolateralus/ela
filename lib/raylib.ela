@@ -118,6 +118,10 @@ Color :: struct {
   g: u8;
   b: u8;
   a: u8;
+  
+  to_string :: () -> string {
+    return $"r: {r}, g: {g}, b: {b}, a: {a}";
+  }
 }
 
 Texture2D :: struct {
@@ -131,6 +135,9 @@ Texture2D :: struct {
 Vector2 :: struct {
   x: float;
   y: float;
+  to_string :: () -> string {
+    return $"x: {x}, y: {y}"
+  }
 }
 
 Rectangle :: struct {
@@ -138,6 +145,10 @@ Rectangle :: struct {
   y: float;
   width: float;
   height: float;
+  
+  to_string :: () -> string {
+    return $"x: {x}, y: {y}"
+  }
 }
 
 Sound :: struct {
@@ -177,6 +188,8 @@ DARKPURPLE: Color = { (u8)139, (u8)0, (u8)139, (u8)255 };
 DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
 
 
+#foreign InitTimer :: () -> void;
+#foreign GetTime :: () -> float64;
 
 #foreign Vector2Equals :: (v1: Vector2, v2: Vector2) -> bool;
 #foreign Vector2Add :: (v1: Vector2, v2: Vector2) -> Vector2;
@@ -189,13 +202,13 @@ DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
 #foreign Vector2Angle :: (v1: Vector2, v2: Vector2) -> float;
 #foreign Vector2Normalize :: (v: Vector2) -> Vector2;
 
+
 #foreign CheckCollisionRecs :: (rec1: Rectangle, rec2: Rectangle) -> bool;
 #foreign CheckCollisionCircles :: (center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
 #foreign CheckCollisionCircleRec :: (center: Vector2, radius: float, rec: Rectangle) -> bool;
 #foreign CheckCollisionPointRec :: (point: Vector2, rec: Rectangle) -> bool;
 #foreign CheckCollisionPointCircle :: (point: Vector2, center: Vector2, radius: float) -> bool;
 #foreign CheckCollisionPointTriangle :: (point: Vector2, p1: Vector2, p2: Vector2, p3: Vector2) -> bool;
-
 
 
 #foreign GetKeyPressed :: () -> int;
