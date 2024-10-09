@@ -244,7 +244,9 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     // this is just a plain scalar type, such as an int.
   } else if (type->is_kind(TYPE_STRUCT)) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
-    if (info->scope->fields_count() < node->types.size()) {
+    // !HACK i used node->expressions.size() to bypass a bug with the types of initlist exceeding the number of expressions.
+    // * REMOVE ME * 
+    if (info->scope->fields_count() < node->expressions.size()) {
       throw_error("excess elements provided in initializer list.",
                   node->source_range);
     }
@@ -1244,6 +1246,7 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
         node->types_are_homogenous = false;
       }
     }
+    // !BUG: somehow for 2 expressions, sometimes this will end up with 4 types. I have no idea how atha's happening.
     node->types.push_back(type);
   }
 

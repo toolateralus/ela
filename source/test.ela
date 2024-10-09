@@ -914,3 +914,17 @@ generic_calling_generic :: (v: $T) -> $T {
   array ~~ 10;
   assert("failed to erase element from array with ~~", array.length == 0);
 }
+
+XarBarInitListTestStruct :: struct {
+  x: float;
+  y: float;
+}
+
+New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
+  return v;
+}
+
+#test test_init_list_as_implicit_parameter :: () {
+  v := New({0.0, 0.0});
+  assert("failed", v.x == 0.0 && v.y == 0.0);
+}
