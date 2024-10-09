@@ -13,4 +13,6 @@ New :: (v: Vec2) {
 
 main :: () {
   New({0.0, 0.0});
+  v : Vec2;
+  v = {randf(), 0.0};
 }

@@ -716,7 +716,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   Type *type = global_get_type(symbol->type_id);
   
+  auto old_ty = declaring_or_assigning_type;
+  Defer _defer([&]{
+    declaring_or_assigning_type = old_ty;
+  });
   if (type) {
+    
     declaring_or_assigning_type = symbol->type_id;
   }
   
@@ -1225,7 +1230,12 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
 }
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
-  // use this to infer type for initializer lists when using new etc.
+  
+  auto old_ty = declaring_or_assigning_type;
+  Defer _defer([&]{
+    declaring_or_assigning_type = old_ty;
+  });
+  
   declaring_or_assigning_type = type;
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
