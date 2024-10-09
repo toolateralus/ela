@@ -147,20 +147,34 @@ Rectangle :: struct {
   height: float;
   
   to_string :: () -> string {
-    return $"x: {x}, y: {y}"
+    return $"x: {x}, y: {y}, width: {width}, height: {height}";
   }
 }
 
-Sound :: struct {
-  id: int;
+// Opaque structs defined in C files in raudio.c;
+rAudioBuffer :: struct;
+rAudioProcessor :: struct;
+
+AudioStream :: struct {
+  buffer: rAudioBuffer*;
+  processor: rAudioProcessor*;
+  sampleRate: u32;
+  sampleSize: u32;
+  channels: u32;
 }
 
 Music :: struct {
-  id: int;
-  loopCount: int;
-  volume: float;
-  pitch: float;
+  stream: AudioStream;
+  frameCount: u32;
+  looping: bool;
+  ctxType: int;
+  ctxData: void*;
 }
+
+Sound :: struct {
+  stream: AudioStream;
+  frameCount: u32;
+} 
 
 WHITE: Color = { (u8)255, (u8)255, (u8)255, (u8)255 };
 BLACK: Color = { (u8)0, (u8)0, (u8)0, (u8)255 };
@@ -186,7 +200,9 @@ MAROON: Color = { (u8)128, (u8)0, (u8)0, (u8)255 };
 DARKBLUE: Color = { (u8)0, (u8)0, (u8)139, (u8)255 };
 DARKPURPLE: Color = { (u8)139, (u8)0, (u8)139, (u8)255 };
 DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
-
+CYAN: Color = { (u8)0, (u8)255, (u8)255, (u8)255 };
+DARKCYAN: Color = { (u8)0, (u8)139, (u8)139, (u8)255 };
+LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 
 #foreign InitTimer :: () -> void;
 #foreign GetTime :: () -> float64;
@@ -232,8 +248,8 @@ DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
 #foreign IsKeyDown :: (key: int) -> bool;
 #foreign IsKeyReleased :: (key: int) -> bool;
 #foreign SetTargetFPS :: (fps: int) -> void;
+#foreign DrawFPS :: (posX: int, posY: int) -> void;
 #foreign GetFPS :: () -> int;
-#foreign DrawFPS :: (posX: int, posY) -> void;
 #foreign DrawLine :: (startPosX: int, startPosY, endPosX, endPosY, color: Color) -> void;
 #foreign DrawCircle :: (centerX: int, centerY, radius: float, color: Color) -> void;
 #foreign DrawRectangle :: (posX: int, posY, width, height, color: Color) -> void;
@@ -260,7 +276,9 @@ DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
 #foreign ResumeMusicStream :: (music: Music) -> void;
 #foreign SetMusicVolume :: (music: Music, volume: float) -> void;
 #foreign SetSoundVolume :: (sound: Sound, volume: float) -> void;
+#foreign IsMusicStreamPlaying :: (music: Music) -> bool;
 #foreign InitAudioDevice :: () -> void;
 #foreign CloseAudioDevice :: () -> void;
 #foreign IsAudioDeviceReady :: () -> bool;
 #foreign SetMasterVolume :: (volume: float) -> void;
+#foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;

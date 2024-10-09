@@ -5,6 +5,17 @@
   * otherwise the overloaded functions will always take precedence over generic procedures.
 */
 
+
+// fi theres overloads with similar parameter types but one has more, it completely fails to find it.
+add :: (n : int, y, z) {
+  
+}
+
+add :: (n : int, y) {
+  
+}
+
+
 add :: ($T a, b) -> $T {
   return a + b;
 }

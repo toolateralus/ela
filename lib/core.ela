@@ -127,6 +127,10 @@ lerp :: (a: float, b, t) -> float {
   return (a * (1.0 - t)) + (b * t);
 }
 
+lerp :: (a: int, b: int, t: float) -> int {
+  return (int)(a * (1.0 - t)) + (b * t) + 0.5;
+}
+
 Random :: enum {
   Max = 2147483647,
 }

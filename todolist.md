@@ -1,5 +1,8 @@
 ## TODO List
 
+
+
+
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
@@ -7,6 +10,8 @@ Add a offsetof() or #offset() or something like that
 `#offset(Vector2, x);`
 
 ## string interpolation: 
+ Interpolating strings is *SUPER* slow, we need to find a much better waay to do it than using lambdas and sprintf.
+
  Right now a string interpolation is limited to rules created by the lexer. So you can't use any characters that arent recognized by the language as tokens
  I don't really want to make another lexer so we should find a way to put the lexer in a state that says we don't care about unrecognized tokens, just build them as best as you can. That probably wont work because thenw ed end up lexing `\"{something}\"` as 
   Operator: `\"{`
