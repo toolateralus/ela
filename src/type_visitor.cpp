@@ -1225,6 +1225,8 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
 }
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
+  // use this to infer type for initializer lists when using new etc.
+  declaring_or_assigning_type = type;
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
   }
