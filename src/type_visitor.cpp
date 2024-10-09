@@ -560,6 +560,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
     }
   }
 
+  declaring_or_assigning_type = id;
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     assert_types_can_cast_or_equal(
@@ -711,11 +712,15 @@ std::any TypeVisitor::visit(ASTCall *node) {
                 node->source_range);
   }
 
+  Type *type = global_get_type(symbol->type_id);
+  
+  if (type) {
+    declaring_or_assigning_type = symbol->type_id;
+  }
+  
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
-
-  Type *type = global_get_type(symbol->type_id);
-
+  
   if (symbol->declaring_node.is_not_null()) {
     auto func_decl =
         static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
@@ -723,6 +728,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
       return generate_generic_function(node, func_decl, arg_tys);
     }
   }
+
 
   // the type may be null for a generic function but the if statement above
   // should always take care of that if that was the case.
@@ -758,7 +764,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     if (arg_tys.size() <= i) {
       continue;
     }
-
+    
     assert_types_can_cast_or_equal(
         arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
@@ -769,12 +775,24 @@ std::any TypeVisitor::visit(ASTCall *node) {
   return info->return_type;
 }
 std::any TypeVisitor::visit(ASTArguments *node) {
+  
+  auto type = global_get_type(declaring_or_assigning_type);
+  
+  FunctionTypeInfo* info = nullptr;
+  if (type) {
+    info = dynamic_cast<FunctionTypeInfo*>(type->get_info());
+  }
+  
   std::vector<int> argument_types;
-  for (auto arg : node->arguments) {
-    // TODO: We need to have a way to get the expected types of the parameters
-    // of the function we're visiting for here so that we can implicitly
-    // convert initializer lists to the correct type here
-    // * use declaring_or_assigning_type ...
+  for (int i = 0; i < node->arguments.size(); ++i) {
+    // TODO: make sure this never happens, we should always have the type of the thing. However args are sometime used for non-functions.
+    auto arg = node->arguments[i];
+    if (!info) {
+      auto arg_ty = int_from_any(arg->accept(this));
+      argument_types.push_back(arg_ty);
+      continue;
+    }
+    declaring_or_assigning_type = info->parameter_types[i];
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;

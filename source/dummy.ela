@@ -1,7 +1,16 @@
 #import file;
 #import core;
 
+
+Vec2 :: struct {
+  x: float;
+  y: float;
+}
+
+New :: (v: Vec2) {
+  
+}
+
 main :: () {
-  n := 0;
-  println($"{(#type n).name}");
+  New({0.0, 0.0});
 }
