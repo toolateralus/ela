@@ -594,14 +594,14 @@ std::any TypeVisitor::visit(ASTBreak *node) {
 std::any TypeVisitor::visit(ASTFor *node) {
   ctx.set_scope(node->block->scope);
   switch (node->tag) {
-  case ASTFor::RangeBased: {
-    auto v = node->value.range_based;
+  case ASTFor::CollectionBased: {
+    auto v = node->value.collection_based;
     auto type = int_from_any(v.collection->accept(this));
 
     auto t = global_get_type(type);
 
     auto iden = static_cast<ASTIdentifier *>(v.target);
-
+    
     if (!t) {
       throw_error("Internal compiler error: element type was null in range "
                   "based for loop",
@@ -652,6 +652,14 @@ std::any TypeVisitor::visit(ASTFor *node) {
     v.condition->accept(this);
     v.increment->accept(this);
   } break;
+  case ASTFor::RangeBased: {
+    auto v = node->value.range_based;
+    auto iden = static_cast<ASTIdentifier*>(v.iden);
+    ctx.scope->insert(iden->value.value, int_type());
+    v.iden->accept(this);
+    v.range->accept(this);
+  }
+    break;
   }
   ctx.exit_scope();
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
@@ -1294,4 +1302,14 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
 
   auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
+}
+
+std::any TypeVisitor::visit(ASTRange *node) { 
+  auto left =  int_from_any(node->left->accept(this));
+  auto right = int_from_any(node->right->accept(this));
+  if (!type_is_numerical(global_get_type(left)) || !type_is_numerical(global_get_type(right))) {
+    throw_error("cannot use a non-numerical type in a range expression", node->source_range);
+  }
+  assert_types_can_cast_or_equal(left, right, node->source_range, "expected: {}, got: {}", "Invalid types in a range expression");
+  return left;
 }

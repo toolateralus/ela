@@ -22,6 +22,27 @@ extern "C" int printf(const char *format, ...);
 #include <algorithm>
 #include <initializer_list>
 
+struct Range {
+  int m_begin, m_end;
+  Range(int m_begin, int m_end) : m_begin(m_begin), m_end(m_end) {}
+  struct iterator {
+    int current;
+    iterator(int start) : current(start) {}
+    int operator*() const { return current; }
+    iterator &operator++() {
+      ++current;
+      return *this;
+    }
+    bool operator!=(const iterator &other) const {
+      return current != other.current;
+    }
+  };
+  iterator begin() const { return iterator(m_begin); }
+  iterator end() const { return iterator(m_end); }
+  iterator begin() { return iterator(m_begin); }
+  iterator end() { return iterator(m_end); }
+};
+
 // TODO: implement this. not sure how we want to approach it.
 // template <class T> struct Any {
 //   T value;

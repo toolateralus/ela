@@ -928,3 +928,12 @@ New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   v := New({0.0, 0.0});
   assert("failed", v.x == 0.0 && v.y == 0.0);
 }
+
+
+#test test_range_based_for_loop_exclusive :: () {
+  n: int;
+  for i in 0..10 {
+    n = i;
+  }
+  assert("Range based for loop failed.", n == 9);
+}

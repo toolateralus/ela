@@ -62,6 +62,7 @@ enum ASTNodeType {
   AST_NODE_UNION_DECLARATION,
   AST_NODE_ALLOCATE,
   AST_NODE_NOOP,
+  AST_NODE_RANGE,
 };
 
 // TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
@@ -322,19 +323,33 @@ enum ValueSemantic {
   VALUE_SEMANTIC_POINTER,
 }; 
 
+struct ASTRange: ASTExpr {
+  ASTExpr *left;
+  ASTExpr *right;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_RANGE;
+  }
+};
+
 struct ASTFor : ASTStatement {
   enum ForType {
+    CollectionBased,
     RangeBased,
     CStyle,
   } tag;
 
   union {
     struct {
+      ASTExpr* iden;
+      ASTRange* range;
+    } range_based;
+    struct {
       ValueSemantic value_semantic;
       // FEATURE: add a way to use 'for v, idx in collection'
       ASTExpr *target;
       ASTExpr *collection;
-    } range_based;
+    } collection_based;
     struct {
       ASTDeclaration *decl;
       ASTExpr *condition;
@@ -463,6 +478,8 @@ struct ASTAllocate : ASTExpr {
   }
 };
 
+
+
 struct Allocation {
   ASTAllocate* alloc;
   Symbol* symbol;
@@ -514,6 +531,7 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTEnumDeclaration *node) override {}                         \
   std::any visit(ASTUnionDeclaration *node) override {}                        \
   std::any visit(ASTAllocate *node) override {};                        \
+  std::any visit(ASTRange *node) override {};                        \
   
 
 
@@ -548,7 +566,9 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
   virtual std::any visit(ASTUnionDeclaration *node) = 0;                        \
   virtual std::any visit(ASTAllocate *node) = 0;                        \
-
+  virtual std::any visit(ASTRange *node) = 0;                        \
+  
+  
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,

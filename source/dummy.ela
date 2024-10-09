@@ -1,18 +1,8 @@
 #import file;
 #import core;
 
-
-Vec2 :: struct {
-  x: float;
-  y: float;
-}
-
-New :: (v: Vec2) {
-  
-}
-
 main :: () {
-  New({0.0, 0.0});
-  v : Vec2;
-  v = {randf(), 0.0};
+  for i in 0..10 {
+    println($"Hi, i am queer as f*ck {i}");
+  }
 }

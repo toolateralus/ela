@@ -141,16 +141,17 @@ void Lexer::get_token(State &state) {
           pos++;
           c = input[pos];
         }
-                
         if (c == '.') {
           if (is_float) {
             auto str = token.str();
             str.pop_back();
             pos++;
-            state.lookahead_buffer.emplace_back(location, "..", TType::Range,
-                                                TFamily::Operator);
             state.lookahead_buffer.push_back(
                 Token(location, str, TType::Integer, TFamily::Literal));
+                
+            state.lookahead_buffer.emplace_back(location, "..", TType::Range,
+                                                TFamily::Operator);
+            return;
           }
           is_float = true;
         }

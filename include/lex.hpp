@@ -86,6 +86,7 @@ enum struct TType {
   Dollar,
   Then,
   Colon,
+  In,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -95,6 +96,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Colon);
+    TTYPE_CASE(In);
     TTYPE_CASE(Then);
     TTYPE_CASE(Erase);
     TTYPE_CASE(Concat);
@@ -286,7 +288,7 @@ struct Lexer {
       {"then", TType::Then},     {"union", TType::Union},
       {"enum", TType::Enum},     {"return", TType::Return},
       {"break", TType::Break},   {"continue", TType::Continue},
-
+      {"in", TType::In},
       {"for", TType::For},       {"while", TType::While},
       {"if", TType::If},         {"else", TType::Else},
       {"struct", TType::Struct}, {"true", TType::True},

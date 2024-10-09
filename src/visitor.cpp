@@ -173,8 +173,8 @@ std::any SerializeVisitor::visit(ASTFor *node) {
   indentLevel++;
 
   switch (node->tag) {
-  case ASTFor::RangeBased: {
-    auto v = node->value.range_based;
+  case ASTFor::CollectionBased: {
+    auto v = node->value.collection_based;
     ss << indent() << "RangeBased:\n";
     ss << indent() << "target: ";
     v.target->accept(this);
@@ -192,6 +192,9 @@ std::any SerializeVisitor::visit(ASTFor *node) {
     v.increment->accept(this);
     ss << '\n';
   } break;
+  case ASTFor::RangeBased:
+    ss << "range based implement me no one uses this ast serializer\n";
+    break;
   }
 
   node->block->accept(this);
@@ -360,6 +363,7 @@ std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }

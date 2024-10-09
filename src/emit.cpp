@@ -49,8 +49,8 @@ std::any EmitVisitor::visit(ASTIf *node) {
 
 std::any EmitVisitor::visit(ASTFor *node) {
   emit_line_directive(node);
-  const auto emit_range_based = [&] {
-    auto v = node->value.range_based;
+  const auto emit_collection_based = [&] {
+    auto v = node->value.collection_based;
 
     switch (v.value_semantic) {
     case VALUE_SEMANTIC_COPY: {
@@ -86,16 +86,27 @@ std::any EmitVisitor::visit(ASTFor *node) {
     space();
     v.increment->accept(this);
   };
+  
+  const auto emit_range_based = [&] {
+    auto v = node->value.range_based;
+    (*ss) << "auto ";
+    v.iden->accept(this);
+    (*ss) << " : ";
+    v.range->accept(this);
+  };
 
   auto old_scope = ctx.scope;
   ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
   switch (node->tag) {
-  case ASTFor::RangeBased:
-    emit_range_based();
+  case ASTFor::CollectionBased:
+    emit_collection_based();
     break;
   case ASTFor::CStyle:
     emit_c_style();
+    break;
+  case ASTFor::RangeBased:
+    emit_range_based();
     break;
   }
   (*ss) << ")";
@@ -1261,4 +1272,13 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   //   output += ss.str();
   // }
   return output;
+}
+
+std::any EmitVisitor::visit(ASTRange *node) { 
+  (*ss) << "Range(";
+  node->left->accept(this);
+  (*ss) << ", ";
+  node->right->accept(this);
+  (*ss) << ")";
+  return {};
 }
