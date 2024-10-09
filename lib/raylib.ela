@@ -183,6 +183,7 @@ DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
 #foreign Vector2Subtract :: (v1: Vector2, v2: Vector2) -> Vector2;
 #foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
 #foreign Vector2Length :: (v: Vector2) -> float;
+#foreign Vector2LengthSqr :: (v: Vector2) -> float;
 #foreign Vector2DotProduct :: (v1: Vector2, v2: Vector2) -> float;
 #foreign Vector2Distance :: (v1: Vector2, v2: Vector2) -> float;
 #foreign Vector2Angle :: (v1: Vector2, v2: Vector2) -> float;
