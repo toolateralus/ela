@@ -1310,6 +1310,20 @@ std::any TypeVisitor::visit(ASTRange *node) {
   if (!type_is_numerical(global_get_type(left)) || !type_is_numerical(global_get_type(right))) {
     throw_error("cannot use a non-numerical type in a range expression", node->source_range);
   }
-  assert_types_can_cast_or_equal(left, right, node->source_range, "expected: {}, got: {}", "Invalid types in a range expression");
+  
+  auto l_ty = global_get_type(left);
+  auto r_ty = global_get_type(right);
+  
+  if (!l_ty->is_kind(TYPE_SCALAR) || !r_ty->is_kind(TYPE_SCALAR)) {
+    throw_error("Cannot use non-scalar or integral types in a range expression", node->source_range);
+  }
+  
+  auto l_info = static_cast<ScalarTypeInfo*>(l_ty->get_info());
+  auto r_info = static_cast<ScalarTypeInfo*>(r_ty->get_info());
+  
+  if (!l_info->is_integral || !r_info->is_integral) {
+    throw_error("Cannot use non-scalar or integral types in a range expression", node->source_range);
+  }
+  
   return left;
 }

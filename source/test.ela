@@ -932,8 +932,26 @@ New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 
 #test test_range_based_for_loop_exclusive :: () {
   n: int;
+  ten := 10;
+  zero := 0;
+  
   for i in 0..10 {
     n = i;
   }
+  
+  for i in 0..ten {
+    n = i;
+  }
+  
+  for i in zero..ten {
+    n = i;
+  }
+  
+  for i in zero..10 {
+    n = i;
+  }
+  
+  
+  
   assert("Range based for loop failed.", n == 9);
 }
