@@ -71,12 +71,16 @@ println :: (str: string) {
   printf("%s\n", #make(char*, str));
 }
 
-#foreign fabs :: (f: float) -> float;
+println :: (str: char*) {
+  printf("%s\n", str);
+}
+
+#foreign fabs :: (f: float64) -> float64;
 #foreign abs :: (n: int) -> int;
 #foreign isinf :: (arg: float) -> bool;
-#foreign sqrt :: (f: float) -> float;
-#foreign cos :: (f: float) -> float;
-#foreign sin :: (f: float) -> float;
+#foreign sqrt :: (f: float64) -> float64;
+#foreign cos :: (f: float64) -> float64;
+#foreign sin :: (f: float64) -> float64;
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32) -> void;
 
