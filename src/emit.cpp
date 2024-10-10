@@ -10,6 +10,12 @@
 #include <sstream>
 #include <string>
 
+/* 
+  TODO: 
+   This entire visitor needs a huge cleanup. there's some absolutely terrible code in here and it's super messy.
+  ? However it works xD
+*/
+
 std::any EmitVisitor::visit(ASTWhile *node) {
   emit_line_directive(node);
   (*ss) << indent() << "while ";

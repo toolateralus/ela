@@ -1,0 +1,27 @@
+
+#import dlfcn;
+#include "shared.ela";
+
+// TODO improve this syntax. Probably add a fn keyword.
+
+
+main :: () {
+  handle := dlopen("test.so", Rtld.Now);
+  hook: function = dlsym(handle, "test_call");
+  
+  ctx: DrawContext;
+  
+  
+  
+  InitWindow(0, 0, "Testing DLL");
+  while !WindowShouldClose() {
+    for key in 0..256 {
+      ctx.inputState[key] = IsKeyDown(key);
+    }
+    BeginDrawing();
+      ClearBackground(BLACK);
+      hook(&ctx);
+      ctx.draw();
+    EndDrawing();
+  }
+}

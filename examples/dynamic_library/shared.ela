@@ -1,0 +1,22 @@
+#import core;
+#import raylib;
+
+
+DrawCommand :: struct {
+  rect: Rectangle;
+  color: Color;
+}
+
+DrawContext :: struct {
+  rectangles: DrawCommand[];
+  inputState: bool[];
+  
+  draw :: () {
+    for command; rectangles {
+      DrawRectangle((int)command.rect.x, (int)command.rect.y, (int)command.rect.width, (int)command.rect.height, command.color);
+    }
+  }
+}
+
+
+#alias function :: void(DrawContext*)*;

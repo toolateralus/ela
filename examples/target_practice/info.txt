@@ -1,0 +1,23 @@
+
+
+|-----------------------------------------------------------------------------------------------------------------------|
+|________________________________________ >>> 'Target Practice' <<< ____________________________________________________|
+|-----------------------------------------------------------------------------------------------------------------------|
+            
+|----- Made by Josh Slavik & Cooper Pilot, ---------    2024-10-10    --------------------------------------------------|
+|                                                                                                                       |
+|  \-------------------------------------------------------------------------\                                          |
+|  "A simple test game for the ela compiler. Shoot targets and gain points."                                            |
+|  \-------------------------------------------------------------------------\                                          |
+|                                                                                                                       |
+|  -- Controls                                                                                                          |
+|    - Hold `SPACE` to shoot 3 round burst, tap for single fire.                                                        |
+|    - Hold `A` to move left, `D` to move right.                                                                        |
+|                                                                                                                       |
+|  -- Hitting a target awards points. The further the target, the more points are awarded.                              |
+|                                                                                                                       |
+|  -- Missing a target and having a bullet hit the top of the screen incurs a penalty, and quite a large one.           |
+|                                                                                                                       |
+|  -- Clearing all the screen of all targets incurs an massive bonus, score *= 1.2;                                     |
+|                                                                                                                       |
+|-----------------------------------------------------------------------------------------------------------------------|
