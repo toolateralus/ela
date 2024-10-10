@@ -971,7 +971,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
     }
     
     
-    //! TEMPORARILY DISABLED :: SEE BUG 5.1
+    //! TEMPORARILY DISABLED :: SEE REPRO 5.1
     // dynamic : int[][];
     // for x in 0..5 {
     //   dynamic ~= #make(int[]);
