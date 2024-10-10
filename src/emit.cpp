@@ -10,10 +10,10 @@
 #include <sstream>
 #include <string>
 
-/* 
-  TODO: 
-   This entire visitor needs a huge cleanup. there's some absolutely terrible code in here and it's super messy.
-  ? However it works xD
+/*
+  TODO:
+   This entire visitor needs a huge cleanup. there's some absolutely terrible
+  code in here and it's super messy. ? However it works xD
 */
 
 std::any EmitVisitor::visit(ASTWhile *node) {
@@ -92,7 +92,7 @@ std::any EmitVisitor::visit(ASTFor *node) {
     space();
     v.increment->accept(this);
   };
-  
+
   const auto emit_range_based = [&] {
     auto v = node->value.range_based;
     (*ss) << "auto ";
@@ -155,23 +155,27 @@ std::any EmitVisitor::visit(ASTArguments *node) {
   return {};
 }
 
-// Identifier may contain a fixed buffer size like name[30] due to the way function pointers have to work in C.
-void EmitVisitor::emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
+// Identifier may contain a fixed buffer size like name[30] due to the way
+// function pointers have to work in C.
+void EmitVisitor::emit_function_pointer_type_string(
+    Type *type, Nullable<std::string> identifier) {
   if (!type->is_kind(TYPE_FUNCTION)) {
-    throw_error("Internal compiler error: tried to get a function pointer from a non-function type", {});
+    throw_error("Internal compiler error: tried to get a function pointer from "
+                "a non-function type",
+                {});
   }
-  
-  auto info = static_cast<FunctionTypeInfo*>(type->get_info());
+
+  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
   auto return_type = global_get_type(info->return_type);
-  
+
   (*ss) << to_cpp_string(return_type) << "(*";
-  
+
   if (identifier) {
     (*ss) << *identifier.get();
   }
-  
+
   (*ss) << ")(";
-  
+
   for (int i = 0; i < info->params_len; ++i) {
     auto type = global_get_type(info->parameter_types[i]);
     (*ss) << to_cpp_string(type);
@@ -184,7 +188,7 @@ void EmitVisitor::emit_function_pointer_type_string(Type *type, Nullable<std::st
 
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
-  
+
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
@@ -291,11 +295,13 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       auto sym = info->scope->lookup("to_string");
       if (sym) {
-        auto sym_ty = static_cast<FunctionTypeInfo*>(global_get_type(sym->type_id)->get_info());
+        auto sym_ty = static_cast<FunctionTypeInfo *>(
+            global_get_type(sym->type_id)->get_info());
         auto return_ty = global_get_type(sym_ty->return_type);
         value->accept(this);
         (*ss) << ".to_string()";
-        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions())
+        if (return_ty->get_base() == "string" &&
+            return_ty->get_ext().has_no_extensions())
           (*ss) << ".data";
       }
     } else {
@@ -369,10 +375,10 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
     return {};
   }
   (*ss) << '(';
-  // we always do these as postfix unary since if we don't it's kinda undefined behaviour
-  // and it messes up unary expressions at the end of dot expressions
+  // we always do these as postfix unary since if we don't it's kinda undefined
+  // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
-    node->operand->accept(this);  
+    node->operand->accept(this);
     (*ss) << node->op.value;
   } else {
     (*ss) << node->op.value;
@@ -391,6 +397,29 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     // }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
     auto type = global_get_type(id);
+
+    if (type->is_kind(TYPE_FUNCTION)) {
+      std::string identifier =
+          static_cast<ASTIdentifier *>(node->left)->value.value;
+      auto &ext = type->get_ext();
+
+      if (ext.is_fixed_sized_array()) {
+        identifier += ext.to_string();
+      } else if (ext.is_array()) {
+        std::stringstream my_ss;
+        auto old = ss;
+        ss = &my_ss;
+        emit_function_pointer_type_string(type, nullptr);
+        ss = old;
+        auto type_string = my_ss.str();
+        emit_function_pointer_dynamic_array_declaration(type_string, identifier, type);
+        return {};
+      }
+      
+      emit_function_pointer_type_string(type, &identifier);
+      return {};
+    }
+
     (*ss) << to_cpp_string(type) << ' ';
     node->left->accept(this);
     (*ss) << " = ";
@@ -406,7 +435,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     return {};
   }
 
-  // TODO: add a remove array element operator too.  
+  // TODO: add a remove array element operator too.
   if (node->op.type == TType::Concat) {
     node->left->accept(this);
     (*ss) << ".push(";
@@ -414,7 +443,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     (*ss) << ");\n";
     return {};
   }
-  
+
   // SIMPLIFY(Josh) We probably don't want to always parenthesize every single
   // expression. We can just have a table of which operators need custom
   // precedence 9/30/2024, 10:20:00 AM
@@ -451,27 +480,27 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-void EmitVisitor::emit_function_pointer_dynamic_array_declaration(const std::string &type_string, ASTDeclaration* node, Type *type) {
+void EmitVisitor::emit_function_pointer_dynamic_array_declaration(
+    const std::string &type_string, const std::string &name, Type *type) {
   //? type string will equal something like void(*)();
   //? we need to emit _array<void(*)()>
   //? or possibley _array<_array<void(*)()>*>
   auto string = to_cpp_string(type->get_ext(), type_string);
-  if (!string.contains(' ' + node->name.value + ' ')) {
-    (*ss) << string << ' ' << node->name.value;
+  if (!string.contains(' ' + name + ' ')) {
+    (*ss) << string << ' ' << name;
   } else {
     (*ss) << string;
   }
 }
 
-
-void EmitVisitor::get_declaration_type_signature_and_identifier(ASTDeclaration *node, Type *type) {
+void EmitVisitor::get_declaration_type_signature_and_identifier(
+    ASTDeclaration *node, Type *type) {
   std::stringstream tss;
-  
-  
+
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = node->name.value;
     auto &ext = type->get_ext();
-    
+
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
     } else if (ext.is_array()) {
@@ -481,15 +510,14 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(ASTDeclaration *
       emit_function_pointer_type_string(type, nullptr);
       ss = old;
       auto type_string = my_ss.str();
-      emit_function_pointer_dynamic_array_declaration(type_string, node, type);
+      emit_function_pointer_dynamic_array_declaration(type_string, node->name.value, type);
       return;
     }
-    
+
     emit_function_pointer_type_string(type, &identifier);
     return;
   }
-  
-  
+
   auto array_sizes = type->get_ext().array_sizes;
   tss << type->get_base();
   if (!type->get_ext().is_fixed_sized_array()) {
@@ -643,12 +671,11 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
-    
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
       emit_forward_declaration(node);
       return;
     }
-    
+
     // local function
     if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope &&
         (node->flags & FUNCTION_IS_METHOD) == 0) {
@@ -719,13 +746,13 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       }
       node->return_type->accept(this);
       (*ss) << " operator " << op.value;
-      
+
       if (op.type == TType::Increment || op.type == TType::Decrement) {
         (*ss) << "(int)";
       } else {
         node->params->accept(this);
       }
-      
+
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
         (*ss) << " const ";
       }
@@ -843,7 +870,8 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   Defer deferred([&] { current_struct_decl = nullptr; });
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
-    if (node->is_extern) header << "extern \"C\" ";
+    if (node->is_extern)
+      header << "extern \"C\" ";
     header << "struct " << node->type->base << ";\n";
     return {};
   }
@@ -853,7 +881,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   ctx.set_scope(node->scope);
 
   if (!is_anonymous) {
-    
+
     if (node->is_extern) {
       header << "extern \"C\" ";
       (*ss) << "extern \"C\" ";
@@ -1066,7 +1094,9 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   // TODO: remove this hack to get array length, or at least make a nicer system
   // for getting properties of builtin types that aren't considered structs by
   // the langauge.
-  if (left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() && node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+  if (left_ty->get_ext().is_array() &&
+      !left_ty->get_ext().is_fixed_sized_array() &&
+      node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
     if (right->value.value == "length") {
       node->left->accept(this);
@@ -1169,7 +1199,6 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
   (*ss) << "}";
   return {};
 }
-
 
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {
@@ -1304,12 +1333,12 @@ std::string EmitVisitor::get_cpp_scalar_type(int id) {
 
 std::string EmitVisitor::to_cpp_string(Type *type) {
   type = global_get_type(type->get_true_type());
-  
+
   auto output = std::string{};
   switch (type->kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
-    output= to_cpp_string(type->get_ext(), type->get_base());
+    output = to_cpp_string(type->get_ext(), type->get_base());
     break;
   case TYPE_FUNCTION: {
     std::stringstream my_ss;
@@ -1320,10 +1349,10 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     return my_ss.str();
   }
   case TYPE_ENUM:
-    output= type->get_base();
+    output = type->get_base();
     break;
   case TYPE_UNION:
-    output= to_cpp_string(type->get_ext(), type->get_base());
+    output = to_cpp_string(type->get_ext(), type->get_base());
     break;
   }
   // TODO: re-implement generic structs.
@@ -1344,7 +1373,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   return output;
 }
 
-std::any EmitVisitor::visit(ASTRange *node) { 
+std::any EmitVisitor::visit(ASTRange *node) {
   (*ss) << "Range(";
   node->left->accept(this);
   (*ss) << ", ";

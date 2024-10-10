@@ -1,21 +1,27 @@
+// * multi dimensional dynamic arrays have a host of issues. And so do the type extensions in accordance to them
+
+// !BUG 0
+/* 
+  * this registers as int*[][];
+  dynamic : int[][]* = new int[][];
+*/
 
 
-int main() {
-  //? single declaration
-  int(*field)(int,int);
-  
-  //? dynamic array fn_ptr[];
-  _array<int(*)(int,int)> dyn_array;
-  
-  //? fixed buffer;
-  int(*arr[30])(int,int);
-  
-  // return value;
-  auto function = [] -> int(*)(int,int) {
-    return nullptr;
-  };
-  
-  auto function1 = [](int(*param)(int,int)) -> void* {
-    return nullptr;
-  };
-};
+// !BUG 1
+/* 
+
+  * This works, but when we exit the scope this was in, we get a double free.
+    dynamic : int[][];
+    for x in 0..5 {
+      dynamic ~= #make(int[]);
+      for y in 0..5 {
+        dynamic[x] ~= x * y;
+      }
+    }
+    assert("length failed", dynamic.length == 4 * 4);
+    for x in 0..5 {
+      for y in 0..5 {
+        assert("multidimensional failure", dynamic[x][y] == x * y);
+      }
+    }
+ */
