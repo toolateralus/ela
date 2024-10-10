@@ -362,8 +362,10 @@ void Parser::init_directive_routines() {
                    aliased_type->base,
                    *static_cast<FunctionTypeInfo *>(type->get_info()),
                    aliased_type->extension_info);
-              //  parser->ctx.scope->create_type_alias(id, name.value);
-              global_create_type_alias(id, name.value);
+              
+              parser->ctx.scope->create_type_alias(id, name.value);
+              //  auto alias = global_create_type_alias(id, name.value);
+              //  parser->ctx.scope->aliases.push_back(alias);
                return ast_alloc<ASTNoop>();
              }
            }

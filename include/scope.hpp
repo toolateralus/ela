@@ -1,5 +1,6 @@
 #pragma once
 
+#include "error.hpp"
 #include "type.hpp"
 #include <jstl/memory/arena.hpp>
 #include <string>
@@ -112,11 +113,14 @@ struct Context {
     scope->on_scope_enter();
   }
   inline Scope *exit_scope() {
+    if (scope == root_scope) {
+      throw_error("Internal Compiler Error: attempted to exit the global scope.", {});
+    }
     auto old_scope = scope;
     if (scope) {
+      scope->on_scope_exit();
       scope = scope->parent;
     }
-    scope->on_scope_exit();
     return old_scope;
   }
 };

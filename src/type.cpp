@@ -137,7 +137,7 @@ int global_find_type_id(const std::string &name,
 // is not really going to pay off that much probably.
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
-    throw_error("type was null when checking type conversion rules", {});
+    throw_error("Internal Compiler Error: type was null when checking type conversion rules", {});
   }
 
   // same exact type. no cast needed.
