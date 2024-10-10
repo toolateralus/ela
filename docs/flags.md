@@ -19,44 +19,42 @@ Write performance metrics (time taken for each compilation step) to stdout.
 ## --test
 Only emit functions marked `#test` and create a test runner. The output binary will run all the tests. much like cargo test.
 
-
-
 # '#' Directives
 
 ### Summary of Hash Directives and Their Usages
 
 #### `#include`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Similar to C's include, it pastes a text file right above where the include is used.
-  - Not a pre-processor.
 - **Example**:
   ```cpp
   #include "filename"
   ```
 
 #### `#raw`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
+- **Kind**: `Expression`
 - **Usage**: 
   - String literals delimited by `#raw` can span multiple lines.
+  - *Do not use this. it is currently bugged*
 - **Example**:
   ```cpp
-  u8 *string = #raw
+  string: u8* = #raw
   This is a raw string literal
   #raw
   ```
 
 #### `#read`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
+- **Kind**: `Expression`
 - **Usage**: 
-  - Reads a file into a string at compile time.
+  - Reads a file into a string at compile time. there is currently no option for binary output, it defaults to a char * as text. However this can and will be added easily.
 - **Example**:
   ```cpp
   #read "filename"
   ```
 
 #### `#test`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Declares a test function.
   - Only compiled into `--test` builds.
@@ -66,7 +64,7 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#foreign`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Declares a foreign function, similar to C's `extern`.
 - **Example**:
@@ -76,7 +74,7 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#import`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Imports from `/usr/local/lib/ela` by identifier and no file extension.
 - **Example**:
@@ -85,7 +83,7 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#type`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
+- **Kind**: `Expression`
 - **Usage**: 
   - Gets a `Type *` struct pointer to reflect on a given type.
 - **Example**:
@@ -94,7 +92,7 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#ctor` and `#dtor`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Declares constructor (`#ctor`) and destructor (`#dtor`) functions.
 - **Example**:
@@ -104,7 +102,7 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#make`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
+- **Kind**: `Expression`
 - **Usage**: 
   - Serves as a casting and copy construction method, as well as normal constructors.
 - **Example**:
@@ -113,16 +111,17 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#compiler_flags`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Adds compiler flags like linker options, `-g`, etc., from within your program or header.
+  - This is only a thing because of us using the C++ compiler stll for a backend.
 - **Example**:
   ```cpp
   #compiler_flags "-g -O2"
   ```
 
 #### `#flags`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Makes an enum declaration auto-increment with a flags value.
 - **Example**:
@@ -131,25 +130,16 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#alias`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Creates type aliases.
 - **Example**:
   ```cpp
   #alias NewName :: OldName
-  ```
 
-#### `#typename`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
-- **Usage**: 
-  - Gets the name of a type as a string.
-- **Example**:
-  ```cpp
-  #typename(MyType)
   ```
-
 #### `#self`
-- **Kind**: `DIRECTIVE_KIND_EXPRESSION`
+- **Kind**: `Expression`
 - **Usage**: 
   - Returns the type of the current declaring struct or union.
 - **Example**:
@@ -158,15 +148,57 @@ Only emit functions marked `#test` and create a test runner. The output binary w
   ```
 
 #### `#anon`
-- **Kind**: `DIRECTIVE_KIND_STATEMENT`
+- **Kind**: `Statement`
 - **Usage**: 
   - Declares anonymous structs. Can only be used in enums, and cannot use c style.
 - **Example**:
   ```cpp
   #anon :: struct { ... }
   ```
-  do NOT do:
-  ```
+  **_THIS IS NOT VALID_** :
+  ```cpp
   #anon :: struct { ... } fieldName;
   ```
+
+#### `#operator`
+- **Kind**: `Statement`
+- **Usage**: 
+  - Declare an operator overload for a given struct or union. There is not an official list of banned or non-overrideable operators, but () is one of them.
+- **Example**:
+  ```cpp
+  
+  Vec2 :: struct {
+    x: float;
+    y: float;
+    // Note: you have to manually override both + and += if you want them both supported.
+    #operator(+) :: (other: #self) -> #self {
+      // at the time of writing this, you have to use
+      // #make(#self, {..init_list..}) for return types.
+      // however for parameters, arguments, and all other declarations,
+      // you do not need to manually call a constructor for an initializer list.
+      
+      // ! This works right now though: 
+      // ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- 
+      //  return #make(#self {x + other.x, y + other.y});
+      // ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- 
+      
+      // but this will be fixed soon.
+      
+      return {x + other.x, y + other.y};
+    }
+  }
+  
+  ```
+  
+#### `#export`
+- **Kind**: `Statement`
+- **Usage**: 
+  - Declares a function as being available to dynamic libraries. This is mandatory for creating a visible function within a dynamic library on both linux and windows.
+- **Example**:
+  ```cpp
+  #export some_function_that_is_in_a_dll :: () -> int {
+    return 0;
+  }
+  ```
+  
   
