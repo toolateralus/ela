@@ -381,8 +381,17 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   current_func_decl = node;
   Defer _([&] { current_func_decl = last_decl; });
 
-  if (ctx.scope->is_struct_or_union_scope)
+  if (ctx.scope->is_struct_or_union_scope) {
     node->flags |= FUNCTION_IS_METHOD;
+    
+    if (current_struct_decl) {
+      ctx.scope->insert("this", get_pointer_to_type(current_struct_decl.get()->type->resolved_type));
+    } else if (current_union_decl) {
+      ctx.scope->insert("this", get_pointer_to_type(current_union_decl.get()->type->resolved_type));
+    }
+  }
+  
+  
   if (ignore_generic_functions && (node->flags & FUNCTION_IS_GENERIC) != 0)
     return {};
 

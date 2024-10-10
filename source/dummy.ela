@@ -1,19 +1,15 @@
 #import core;
 
-#alias FunctionPointer :: int(int, int)*;
-function_pointer_helper :: (x: int, y) -> int { return x * y; }
+structy :: struct {
+  x : int;  
+  something :: () {
+    this.x = 10;
+  }
+}
+
 
 main :: () {
-  ptr: FunctionPointer = &function_pointer_helper;
-  
-  array: FunctionPointer[][];
-  
-  fixed: FunctionPointer[12];
-  
-  
-  function :: () -> FunctionPointer {
-    return null;
-  }
-  
-  printf("%d\n", ptr(4, 4));
+  s : structy;
+  s.something();
+  printf("%d\n", s.x);
 }
