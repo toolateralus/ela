@@ -274,11 +274,14 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign StopMusicStream :: (music: Music) -> void;
 #foreign PauseMusicStream :: (music: Music) -> void;
 #foreign ResumeMusicStream :: (music: Music) -> void;
-#foreign SetMusicVolume :: (music: Music, volume: float) -> void;
-#foreign SetSoundVolume :: (sound: Sound, volume: float) -> void;
+#foreign SetMusicVolume :: (music: Music, volume: float);
+#foreign SetSoundVolume :: (sound: Sound, volume: float);
 #foreign IsMusicStreamPlaying :: (music: Music) -> bool;
+#foreign SetAudioStreamPitch :: (music: Music, pitch: float);
 #foreign InitAudioDevice :: () -> void;
 #foreign CloseAudioDevice :: () -> void;
 #foreign IsAudioDeviceReady :: () -> bool;
 #foreign SetMasterVolume :: (volume: float) -> void;
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
+#foreign SetExitKey :: (key :int);
+

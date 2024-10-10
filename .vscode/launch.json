@@ -40,6 +40,22 @@
     {
       "type": "lldb",
       "request": "launch",
+      "name": "Debug target practice executable",
+      "program": "${workspaceFolder}/examples/target_practice/main",
+      "args": [],
+      "cwd": "${workspaceFolder}/examples/target_practice"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug target practice",
+      "program": "${workspaceFolder}/bin/ela",
+      "args": ["main.ela"],
+      "cwd": "${workspaceFolder}/examples/target_practice"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["dummy.ela", "--s", "--sanitize"],
