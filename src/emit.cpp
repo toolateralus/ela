@@ -149,15 +149,46 @@ std::any EmitVisitor::visit(ASTArguments *node) {
   return {};
 }
 
+// Identifier may contain a fixed buffer size like name[30] due to the way function pointers have to work in C.
+void EmitVisitor::emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    throw_error("Internal compiler error: tried to get a function pointer from a non-function type", {});
+  }
+  
+  auto info = static_cast<FunctionTypeInfo*>(type->get_info());
+  auto return_type = global_get_type(info->return_type);
+  
+  (*ss) << to_cpp_string(return_type) << "(*";
+  
+  if (identifier) {
+    (*ss) << *identifier.get();
+  }
+  
+  (*ss) << ")(";
+  
+  for (int i = 0; i < info->params_len; ++i) {
+    auto type = global_get_type(info->parameter_types[i]);
+    (*ss) << to_cpp_string(type);
+    if (i != info->params_len - 1) {
+      (*ss) << ", ";
+    }
+  }
+  (*ss) << ")";
+}
+
 std::any EmitVisitor::visit(ASTType *node) {
-
   auto type = global_get_type(node->resolved_type);
-
+  
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
     (*ss) << to_type_struct(global_get_type(pointed_to_ty), ctx);
+    return {};
+  }
+
+  if (type->is_kind(TYPE_FUNCTION)) {
+    emit_function_pointer_type_string(type);
     return {};
   }
 
@@ -414,46 +445,78 @@ void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-void EmitVisitor::get_declaration_type_signature_and_identifier(
-    ASTDeclaration *&node, Type *&type) {
-  {
-    std::stringstream tss;
-    std::vector<Nullable<ASTExpr>> array_sizes = type->get_ext().array_sizes;
-    tss << type->get_base();
-
-    if (!type->get_ext().is_fixed_sized_array()) {
-      tss << node->name.value << ' ';
-    }
-
-    bool emitted_iden = false;
-    for (const auto ext : type->get_ext().extensions) {
-      if (ext == TYPE_EXT_ARRAY) {
-        auto size = array_sizes.back();
-        array_sizes.pop_back();
-        if (size.is_null()) {
-          std::string current = tss.str();
-          tss.str("");
-          tss.clear();
-          tss << "_array<" << current << ">";
-        } else {
-          auto old = this->ss;
-          this->ss = &tss;
-          if (!emitted_iden) {
-            emitted_iden = true;
-            tss << ' ' << node->name.value;
-          }
-          tss << "[";
-          size.get()->accept(this);
-          tss << "]";
-          this->ss = old;
-        }
-      }
-      if (ext == TYPE_EXT_POINTER) {
-        tss << "*";
-      }
-    }
-    (*ss) << tss.str();
+void EmitVisitor::emit_function_pointer_dynamic_array_declaration(const std::string &type_string, ASTDeclaration* node, Type *type) {
+  //? type string will equal something like void(*)();
+  //? we need to emit _array<void(*)()>
+  //? or possibley _array<_array<void(*)()>*>
+  auto string = to_cpp_string(type->get_ext(), type_string);
+  if (!string.contains(' ' + node->name.value + ' ')) {
+    (*ss) << string << ' ' << node->name.value;
+  } else {
+    (*ss) << string;
   }
+}
+
+
+void EmitVisitor::get_declaration_type_signature_and_identifier(ASTDeclaration *node, Type *type) {
+  std::stringstream tss;
+  
+  
+  if (type->is_kind(TYPE_FUNCTION)) {
+    std::string identifier = node->name.value;
+    auto &ext = type->get_ext();
+    
+    if (ext.is_fixed_sized_array()) {
+      identifier += ext.to_string();
+    } else if (ext.is_array()) {
+      std::stringstream my_ss;
+      auto old = ss;
+      ss = &my_ss;
+      emit_function_pointer_type_string(type, nullptr);
+      ss = old;
+      auto type_string = my_ss.str();
+      emit_function_pointer_dynamic_array_declaration(type_string, node, type);
+      return;
+    }
+    
+    emit_function_pointer_type_string(type, &identifier);
+    return;
+  }
+  
+  
+  auto array_sizes = type->get_ext().array_sizes;
+  tss << type->get_base();
+  if (!type->get_ext().is_fixed_sized_array()) {
+    tss << node->name.value << ' ';
+  }
+  bool emitted_iden = false;
+  for (const auto ext : type->get_ext().extensions) {
+    if (ext == TYPE_EXT_ARRAY) {
+      auto size = array_sizes.back();
+      array_sizes.pop_back();
+      if (size.is_null()) {
+        std::string current = tss.str();
+        tss.str("");
+        tss.clear();
+        tss << "_array<" << current << ">";
+      } else {
+        auto old = this->ss;
+        this->ss = &tss;
+        if (!emitted_iden) {
+          emitted_iden = true;
+          tss << ' ' << node->name.value;
+        }
+        tss << "[";
+        size.get()->accept(this);
+        tss << "]";
+        this->ss = old;
+      }
+    }
+    if (ext == TYPE_EXT_POINTER) {
+      tss << "*";
+    }
+  }
+  (*ss) << tss.str();
 }
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
@@ -463,6 +526,16 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
       !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
     (*ss) << "const ";
+  }
+
+  if (type->is_kind(TYPE_FUNCTION)) {
+    get_declaration_type_signature_and_identifier(node, type);
+    if (node->value.is_not_null()) {
+      (*ss) << " = ";
+      cast_pointers_implicit(node);
+      node->value.get()->accept(this);
+    }
+    return {};
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
@@ -1233,21 +1306,12 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     output= to_cpp_string(type->get_ext(), type->get_base());
     break;
   case TYPE_FUNCTION: {
-    if (type->get_ext().has_extensions()) {
-      return to_cpp_string(type->get_ext(), type->get_base());
-    }
-    auto info = static_cast<FunctionTypeInfo *>(type->get_info());
-    auto ret = to_cpp_string(global_get_type(info->return_type));
-    std::string params = "(";
-    for (int i = 0; i < info->params_len; ++i) {
-      params += to_cpp_string(global_get_type(info->parameter_types[i]));
-      if (i != info->params_len - 1) {
-        params += ", ";
-      }
-    }
-    params += ")";
-    output= ret + params;
-    break;
+    std::stringstream my_ss;
+    auto old = ss;
+    ss = &my_ss;
+    emit_function_pointer_type_string(type);
+    ss = old;
+    return my_ss.str();
   }
   case TYPE_ENUM:
     output= type->get_base();

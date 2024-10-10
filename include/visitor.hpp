@@ -174,6 +174,7 @@ struct EmitVisitor : VisitorBase {
   bool should_emit_function(EmitVisitor *visitor, ASTFunctionDeclaration *node,
                             bool test_flag);
 
+  void emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
   std::string to_cpp_string(const TypeExt &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
@@ -184,7 +185,8 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-  void get_declaration_type_signature_and_identifier(ASTDeclaration *&node, Type *&type);
+  void emit_function_pointer_dynamic_array_declaration(const std::string &type_string, ASTDeclaration* node, Type *type);
+  void get_declaration_type_signature_and_identifier(ASTDeclaration *node, Type *type);
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
   std ::any visit(ASTBinExpr *node) override;

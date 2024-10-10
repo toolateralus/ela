@@ -1,0 +1,21 @@
+
+
+int main() {
+  //? single declaration
+  int(*field)(int,int);
+  
+  //? dynamic array fn_ptr[];
+  _array<int(*)(int,int)> dyn_array;
+  
+  //? fixed buffer;
+  int(*arr[30])(int,int);
+  
+  // return value;
+  auto function = [] -> int(*)(int,int) {
+    return nullptr;
+  };
+  
+  auto function1 = [](int(*param)(int,int)) -> void* {
+    return nullptr;
+  };
+};

@@ -73,6 +73,9 @@ struct Scope {
   int create_type_alias(int aliased, const std::string& name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
+    if (this == root_scope) {
+      type_alias_map[name] = id;
+    }
     return id;
   }
   void on_scope_enter() {

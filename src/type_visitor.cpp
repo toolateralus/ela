@@ -966,10 +966,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   }
 
   if (node->op.type == TType::And) {
-    auto ty = global_get_type(operand_ty);
-    auto extensions = ty->get_ext();
-    extensions.extensions.push_back(TYPE_EXT_POINTER);
-    return global_find_type_id(ty->get_base(), extensions);
+    return get_pointer_to_type(operand_ty);
   }
 
   if (node->op.type == TType::Mul) {
