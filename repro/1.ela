@@ -1,7 +1,7 @@
 #import core;
 
 // ! These are dependencies for the 2 bugs.
-array_realloc :: ($T[] *array) {
+array_realloc :: (array: $T[] *) {
   array.capacity = array.length * 1.5;
   new_data := malloc(sizeof(T) * array.capacity);
   memcpy((void*)new_data, (void*)array.data, sizeof(T) * array.length);
@@ -10,10 +10,10 @@ array_realloc :: ($T[] *array) {
 }
 
 // ! These are dependencies for the 2 bugs.
-array_push :: ($T[] *array, $T value) {
+array_push :: (array: $T[]*, value: $T) {
   capacity := &array.capacity;
   length := &array.length;
-  T** data = &array.data;
+  data: T**  = &array.data;
 
   if *length >= *capacity 
     then array_realloc(array);
@@ -24,7 +24,7 @@ array_push :: ($T[] *array, $T value) {
 }
 
 // ! These are dependencies for the 2 bugs.
-array_pop :: ($T[] *array) -> $T {
+array_pop :: (array: $T[]*) -> $T {
   length := &array.length;
   data := &array.data;
 
@@ -49,10 +49,12 @@ array_pop :: ($T[] *array) -> $T {
   
   ? ---- CODE ---- 
   
-  * main :: () {
-  *   int[] array;
-  *   array_push(&array, (int)100);
-  * }
+*     main :: () {
+*       array: int[] ;
+*       array_push(&array, (int)100);
+*     }
+  
+
   
   ? ---- CODE ----
   
@@ -86,10 +88,11 @@ array_pop :: ($T[] *array) -> $T {
   
   ? ---- CODE ----
   
-  * main :: () {
-  *   int[] array;
-  *   array_push(&array, 100);
-  * }
+*   main :: () {
+*     array: int[] ;
+*     array_push(&array, 100);
+*   }
+  
   
   * I suspect that this issue is caused by us inferring T from the first non-extended argument, which in this case it the 'value' parameter of 'array_push'
   * whereas we really need to infer the type from the first ocurring usage of a particular generic parameter.

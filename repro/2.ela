@@ -16,11 +16,11 @@ add :: (n : int, y) {
 }
 
 
-add :: ($T a, b) -> $T {
+add :: (a: $T, b) -> $T {
   return a + b;
 }
 
-add :: (int a, b) -> int {
+add :: (a: int, b) -> int {
   return a;
 }
 
