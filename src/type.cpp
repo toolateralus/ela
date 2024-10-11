@@ -316,7 +316,11 @@ std::string Type::to_string() const {
 // This should be in the emit visitor not here.
 std::string to_type_struct(Type *type, Context &context) {
   auto id = type->get_true_type();
-  type = global_get_type(id);
+  auto new_type = global_get_type(id);
+  
+  if (new_type != type) {
+    type = new_type;
+  }
 
   static bool *type_cache = [] {
     auto arr = new bool[MAX_NUM_TYPES];
@@ -327,7 +331,9 @@ std::string to_type_struct(Type *type, Context &context) {
   if (type_cache[id]) {
     return std::format("_type_info[{}]", id);
   }
-
+  
+  type_cache[id] = true;
+  
   std::stringstream fields_ss;
   if (type->kind == TYPE_UNION) {
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
@@ -424,7 +430,6 @@ std::string to_type_struct(Type *type, Context &context) {
     return std::string("_type_info[") + std::to_string(id) + "]";
   }
 
-  type_cache[id] = true;
 
   context.type_info_strings.push_back(std::format(
       "_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", .fields = {} }};",
