@@ -1312,6 +1312,8 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
       }
     }
     // !BUG: somehow for 2 expressions, sometimes this will end up with 4 types. I have no idea how atha's happening.
+    // I put a hack in somewhere that checks the length of the expressions instead of the types.
+    // paste this into the terminal and click the link ::  echo type_visitor.cpp:249:1
     node->types.push_back(type);
   }
 

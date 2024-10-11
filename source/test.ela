@@ -815,7 +815,9 @@ InitListStruct :: struct {
     str: InitListStruct = {0, 0, 0};
     
     //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
-    //! This line causes it: InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    //! This line causes it: 
+    //                    InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    
     strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
     strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 

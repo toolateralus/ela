@@ -29,8 +29,7 @@ Context::Context() {
                   SYMBOL_IS_FUNCTION);
   }
 
-  // define types used for reflection, which are currently half implemented due
-  // to ineffectiveness.
+  // define types used for reflection. Very weak right now.
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -75,13 +74,6 @@ Context::Context() {
     str_scope->insert("capacity", s32_type());
     str_scope->insert("[", s8_type());
   }
-
-  // !BUG fix segfault when accessing this table from in-language.
-  root_scope->insert(
-      "_type_info",
-      global_find_type_id("Type",
-                          {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
-                           .array_sizes = {nullptr}}));
 }
 
 
@@ -94,7 +86,6 @@ void Scope::insert(const std::string &name, int type_id, int flags) {
 /* 
   !BUG !!! SUPER CRITICAL !!! 
   Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
-
 */
 
 Symbol *Scope::lookup(const std::string &name) {

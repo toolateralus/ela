@@ -143,6 +143,7 @@ struct EmitVisitor : VisitorBase {
 
       // !BUG: figure out why this is sometimes empty.
       if (filename.empty()) {
+        // printf("Empty filename for line directive.\n");
         return;
       }
 

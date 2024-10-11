@@ -341,10 +341,6 @@ void Parser::init_directive_routines() {
          }});
   }
 
-  // !BUG Aliases for function types are assumed to be broken. I forget what we
-  // changed during ! implementing generic functions, but it lead to this being
-  // impossible.
-
   // #alias for making type aliases. #alias NewName :: OldName;
   {
     directive_routines.push_back(
