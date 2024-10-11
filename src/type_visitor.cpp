@@ -139,8 +139,10 @@ int TypeVisitor::generate_generic_function(ASTCall *node,
 
   if (std::ranges::find(func_decl->generic_types, type_id) ==
       func_decl->generic_types.end()) {
-    printf("Generating a new generic function id=%d %s\n", type_id,
-           global_get_type(type_id)->to_string().c_str());
+        
+    // ? Enable this for debug.
+    // printf("Generating a new generic function id=%d %s\n", type_id,
+    //        global_get_type(type_id)->to_string().c_str());
     func_decl->generic_types.push_back(type_id);
   }
 
