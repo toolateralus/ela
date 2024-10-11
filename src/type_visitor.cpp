@@ -304,8 +304,12 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
     return {};
   }
-
-  ctx.set_scope(node->scope);
+  
+  if (info->scope == nullptr) {
+    info->scope = node->scope;
+  }
+  
+  ctx.set_scope(info->scope);
 
   for (auto decl : node->fields) {
     decl->accept(this);

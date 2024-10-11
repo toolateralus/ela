@@ -1,12 +1,16 @@
-
 Something :: struct;
 
 Something :: struct {
-  
+  tag: int = 10;
 }
 
-forward :: (something : int) -> int;
+forward :: (something : int) -> Something;
 
-forward :: (something : int) -> int {
-  return 0;
+forward :: (something : int) -> Something {
+  return #make(Something, {100});
+}
+
+#import core;
+main :: () {
+  println($"{forward(10).tag == 100}");
 }

@@ -1102,23 +1102,23 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
-  auto id = global_find_type_id(name.value, {});
+  auto type_id = global_find_type_id(name.value, {});
   
-  if (id != -1) {
-    auto type = global_get_type(id);
+  if (type_id != -1) {
+    auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = static_cast<StructTypeInfo*>(type->get_info());
-      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 && info->scope != nullptr) {
         throw_error("Redefinition of struct", range);
       }
     } else {
       throw_error("cannot redefine already existing type", range);
     }
+  } else {
+    type_id = global_create_struct_type(name.value, {});
   }
 
-  // fwd declare the type.
-  auto type_id = global_create_struct_type(name.value, {});
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
