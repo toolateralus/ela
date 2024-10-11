@@ -1,4 +1,5 @@
 #compiler_flags "-lraylib -lm"
+#import core;
 
 Key :: enum {
   Null            = 0,  
@@ -113,6 +114,16 @@ Key :: enum {
   VolumeDown     = 25  
 }
 
+MouseButton :: enum {
+  Left = 0,
+  Right = 1,
+  Middle = 2,
+  Side = 3,
+  Extra = 4,
+  Forward = 5,
+  Back = 6
+}
+
 Color :: struct {
   r: u8;
   g: u8;
@@ -121,6 +132,10 @@ Color :: struct {
   
   to_string :: () -> string {
     return $"r: {r}, g: {g}, b: {b}, a: {a}";
+  }
+  
+  #operator(==) :: (other: #self) -> bool {
+    return other.a == a && other.r == r && other.g == g && other.b == b;
   }
 }
 
@@ -138,7 +153,99 @@ Vector2 :: struct {
   to_string :: () -> string {
     return $"x: {x}, y: {y}"
   }
+  #operator(+) :: (other: #self) -> #self {
+    return #make(#self, { x + other.x, y + other.y });
+  }
+
+  #operator(-) :: (other: #self) -> #self {
+    return #make(#self, {x - other.x, y - other.y });
+  }
+
+  #operator(*) :: (scalar: float) -> #self {
+    return #make(#self, {x * scalar, y * scalar });
+  }
+
+  #operator(/) :: (scalar: float) -> #self {
+    return #make(#self, {x / scalar, y / scalar });
+  }
+
+  #operator(+=) :: (other: #self) -> #self {
+    x += other.x;
+    y += other.y;
+    return *this;
+  }
+
+  #operator(-=) :: (other: #self) -> #self {
+    x -= other.x;
+    y -= other.y;
+    return *this;
+  }
+
+  #operator(*=) :: (scalar: float) -> #self {
+    x *= scalar;
+    y *= scalar;
+    return *this;
+  }
+
+  #operator(/=) :: (scalar: float) -> #self {
+    x /= scalar;
+    y /= scalar;
+    return *this;
+  }
 }
+
+Vector3 :: struct {
+  x: float;
+  y: float;
+  z: float;
+  to_string :: () -> string {
+    return $"x: {x}, y: {y}, z: {z}"
+  }
+  #operator(+) :: (other: Vector3) -> Vector3 {
+    return #make(#self, {x + other.x, y + other.y, z + other.z });
+  }
+
+  #operator(-) :: (other: Vector3) -> Vector3 {
+    return #make(#self, {x - other.x, y - other.y, z - other.z });
+  }
+
+  #operator(*) :: (scalar: float) -> Vector3 {
+    return #make(#self, {x * scalar, y * scalar, z * scalar });
+  }
+
+  #operator(/) :: (scalar: float) -> Vector3 {
+    return #make(#self, {x / scalar, y / scalar, z / scalar });
+  }
+
+  #operator(+=) :: (other: Vector3) -> Vector3 {
+    x += other.x;
+    y += other.y;
+    z += other.z;
+    return *this;
+  }
+
+  #operator(-=) :: (other: Vector3) -> Vector3 {
+    x -= other.x;
+    y -= other.y;
+    z -= other.z;
+    return *this;
+  }
+
+  #operator(*=) :: (scalar: float) -> Vector3 {
+    x *= scalar;
+    y *= scalar;
+    z *= scalar;
+    return *this;
+  }
+
+  #operator(/=) :: (scalar: float) -> Vector3 {
+    x /= scalar;
+    y /= scalar;
+    z /= scalar;
+    return *this;
+  }
+}
+
 
 Rectangle :: struct {
   x: float;
@@ -176,6 +283,21 @@ Sound :: struct {
   frameCount: u32;
 } 
 
+color_with_alpha :: (color: Color, alpha: u8) -> Color {
+  color.a = alpha;
+  return color;
+}
+
+color_lerp :: (a: Color, b: Color, t: float) -> Color {
+  return #make(Color, {
+    (u8)clamp(a.r + (b.r - a.r) * t, 0, 255),
+    (u8)clamp(a.g + (b.g - a.g) * t, 0, 255),
+    (u8)clamp(a.b + (b.b - a.b) * t, 0, 255),
+    (u8)clamp(a.a + (b.a - a.a) * t, 0, 255)
+  });
+}
+
+CLEAR: Color;
 WHITE: Color = { (u8)255, (u8)255, (u8)255, (u8)255 };
 BLACK: Color = { (u8)0, (u8)0, (u8)0, (u8)255 };
 RED: Color = { (u8)255, (u8)0, (u8)0, (u8)255 };
@@ -230,6 +352,7 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign GetKeyPressed :: () -> int;
 #foreign GetScreenWidth :: () -> int;
 #foreign GetScreenHeight :: () -> int;
+
 #foreign GetMouseX :: () -> int;
 #foreign GetMouseY :: () -> int;
 #foreign GetMousePosition :: () -> Vector2;
@@ -237,6 +360,7 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign IsMouseButtonDown :: (button: int) -> bool;
 #foreign IsMouseButtonReleased :: (button: int) -> bool;
 #foreign IsMouseButtonUp :: (button: int) -> bool;
+
 #foreign InitWindow :: (width: int, height: int, title: char*) -> void;
 #foreign WindowShouldClose :: () -> bool;
 #foreign CloseWindow :: () -> void;
@@ -261,6 +385,8 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
 #foreign DrawTextureRec :: (texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
 #foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
+#foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
+
 #foreign LoadSound :: (fileName: char*) -> Sound;
 #foreign UnloadSound :: (sound: Sound) -> void;
 #foreign PlaySound :: (sound: Sound) -> void;
@@ -285,3 +411,67 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
 #foreign SetExitKey :: (key :int);
 
+#foreign MeasureText :: (text: char*, fontSize: int) -> int;
+
+
+Camera :: struct {
+    position:     Vector3;
+    target:       Vector3;
+    up:           Vector3;
+    fovy:         float;
+    projection:   int;
+} 
+
+Camera2D :: struct {
+  offset:         Vector2;
+  target:         Vector2;
+  rotation:       float;
+  zoom:           float = 1.0;
+}
+
+CameraMode :: enum {
+  Custom        = 0,
+  Free          = 1,
+  Orbital       = 2,
+  FirstPerson   = 3,
+  ThirdPerson   = 4
+}
+
+ConfigFlags :: enum {
+  FullscreenMode        = 0x00000002, // 1 << 1
+  WindowResizable       = 0x00000004, // 1 << 2
+  WindowUndecorated     = 0x00000008, // 1 << 3
+  WindowTransparent     = 0x00000010, // 1 << 4
+  Msaa4xHint            = 0x00000020, // 1 << 5
+  VsyncHint             = 0x00000040, // 1 << 6
+  WindowHidden          = 0x00000080, // 1 << 7
+  WindowAlwaysRun       = 0x00000100, // 1 << 8
+  WindowMinimized       = 0x00000200, // 1 << 9
+  WindowMaximized       = 0x00000400, // 1 << 10
+  WindowUnfocused       = 0x00000800, // 1 << 11
+  WindowTopmost         = 0x00001000, // 1 << 12
+  WindowHighdpi         = 0x00002000, // 1 << 13
+  WindowMousePassthrough = 0x00004000, // 1 << 14
+  BorderlessWindowedMode = 0x00008000, // 1 << 15
+  InterlacedHint        = 0x00010000  // 1 << 16
+}
+
+#foreign SetCameraMode :: (camera: Camera2D, mode: int) -> void;
+#foreign UpdateCamera :: (camera: Camera2D*) -> void;
+#foreign BeginMode2D :: (camera: Camera2D) -> void;
+#foreign EndMode2D :: () -> void;
+
+#foreign GetWorldToScreen :: (position: Vector3, camera: Camera) -> Vector2;
+#foreign GetWorldToScreenEx :: (position: Vector3, camera: Camera, width: int, height: int) -> Vector2;
+#foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
+#foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
+
+#foreign IsWindowResized :: () -> bool;      
+
+#foreign SetWindowState :: (flags: int) -> void;
+
+
+#foreign BeginScissorMode :: (x: int, y, w, h);
+#foreign EndScissorMode :: ();
+#foreign Fade :: (color: Color, alpha: float) -> Color;
+#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;

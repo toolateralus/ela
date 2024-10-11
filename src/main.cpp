@@ -14,7 +14,7 @@
   ### PROVIDING EXTERNS ###
   #########################
 */
-Type *type_table[MAX_NUM_TYPES];
+Type **type_table = new Type*[MAX_NUM_TYPES];
 int num_types;
 
 // this is just an approximation.
@@ -47,24 +47,18 @@ std::unordered_set<std::string> import_set;
 */
 
 int main(int argc, char *argv[]) {
-  try {
-    compile_command = CompileCommand(argc, argv);
-    compile_command.print();
-    init_type_system();
-    auto result = compile_command.compile();
-    
-    
-    if (compile_command.has_flag("sanitize")) {
-      if (report_unfreed_allocations()) {
-        return 1;
-      }
+  compile_command = CompileCommand(argc, argv);
+  compile_command.print();
+  init_type_system();
+  auto result = compile_command.compile();
+  
+  
+  if (compile_command.has_flag("sanitize")) {
+    if (report_unfreed_allocations()) {
+      return 1;
     }
-    return result != 0;
-  } catch (const std::exception &e) {
-    fprintf(stderr, "\e[31m%s\e[0m\n", e.what());
-    return 1;
   }
-  return 0;
+  return result != 0;
 }
 
 ASTProgram *CompileCommand::process_ast(Context &context) {
@@ -120,20 +114,22 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.flush();
   output.close();
 
-  std::string extra_flags = "" + compilation_flags;
-  static std::string ignored_warnings = "-Wno-return-type-c-linkage -Wno-writable-strings -Wno-constant-logical-operand -Wno-parentheses-equality -Wno-c99-designator";
-
-  auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} -o {} {}", ignored_warnings, output_path.string(), binary_path.string(), extra_flags);
-                     
-  printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
-  cpp.begin();
-  auto result = system(compilation_string.c_str());
-  printf("compiler returned %d\n", result);
-  cpp.end("compiling and linking cpp");
-  if (!has_flag("s")) {
-    std::filesystem::remove(output_path);
-    std::filesystem::remove(header_output_path);
+  int result = 0;
+  if (!has_flag("no-compile")) {
+    std::string extra_flags = "" + compilation_flags;
+    static std::string ignored_warnings = "-Wno-return-type-c-linkage -Wno-writable-strings -Wno-constant-logical-operand -Wno-parentheses-equality -Wno-c99-designator";
+    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} -o {} {}", ignored_warnings, output_path.string(), binary_path.string(), extra_flags);
+    printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
+    cpp.begin();
+    result = system(compilation_string.c_str());
+    printf("compiler returned %d\n", result);
+    cpp.end("compiling and linking cpp");
+    if (!has_flag("s")) {
+      std::filesystem::remove(output_path);
+      std::filesystem::remove(header_output_path);
+    }
   }
+                     
   std::filesystem::current_path(original_path);
   return result;
 }

@@ -29,10 +29,8 @@ clean:
 
 run: all ela
 	./$(BIN_DIR)/ela
+			
+release: clean
+	$(MAKE) directories
 	
-release: COMPILER_FLAGS := -std=c++23 -O3 -flto -DMAX_NUM_TYPES=2000 -Iinclude
-release: LD_FLAGS := -flto -s
-
-release: 
-	$(MAKE) clean
-	$(MAKE) all -j24
+	$(MAKE) ela -j24 COMPILER_FLAGS="-std=c++23 -O3 -flto -DMAX_NUM_TYPES=2000 -Iinclude -fno-exceptions" LD_FLAGS="-flto -s"

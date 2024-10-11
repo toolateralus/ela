@@ -1,6 +1,11 @@
 ## TODO List
 
-
+### Imports & FFI
+- We should have a way to rename FFI functions and imported symbols.
+`#foreign DrawBackground :: (...) as "draw_background";
+> So we can have libraries conform to our own naming conventions.
+- Python / JS style imports.
+`#import {this, that, another} from raylib;`
 
 
 To search for all info comments in the source just use vscodes regex search with

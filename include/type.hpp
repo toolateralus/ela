@@ -25,7 +25,7 @@ struct ASTDeclaration;
 struct Scope;
 struct Context;
 
-extern Type *type_table[MAX_NUM_TYPES];
+extern Type **type_table;
 extern int num_types;
 extern jstl::Arena type_arena;
 

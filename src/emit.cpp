@@ -189,6 +189,10 @@ void EmitVisitor::emit_function_pointer_type_string(
 std::any EmitVisitor::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
 
+  if (!type) {
+    throw_error("Internal compiler error: an ASTType* was null when trying to find it's type in the table", node->source_range);
+  }
+
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
@@ -494,13 +498,12 @@ void EmitVisitor::emit_function_pointer_dynamic_array_declaration(
 }
 
 void EmitVisitor::get_declaration_type_signature_and_identifier(
-    ASTDeclaration *node, Type *type) {
+    const std::string &name, Type *type) {
   std::stringstream tss;
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    std::string identifier = node->name.value;
+    std::string identifier = name;
     auto &ext = type->get_ext();
-
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
     } else if (ext.is_array()) {
@@ -510,7 +513,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
       emit_function_pointer_type_string(type, nullptr);
       ss = old;
       auto type_string = my_ss.str();
-      emit_function_pointer_dynamic_array_declaration(type_string, node->name.value, type);
+      emit_function_pointer_dynamic_array_declaration(type_string, name, type);
       return;
     }
 
@@ -521,7 +524,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
   auto array_sizes = type->get_ext().array_sizes;
   tss << type->get_base();
   if (!type->get_ext().is_fixed_sized_array()) {
-    tss << node->name.value << ' ';
+    tss << name << ' ';
   }
   bool emitted_iden = false;
   for (const auto ext : type->get_ext().extensions) {
@@ -538,7 +541,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
         this->ss = &tss;
         if (!emitted_iden) {
           emitted_iden = true;
-          tss << ' ' << node->name.value;
+          tss << ' ' << name;
         }
         tss << "[";
         size.get()->accept(this);
@@ -563,7 +566,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node, type);
+    get_declaration_type_signature_and_identifier(node->name.value, type);
     if (node->value.is_not_null()) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
@@ -573,7 +576,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    get_declaration_type_signature_and_identifier(node, type);
+    get_declaration_type_signature_and_identifier(node->name.value, type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init && !type->get_ext().is_pointer()) {
@@ -998,8 +1001,14 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
-  node->type->accept(this);
-  (*ss) << ' ' << node->name;
+  
+  if (type->is_kind(TYPE_FUNCTION)) {
+    get_declaration_type_signature_and_identifier(node->name, type);
+  } else {
+    node->type->accept(this);
+    (*ss) << ' ' << node->name;
+  }
+  
   if (node->default_value.is_not_null() && emit_default_args) {
     (*ss) << " = ";
     node->default_value.get()->accept(this);

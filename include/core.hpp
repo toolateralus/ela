@@ -108,8 +108,8 @@ struct CompileCommand {
   }
   inline CompileCommand(int argc, char *argv[]) {
     if (argc < 2) {
-      throw std::invalid_argument("\e[31mUsage: <input.ela> (optional)::[-o "
-                                  "<output.cpp>] [--flag]\e[0m");
+      printf("\e[31mUsage: <input.ela> (optional)::[-o "
+                                  "<output.cpp>] [--flag]\e[0m\n");
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -124,21 +124,24 @@ struct CompileCommand {
     }
 
     if (input_path.empty()) {
-      throw std::invalid_argument(
-          "\e[31mError: No input file specified.\e[0m");
+      printf("\e[31mError: No input file specified.\e[0m\n");
+      exit(1);
     }
 
     std::filesystem::path input_fs_path(input_path);
+    
     if (!std::filesystem::exists(input_fs_path)) {
-      throw std::runtime_error(std::format(
-          "\e[31mError: File '{}' does not exist.\e[0m", input_path.string()));
+      printf("%s\n", (std::format(
+          "\e[31mError: File '{}' does not exist.\e[0m", input_path.string())).c_str());
+      exit(1);
     }
 
     std::filesystem::path parent_path = input_fs_path.parent_path();
     if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
-      throw std::runtime_error(std::format(
+      printf("%s\n", std::format(
           "\e[31mError: Parent directory '{}' does not exist.\e[0m",
-          parent_path.string()));
+          parent_path.string()).c_str());
+      exit(1);
     }
 
     binary_path = input_fs_path.stem().string();
@@ -159,7 +162,8 @@ struct CompileCommand {
     std::stringstream ss;
     ss << stream.rdbuf();
     if (ss.str().empty()) {
-      throw std::runtime_error(std::format("\e[31mError: {} is empty.\e[0m", input_path.string()));
+      printf("%s\n", std::format("\e[31mError: {} is empty.\e[0m", input_path.string()).c_str());
+      exit(1);
     }
     return ss.str();
   }

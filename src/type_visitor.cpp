@@ -1127,13 +1127,29 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (left_ty->is_kind(TYPE_ENUM)) {
     auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
 
-    if (node->right->get_node_type() != AST_NODE_IDENTIFIER) {
+
+    /* 
+      ! BUG cannot have enum variants with the same name as a 
+      ! type that exists in your program. Super Annoying!!! 
+      
+      ! Remove the hack i put in just to get this working
+    */ 
+    std::string name;
+    if (node->right->get_node_type() == AST_NODE_TYPE) {
+      name = static_cast<ASTType*>(node->right)->base;
+      // ! HACK HACK Super hacky solution ;; replace the ast with an iden. REMOVE ME HACK 
+      auto iden = ast_alloc<ASTIdentifier>();
+      iden->value = Token({}, name, TType::Identifier, TFamily::Identifier);
+      node->right = iden;
+    } else if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+      name = static_cast<ASTIdentifier *>(node->right)->value.value;
+    } else {
       throw_error("cannot use a dot expression with a non identifer on the "
                   "right hand side when referring to a enum.",
                   node->source_range);
     }
-    auto iden = static_cast<ASTIdentifier *>(node->right);
-    auto name = iden->value.value;
+    
+    
     bool found = false;
     for (const auto &key : info->keys) {
       if (name == key) {

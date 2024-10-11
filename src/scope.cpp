@@ -91,6 +91,12 @@ void Scope::insert(const std::string &name, int type_id, int flags) {
   ordered_symbols.push_back(name);
 }
 
+/* 
+  !BUG !!! SUPER CRITICAL !!! 
+  Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
+
+*/
+
 Symbol *Scope::lookup(const std::string &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];
@@ -104,3 +110,8 @@ void Scope::erase(const std::string &name) {
   symbols.erase(name);
   ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
 }
+
+
+
+
+

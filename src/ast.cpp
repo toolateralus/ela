@@ -375,6 +375,10 @@ void Parser::init_directive_routines() {
 
            auto type = global_get_type(id);
 
+           if (!type)  {
+            throw_error("Unable to create type alias: target type does not exist.", aliased_type->source_range);
+           }
+
            if (type->is_kind(TYPE_FUNCTION))
              throw_error(
                  "Temporarily it is illegal to declare aliases to function "
@@ -607,6 +611,10 @@ ASTProgram *Parser::parse() {
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
+
+  if (tok.type == TType::Eof) {
+    return ast_alloc<ASTNoop>();
+  }
 
   if (tok.type == TType::Identifier &&
       lookahead_buf()[1].type == TType::Colon) {
@@ -868,7 +876,12 @@ ASTBlock *Parser::parse_block() {
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
   ctx.set_scope();
-  while (not_eof() && peek().type != TType::RCurly) {
+  while (peek().type != TType::RCurly) {
+    if (peek().type == TType::Eof) {
+      end_node(nullptr, range);
+      throw_error("Imbalanced '{' and '}'", range);
+    }
+    
     block->statements.push_back(parse_statement());
     if (semicolon())
       eat();

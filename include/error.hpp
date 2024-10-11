@@ -83,6 +83,7 @@ static std::string format_source_location(const SourceRange &source_range, Error
     
     return ss.str();
 }
+
 static void throw_warning(const std::string message, const SourceRange &source_range) {
   std::stringstream ss;
   auto span = source_range.get_tokens();
@@ -93,11 +94,15 @@ static void throw_warning(const std::string message, const SourceRange &source_r
   std::cerr << token_str << std::endl;
 }
 
+
+static SourceRange source_range_no_found_info() {
+  // TODO: add a log that says there was no found information or something.
+  return {};
+}
+
+
 [[noreturn]] static void throw_error(const std::string &message,
                                      const SourceRange &source_range) {
-  if (num_errors >= MAX_ERRORS) {
-    throw std::runtime_error("Maximum number of errors exceeded");
-  }
   auto errid = num_errors++;
   auto memory = (Error *)error_arena.allocate(sizeof(Error));
   error_table[errid] = new (memory) Error(message, source_range);
@@ -106,5 +111,7 @@ static void throw_warning(const std::string message, const SourceRange &source_r
   ss << "\e[31m" << "Error:\n\t" << message << "\e[0m\n";
   ss << format_source_location(source_range, ERROR_FAILURE);
   const auto token_str = ss.str();
-  throw std::runtime_error(token_str);
+  printf("%s\n", token_str.c_str());
+  //throw std::runtime_error(token_str);
+  exit(1);
 }
