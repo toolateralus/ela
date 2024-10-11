@@ -619,11 +619,14 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
 }
 
 #test test_function_overloads :: () {
-  assert("overload with integer arg failed to call", strcmp((#type overloaded(10)).name, "int") == 0);
-  assert("overload with float arg failed to call", strcmp((#type overloaded(12.5)).name, "float") == 0);
+  t := #type overloaded(10);
+  assert("overload with integer arg failed to call", strcmp(t.name, "int") == 0);
+  t = #type overloaded(12.5);
+  assert("overload with float arg failed to call", strcmp(t.name, "float") == 0);
   xaryu: Xaryu;
   xaryu.value = 100;
-  assert("overload with float arg failed to call", strcmp((#type overloaded(xaryu)).name, "Xaryu") == 0);
+  t = #type overloaded(xaryu);
+  assert("overload with float arg failed to call", strcmp(t.name, "Xaryu") == 0);
   
   //! Bug? maybe its fine
   // if an overloaded function has a different number of parameters,

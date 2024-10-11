@@ -292,11 +292,12 @@ std::any TypeVisitor::visit(ASTProgram *node) {
     statement->accept(this);
   return {};
 }
+
 std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   auto last_decl = current_struct_decl;
   current_struct_decl = node;
   Defer _([&] { current_struct_decl = last_decl; });
-
+  
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
 
@@ -318,6 +319,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   auto last_decl = current_union_decl;
+  
   current_union_decl = node;
   Defer _([&] { current_union_decl = last_decl; });
   // we store this ast just to type check the stuff.
@@ -330,6 +332,7 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
       node->scope->insert(field->name.value, field->type->resolved_type);
     }
   }
+  
   for (const auto &field : node->fields) {
     field->accept(this);
   }
@@ -401,6 +404,11 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   FunctionTypeInfo info;
 
   info.return_type = node->return_type->resolved_type;
+  
+  if (info.return_type == -1) {
+    throw_error("Use of undeclared type", node->return_type->source_range);
+  }
+  
   info.params_len = 0;
   info.default_params = 0;
   info.meta_type = node->meta_type;
@@ -489,6 +497,10 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 std::any TypeVisitor::visit(ASTDeclaration *node) {
   node->type->accept(this);
 
+  if (node->type->resolved_type == -1) {
+    throw_error("Declaration of a variable with a non-existent type.", node->source_range);
+  }
+
   if (node->value.is_not_null()) {
     declaring_or_assigning_type = node->type->resolved_type;
     auto expr_type = int_from_any(node->value.get()->accept(this));
@@ -545,6 +557,11 @@ std::any TypeVisitor::visit(ASTParamsDecl *node) {
 }
 std::any TypeVisitor::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
+  
+  if (id == -1) {
+    throw_error("Use of undeclared type.", node->source_range);
+  }
+  
   auto type = global_get_type(id);
 
   if (type->get_ext().is_fixed_sized_array()) {

@@ -10,7 +10,7 @@
       "request": "launch",
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["3.ela", "--debug"],
+      "args": ["7.1.ela", "--debug"],
       "cwd": "${workspaceFolder}/repro"
     },
     {

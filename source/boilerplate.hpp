@@ -199,13 +199,13 @@ struct string {
 
 struct Type;
 struct Field {
-  const char *name;
+  char *name;
   Type *type;
 };
 
 struct Type {
   int id;
-  const char *name;
+  char *name;
   _array<Field *> fields;
 };
 

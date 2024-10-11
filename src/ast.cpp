@@ -1102,6 +1102,21 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
+  auto id = global_find_type_id(name.value, {});
+  
+  if (id != -1) {
+    auto type = global_get_type(id);
+    end_node(nullptr, range);
+    if (type->is_kind(TYPE_STRUCT)) {
+      auto info = static_cast<StructTypeInfo*>(type->get_info());
+      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+        throw_error("Redefinition of struct", range);
+      }
+    } else {
+      throw_error("cannot redefine already existing type", range);
+    }
+  }
+
   // fwd declare the type.
   auto type_id = global_create_struct_type(name.value, {});
 
@@ -1145,6 +1160,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return decl;
 }
 ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
+  auto range = begin_node();
   auto node = ast_alloc<ASTUnionDeclaration>();
   current_union_decl = node;
 
@@ -1152,12 +1168,19 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->type = ast_alloc<ASTType>();
   node->type->base = name.value;
 
+  auto id = global_find_type_id(name.value, {});
+  
+  if (id != -1) {
+    auto type = global_get_type(id);
+    end_node(nullptr, range);
+    throw_error("cannot redefine already existing type", range);
+  }
+
   auto type_id = node->type->resolved_type =
       global_create_union_type(name.value, nullptr, UNION_IS_NORMAL);
 
   Defer _([&] { current_union_decl = nullptr; });
 
-  auto range = begin_node();
   expect(TType::Union);
 
   std::vector<ASTDeclaration *> fields;
