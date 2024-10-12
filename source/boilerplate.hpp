@@ -1,5 +1,6 @@
 #include <cstdint>
 #include <unordered_map>
+#include <vector>
 
 using float64 = double;
 using u64 = uint64_t;
@@ -53,102 +54,63 @@ struct Range {
 
 // TODO: implement this actually, where this will represent all dynamic arrays
 // in the language, such as int[]. int[32] is still a C fixed buffer.
+
 template <class T> struct _array {
-  T *data = nullptr;
-  int length = 0;
-  int capacity = 1;
-  _array() { data = new T[capacity]; }
-  T &operator[](int n) { return data[n]; }
+  std::vector<T> vector;
+
+  s64 length;
+  s64 capacity;
+  void *data;
+
+  void update() {
+    length = vector.size();
+    capacity = vector.capacity();
+    data = vector.data();
+  }
+
   _array(const _array &other) {
-    length = other.length;
-    capacity = other.capacity;
-    data = new T[capacity];
-    std::copy(other.data, other.data + length, data);
+    vector = other.vector;
+    update();
   }
   _array(int length) {
-    capacity = length * 1.5f;
-    this->length = length;
-    data = new T[length];
+    vector.resize(length);
+    update();
   }
   _array(T *array, int len) {
-    length = len;
-    capacity = len;
-    data = new T[capacity];
-    std::copy(array, array + length, data);
+    vector = std::vector(array, array + len);
+    update();
   }
-
-  bool operator==(const _array &other) const {
-    if (length != other.length) return false;
-    for (int i = 0; i < length; ++i) {
-      if (data[i] != other.data[i]) return false;
-    }
-    return true;
-  }
-
-  bool operator!=(const _array &other) const {
-    return !(*this == other);
-  }
-
+  bool operator==(const _array &other) const { return vector == other.vector; }
+  bool operator!=(const _array &other) const { return vector != other.vector; }
   void erase(const T &value) {
-    auto it = std::find(begin(), end(), value);
-    if (it != end()) {
-      std::move(it + 1, end(), it);
-      --length;
+    auto it = std::remove(vector.begin(), vector.end(), value);
+    if (it != vector.end()) {
+      vector.erase(it, vector.end());
     }
+    update();
+  }
+  auto operator[](int n) const { return vector[n]; }
+  auto operator[](int n) { return vector[n]; }
+  explicit operator void *() { return (void *)vector.data(); }
+  explicit operator T *() { return (T *)vector.data(); }
+  _array(std::initializer_list<T> list) {
+    vector = std::vector<T>(list);
+    update();
   }
 
-  T &operator[](int n) const { return data[n]; }
-  explicit operator void *() { return data; }
-  explicit operator T *() { return data; }
-  template <class From>
-    requires std::is_convertible_v<From, T>
-  operator _array<From>() {
-    _array<From> result;
-    result.length = length;
-    result.data = new From[length];
-    std::copy(data, data + length, result.data);
-    return result;
-  }
-  _array(std::initializer_list<T> list) {
-    length = list.size();
-    capacity = length * 1.5f;
-    data = new T[capacity];
-    std::copy(list.begin(), list.end(), data);
-  }
-  ~_array() {
-    if (data)
-      delete[] data;
-  }
-  T *begin() const { return data; }
-  T *end() const { return data + length; }
+  auto begin() const { return vector.data(); }
+  auto end() const { return vector.data() + vector.size(); }
+  auto begin() { return vector.data(); }
+  auto end() { return vector.data() + vector.size(); }
   void push(const T &value) {
-    if (length >= capacity) {
-      reserve(capacity * 2);
-    }
-    data[length++] = value;
+    vector.push_back(value);
+    update();
   }
-  T pop() {
-    if (length > 0) {
-      auto value = data[length - 1];
-      --length;
-      return value;
-    }
-    return T();
-  }
-  void resize(int new_size) {
-    if (new_size > capacity) {
-      reserve(new_size);
-    }
-    length = new_size;
-  }
-  void reserve(int new_capacity) {
-    if (new_capacity > capacity) {
-      T *new_data = new T[new_capacity];
-      std::copy(data, data + length, new_data);
-      delete[] data;
-      data = new_data;
-      capacity = new_capacity;
-    }
+  auto pop() {
+    auto value = vector.back();
+    vector.pop_back();
+    update();
+    return value;
   }
 };
 
@@ -181,7 +143,7 @@ struct string {
   }
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
-  
+
   string(const string &other) {
     if (other.data) {
       length = other.length;
@@ -207,41 +169,37 @@ struct string {
   }
   auto begin() { return data; }
   auto end() { return data + length; }
-  
+
   bool operator==(const string &other) const {
-    if (length != other.length) return false;
+    if (length != other.length)
+      return false;
     for (int i = 0; i < length; ++i) {
-      if (data[i] != other.data[i]) return false;
+      if (data[i] != other.data[i])
+        return false;
     }
     return true;
   }
 
-  bool operator!=(const string &other) const {
-    return !(*this == other);
-  }
-  
+  bool operator!=(const string &other) const { return !(*this == other); }
+
   auto begin() const { return data; }
   auto end() const { return data + length; }
 };
 
-
 // Specialize std::hash for your string class
 namespace std {
-  template <>
-  struct hash<string> {
-    std::size_t operator()(const string &s) const noexcept {
-      std::size_t h = 0;
-      for (char c : s) {
-        h = h * 31 + c;
-      }
-      return h;
+template <> struct hash<string> {
+  std::size_t operator()(const string &s) const noexcept {
+    std::size_t h = 0;
+    for (char c : s) {
+      h = h * 31 + c;
     }
-  };
-}
+    return h;
+  }
+};
+} // namespace std
 
-template<class Key, class Value>
-using _map = std::unordered_map<Key, Value>;
-
+template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
 struct Type;
 struct Field {

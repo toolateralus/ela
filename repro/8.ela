@@ -1,0 +1,10 @@
+
+Object :: struct {
+  arr: int[];
+}
+
+obj: Object;
+
+main :: () {
+  obj.arr ~= 100;
+}

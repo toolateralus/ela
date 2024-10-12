@@ -111,6 +111,7 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
   
+  std::vector<std::function<void()>> pending_statements;
   
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;

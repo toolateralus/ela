@@ -999,7 +999,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement ||
-      node->op.type == TType::And || node->op.type == TType::Mul) {
+      node->op.type == TType::And || node->op.type == TType::Mul || node->op.type == TType::BitwiseNot) {
     report_mutated_if_iden(node->operand);
   }
 
