@@ -1024,3 +1024,34 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   returned_ptr : FunctionPointer = function();
   assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 }
+
+#test test_map_aka_associative_array :: () {
+  variables: int[string];
+  map1: int*[char*];
+
+  str1 := #make(string, "Key1");
+  str2 := #make(string, "Key2");
+  variables[str1] = (int)100;
+  variables[str2] = (int)200;
+
+  assert("Expected: 100", variables[str1] == 100);
+  assert("Expected: 200", variables[str2] == 200);
+
+  variables[str1] = (int)300;
+  assert("Expected: 300", variables[str1] == 300);
+
+  variables[str1] = 0;
+  assert("Expected: 0", variables[str1] == 0);
+
+  map1["Something"] = new int(200);
+  assert("Expected: 200", *map1["Something"] == 200);
+
+  *map1["Something"] = 400;
+  assert("Expected: 400", *map1["Something"] == 400);
+
+  map1["Another"] = new int(500);
+  assert("Expected: 500", *map1["Another"] == 500);
+
+  delete(map1["Something"]);
+  delete(map1["Another"]);
+}

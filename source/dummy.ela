@@ -1,11 +1,42 @@
 
 #import core;
 
-// Trying to implement associative arrays as compiler primitives.
-main :: () {
+#test test_main :: () {
+  // Initialize associative arrays
   variables: int[string];
-  str := #make(string, "Hi i am gay");
-  variables[str] = (int)100;
-  
-  printf("%d\n", variables[str]);
+  map1: int*[char*];
+
+  // Insert elements
+  str1 := #make(string, "Key1");
+  str2 := #make(string, "Key2");
+  variables[str1] = (int)100;
+  variables[str2] = (int)200;
+
+  // Retrieve and assert elements
+  assert("Expected: 100", variables[str1] == 100);
+  assert("Expected: 200", variables[str2] == 200);
+
+  // Update elements
+  variables[str1] = (int)300;
+  assert("Expected: 300", variables[str1] == 300);
+
+  // Delete elements
+  variables[str1] = 0; // Assuming 0 means deletion or invalid value
+  assert("Expected: 0", variables[str1] == 0);
+
+  // Test with map1
+  map1["Something"] = new int(200);
+  assert("Expected: 200", *map1["Something"] == 200);
+
+  // Update map1
+  *map1["Something"] = 400;
+  assert("Expected: 400", *map1["Something"] == 400);
+
+  // Insert more elements into map1
+  map1["Another"] = new int(500);
+  assert("Expected: 500", *map1["Another"] == 500);
+
+  // Clean up dynamically allocated memory
+  delete(map1["Something"]);
+  delete(map1["Another"]);
 }
