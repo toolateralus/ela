@@ -844,9 +844,16 @@ std::string TypeExt::to_string() const {
     } break;
     case TYPE_EXT_MAP: {
       ss << "[" << global_get_type(key_type)->to_string() << "]";
-      break;
-      }
+    } break;
     } 
   }
   return ss.str();
+}
+
+int get_map_value_type(Type *map_type) { 
+  // We assume that maps are only ever one deep right now.
+  // Later we may come back and fix this up, just trying to get it working.
+  auto id  = global_find_type_id(map_type->get_base(), map_type->get_ext().without_back());
+  assert(!global_get_type(id)->get_ext().is_map());
+  return id;
 }

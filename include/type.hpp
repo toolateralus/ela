@@ -116,7 +116,7 @@ struct TypeExt {
   // would be like int[string];
   int key_type = -1;
   
-  inline bool is_map() {
+  inline bool is_map() const {
     for (const auto ext: extensions) {
       if (ext == TYPE_EXT_MAP) {
         assert(key_type != -1);
@@ -180,6 +180,9 @@ struct TypeExt {
     auto these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
       these.array_sizes.pop_back();
+    }
+    if (these.extensions.back() == TYPE_EXT_MAP) {
+      these.key_type = -1;
     }
     
     these.extensions.pop_back();
@@ -300,6 +303,8 @@ int get_pointer_to_type(int base);
 
 int global_create_type_alias(int aliased_type, const std::string &name);
 
+int get_map_value_type(Type *map_type);
+
 struct Type {
   const int id = invalid_id;
 
@@ -321,7 +326,6 @@ struct Type {
     }
     return type->id;
   }
-
 
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
@@ -374,6 +378,8 @@ struct Type {
   TypeInfo *get_info() const {
     return info;
   }
+
+  
 
   private:
   std::string base;

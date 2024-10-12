@@ -1,7 +1,11 @@
 
+#import core;
 
 // Trying to implement associative arrays as compiler primitives.
 main :: () {
   variables: int[string];
+  str := #make(string, "Hi i am gay");
+  variables[str] = (int)100;
   
+  printf("%d\n", variables[str]);
 }

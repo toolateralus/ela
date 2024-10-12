@@ -920,12 +920,12 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     }
   }
 
-  // CLEANUP(Josh) 10/4/2024, 1:59:20 PM
+  // ! CLEANUP(Josh) 10/4/2024, 1:59:20 PM
   // These (= and :=) really shouldn't be a part of the expression hierarchy,
   // Same with assignment. Not only will this refuse to compile to C++,
   // it also makes 0 sense.
 
-  // special case for type inferred declarations
+  // ? special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
     if (right == void_type()) {
       throw_error("Cannot assign a variable of type 'void'",
@@ -944,16 +944,14 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
     
     left = right;
 
-    
-
     if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
       ctx.scope->insert(static_cast<ASTIdentifier *>(node->left)->value.value, left);
     } else {
       throw_error("Cannot use implicit declaration on a non-identifier", node->source_range);
     }
   }
-
-  // TODO: add a remove operator for arrays too.
+  
+  // TODO: clean up this hacky mess.
   if (node->op.type == TType::Concat) {
     report_mutated_if_iden(node->left);
     if (!type->get_ext().is_array()) {
@@ -1238,42 +1236,51 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   throw_error("unable to resolve dot expression type.", node->source_range);
 }
 std::any TypeVisitor::visit(ASTSubscript *node) {
+  
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = global_get_type(left);
 
-  /// CLEANUP(Josh) 10/4/2024, 2:18:42 PM
+  /// ? CLEANUP(Josh) 10/4/2024, 2:18:42 PM  Remove unwanted operator overloads.
   // delete the subscript operator, call operator, and various other operators
   // we may not want in the languaeg. We want to keep it simple, and having
   // 100-200 lines of code dedicated to things that are never used is not
   // conducive to that prospect.
-  if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
-      left_ty->get_ext().has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
-    if (auto sym = info->scope->lookup("[")) {
-      auto enclosing_scope = ctx.scope;
-      ctx.set_scope(info->scope);
-      Defer _([&]() { ctx.set_scope(enclosing_scope); });
-      if (sym->is_function()) {
-        // TODO: fix this. we have ambiguitty with how we do this
-        int t = -1;
-        if (sym->function_overload_types[0] == -1) {
-          t = sym->type_id;
-        } else {
-          t = sym->function_overload_types[0];
+  {
+    if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
+        left_ty->get_ext().has_no_extensions()) {
+      auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
+      if (auto sym = info->scope->lookup("[")) {
+        auto enclosing_scope = ctx.scope;
+        ctx.set_scope(info->scope);
+        Defer _([&]() { ctx.set_scope(enclosing_scope); });
+        if (sym->is_function()) {
+          // TODO: fix this. we have ambiguitty with how we do this
+          int t = -1;
+          if (sym->function_overload_types[0] == -1) {
+            t = sym->type_id;
+          } else {
+            t = sym->function_overload_types[0];
+          }
+          auto fun_ty = global_get_type(t);
+          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
+          auto param_0 = fun_info->parameter_types[0];
+          assert_types_can_cast_or_equal(
+              subscript, fun_info->parameter_types[0], node->source_range,
+              "expected: {}, got: {}",
+              "invalid parameter type in subscript operator overload");
+          return fun_info->return_type;
         }
-        auto fun_ty = global_get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
-        auto param_0 = fun_info->parameter_types[0];
-        assert_types_can_cast_or_equal(
-            subscript, fun_info->parameter_types[0], node->source_range,
-            "expected: {}, got: {}",
-            "invalid parameter type in subscript operator overload");
-        return fun_info->return_type;
-      }
-    } else
-      throw_error("couldn't find [] overload for struct type",
-                  node->source_range);
+      } else
+        throw_error("couldn't find [] overload for struct type",
+                    node->source_range);
+    }
+  }
+  auto ext = left_ty->get_ext();
+  
+  if (ext.is_map()) {
+    assert_types_can_cast_or_equal(subscript, ext.key_type, node->source_range, "expected : {}, got {}", "Invalid type when subscripting map");
+    return get_map_value_type(left_ty);
   }
 
   if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_pointer()) {

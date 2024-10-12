@@ -538,7 +538,7 @@ ASTType *Parser::parse_type() {
           auto type = static_cast<ASTType*>(size);
           extension_info.key_type = global_find_type_id(type->base, type->extension_info);
           expect(TType::RBrace);
-          continue;
+          goto early_return;
         }
         
         extension_info.extensions.push_back(TYPE_EXT_ARRAY);
@@ -557,6 +557,8 @@ ASTType *Parser::parse_type() {
       break;
     }
   }
+  
+  early_return:
   auto node = ast_alloc<ASTType>();
   node->base = base;
   node->extension_info = extension_info;
