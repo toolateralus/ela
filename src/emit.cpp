@@ -1266,12 +1266,12 @@ bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
   return true;
 }
 
-std::string EmitVisitor::to_cpp_string(const TypeExt &ext,
+std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
                                        const std::string &base) {
-  std::vector<Nullable<ASTExpr>> array_sizes = ext.array_sizes;
+  std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   std::stringstream ss;
   ss << base;
-  for (const auto ext : ext.extensions) {
+  for (const auto ext : extensions.extensions) {
     if (ext == TYPE_EXT_ARRAY) {
       auto size = array_sizes.back();
       array_sizes.pop_back();
@@ -1291,6 +1291,13 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &ext,
     }
     if (ext == TYPE_EXT_POINTER) {
       ss << "*";
+    }
+    if (ext == TYPE_EXT_MAP) {
+      std::string current = ss.str();
+      auto key_string = to_cpp_string(global_get_type(extensions.key_type));
+      ss.str("");
+      ss.clear();
+      ss << "_map<" << key_string << ", " << current << ">";
     }
   }
   return ss.str();
@@ -1368,21 +1375,6 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     output = to_cpp_string(type->get_ext(), type->get_base());
     break;
   }
-  // TODO: re-implement generic structs.
-  // auto args = type->get_ext().generic_arguments;
-  // if (!args.empty()) {
-  //   std::stringstream ss;
-  //   auto old = this->ss;
-  //   this->ss = &ss;
-  //   ss << "<";
-  //   for (const auto &arg: args) {
-  //     arg->accept(this);
-  //     if (arg != args.back()) ss << ", ";
-  //   }
-  //   ss << ">";
-  //   this->ss = old;
-  //   output += ss.str();
-  // }
   return output;
 }
 

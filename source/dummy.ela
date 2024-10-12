@@ -1,59 +1,7 @@
-#import core;
 
-Opcode :: enum {
-  Halt,
-  Noop,
-  Add,
-  Sub,
-  Mul,
-  Div,
-  Jump,
-  Call,
-  Return,
-  Push,
-  Pop,
-  Comp,
-  Beq,
-  Bneq,
-  Bgt,
-  Blt,
-  LoadImm,
-  StoreImm,
-  LoadMem,
-  StoreMem,
-}
 
-Op :: union;
-
-Nullary :: struct {
-  opcode: int;
-}
-
-Unary :: struct {
-  opcode: int;
-  operand: Op*;
-}
-
-Binary :: struct {
-  opcode: int;
-  left: Op*;
-  right: Op*;
-}
-
-Op :: union {
-  nullary: Nullary;
-  unary: Unary;
-  binary: Binary;
-}
-
-memory : u8[1024];
-
-cycle :: () {
- 
-  
-}
-
+// Trying to implement associative arrays as compiler primitives.
 main :: () {
- 
+  variables: int[string];
   
 }

@@ -3,7 +3,7 @@
 
 #include "core.hpp"
 #include "lex.hpp"
-#include <sstream>
+#include <cassert>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -12,7 +12,6 @@
 #include <unordered_set>
 #include <vector>
 
-#include <jstl/containers/vector.hpp>
 #include <jstl/memory/arena.hpp>
 
 #ifndef MAX_NUM_TYPES
@@ -76,6 +75,7 @@ enum TypeKind {
 enum TypeExtEnum {
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
+  TYPE_EXT_MAP,
 };
 
 enum FunctionInstanceFlags {
@@ -111,6 +111,21 @@ struct TypeExt {
   // for each type extension that is [], nullptr == dynamic array, [non-nullptr] == fixed array size.
   std::vector<Nullable<ASTExpr>> array_sizes{};
   
+  // This is a key type of a map.
+  // so int with a MAP extension and a key type of string,
+  // would be like int[string];
+  int key_type = -1;
+  
+  inline bool is_map() {
+    for (const auto ext: extensions) {
+      if (ext == TYPE_EXT_MAP) {
+        assert(key_type != -1);
+        return true;
+      }
+    }
+    return false;
+  }
+  
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       for (const auto ext : extensions) {
@@ -130,22 +145,33 @@ struct TypeExt {
     }
     return n == depth;
   }
+  
   inline bool operator==(const TypeExt &other) const { return equals(other); }
+  
   bool equals(const TypeExt &other) const;
+  
   inline bool has_no_extensions() const {
-    return extensions.size() == 0 && array_sizes.size() == 0;
+    return extensions.empty();
   }
+  
   inline bool has_extensions() const {
     return !has_no_extensions();
   }
+  
   TypeExt append(const TypeExt& to_append) const {
     auto these = *this;
     int sizes_i = 0;
+    
     for (auto ext : to_append.extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         these.array_sizes.push_back(to_append.array_sizes[sizes_i]);
         sizes_i++;
       }
+      
+      if (ext == TYPE_EXT_MAP) {
+        these.key_type = to_append.key_type;
+      }
+      
       these.extensions.push_back(ext);
     }
     return these;
@@ -155,33 +181,16 @@ struct TypeExt {
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
       these.array_sizes.pop_back();
     }
+    
     these.extensions.pop_back();
     return these;
   }
+  
   inline bool is_array() const { return !array_sizes.empty(); }
 
   bool is_fixed_sized_array() const;
 
-  inline std::string to_string() const {
-    std::stringstream ss;
-    auto array_sizes = this->array_sizes;
-    for (const auto ext : extensions) {
-      if (ext == TYPE_EXT_ARRAY) {
-        auto size = array_sizes.back();
-        array_sizes.pop_back();
-        if (size.is_null())
-          ss << "[]";
-        else {
-          ss << "[" << size << "]";
-        }
-      }
-      if (ext == TYPE_EXT_POINTER) {
-        ss << "*";
-      }
-    }
-    return ss.str();
-  }
-  
+  std::string to_string() const;
 };
 
 struct TypeInfo {

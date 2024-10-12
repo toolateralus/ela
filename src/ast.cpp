@@ -509,9 +509,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
                   identifier),
       range);
 }
-// TODO(Josh) 10/1/2024, 10:04:12 AM
-// We need to use parse_type_extensions, to reduce code size and make things
-// more reliable but right now that's tailored for certain tasks.
+
 ASTType *Parser::parse_type() {
   auto range = begin_node();
 
@@ -531,12 +529,22 @@ ASTType *Parser::parse_type() {
 
   while (true) {
     if (peek().type == TType::LBrace) {
-      extension_info.extensions.push_back(TYPE_EXT_ARRAY);
-      expect(TType::LBrace);
+      expect(TType::LBrace);  
       if (peek().type != TType::RBrace) {
-        auto integer = parse_expr();
-        extension_info.array_sizes.push_back(integer);
+        auto size = parse_expr();
+        
+        if (size->get_node_type() == AST_NODE_TYPE) {
+          extension_info.extensions.push_back(TYPE_EXT_MAP);
+          auto type = static_cast<ASTType*>(size);
+          extension_info.key_type = global_find_type_id(type->base, type->extension_info);
+          expect(TType::RBrace);
+          continue;
+        }
+        
+        extension_info.extensions.push_back(TYPE_EXT_ARRAY);
+        extension_info.array_sizes.push_back(size);
       } else {
+        extension_info.extensions.push_back(TYPE_EXT_ARRAY);
         extension_info.array_sizes.push_back(nullptr);
       }
       expect(TType::RBrace);
@@ -545,18 +553,6 @@ ASTType *Parser::parse_type() {
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
       return parse_function_type(base, extension_info);
-    } else if (peek().type == TType::LT) {
-      end_node(nullptr, range);
-      throw_error("Generic structs are not yet implemented.", range);
-      // eat();
-      // std::vector<ASTExpr *> generic_arguments;
-      // while (peek().type != TType::GT) {
-      //   generic_arguments.push_back(parse_primary());
-      //   if (peek().type != TType::GT)
-      //     expect(TType::Comma);
-      // }
-      // expect(TType::GT);
-
     } else {
       break;
     }

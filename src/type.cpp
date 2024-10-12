@@ -274,14 +274,23 @@ bool Type::equals(const std::string &name, const TypeExt &type_extensions,
 bool TypeExt::equals(const TypeExt &other) const {
   if (extensions.size() != other.extensions.size())
     return false;
+  
   if (array_sizes.size() != other.array_sizes.size())
     return false;
+  
+  
   for (int i = 0; i < extensions.size(); ++i)
     if (extensions[i] != other.extensions[i])
       return false;
+    
   for (int i = 0; i < array_sizes.size(); ++i)
     if (array_sizes[i] != other.array_sizes[i])
       return false;
+  
+  if (key_type != other.key_type) {
+    return false;
+  }
+  
   return true;
 }
 
@@ -813,4 +822,31 @@ bool TypeExt::is_fixed_sized_array() const {
     }
   }
   return false;
+}
+
+std::string TypeExt::to_string() const {
+  std::stringstream ss;
+  auto array_sizes = this->array_sizes;
+  
+  for (const auto ext : extensions) {
+    switch (ext) {
+    case TYPE_EXT_POINTER:
+      ss << "*";
+      break;
+    case TYPE_EXT_ARRAY: {
+      auto size = array_sizes.back();
+      array_sizes.pop_back();
+      if (size.is_null())
+        ss << "[]";
+      else {
+        ss << "[" << size << "]";
+      }
+    } break;
+    case TYPE_EXT_MAP: {
+      ss << "[" << global_get_type(key_type)->to_string() << "]";
+      break;
+      }
+    } 
+  }
+  return ss.str();
 }

@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <unordered_map>
 
 using float64 = double;
 using u64 = uint64_t;
@@ -76,6 +77,18 @@ template <class T> struct _array {
     std::copy(array, array + length, data);
   }
 
+  bool operator==(const _array &other) const {
+    if (length != other.length) return false;
+    for (int i = 0; i < length; ++i) {
+      if (data[i] != other.data[i]) return false;
+    }
+    return true;
+  }
+
+  bool operator!=(const _array &other) const {
+    return !(*this == other);
+  }
+
   void erase(const T &value) {
     auto it = std::find(begin(), end(), value);
     if (it != end()) {
@@ -139,8 +152,6 @@ template <class T> struct _array {
   }
 };
 
-
-
 // For now, we'll just use a simple null terminated string.
 struct string {
   char *data = nullptr;
@@ -196,7 +207,41 @@ struct string {
   }
   auto begin() { return data; }
   auto end() { return data + length; }
+  
+  bool operator==(const string &other) const {
+    if (length != other.length) return false;
+    for (int i = 0; i < length; ++i) {
+      if (data[i] != other.data[i]) return false;
+    }
+    return true;
+  }
+
+  bool operator!=(const string &other) const {
+    return !(*this == other);
+  }
+  
+  auto begin() const { return data; }
+  auto end() const { return data + length; }
 };
+
+
+// Specialize std::hash for your string class
+namespace std {
+  template <>
+  struct hash<string> {
+    std::size_t operator()(const string &s) const noexcept {
+      std::size_t h = 0;
+      for (char c : s) {
+        h = h * 31 + c;
+      }
+      return h;
+    }
+  };
+}
+
+template<class Key, class Value>
+using _map = std::unordered_map<Key, Value>;
+
 
 struct Type;
 struct Field {
