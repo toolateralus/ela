@@ -333,15 +333,16 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign InitTimer :: () -> void;
 #foreign GetTime :: () -> float64;
 
-#foreign Vector2Equals :: (v1: Vector2, v2: Vector2) -> bool;
-#foreign Vector2Add :: (v1: Vector2, v2: Vector2) -> Vector2;
-#foreign Vector2Subtract :: (v1: Vector2, v2: Vector2) -> Vector2;
+#foreign Vector2Equals :: (v1: Vector2, v2) -> bool;
+#foreign Vector2Clamp :: (v: Vector2, a, b) -> bool;
+#foreign Vector2Add :: (v1: Vector2, v2) -> Vector2;
+#foreign Vector2Subtract :: (v1: Vector2, v2) -> Vector2;
 #foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
 #foreign Vector2Length :: (v: Vector2) -> float;
 #foreign Vector2LengthSqr :: (v: Vector2) -> float;
-#foreign Vector2DotProduct :: (v1: Vector2, v2: Vector2) -> float;
-#foreign Vector2Distance :: (v1: Vector2, v2: Vector2) -> float;
-#foreign Vector2Angle :: (v1: Vector2, v2: Vector2) -> float;
+#foreign Vector2DotProduct :: (v1: Vector2, v2) -> float;
+#foreign Vector2Distance :: (v1: Vector2, v2) -> float;
+#foreign Vector2Angle :: (v1: Vector2, v2) -> float;
 #foreign Vector2Normalize :: (v: Vector2) -> Vector2;
 
 
