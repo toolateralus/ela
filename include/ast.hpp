@@ -454,7 +454,8 @@ struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
   Token name;
   ASTType* type;
-  UnionKind kind = UNION_IS_NORMAL;
+  int kind = UNION_IS_NORMAL;
+  bool is_fwd_decl = false;
   std::vector<ASTDeclaration*> fields;
   std::vector<ASTFunctionDeclaration*> methods;
   std::vector<ASTStructDeclaration*> structs;

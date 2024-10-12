@@ -150,9 +150,7 @@ Texture2D :: struct {
 Vector2 :: struct {
   x: float;
   y: float;
-  to_string :: () -> string {
-    return $"x: {x}, y: {y}"
-  }
+
   #operator(+) :: (other: #self) -> #self {
     return #make(#self, { x + other.x, y + other.y });
   }
@@ -192,15 +190,17 @@ Vector2 :: struct {
     y /= scalar;
     return *this;
   }
+  
+  to_string :: () -> string {
+    return $"x: {x}, y: {y}"
+  }
 }
 
 Vector3 :: struct {
   x: float;
   y: float;
   z: float;
-  to_string :: () -> string {
-    return $"x: {x}, y: {y}, z: {z}"
-  }
+  
   #operator(+) :: (other: Vector3) -> Vector3 {
     return #make(#self, {x + other.x, y + other.y, z + other.z });
   }
@@ -243,6 +243,10 @@ Vector3 :: struct {
     y /= scalar;
     z /= scalar;
     return *this;
+  }
+  
+  to_string :: () -> string {
+    return $"x: {x}, y: {y}, z: {z}"
   }
 }
 

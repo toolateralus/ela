@@ -97,9 +97,10 @@ enum struct FunctionMetaType {
   FUNCTION_TYPE_FOREIGN,
 };
 
-enum UnionKind {
-  UNION_IS_NORMAL = 0,
-  UNION_IS_SUM_TYPE = 1,
+enum UnionFlags {
+  UNION_IS_NORMAL = 1 << 0, // this and the next flag should never be present at the same itme.
+  UNION_IS_SUM_TYPE = 1 << 1,
+  UNION_IS_FORWARD_DECLARED = 1 << 2,
 };
 
 struct ASTExpr;
@@ -218,7 +219,7 @@ struct EnumTypeInfo : TypeInfo {
 };
 
 struct UnionTypeInfo : TypeInfo {
-  UnionKind kind;
+  int flags;
   Scope *scope;
 };
 
@@ -242,7 +243,7 @@ int global_create_struct_type(const std::string &, Scope *);
 int global_create_enum_type(const std::string &, const std::vector<std::string> &,
                      bool = false);
 
-int global_create_union_type(const std::string &name, Scope *scope, UnionKind kind);
+int global_create_union_type(const std::string &name, Scope *scope, UnionFlags kind);
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
 

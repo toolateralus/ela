@@ -474,12 +474,12 @@ int global_create_struct_type(const std::string &name, Scope *scope) {
   return type->id;
 }
 int global_create_union_type(const std::string &name, Scope *scope,
-                             UnionKind kind) {
+                             UnionFlags kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
   type_table[num_types] = type;
   type->set_base(name);
   auto info = type_alloc<UnionTypeInfo>();
-  info->kind = kind;
+  info->flags = kind;
   info->scope = scope;
   type->set_info(info);
   num_types++;

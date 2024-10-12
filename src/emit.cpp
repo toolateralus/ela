@@ -961,6 +961,10 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   use_header();
   (*ss) << "union " << node->name.value << ";\n";
   use_code();
+  
+  if (node->is_fwd_decl) {
+    return {};
+  }
 
   (*ss) << "union " << node->name.value << "{\n";
   current_union_decl = node;

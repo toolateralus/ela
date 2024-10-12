@@ -1,73 +1,59 @@
 #import core;
-#import raylib;
 
-#flags ColliderFlags :: enum {
-  Collision,
-  Trigger,
-  Visible,
-  Circle,
-  Rectangle,
+Opcode :: enum {
+  Halt,
+  Noop,
+  Add,
+  Sub,
+  Mul,
+  Div,
+  Jump,
+  Call,
+  Return,
+  Push,
+  Pop,
+  Comp,
+  Beq,
+  Bneq,
+  Bgt,
+  Blt,
+  LoadImm,
+  StoreImm,
+  LoadMem,
+  StoreMem,
 }
 
-check_flag :: (flags: int, flag) -> bool {
-  return flags & flag != 0;
-}
-set_flag :: (flags: int*, flag: int) {
-  *flags |= flag;
-}
+Op :: union;
 
-
-Circle :: struct {
-  center: Vector2;
-  radius: float;
+Nullary :: struct {
+  opcode: int;
 }
 
-ColliderShape :: union {
-  rectangle: Rectangle;
-  circle: Circle;
+Unary :: struct {
+  opcode: int;
+  operand: Op*;
 }
 
-Collision :: struct {
-  triggered: bool;
-  hit: bool;
+Binary :: struct {
+  opcode: int;
+  left: Op*;
+  right: Op*;
 }
 
-Collider :: struct {
-  flags : int;
-  shape: ColliderShape;
+Op :: union {
+  nullary: Nullary;
+  unary: Unary;
+  binary: Binary;
+}
+
+memory : u8[1024];
+
+cycle :: () {
+ 
   
-  is_colliding :: (other: #self) -> Collision {
-    is_hitting := false;
-    
-    if check_flag(flags, ColliderFlags.Circle) && check_flag(other.flags, ColliderFlags.Circle) {
-      is_hitting = CheckCollisionCircles(shape.circle.center, shape.circle.radius, other.shape.circle.center, other.shape.circle.radius);
-    } else if check_flag(flags, ColliderFlags.Rectangle) && check_flag(other.flags, ColliderFlags.Rectangle) {
-      is_hitting = CheckCollisionRecs(shape.rectangle, other.shape.rectangle);
-    } else if check_flag(flags, ColliderFlags.Rectangle) && check_flag(other.flags, ColliderFlags.Circle) {
-      is_hitting = CheckCollisionCircleRec(other.shape.circle.center, other.shape.circle.radius, shape.rectangle);
-    } else if check_flag(flags, ColliderFlags.Circle) && check_flag(other.flags, ColliderFlags.Rectangle) {
-      is_hitting = CheckCollisionCircleRec(shape.circle.center, shape.circle.radius, other.shape.rectangle);
-    }
-    
-    
-    
-    
-    //? triggers can't hit each other.
-    if check_flag(flags, ColliderFlags.Trigger) &&
-       check_flag(other.flags, ColliderFlags.Trigger) {
-      return #make(Collision, {false, false});
-    }
-    
-    if check_flag(flags, ColliderFlags.Trigger) && 
-       check_flag(other.flags, ColliderFlags.Collision) {
-      
-      hit := CheckCollisionRecs
-        
-      
-    }
-    
-    
-    
-    return #make(Collision);
-  }
+}
+
+main :: () {
+ 
+  
 }

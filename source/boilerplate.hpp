@@ -139,6 +139,8 @@ template <class T> struct _array {
   }
 };
 
+
+
 // For now, we'll just use a simple null terminated string.
 struct string {
   char *data = nullptr;
@@ -156,20 +158,19 @@ struct string {
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
-
   string(char *begin, char *end) {
     length = std::distance(begin, end);
     data = new char[length + 1];
     std::copy(begin, end, data);
     data[length] = '\0';
   }
-
   ~string() {
     if (data)
       delete[] data;
   }
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
+  
   string(const string &other) {
     if (other.data) {
       length = other.length;

@@ -907,6 +907,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     // to allow for recursion
     ctx.scope->insert(name.value, -1);
     auto sym = ctx.scope->lookup(name.value);
+    sym->flags |= SYMBOL_IS_FUNCTION;
     sym->declaring_node = function;
   }
 
@@ -1168,16 +1169,49 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   
   if (id != -1) {
     auto type = global_get_type(id);
-    end_node(nullptr, range);
-    throw_error("cannot redefine already existing type", range);
+    
+    if (!type->is_kind(TYPE_UNION)) {
+      end_node(nullptr, range);
+      throw_error("cannot redefine already existing type", range);
+    }
+    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    
+    if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
+      end_node(nullptr, range);
+      throw_error("cannot redefine already existing union type", range);
+    } 
   }
-
-  auto type_id = node->type->resolved_type =
-      global_create_union_type(name.value, nullptr, UNION_IS_NORMAL);
 
   Defer _([&] { current_union_decl = nullptr; });
 
   expect(TType::Union);
+
+  auto type_id = global_find_type_id(name.value, {});
+  auto type = global_get_type(type_id);
+  
+  if (type && type->is_kind(TYPE_UNION)) {
+    auto info = static_cast<UnionTypeInfo*>(type->get_info());
+    if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
+      end_node(nullptr, range);
+      throw_error("Redefinition of non forward-declared union type.", range);
+    }
+    info->flags &= ~UNION_IS_FORWARD_DECLARED;
+  } else {
+    // if we didn't find a foward declaration, instantiate a new empty union type,
+    // and resolve the node type, cause might as well.
+    type_id = 
+    node->type->resolved_type = 
+      global_create_union_type(name.value, nullptr, UNION_IS_NORMAL);  
+  }
+      
+  if (peek().type == TType::Semi) {
+    eat();
+    node->is_fwd_decl = true;
+    type = global_get_type(type_id);
+    auto info = static_cast<UnionTypeInfo*>(type->get_info());
+    info->flags |= UNION_IS_FORWARD_DECLARED;
+    return node;
+  }
 
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
@@ -1215,7 +1249,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->structs = structs;
   node->scope = block->scope;
 
-  auto type = global_get_type(type_id);
+  type = global_get_type(type_id);
   auto info = static_cast<UnionTypeInfo *>(type->get_info());
 
   info->scope = scope;

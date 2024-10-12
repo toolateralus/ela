@@ -261,7 +261,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       }
       if (!sym.is_function()) {
         assert_types_can_cast_or_equal(
-            node->types[i], sym.type_id, node->source_range, "{}, {}",
+            node->types[i], sym.type_id, node->source_range, "expected: {}, got: {}",
             "Invalid types in initializer list for struct");
       }
       i++;
@@ -324,6 +324,11 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
+  
+  if (node->is_fwd_decl) {
+    return {};
+  }
+  
   auto last_decl = current_union_decl;
   
   current_union_decl = node;
@@ -775,7 +780,10 @@ std::any TypeVisitor::visit(ASTCall *node) {
       return generate_generic_function(node, func_decl, arg_tys);
     }
   }
-
+  
+  // ! janky and annoying that we can't have const functions because of function pointers.
+  // ! HACK
+  symbol->flags |= SYMBOL_WAS_MUTATED;
 
   // the type may be null for a generic function but the if statement above
   // should always take care of that if that was the case.
