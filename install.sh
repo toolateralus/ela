@@ -2,6 +2,7 @@
 #!/bin/bash
 
 make clean
+
 make release
 
 # Create the destination directory if it doesn't exist

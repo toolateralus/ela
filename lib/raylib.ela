@@ -333,18 +333,37 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign InitTimer :: () -> void;
 #foreign GetTime :: () -> float64;
 
-#foreign Vector2Equals :: (v1: Vector2, v2) -> bool;
-#foreign Vector2Clamp :: (v: Vector2, a, b) -> bool;
-#foreign Vector2Add :: (v1: Vector2, v2) -> Vector2;
-#foreign Vector2Subtract :: (v1: Vector2, v2) -> Vector2;
-#foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
+#foreign Vector2Zero :: () -> Vector2;
+#foreign Vector2One :: () -> Vector2;
+#foreign Vector2Add :: (v: Vector2, v1: Vector2) -> Vector2;
+#foreign Vector2AddValue :: (v: Vector2, add: float) -> Vector2;
+#foreign Vector2Subtract :: (v: Vector2, v1: Vector2) -> Vector2;
+#foreign Vector2SubtractValue :: (v: Vector2, sub: float) -> Vector2;
 #foreign Vector2Length :: (v: Vector2) -> float;
 #foreign Vector2LengthSqr :: (v: Vector2) -> float;
-#foreign Vector2DotProduct :: (v1: Vector2, v2) -> float;
-#foreign Vector2Distance :: (v1: Vector2, v2) -> float;
-#foreign Vector2Angle :: (v1: Vector2, v2) -> float;
+#foreign Vector2DotProduct :: (v: Vector2, v1: Vector2) -> float;
+#foreign Vector2Distance :: (v: Vector2, v1: Vector2) -> float;
+#foreign Vector2DistanceSqr :: (v: Vector2, v1: Vector2) -> float;
+#foreign Vector2Angle :: (v: Vector2, v1: Vector2) -> float;
+#foreign Vector2LineAngle :: (start: Vector2, end) -> float;
+#foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
+#foreign Vector2Multiply :: (v: Vector2, v1) -> Vector2;
+#foreign Vector2Negate :: (v: Vector2) -> Vector2;
+#foreign Vector2Divide :: (v: Vector2, v1) -> Vector2;
 #foreign Vector2Normalize :: (v: Vector2) -> Vector2;
-
+// I don't think we have matrices yet.
+// #foreign Vector2Transform :: (v: Vector2, mat: Matrix) -> Vector2;
+#foreign Vector2Lerp :: (v: Vector2, v1, amount: float) -> Vector2;
+#foreign Vector2Reflect :: (v: Vector2, normal) -> Vector2;
+#foreign Vector2Min :: (v: Vector2, v1) -> Vector2;
+#foreign Vector2Max :: (v: Vector2, v1) -> Vector2;
+#foreign Vector2Rotate :: (v: Vector2, angle: float) -> Vector2;
+#foreign Vector2MoveTowards :: (v: Vector2, target, maxDistance: float) -> Vector2;
+#foreign Vector2Invert :: (v: Vector2) -> Vector2;
+#foreign Vector2Clamp :: (v: Vector2, min, max) -> Vector2;
+#foreign Vector2ClampValue :: (v: Vector2, min: float, max) -> Vector2;
+#foreign Vector2Equals :: (p: Vector2, q) -> int;
+#foreign Vector2Refract :: (v: Vector2, n, r: float) -> Vector2;
 
 #foreign CheckCollisionRecs :: (rec1: Rectangle, rec2: Rectangle) -> bool;
 #foreign CheckCollisionCircles :: (center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
