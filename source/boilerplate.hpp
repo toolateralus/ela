@@ -67,7 +67,9 @@ template <class T> struct _array {
     capacity = vector.capacity();
     data = vector.data();
   }
-
+  _array() {
+    update();
+  }
   _array(const _array &other) {
     vector = other.vector;
     update();
