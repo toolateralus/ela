@@ -91,8 +91,10 @@ template <class T> struct _array {
     }
     update();
   }
-  auto operator[](int n) const { return vector[n]; }
-  auto operator[](int n) { return vector[n]; }
+  
+  auto &operator[](int n) const { return vector[n]; }
+  auto &operator[](int n) { return vector[n]; }
+  
   explicit operator void *() { return (void *)vector.data(); }
   explicit operator T *() { return (T *)vector.data(); }
   _array(std::initializer_list<T> list) {
