@@ -324,28 +324,14 @@ std::string Type::to_string() const {
 
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);
-  int ptr_depth = 0;
-  for (const auto &ext : ty->get_ext().extensions) {
-    if (ext == TYPE_EXT_POINTER)
-      ptr_depth++;
-  }
+  auto ext = ty->get_ext();
 
-  if (ptr_depth == 0) {
+  if (ext.extensions.empty() || ext.extensions.back() != TYPE_EXT_POINTER) {
     throw_error("cannot dereference a non-pointer type.", source_range);
   }
 
-  bool pointer_removed = false;
-  std::vector<TypeExtEnum> extensions{};
-  for (const auto &ext : ty->get_ext().extensions) {
-    if (!pointer_removed && ext == TYPE_EXT_POINTER) {
-      pointer_removed = true;
-    } else {
-      extensions.push_back(ext);
-    }
-  }
-  return global_find_type_id(ty->get_base(),
-                             TypeExt{.extensions = extensions,
-                                     .array_sizes = ty->get_ext().array_sizes});
+  ext.extensions.pop_back();
+  return global_find_type_id(ty->get_base(), ext);
 }
 int global_create_struct_type(const std::string &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
