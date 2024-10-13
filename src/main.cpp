@@ -94,20 +94,12 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   EmitVisitor emit(context, type_visitor);
   emit.visit(root);
   lower.end("lowering to cpp complete");
-  auto header = emit.get_header();
-  std::filesystem::path header_output_path = output_path;
-  header_output_path.replace_extension(".hpp");
-  std::ofstream header_file(header_output_path);
-  header_file << header;
-  header_file.flush();
-  header_file.close();
-
-  auto program =
-      std::format("#include \"{}\"\n", header_output_path.filename().string()) +
-      emit.get_code();
-
+  
+  std::string program;
   if (compile_command.has_flag("test")) {
-    program = "#define TESTING\n" + program;
+    program = "#define TESTING\n" + emit.code.str();
+  } else {
+    program = emit.code.str();
   }
 
   std::ofstream output(output_path);
@@ -135,7 +127,6 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
     cpp.end("compiling and linking cpp");
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);
-      std::filesystem::remove(header_output_path);
     }
   }
                      

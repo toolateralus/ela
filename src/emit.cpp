@@ -624,7 +624,7 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   emit_default_args = true;
-  use_header();
+  
 
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
     (*ss) << "extern \"C\" ";
@@ -634,7 +634,6 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   (*ss) << ' ' << node->name.value << ' ';
   node->params->accept(this);
   (*ss) << ";\n";
-  use_code();
   emit_default_args = false;
 }
 void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
@@ -654,7 +653,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
-  use_header();
+  
   (*ss) << "extern \"C\" ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
@@ -672,7 +671,6 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
     (*ss) << ");";
   }
 
-  use_code();
 }
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
@@ -872,8 +870,9 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   current_struct_decl = node;
 
-  use_header();
-  Defer deferred([&] {  use_code(); current_struct_decl = nullptr; });
+  Defer _defer([&]{
+    current_struct_decl = nullptr;
+  });
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern)
@@ -896,14 +895,14 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   for (const auto &decl : node->fields) {
     indented("");
-    use_header();
+    
     decl->accept(this);
     semicolon();
     newline();
   }
   for (const auto &method : node->methods) {
     indented("");
-    use_header();
+    
     method->accept(this);
     semicolon();
     newline();
@@ -916,7 +915,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
-  use_header();
+  
   std::string iden;
   if (node->is_flags) {
     iden = "enum ";
@@ -953,7 +952,6 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
     n++;
   }
   (*ss) << "\n};";
-  use_code();
   return {};
 }
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
@@ -961,15 +959,12 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
     return {};
   
   Defer _([&] {
-    use_code();
     current_union_decl = nullptr; 
   });
-
-  use_header();
+  current_union_decl = node;
   
   (*ss) << "union " << node->name.value << "{\n";
   
-  current_union_decl = node;
   indentLevel++;
   ctx.set_scope(node->scope);
   emit_default_init = false;
@@ -979,7 +974,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   // this may not pan out, but ideally unions would only be used for stuff like
   // vector3's and ASTnodes.
   for (const auto &field : node->fields) {
-      use_header();
+      
     if (field == node->fields.front()) {
       emit_default_init = true;
       field->accept(this);
@@ -990,17 +985,18 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
 
     (*ss) << ";\n";
   }
+  
   for (const auto &method : node->methods) {
-    use_header();
     method->accept(this);
     (*ss) << ";\n";
   }
+  
   for (const auto &_struct : node->structs) {
-    use_header();
+    
     _struct->accept(this);
     (*ss) << ";\n";
   }
-  use_header();
+  
   emit_default_init = true;
   indentLevel--;
   ctx.exit_scope();
@@ -1068,10 +1064,10 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
   
   const auto testing = get_compilation_flag("test");
-  header << "#define TESTING\n";
-  header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  code << "#define TESTING\n";
+  code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  code << "extern Type **_type_info;\n";
   
-  use_code();
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
@@ -1094,7 +1090,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     for (const auto &str : ctx.type_info_strings) {
       type_info << str << ";\n";
     }
-    header << std::format("static Type** _type_info = []{{ Type **_type_info = "
+    code << std::format("Type** _type_info = []{{ Type **_type_info = "
                           "new Type*[{}]; {}; return _type_info; }}();",
                           num_types, type_info.str());
   }

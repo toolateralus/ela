@@ -110,7 +110,8 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
-
+  
+  
   std::vector<std::function<void()>> pending_statements;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
@@ -119,7 +120,6 @@ struct EmitVisitor : VisitorBase {
 
   TypeVisitor &type_visitor;
 
-  std::stringstream header{};
   std::stringstream code{};
   std::stringstream *ss{};
   std::stringstream test_functions{};
@@ -127,8 +127,7 @@ struct EmitVisitor : VisitorBase {
   int indentLevel = 0;
   Context &ctx;
 
-  inline std::string get_code() const { return code.str(); }
-  inline std::string get_header() const { return header.str(); }
+
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.
@@ -155,8 +154,6 @@ struct EmitVisitor : VisitorBase {
   // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
   // This should be in the emit visitor not here.
   std::string to_type_struct(Type *type, Context &context);
-  inline void use_code() { ss = &code; }
-  inline void use_header() { ss = &header; }
   inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
       : ctx(context), type_visitor(type_visitor) {
     ss = &code;
