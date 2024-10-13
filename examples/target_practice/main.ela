@@ -1,7 +1,9 @@
 #import raylib;
 #import core;
+#include "ui.ela";
 
 #compiler_flags "-g"
+
 
 /*
   * TODO 
@@ -9,6 +11,35 @@
   ? - Rounds? increased spawn rate, rogue like- advancing by completing N clears, and when you fail to clear it in X time per round, you go back to the start.
   ? - High score leaderboard
 */
+
+round_base_num_enemies_to_advance: int = 4;
+round_index : int = 1;
+
+round_failed := false;
+
+camera: Camera2D;
+
+Scene :: enum {
+  MainMenu,
+  Game,
+}
+
+  
+button_style : Style = {
+  WHITE,
+  CLEAR,
+  color_with_alpha(CYAN, 24),
+  20
+};
+
+jiggly_text_style : Style = {
+  WHITE,
+  CLEAR,
+  color_with_alpha(CYAN, 24),
+  40
+};
+
+scene: int = Scene.MainMenu;
 
 max_tilt : float = 16;
 screen_width : float;
@@ -24,7 +55,7 @@ bullet_drag := 0.99;
 
 enemy_scale := 48.0;
 enemy_rotation_speed := 13.0;
-enemy_max_speed := 5.0;
+enemy_max_speed := 1.0;
 
 score : int  = 0;
 targets_destroyed : int = 0;
@@ -40,9 +71,18 @@ player_smoke_color : Color;
 fire_particle_density := 3.0;
 fire_particle_max_burst := 6;
 
+game_start_time : float;
+fade_in_length : float = 3.0;
+misses_this_round : s8 = 0;
+round_finish_start_time : float = -1;
+
 background_rect : Rectangle;
 
 format_buffer: char* = malloc(sizeof(char) * 1024);
+
+game_music: Music;
+menu_music: Music;
+current_music: Music*;
 
 spark_color : Color = {
   YELLOW.r,
@@ -52,6 +92,12 @@ spark_color : Color = {
 };
 
 bg_color : Color = BLACK;
+
+
+target_bg_color : Color = {
+  75,75,75,(u8)255,
+}
+
 
 ParticleKind :: enum {
   Smoke,
@@ -158,8 +204,17 @@ shot_sound: Sound;
 explosion_sound: Sound;
 thud_sound: Sound;
 fail_sound: Sound;
-stream: Music;
 
+ui_text_color : Color = WHITE;
+
+get_center_screen_rect:: (width: float, height, offset: Vector2) -> Rectangle {
+  return #make(Rectangle, {
+    screen_width / 2 + offset.x,
+    screen_width / 2 + offset.y,
+    width,
+    height
+  });
+}
 
 TextParticle :: struct {
   position: Vector2;
@@ -219,7 +274,7 @@ make_particle :: (kind: int, position: Vector2, tint: Color) {
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(), tint, WHITE);
     particle.render_info = smoke_particle_render_info;
     particle.lifetime = 1.0;
-    particle.scale = Vector2Scale(smoke_particle_init_scale, randf() * 6400.0);
+    particle.scale = smoke_particle_init_scale * randf() * 6400.0;
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind.Fire {
     max_spread := 24.0;
@@ -243,7 +298,6 @@ make_particle :: (kind: int, position: Vector2, tint: Color) {
   particles ~= particle;
 }
 
-
 update_particle :: (particle: Particle*) -> bool {
   time := GetTime(); 
   if particle.kind == ParticleKind.Smoke {
@@ -258,7 +312,8 @@ update_particle :: (particle: Particle*) -> bool {
     }
     particle.scale = {scale, scale};
   } else if  particle.kind == ParticleKind.Fire {
-    // ? Make it more transparent over time?
+    particle.scale.x *= 0.95;
+    particle.scale.y *= 0.95;
     if particle.color.a > 0 {
       particle.color.a /= 2;
     }
@@ -271,7 +326,7 @@ enemy_move_towards_or_get_new_target :: (enemy: Enemy*) {
   if Vector2Distance(position, enemy.target) < 5 || Vector2Equals(zero, enemy.target) {
     enemy.target = { randf() * screen_width, randf() * screen_height };
     enemy.target.y = clamp(enemy.target.y, 0, screen_height / 1.5);
-    enemy.speed = randf() * enemy_max_speed;
+    enemy.speed = randf() * enemy_max_speed * round_index;
   } else {
     direction := Vector2Normalize(Vector2Subtract(enemy.target, position));
     position = Vector2Add(position, Vector2Scale(direction, enemy.speed));
@@ -291,6 +346,11 @@ make_enemy :: () {
   
   enemy := new Enemy(rect, enemy_render_info);
   enemy_move_towards_or_get_new_target(enemy);
+  
+  for _ in 0..10 {
+    make_particle(ParticleKind.Smoke, {rect.x, rect.y}, BLUE);
+  }
+  
   enemy.id = enemies.length;
   enemies ~= enemy;
 }
@@ -308,12 +368,34 @@ make_bullet :: (x: float, y, rotation) {
   start_velocity := Vector2Scale(direction, bullet_start_velocity);
   bullets ~= new Bullet(rect, bullet_render_info, start_velocity, rotation);
   make_particle(ParticleKind.Smoke, {rect.x, rect.y}, PINK);
+  fire_pos : Vector2 = {rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, rect.y - bullet_scale};
+  make_particle(ParticleKind.Fire, fire_pos, WHITE);
+}
+
+
+move_background_color_towards_white :: () {
+  bg_color = color_lerp(bg_color, target_bg_color, 0.25);
+}
+
+draw_background :: () { 
+  move_background_color_towards_white();
+  DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color); 
+  now : float = (float)GetTime();
+  
+  t := (now - game_start_time) / fade_in_length;
+  if scene == Scene.Game && t < fade_in_length {
+    DrawRectangle(0, 0, (int)screen_width, (int)screen_height, color_lerp(BLACK, CLEAR, t));
+  } else {
+  }
 }
 
 draw_game :: () {
-  
-  
-  DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
+  for bullet; bullets {
+    DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);  
+  }
+  for enemy; enemies {
+    DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);  
+  }
   
   for particle; particles {
     rect : Rectangle = {
@@ -324,12 +406,6 @@ draw_game :: () {
     };
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);    
   }
-  for bullet; bullets {
-    DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);  
-  }
-  for enemy; enemies {
-    DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);  
-  }
   
   for particle; text_particles {
     DrawText(particle.text.data, (int)particle.position.x, (int)particle.position.y, particle.font_size, particle.color);
@@ -338,12 +414,12 @@ draw_game :: () {
   DrawTexturePro(character.texture, character.tex_rect, character.rect, character.origin, character.rotation, WHITE);
   
   sprintf(format_buffer,  "Score:            %d", score);
-  DrawText(format_buffer, 0, 0, 24, WHITE);
+  DrawText(format_buffer, 0, 0, 24, ui_text_color);
   
   sprintf(format_buffer,  "Count:            %d", targets_destroyed);
-  DrawText(format_buffer, 0, 30, 24, WHITE);
+  DrawText(format_buffer, 0, 30, 24, ui_text_color);
   
-  DrawFPS((int)screen_width-128, 0);
+  if ui_text_color.a > 0 then ui_text_color = color_with_alpha(ui_text_color, ui_text_color.a - 5);
 }
 
 BulletRoutine :: struct {
@@ -369,12 +445,25 @@ BulletRoutine :: struct {
 
 bullet_routine : BulletRoutine;
 
+
 on_bullet_fizzle :: () {
   score *= 0.85;
+  ui_text_color.a = 255;
   PlaySound(thud_sound);
   PlaySound(fail_sound);
   bg_color.r += 55;
+  
+  misses_this_round++;
+  
+  if misses_this_round >= 3 {
+    println($"misses; {misses_this_round}");
+    round_failed = true;
+    scene = Scene.MainMenu;
+  }
+  
 }
+
+
 
 on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
   PlaySound(explosion_sound);
@@ -383,27 +472,50 @@ on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
     make_particle(ParticleKind.Smoke, {enemy.rect.x, enemy.rect.y}, spark_color);
   }
   
+  // bonus score.
   if n_enemies_killed_this_frame >= enemies.length {
     bg_color.g += 55;
     score *= 1.2;
   }
+  
+  
 }
 
 space_down := false;
 
 update_game :: () {
   
-  if bg_color.r != 0 ||
-     bg_color.g != 0 ||
-     bg_color.b != 0 ||
-     bg_color.a != 0 {
+  if targets_destroyed >= round_base_num_enemies_to_advance * round_index {
     
-    bg_color.r = lerp(bg_color.r, 75, 0.25);
-    bg_color.g = lerp(bg_color.g, 75, 0.25);
-    bg_color.b = lerp(bg_color.b, 75, 0.25);
-    bg_color.a = lerp(bg_color.a, 255, 0.25);
+    if round_finish_start_time == -1.0 { round_finish_start_time  = (float)GetTime(); }
+    
+    now : float = (float)GetTime();
+    
+    if now - round_finish_start_time < 2.0 {
+      text : string = $"Round: {round_index + 1}...";
+      style := jiggly_text_style;
+      style.foreground = color_lerp(GREEN, CYAN, 0.5);
+      style.font_size = 18;
+      style.jiggle_intensity = 2;
+      style.jiggle_rate = 10;
+      
+      text_w := measure_jiggly_text(text.data, style) / 4.0;
+      jiggly_text(text.data, get_center_screen_rect(24, 12, {-(text_w * 3), 0.0}), style);
+      
+      text = $"Requires {round_base_num_enemies_to_advance * round_index} enemies to pass.";
+      jiggly_text(text.data, get_center_screen_rect(24, 12, {-(text_w * 3), 24}), style);
+      
+    } else {
+      misses_this_round = 0;
+      round_index++;
+      targets_destroyed = 0;
+      round_finish_start_time = -1.0;
+    }
   }
   
+  if IsWindowResized() {
+    character.rect.y = screen_height / 1.2;
+  }
   
   if IsKeyReleased(Key.Space) && space_down {
     space_down = false;
@@ -418,15 +530,17 @@ update_game :: () {
     bullet_routine.count = 0; 
   }
   
-  
-  if timer.update() && enemies.length < 10 {
-    make_enemy(); 
-    make_enemy(); 
-    make_enemy(); 
-    make_enemy(); 
-    make_enemy(); 
+  if timer.update() {
+    expected_length := 3 * round_index;
+    if enemies.length < expected_length  {
+      for i in 0..expected_length/2 {
+        make_enemy();
+      }
+    } else {    
+      round_failed = true;
+      scene = Scene.MainMenu;
+    }
   }
-  
   moved := false;
   if IsKeyDown(Key.A) { 
     character.horizontal_velocity -= character.speed;
@@ -439,7 +553,6 @@ update_game :: () {
   
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
     for i in 0..(int)fabs(character.horizontal_velocity * smoke_particle_density) {
-      
       make_particle(ParticleKind.Smoke, {
         character.rect.x - 10,
         character.rect.y + (character.rect.height / 3),
@@ -453,7 +566,7 @@ update_game :: () {
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
   
   if IsKeyPressed(Key.Space) && bullet_routine.count == 0 {
-    bullet_routine.count = 3;
+    bullet_routine.count = 3 * round_index;
   }
   
   dead_bullets: Bullet*[];
@@ -463,6 +576,7 @@ update_game :: () {
   for enemy; enemies {
     enemy_move_towards_or_get_new_target(enemy);
     enemy.rotation += enemy_rotation_speed;
+    
     if enemy.rotation >= 360.0 {
       enemy.rotation = 0.0;
     }
@@ -470,7 +584,8 @@ update_game :: () {
   
   screen_rect : Rectangle = {
     0.0, 0.0,
-    (float)GetScreenWidth(), (float)GetScreenHeight()
+    (float)GetScreenWidth(), 
+    (float)GetScreenHeight()
   };
   
   // update bullets and perform collision against enemies.
@@ -514,8 +629,10 @@ update_game :: () {
         enemy_pos : Vector2 = {enemy.rect.x, enemy.rect.y};
         character_pos : Vector2 = {character.rect.x, character.rect.y};
         distance := Vector2Distance(enemy_pos, character_pos);
-        score += (int)distance;
-        make_text_particle($"+{(int)distance}", 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, (float)distance));
+        amount : int = (int)distance * round_index;
+        score += amount
+        ui_text_color.a = (u8)255;
+        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, (float)distance));
         break;
       } 
     }
@@ -560,6 +677,9 @@ update_game :: () {
 }
 
 init :: () {
+  
+  
+  
   background_texture = LoadTexture("res/background.png");
   
   screen_width = (float)GetScreenWidth();
@@ -583,11 +703,13 @@ init :: () {
     0, 0,
     w, h
   };
+  
   character.rect = {
-    screen_width / 2.0,
+    screen_width / 2,
     screen_height / 1.25,
     64, 64
   };
+    
   character.origin = { character.rect.width / 2, character.rect.height / 2 };
   
   bullet_render_info = new RenderInfo(LoadTexture("res/bullet.png"));
@@ -599,51 +721,204 @@ init :: () {
 }
 
 init_audio :: () {
+  InitAudioDevice();
+  if !IsAudioDeviceReady() {
+    printf("Failed to initialize audio device.\n");
+    exit(1);
+  }
   // init audio
-  stream = LoadMusicStream("res/music.wav");
-  stream.looping = true;
-  PlayMusicStream(stream);
+  menu_music = LoadMusicStream("res/music1.wav")
+  game_music = LoadMusicStream("res/music.wav");
+  menu_music.looping = true;
+  game_music.looping = true;
+  
+  SetMusicVolume(menu_music, 1.0);
+  SetMusicVolume(game_music, 1.5);
+  
+  PlayMusicStream(menu_music);
+  current_music = &menu_music;
   
   shot_sound = LoadSound("res/shot.wav");
   SetSoundVolume(shot_sound, 5.0);
-  SetMusicVolume(stream, 1.5);
   
   explosion_sound = LoadSound("res/explosion_low.wav");
-  SetSoundVolume(explosion_sound, 0.5);
+  SetSoundVolume(explosion_sound, 1);
   
   thud_sound = LoadSound("res/thud.wav");
   SetSoundVolume(thud_sound, 0.4);
   
   fail_sound = LoadSound("res/fail.wav");
-  SetSoundVolume(fail_sound, 0.1);
+  SetSoundVolume(fail_sound, 0.05);
+  SetMasterVolume(0.75);
 }
 
-main :: () -> int {
-  InitWindow(800, 600, "Shooter");
-  SetTargetFPS(60);
-  init();
+reset_game_state :: () {
+  misses_this_round = 0;
+  score = 0;
+  targets_destroyed = 0;
+  num_enemies_spawned = 0;
+  can_burst = true;
+  timer.last_tick_time = GetTime();
   
-  InitAudioDevice();
   
-  if !IsAudioDeviceReady() {
-    printf("couldn't initialize the audio device :notlikethis:\n");
-    return 1;
+  while bullets.length > 0 {
+    n := ~bullets;
   }
+  while particles.length > 0 {
+    n := ~particles;
+  }
+  while enemies.length > 0 {
+    n := ~enemies;
+  }
+  while text_particles.length > 0 {
+    n := ~text_particles;
+  }
+}
+
+swap_music :: () {
+  StopMusicStream(*current_music);
+  if scene == Scene.MainMenu {
+    current_music = &menu_music;
+  } else {
+    current_music = &game_music;
+  }
+  PlayMusicStream(*current_music);
+}
+
+start_game_callback :: () {
+  scene = !scene;
+  game_start_time = GetTime();
+  reset_game_state();
+  bg_color = BLACK;
+  swap_music();
+  round_failed = false;
+}
+
+
+draw_main_menu :: () {
+  width : float = 72;
+  height : float = 48;
+  draw_button("Start game", {screen_width / 2 - (width / 2), screen_height / 1.2 - (height / 2), width, height}, button_style, &start_game_callback);
   
+  rect : Rectangle = {
+    screen_width / 7,
+    screen_height / 10,
+    screen_width / 2,
+    screen_height / 10
+  };
+  
+  jiggly_text("target practice", rect, jiggly_text_style);
+  
+  if round_failed {
+    style := jiggly_text_style;
+    rect : Rectangle = {
+      screen_width / 7,
+      screen_height / 3,
+      screen_width / 2,
+      screen_height / 10
+    };
+    style.foreground = RED;
+    jiggly_text("You Lost!", rect, style);
+    rect.y += 128;
+    style.font_size = 12;
+    
+    style.foreground = CYAN;
+    style.jiggle_intensity = 3.0;
+    style.jiggle_rate = 1.0;
+    jiggly_text($"reached round {round_index},".data, rect, style);
+    rect.y += 64;
+    jiggly_text($"{targets_destroyed} targets taken down".data, rect, style);
+    rect.y += 64;
+    jiggly_text($"scored {score} points".data, rect, style);
+    
+  }
+}
+
+switch_music_callback :: () {
+  StopMusicStream(*current_music);
+  if current_music == &game_music {
+    current_music = &menu_music;
+  } else {
+    current_music = &game_music;
+  }
+  PlayMusicStream(*current_music);
+  
+}
+
+music_muted := false;
+mute_music_callback :: () {
+  if music_muted {
+    PlayMusicStream(*current_music);
+    music_muted = false;
+  } else {
+    music_muted = true;
+    StopMusicStream(*current_music);
+  }
+}
+
+draw_game_menu :: () {
+  width : float = 72 / 3;
+  height : float = 48 / 3;
+  
+  style := button_style;
+  style.use_jiggly_text = false;
+  draw_button("swap music", {screen_width - width * 8, screen_height - height * 1.2, width, height}, style, &switch_music_callback);
+  
+  style = button_style;
+  style.use_jiggly_text = false;
+  draw_button("mute music", {screen_width - width * 3, screen_height - height * 1.2, width, height}, style, &mute_music_callback);
+  
+  
+  
+}
+
+
+main :: () -> int {
+  InitWindow(800, 600, "target practice");
+  SetTargetFPS(60);
+  
+  init();
   init_audio();
+  SetWindowState(ConfigFlags.WindowResizable);
   
   while !WindowShouldClose() {
-    UpdateMusicStream(stream);
+    screen_width = GetScreenWidth();
+    screen_height = GetScreenHeight();
+    
+    
+    UpdateMusicStream(*current_music);
     BeginDrawing();
+    BeginMode2D(camera);
       ClearBackground(bg_color);
-      update_game();
-      draw_game();
+      draw_background();  
+      
+      // ? DrawFPS(0, 72); For debugging framerate.
+      
+      if scene == Scene.MainMenu {
+        
+        draw_main_menu();
+      } else {
+        
+        if IsKeyPressed(Key.Backspace) {
+          scene = Scene.MainMenu;
+          swap_music();
+        }
+        
+        update_game();
+        draw_game();
+        draw_game_menu();
+      }
+    EndMode2D();
     EndDrawing();
   }
   
   CloseAudioDevice();
   
-  delete(bullet_render_info);
+  delete(bullet_render_info, 
+        fire_particle_render_info,
+        smoke_particle_render_info,
+        enemy_render_info);
+        
   free(format_buffer);
   return 0;
 }
