@@ -1,1 +1,1 @@
-ela main.ela && ./main
+ela main.ela --debug && ./main

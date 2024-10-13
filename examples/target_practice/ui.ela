@@ -1,0 +1,96 @@
+#import raylib;
+
+
+#alias ButtonCallback :: void()*;
+
+
+ChromaticRipple :: struct {
+  start_time : float;
+  lifetime: float; 
+  radius_t: float; // current radius.
+  start_radius: float; // beginning radius of the circles.
+  max_radius: float;
+  clip_rect: Rectangle; // limit
+}
+
+
+Style :: struct {
+  foreground: Color;
+  background: Color;
+  highlighted: Color;
+  font_size: int;
+  use_jiggly_text: bool = true;
+  jiggle_intensity : float = 10.0;
+  jiggle_rate : float = 4.0;
+  
+  ripple: ChromaticRipple*;
+  use_ripple: bool = true;
+}
+
+measure_jiggly_text :: (text: char*, style: Style) -> float {
+  length: int = strlen(text);
+  total_width: float = 0.0;
+  for i : int = 0; i < length; i++ {
+    total_width += style.font_size;
+  }
+  return total_width;
+}
+
+jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
+  time: float = (float)GetTime();
+  length: int = strlen(text);
+  
+  intensity := style.jiggle_intensity;
+  rate := style.jiggle_rate;
+  
+  for i : int = 0; i < length; i++ {
+    char_x := rect.x + i * style.font_size;
+    char_y := rect.y + intensity * sin(rate * time + i);
+    temp : char[2] = { text[i], #char "\0" }; // Create a temporary string for the character
+    DrawText((char*)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
+  }
+}
+
+draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
+  position: Vector2 = {rect.x, rect.y};
+  size: Vector2 = {rect.width, rect.height};
+  
+  text_width : float;
+  if style.use_jiggly_text {
+    text_width = measure_jiggly_text(text, style);
+  } else {
+    text_width = MeasureText(text, style.font_size);
+  }
+  
+  text_height : float = style.font_size; 
+  
+  if text_width > rect.width {
+    size.x = text_width;
+    position.x = rect.x - (text_width - rect.width) / 2;
+  }
+  
+  rect = {position.x, position.y, size.x, size.y};
+  
+  text_x := position.x + (size.x - text_width) / 2;
+  text_y := position.y + (size.y - text_height) / 2;
+  
+  mouse_over := CheckCollisionPointRec(GetMousePosition(), rect);
+  
+  if mouse_over {
+    DrawRectangleV(position, size, style.highlighted);
+    if (IsMouseButtonPressed(MouseButton.Left)) {
+      callback();
+      return true;
+    }
+  } else {
+    DrawRectangleV(position, size, style.background);
+  }
+  
+  if !style.use_jiggly_text {
+    DrawText(text, (int)text_x, (int)text_y, style.font_size, style.foreground);
+  } else {
+    jiggly_text(text, {text_x, text_y, rect.width, rect.height}, style);
+  }
+
+  return false;
+}
