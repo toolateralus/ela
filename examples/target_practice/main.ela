@@ -186,6 +186,17 @@ Enemy :: struct {
   }
 };
 
+
+TextParticle :: struct {
+  position: Vector2;
+  font_size : int;
+  text: string;
+  spawn_time: float;
+  lifetime: float;
+  color: Color = WHITE;
+}
+
+
 timer : Timer;
 
 bullet_render_info: RenderInfo*;
@@ -214,15 +225,6 @@ get_center_screen_rect:: (width: float, height, offset: Vector2) -> Rectangle {
     width,
     height
   });
-}
-
-TextParticle :: struct {
-  position: Vector2;
-  font_size : int;
-  text: string;
-  spawn_time: float;
-  lifetime: float;
-  color: Color = WHITE;
 }
 
 make_text_particle :: (text: string, font_size: int, position: Vector2, lifetime: float) {
