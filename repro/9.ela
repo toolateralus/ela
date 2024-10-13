@@ -1,0 +1,13 @@
+#import core;
+
+Something :: struct {
+  n: int;
+  v: int;
+}
+
+main :: () {
+  somethingElse: int[];
+  somethingElse ~= 10;
+  ints: Something[];
+  ints ~= {100, 20};
+}

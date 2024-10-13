@@ -513,7 +513,11 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   }
 
   if (node->value.is_not_null()) {
+    auto old_ty = declaring_or_assigning_type;
     declaring_or_assigning_type = node->type->resolved_type;
+    Defer _defer([&]{
+      declaring_or_assigning_type = old_ty;
+    });
     auto expr_type = int_from_any(node->value.get()->accept(this));
     assert_types_can_cast_or_equal(
         expr_type, node->type->resolved_type, node->source_range,
@@ -599,7 +603,12 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
     }
   }
 
+  auto old_ty = declaring_or_assigning_type;
   declaring_or_assigning_type = id;
+  Defer _defer([&]{
+    declaring_or_assigning_type = old_ty;
+  });
+  
   if (node->default_value.is_not_null()) {
     auto expr_type = int_from_any(node->default_value.get()->accept(this));
     assert_types_can_cast_or_equal(
@@ -847,7 +856,11 @@ std::any TypeVisitor::visit(ASTArguments *node) {
       argument_types.push_back(arg_ty);
       continue;
     }
+    auto old_ty = declaring_or_assigning_type;
     declaring_or_assigning_type = info->parameter_types[i];
+    Defer _defer([&]{
+      declaring_or_assigning_type = old_ty;
+    });
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;
@@ -869,8 +882,18 @@ std::any TypeVisitor::visit(ASTType *node) {
 std::any TypeVisitor::visit(ASTBinExpr *node) {
   auto left = int_from_any(node->left->accept(this));
 
-  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals)
+  auto old_ty = declaring_or_assigning_type;
+  Defer _defer([&]{
+    declaring_or_assigning_type = old_ty;
+  });
+  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) {
     declaring_or_assigning_type = left;
+  }
+  
+  if (node->op.type == TType::Concat) {
+    auto type = global_get_type(left);
+    declaring_or_assigning_type = type->get_element_type();
+  }
 
   auto right = int_from_any(node->right->accept(this));
   auto type = global_get_type(left);

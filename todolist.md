@@ -1,7 +1,10 @@
 ## TODO List
 
 ### Arrays and Maps
+
 - Right now maps have no operators but []
+
+- Maps are incredibly buggy and only work for very specific circumstances.
 
 - Arrays have ~=, ~~ and ~, but those are pretty bad and should probably be replaced with either methods
   or some better clearer operators.
