@@ -1138,14 +1138,21 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (left_ty->get_ext().is_array() &&
       node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
-    if (right && right->value.value == "capacity") {
-      return s32_type();
-    }
     if (right && right->value.value == "length") {
       return s32_type();
     }
     if (right && right->value.value == "data") {
       return get_pointer_to_type(left_ty->get_element_type());
+    }
+  }
+
+  // TODO: remove this hack as well
+  if (left_ty->get_ext().is_map() &&
+      node->right->get_node_type() == AST_NODE_CALL) {
+    auto right = static_cast<ASTCall *>(node->right);
+    // TODO: type check args too, also make sure only one arg
+    if (right && right->name.value == "contains") {
+      return bool_type();
     }
   }
 

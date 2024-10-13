@@ -564,10 +564,6 @@ something :: (f: float32) -> float32 {
 #test test_array :: () {
   array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
-  
-  // we can always expect the capacity to equal length * 1.5f if we havent mutated it ourselves.
-  assert("array capacity failed to equal expected value", array.capacity == 16);
-  
   // !BUG: we need to fix this.
   // !This throws C++ errors during compilation
   // !because initializer lists have strangely strict typing
@@ -1031,12 +1027,16 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   
   str1 := #make(string, "Key1");
   str2 := #make(string, "Key2");
+  str3 := #make(string, "shouldn't exist");
   
   variables[str1] = 100;
   variables[str2] = 200;
 
   assert("Expected: 100", variables[str1] == 100);
   assert("Expected: 200", variables[str2] == 200);
+
+  assert("Didn't contain known key.", variables.contains(str1));
+  assert("Map contained incorrect key.", !variables.contains(str3));
 
   variables[str1] = 300;
   assert("Expected: 300", variables[str1] == 300);
@@ -1055,5 +1055,4 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
 
   delete(map1["Something"]);
   delete(map1["Another"]);
-  
 }
