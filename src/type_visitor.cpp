@@ -660,9 +660,9 @@ std::any TypeVisitor::visit(ASTFor *node) {
                   node->source_range);
     }
     
-    if (t && t->get_ext().has_extensions() && t->get_ext().extensions.back() == TYPE_EXT_POINTER) {
-      throw_error("Cannot iterate over a pointer. Did you mean to dereference a pointer to an array?", node->source_range);
-    }
+    // if (t && t->get_ext().has_extensions() && t->get_ext().extensions.back() == TYPE_EXT_POINTER) {
+    //   throw_error("Cannot iterate over a pointer. Did you mean to dereference a pointer to an array?", node->source_range);
+    // }
     
     int iter_ty = -1;
 
