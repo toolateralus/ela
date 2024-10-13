@@ -209,12 +209,15 @@ struct Type;
 struct Field {
   char *name;
   Type *type;
+  size_t size;
+  size_t offset;
 };
 
 struct Type {
   int id;
   char *name;
   _array<Field *> fields;
+  
 };
 
 #ifdef TESTING

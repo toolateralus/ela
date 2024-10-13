@@ -407,8 +407,6 @@ struct Type {
   constexpr static int invalid_id = -1;
 };
 
-std::string to_type_struct(Type *type, Context& context);
-
 struct ASTFunctionDeclaration;
 std::string global_get_function_typename(ASTFunctionDeclaration *);
 

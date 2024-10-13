@@ -872,40 +872,38 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   current_struct_decl = node;
 
-  Defer deferred([&] { current_struct_decl = nullptr; });
+  use_header();
+  Defer deferred([&] {  use_code(); current_struct_decl = nullptr; });
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern)
-      header << "extern \"C\" ";
-    header << "struct " << node->type->base << ";\n";
+      *ss << "extern \"C\" ";
+    *ss << "struct " << node->type->base << ";\n";
     return {};
   }
 
-  const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
-
   ctx.set_scope(node->scope);
 
-  if (!is_anonymous) {
-
-    if (node->is_extern) {
-      header << "extern \"C\" ";
+  if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+    (*ss) << "struct {\n";
+  } else {
+     if (node->is_extern) {
       (*ss) << "extern \"C\" ";
     }
     (*ss) << "struct " << node->type->base << "{\n";
-    header << "struct " << node->type->base << ";\n";
-  } else {
-    (*ss) << "struct {\n";
   }
   indentLevel++;
 
   for (const auto &decl : node->fields) {
     indented("");
+    use_header();
     decl->accept(this);
     semicolon();
     newline();
   }
   for (const auto &method : node->methods) {
     indented("");
+    use_header();
     method->accept(this);
     semicolon();
     newline();
@@ -959,18 +957,19 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   return {};
 }
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
-  // FEATURE(Josh) 10/1/2024, 12:58:56 PM  implement sum types
-  use_header();
-  (*ss) << "union " << node->name.value << ";\n";
-  use_code();
-  
-  if (node->is_fwd_decl) {
+  if (node->is_fwd_decl)
     return {};
-  }
+  
+  Defer _([&] {
+    use_code();
+    current_union_decl = nullptr; 
+  });
 
+  use_header();
+  
   (*ss) << "union " << node->name.value << "{\n";
+  
   current_union_decl = node;
-  Defer _([&] { current_union_decl = nullptr; });
   indentLevel++;
   ctx.set_scope(node->scope);
   emit_default_init = false;
@@ -980,6 +979,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   // this may not pan out, but ideally unions would only be used for stuff like
   // vector3's and ASTnodes.
   for (const auto &field : node->fields) {
+      use_header();
     if (field == node->fields.front()) {
       emit_default_init = true;
       field->accept(this);
@@ -991,13 +991,16 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
     (*ss) << ";\n";
   }
   for (const auto &method : node->methods) {
+    use_header();
     method->accept(this);
     (*ss) << ";\n";
   }
   for (const auto &_struct : node->structs) {
+    use_header();
     _struct->accept(this);
     (*ss) << ";\n";
   }
+  use_header();
   emit_default_init = true;
   indentLevel--;
   ctx.exit_scope();
@@ -1063,8 +1066,11 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 
 std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
+  
   const auto testing = get_compilation_flag("test");
+  header << "#define TESTING\n";
   header << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  
   use_code();
   for (const auto &statement : node->statements) {
     statement->accept(this);
@@ -1394,4 +1400,146 @@ std::any EmitVisitor::visit(ASTRange *node) {
   node->right->accept(this);
   (*ss) << ")";
   return {};
+}
+std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
+  auto id = type->get_true_type();
+  auto new_type = global_get_type(id);
+
+  if (new_type != type) {
+    type = new_type;
+  }
+
+  static bool *type_cache = [] {
+    auto arr = new bool[MAX_NUM_TYPES];
+    memset(arr, false, MAX_NUM_TYPES);
+    return arr;
+  }();
+
+  if (type_cache[id]) {
+    return std::format("_type_info[{}]", id);
+  }
+
+  type_cache[id] = true;
+
+  std::stringstream fields_ss;
+  if (type->kind == TYPE_UNION) {
+    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    if (info->scope->symbols.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << type->to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    fields_ss << "{";
+
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+      auto t = global_get_type(sym.type_id);
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
+                    
+      if ((t->is_kind(TYPE_STRUCT) || t->is_kind(TYPE_UNION)) && name != "this") {
+        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                  << std::format(".type = {},", to_type_struct(t, context))
+                  << std::format(".size = sizeof({}),", to_cpp_string(t))
+                  << std::format(".offset = offsetof({}, {})", to_cpp_string(type), name)
+                  << " }";
+      } else {
+        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                  << std::format(".type = {}", to_type_struct(t, context))
+                  << " }";
+      }
+                    
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else if (type->kind == TYPE_ENUM) {
+    auto info = static_cast<EnumTypeInfo *>(type->get_info());
+    if (info->keys.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << type->to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+
+    fields_ss << "{";
+
+    int count = info->keys.size();
+    int it = 0;
+    for (const auto &name : info->keys) {
+      auto t = global_get_type(s32_type());
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
+      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                << std::format(".type = {}", to_type_struct(t, context))
+                << " }";
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else if (type->kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(type->get_info());
+    if (info->scope->symbols.empty()) {
+      fields_ss << "_type_info[" << id << "] = new Type {"
+                << ".name = \"" << type->to_string() << "\","
+                << ".id = " << id << "}";
+      context.type_info_strings.push_back(fields_ss.str());
+      return std::string("_type_info[") + std::to_string(id) + "]";
+    }
+    fields_ss << "{";
+
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+      auto t = global_get_type(sym.type_id);
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
+      if ((t->is_kind(TYPE_STRUCT) || t->is_kind(TYPE_UNION)) && name != "this") {
+        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                  << std::format(".type = {},", to_type_struct(t, context))
+                  << std::format(".size = sizeof({}),", to_cpp_string(t))
+                  << std::format(".offset = offsetof({}, {})", to_cpp_string(type), name)
+                  << " }";
+      } else {
+        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
+                  << std::format(".type = {}", to_type_struct(t, context))
+                  << " }";
+      }
+      
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else {
+    fields_ss << "_type_info[" << id << "] = new Type {"
+              << ".id = " << id << ",\n"
+              << ".name = \"" << type->to_string() << "\"}";
+    context.type_info_strings.push_back(fields_ss.str());
+    return std::string("_type_info[") + std::to_string(id) + "]";
+  }
+
+  context.type_info_strings.push_back(
+      std::format("_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", "
+                  ".fields = {} }};",
+                  id, id, type->to_string(), fields_ss.str()));
+
+  return std::format("_type_info[{}]", id);
 }

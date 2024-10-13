@@ -58,13 +58,13 @@ struct TypeVisitor : VisitorBase {
   bool ignore_generic_functions = true;
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
-  
+
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  
+
   void report_mutated_if_iden(ASTExpr *node);
-  
+
   TypeVisitor(Context &context) : ctx(context) {}
   Context &ctx;
   std::string getIndent();
@@ -101,8 +101,8 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTRange *node) override;
   int generate_generic_function(ASTCall *node,
-                                    ASTFunctionDeclaration *func_decl,
-                                    std::vector<int> arg_tys);
+                                ASTFunctionDeclaration *func_decl,
+                                std::vector<int> arg_tys);
 };
 
 struct EmitVisitor : VisitorBase {
@@ -110,9 +110,9 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
-  
+
   std::vector<std::function<void()>> pending_statements;
-  
+
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
@@ -152,6 +152,9 @@ struct EmitVisitor : VisitorBase {
       last_loc = loc;
     }
   }
+  // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
+  // This should be in the emit visitor not here.
+  std::string to_type_struct(Type *type, Context &context);
   inline void use_code() { ss = &code; }
   inline void use_header() { ss = &header; }
   inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
@@ -176,8 +179,9 @@ struct EmitVisitor : VisitorBase {
   bool should_emit_function(EmitVisitor *visitor, ASTFunctionDeclaration *node,
                             bool test_flag);
 
-
-  void emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
+  void
+  emit_function_pointer_type_string(Type *type,
+                                    Nullable<std::string> identifier = nullptr);
   std::string to_cpp_string(const TypeExt &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
@@ -188,10 +192,12 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-    
-  void emit_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name, Type *type);
-  void get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
-  
+
+  void emit_function_pointer_dynamic_array_declaration(
+      const std::string &type_string, const std::string &name, Type *type);
+  void get_declaration_type_signature_and_identifier(const std::string &name,
+                                                     Type *type);
+
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
   std ::any visit(ASTBinExpr *node) override;
