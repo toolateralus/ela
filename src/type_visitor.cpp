@@ -405,7 +405,6 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     }
   }
   
-  
   if (ignore_generic_functions && (node->flags & FUNCTION_IS_GENERIC) != 0)
     return {};
 
@@ -416,6 +415,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
 
   info.return_type = node->return_type->resolved_type;
   
+    
   if (info.return_type == -1) {
     throw_error("Use of undeclared type", node->return_type->source_range);
   }
@@ -486,6 +486,13 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   }
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN)
     return {};
+  
+  auto old_ty = declaring_or_assigning_type;
+  auto _defer = Defer([&]{
+    declaring_or_assigning_type = old_ty;
+  });
+  declaring_or_assigning_type = info.return_type;
+  
   auto control_flow =
       std::any_cast<ControlFlow>(node->block.get()->accept(this));
   if (control_flow.type == -1)

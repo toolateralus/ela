@@ -3,11 +3,16 @@
 Something :: struct {
   n: int;
   v: int;
+  
+  to_string :: () -> string {
+    return $"{n}, {v}";
+  }
+}
+
+SomeFunc :: () -> Something {
+  return {0, 0};
 }
 
 main :: () {
-  somethingElse: int[];
-  somethingElse ~= 10;
-  ints: Something[];
-  ints ~= {100, 20};
+  println($"{SomeFunc()}");  
 }
