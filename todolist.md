@@ -1,5 +1,11 @@
 ## TODO List
 
+### Arrays and Maps
+- Right now maps have no operators but []
+
+- Arrays have ~=, ~~ and ~, but those are pretty bad and should probably be replaced with either methods
+  or some better clearer operators.
+
 ### Imports & FFI
 - We should have a way to rename FFI functions and imported symbols.
 `#foreign DrawBackground :: (...) as "draw_background";

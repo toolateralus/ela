@@ -30,6 +30,7 @@
 #foreign ispunct :: (c: int) -> int;
 
 #foreign atoi :: (v: char*) -> int;
+#foreign atof :: (v: char*) -> float64;
 
 str_starts_with :: (str: char*, substr: char*) -> bool {
   if str == null || substr == null { return false; }

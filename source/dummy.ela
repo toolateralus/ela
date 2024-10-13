@@ -1,6 +1,43 @@
 #import core;
 
+#tagged Value :: union {
+  Integer(int);
+  Float(float);
+  Bool(bool);
+  String(string);
+}
+
+#tagged AST :: union {
+  Identifier { name: string };
+  Variable { iden: AST*, value: Value*};
+}
+
 main :: () {
-  n : int[] = {0, 1, 2};
-  n1 := &n[0];
+  value: Value.Integer(10);
+  x: AST.Identifier("x");
+  ast : AST.Variable(&x, & value);
+ 
+  let { iden, value } = AST.Variable(ast) {
+    
+  }
+  
+  let *var = Value.Integer(value) {
+    
+  }
+
+  var := match value {
+    Value.Integer(*n): { 
+      *n = *n + 2; // does mutate the union's value
+      return *n;
+    };
+    Value.Bool(b): { 
+      b = !b; // doesn't mutate the tagged union's value.
+      return b; 
+    };
+    Value.Float(f): 
+      return f;
+    Value.String(str): 
+      return str;
+}
+ 
 }
