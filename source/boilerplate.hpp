@@ -220,7 +220,7 @@ struct Field {
   }
   
   template<class T>
-  s8* get(T source) const {
+  s8* get(T *source) const {
     return reinterpret_cast<s8*>(reinterpret_cast<char*>(source) + offset);
   }
 };
