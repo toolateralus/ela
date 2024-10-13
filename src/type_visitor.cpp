@@ -770,10 +770,8 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = ctx.scope->lookup(node->name.value);
 
-  if (!symbol) {
-    throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
-                node->source_range);
-  }
+  if (!symbol) 
+    throw_error(std::format("Use of undeclared symbol '{}'", node->name.value), node->source_range);
 
   Type *type = global_get_type(symbol->type_id);
   
@@ -899,6 +897,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   
   if (node->op.type == TType::Concat) {
     auto type = global_get_type(left);
+    // TODO: if the array is a pointer to an array, we should probably have an implicit dereference.
     declaring_or_assigning_type = type->get_element_type();
   }
 

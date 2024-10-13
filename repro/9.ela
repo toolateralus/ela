@@ -1,18 +1,13 @@
-#import core;
+/* 
+  ! Right now enums work just like C enums, except you can never refer to an enum value by it's type name.
+  ! We should have type safe implicitly-convertible-to-integer enums, Like a mix of C++ and C enums.
+*/
 
-Something :: struct {
-  n: int;
-  v: int;
-  
-  to_string :: () -> string {
-    return $"{n}, {v}";
-  }
-}
-
-SomeFunc :: () -> Something {
-  return {0, 0};
+Enum :: enum {
+  One,
+  Two,
 }
 
 main :: () {
-  println($"{SomeFunc()}");  
+  e: Enum = Enum.One;
 }

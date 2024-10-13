@@ -1,21 +1,4 @@
-#import core;
 #import raylib;
-
-#flags ColliderFlags :: enum {
-  Collision,
-  Trigger,
-  Visible,
-  Circle,
-  Rectangle,
-}
-
-check_flag :: (flags: int, flag) -> bool {
-  return flags & flag != 0;
-}
-set_flag :: (flags: int*, flag: int) {
-  *flags |= flag;
-}
-
 
 Circle :: struct {
   center: Vector2;
@@ -23,48 +6,24 @@ Circle :: struct {
 }
 
 ColliderShape :: union {
-  rectangle: Rectangle;
   circle: Circle;
 }
-
-Collision :: struct {
-  triggered: bool;
-  hit: bool;
-}
-
-/* 
-    ! This is demonstrating that within certain methods for an unknown reason, we get a cyclic reference in scope, 
-    ! Which causes a compiler crash. I don't know how to simplify this repro as every time I try it stops happening.
-*/
 
 Collider :: struct {
   flags : int;
   shape: ColliderShape;
-
-  // !! WE CRASH HERE DURING COMPILATION !!  
-  is_colliding :: (other: #self) -> Collision {
-    is_hitting := false;
-    
-    if check_flag(flags, ColliderFlags.Circle) && check_flag(other.flags, ColliderFlags.Circle) {
-      CheckCollisionCircles(shape.circle.center, shape.circle.radius, other.shape.circle.center, other.shape.circle.radius);
-    } else if check_flag(flags, ColliderFlags.Rectangle) && check_flag(other.flags, ColliderFlags.Rectangle) {
-      CheckCollisionRecs(shape.rectangle, other.shape.rectangle);
-    } else if check_flag(flags, ColliderFlags.Rectangle) && check_flag(other.flags, ColliderFlags.Circle) {
-      CheckCollisionCircleRec(other.shape.circle.center, other.shape.circle.radius, shape.rectangle);
-    } else if check_flag(flags, ColliderFlags.Circle) && check_flag(other.flags, ColliderFlags.Rectangle) {
-      CheckCollisionCircleRec(shape.circle.center, shape.circle.radius, other.shape.rectangle);
-    }
-    
-    //? triggers can't hit each other.
-    if check_flag(flags, ColliderFlags.Trigger) &&
-       check_flag(other.flags, ColliderFlags.Trigger) {
-      return #make(Collision, {false, false});
-    }
-    
-    if check_flag(flags, ColliderFlags.Trigger) && 
-       check_flag(other.flags, ColliderFlags.Collision) {
-    }
-    
-    return #make(Collision);
+  
+  /* 
+    ! Due to how we're using 'stack scoping' for our dot expressions,
+    ! using 'other.*' in here, we end up parenting our own scope to ourselves temporarily.
+    ! this causes an infinite loop when looking up symbols resulting in a segfault in the compiler.
+    ! maybe we should avoid doing the stack scope for a root if we're already in the scope we're about to enter?
+    ! maybe there's a better solution to dot expression scoping.  
+  */
+  is_colliding :: (other: #self) {
+    CheckCollisionCircles(shape.circle.center,
+                          shape.circle.radius, 
+                          other.shape.circle.center,
+                          other.shape.circle.radius);
   }
 }

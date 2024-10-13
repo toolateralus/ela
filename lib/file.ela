@@ -36,7 +36,7 @@ file_get_length :: (file: FILE *) -> u32 {
 file_read_to_string :: (file: FILE*, len: u32*) -> char * {
   *len = file_get_length(file);
   str: char* = malloc(sizeof(char) * (*len + 1));
-  index := 0;
+  index : int = 0;
   c: char ;
   while ((c = fgetc(file)) != EOF) {
     str[index] = c;
@@ -50,7 +50,7 @@ file_read_to_string :: (filename: char *) -> char * {
   file := fopen(filename, "r");
   len := file_get_length(file);
   str: char* = malloc(sizeof(char) * (len + 1));
-  index := 0;
+  index : int = 0;
   c: char;
   while ((c = fgetc(file)) != EOF) {
     str[index] = c;
