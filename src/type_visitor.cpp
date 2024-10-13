@@ -652,10 +652,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto type = int_from_any(v.collection->accept(this));
     auto t = global_get_type(type);
     
-    if (t->get_ext().extensions.back() == TYPE_EXT_POINTER) {
-      throw_error("Cannot iterate over a pointer. Did you mean to dereference a pointer to an array?", node->source_range);
-    }
-
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
     if (!t) {
@@ -663,7 +659,11 @@ std::any TypeVisitor::visit(ASTFor *node) {
                   "based for loop",
                   node->source_range);
     }
-
+    
+    if (t && t->get_ext().has_extensions() && t->get_ext().extensions.back() == TYPE_EXT_POINTER) {
+      throw_error("Cannot iterate over a pointer. Did you mean to dereference a pointer to an array?", node->source_range);
+    }
+    
     int iter_ty = -1;
 
     if (t->is_kind(TYPE_STRUCT) &&
