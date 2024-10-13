@@ -1068,3 +1068,8 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
 }
+
+#test subscript_string :: () {
+  s: string = #make(string, "0,1,2,3");
+  s[0] = 10;
+}

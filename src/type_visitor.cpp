@@ -1283,8 +1283,8 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   // 100-200 lines of code dedicated to things that are never used is not
   // conducive to that prospect.
   {
-    if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
-        left_ty->get_ext().has_no_extensions()) {
+    if ((left_ty && left_ty->is_kind(TYPE_STRUCT) &&
+        left_ty->get_ext().has_no_extensions())) {
       auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
       if (auto sym = info->scope->lookup("[")) {
         auto enclosing_scope = ctx.scope;

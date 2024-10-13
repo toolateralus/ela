@@ -72,7 +72,12 @@ Context::Context() {
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
     str_scope->insert("capacity", s32_type());
-    str_scope->insert("[", s8_type());
+    str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
+    auto sym = str_scope->local_lookup("[");
+    auto info = type_alloc<FunctionTypeInfo>();
+    info->parameter_types[0] = int_type();
+    info->return_type = s8_type();
+    sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
   }
 }
 
