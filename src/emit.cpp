@@ -1123,13 +1123,20 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
       node->right->accept(this);
       return {};
     }
-    if (right->value.value == "capacity") {
+  }
+  
+  // TODO: remove this hack as well
+  if (left_ty->get_ext().is_map() &&
+      node->right->get_node_type() == AST_NODE_CALL) {
+    auto right = static_cast<ASTCall *>(node->right);
+    if (right && right->name.value == "contains") {
       node->left->accept(this);
       (*ss) << op;
       node->right->accept(this);
       return {};
     }
   }
+
 
   if (left_ty->is_kind(TYPE_ENUM)) {
     (*ss) << left_ty->get_base() << '_';
