@@ -562,7 +562,9 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   auto symbol = ctx.scope->local_lookup(node->name.value);
   if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
       !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
-    (*ss) << "const ";
+        
+    // ! Removed this because it was causing too many bugs.
+    //(*ss) << "const ";
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
