@@ -55,6 +55,24 @@ Context::Context() {
 
     field_scope->insert("name", charptr_type());
     field_scope->insert("type", type_ptr);
+    
+    auto get_info = type_alloc<FunctionTypeInfo>();
+    get_info->is_varargs = true;
+    get_info->return_type = charptr_type();
+    auto _t = global_find_function_type_id("s8*(...)", *get_info, {});
+    field_scope->insert("get", _t, SYMBOL_IS_FUNCTION);
+    auto get_sym = field_scope->local_lookup("get");
+    get_sym->function_overload_types.push_back(_t);
+    
+    auto set_info = type_alloc<FunctionTypeInfo>();
+    set_info->is_varargs = true;
+    set_info->return_type = void_type();
+    _t = global_find_function_type_id("void(...)", *set_info, {});
+    
+    field_scope->insert("set", _t, SYMBOL_IS_FUNCTION);
+    auto set_sym = field_scope->local_lookup("set");
+    set_sym->function_overload_types.push_back(_t);
+    
   }
 
   // string struct, stores length info.
@@ -73,6 +91,7 @@ Context::Context() {
     str_scope->insert("length", s32_type());
     str_scope->insert("capacity", s32_type());
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
+    
     auto sym = str_scope->local_lookup("[");
     auto info = type_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();

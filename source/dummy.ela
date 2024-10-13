@@ -1,7 +1,17 @@
 #import core;
 
+Reflector :: struct {
+  n: int;
+}
+
 main :: () {
-  str: string = #make(string, "Hello1");
-  str[0] = #char "h";
-  println(str);
+ reflector: Reflector;
+  
+ type := #type Reflector;
+ field := type.fields[0];
+ 
+ integer: int = 100;
+ field.set(&reflector, integer);
+ 
+ println($"{reflector.n}");
 }

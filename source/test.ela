@@ -1073,3 +1073,25 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   s: string = #make(string, "0,1,2,3");
   s[0] = 10;
 }
+  
+Reflector :: struct {
+  n: int;
+}
+
+#test test_set_field_with_reflection :: () {
+ reflector: Reflector;
+ type := #type Reflector;
+ field := type.fields[0];
+ integer: int = 100;
+ field.set(&reflector, integer);
+ assert("reflection field.set() failed.", reflector.n == 100);
+}
+
+#test test_get_field_with_reflection :: () {
+ reflector: Reflector;
+ reflector.n = 100;
+ type := #type Reflector;
+ field := type.fields[0];
+ n := *(int*)field.get(&reflector);
+ assert("reflection field.set() failed.", n == 100);
+}

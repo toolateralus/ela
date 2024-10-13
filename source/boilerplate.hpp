@@ -205,19 +205,31 @@ template <> struct hash<string> {
 
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
+extern "C" void *memcpy(void *, void *, size_t);
+
 struct Type;
 struct Field {
   char *name;
   Type *type;
   size_t size;
   size_t offset;
+  
+  template<class T, class T1>
+  void set(T *target, T1 data) const {
+    memcpy(reinterpret_cast<char*>(target) + offset, (char*)&data, sizeof(T1));
+  }
+  
+  template<class T>
+  s8* get(T source) const {
+    return reinterpret_cast<s8*>(reinterpret_cast<char*>(source) + offset);
+  }
 };
 
 struct Type {
   int id;
   char *name;
   _array<Field *> fields;
-  
+  size_t size;
 };
 
 #ifdef TESTING
