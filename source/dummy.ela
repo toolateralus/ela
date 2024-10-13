@@ -1,17 +1,11 @@
 #import core;
 
-Reflector :: struct {
-  n: int;
-}
-
 main :: () {
- reflector: Reflector;
+  n : int[]*;
   
- type := #type Reflector;
- field := type.fields[0];
- 
- integer: int = 100;
- field.set(&reflector, integer);
- 
- println($"{reflector.n}");
+  for k; n {
+    
+  }  
+  
+  
 }
