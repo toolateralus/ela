@@ -1073,7 +1073,9 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
   
   const auto testing = get_compilation_flag("test");
-  code << "#define TESTING\n";
+  
+  if (testing) { code << "#define TESTING\n"; }
+  
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
   code << "extern Type **_type_info;\n";
   
@@ -1082,19 +1084,24 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     semicolon();
     newline();
   }
+  
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-
+    
+    // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests,
-                        "{ " + test_init + " };");
-
+                        "{ " + test_init + " };"); 
+                        
+    // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   }
-  // Emit runtime reflection type info for requested types
-  {
+  
+  // Emit runtime reflection type info for requested types, only when we have actually requested
+  // runtime type information.
+  if (!ctx.type_info_strings.empty()) {
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
       type_info << str << ";\n";

@@ -758,9 +758,6 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   
 }
 
-
-
-
 #test test_operator_overload :: () {
   opstr1: OperatorOverloadTest;
   opstr2: OperatorOverloadTest;
