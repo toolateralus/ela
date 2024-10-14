@@ -1,5 +1,12 @@
+#import core;
+
+Struct :: struct {
+  to_string :: () -> string {
+    return $"Hello {1}";
+  }
+}
 
 main :: () {
-  v: int*[]*;
-  v1 := *(int*[]*)v;
+  s := new Struct;
+  println($"{s}");
 }

@@ -237,6 +237,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     auto type = global_get_type(type_id);
     type = global_get_type(type->get_true_type());
 
+    // We just assume that the type-checker has validated that this struct has a to_string() function
     if (type->is_kind(TYPE_STRUCT)) {
       return "%s";
     }
@@ -303,9 +304,14 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       if (sym) {
         auto sym_ty = static_cast<FunctionTypeInfo *>(
             global_get_type(sym->type_id)->get_info());
+                    
         auto return_ty = global_get_type(sym_ty->return_type);
         value->accept(this);
-        (*ss) << ".to_string()";
+        if (type->get_ext().extensions.back() == TYPE_EXT_POINTER) {
+          (*ss) << "->to_string()";
+        } else {
+          (*ss) << ".to_string()";
+        }
         if (return_ty->get_base() == "string" &&
             return_ty->get_ext().has_no_extensions())
           (*ss) << ".data";
