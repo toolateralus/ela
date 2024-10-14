@@ -222,7 +222,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     throw_warning(
         "using an empty interpolated string causes memory leaks right now.",
         node->source_range);
-    (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
+    (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks. EDIT: Actually that makes no sense I don't think it will.
     return;
   }
 
@@ -448,7 +448,8 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     return {};
   }
 
-  // TODO: add a remove array element operator too.
+  // CLEANUP(Josh) 10/14/2024, 10:13:23 AM
+  // Get rid of these janky operators and just use methods.
   if (node->op.type == TType::Concat) {
     node->left->accept(this);
     (*ss) << ".push(";

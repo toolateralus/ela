@@ -95,11 +95,6 @@ static void throw_warning(const std::string message, const SourceRange &source_r
 }
 
 
-static SourceRange source_range_no_found_info() {
-  // TODO: add a log that says there was no found information or something.
-  return {};
-}
-
 
 [[noreturn]] static void throw_error(const std::string &message,
                                      const SourceRange &source_range) {

@@ -52,9 +52,8 @@ struct Range {
 //   template <class U> operator U() { return static_cast<U>(value); }
 // };
 
-// TODO: implement this actually, where this will represent all dynamic arrays
-// in the language, such as int[]. int[32] is still a C fixed buffer.
-
+// TODO: get rid of the usage of std::vector. It was a shortcut, 
+// We should easily be able to have our own type to improve compile times.
 template <class T> struct _array {
   std::vector<T> vector;
 

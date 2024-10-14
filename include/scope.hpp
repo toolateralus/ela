@@ -100,9 +100,11 @@ static Scope *create_child(Scope *parent) {
 }
 struct Context {
   
-  // TODO: clean this system up so we don't have to generate c++ code in the type system.
-  // Would be much more preferable to have something that's flexible to various backends.
+  // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
+  // This type_info_strings field should be in the emit visitor.
+  // That's the only place it's used anyway.
   std::vector<std::string> type_info_strings;
+  
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Context();
   inline void set_scope(Scope *in_scope = nullptr) {

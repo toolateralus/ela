@@ -663,6 +663,12 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
+    
+    // CLEANUP(Josh) 10/14/2024, 10:10:15 AM
+      // * We don't really need C style for loops if we have
+      // * for i in 0..10 \\ for i in 10..0 etc.
+      // * That's the same thing with a much nicer syntax.
+    
     // TODO: add implict assignment here. like for i := 0; i < ...
     if (lookahead_buf()[1].type == TType::Colon) {
       node->tag = ASTFor::CStyle;
@@ -1566,7 +1572,10 @@ ASTExpr *Parser::parse_primary() {
     // for (Type)expr;
     if (global_find_type_id(peek().value, {}) != -1) {
       // CLEANUP: We probably don't wanna use ASTMake for so many things,
-      // but for now it's okay.
+      // but for now it's okay. Actually, we don't want ASTMake at all, it should get
+      // eliminated and ASTConstruct and ASTCast should probably be added to replace it.
+      // This would help us have a more consistent and clear syntax.
+      
       auto type = parse_type();
       auto node = ast_alloc<ASTMake>();
       expect(TType::RParen);

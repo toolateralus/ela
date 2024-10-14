@@ -1,5 +1,9 @@
 ## TODO List
 
+
+To search for all info comments in the source just use vscodes regex search with
+`TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
+
 ### Arrays and Maps
 
 - We should be able to do slicing with ranges.
@@ -64,8 +68,7 @@
 `#import {this, that, another} from raylib;`
 
 
-To search for all info comments in the source just use vscodes regex search with
-`TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
+
 
 Add a offsetof() or #offset() or something like that
 `#offset(Vector2, x);`

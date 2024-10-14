@@ -109,7 +109,8 @@ void Scope::insert(const std::string &name, int type_id, int flags) {
 
 /* 
   !BUG !!! SUPER CRITICAL !!! 
-  Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
+  ! Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
+  ! There is a repro for this, with a possible and likely explanation for why this is happening
 */
 
 Symbol *Scope::lookup(const std::string &name) {

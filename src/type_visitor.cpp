@@ -83,7 +83,6 @@ int TypeVisitor::generate_generic_function(ASTCall *node,
       auto arg_type = global_get_type(arg_tys[i]);
       auto arg_ext = arg_type->get_ext();
       while (!param_ext.has_no_extensions()) {
-        // TODO: Add better errors here. I don't really know what we'd say.
         if (arg_ext.has_no_extensions()) {
           throw_error("Invalid argument in polymorphic function. Probably "
                       "expected a T* or T[] but didn't get the right type",
@@ -629,8 +628,6 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
 std::any TypeVisitor::visit(ASTReturn *node) {
   int type;
   if (node->expression.is_not_null()) {
-    // TODO: we should know the return type of the function we're visiting
-    // here so we can coerce initializer lists
     type = int_from_any(node->expression.get()->accept(this));
   } else {
     type = global_find_type_id("void", {});
@@ -767,7 +764,7 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 }
 
 // FEATURE(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
-// without this function syntax, using #make(Type, ...) is really clunky
+// with this function syntax, using #make(Type, ...) is really clunky
 // and annoying;
 std::any TypeVisitor::visit(ASTCall *node) {
   auto symbol = ctx.scope->lookup(node->name.value);

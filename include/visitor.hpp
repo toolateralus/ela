@@ -151,8 +151,7 @@ struct EmitVisitor : VisitorBase {
       last_loc = loc;
     }
   }
-  // CLEANUP(Josh) 10/5/2024, 9:57:02 AM
-  // This should be in the emit visitor not here.
+
   std::string to_type_struct(Type *type, Context &context);
   inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
       : ctx(context), type_visitor(type_visitor) {

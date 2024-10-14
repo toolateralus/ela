@@ -65,8 +65,6 @@ enum ASTNodeType {
   AST_NODE_RANGE,
 };
 
-// TODO: add a set of common ASTNode flags like unused, unresolved_symbol, etc.
-// this way we can use functions and type declarations before theyre defined, prune unused code, etc.
 struct ASTNode {
   SourceRange source_range{};
   virtual ~ASTNode() = default;
@@ -214,7 +212,7 @@ struct ASTLiteral : ASTExpr {
   }
 };
 
-// CLEANUP(Josh) 10/1/2024, 10:31:35 AM This node is entirely unneccesary, and pruning any node we don't need from the AST significantly reduces code complexity.
+
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
@@ -294,10 +292,7 @@ struct ASTDotExpr : ASTExpr {
   }
 };
 
-// CLEANUP(Josh) 10/1/2024, 10:32:12 AM
-// Remove these 3 nodes and have a generic ASTControlFlowChanger or something like that
-// that just uses an enum tag and has an expr field.
-// it would simplify our stuff.
+
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
