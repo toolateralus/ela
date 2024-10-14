@@ -56,12 +56,26 @@ void Lexer::get_token(State &state) {
     if (c == '"') {
       pos++;
       c = input[pos];
-      while (c != '"') {
-        if (c == '\n')
-          lines++;
-        token.put(c);
-        pos++;
+      while (pos < len) {
         c = input[pos];
+        if (c == '"') break;
+        else if (c == '\n') lines++;
+        else if (c == '\\') {
+          if (pos + 1 < len) {
+            token.put(c);
+            pos++;
+            token.put(input[pos]);
+            pos++;
+          } else {
+            std::cout << location.ToString();
+            std::cout << "\nela: incomplete escape sequence at end of input\n";
+            exit(1);
+          }
+        } else {
+          token.put(c);
+          pos++;
+          c = input[pos];
+        }
       }
       pos++;
       state.lookahead_buffer.push_back(

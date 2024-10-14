@@ -1,12 +1,6 @@
 #import core;
 
-Something :: union {
-  s: string;
-  #dtor :: (){}
-}
-
 main :: () {
-  something: Something = {""}
-  something1: Something = {""};
-  destruct(something.s, something1.s);
+  s : string = "Hello";
+  println(s);
 }

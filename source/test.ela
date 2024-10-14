@@ -1096,3 +1096,9 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  n := *(int*)field.get(&reflector);
  assert("reflection field.set() failed.", n == 100);
 }
+
+#test test_some_escape_chars :: () {
+  s : string = "\"";
+  
+  assert("", s[0] == #char "\"");
+}
