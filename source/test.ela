@@ -6,6 +6,17 @@ XaryuStruct :: struct {
   f: float ;
 }
 
+  
+Reflector :: struct {
+  n: int;
+}
+
+InitListStruct :: struct {
+  a: int;
+  b: int;
+  c: int;
+}
+
 Union :: union {
   a: int;
   b: int;
@@ -106,6 +117,130 @@ IHaveAMethod :: struct {
   }
   parameter_method :: (x: float32) -> float32 {
       return x;
+  }
+}
+
+InitListTest :: struct {
+  n : int;
+}
+XarBarInitListTestStruct :: struct {
+  x: float;
+  y: float;
+}
+Xaryu :: struct {
+  value: int;
+  to_string :: () -> string {
+    return "XarBar";
+  }
+}
+OperatorOverloadTest :: struct {
+  value: int = 0;
+
+  #operator(+) :: (something: OperatorOverloadTest) -> int {
+    return value + something.value;
+  }
+  #operator(-) :: (something: OperatorOverloadTest) -> int {
+    return value - something.value;
+  }
+  #operator(*) :: (something: OperatorOverloadTest) -> int {
+    return value * something.value;
+  }
+  #operator(/) :: (something: OperatorOverloadTest) -> int {
+    return value / something.value;
+  }
+  #operator(%) :: (something: OperatorOverloadTest) -> int {
+    return value % something.value;
+  }
+  #operator(&) :: (something: OperatorOverloadTest) -> int {
+    return value & something.value;
+  }
+  #operator(|) :: (something: OperatorOverloadTest) -> int {
+    return value | something.value;
+  }
+  #operator(^) :: (something: OperatorOverloadTest) -> int {
+    return value ^ something.value;
+  }
+  #operator(~) :: () -> int {
+    return ~value;
+  }
+  #operator(<<) :: (something: OperatorOverloadTest) -> int {
+    return value << something.value;
+  }
+  #operator(>>) :: (something: OperatorOverloadTest) -> int {
+    return value >> something.value;
+  }
+  #operator(+=) :: (something: OperatorOverloadTest) -> int {
+    value += something.value;
+    return value;
+  }
+  #operator(-=) :: (something: OperatorOverloadTest) -> int {
+    value -= something.value;
+    return value;
+  }
+  #operator(*=) :: (something: OperatorOverloadTest) -> int {
+    value *= something.value;
+    return value;
+  }
+  #operator(/=) :: (something: OperatorOverloadTest) -> int {
+    value /= something.value;
+    return value;
+  }
+  #operator(%=) :: (something: OperatorOverloadTest) -> int {
+    value %= something.value;
+    return value;
+  }
+  #operator(&=) :: (something: OperatorOverloadTest) -> int {
+    value &= something.value;
+    return value;
+  }
+  #operator(|=) :: (something: OperatorOverloadTest) -> int {
+    value |= something.value;
+    return value;
+  }
+  #operator(^=) :: (something: OperatorOverloadTest) -> int {
+    value ^= something.value;
+    return value;
+  }
+  #operator(<<=) :: (something: OperatorOverloadTest) -> int {
+    value <<= something.value;
+    return value;
+  }
+  #operator(>>=) :: (something: OperatorOverloadTest) -> int {
+    value >>= something.value;
+    return value;
+  }
+  #operator(++) :: () -> int {
+    return ++value;
+  }
+  #operator(--) :: () -> int {
+    return --value;
+  }
+  #operator(==) :: (something: OperatorOverloadTest) -> bool {
+    return value == something.value;
+  }
+  #operator(!=) :: (something: OperatorOverloadTest) -> bool {
+    return value != something.value;
+  }
+  #operator(<) :: (something: OperatorOverloadTest) -> bool {
+    return value < something.value;
+  }
+  #operator(<=) :: (something: OperatorOverloadTest) -> bool {
+    return value <= something.value;
+  }
+  #operator(>) :: (something: OperatorOverloadTest) -> bool {
+    return value > something.value;
+  }
+  #operator(>=) :: (something: OperatorOverloadTest) -> bool {
+    return value >= something.value;
+  }
+  #operator([]) :: (n: int) -> int {
+    base: int = 10;
+    return n + base;
+  }
+  to_string :: () -> char *  {
+    str: char* = malloc(sizeof(char *) * 1);
+    sprintf(str, "%d", value);
+    return str;
   }
 }
 
@@ -475,13 +610,12 @@ something :: (f: float32) -> float32 {
   assert("Zero case of enum did not equal 0", value == 0);
 }
 
-// #test test_type_alias :: () {
-//   #alias Xaryu :: int;
-//   Xaryu i = 0;
-//   assert("type alias failed", i == 0);
-// }
+#test test_type_alias :: () {
+  #alias XaryuBarSchnar :: int;
+  i: XaryuBarSchnar = 0;
+  assert("type alias failed", i == 0);
+}
 
-// woo hoo complex expressions parse and type very well!.
 #test test_comp_assign_non_iden :: () {
   arr: float32[12];
   arr[0] = 10;
@@ -493,23 +627,6 @@ something :: (f: float32) -> float32 {
   xarbars[0].f += 10.0;
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
-
-// FEATURE(Josh) 10/1/2024, 1:20:30 PM
-// implement tagged unions once we have paramterized structs.
-// until we have that, this will be nearly pointless.
-// #tagged Union :: union {
-//   None,
-//   Some :: struct {
-//     $T data;
-//   }
-// }
-
-// function :: ($T[] a, $T value) {
-  
-// }
-
-// int[] arr;
-
 
 #test test_union_type :: () {
   test_union: Union;
@@ -542,6 +659,14 @@ something :: (f: float32) -> float32 {
   n: int ;
   for *v; array {
     assert("", n == *v);
+    ++n;
+  }
+  
+  n = 0;
+  // TODO: tidy up the confusing and often strangely inconsistent semantics around construction of types.
+  arr : s8[]* = new s8[] ({0,1,2,3});
+  for v; *arr {
+    assert("", n == v);
     ++n;
   }
 }
@@ -582,16 +707,11 @@ something :: (f: float32) -> float32 {
   assert("alias failed to equal pointed to type field.", pp == other1);
 }
 
-Xaryu :: struct {
-  value: int;
-  to_string :: () -> char * {
-    return "XarBar";
-  }
-}
+
 
 #test test_string_interpolation :: () {
   xarbar: Xaryu;
-  interp: string = $"{xarbar.to_string()}";
+  interp: string = $"{xarbar}";
   assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
   interp = $"{(1 + 1) * 2}";
   println($"Interpolated value {interp}");
@@ -604,6 +724,10 @@ overloaded :: (n: int , y) -> int {
 
 overloaded :: (n: int) -> int {
   return n;
+}
+
+overloaded :: (n: int, y: float) -> float {
+  return n * y;
 }
 
 overloaded :: (f: float ) -> float {
@@ -624,125 +748,18 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   t = #type overloaded(xaryu);
   assert("overload with float arg failed to call", strcmp(t.name, "Xaryu") == 0);
   
-  //! Bug? maybe its fine
-  // if an overloaded function has a different number of parameters,
-  // and its like (int, int)
-  // and we pass it (float, float)
-  // it fails to call, and claims wrong number of parameters, because it began searching with the first
-  // function that had a float argument at the beginning.
   assert("overload with different number of parameters failed", overloaded(1, 2) == 2);
+  
+  /* 
+    ! Bug. Overloads fail to get the actual correct overload often when theres a similar first parameter,
+    ! But there's a different following parameter. There's probably a repro on this.
+  */
+  //! assert("overload with different number of parameters failed", overloaded(1, 2.0) == 2);
+  
 }
 
-OperatorOverloadTest :: struct {
-  value: int = 0;
 
-  #operator(+) :: (something: OperatorOverloadTest) -> int {
-    return value + something.value;
-  }
-  #operator(-) :: (something: OperatorOverloadTest) -> int {
-    return value - something.value;
-  }
-  #operator(*) :: (something: OperatorOverloadTest) -> int {
-    return value * something.value;
-  }
-  #operator(/) :: (something: OperatorOverloadTest) -> int {
-    return value / something.value;
-  }
-  #operator(%) :: (something: OperatorOverloadTest) -> int {
-    return value % something.value;
-  }
-  #operator(&) :: (something: OperatorOverloadTest) -> int {
-    return value & something.value;
-  }
-  #operator(|) :: (something: OperatorOverloadTest) -> int {
-    return value | something.value;
-  }
-  #operator(^) :: (something: OperatorOverloadTest) -> int {
-    return value ^ something.value;
-  }
-  #operator(~) :: () -> int {
-    return ~value;
-  }
-  #operator(<<) :: (something: OperatorOverloadTest) -> int {
-    return value << something.value;
-  }
-  #operator(>>) :: (something: OperatorOverloadTest) -> int {
-    return value >> something.value;
-  }
-  #operator(+=) :: (something: OperatorOverloadTest) -> int {
-    value += something.value;
-    return value;
-  }
-  #operator(-=) :: (something: OperatorOverloadTest) -> int {
-    value -= something.value;
-    return value;
-  }
-  #operator(*=) :: (something: OperatorOverloadTest) -> int {
-    value *= something.value;
-    return value;
-  }
-  #operator(/=) :: (something: OperatorOverloadTest) -> int {
-    value /= something.value;
-    return value;
-  }
-  #operator(%=) :: (something: OperatorOverloadTest) -> int {
-    value %= something.value;
-    return value;
-  }
-  #operator(&=) :: (something: OperatorOverloadTest) -> int {
-    value &= something.value;
-    return value;
-  }
-  #operator(|=) :: (something: OperatorOverloadTest) -> int {
-    value |= something.value;
-    return value;
-  }
-  #operator(^=) :: (something: OperatorOverloadTest) -> int {
-    value ^= something.value;
-    return value;
-  }
-  #operator(<<=) :: (something: OperatorOverloadTest) -> int {
-    value <<= something.value;
-    return value;
-  }
-  #operator(>>=) :: (something: OperatorOverloadTest) -> int {
-    value >>= something.value;
-    return value;
-  }
-  #operator(++) :: () -> int {
-    return ++value;
-  }
-  #operator(--) :: () -> int {
-    return --value;
-  }
-  #operator(==) :: (something: OperatorOverloadTest) -> bool {
-    return value == something.value;
-  }
-  #operator(!=) :: (something: OperatorOverloadTest) -> bool {
-    return value != something.value;
-  }
-  #operator(<) :: (something: OperatorOverloadTest) -> bool {
-    return value < something.value;
-  }
-  #operator(<=) :: (something: OperatorOverloadTest) -> bool {
-    return value <= something.value;
-  }
-  #operator(>) :: (something: OperatorOverloadTest) -> bool {
-    return value > something.value;
-  }
-  #operator(>=) :: (something: OperatorOverloadTest) -> bool {
-    return value >= something.value;
-  }
-  #operator([]) :: (n: int) -> int {
-    base: int = 10;
-    return n + base;
-  }
-  to_string :: () -> char *  {
-    str: char* = malloc(sizeof(char *) * 1);
-    sprintf(str, "%d", value);
-    return str;
-  }
-}
+
 
 #test test_operator_overload :: () {
   opstr1: OperatorOverloadTest;
@@ -799,11 +816,6 @@ OperatorOverloadTest :: struct {
   assert("Right shift assignment operator overload failed",     opstr1.value == 0);
 }
 
-InitListStruct :: struct {
-  a: int;
-  b: int;
-  c: int;
-}
 #test test_initializer_lists :: () {
     scalar: int = {0};
     arr: int[]  = {0, 1, 2};
@@ -916,10 +928,7 @@ generic_calling_generic :: (v: $T) -> $T {
   assert("failed to erase element from array with ~~", array.length == 0);
 }
 
-XarBarInitListTestStruct :: struct {
-  x: float;
-  y: float;
-}
+
 
 New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   return v;
@@ -1055,9 +1064,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
 }
 
-InitListTest :: struct {
-  n : int;
-}
+
 returns_an_init_list  :: () -> InitListTest {
   return {0};
 }
@@ -1073,10 +1080,7 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   s: string = #make(string, "0,1,2,3");
   s[0] = 10;
 }
-  
-Reflector :: struct {
-  n: int;
-}
+
 
 #test test_set_field_with_reflection :: () {
  reflector: Reflector;

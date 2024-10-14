@@ -307,7 +307,8 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
                     
         auto return_ty = global_get_type(sym_ty->return_type);
         value->accept(this);
-        if (type->get_ext().extensions.back() == TYPE_EXT_POINTER) {
+        auto &extensions = type->get_ext();
+        if (extensions.has_extensions() && extensions.extensions.back() == TYPE_EXT_POINTER) {
           (*ss) << "->to_string()";
         } else {
           (*ss) << ".to_string()";

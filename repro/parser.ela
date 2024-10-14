@@ -1,0 +1,339 @@
+#import core;
+#import file;
+
+#compiler_flags "-g"
+
+JsonTokenType :: enum {
+  Invalid,
+  Eof,
+  Colon,
+  Number,
+  String,
+  LCurly,
+  RCurly,
+  LBracket,
+  RBracket,
+  Comma,
+}
+
+JsonToken :: struct {
+  value : string;
+  type : int = JsonTokenType.Invalid;
+  line: int;
+  column: int;
+}
+
+JsonLexer :: struct {
+  tokenTypeNames : char*[JsonTokenType.Comma + 1] = {
+    "Invalid",
+    "Eof",
+    "Colon",
+    "Number",
+    "String",
+    "LCurly",
+    "RCurly",
+    "LBracket",
+    "RBracket",
+    "Comma"
+  };
+  file: char*;
+  line_start: int;
+  cur_line: int;
+  position : int;
+  length : int;
+  input : char*;
+  lookahead_buffer : JsonToken[];
+
+  #ctor :: (_file: char*, _input: char*) {
+    file = _file;
+    input = _input;
+    length = strlen(input);
+
+    // this doesn't work here
+    // enum_type : Type* = #type JsonTokenType;
+    // i : int;
+    // for key; enum_type.fields {
+    //   tokenTypeNames[i] = key.name;
+    //   ++i;
+    // }
+  }
+
+  get_token :: () -> JsonToken {
+    if lookahead_buffer.length != 0 {
+      return ~lookahead_buffer;
+    }
+    token : JsonToken;
+    token.column = position - line_start;
+    token.line = cur_line + 1;
+    if position >= length || input[position] == 0 {
+      printf("exiting %d, %d\n", position, length);
+      token.type = JsonTokenType.Eof;
+      return token;
+    }
+    c : char = input[position];
+
+    // whitespace
+    while position < length {
+      if c == #char "\n" || c == #char "\r" {
+        line_start = position;
+        cur_line++;
+      } else if !isspace(c) {
+        break;
+      }
+      position++;
+      c = input[position];
+    }
+    token.column = position - line_start;
+    token.line = cur_line + 1;
+
+    if position >= length || input[position] == 0 {
+      token.type = JsonTokenType.Eof;
+      return token;
+    }
+
+    if isdigit(c) {
+      // numbers
+      len : int;
+      start : int = position;
+      while (isdigit(c) || c == #char ".") && position < length {
+        len++;
+        position++;
+        c = input[position];
+      }
+      token.value = #make(string, &input[start], &input[start] + len);
+      token.type = JsonTokenType.Number;
+      return token;
+      // operators
+    } else if c == #char ":" {
+      token.value = #make(string, ":");
+      token.type = JsonTokenType.Colon;
+      position++;
+      return token;
+    } else if c == #char "{" {
+      token.value = #make(string, "{");
+      token.type = JsonTokenType.LCurly;
+      position++;
+      return token;
+    } else if c == #char "}" {
+      token.value = #make(string, "}");
+      token.type = JsonTokenType.RCurly;
+      position++;
+      return token;
+    } else if c == #char "[" {
+      token.value = #make(string, "[");
+      token.type = JsonTokenType.LBracket;
+      position++;
+      return token;
+    } else if c == #char "]" {
+      token.value = #make(string, "]");
+      token.type = JsonTokenType.RBracket;
+      position++;
+      return token;
+    } else if c == #char "," {
+      token.value = #make(string, ",");
+      token.type = JsonTokenType.Comma;
+      position++;
+      return token;
+    } else if c == 34 {
+      position++;
+      c = input[position];
+      len : int;
+      start : int = position;
+      while c != 34 && position < length {
+        if c == #char "\n" || c == #char "\r" {
+          line_start = position;
+          cur_line++;
+        }
+        len++;
+        position++;
+        c = input[position];
+      }
+      position++;
+      token.value = #make(string, &input[start], &input[start] + len);
+      token.type = JsonTokenType.String;
+      return token;
+    } else {
+      println($"[{file}:{token.line}:{token.column}] Expected string, number, bracket, colon, or comma.");
+      exit(1);
+      return token;
+    }
+  }
+
+  peek_token :: () -> JsonToken {
+    token : JsonToken = get_token();
+    lookahead_buffer ~= token;
+    return token;
+  }
+
+  expect_types :: (types: s32[]) -> JsonToken {
+    token := this.get_token();
+    types_string: string;
+    i : int;
+    for type; types {
+      if token.type == type then return token;
+      if i == 0 {
+        types_string = #make(string, tokenTypeNames[type]);
+        i++;
+      } else {
+        types_string = $"{types_string} | {tokenTypeNames[type]}"
+      }
+    }
+    println($"[{file}:{token.line}:{token.column}] Expected {types_string}, got {tokenTypeNames[token.type]} :: {token.value}");
+    exit(1);
+    return {#make(string, ""), JsonTokenType.Invalid};
+  }
+
+  expect_type :: (type: s32) -> JsonToken {
+    return this.expect_types({type});
+  }
+}
+
+JsonValueType :: enum {
+  Invalid = -1,
+  String,
+  Number,
+  Object,
+  Array,
+}
+
+JsonKeyValuePair :: struct;
+JsonValue :: struct;
+
+// this causes a type error for some reason
+// #alias JsonObject :: JsonKeyValuePair*[];
+// #alias JsonArray :: JsonValue*[];
+
+JsonKeyValuePair :: struct {
+  key: string;
+  value: JsonValue*;
+}
+
+JsonValue :: struct {
+  data: char*;
+  type : int = JsonValueType.Invalid;
+  #dtor :: () {
+    if data {
+      if type == JsonValueType.Object {
+        ptr := (JsonKeyValuePair*[]*)data;
+        for kvp; *ptr {
+          delete(kvp.value);
+          delete(kvp);
+        }
+        delete(ptr);
+      } else if type == JsonValueType.Array {
+        ptr := (JsonValue*[]*)data;
+        for val; *ptr {
+          delete(val);
+        }
+        delete(ptr);
+      } else if type == JsonValueType.String {
+        ptr := (string*)data;
+        delete(ptr);
+      } else {
+        delete(data);
+      }
+      data = (char*)0;
+      // printf("deleted %d\n", type);
+    }
+  }
+  as_number :: () -> float64 {
+    return *(float64*)data;
+  }
+  as_string :: () -> string {
+    return *(string*)data;
+  }
+  to_string :: () -> string {
+    if type == JsonValueType.Object {
+      obj := (JsonKeyValuePair*[]*)data;
+      len := obj.length;
+      str : string;
+      
+      for i in 0..len {
+        kvp := obj[i];
+        val := (obj[i]).value;
+        if i == 0 {
+          str = $"{kvp->key}: {val}";
+        } else {
+          str = $"{str}, {kvp->key}: {val}";
+        }
+      }
+      str = $"{str}{(s8)124}";
+      return str;
+    } else if type = JsonValueType.Array {
+      arr := (JsonValue*[]*)data;
+      len := arr.length;
+      str : string;
+      for i in 0..len {
+        val := arr[i];
+        if i == 0 {
+          str = $"[{val}";
+        } else {
+          str = $"{str}, {val}";
+        }
+      }
+      str = $"{str}]";
+      return str;
+    } else if type = JsonValueType.Number {
+      return $"{as_number()}";
+    } else if type = JsonValueType.String {
+      return $"{(s8)34}{as_string()}{(s8)34}";
+    } else {
+      return #make(string);
+    }
+  }
+}
+
+json_parse :: (lexer: JsonLexer*) -> JsonValue* {
+  value := new JsonValue;
+  token := lexer.expect_types({
+    JsonTokenType.LBracket,
+    JsonTokenType.LCurly,
+    JsonTokenType.Number,
+    JsonTokenType.String
+  });
+  if token.type == JsonTokenType.LBracket {
+    value.type = JsonValueType.Array;
+    array := new JsonValue*[];
+    while token.type != JsonTokenType.RBracket {
+      *array ~= json_parse(lexer);
+      token = lexer.expect_types({JsonTokenType.RBracket, JsonTokenType.Comma});
+    }
+    value.data = (char*)array;
+  } else if token.type == JsonTokenType.LCurly {
+    value.type = JsonValueType.Object;
+    obj := new JsonKeyValuePair*[];
+    while token.type != JsonTokenType.RCurly {
+      key := lexer.expect_type(JsonTokenType.String);
+      _ := lexer.expect_type(JsonTokenType.Colon);
+      *obj ~= new JsonKeyValuePair(key.value, json_parse(lexer));
+      token = lexer.expect_types({JsonTokenType.RCurly, JsonTokenType.Comma});
+    }
+    value.data = (char*)obj;
+  } else if token.type == JsonTokenType.Number {
+    value.type = JsonValueType.Number;
+    value.data = (char*)new float64(atof(token.value.data));
+    return value;
+  } else if token.type == JsonTokenType.String {
+    value.type = JsonValueType.String;
+    value.data = (char*)new string(token.value);
+  }
+  return value;
+}
+
+json_parse_file :: (file: char*) -> JsonValue* {
+  lexer := #make(JsonLexer, file, file_read_to_string(file));
+  return json_parse(&lexer);
+}
+
+json_parse_string :: (str: char*) -> JsonValue* {
+  lexer := #make(JsonLexer, "string", str);
+  return json_parse(&lexer);
+}
+
+main :: () {
+// #test test_json_parser :: () {
+  value := json_parse_file("level1.json");
+  assert("value was not an object", value.type == JsonValueType.Object);
+  println(value.to_string());
+  delete(value);
+}
