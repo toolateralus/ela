@@ -8,11 +8,12 @@ DrawCommand :: struct {
 }
 
 DrawContext :: struct {
-  rectangles: DrawCommand[];
-  inputState: bool[];
+  commands: DrawCommand[];
+  inputState: bool[256];
   
   draw :: () {
-    for command; rectangles {
+    while commands.length > 0 {
+      command := ~commands;
       DrawRectangle((int)command.rect.x, (int)command.rect.y, (int)command.rect.width, (int)command.rect.height, command.color);
     }
   }

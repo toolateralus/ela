@@ -2,16 +2,19 @@
 #import dlfcn;
 #include "shared.ela";
 
-// TODO improve this syntax. Probably add a fn keyword.
-
-
-main :: () {
+#compiler_flags "-g"
+main :: () -> int {
   handle := dlopen("test.so", Rtld.Now);
+  
   hook: function = dlsym(handle, "test_call");
+  
+  if !hook {
+    return 1;
+  }
   
   ctx: DrawContext;
   
-  
+  SetTargetFPS(60);
   
   InitWindow(0, 0, "Testing DLL");
   while !WindowShouldClose() {
@@ -24,4 +27,5 @@ main :: () {
       ctx.draw();
     EndDrawing();
   }
+  return 0;
 }
