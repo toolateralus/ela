@@ -97,7 +97,13 @@ Context::Context() {
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
+    
   }
+  
+  auto info = FunctionTypeInfo{};
+  info.is_varargs = true;
+  info.return_type = void_type();
+  root_scope->insert("destruct", global_find_function_type_id("void(...)", info, {}));
 }
 
 

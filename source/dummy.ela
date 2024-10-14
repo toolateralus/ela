@@ -1,11 +1,12 @@
 #import core;
 
-Enum :: enum {
-  VariantA,
-  VariantB,
-  VariantC,
+Something :: union {
+  s: string;
+  #dtor :: (){}
 }
 
 main :: () {
-  println($"{.VariantC}");
+  something: Something = {""}
+  something1: Something = {""};
+  destruct(something.s, something1.s);
 }

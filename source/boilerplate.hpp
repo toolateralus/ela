@@ -45,6 +45,12 @@ struct Range {
   iterator end() { return iterator(m_end); }
 };
 
+
+template<class ...T>
+void destruct(T &...t) {
+  (t.~T(), ...);
+}
+
 // TODO: implement this. not sure how we want to approach it.
 // template <class T> struct Any {
 //   T value;
