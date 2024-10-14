@@ -248,7 +248,9 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       return "%p";
     }
     if (type->is_kind(TYPE_SCALAR)) {
-      if (type->id == s8_type() || type->id == s16_type() ||
+      if (type->id == char_type()) {
+        return "%c"; 
+      } else if (type->id == s8_type() || type->id == s16_type() ||
           type->id == s32_type() || type->id == u8_type() ||
           type->id == u16_type() || type->id == u32_type() ||
           type->id == int_type()) {
