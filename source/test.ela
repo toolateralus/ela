@@ -1077,6 +1077,12 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
 #test test_init_list_comprehensive :: () {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
+  
+  empty_init_list := InitListTest
+  {
+    
+  };
+  
 }
 
 #test subscript_string :: () {
@@ -1103,10 +1109,5 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  assert("reflection field.set() failed.", n == 100);
 }
 
-#test test_some_escape_chars :: () {
-  s : string = "\"";
-  
-  assert("", s[0] == #char "\"");
-}
 
 

@@ -1391,13 +1391,6 @@ std::any TypeVisitor::visit(ASTInitializerList *node) {
     node->types.push_back(type);
   }
 
-  // TODO: assert that type can be default constructed.
-  // for now this is just an error
-  if (node->types.empty()) {
-    throw_error("Cannot have an empty initializer list currently. to be "
-                "implemented.",
-                node->source_range);
-  }
   return assert_type_can_be_assigned_from_init_list(
       node, declaring_or_assigning_type);
 }
