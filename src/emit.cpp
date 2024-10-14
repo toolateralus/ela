@@ -767,7 +767,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       }
 
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
-        (*ss) << " const ";
+        //(*ss) << " const ";
       }
 
       node->block.get()->accept(this);
@@ -792,7 +792,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 
     if ((node->flags & FUNCTION_IS_METHOD) != 0) {
       if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
-        (*ss) << " const ";
+        //(*ss) << " const ";
       }
     }
 

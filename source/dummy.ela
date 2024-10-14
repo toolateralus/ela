@@ -1,12 +1,11 @@
 #import core;
 
-Struct :: struct {
-  to_string :: () -> string {
-    return $"Hello {1}";
-  }
+Enum :: enum {
+  VariantA,
+  VariantB,
+  VariantC,
 }
 
 main :: () {
-  s := new Struct;
-  println($"{s}");
+  println($"{.VariantC}");
 }

@@ -1,6 +1,5 @@
 #import raylib;
 #import core;
-#include "ui.ela";
 
 #compiler_flags "-g"
 

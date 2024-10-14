@@ -1444,7 +1444,21 @@ ASTExpr *Parser::parse_primary() {
     return node;
   }
 
+  auto range = begin_node();
+
   switch (tok.type) {
+  case TType::Dot: {
+    eat();
+    if (peek().type != TType::Identifier) {
+      end_node(nullptr, range);
+      throw_error(".Something syntax is only for using enum variants that are in your current scope.", range);
+    }
+    auto dot = ast_alloc<ASTDotExpr>();
+    dot->left = nullptr;
+    dot->right = parse_primary();
+    end_node(dot, range);
+    return dot;
+  }
   case TType::Dollar: {
     auto range = begin_node();
     eat();

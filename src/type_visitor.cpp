@@ -777,13 +777,10 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-  if (type) {
+  
+  if (type) declaring_or_assigning_type = symbol->type_id;
 
-    declaring_or_assigning_type = symbol->type_id;
-  }
-
-  std::vector<int> arg_tys =
-      std::any_cast<std::vector<int>>(node->arguments->accept(this));
+  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   if (symbol->declaring_node.is_not_null()) {
     auto func_decl =
@@ -1158,6 +1155,28 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
+  if (node->left == nullptr) {
+    auto identifier = static_cast<ASTIdentifier*>(node->right);
+    for (auto i = 0; i < num_types; ++i) {
+      auto type = global_get_type(i);
+      if (type->is_kind(TYPE_ENUM)) {
+        auto info = static_cast<EnumTypeInfo*>(type->get_info());
+        for (const auto &key: info->keys) {
+          if (key == identifier->value.value) {
+            auto ast_type = ast_alloc<ASTType>();
+            ast_type->base = type->get_base();
+            node->left = ast_type;
+            goto found_enum_variant;
+          }
+        }
+      }
+    }
+    found_enum_variant:
+    
+    if (node->left == nullptr) 
+      throw_error(std::format("Unable to find enum variant {}", identifier->value.value), node->source_range);
+  }
+  
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = global_get_type(left);
 
