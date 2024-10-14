@@ -1517,7 +1517,18 @@ ASTExpr *Parser::parse_primary() {
     auto name = tok.value;
 
     if (global_find_type_id(tok.value, {}) != -1) {
-      return parse_type();
+      auto type = parse_type();
+      if (peek().type == TType::LCurly) {
+        auto init_list = parse_expr();
+        auto make = ast_alloc<ASTMake>();
+        auto args = ast_alloc<ASTArguments>();
+        args->arguments.push_back(init_list);
+        make->type_arg = type;
+        make->arguments = args;
+        return make;
+      } else {
+        return type;
+      }
     }
     eat();
     auto iden = ast_alloc<ASTIdentifier>();

@@ -576,8 +576,14 @@ something :: (f: float32) -> float32 {
   assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
+MakeStruct2 :: struct {
+  f: float;
+  n: int;
+}
+
 #test test_make :: () {
-  c: Constructible = #make(Constructible, 10.0);
+  c := Constructible{10.0};
+  ms2 := MakeStruct2{0.0, 10};
   assert("failed to construct", c.x == 10.0);
 }
 
@@ -1102,3 +1108,5 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   
   assert("", s[0] == #char "\"");
 }
+
+
