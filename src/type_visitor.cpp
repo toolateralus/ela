@@ -356,8 +356,9 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
-  int largest_type = s32_type();
-  int largest_type_size = 1;
+  
+  auto elem_type = -1;
+  
   for (const auto &[key, value] : node->key_values) {
     if (value.is_null())
       continue;
@@ -371,24 +372,24 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
     auto expr = value.get();
     auto id = int_from_any(value.get()->accept(this));
     auto type = global_get_type(id);
-
-    if (!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions()) {
-      throw_error("Cannot have non integral types in enums got: " +
-                      type->to_string(),
-                  node->source_range);
+    
+    if (elem_type == -1) {
+      elem_type = id;
     }
-
-    auto info = static_cast<ScalarTypeInfo *>(type->get_info());
-    if (info->size > largest_type_size) {
-      largest_type = id;
-      largest_type_size = info->size;
-    }
-
-    assert_types_can_cast_or_equal(id, s64_type(), node->source_range,
+    
+    assert_types_can_cast_or_equal(id, elem_type, node->source_range,
                                    "expected: {}, got : {}",
-                                   "Cannot have non-integral types in enums");
+                                   "Inconsistent types in enum declaration.");
   }
-  node->element_type = largest_type;
+  
+  if (elem_type == void_type())
+    throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
+  
+  if (elem_type == -1) {
+    elem_type = s32_type();
+  }
+  
+  node->element_type = elem_type;
   return {};
 }
 std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {

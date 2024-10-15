@@ -1151,5 +1151,16 @@ SwitchCaseEnum :: enum {
   
 }
 
+EnumOfStrings :: enum {
+  A = string{"Hello"},
+  B = string{"Goodbye"}
+};
+
+#test test_string_enum :: () {
+  b: bool = EnumOfStrings.A == string{"Hello"};
+  assert("String enum failed", b);
+}
+
+
 
 
