@@ -333,6 +333,7 @@ std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
 // {
 
 // clang-format off
+std::any ASTSwitch::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTProgram::accept(VisitorBase *visitor) {return visitor->visit(this); }
 std::any ASTBlock::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTType::accept(VisitorBase *visitor) { return visitor->visit(this); }

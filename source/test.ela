@@ -1077,11 +1077,7 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
 #test test_init_list_comprehensive :: () {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
-  
-  empty_init_list := InitListTest
-  {
-    
-  };
+  empty_init_list := InitListTest{};
   
 }
 
@@ -1089,7 +1085,6 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   s: string = #make(string, "0,1,2,3");
   s[0] = 10;
 }
-
 
 #test test_set_field_with_reflection :: () {
  reflector: Reflector;
@@ -1107,6 +1102,42 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  field := type.fields[0];
  n := *(int*)field.get(&reflector);
  assert("reflection field.set() failed.", n == 100);
+}
+
+SwitchCaseEnum :: enum {
+  SwitchVariant0,
+  SwitchVariant1,
+}
+
+#test test_switch_statements :: () {
+  integer: int;
+  
+  passed := false;
+  switch integer {
+    0: { passed = true; }
+    1: { assert("Switch on int case failed", false);  }
+  }
+  
+  assert("Failed to hit positive switch case for integer", passed);
+  str: string = "Hello!";
+  
+  passed = false;
+  switch str {
+    string{"Hello"}: { assert("Switch case on string failed", false); }
+    string{"Hello!"}: { passed = true; }
+  }
+  assert("Failed to hit positive switch case for string", passed);
+  
+  passed = false;
+  switch .SwitchVariant0 {
+    .SwitchVariant0: {
+      passed = true;
+    }
+    .SwitchVariant1: {
+      assert("Switch on enum value failed", false);
+    }
+  }
+  assert("Failed to hit positive switch case for enum", passed);
 }
 
 

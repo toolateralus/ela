@@ -43,6 +43,11 @@ struct Range {
   iterator end() const { return iterator(m_end); }
   iterator begin() { return iterator(m_begin); }
   iterator end() { return iterator(m_end); }
+  
+  bool operator==(int number) const {
+    return number >= m_begin && number <= m_end;
+  }
+  
 };
 
 

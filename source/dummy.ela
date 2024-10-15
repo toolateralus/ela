@@ -1,6 +1,20 @@
-#import core;
+
+#foreign printf::(fmt: char*, ...) -> int;
+
+Enum :: enum {
+  VariantA,
+  VariantB
+}
 
 main :: () {
-  s : string = "Hello";
-  println(s);
+  str : string = "hello!";
+  
+  switch str {
+    string{"Hello1"} : {
+      printf("Value A\n");
+    }
+    string{"hello!"} : {
+      printf("Value B\n");
+    }
+  }
 }

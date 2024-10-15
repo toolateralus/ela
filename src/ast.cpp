@@ -609,7 +609,7 @@ ASTStatement *Parser::parse_statement() {
   if (tok.type == TType::Eof) {
     return ast_alloc<ASTNoop>();
   }
-
+  
   if (tok.type == TType::Identifier &&
       lookahead_buf()[1].type == TType::Colon) {
     auto decl = parse_declaration();
@@ -632,7 +632,7 @@ ASTStatement *Parser::parse_statement() {
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
              tok.type == TType::Delete || tok.type == TType::LParen ||
-             tok.type == TType::Erase) {
+             tok.type == TType::Erase || tok.type == TType::Switch) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
@@ -1447,6 +1447,26 @@ ASTExpr *Parser::parse_primary() {
   auto range = begin_node();
 
   switch (tok.type) {
+  case TType::Switch: {
+    expect(TType::Switch);
+    auto expr = parse_expr();
+    expect(TType::LCurly);
+    std::vector<SwitchCase> cases;    
+    while (peek().type != TType::RCurly) {
+      SwitchCase _case;
+      _case.expression = parse_expr();
+      expect(TType::Colon);
+      _case.block = parse_block();
+      cases.push_back(_case);
+    }
+    expect(TType::RCurly);
+    auto node = ast_alloc<ASTSwitch>();
+    node->cases = cases;
+    node->target = expr;
+    end_node(node, range);
+    return node;
+  }
+    
   case TType::Dot: {
     eat();
     if (peek().type != TType::Identifier) {
@@ -1861,3 +1881,5 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
+
+

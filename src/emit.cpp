@@ -1556,3 +1556,27 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 
   return std::format("_type_info[{}]", id);
 }
+
+
+std::any EmitVisitor::visit(ASTSwitch *node) {
+  auto emit_switch_case = [&](ASTExpr* target, const SwitchCase &_case, bool first) {
+    if (!first) {
+      (*ss) << " else ";
+    }
+    (*ss) << " if (";
+    target->accept(this);
+    (*ss) << " == ";
+    _case.expression->accept(this);
+    (*ss) << ") ";
+    _case.block->accept(this);
+  };
+  
+  bool first = true;
+  
+  for (const auto &_case: node->cases) {
+    emit_switch_case(node->target, _case, first);
+    first = false;
+  }
+  
+  return {};
+}

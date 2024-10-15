@@ -32,7 +32,7 @@ void assert_types_can_cast_or_equal(
                 source_range);
   }
 }
-const void assert_return_type_is_valid(int &return_type, int new_type,
+void assert_return_type_is_valid(int &return_type, int new_type,
                                        ASTNode *node) {
   if (return_type == -1) {
     return_type = new_type;
@@ -648,7 +648,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto v = node->value.collection_based;
     auto type = int_from_any(v.collection->accept(this));
     auto t = global_get_type(type);
-    
+
     auto iden = static_cast<ASTIdentifier *>(v.target);
 
     if (!t) {
@@ -656,11 +656,13 @@ std::any TypeVisitor::visit(ASTFor *node) {
                   "based for loop",
                   node->source_range);
     }
-    
-    // if (t && t->get_ext().has_extensions() && t->get_ext().extensions.back() == TYPE_EXT_POINTER) {
-    //   throw_error("Cannot iterate over a pointer. Did you mean to dereference a pointer to an array?", node->source_range);
+
+    // if (t && t->get_ext().has_extensions() && t->get_ext().extensions.back()
+    // == TYPE_EXT_POINTER) {
+    //   throw_error("Cannot iterate over a pointer. Did you mean to dereference
+    //   a pointer to an array?", node->source_range);
     // }
-    
+
     int iter_ty = -1;
 
     if (t->is_kind(TYPE_STRUCT) &&
@@ -777,10 +779,12 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-  
-  if (type) declaring_or_assigning_type = symbol->type_id;
 
-  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
+  if (type)
+    declaring_or_assigning_type = symbol->type_id;
+
+  std::vector<int> arg_tys =
+      std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   if (symbol->declaring_node.is_not_null()) {
     auto func_decl =
@@ -1156,27 +1160,35 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   if (node->left == nullptr) {
-    auto identifier = static_cast<ASTIdentifier*>(node->right);
+    auto identifier = static_cast<ASTIdentifier *>(node->right);
+
+    bool found = false;
     for (auto i = 0; i < num_types; ++i) {
       auto type = global_get_type(i);
       if (type->is_kind(TYPE_ENUM)) {
-        auto info = static_cast<EnumTypeInfo*>(type->get_info());
-        for (const auto &key: info->keys) {
+        auto info = static_cast<EnumTypeInfo *>(type->get_info());
+        for (const auto &key : info->keys) {
           if (key == identifier->value.value) {
-            auto ast_type = ast_alloc<ASTType>();
-            ast_type->base = type->get_base();
-            node->left = ast_type;
-            goto found_enum_variant;
+            if (found) {
+              throw_warning(std::format("Found multiple enum types with variant '{}'.. using the `.{}` syntax will choose the first defined one. (Note: ignored candidate `{}`)", key, key, type->get_base()), node->source_range);
+            } else {
+              auto ast_type = ast_alloc<ASTType>();
+              ast_type->base = type->get_base();
+              node->left = ast_type;
+              found = true;
+            }
           }
         }
       }
     }
-    found_enum_variant:
-    
-    if (node->left == nullptr) 
-      throw_error(std::format("Unable to find enum variant {}", identifier->value.value), node->source_range);
+  found_enum_variant:
+
+    if (node->left == nullptr)
+      throw_error(std::format("Unable to find enum variant {}",
+                              identifier->value.value),
+                  node->source_range);
   }
-  
+
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = global_get_type(left);
 
@@ -1329,9 +1341,10 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
               "invalid parameter type in subscript operator overload");
           return fun_info->return_type;
         }
-      } else
+      } else {
         throw_error("couldn't find [] overload for struct type",
                     node->source_range);
+      }
     }
   }
   auto ext = left_ty->get_ext();
@@ -1444,4 +1457,33 @@ std::any TypeVisitor::visit(ASTRange *node) {
   }
 
   return left;
+}
+
+std::any TypeVisitor::visit(ASTSwitch *node) {
+  auto type_id = int_from_any(node->target->accept(this));
+  auto type = global_get_type(type_id);
+  
+  int return_type = void_type();
+  
+  for (const auto &_case: node->cases) {
+    auto expr_type = int_from_any(_case.expression->accept(this));
+    auto block_cf = std::any_cast<ControlFlow>(_case.block->accept(this));
+    
+    // TODO: we should be able to return from a function from within a switch, however that conflicts a bit
+    // ? with how we're allowing switches to be an expression. I am sure there is a way we can detect it's a switch 
+    // ? that's a void and visit in a certain way.
+    // ? However for now, I think it's more valuable to have switches act like a expression rather than just a statement.
+    // ? Although, you can use it as a standalone statement.
+    if ((block_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
+      assert_return_type_is_valid(return_type, block_cf.type, node);
+      return_type = block_cf.type;
+    } else if ((block_cf.flags & BLOCK_FLAGS_BREAK) != 0) {
+      throw_warning("You do not need to break from switch cases.", node->source_range);
+    } else if ((block_cf.flags & BLOCK_FLAGS_CONTINUE) != 0) {
+      throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
+    }
+    assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "got {}, expected {}", "Invalid switch case.");
+  }
+  
+  return return_type;
 }

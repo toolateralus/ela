@@ -33,38 +33,56 @@
 #foreign atof :: (v: char*) -> float64;
 
 str_starts_with :: (str: char*, substr: char*) -> bool {
-  if str == null || substr == null { return false; }
+  if str == null || substr == null 
+    then return false;
+    
   str_len: int = strlen(str);
   substr_len: int = strlen(substr);
-  if str_len < substr_len { return false; }
-  if str_len == substr_len && strcmp(str, substr) == 0 { return true;  }
+  
+  if str_len < substr_len 
+    then return false;
+    
+  if str_len == substr_len && strcmp(str, substr) == 0
+    then return true;
+    
   return strncmp(str, substr, substr_len) == 0;
 }
 
 string_ends_with :: (str: char*, pattern: char*) -> bool {
-  if !str || !pattern {
-    return false;
-  }
+  if !str || !pattern 
+    then return false;
+    
   len: int = strlen(str);
   patlen: int = strlen(pattern);
-  if len < patlen {
-    return false;
-  }
+  
+  if len < patlen 
+    then return false;
+    
   return strncmp(str + (len - patlen), pattern, patlen) == 0;
 }
 
 string_substr :: (src: char*, start: int, end: int) -> string {
-  if !src {
-    return #make(string, null);
-  }
+  if !src 
+    then return string{""};
+    
   len: int = strlen(src);
-  if (start > end) { return #make(string, null); }
-  if (len < end - start) { return #make(string, null); }
+  
+  if (start > end) 
+    then return string{""};
+  
+  if (len < end - start) 
+    then return string{""};
+    
   dest: char* = malloc(sizeof(char) * (end - start) + 1);
+  
   memcpy(dest, src + start, end - start);
+  
   dest[(end - start)] = 0;
-  v: string = #make(string, dest);
+  
+  v: string = string{dest};
+  
   free(dest);
+  
   return v;
 }
 
@@ -85,50 +103,43 @@ println :: (str: char*) {
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32) -> void;
 
-min :: (a: int, b: int) -> int {
-  if a > b  {
-    return b;
-  }
+min :: (a: int, b) -> int {
+  if a > b  then return b;
   return a;
 }
 
-max :: (a: int, b: int) -> int {
-  if a > b  {
-    return a;
-  }
+max :: (a: int, b) -> int {
+  if a > b then return a;
   return b;
 }
 
-min :: (a: float, b: float) -> float {
-  if a > b  {
-    return b;
-  }
+min :: (a: float, b) -> float {
+  if a > b then return b;
   return a;
 }
 
-max :: (a: float, b: float) -> float {
-  if a > b  {
-    return a;
-  }
+max :: (a: float, b) -> float {
+  if a > b 
+    then return a;
   return b;
 }
 
-clamp :: (v: float, min: float, max: float) -> float {
-  if v < min { return min; }
-  if v > max { return max; }
+clamp :: (v: float, min, max) -> float {
+  if v < min then return min;
+  if v > max then return max;
   return v;
 }
 
-clamp :: (v: float*, min: float, max: float) {
-  if *v < min { *v = min; }
-  if *v > max { *v = max; }
+clamp :: (v: float*, min: float, max) {
+  if *v < min then *v = min;
+  if *v > max then *v = max;
 }
 
 lerp :: (a: float, b, t) -> float {
   return (a * (1.0 - t)) + (b * t);
 }
 
-lerp :: (a: int, b: int, t: float) -> int {
+lerp :: (a: int, b, t: float) -> int {
   return (int)(a * (1.0 - t)) + (b * t) + 0.5;
 }
 
@@ -137,7 +148,7 @@ Random :: enum {
 }
 
 randf :: () -> float {
-  return #make(float, rand()) / #make(float, Random.Max);
+  return (float)rand() / (float)Random.Max;
 }
 
 // !BUG can't define this because it's a redefinition of timeval even though we're not including anything that contains it as far as I know.

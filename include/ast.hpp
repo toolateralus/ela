@@ -63,6 +63,7 @@ enum ASTNodeType {
   AST_NODE_ALLOCATE,
   AST_NODE_NOOP,
   AST_NODE_RANGE,
+  AST_NODE_SWITCH,
 };
 
 struct ASTNode {
@@ -474,6 +475,20 @@ struct ASTAllocate : ASTExpr {
   }
 };
 
+struct SwitchCase {
+  ASTExpr* expression;
+  ASTBlock* block;
+};
+
+struct ASTSwitch : ASTExpr {
+  ASTExpr *target;
+  std::vector<SwitchCase> cases;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_SWITCH;
+  }
+};
+
 
 
 struct Allocation {
@@ -528,7 +543,7 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTUnionDeclaration *node) override {}                        \
   std::any visit(ASTAllocate *node) override {};                        \
   std::any visit(ASTRange *node) override {};                        \
-  
+  std::any visit(ASTSwitch *node) override {};
 
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
@@ -563,6 +578,7 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTUnionDeclaration *node) = 0;                        \
   virtual std::any visit(ASTAllocate *node) = 0;                        \
   virtual std::any visit(ASTRange *node) = 0;                        \
+  virtual std::any visit(ASTSwitch *node) = 0;                        \
   
   
 enum DirectiveKind {

@@ -119,7 +119,6 @@ struct TypeExt {
   inline bool is_map() const {
     for (const auto ext: extensions) {
       if (ext == TYPE_EXT_MAP) {
-        assert(key_type != -1);
         return true;
       }
     }
@@ -128,22 +127,14 @@ struct TypeExt {
   
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
-      for (const auto ext : extensions) {
-        if (ext == TYPE_EXT_POINTER)
-          return true;
-      }
+      return std::find(extensions.rbegin(), extensions.rend(), TYPE_EXT_POINTER) != extensions.rend();
+    }
+    if (depth > extensions.size()) {
       return false;
     }
-
-    bool eq = false;
-    int n = 0;
-    for (const auto &ext : extensions) {
-      if (n >= depth || ext != TYPE_EXT_POINTER) {
-        return false;
-      }
-      n++;
-    }
-    return n == depth;
+    return std::all_of(extensions.rbegin(), extensions.rbegin() + depth, [](TypeExtEnum ext) {
+      return ext == TYPE_EXT_POINTER;
+    });
   }
   
   inline bool operator==(const TypeExt &other) const { return equals(other); }

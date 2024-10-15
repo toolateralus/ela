@@ -76,17 +76,22 @@ enum struct TType {
   False,
   Null,
   Varargs,
-  Directive,
+  Directive, // #
+  ColonEquals, //  :=
+  Dollar, // $
+  
   Struct,
-  ColonEquals,
   Enum,
   Union,
+  
   New,
   Delete,
-  Dollar,
+  
   Then,
   Colon,
   In,
+  
+  Switch,
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -96,6 +101,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Colon);
+    TTYPE_CASE(Switch);
     TTYPE_CASE(In);
     TTYPE_CASE(Then);
     TTYPE_CASE(Erase);
@@ -285,10 +291,10 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> keywords{
+      {"in", TType::In},         {"switch", TType::Switch},
       {"then", TType::Then},     {"union", TType::Union},
       {"enum", TType::Enum},     {"return", TType::Return},
-      {"break", TType::Break},   {"continue", TType::Continue},
-      {"in", TType::In},
+      {"break", TType::Break},   {"continue", TType::Continue}, 
       {"for", TType::For},       {"while", TType::While},
       {"if", TType::If},         {"else", TType::Else},
       {"struct", TType::Struct}, {"true", TType::True},
