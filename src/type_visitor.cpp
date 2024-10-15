@@ -559,7 +559,7 @@ std::any TypeVisitor::visit(ASTBlock *node) {
     if (node_type == AST_NODE_BLOCK || node_type == AST_NODE_IF ||
         node_type == AST_NODE_FOR || node_type == AST_NODE_WHILE ||
         node_type == AST_NODE_RETURN || node_type == AST_NODE_CONTINUE ||
-        node_type == AST_NODE_BREAK) {
+        node_type == AST_NODE_BREAK || node_type == AST_NODE_EXPR_STATEMENT) {
       auto stmnt_cf = std::any_cast<ControlFlow>(result);
       block_cf.flags |= stmnt_cf.flags;
       if ((stmnt_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
@@ -1496,12 +1496,14 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
   auto type = global_get_type(type_id);
   
   int return_type = void_type();
+  int flags = BLOCK_FLAGS_FALL_THROUGH;
   
   // ! BUG:  add a way to have us return control flow here. 
   // ! I am not sure how that works @Cooper-Pilot
   for (const auto &_case: node->cases) {
     auto expr_type = int_from_any(_case.expression->accept(this));
     auto block_cf = std::any_cast<ControlFlow>(_case.block->accept(this));
+    flags |= block_cf.flags;
     
     // TODO: we should be able to return from a function from within a switch, however that conflicts a bit
     // ? with how we're allowing switches to be an expression. I am sure there is a way we can detect it's a switch 
@@ -1513,16 +1515,20 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
         assert_return_type_is_valid(return_type, block_cf.type, node);
       }
       return_type = block_cf.type;
-    } else if ((block_cf.flags & BLOCK_FLAGS_BREAK) != 0) {
-      throw_warning("You do not need to break from switch cases.", node->source_range);
-    } else if ((block_cf.flags & BLOCK_FLAGS_CONTINUE) != 0) {
-      throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
-    }
+    } 
     assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "got {}, expected {}", "Invalid switch case.");
   }
   node->return_type = return_type;
-  
-  return return_type;
+  if (node->is_statement) {
+    return ControlFlow{flags, return_type};
+  } else {
+    if ((flags & BLOCK_FLAGS_BREAK) != 0) {
+      throw_warning("You do not need to break from switch cases.", node->source_range);
+    } else if ((flags & BLOCK_FLAGS_CONTINUE) != 0) {
+      throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
+    }
+    return return_type;
+  }
 }
 
 std::any TypeVisitor::visit(ASTTuple *node) {

@@ -1111,6 +1111,15 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  assert("reflection field.set() failed.", n == 100);
 }
 
+switch_helper :: () -> int {
+  number := 5;
+  switch number {
+    0: { return 0; }
+    5: { return 5; }
+  }
+  return 1;
+}
+
 #test test_switch_statements :: () {
   integer: int;
   
@@ -1161,6 +1170,8 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
     }
   }
   assert("Failed to pass range based switch statement", passed);
+
+  assert("Returns in switched failed", switch_helper() == 5);
 }
 
 #test test_string_enum :: () {
@@ -1259,6 +1270,26 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   }
   
   assert("Slice failed", subarr.length == 10);
+}
+
+#test test_switch_statement :: () {
+  arr := #make(s64[], 1000);
+  assert("Length", arr.length == 1000);
   
+  /* 
+    Ranges are always max-exclusive right now.
+    0..10 == 0->9;
+    We don't currently have a way to represent max inclusive ranges.
+  */
+  for i in 0..10 {
+    arr[i] = 100;
+  }
   
+  subarr := arr[0..10];
+  
+  for i in 0..10 {
+    assert("Slice failed", subarr[i] == arr[i]);
+  }
+  
+  assert("Slice failed", subarr.length == 10);
 }

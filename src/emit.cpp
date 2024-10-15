@@ -1558,7 +1558,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 }
 std::any EmitVisitor::visit(ASTSwitch *node) {
   
-  if (node->return_type != void_type()) {
+  if (!node->is_statement) {
     (*ss) << "[&] ->";
     auto type = global_get_type(node->return_type);
     (*ss) << to_cpp_string(type);
@@ -1584,7 +1584,7 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
     first = false;
   }
   
-  if (node->return_type != void_type()) {
+  if (!node->is_statement) {
     (*ss) << "else {";
     
     auto type = global_get_type(node->return_type);
