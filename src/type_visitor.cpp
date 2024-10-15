@@ -885,7 +885,9 @@ std::any TypeVisitor::visit(ASTType *node) {
     std::vector<int> types;
     for (const auto &t: node->tuple_types) 
       types.push_back(int_from_any(t->accept(this)));
-    node->resolved_type = global_find_type_id(types);
+    node->resolved_type = global_find_type_id(types, node->extension_info);
+    node->base = get_tuple_type_name(types);
+    
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->resolved_type = int_from_any(node->pointing_to.get()->accept(this));
     node->resolved_type = global_find_type_id(node->base, node->extension_info);
@@ -1506,7 +1508,8 @@ std::any TypeVisitor::visit(ASTTuple *node) {
   for (const auto &v: node->values) {
     types.push_back(int_from_any(v->accept(this)));
   }
-  return node->type->resolved_type = global_find_type_id(types);
+  
+  return node->type->resolved_type = global_find_type_id(types, node->type->extension_info);
 }
 
 std::any TypeVisitor::visit(ASTTupleDeconstruction *node) {

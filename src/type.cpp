@@ -128,6 +128,35 @@ int global_find_type_id(const std::string &name,
   return -1;
 }
 
+int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
+  for (int i = 0; i < num_types; ++i) {
+    auto type = type_table[i];
+    
+    if (!type->is_kind(TYPE_TUPLE))
+      continue;
+    
+    auto info = static_cast<TupleTypeInfo*>(type->get_info());
+    
+    if (info->types.size() != tuple_types.size())
+      continue;
+    
+    for (int i = 0; i < info->types.size(); ++i) 
+      if (info->types[i] != tuple_types[i]) 
+        goto end_of_loop;
+    
+    if (type->get_ext() == type_extensions) {
+      // Found a matching type with the same extensions. Return it.
+      return type->id;
+    }
+      
+    end_of_loop:
+  }
+  
+  // We didn't find the tuple type. Return a new one.
+  return global_create_tuple_type(tuple_types, type_extensions);
+}
+
+
 // CLEANUP(Josh) 10/3/2024, 9:25:36 AM
 // This could be significantly improved for readability
 // PERFORMANCE(Josh) 10/3/2024, 9:25:51 AM
@@ -434,7 +463,13 @@ int Type::get_element_type() const {
       it = std::vector<TypeExtEnum>::reverse_iterator(
           extensions.extensions.erase((it + 1).base()));
       extensions.array_sizes.pop_back();
-      return global_find_type_id(base, extensions);
+      
+      if (is_kind(TYPE_TUPLE)) {
+        auto info = static_cast<TupleTypeInfo*>(get_info());
+        return global_find_type_id(info->types, extensions);
+      }
+      else return global_find_type_id(base, extensions);
+      
     } else {
       ++it;
     }
@@ -733,33 +768,9 @@ int get_map_value_type(Type *map_type) {
   auto id  = global_find_type_id(map_type->get_base(), map_type->get_ext().without_back());
   return id;
 }
-int global_find_type_id(std::vector<int> &tuple_types) {
-  for (int i = 0; i < num_types; ++i) {
-    auto type = type_table[i];
-    
-    if (!type->is_kind(TYPE_TUPLE))
-      continue;
-    
-    auto info = static_cast<TupleTypeInfo*>(type->get_info());
-    
-    if (info->types.size() != tuple_types.size())
-      continue;
-    
-    for (int i = 0; i < info->types.size(); ++i) 
-      if (info->types[i] != tuple_types[i]) 
-        goto end_of_loop;
-      
-    // Found a matching type. Return it.
-    return type->id;
-      
-    end_of_loop:
-  }
-  
-  // We didn't find the tuple type. Return a new one.
-  return global_create_tuple_type(tuple_types);
-}
 
-int global_create_tuple_type(const std::vector<int> &types) {
+
+int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_TUPLE);
   type_table[num_types] = type;
@@ -773,6 +784,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   info->types = types;
   
   type->set_info(info);
+  type->set_ext(ext);
   
   num_types += 1;
   return type->id;

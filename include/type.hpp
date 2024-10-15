@@ -252,7 +252,7 @@ int global_create_struct_type(const std::string &, Scope *);
 int global_create_enum_type(const std::string &, const std::vector<std::string> &,
                      bool = false);
 
-int global_create_tuple_type(const std::vector<int> &types);
+int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext);
 
 int global_create_union_type(const std::string &name, Scope *scope, UnionFlags kind);
 
@@ -282,7 +282,7 @@ int charptr_type();
 int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
 
-int global_find_type_id(std::vector<int> &tuple_types);
+int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions);
 
 int global_find_type_id(const std::string &, const TypeExt &);
 

@@ -402,7 +402,7 @@ void Parser::init_directive_routines() {
                          "type name of the current declaring type",
                          {});
            }
-           parser->parse_type_extensions(type);
+           parser->append_type_extensions(type);
            return type;
          }});
   }
@@ -522,8 +522,12 @@ ASTType *Parser::parse_type() {
     }
     expect(TType::GT);
     auto node = ast_alloc<ASTType>();
+    node->resolved_type = -1;
+    node->flags = 0;
     node->tuple_types = types;
     node->flags |= ASTTYPE_IS_TUPLE;
+    // grab up more extensions if they exist.
+    append_type_extensions(node);
     return node;
   }
 
@@ -1869,18 +1873,27 @@ std::vector<ASTType *> Parser::parse_parameter_types() {
   expect(TType::RParen);
   return param_types;
 }
-void Parser::parse_type_extensions(ASTType *type) {
+void Parser::append_type_extensions(ASTType *type) {
   while (peek().type == TType::Mul || peek().type == TType::LBrace) {
     if (peek().type == TType::Mul) {
       eat();
       type->extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (peek().type == TType::LBrace) {
-      type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
       expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
-        auto integer = parse_expr();
-        type->extension_info.array_sizes.push_back(integer);
+        auto size = parse_expr();
+        if (size->get_node_type() == AST_NODE_TYPE) {
+          type->extension_info.extensions.push_back(TYPE_EXT_MAP);
+          auto type = static_cast<ASTType*>(size);
+          type->extension_info.key_type = global_find_type_id(type->base, type->extension_info);
+          printf("KEY TYPE: %d\n", type->extension_info.key_type);
+          expect(TType::RBrace);
+          continue;
+        }
+        type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
+        type->extension_info.array_sizes.push_back(size);
       } else {
+        type->extension_info.extensions.push_back(TYPE_EXT_ARRAY);
         type->extension_info.array_sizes.push_back(nullptr);
       }
       expect(TType::RBrace);
@@ -1921,7 +1934,7 @@ ASTType *Parser::parse_function_type(const std::string &base,
   return_type->base = type_name;
   return_type->extension_info = {};
 
-  parse_type_extensions(return_type);
+  append_type_extensions(return_type);
 
   return return_type;
 }

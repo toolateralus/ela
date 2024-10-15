@@ -1179,6 +1179,39 @@ EnumOfStrings :: enum {
   n : int;
   get(t1, 2, &n);
   assert("using 'get(tuple, index, *out_value)' failed", n == 2);
+  
+  array : <int, int>[];
+  array ~= <10, 10>;
+  
+  {
+    a, b := array[0];
+    assert("Storing tuple in array failed", a == 10 && b == 10);
+  }
+  
+  ptr : <int, int>* = new <int, int>(10, 10);
+  {
+    a, b := *ptr;
+    assert("Calling new with tuple failed", a == 10 && b == 10);
+  }
+  
+  // ! Bug: This just completely fails. The type ends up being null during the subscript.
+  // ! I am too tired today to fix this.
+  // map : <int, int>[string];
+  // {
+  //   map["Hi"] = <10, 10>;
+    
+  //   a, b := map["Hi"];
+  //   assert("tuple in map failed", a == 10 && b == 10);
+  // }
+  
+  ptr_arr: <int, int>*[];
+  ptr_arr ~= new <int, int>(10, 10);
+  
+  {
+    a, b := *(ptr_arr[0]);
+    assert("Calling new with tuple failed", a == 10 && b == 10);
+  }
+  
 }
 
 

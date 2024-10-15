@@ -1399,6 +1399,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   case TYPE_TUPLE: {
     auto info = static_cast<TupleTypeInfo*>(type->get_info());
     output = "_tuple" + get_tuple_type_name(info->types);
+    output = to_cpp_string(type->get_ext(), output);
     break;
   }
   }

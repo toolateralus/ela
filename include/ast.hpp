@@ -683,7 +683,7 @@ struct Parser {
   
   ASTType *parse_type();
   std::vector<ASTType *> parse_parameter_types();
-  void parse_type_extensions(ASTType *type);
+  void append_type_extensions(ASTType *type);
 
   ASTType *parse_function_type(const std::string &base, TypeExt extension_info);
 
