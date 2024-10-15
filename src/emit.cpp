@@ -927,13 +927,6 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   
   std::string iden;
-  if (node->is_flags) {
-    iden = "enum ";
-  } else {
-    iden = "enum ";
-  }
-  auto type = global_get_type(node->element_type);
-  (*ss) << iden << node->type->base << " : " << type->get_base() << "{\n";
   int i = 0;
   auto get_next_index = [&] {
     int value;
@@ -947,9 +940,11 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   };
   int n = 0;
 
+  auto elem_ty = global_get_type(node->element_type);
+
   auto type_name = node->type->base;
   for (const auto &[key, value] : node->key_values) {
-    (*ss) << type_name << '_' << key;
+    (*ss) << "const " << to_cpp_string(elem_ty) << " " << type_name << '_' << key;
     (*ss) << " = ";
     if (value.is_not_null()) {
       value.get()->accept(this);
@@ -957,11 +952,10 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
       (*ss) << std::to_string(get_next_index());
     }
     if (n != node->key_values.size() - 1) {
-      (*ss) << ",\n";
+      (*ss) << ";\n";
     }
     n++;
   }
-  (*ss) << "\n};";
   return {};
 }
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
@@ -1556,8 +1550,6 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 
   return std::format("_type_info[{}]", id);
 }
-
-
 std::any EmitVisitor::visit(ASTSwitch *node) {
   
   if (node->return_type != void_type()) {
