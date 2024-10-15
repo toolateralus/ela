@@ -21,6 +21,7 @@ struct SerializeVisitor : VisitorBase {
   int indentLevel = 0;
   Context &context;
   std::string indent();
+  
   std::any visit(ASTProgram *node) override;
   std::any visit(ASTFunctionDeclaration *node) override;
   std::any visit(ASTBlock *node) override;
@@ -53,7 +54,7 @@ struct SerializeVisitor : VisitorBase {
   // TODO: implement me.
   std::any visit(ASTRange *node) override { return {}; }
   std::any visit(ASTSwitch *node) override { return {}; };
-  
+  std::any visit(ASTTuple *node) override;
 };
 
 struct TypeVisitor : VisitorBase {
@@ -103,7 +104,7 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
-
+  std::any visit(ASTTuple *node) override;
   int generate_generic_function(ASTCall *node,
                                 ASTFunctionDeclaration *func_decl,
                                 std::vector<int> arg_tys);
@@ -223,4 +224,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
+  std::any visit(ASTTuple *node) override;
 };

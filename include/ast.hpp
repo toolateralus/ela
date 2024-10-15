@@ -18,6 +18,7 @@
 // this could be a simple boolean.
 enum {
   ASTTYPE_EMIT_OBJECT,
+  ASTTYPE_IS_TUPLE,
 };
 
 extern jstl::Arena ast_arena;
@@ -44,6 +45,7 @@ enum ASTNodeType {
   AST_NODE_IDENTIFIER,
   AST_NODE_LITERAL,
   AST_NODE_TYPE,
+  AST_NODE_TUPLE,
   AST_NODE_CALL,
   AST_NODE_ARGUMENTS,
   AST_NODE_RETURN,
@@ -128,13 +130,20 @@ struct ASTExpr : ASTNode {
 };
 
 struct ASTType : ASTExpr {
+  int flags = -1;
+  // base name,
   std::string base;
+  // [], *, [string] etc.
   TypeExt extension_info{};
+  
+  // the actual type this got resolved to in the type checker.
   int resolved_type = Type::invalid_id;
   
   // special info for reflection
   Nullable<ASTExpr> pointing_to;
-  int flags = -1;
+  
+  // special info for tuple types.
+  std::vector<ASTType*> tuple_types;
   
   ASTNodeType get_node_type() const override {
     return AST_NODE_TYPE;
@@ -213,6 +222,14 @@ struct ASTLiteral : ASTExpr {
   }
 };
 
+struct ASTTuple : ASTExpr {
+  ASTType* type;
+  std::vector<ASTExpr*> values;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_TUPLE;
+  }
+};
 
 struct ASTParamDecl : ASTNode {
   ASTType *type;
@@ -542,16 +559,16 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTInitializerList *node) override {}                         \
   std::any visit(ASTEnumDeclaration *node) override {}                         \
   std::any visit(ASTUnionDeclaration *node) override {}                        \
-  std::any visit(ASTAllocate *node) override {};                        \
-  std::any visit(ASTRange *node) override {};                        \
-  std::any visit(ASTSwitch *node) override {};
-
+  std::any visit(ASTAllocate *node) override {};                               \
+  std::any visit(ASTRange *node) override {};                                  \
+  std::any visit(ASTSwitch *node) override {};                                 \
+  std::any visit(ASTTuple *node) = override;                                   \
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   std::any visit(ASTNoop *noop) { return {}; }                                 \
   virtual std::any visit(ASTProgram *node) = 0;                                \
   virtual std::any visit(ASTBlock *node) = 0;                                  \
-  virtual std::any visit(ASTFunctionDeclaration *node) = 0;                               \
+  virtual std::any visit(ASTFunctionDeclaration *node) = 0;                    \
   virtual std::any visit(ASTParamsDecl *node) = 0;                             \
   virtual std::any visit(ASTParamDecl *node) = 0;                              \
   virtual std::any visit(ASTDeclaration *node) = 0;                            \
@@ -580,6 +597,7 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTAllocate *node) = 0;                        \
   virtual std::any visit(ASTRange *node) = 0;                        \
   virtual std::any visit(ASTSwitch *node) = 0;                        \
+  virtual std::any visit(ASTTuple *node) = 0;                        \
   
   
 enum DirectiveKind {

@@ -1,0 +1,51 @@
+#import core;
+
+// Super basic arena allocator, with a constructor that allocates a big block,
+// an allocate method that returns u8*, and a destructor that frees the block.
+#flags ArenaFlags :: enum {
+  None,        // default.
+  AlignAllocations,   // if this flag is set, the allocator will fix alignment automatically when a misaligned allocation is found. Else it will naively allocate regardless of size.
+  OutOfMemory, // if this flag is set, the program will exit and print a message on out of memory. Otherwise it will silently return null.
+}
+
+Arena :: struct {
+  ptr: u64;
+  size: u64;
+  memory: u8*;
+  flags: int = .None;
+  alignment : int = 8;
+  
+  #ctor :: (size: u64, flags: int) {
+    this.size = size;
+    this.flags = flags;
+    memory = malloc(sizeof(u8) * size);
+  }
+  #dtor :: () {
+    free(memory);
+    memory = null;
+  }
+  
+  allocate :: (size: u64) -> u8* {
+    if size == 0 {
+      return null;
+    }
+    
+    aligned_ptr := this.ptr;
+    if this.flags & .AlignAllocations != 0 {
+      aligned_ptr = (this.ptr + alignment - 1) & ~(alignment - 1);
+    }
+    
+    oom := aligned_ptr + size > this.size;
+    
+    if oom && this.flags & .OutOfMemory != 0 {
+      printf("Arena Allocator: Ran out of memory\n");
+      exit(1);
+    } else if oom {
+      return null;
+    }
+    
+    result := this.memory + aligned_ptr;
+    this.ptr = aligned_ptr + size;
+    return result;
+  }
+}

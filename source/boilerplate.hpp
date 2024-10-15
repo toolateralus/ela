@@ -24,9 +24,9 @@ extern "C" int printf(const char *format, ...);
 #include <algorithm>
 #include <initializer_list>
 
-struct Range {
+struct _range {
   int m_begin, m_end;
-  Range(int m_begin, int m_end) : m_begin(m_begin), m_end(m_end) {}
+  _range(int m_begin, int m_end) : m_begin(m_begin), m_end(m_end) {}
   struct iterator {
     int current;
     iterator(int start) : current(start) {}
@@ -50,6 +50,8 @@ struct Range {
   
 };
 
+template<class ...T>
+using _tuple = std::tuple<T...>;
 
 template<class ...T>
 void destruct(T &...t) {

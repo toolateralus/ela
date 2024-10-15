@@ -346,6 +346,7 @@ std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this);
 std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTFunctionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTTuple::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTArguments::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };
@@ -396,3 +397,7 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
   return {};
 }
 
+// TODO: implement me. Im lazy and this takes a while and uses up my hands!
+std::any SerializeVisitor::visit(ASTTuple *node) {
+  return {}; 
+}

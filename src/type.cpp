@@ -307,17 +307,15 @@ std::string Type::to_string() const {
   }
 
   switch (kind) {
-  case TYPE_STRUCT:
-  case TYPE_SCALAR:
-    return type->base + type->extensions.to_string();
-  case TYPE_FUNCTION:
-    return type->info->to_string() + type->extensions.to_string();
-    break;
-  case TYPE_ENUM: {
-    return type->base;
-  }
-  case TYPE_UNION:
-    return type->base;
+    case TYPE_FUNCTION:
+      return type->info->to_string() + type->extensions.to_string();
+    case TYPE_STRUCT:
+    case TYPE_TUPLE:
+    case TYPE_SCALAR:
+      return type->base + type->extensions.to_string();
+    case TYPE_ENUM: 
+    case TYPE_UNION:
+      return type->base;
   }
 }
 
@@ -714,4 +712,64 @@ std::string TypeExt::to_string() const {
 int get_map_value_type(Type *map_type) { 
   auto id  = global_find_type_id(map_type->get_base(), map_type->get_ext().without_back());
   return id;
+}
+int global_find_type_id(std::vector<int> &tuple_types) {
+  for (int i = 0; i < num_types; ++i) {
+    auto type = type_table[i];
+    
+    if (!type->is_kind(TYPE_TUPLE))
+      continue;
+    
+    auto info = static_cast<TupleTypeInfo*>(type->get_info());
+    
+    if (info->types.size() != tuple_types.size())
+      continue;
+    
+    for (int i = 0; i < info->types.size(); ++i) 
+      if (info->types[i] != tuple_types[i]) 
+        goto end_of_loop;
+      
+    // Found a matching type. Return it.
+    return type->id;
+      
+    end_of_loop:
+  }
+  
+  // We didn't find the tuple type. Return a new one.
+  return global_create_tuple_type(tuple_types);
+}
+
+int global_create_tuple_type(const std::vector<int> &types) {
+  auto id = num_types;
+  auto type = new (type_alloc<Type>()) Type(id, TYPE_TUPLE);
+  type_table[num_types] = type;
+  
+  //! BUG: we should allow nested tuples;
+  //! right now I doubt that it would generate itself recursively.
+    
+  type->set_base(get_tuple_type_name(types));
+
+  auto info = new (type_alloc<TupleTypeInfo>()) TupleTypeInfo();
+  info->types = types;
+  
+  type->set_info(info);
+  
+  num_types += 1;
+  return type->id;
+}
+
+std::string get_tuple_type_name(const std::vector<int> &types) {
+  std::stringstream ss;
+  ss << "<";
+  for (auto it = types.begin(); it != types.end(); ++it) {
+    auto type = global_get_type(*it);
+    
+    ss << type->to_string();
+    
+    if (it != types.end() - 1) {
+      ss << ", ";
+    }
+  }
+  ss << ">";
+  return ss.str();
 }

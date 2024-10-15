@@ -3,7 +3,6 @@
 
 #include "core.hpp"
 #include "lex.hpp"
-#include <cassert>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -70,6 +69,7 @@ enum TypeKind {
   TYPE_STRUCT,
   TYPE_ENUM,
   TYPE_UNION,
+  TYPE_TUPLE,
 };
 
 enum TypeExtEnum {
@@ -236,7 +236,13 @@ struct StructTypeInfo : TypeInfo {
   virtual std::string to_string() const override { return ""; }
 };
 
+struct TupleTypeInfo : TypeInfo {
+  std::vector<int> types;
+};
+
 Type *global_get_type(const int id);
+
+std::string get_tuple_type_name(const std::vector<int> &types);
 
 int global_create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
                 const TypeExt & = {});
@@ -245,6 +251,8 @@ int global_create_struct_type(const std::string &, Scope *);
 
 int global_create_enum_type(const std::string &, const std::vector<std::string> &,
                      bool = false);
+
+int global_create_tuple_type(const std::vector<int> &types);
 
 int global_create_union_type(const std::string &name, Scope *scope, UnionFlags kind);
 
@@ -273,6 +281,8 @@ int charptr_type();
 
 int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
                  const TypeExt &);
+
+int global_find_type_id(std::vector<int> &tuple_types);
 
 int global_find_type_id(const std::string &, const TypeExt &);
 

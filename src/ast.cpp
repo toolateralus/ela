@@ -527,6 +527,20 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   TypeExt extension_info;
 
+  if (peek().type == TType::LT) {
+    eat();
+    std::vector<ASTType*> types;
+    while (peek().type != TType::GT) {
+      types.push_back(parse_type());
+      if (peek().type == TType::Comma) eat();
+    }
+    expect(TType::GT);
+    auto node = ast_alloc<ASTType>();
+    node->tuple_types = types;
+    node->flags |= ASTTYPE_IS_TUPLE;
+    return node;
+  }
+
   while (true) {
     if (peek().type == TType::LBrace) {
       expect(TType::LBrace);  
@@ -611,7 +625,7 @@ ASTStatement *Parser::parse_statement() {
   }
   
   if (tok.type == TType::Identifier &&
-      lookahead_buf()[1].type == TType::Colon) {
+      lookahead_buf()[1].type == TType::Colon) {       
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -764,6 +778,7 @@ ASTStatement *Parser::parse_statement() {
               lookahead_buf()[1].type == TType::Dot) ||
              lookahead_buf()[1].type == TType::Assign ||
              lookahead_buf()[1].type == TType::ColonEquals ||
+             lookahead_buf()[1].type == TType::Comma ||
              lookahead_buf()[1].type == TType::LParen ||
              lookahead_buf()[1].is_comp_assign()) {
     auto statement = ast_alloc<ASTExprStatement>();
@@ -1267,23 +1282,53 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
     
+       // ! A little hack for tuples.
+    { 
+      // <1, 2, 3>; is valid
+      // <1, 2, 3 > 10>; can work too.
+      auto lookahead = lookahead_buf();
+      bool is_gt = peek().type == TType::GT;
+      bool is_not_identifier = lookahead.size() > 1 && lookahead[1].type != TType::Identifier;
+      bool is_not_literal = lookahead.size() > 1 && lookahead[1].family != TFamily::Literal;
+      bool is_not_operator = lookahead.size() > 1 && (lookahead[1].family != TFamily::Operator || lookahead[1].type != TType::LParen);
+      bool is_semi = lookahead.size() > 1 && lookahead[1].type == TType::Semi;
+      if (is_gt && is_not_identifier && is_not_literal && is_not_operator && !is_semi) {
+        return left;
+      }
+    }
+    
+    // ! Type inferred assignment.
+    // TODO: Put this somewhere within the declaration stuff.
+    // Right now we cant use n := false in structs, which would be nice terse syntax for declaring members.
+    {
+      if (peek().type == TType::ColonEquals) {
+        if (left->get_node_type() != AST_NODE_IDENTIFIER) {
+          end_node(left, range);
+          throw_error(
+              "Cannot use type inference assignment ':=' on non-identifiers.",
+              range);
+        }
+        auto iden = static_cast<ASTIdentifier *>(left);
+        if (ctx.scope->local_lookup(iden->value.value)) {
+          end_node(nullptr, range);
+          throw_error("redefinition of a variable.", range);
+        }
+        ctx.scope->insert(iden->value.value, -1);
+      }  
+    }
+    
+    // Tuple deconstruction and multiple assignment.
+    {
+      if (left->get_node_type() == AST_NODE_IDENTIFIER && peek().type == TType::Comma) {
+        printf("Hit tuple decsonstructiion rule\n") ;
+      }
+    }
+    
+    
     
     Precedence token_precedence = get_operator_precedence(peek());
-    if (token_precedence == PRECEDENCE_ASSIGNMENT &&
-        peek().type == TType::ColonEquals) {
-      if (left->get_node_type() != AST_NODE_IDENTIFIER) {
-        end_node(left, range);
-        throw_error(
-            "Cannot use type inference assignment ':=' on non-identifiers.",
-            range);
-      }
-      auto iden = static_cast<ASTIdentifier *>(left);
-      if (ctx.scope->local_lookup(iden->value.value)) {
-        end_node(nullptr, range);
-        throw_error("redefinition of a variable.", range);
-      }
-      ctx.scope->insert(iden->value.value, -1);
-    }
+    
+    
 
     if (token_precedence <= precedence) {
       break;
@@ -1358,7 +1403,6 @@ ASTExpr *Parser::parse_unary() {
 ASTExpr *Parser::parse_postfix() {
   auto range = begin_node();
   auto left = parse_primary();
-
   if (peek().type == TType::Range) {
     eat();
     auto right = parse_expr();
@@ -1447,6 +1491,19 @@ ASTExpr *Parser::parse_primary() {
   auto range = begin_node();
 
   switch (tok.type) {
+  case TType::LT: {
+    eat(); // <
+    auto exprs = std::vector<ASTExpr*>();
+    while (peek().type != TType::GT) {
+      exprs.push_back(parse_expr());
+      if (peek().type == TType::Comma) eat();
+    }
+    expect(TType::GT); // >
+    auto tuple = ast_alloc<ASTTuple>();
+    tuple->values = exprs;
+    tuple->type = ast_alloc<ASTType>();
+    return tuple;
+  }
   case TType::Switch: {
     expect(TType::Switch);
     auto expr = parse_expr();
@@ -1632,6 +1689,7 @@ ASTExpr *Parser::parse_primary() {
     }
 
     auto expr = parse_expr();
+    
     if (peek().type != TType::RParen) {
       throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
     }
@@ -1640,7 +1698,7 @@ ASTExpr *Parser::parse_primary() {
     return expr;
   }
   default: {
-    throw_error(std::format("Invalid primary expression. Token: {}, Type: {}",
+    throw_error(std::format("Invalid primary expression. Token: '{}'... Type: '{}'",
                             tok.value, TTypeToString(tok.type)),
                 {token_idx - 5, token_idx});
     return nullptr;
@@ -1881,5 +1939,4 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
-
 

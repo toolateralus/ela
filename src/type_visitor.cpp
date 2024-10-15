@@ -10,7 +10,6 @@
 #include <cassert>
 #include <format>
 #include <jstl/containers/vector.hpp>
-#include <limits>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -32,6 +31,7 @@ void assert_types_can_cast_or_equal(
                 source_range);
   }
 }
+
 void assert_return_type_is_valid(int &return_type, int new_type,
                                        ASTNode *node) {
   if (return_type == -1) {
@@ -42,6 +42,7 @@ void assert_return_type_is_valid(int &return_type, int new_type,
                                    "Inconsistent return types in block.");
   }
 };
+
 void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
   if (node->get_node_type() == AST_NODE_IDENTIFIER) {
     auto iden = static_cast<ASTIdentifier *>(node);
@@ -68,6 +69,7 @@ void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
     report_mutated_if_iden(subscript->left);
   }
 }
+
 int TypeVisitor::generate_generic_function(ASTCall *node,
                                            ASTFunctionDeclaration *func_decl,
                                            std::vector<int> arg_tys) {
@@ -153,6 +155,7 @@ int TypeVisitor::generate_generic_function(ASTCall *node,
 
   return return_type_id;
 }
+
 void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
                                          std::vector<int> &arg_tys,
                                          Type *&type) {
@@ -1120,23 +1123,16 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
       base = 2;
     }
     auto n = std::strtoll(node->value.c_str(), nullptr, base);
-
-    if (n > std::numeric_limits<int32_t>::max() ||
-        n < std::numeric_limits<int32_t>::min()) {
-      return s64_type();
+    
+    if (declaring_or_assigning_type != -1) {
+      auto type = global_get_type(declaring_or_assigning_type);
+      if (type->is_kind(TYPE_SCALAR) && type_is_numerical(type)) {
+        auto info = static_cast<ScalarTypeInfo*>(type->get_info());
+        if (info->is_integral)
+          return type->id;
+      }
     }
-
-    if (n > std::numeric_limits<int16_t>::max() ||
-        n < std::numeric_limits<int16_t>::min()) {
-      return s32_type();
-    }
-
-    if (n > std::numeric_limits<int8_t>::max() ||
-        n < std::numeric_limits<int8_t>::min()) {
-      return s16_type();
-    }
-
-    return s8_type();
+    return s32_type();
   }
   case ASTLiteral::Float:
     return float32_type();
@@ -1431,7 +1427,6 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
 }
-
 std::any TypeVisitor::visit(ASTRange *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));
@@ -1459,7 +1454,6 @@ std::any TypeVisitor::visit(ASTRange *node) {
 
   return left;
 }
-
 std::any TypeVisitor::visit(ASTSwitch *node) {
   auto type_id = int_from_any(node->target->accept(this));
   auto type = global_get_type(type_id);
@@ -1494,4 +1488,12 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
   }
   
   return return_type;
+}
+
+std::any TypeVisitor::visit(ASTTuple *node) {
+  std::vector<int> types;
+  for (const auto &v: node->values) {
+    types.push_back(int_from_any(v->accept(this)));
+  }
+  return node->type->resolved_type = global_find_type_id(types);
 }

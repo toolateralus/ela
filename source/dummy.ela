@@ -1,20 +1,5 @@
 
-#foreign printf::(fmt: char*, ...) -> int;
-
-Enum :: enum {
-  VariantA,
-  VariantB
-}
-
 main :: () {
-  str : string = "hello!";
+  t := <1, 2, 3+3> ;
   
-  switch str {
-    string{"Hello1"} : {
-      printf("Value A\n");
-    }
-    string{"hello!"} : {
-      printf("Value B\n");
-    }
-  }
 }
