@@ -1162,6 +1162,15 @@ EnumOfStrings :: enum {
 }
 
 
+func_returns_tuple :: () -> <int, int> {
+  return <10, 10>;
+}
+
+func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
+  a, b := tuple;
+  return <a + 10, b + 10>;
+}
+
 #test test_tuples :: () {
   t1 : <int, int, int> = <0, 1, 2>;
   {
@@ -1210,6 +1219,17 @@ EnumOfStrings :: enum {
   {
     a, b := *(ptr_arr[0]);
     assert("Calling new with tuple failed", a == 10 && b == 10);
+  }
+  
+  {
+    a, b := func_returns_tuple();
+    assert("returning tuple from function failed", a == 10 && b == 10);
+  }
+  
+  {
+    tuple := <0, 0>;
+    a, b := func_takes_tuple_arg(tuple);
+    assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
   }
   
 }
