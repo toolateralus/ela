@@ -1,10 +1,12 @@
 // ! the key type is null on subscript here.
+// ! Really the entire system is completely screwed,
+// ! every single line in here reveals a bug.
+
 main :: () {
-  map : <int, int>[string];
+  map : <int, int>[string]; // ! Segfault before compile finishes.
   {
-    map["Hi"] = <10, 10>;
-    
-    a, b := map["Hi"];
-    assert("tuple in map failed", a == 10 && b == 10);
+    //map["Hi"] = <10, 10>; // ! Null type
+    //a, b := map["Hi"]; // ! Null Type.
+    //  assert("tuple in map failed", a == 10 && b == 10); // ! Idk.
   }
 }
