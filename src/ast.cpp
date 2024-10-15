@@ -1444,7 +1444,6 @@ ASTExpr *Parser::parse_postfix() {
     node->right = right;
     return node;
   }
-
   if (peek().type == TType::Increment || peek().type == TType::Decrement) {
     auto unary = ast_alloc<ASTUnaryExpr>();
     unary->operand = left;
@@ -1453,7 +1452,6 @@ ASTExpr *Parser::parse_postfix() {
     end_node(unary, range);
     return unary;
   }
-
   // build dot and subscript expressions
   while (peek().type == TType::Dot || peek().type == TType::LBrace ||
          peek().type == TType::LParen) {

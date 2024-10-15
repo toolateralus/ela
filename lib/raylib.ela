@@ -250,7 +250,6 @@ Vector3 :: struct {
   }
 }
 
-
 Rectangle :: struct {
   x: float;
   y: float;
@@ -434,16 +433,14 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign SetMasterVolume :: (volume: float) -> void;
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
 #foreign SetExitKey :: (key :int);
-
 #foreign MeasureText :: (text: char*, fontSize: int) -> int;
 
-
 Camera :: struct {
-    position:     Vector3;
-    target:       Vector3;
-    up:           Vector3;
-    fovy:         float;
-    projection:   int;
+  position:     Vector3;
+  target:       Vector3;
+  up:           Vector3;
+  fovy:         float;
+  projection:   int;
 } 
 
 Camera2D :: struct {
@@ -480,6 +477,13 @@ ConfigFlags :: enum {
   InterlacedHint        = 0x00010000  // 1 << 16
 }
 
+#foreign IsWindowResized :: () -> bool;      
+#foreign SetWindowState :: (flags: int) -> void;
+#foreign BeginScissorMode :: (x: int, y, w, h);
+#foreign EndScissorMode :: ();
+#foreign Fade :: (color: Color, alpha: float) -> Color;
+#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;
+
 #foreign SetCameraMode :: (camera: Camera2D, mode: int) -> void;
 #foreign UpdateCamera :: (camera: Camera2D*) -> void;
 #foreign BeginMode2D :: (camera: Camera2D) -> void;
@@ -490,21 +494,12 @@ ConfigFlags :: enum {
 #foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
 #foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
 
-#foreign IsWindowResized :: () -> bool;      
 
-#foreign SetWindowState :: (flags: int) -> void;
-
-
-#foreign BeginScissorMode :: (x: int, y, w, h);
-#foreign EndScissorMode :: ();
-#foreign Fade :: (color: Color, alpha: float) -> Color;
-#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;
-
-/* 
-  ########### BUILTIN UI HELPERS ###############
-*/
+// * ########### BUILTIN UI HELPERS ############### //
+// * Function pointer to use with the `draw_button` function.
 #alias ButtonCallback :: void()*;
 
+// * Style struct used for UI styling.
 Style :: struct {
   foreground: Color;
   background: Color;
@@ -515,6 +510,7 @@ Style :: struct {
   jiggle_rate : float = 4.0;
 }
 
+// * Measure the width of a jiggly text of 'text' and 'style'
 measure_jiggly_text :: (text: char*, style: Style) -> float {
   length: int = strlen(text);
   total_width: float = 0.0;
@@ -524,6 +520,7 @@ measure_jiggly_text :: (text: char*, style: Style) -> float {
   return total_width;
 }
 
+// * Draw wavy jiggly text.
 jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
   time: float = (float)GetTime();
   length: int = strlen(text);
@@ -539,6 +536,7 @@ jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
   }
 }
 
+// * Draw a button with a click callback.
 draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
   position: Vector2 = {rect.x, rect.y};
   size: Vector2 = {rect.width, rect.height};
@@ -583,6 +581,20 @@ draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCall
   return false;
 }
 
-/* 
-  ########### END BUILTIN UI HELPERS ###############
-*/
+// *########### END BUILTIN UI HELPERS ############### */
+
+// ? A simple timer that can be used in update loops to get a tick every N seconds.
+// * interval: float = seconds between each tick.
+Timer :: struct {
+  interval : float = 0.5;
+  // Returns true if the timer has exceeded the interval time relative to the last tick time.
+  last_tick_time: float;
+  tick :: () -> bool {
+    now := GetTime();
+    if now > (last_tick_time + interval) || last_tick_time == 0 {
+      last_tick_time = now;
+      return true;
+    }
+    return false;
+  }
+}

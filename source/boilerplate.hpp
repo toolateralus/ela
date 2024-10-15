@@ -54,7 +54,6 @@ template<class ...T>
 using _tuple = std::tuple<T...>;
 
 
-
 template<class ...T>
 using _tuple = std::tuple<T...>;
 
@@ -75,7 +74,6 @@ template<class T, class T1>
 void get(const T& tuple, int index, T1* value) {
   get_helper(tuple, index, value);
 }
-
 
 template<class ...T>
 void destruct(T &...t) {
@@ -130,6 +128,18 @@ template <class T> struct _array {
   
   auto &operator[](int n) const { return vector[n]; }
   auto &operator[](int n) { return vector[n]; }
+  
+  template <typename InputIt>
+  _array(InputIt first, InputIt last) {
+    vector = std::vector<T>(first, last);
+    update();
+  }
+  
+  auto operator[](const _range &range) {
+    // TODO: We could probably avoid copying and instead return an actual slice.
+    return _array<T>(vector.data() + range.m_begin, vector.data() + range.m_end);
+  }
+  
   
   explicit operator void *() { return (void *)vector.data(); }
   explicit operator T *() { return (T *)vector.data(); }

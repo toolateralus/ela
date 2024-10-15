@@ -257,6 +257,21 @@ MyEnum :: enum {
   Value = 100 * 2,
 }
 
+MakeStruct2 :: struct {
+  f: float;
+  n: int;
+}
+
+SwitchCaseEnum :: enum {
+  SwitchVariant0,
+  SwitchVariant1,
+}
+
+EnumOfStrings :: enum {
+  A = string{"Hello"},
+  B = string{"Goodbye"}
+};
+
 // Keep this at the top otherwise it messesup the output formatting in the middle
 #test test_printf :: () {
   s: char*  = "Hello i am a string";
@@ -576,10 +591,6 @@ something :: (f: float32) -> float32 {
   assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
-MakeStruct2 :: struct {
-  f: float;
-  n: int;
-}
 
 #test test_make :: () {
   c := Constructible{10.0};
@@ -712,8 +723,6 @@ MakeStruct2 :: struct {
   other1: int_ptr* = pp;
   assert("alias failed to equal pointed to type field.", pp == other1);
 }
-
-
 
 #test test_string_interpolation :: () {
   xarbar: Xaryu;
@@ -931,8 +940,6 @@ generic_calling_generic :: (v: $T) -> $T {
   assert("failed to erase element from array with ~~", array.length == 0);
 }
 
-
-
 New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   return v;
 }
@@ -999,8 +1006,6 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
     }
   }
 }
-
-
   
 /* //!BUG
   ! when we use `:=` on a function pointer, it just completely fails
@@ -1104,10 +1109,6 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  assert("reflection field.set() failed.", n == 100);
 }
 
-SwitchCaseEnum :: enum {
-  SwitchVariant0,
-  SwitchVariant1,
-}
 
 #test test_switch_statements :: () {
   integer: int;
@@ -1151,16 +1152,11 @@ SwitchCaseEnum :: enum {
   
 }
 
-EnumOfStrings :: enum {
-  A = string{"Hello"},
-  B = string{"Goodbye"}
-};
 
 #test test_string_enum :: () {
   b: bool = EnumOfStrings.A == string{"Hello"};
   assert("String enum failed", b);
 }
-
 
 func_returns_tuple :: () -> <int, int> {
   return <10, 10>;
@@ -1231,9 +1227,21 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
     a, b := func_takes_tuple_arg(tuple);
     assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
   }
-  
 }
 
-
-
-
+#test test_slicing_array :: () {
+  arr := #make(s64[], 1000);
+  assert("Length", arr.length == 1000);
+  
+  for i in 0..10 {
+    arr[i] = 100;
+  }
+  
+  subarr := arr[0..10];
+  
+  for i in 0..10 {
+    assert("Slice failed", subarr[i] == arr[i]);
+  }
+  
+  
+}

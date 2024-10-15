@@ -1373,6 +1373,16 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   }
 
   if (left_ty->get_ext().is_array()) {
+    // ? Slice. Right now I just plan on returning a copy of the requested range.
+    // ? Perhaps we'll have a way to return a non-owning slice.
+    if (node->subscript->get_node_type() == AST_NODE_RANGE) {
+      if (left_ty->get_ext().is_fixed_sized_array()) {
+        throw_error("Cannot take a slice of a fixed sized array currently.", node->source_range);
+      }
+      
+      return left_ty->id;
+    }
+    
     auto element_id = left_ty->get_element_type();
     return element_id;
   } else {
