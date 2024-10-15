@@ -1,0 +1,10 @@
+// ! the key type is null on subscript here.
+main :: () {
+  map : <int, int>[string];
+  {
+    map["Hi"] = <10, 10>;
+    
+    a, b := map["Hi"];
+    assert("tuple in map failed", a == 10 && b == 10);
+  }
+}
