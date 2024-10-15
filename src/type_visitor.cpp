@@ -877,8 +877,11 @@ std::any TypeVisitor::visit(ASTArguments *node) {
 }
 
 std::any TypeVisitor::visit(ASTExprStatement *node) {
-  node->expression->accept(this);
-  return {};
+  auto result = node->expression->accept(this);
+  if (auto _switch = dynamic_cast<ASTSwitch*>(node->expression)) {
+    return result;
+  }
+  return ControlFlow{.flags = BLOCK_FLAGS_FALL_THROUGH, .type = void_type()};
 }
 std::any TypeVisitor::visit(ASTType *node) {
   if (!node->tuple_types.empty()) {
