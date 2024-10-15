@@ -1109,6 +1109,17 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
+  
+  auto str = node->value.value;
+  
+  if (str == "_range" || str == "_tuple" ||
+      str == "get"    || str == "_map"   ||
+      str == "_array" || str == "destruct") {
+    throw_error(std::format("Cannot use reserved word : {}", str), node->source_range);
+  }
+  
+  
+  
   if (global_find_type_id(node->value.value, {}) != -1) {
     throw_error("Invalid identifier: a type exists with that name.",
                 node->source_range);

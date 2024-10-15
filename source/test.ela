@@ -974,6 +974,7 @@ New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 }
 
 #alias FunctionPointer :: int(int, int)*;
+
 function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
 
 #test test_multidimensional_arrays :: () {
@@ -1072,13 +1073,14 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
 }
 
-
 returns_an_init_list  :: () -> InitListTest {
   return {0};
 }
+
 infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   return t;
 }
+
 #test test_init_list_comprehensive :: () {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
@@ -1108,7 +1110,6 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
  n := *(int*)field.get(&reflector);
  assert("reflection field.set() failed.", n == 100);
 }
-
 
 #test test_switch_statements :: () {
   integer: int;
@@ -1140,7 +1141,6 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   }
   assert("Failed to hit positive switch case for enum", passed);
   
-  
   /*  With return value as expression :  */
   
   new_int := switch integer {
@@ -1150,8 +1150,18 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   
   assert("Return value of switch statement failed", new_int == integer);
   
+  // test range based shiz.
+  passed = false;
+  switch 0 {
+    0..10: {
+      passed = true;
+    }
+    10..20: {
+      assert("switch on range passing in number failed", false);
+    }
+  }
+  assert("Failed to pass range based switch statement", passed);
 }
-
 
 #test test_string_enum :: () {
   b: bool = EnumOfStrings.A == string{"Hello"};
@@ -1233,6 +1243,11 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   arr := #make(s64[], 1000);
   assert("Length", arr.length == 1000);
   
+  /* 
+    Ranges are always max-exclusive right now.
+    0..10 == 0->9;
+    We don't currently have a way to represent max inclusive ranges.
+  */
   for i in 0..10 {
     arr[i] = 100;
   }
@@ -1242,6 +1257,8 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   for i in 0..10 {
     assert("Slice failed", subarr[i] == arr[i]);
   }
+  
+  assert("Slice failed", subarr.length == 10);
   
   
 }

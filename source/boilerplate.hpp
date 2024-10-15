@@ -24,6 +24,13 @@ extern "C" int printf(const char *format, ...);
 #include <algorithm>
 #include <initializer_list>
 
+/* 
+  * GENERAL GOAL *
+  ? Replace all of these std:: types with our own types. Just using these now because theyre reliable
+  ? And obviously super easy to implement.
+*/
+
+
 struct _range {
   int m_begin, m_end;
   _range(int m_begin, int m_end) : m_begin(m_begin), m_end(m_end) {}
@@ -44,10 +51,9 @@ struct _range {
   iterator begin() { return iterator(m_begin); }
   iterator end() { return iterator(m_end); }
   
-  bool operator==(int number) const {
+  bool operator==(auto number) const {
     return number >= m_begin && number <= m_end;
   }
-  
 };
 
 template<class ...T>
@@ -58,12 +64,12 @@ template<class ...T>
 using _tuple = std::tuple<T...>;
 
 template<std::size_t I = 0, typename TTuple, typename T1>
-void get_helper(const TTuple& tuple, int index, T1* value) {
+void __get_helper(const TTuple& tuple, int index, T1* value) {
   if constexpr (I < std::tuple_size_v<TTuple>) {
     if (I == index) {
       *value = std::get<I>(tuple);
     } else {
-      get_helper<I + 1>(tuple, index, value);
+      __get_helper<I + 1>(tuple, index, value);
     }
   } else {
     return;
@@ -72,7 +78,7 @@ void get_helper(const TTuple& tuple, int index, T1* value) {
 
 template<class T, class T1>
 void get(const T& tuple, int index, T1* value) {
-  get_helper(tuple, index, value);
+  __get_helper(tuple, index, value);
 }
 
 template<class ...T>
