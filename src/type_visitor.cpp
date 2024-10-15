@@ -1506,13 +1506,10 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
     // ? However for now, I think it's more valuable to have switches act like a expression rather than just a statement.
     // ? Although, you can use it as a standalone statement.
     if ((block_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
-      if (return_type == void_type()) {
-        return_type = block_cf.type;
-      } else {
-        node->return_type = return_type;
+      if (return_type != void_type()) {
         assert_return_type_is_valid(return_type, block_cf.type, node);
-        return_type = block_cf.type;
       }
+      return_type = block_cf.type;
     } else if ((block_cf.flags & BLOCK_FLAGS_BREAK) != 0) {
       throw_warning("You do not need to break from switch cases.", node->source_range);
     } else if ((block_cf.flags & BLOCK_FLAGS_CONTINUE) != 0) {
@@ -1520,6 +1517,7 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
     }
     assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "got {}, expected {}", "Invalid switch case.");
   }
+  node->return_type = return_type;
   
   return return_type;
 }
