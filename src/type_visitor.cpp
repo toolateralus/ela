@@ -1466,6 +1466,8 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
   
   int return_type = void_type();
   
+  // ! BUG:  add a way to have us return control flow here. 
+  // ! I am not sure how that works @Cooper-Pilot
   for (const auto &_case: node->cases) {
     auto expr_type = int_from_any(_case.expression->accept(this));
     auto block_cf = std::any_cast<ControlFlow>(_case.block->accept(this));

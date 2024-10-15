@@ -104,6 +104,7 @@ Context::Context() {
   info.is_varargs = true;
   info.return_type = void_type();
   root_scope->insert("destruct", global_find_function_type_id("void(...)", info, {}));
+  
 }
 
 
