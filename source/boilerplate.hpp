@@ -53,6 +53,30 @@ struct _range {
 template<class ...T>
 using _tuple = std::tuple<T...>;
 
+
+
+template<class ...T>
+using _tuple = std::tuple<T...>;
+
+template<std::size_t I = 0, typename TTuple, typename T1>
+void get_helper(const TTuple& tuple, int index, T1* value) {
+  if constexpr (I < std::tuple_size_v<TTuple>) {
+    if (I == index) {
+      *value = std::get<I>(tuple);
+    } else {
+      get_helper<I + 1>(tuple, index, value);
+    }
+  } else {
+    return;
+  }
+}
+
+template<class T, class T1>
+void get(const T& tuple, int index, T1* value) {
+  get_helper(tuple, index, value);
+}
+
+
 template<class ...T>
 void destruct(T &...t) {
   (t.~T(), ...);

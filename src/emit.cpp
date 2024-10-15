@@ -1609,3 +1609,16 @@ std::any EmitVisitor::visit(ASTTuple *node) {
 
 
 
+std::any EmitVisitor::visit(ASTTupleDeconstruction *node) { 
+  (*ss) << "auto [";
+  for (auto &iden : node->idens) {
+    (*ss) << iden->value.value;
+    if (iden != node->idens.back()) {
+      (*ss) << ", ";
+    }
+  }
+  (*ss) << "] = ";
+  node->right->accept(this);
+  (*ss) << ";\n";
+  return {};
+};

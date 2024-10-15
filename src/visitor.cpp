@@ -366,6 +366,7 @@ std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visi
 std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }

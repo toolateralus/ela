@@ -1,5 +1,13 @@
-
-main :: () {
-  t := <1, 2, 3+3> ;
+#import core;  
   
+main :: () {
+  t1 : <int, int, int> = <0, 1, 2>;
+  t2 := <3, 2, 1, 0>;
+  
+  a,b,c,d := t2;
+  
+  n : int;
+  get(t1, 2, &n);
+  
+  printf("%d\n", n);
 }

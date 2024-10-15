@@ -881,12 +881,18 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTType *node) {
-  if (node->flags == ASTTYPE_EMIT_OBJECT) {
-    node->pointing_to.get()->accept(this);
+  if (!node->tuple_types.empty()) {
+    std::vector<int> types;
+    for (const auto &t: node->tuple_types) 
+      types.push_back(int_from_any(t->accept(this)));
+    node->resolved_type = global_find_type_id(types);
+  } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
+    node->resolved_type = int_from_any(node->pointing_to.get()->accept(this));
+    node->resolved_type = global_find_type_id(node->base, node->extension_info);
+  } else {
+    node->resolved_type = global_find_type_id(node->base, node->extension_info);
   }
-  node->resolved_type = global_find_type_id(node->base, node->extension_info);
-  // for (const auto &arg: node->extension_info.generic_arguments)
-  // arg->accept(this);
+  
   return node->resolved_type;
 }
 std::any TypeVisitor::visit(ASTBinExpr *node) {
@@ -960,6 +966,11 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
   // ? special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
+    
+    if (right == -1) {
+      throw_error("Internal compiler error: type was null in inferred assignment ':=", node->source_range);
+    }
+    
     if (right == void_type()) {
       throw_error("Cannot assign a variable of type 'void'",
                   node->source_range);
@@ -1497,3 +1508,35 @@ std::any TypeVisitor::visit(ASTTuple *node) {
   }
   return node->type->resolved_type = global_find_type_id(types);
 }
+
+std::any TypeVisitor::visit(ASTTupleDeconstruction *node) {
+  auto type = global_get_type(int_from_any(node->right->accept(this)));
+  
+  if (!type->is_kind(TYPE_TUPLE)) {
+    throw_error("Cannot currently destruct a non-tuple. Coming soon for structs.", node->source_range);
+  }
+  
+  auto info = static_cast<TupleTypeInfo*>(type->get_info());
+  
+  if (node->idens.size() != info->types.size()) {
+    throw_error(
+      std::format("Cannot currently partially deconstruct a tuple. expected {} identifiers to assign, got {}", 
+        info->types.size(), node->idens.size()), node->source_range);
+  }
+  
+  for (int i = 0; i < node->idens.size(); ++i) {
+    auto type = info->types[i];
+    auto iden = node->idens[i];
+    
+    // ! Due to how we're lowering, We have to throw a redefinition here. However I would rather allow this sort of reassignment.
+    
+    if (ctx.scope->local_lookup(iden->value.value)) {
+      throw_error(std::format("Redefinition of a variable is not allowed in a tuple deconstruction yet.\nOffending variable {}", iden->value.value), node->source_range);
+    }
+    
+    
+    ctx.scope->insert(iden->value.value, type);
+  }
+  
+  return {};
+};

@@ -55,6 +55,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTRange *node) override { return {}; }
   std::any visit(ASTSwitch *node) override { return {}; };
   std::any visit(ASTTuple *node) override;
+  std::any visit(ASTTupleDeconstruction *node) override { return {}; };
 };
 
 struct TypeVisitor : VisitorBase {
@@ -105,6 +106,7 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
+  std::any visit(ASTTupleDeconstruction *node) override;
   int generate_generic_function(ASTCall *node,
                                 ASTFunctionDeclaration *func_decl,
                                 std::vector<int> arg_tys);
@@ -225,4 +227,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
+  std::any visit(ASTTupleDeconstruction *node) override;
 };

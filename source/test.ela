@@ -1162,5 +1162,25 @@ EnumOfStrings :: enum {
 }
 
 
+#test test_tuples :: () {
+  t1 : <int, int, int> = <0, 1, 2>;
+  {
+    a,b,c := t1;
+    assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
+  }
+  
+  t2 := <3, 2, 1, 0>;
+  
+  {
+    a,b,c,d := t2;
+    assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
+  }
+  
+  n : int;
+  get(t1, 2, &n);
+  assert("using 'get(tuple, index, *out_value)' failed", n == 2);
+}
+
+
 
 

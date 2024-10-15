@@ -139,6 +139,26 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
     throw_error("Internal Compiler Error: type was null when checking type conversion rules", {});
   }
+  
+  if (from->is_kind(TYPE_TUPLE) && to->is_kind(TYPE_TUPLE)) {
+    auto from_info = static_cast<TupleTypeInfo*>(from->get_info());
+    auto to_info = static_cast<TupleTypeInfo*>(to->get_info());
+    
+    if (from_info->types.size() != to_info->types.size()) {
+      return CONVERT_PROHIBITED;
+    }
+    
+    ConversionRule rule;
+    for (int i = 0; i < from_info->types.size(); ++i) {
+      auto from_t = from_info->types[i];
+      auto to_t = to_info->types[i];
+      rule = type_conversion_rule(global_get_type(from_t), global_get_type(to_t));
+      if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
+        return rule;
+      }
+    }
+    return rule;
+  }
 
   // same exact type. no cast needed.
   if (from->id == to->id)

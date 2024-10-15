@@ -513,6 +513,20 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
 ASTType *Parser::parse_type() {
   auto range = begin_node();
 
+  if (peek().type == TType::LT) {
+    eat();
+    std::vector<ASTType*> types;
+    while (peek().type != TType::GT) {
+      types.push_back(parse_type());
+      if (peek().type == TType::Comma) eat();
+    }
+    expect(TType::GT);
+    auto node = ast_alloc<ASTType>();
+    node->tuple_types = types;
+    node->flags |= ASTTYPE_IS_TUPLE;
+    return node;
+  }
+
   // parse #self types.
   if (peek().type == TType::Directive) {
     auto expr = try_parse_directive_expr().get();
@@ -527,19 +541,7 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   TypeExt extension_info;
 
-  if (peek().type == TType::LT) {
-    eat();
-    std::vector<ASTType*> types;
-    while (peek().type != TType::GT) {
-      types.push_back(parse_type());
-      if (peek().type == TType::Comma) eat();
-    }
-    expect(TType::GT);
-    auto node = ast_alloc<ASTType>();
-    node->tuple_types = types;
-    node->flags |= ASTTYPE_IS_TUPLE;
-    return node;
-  }
+  
 
   while (true) {
     if (peek().type == TType::LBrace) {
@@ -616,6 +618,33 @@ ASTProgram *Parser::parse() {
   end_node(program, range);
   return program;
 }
+
+ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
+  auto range = begin_node();
+  auto first = parse_primary();
+  auto node = ast_alloc<ASTTupleDeconstruction>();
+  node->idens.push_back(static_cast<ASTIdentifier*>(first));
+  while (peek().type == TType::Comma) {
+    eat();
+    auto expr = parse_primary();
+    if (auto iden = dynamic_cast<ASTIdentifier*>(expr)) {
+      node->idens.push_back(iden);
+    } else {
+      end_node(nullptr, range);
+      throw_error("Can only have identifiers on the left hand side of a tuple deconstruction expressions", range);
+    }
+  }
+  if (peek().type == TType::ColonEquals) {
+    eat();
+    node->right = parse_expr();
+  } else {
+    // TODO: allow typed tuple deconstructions.
+    end_node(nullptr, range);
+    throw_error("Currently, you cannot have an explicitly typed tuple deconstruction. Use a, b, c := ....", range);
+  }
+  return node;
+}
+
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
@@ -623,6 +652,11 @@ ASTStatement *Parser::parse_statement() {
   if (tok.type == TType::Eof) {
     return ast_alloc<ASTNoop>();
   }
+  
+  if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
+    return parse_multiple_asssignment();
+  }
+  
   
   if (tok.type == TType::Identifier &&
       lookahead_buf()[1].type == TType::Colon) {       
@@ -1039,6 +1073,8 @@ ASTParamsDecl *Parser::parse_parameters() {
 }
 
 ASTArguments *Parser::parse_arguments() {
+  auto last = state;
+  state = PARSER_STATE_ARGUMENTS;
   auto range = begin_node();
   auto args = ast_alloc<ASTArguments>();
   expect(TType::LParen);
@@ -1058,7 +1094,10 @@ ASTArguments *Parser::parse_arguments() {
   expect(TType::RParen);
 
   end_node(args, range);
+  
+  state = last;
   return args;
+  
 }
 ASTCall *Parser::parse_call(const Token &name) {
   auto range = begin_node();
@@ -1134,7 +1173,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   } else {
     type_id = global_create_struct_type(name.value, {});
   }
-
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
@@ -1292,7 +1330,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       bool is_not_literal = lookahead.size() > 1 && lookahead[1].family != TFamily::Literal;
       bool is_not_operator = lookahead.size() > 1 && (lookahead[1].family != TFamily::Operator || lookahead[1].type != TType::LParen);
       bool is_semi = lookahead.size() > 1 && lookahead[1].type == TType::Semi;
-      if (is_gt && is_not_identifier && is_not_literal && is_not_operator && !is_semi) {
+      if (is_gt && is_not_identifier && is_not_literal && is_not_operator || is_semi) {
         return left;
       }
     }
@@ -1316,15 +1354,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         ctx.scope->insert(iden->value.value, -1);
       }  
     }
-    
-    // Tuple deconstruction and multiple assignment.
-    {
-      if (left->get_node_type() == AST_NODE_IDENTIFIER && peek().type == TType::Comma) {
-        printf("Hit tuple decsonstructiion rule\n") ;
-      }
-    }
-    
-    
     
     Precedence token_precedence = get_operator_precedence(peek());
     
@@ -1939,4 +1968,5 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
+
 

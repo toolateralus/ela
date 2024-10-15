@@ -66,6 +66,7 @@ enum ASTNodeType {
   AST_NODE_NOOP,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
+  AST_NODE_TUPLE_DECONSTRUCTION,
 };
 
 struct ASTNode {
@@ -178,6 +179,7 @@ struct ASTDeclaration : ASTStatement {
     return AST_NODE_DECLARATION;
   }
 };
+
 struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
@@ -221,6 +223,17 @@ struct ASTLiteral : ASTExpr {
     return AST_NODE_LITERAL;
   }
 };
+
+struct ASTTupleDeconstruction: ASTStatement {
+  std::vector<ASTIdentifier*> idens;
+  ASTExpr* right;
+  
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_TUPLE_DECONSTRUCTION;
+  }
+};
+
 
 struct ASTTuple : ASTExpr {
   ASTType* type;
@@ -562,7 +575,10 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTAllocate *node) override {};                               \
   std::any visit(ASTRange *node) override {};                                  \
   std::any visit(ASTSwitch *node) override {};                                 \
-  std::any visit(ASTTuple *node) = override;                                   \
+  std::any visit(ASTTuple *node) override {};                                  \
+  std::any visit(ASTTupleDeconstruction *node) override{};                     \
+
+
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   std::any visit(ASTNoop *noop) { return {}; }                                 \
@@ -598,11 +614,18 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTRange *node) = 0;                        \
   virtual std::any visit(ASTSwitch *node) = 0;                        \
   virtual std::any visit(ASTTuple *node) = 0;                        \
+  virtual std::any visit(ASTTupleDeconstruction *node) = 0;                        \
   
   
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
+};
+
+enum ParserState {
+  PARSER_STATE_NONE,
+  PARSER_STATE_ARGUMENTS,
+  PARSER_STATE_TUPLE,
 };
 
 struct Parser;
@@ -636,10 +659,12 @@ enum Precedence {
 static Precedence get_operator_precedence(Token token);
 
 struct Parser {
+  ParserState state;
   bool allow_function_type_parsing = true;
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
+  ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
