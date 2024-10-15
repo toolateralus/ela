@@ -511,6 +511,7 @@ struct SwitchCase {
 };
 
 struct ASTSwitch : ASTExpr {
+  bool is_statement = false;
   int return_type = void_type();
   ASTExpr *target;
   std::vector<SwitchCase> cases;

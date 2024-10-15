@@ -687,6 +687,11 @@ ASTStatement *Parser::parse_statement() {
              tok.type == TType::Erase || tok.type == TType::Switch) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
+
+    if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
+      _switch->is_statement = true;
+    }
+
     end_node(statement, range);
     return statement;
   } else if (tok.type == TType::LCurly) {
