@@ -481,6 +481,7 @@ struct SwitchCase {
 };
 
 struct ASTSwitch : ASTExpr {
+  int return_type = void_type();
   ASTExpr *target;
   std::vector<SwitchCase> cases;
   std::any accept(VisitorBase *visitor) override;

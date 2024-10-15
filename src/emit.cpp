@@ -1559,6 +1559,14 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 
 
 std::any EmitVisitor::visit(ASTSwitch *node) {
+  
+  if (node->return_type != void_type()) {
+    (*ss) << "[&] ->";
+    auto type = global_get_type(node->return_type);
+    (*ss) << to_cpp_string(type);
+    (*ss) << "{\n";;
+  }
+  
   auto emit_switch_case = [&](ASTExpr* target, const SwitchCase &_case, bool first) {
     if (!first) {
       (*ss) << " else ";
@@ -1576,6 +1584,16 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
   for (const auto &_case: node->cases) {
     emit_switch_case(node->target, _case, first);
     first = false;
+  }
+  
+  if (node->return_type != void_type()) {
+    (*ss) << "else {";
+    
+    auto type = global_get_type(node->return_type);
+    (*ss) <<  "return " <<  to_cpp_string(type) << "{};";
+    (*ss) << "\n}\n";
+    
+    (*ss) << "}()";
   }
   
   return {};

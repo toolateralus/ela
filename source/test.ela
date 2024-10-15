@@ -1138,6 +1138,17 @@ SwitchCaseEnum :: enum {
     }
   }
   assert("Failed to hit positive switch case for enum", passed);
+  
+  
+  /*  With return value as expression :  */
+  
+  new_int := switch integer {
+    0: { return integer; }
+    1: { return -1; }
+  }
+  
+  assert("Return value of switch statement failed", new_int == integer);
+  
 }
 
 
