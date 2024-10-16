@@ -38,7 +38,7 @@ static bool supports_color() {
           strstr(term, "tmux") != NULL;
 }
 
-static bool terminal_supports_color =  false;//supports_color();
+static bool terminal_supports_color =  supports_color();
 
 struct Error {
   Error(const std::string &message,
