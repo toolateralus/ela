@@ -86,8 +86,15 @@ string_substr :: (src: char*, start: int, end: int) -> string {
   return v;
 }
 
+print :: (str: string) {
+  printf("%s", str.data);
+}
+print :: (str: char *) {
+  printf("%s", str);
+}
+
 println :: (str: string) {
-  printf("%s\n", #make(char*, str));
+  printf("%s\n", str.data);
 }
 
 println :: (str: char*) {
@@ -95,7 +102,16 @@ println :: (str: char*) {
 }
 
 #foreign fabs :: (f: float64) -> float64;
-#foreign abs :: (n: int) -> int;
+
+abs :: (v: $T) -> $T {
+  _default: T;
+  if v < _default {
+    return -v;
+  }
+  return v;
+}
+
+
 #foreign isinf :: (arg: float) -> bool;
 #foreign sqrt :: (f: float64) -> float64;
 #foreign cos :: (f: float64) -> float64;
@@ -103,24 +119,13 @@ println :: (str: char*) {
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32) -> void;
 
-min :: (a: int, b) -> int {
+min :: (a: $T, b) -> $T {
   if a > b  then return b;
   return a;
 }
 
-max :: (a: int, b) -> int {
+max :: (a: $T, b) -> $T {
   if a > b then return a;
-  return b;
-}
-
-min :: (a: float, b) -> float {
-  if a > b then return b;
-  return a;
-}
-
-max :: (a: float, b) -> float {
-  if a > b 
-    then return a;
   return b;
 }
 

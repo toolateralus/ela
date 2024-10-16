@@ -1,0 +1,23 @@
+#import core;
+
+__string_cache: s64[string];
+__next_str_id: s64 = 1;
+
+__next_interned_string_id :: () -> s64 {
+  return __next_str_id++;
+}
+
+InternedString :: struct {
+  id: s64;
+  #ctor :: (value: string) {
+    _id := __string_cache[value];
+    if _id == 0 {
+      id = __next_interned_string_id();
+      __string_cache[value] = id;
+     }
+    else { id = _id; }
+  }
+  #operator(==) :: (other: InternedString) -> bool {
+    return other.id == id;
+  }
+}

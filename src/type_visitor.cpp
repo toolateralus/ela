@@ -248,6 +248,33 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     // this is just a plain scalar type, such as an int.
   } else if (type->is_kind(TYPE_STRUCT)) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
+    
+    for (const auto &[name, symbol]: info->scope->symbols) {
+      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0) continue;
+      auto type = global_get_type(symbol.type_id);
+      auto info = static_cast<FunctionTypeInfo*>(type->get_info());
+      auto &params = info->parameter_types;
+      
+      if (info->params_len != node->expressions.size()) {
+        continue;
+      }
+      
+      for (int i = 0; i < info->params_len; ++i) {
+        auto type = global_get_type(params[i]);
+        auto rule = type_conversion_rule(type, global_get_type(node->types[i]));
+        if (rule != CONVERT_NONE_NEEDED && rule != CONVERT_IMPLICIT) {
+          continue;
+        }
+      }
+      
+      // TODO: fix this. We need to know if a symbol is a constructor or not, right now we are just assuming if there's
+      // TODO: a function that matches the type signature of the init list within the struct, that it's a valid constructor.
+      return declaring_type;
+    }
+    
+    
+    
+    
     // !HACK i used node->expressions.size() to bypass a bug with the types of
     // initlist exceeding the number of expressions.
     // * REMOVE ME *

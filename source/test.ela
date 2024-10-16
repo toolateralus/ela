@@ -6,6 +6,15 @@ XaryuStruct :: struct {
   f: float ;
 }
 
+
+InitListTestCtorStruct :: struct {
+  n : int;
+  f : float;
+  #ctor :: (n : int, f : float) {
+    this.n = n;
+    this.f = f;
+  }
+}
   
 Reflector :: struct {
   n: int;
@@ -1292,4 +1301,10 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   }
   
   assert("Slice failed", subarr.length == 10);
+}
+
+
+#test test_init_list_ctor :: () {
+  i : InitListCtorStruct = {0, 1.0};
+  assert("init list calling ctor failed", i.n == 0 && i.f == 1.0);
 }

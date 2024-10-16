@@ -1,14 +1,15 @@
-#import core
 
-switch_helper :: () -> int {
-  number := 5;
-  switch number {
-    0: { return 0; }
-    5: { return 5; }
+
+InitListTestCtorStruct :: struct {
+  n : int;
+  f : float;
+  #ctor :: (n : int, f : float) {
+    this.n = n;
+    this.f = f;
   }
-  return 1;
 }
 
-main :: () {
-  printf("%d\n", switch_helper());
+#test test_init_list_ctor :: () {
+  i : InitListTestCtorStruct = {0, 1.0};
+  assert("init list calling ctor failed", i.n == 0 && i.f == 1.0);
 }
