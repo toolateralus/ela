@@ -8,12 +8,12 @@ XaryuStruct :: struct {
 
 
 InitListTestCtorStruct :: struct {
-  n : int;
-  f : float;
-  #ctor :: (n : int, f : float) {
-    this.n = n;
-    this.f = f;
+  z : int;
+  
+  #ctor :: (n : int, f: int) {
+    z = n * f;
   }
+  
 }
   
 Reflector :: struct {
@@ -1305,6 +1305,6 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
 
 
 #test test_init_list_ctor :: () {
-  i : InitListCtorStruct = {0, 1.0};
-  assert("init list calling ctor failed", i.n == 0 && i.f == 1.0);
+  i : InitListTestCtorStruct = {5, 5};
+  assert("init list calling ctor failed", i.z == 25);
 }

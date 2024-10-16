@@ -250,7 +250,8 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     auto info = static_cast<StructTypeInfo *>(type->get_info());
     
     for (const auto &[name, symbol]: info->scope->symbols) {
-      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0) continue;
+      // constructors use anonymous symbol names.
+      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
       auto type = global_get_type(symbol.type_id);
       auto info = static_cast<FunctionTypeInfo*>(type->get_info());
       auto &params = info->parameter_types;
