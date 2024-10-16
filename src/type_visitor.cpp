@@ -1240,6 +1240,11 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
                               identifier->value.value),
                   node->source_range);
   }
+  
+  if (node->left == nullptr) {
+    throw_error("Internal compiler error: left node in dot expression was null.", node->source_range);
+  }
+  
 
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = global_get_type(left);

@@ -1,6 +1,8 @@
 #import core;
 
 __string_cache: s64[string];
+__string_storage_cache: string[s64];
+
 __next_str_id: s64 = 1;
 
 __next_interned_string_id :: () -> s64 {
@@ -9,14 +11,23 @@ __next_interned_string_id :: () -> s64 {
 
 InternedString :: struct {
   id: s64;
+  #ctor :: () {
+    id = 0;
+  }
   #ctor :: (value: string) {
     _id := __string_cache[value];
     if _id == 0 {
       id = __next_interned_string_id();
       __string_cache[value] = id;
+      __string_storage_cache[id] = value;
      }
     else { id = _id; }
   }
+
+  get_string_value :: () -> string {
+    return __string_storage_cache[id];
+  }
+
   #operator(==) :: (other: InternedString) -> bool {
     return other.id == id;
   }

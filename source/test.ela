@@ -9,11 +9,9 @@ XaryuStruct :: struct {
 
 InitListTestCtorStruct :: struct {
   z : int;
-  
   #ctor :: (n : int, f: int) {
     z = n * f;
   }
-  
 }
   
 Reflector :: struct {

@@ -292,39 +292,47 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
   (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \""
         << node->value << "\",";
 
-  for (const auto &value : node->interpolated_values) {
+  auto interpolate_value = [&](ASTExpr *value) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
     auto type = global_get_type(type_id);
+    
     if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
       value->accept(this);
       (*ss) << ".data";
     } else if (type->is_kind(TYPE_STRUCT)) {
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       auto sym = info->scope->lookup("to_string");
-      if (sym) {
-        auto sym_ty = static_cast<FunctionTypeInfo *>(
-            global_get_type(sym->type_id)->get_info());
-                    
-        auto return_ty = global_get_type(sym_ty->return_type);
-        value->accept(this);
-        auto &extensions = type->get_ext();
-        if (extensions.has_extensions() && extensions.extensions.back() == TYPE_EXT_POINTER) {
-          (*ss) << "->to_string()";
-        } else {
-          (*ss) << ".to_string()";
-        }
-        if (return_ty->get_base() == "string" &&
-            return_ty->get_ext().has_no_extensions())
-          (*ss) << ".data";
+      
+      if (!sym) 
+        throw_error("Cannot use a struct in an interpolated string without defining a `to_string` function that returns either a char* or a string", value->source_range);
+      
+      auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+                  
+      auto return_ty = global_get_type(sym_ty->return_type);
+      value->accept(this);
+      
+      auto &extensions = type->get_ext();
+      if (extensions.has_extensions() && extensions.extensions.back() == TYPE_EXT_POINTER) {
+        (*ss) << "->to_string()"; 
+      } else {
+        (*ss) << ".to_string()"; 
       }
+      
+      if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions())
+      { (*ss) << ".data"; }
+      
+        
     } else {
       value->accept(this);
     }
-    if (value != node->interpolated_values.back()) {
+    if (value != node->interpolated_values.back())
       (*ss) << ", ";
-    }
-  }
-
+    
+  };
+  
+  for (const auto &value : node->interpolated_values)
+    interpolate_value(value);
+  
   (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
            "strlen(buf); return str; }()";
 }
@@ -1073,6 +1081,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
   code << "extern Type **_type_info;\n";
+  code << "static char *__str_interpolation_buffer = new char[4096];\n";
   
   for (const auto &statement : node->statements) {
     statement->accept(this);
