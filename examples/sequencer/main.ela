@@ -1,0 +1,207 @@
+#import core;
+#import raylib;
+
+#import directory;
+#import file;
+
+#compiler_flags "-g"
+
+#foreign usleep :: (c: int);
+
+playing := false;
+timer: Timer;
+
+get_seconds :: (f: float32) -> int {
+  return (int)(f * 1_000_000);
+}
+
+bpm_slider : SliderF = {
+  "bpm", // text
+  Rectangle{0,0, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  30,  // min
+  240,   // max
+  null,  // value
+  false, // held
+};
+
+subdivision_slider : SliderI = {
+  string{"subdivisions"}, // text
+  Rectangle{0, 110, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  1,  // min
+  20,   // max
+  null,  // value
+  false // held
+};
+
+beats_slider : SliderI = {
+  string{"beats"}, // text
+  Rectangle{150, 110, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  1,  // min
+  20,   // max
+  null,  // value
+  false // held
+};
+
+play_button_style : Style = {
+  WHITE,
+  CLEAR,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+};
+
+file_dropdown_style : Style = {
+  WHITE,
+  GRAY,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+}
+
+subdivisions: int = 1;
+beats: int = 4;
+total_notes: int = 4;
+check_buttons: CheckButton[];
+
+check_button_style: Style = {
+  WHITE,
+  RED,
+  GREEN,
+  16,
+  false,
+  5.0,
+  2.0,
+}
+
+index : s32 = 0;
+
+play_callback :: () {
+  playing = !playing;
+  timer.last_tick_time = 0;
+  index = 0;
+}
+
+SequenceChannel :: struct {
+  check_buttons: CheckButton[];
+  sound: Sound;
+  active: bool;
+  
+  draw :: (x: float, y: float) {
+    if total_notes != check_buttons.length {
+      while total_notes > check_buttons.length {
+        _x : float = x + (float)(check_buttons.length * 40);
+        println($"Addd button {check_buttons.length} at: {x}, {y}");
+        check_buttons ~= {
+          false,
+          Rectangle{_x, y, 35, 35},
+          check_button_style,
+          string{null},
+        }
+      }
+      while check_buttons.length > total_notes {
+        button := ~check_buttons;
+        println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
+      }
+    }
+    for *button; check_buttons {
+      button.draw();
+    }
+  }
+  update :: (index: int) {
+    if check_buttons[index].value {
+      PlaySound(sound);
+    }
+  }
+}
+
+channels: SequenceChannel[];
+
+on_file_selected :: (index: int);
+
+file_dropdown : DropDown = {
+  string[]{},
+  Rectangle{0, 250, 125, 30},
+  file_dropdown_style,
+  -1,
+  false,
+  &on_file_selected
+};
+
+on_file_selected :: (index: int) {
+  channels ~= #make(SequenceChannel, {
+    CheckButton[]{},
+    LoadSound(file_dropdown.options[index].data),
+    true,
+  });
+}
+
+sequencer :: () {
+  if playing && timer.tick() {
+    for *channel; channels {
+      channel.update(index);
+    }
+    index = (index + 1 % total_notes) % total_notes;
+  }
+}
+
+bpm : float = 120;
+
+main :: () {
+  
+  dir := directory_open(".");
+  
+  
+  InitAudioDevice();
+  InitWindow(800, 600, "Sequencer");
+  
+  SetTargetFPS(1000);
+  
+  for file; dir.files {
+    if string_ends_with(file.data, ".wav") || string_ends_with(file.data, ".mp3") || string_ends_with(file.data, ".ogg") {
+      file_dropdown.options ~= string{file.data};
+    }
+  }
+  
+  while !WindowShouldClose() {
+    ClearBackground(BLACK);
+    BeginDrawing();
+      sequencer();
+      bpm_slider.value = &bpm;
+      bpm_slider.draw();
+
+      timer.interval = (1 / (bpm / 60)) / subdivisions;
+
+      total_notes = beats * subdivisions;
+      
+      subdivision_slider.value = &subdivisions;
+      subdivision_slider.draw();
+
+      beats_slider.value = &beats;
+      beats_slider.draw();
+      y := GetScreenHeight() / 2.0;
+      x := 0
+      for *channel; channels {
+        channel.draw(x, y);
+        y += 40
+      }
+      
+      file_dropdown.draw();
+      
+      {
+        if playing {
+          play_button_style.highlighted = RED;
+        } else {
+          play_button_style.highlighted = GREEN;
+        }
+        draw_button("play", {0, 50, 100, 40}, play_button_style, &play_callback);
+      }
+    EndDrawing();
+  }
+}
