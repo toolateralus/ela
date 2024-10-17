@@ -249,6 +249,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
   } else if (type->is_kind(TYPE_STRUCT)) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
     
+    // TODO: re enable this once we can find constructors
     for (const auto &[name, symbol]: info->scope->symbols) {
       // constructors use anonymous symbol names.
       if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
@@ -275,9 +276,6 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       // TODO: a function that matches the type signature of the init list within the struct, that it's a valid constructor.
       return declaring_type;
     }
-    
-    
-    
     
     // !HACK i used node->expressions.size() to bypass a bug with the types of
     // initlist exceeding the number of expressions.
@@ -1444,8 +1442,8 @@ std::any TypeVisitor::visit(ASTMake *node) {
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-
   declaring_or_assigning_type = type;
+
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
   }

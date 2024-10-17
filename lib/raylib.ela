@@ -427,6 +427,7 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign SetSoundVolume :: (sound: Sound, volume: float);
 #foreign IsMusicStreamPlaying :: (music: Music) -> bool;
 #foreign SetAudioStreamPitch :: (music: Music, pitch: float);
+#foreign SetSoundPitch :: (sound: Sound, pitch: float) -> void;
 #foreign InitAudioDevice :: () -> void;
 #foreign CloseAudioDevice :: () -> void;
 #foreign IsAudioDeviceReady :: () -> bool;
@@ -434,6 +435,7 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
 #foreign SetExitKey :: (key :int);
 #foreign MeasureText :: (text: char*, fontSize: int) -> int;
+#foreign TextFormat :: (format: char*, ...) -> char*;
 
 Camera :: struct {
   position:     Vector3;
@@ -596,5 +598,74 @@ Timer :: struct {
       return true;
     }
     return false;
+  }
+}
+
+
+SliderState :: struct {
+  min: float;
+  max: float;
+  value: float*;
+  held : bool;
+}
+
+draw_slider :: (text: char*, rect: Rectangle, style: Style, state: SliderState*) {
+  // Draw the slider background
+  DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+
+  slider_width : float = rect.width * ((abs(*state.value - state.min)) / abs(state.max - state.min));
+  
+  slider_rect : Rectangle = {
+    rect.x,
+    rect.y,
+    slider_width,
+    rect.height
+  };
+
+  // Draw the slider foreground
+  DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+
+  // Draw the text
+  text_x := rect.x + (rect.width - MeasureText(text, style.font_size)) / 2;
+  text_y := rect.y + (rect.height - style.font_size) / 2;
+  DrawText(text, (int)text_x, (int)text_y, style.font_size, style.highlighted);
+
+  // Draw the slider value
+
+  value_text := $"{*state.value}";
+  value_text_x := text_x + MeasureText(value_text.data, style.font_size) + 10; // 10 pixels padding
+  DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
+
+
+  adjust_slider_value :: () {
+    increment: float;
+    if IsKeyDown(Key.LeftShift) {
+      increment = (state.max - state.min) / 100;
+    } else {
+      increment = (state.max - state.min) / 50;
+    }
+    if IsKeyPressed(Key.Right) {
+      *state.value = clamp(*state.value + increment, min(state.min, state.max), max(state.min, state.max));
+    } else if IsKeyPressed(Key.Left) {
+      *state.value = clamp(*state.value - increment, min(state.min, state.max), max(state.min, state.max));
+    }
+  };
+
+  // Handle mouse input and call the local function for keyboard input
+  mouse_pos := GetMousePosition();
+  if CheckCollisionPointRec(mouse_pos, rect) {
+    if IsMouseButtonPressed(MouseButton.Left) {
+      state.held = true;
+    }
+    adjust_slider_value(); // Call the local function for keyboard input
+  }
+
+  if state.held {
+    if IsMouseButtonUp(MouseButton.Left) {
+      state.held = false;
+    } else {
+      new_value := state.min + ((mouse_pos.x - rect.x) / rect.width) * (state.max - state.min);
+      *state.value = clamp(new_value, min(state.min, state.max), max(state.min, state.max));
+    }
   }
 }

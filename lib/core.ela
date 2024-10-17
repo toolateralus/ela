@@ -123,12 +123,22 @@ abs :: (v: $T) -> $T {
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32) -> void;
 
-min :: (a: $T, b) -> $T {
-  if a > b  then return b;
+min :: (a: float, b: float) -> float {
+  if a > b then return b;
   return a;
 }
 
-max :: (a: $T, b) -> $T {
+max :: (a: float, b: float) -> float {
+  if a > b then return a;
+  return b;
+}
+
+min :: (a: int, b: int) -> int {
+  if a > b then return b;
+  return a;
+}
+
+max :: (a: int, b: int) -> int {
   if a > b then return a;
   return b;
 }

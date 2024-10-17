@@ -2,28 +2,85 @@
 #import pthread;
 #import raylib;
 
+snare: Sound;
+
 mutex: Mutex;
 some_global: int;
 
-print_from_thread :: () {
-  while true {
+#foreign usleep :: (c: int);
+
+playing := false;
+interval : float = 1.0;
+
+get_seconds :: (f: float32) -> int {
+  return (int)(f * 1_000_000);
+}
+
+kill_thread := false;
+sequencer_thread :: () {
+  while !kill_thread {
     mutex.lock();
-    some_global++;
-    mutex.unlock();
-    printf("From thread %d! \n", some_global);
-    sleep(3);
+    is_playing := playing;
+    
+    if is_playing {
+      PlaySound(snare);
+      usleep(get_seconds(interval));
+    } else {
+      usleep(get_seconds(1.0));
+    }
   }
 }
 
+slider_style : Style = {
+  WHITE,
+  BLACK,
+  GREEN,
+  16,
+  false,
+  0.0,
+  0.0
+};
+
+slider_state : SliderState = {
+  0.01,
+  2.0, 
+};
+
+play_button_style : Style = {
+  WHITE,
+  CLEAR,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+};
+
+play_callback :: () {
+  playing = !playing;
+}
+
 main :: () {
+  InitAudioDevice();
+  snare  = LoadSound("snare.wav");
+  thread := Thread{&sequencer_thread};
+  InitWindow(800, 600, "Sequencer");
   
-  thread := Thread{&print_from_thread};
-  sleep(1);
-  while true {
-    mutex.lock();
-    some_global++;
-    mutex.unlock();
-    printf("Hi..%d\n", some_global);
-    sleep(5);
+  while !WindowShouldClose() {
+    ClearBackground(BLACK);
+    BeginDrawing();
+    printf("Update, interval=%f\n", interval);
+    slider_state.value = &interval;
+    draw_slider("interval", Rectangle{0, 0, 250, 40}, slider_style, &slider_state);
+    
+    if playing {
+      play_button_style.highlighted = RED;
+    } else {
+      play_button_style.highlighted = GREEN;
+    }
+    draw_button("play", {0, 50, 100, 40}, play_button_style, &play_callback);
+    EndDrawing();
   }
+  kill_thread = true;
+  thread.join();
 }
