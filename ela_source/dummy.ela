@@ -1,17 +1,12 @@
 #import core;
-#import pthread;
 #import raylib;
 
 #compiler_flags "-g"
 
-snare: Sound;
-
-some_global: int;
-
 #foreign usleep :: (c: int);
 
 playing := false;
-interval : float = 1.0;
+timer: Timer;
 
 get_seconds :: (f: float32) -> int {
   return (int)(f * 1_000_000);
@@ -61,14 +56,11 @@ check_button_style: Style = {
   2.0,
 }
 
-kill_thread := false;
-waiting := false;
-
-mutex: Mutex;
-index : s32;
+index : s32 = 0;
 
 play_callback :: () {
   playing = !playing;
+  timer.last_tick_time = 0;
   index = 0;
 }
 
@@ -107,46 +99,33 @@ SequenceChannel :: struct {
   }
 }
 
-
 channels: SequenceChannel[];
 
-sequencer_thread :: () {
-  while !kill_thread {
-    mutex.lock();
-    is_playing := playing;
-    if is_playing {
-      usleep(get_seconds(interval));
-      index = (index + 1 % subdivisions) % subdivisions;
-      for *channel; channels {
-        channel.update(index);
-      }
-      mutex.unlock();
-    } else {
-      mutex.unlock();
-      usleep(100);
+sequencer :: () {
+  if playing && timer.tick() {
+    for *channel; channels {
+      channel.update(index);
     }
-    
+    index = (index + 1 % subdivisions) % subdivisions;
   }
 }
 
 main :: () {
   InitAudioDevice();
-  snare  = LoadSound("snare.wav");
   InitWindow(800, 600, "Sequencer");
   
   channels ~= #make(SequenceChannel, {
     CheckButton[]{},
-    snare,
+    LoadSound("snare.wav"),
     true,
     0.0
   });
   
-  thread := Thread{&sequencer_thread};
   while !WindowShouldClose() {
     ClearBackground(BLACK);
     BeginDrawing();
-    
-      interval_slider.value = &interval;
+      sequencer();
+      interval_slider.value = &timer.interval;
       interval_slider.draw();
       
       subdivision_slider.value = &subdivisions;
@@ -166,7 +145,4 @@ main :: () {
       }
     EndDrawing();
   }
-  playing = false;
-  kill_thread = true;
-  thread.join();
 }
