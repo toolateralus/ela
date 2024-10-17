@@ -1,0 +1,1 @@
+ela main.ela && ./main
