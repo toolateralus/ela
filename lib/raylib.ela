@@ -664,7 +664,7 @@ SliderF :: struct {
       if IsMouseButtonPressed(MouseButton.Left) {
         this.held = true;
       }
-      adjust_slider_value(); // Call the local function for keyboard input
+      adjust_slider_value(); 
     }
 
     if this.held {
@@ -687,7 +687,6 @@ SliderI :: struct {
   value: int*;
   held : bool;
   draw :: () {
-    // Draw the slider background
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
     v_f := (float)*this.value;
@@ -703,15 +702,11 @@ SliderI :: struct {
       rect.height
     };
 
-    // Draw the slider foreground
     DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
 
-    // Draw the text
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
     text_y := rect.y + (rect.height - style.font_size) / 2;
     DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
-
-    // Draw the slider value
 
     value_text := $"{*this.value}";
     value_text.data[3] = #char "\0";
@@ -733,13 +728,12 @@ SliderI :: struct {
       }
     };
 
-    // Handle mouse input and call the local function for keyboard input
     mouse_pos := GetMousePosition();
     if CheckCollisionPointRec(mouse_pos, rect) {
       if IsMouseButtonPressed(MouseButton.Left) {
         this.held = true;
       }
-      adjust_slider_value(); // Call the local function for keyboard input
+      adjust_slider_value();
     }
 
     if this.held {
@@ -759,7 +753,8 @@ CheckButton :: struct {
   rect: Rectangle;
   style: Style;
   text: string;
-  
+  id: int;
+  on_clicked: void(int)* = null;
   draw :: () {
     if value {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);

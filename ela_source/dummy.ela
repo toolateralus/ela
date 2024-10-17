@@ -2,6 +2,8 @@
 #import pthread;
 #import raylib;
 
+#compiler_flags "-g"
+
 snare: Sound;
 
 some_global: int;
@@ -14,7 +16,6 @@ interval : float = 1.0;
 get_seconds :: (f: float32) -> int {
   return (int)(f * 1_000_000);
 }
-
 
 interval_slider : SliderF = {
   "interval", // text
@@ -46,9 +47,6 @@ play_button_style : Style = {
   2.0,
 };
 
-play_callback :: () {
-  playing = !playing;
-}
 
 subdivisions: int = 4;
 check_buttons: CheckButton[];
@@ -66,70 +64,84 @@ check_button_style: Style = {
 kill_thread := false;
 waiting := false;
 
-state : int[];
+mutex: Mutex;
 index : s32;
 
-state_mutex: Mutex;
+play_callback :: () {
+  playing = !playing;
+  index = 0;
+}
 
-
-draw_sequencer_check_buttons :: () {
-  if subdivisions != check_buttons.length {
-    while subdivisions > check_buttons.length {
-      x : float = (float)(check_buttons.length * 40);
-      y : float = GetScreenHeight() / 2.0;
-      println($"Addd button {check_buttons.length} at: {x}, {y}");
-      check_buttons ~= {
-        false,
-        Rectangle{x, y, 35, 35},
-        check_button_style,
-        string{null},
+SequenceChannel :: struct {
+  check_buttons: CheckButton[];
+  sound: Sound;
+  active: bool;
+  y_offset: float;
+  
+  draw :: () {
+    if subdivisions != check_buttons.length {
+      while subdivisions > check_buttons.length {
+        x : float = (float)(check_buttons.length * 40);
+        y : float = GetScreenHeight() / 2.0 + y_offset;
+        println($"Addd button {check_buttons.length} at: {x}, {y}");
+        check_buttons ~= {
+          false,
+          Rectangle{x, y, 35, 35},
+          check_button_style,
+          string{null},
+        }
       }
-      state[check_buttons.length] = 1;
+      while check_buttons.length > subdivisions {
+        button := ~check_buttons;
+        println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
+      }
     }
-    while check_buttons.length > subdivisions {
-      button := ~check_buttons;
-      println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
-      state[check_buttons.length] = 0;
+    for *button; check_buttons {
+      button.draw();
     }
   }
-  
-  for *button; check_buttons {
-    button.draw();
+  update :: (index: int) {
+    if check_buttons[index].value {
+      PlaySound(sound);
+    }
   }
 }
 
 
+channels: SequenceChannel[];
+
 sequencer_thread :: () {
   while !kill_thread {
+    mutex.lock();
     is_playing := playing;
-    
-    while state.length < subdivisions {
-      state ~= 0;
-    }
-    while subdivisions > state.length {
-      _ := ~state;
-    }
-    
     if is_playing {
-      state_mutex.lock();
       usleep(get_seconds(interval));
       index = (index + 1 % subdivisions) % subdivisions;
-      if state[index] {
-        PlaySound(snare);
+      for *channel; channels {
+        channel.update(index);
       }
-      state_mutex.unlock();
+      mutex.unlock();
     } else {
+      mutex.unlock();
       usleep(100);
     }
+    
   }
 }
 
 main :: () {
   InitAudioDevice();
   snare  = LoadSound("snare.wav");
-  thread := Thread{&sequencer_thread};
   InitWindow(800, 600, "Sequencer");
   
+  channels ~= #make(SequenceChannel, {
+    CheckButton[]{},
+    snare,
+    true,
+    0.0
+  });
+  
+  thread := Thread{&sequencer_thread};
   while !WindowShouldClose() {
     ClearBackground(BLACK);
     BeginDrawing();
@@ -139,7 +151,10 @@ main :: () {
       
       subdivision_slider.value = &subdivisions;
       subdivision_slider.draw();
-      draw_sequencer_check_buttons();
+      
+      for *channel; channels {
+        channel.draw();
+      }
       
       {
         if playing {

@@ -65,9 +65,9 @@
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy executable",
-      "program": "${workspaceFolder}/dummy",
+      "program": "${workspaceFolder}/ela_source/dummy",
       "args": [],
-      "cwd": "${workspaceFolder}/ela_source"
+      "cwd": "${workspaceFolder}/ela_source/"
     },
     {
       "type": "lldb",
