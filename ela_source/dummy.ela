@@ -32,6 +32,16 @@ subdivision_slider : SliderI = {
   false // held
 };
 
+beats_slider : SliderI = {
+  string{"beats"}, // text
+  Rectangle{150, 110, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  1,  // min
+  20,   // max
+  null,  // value
+  false // held
+};
+
 play_button_style : Style = {
   WHITE,
   CLEAR,
@@ -43,7 +53,9 @@ play_button_style : Style = {
 };
 
 
-subdivisions: int = 4;
+subdivisions: int = 1;
+beats: int = 4;
+total_notes: int = 4;
 check_buttons: CheckButton[];
 
 check_button_style: Style = {
@@ -71,8 +83,8 @@ SequenceChannel :: struct {
   y_offset: float;
   
   draw :: () {
-    if subdivisions != check_buttons.length {
-      while subdivisions > check_buttons.length {
+    if total_notes != check_buttons.length {
+      while total_notes > check_buttons.length {
         x : float = (float)(check_buttons.length * 40);
         y : float = GetScreenHeight() / 2.0 + y_offset;
         println($"Addd button {check_buttons.length} at: {x}, {y}");
@@ -83,7 +95,7 @@ SequenceChannel :: struct {
           string{null},
         }
       }
-      while check_buttons.length > subdivisions {
+      while check_buttons.length > total_notes {
         button := ~check_buttons;
         println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
       }
@@ -106,7 +118,7 @@ sequencer :: () {
     for *channel; channels {
       channel.update(index);
     }
-    index = (index + 1 % subdivisions) % subdivisions;
+    index = (index + 1 % total_notes) % total_notes;
   }
 }
 
@@ -130,10 +142,15 @@ main :: () {
       bpm_slider.value = &bpm;
       bpm_slider.draw();
 
-      timer.interval = 1 / (bpm / 60);
+      timer.interval = (1 / (bpm / 60)) / subdivisions;
+
+      total_notes = beats * subdivisions;
       
       subdivision_slider.value = &subdivisions;
       subdivision_slider.draw();
+
+      beats_slider.value = &beats;
+      beats_slider.draw();
       
       for *channel; channels {
         channel.draw();
