@@ -1,4 +1,3 @@
-
 #!/bin/bash
 
 make clean
@@ -11,6 +10,6 @@ mkdir -p /usr/local/lib/ela
 # Move the contents of ./lib to /usr/local/lib/ela
 sudo cp ./lib/* /usr/local/lib/ela/
 
-sudo cp ./source/boilerplate.hpp /usr/local/lib/ela/boilerplate.hpp
+sudo cp ./ela_source/boilerplate.hpp /usr/local/lib/ela/boilerplate.hpp
 
 sudo ln -sf $(pwd)/bin/ela /usr/local/bin/ela

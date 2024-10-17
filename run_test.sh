@@ -1,5 +1,5 @@
 if [ "$(basename "$PWD")" != "source" ]; then
-  cd source
+  cd ela_source
 fi
 
 ela ./test.ela --metrics --s --test # --debug

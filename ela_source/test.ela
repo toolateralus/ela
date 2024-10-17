@@ -6,7 +6,6 @@ XaryuStruct :: struct {
   f: float ;
 }
 
-
 InitListTestCtorStruct :: struct {
   z : int;
   #ctor :: (n : int, f: int) {

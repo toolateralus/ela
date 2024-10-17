@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "copier.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -15,6 +16,7 @@
   ### PROVIDING EXTERNS ###
   #########################
 */
+
 Type **type_table = new Type*[MAX_NUM_TYPES];
 int num_types;
 
@@ -24,7 +26,6 @@ jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
 
 // the same for this
 jstl::Arena scope_arena{MB(10)};
-
 
 std::unordered_map<std::string, int> type_alias_map;
 
@@ -91,8 +92,11 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
     ast.close();
   }
 
+  Copier copier;
+  ASTProgram* copy = copier.copy_program(root);
+
   EmitVisitor emit(context, type_visitor);
-  emit.visit(root);
+  emit.visit(copy);
   lower.end("lowering to cpp complete");
   
   std::string program;
@@ -143,6 +147,7 @@ int CompileCommand::compile() {
   Lexer lexer;
   Context context;
   ASTProgram *root = process_ast(context);
+
   auto result = emit_code(root, context);
   print_metrics();
   return result;

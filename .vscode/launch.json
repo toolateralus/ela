@@ -27,15 +27,15 @@
       "name": "Debug test",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["test.ela",  "--test", "--s"],
-      "cwd": "${workspaceFolder}/source"
+      "cwd": "${workspaceFolder}/ela_source"
     },
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug test executable",
-      "program": "${workspaceFolder}/source/test",
+      "program": "${workspaceFolder}/ela_source/test",
       "args": [],
-      "cwd": "${workspaceFolder}/source"
+      "cwd": "${workspaceFolder}/ela_source"
     },
     {
       "type": "lldb",
@@ -59,7 +59,7 @@
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["dummy.ela", "--s", "--sanitize"],
-      "cwd": "${workspaceFolder}/source"
+      "cwd": "${workspaceFolder}/ela_source"
     },
     {
       "type": "lldb",
@@ -67,7 +67,7 @@
       "name": "Debug dummy executable",
       "program": "${workspaceFolder}/dummy",
       "args": [],
-      "cwd": "${workspaceFolder}/source"
+      "cwd": "${workspaceFolder}/ela_source"
     },
     {
       "type": "lldb",
@@ -75,7 +75,7 @@
       "name": "Debug dummy tests",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["dummy.ela", "--s", "--test"],
-      "cwd": "${workspaceFolder}/source"
+      "cwd": "${workspaceFolder}/ela_source"
     }
   ]
 }

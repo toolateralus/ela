@@ -1,0 +1,6 @@
+#import core;
+
+main :: () -> int {
+  return 0;
+}
+

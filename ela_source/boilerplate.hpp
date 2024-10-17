@@ -2,6 +2,12 @@
 #include <unordered_map>
 #include <vector>
 
+/* 
+  * This is a bit of boiler-plate or runtime utilities used within Ela.
+  * While we still compile to C++, we will certainly take advantage of being able to compile with
+  * our own library.
+*/
+
 using float64 = double;
 using u64 = uint64_t;
 using s64 = int64_t;
@@ -30,6 +36,7 @@ extern "C" int printf(const char *format, ...);
   ? And obviously super easy to implement.
 */
 
+template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
 struct _range {
   int m_begin, m_end;
@@ -50,7 +57,6 @@ struct _range {
   iterator end() const { return iterator(m_end); }
   iterator begin() { return iterator(m_begin); }
   iterator end() { return iterator(m_end); }
-  
   bool operator==(auto number) const {
     return number >= m_begin && number <= m_end;
   }
@@ -59,10 +65,7 @@ struct _range {
 template<class ...T>
 using _tuple = std::tuple<T...>;
 
-
-template<class ...T>
-using _tuple = std::tuple<T...>;
-
+// * Remove these 'get' functions for tuples. Super type unsafe.
 template<std::size_t I = 0, typename TTuple, typename T1>
 void __get_helper(const TTuple& tuple, int index, T1* value) {
   if constexpr (I < std::tuple_size_v<TTuple>) {
@@ -81,12 +84,13 @@ void get(const T& tuple, int index, T1* value) {
   __get_helper(tuple, index, value);
 }
 
+//  * Manually call destructor on one or many objects. useful for unions that own non-trivial objects.
 template<class ...T>
 void destruct(T &...t) {
   (t.~T(), ...);
 }
 
-// TODO: implement this. not sure how we want to approach it.
+// TODO: implement `Any` type... not sure how we want to approach it.
 // template <class T> struct Any {
 //   T value;
 //   template <class U> Any(U&& v) : value(std::forward<U>(v)) {}
@@ -96,8 +100,7 @@ void destruct(T &...t) {
 // TODO: get rid of the usage of std::vector. It was a shortcut, 
 // We should easily be able to have our own type to improve compile times.
 template <class T> struct _array {
-  std::vector<T> vector;
-
+  std::vector<T> vector; // ! Get rid of this and just write our own array. This is horrible for compile times.
   s64 length;
   s64 capacity;
   void *data;
@@ -107,23 +110,29 @@ template <class T> struct _array {
     capacity = vector.capacity();
     data = vector.data();
   }
+  
   _array() {
     update();
   }
+  
   _array(const _array &other) {
     vector = other.vector;
     update();
   }
+  
   _array(int length) {
     vector.resize(length);
     update();
   }
+  
   _array(T *array, int len) {
     vector = std::vector(array, array + len);
     update();
   }
+  
   bool operator==(const _array &other) const { return vector == other.vector; }
   bool operator!=(const _array &other) const { return vector != other.vector; }
+  
   void erase(const T &value) {
     auto it = std::remove(vector.begin(), vector.end(), value);
     if (it != vector.end()) {
@@ -255,7 +264,6 @@ template <> struct hash<string> {
 };
 } // namespace std
 
-template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
 extern "C" void *memcpy(void *, void *, size_t);
 
@@ -267,12 +275,12 @@ struct Field {
   size_t offset;
   
   template<class T, class T1>
-  void set(T *target, T1 data) const {
+  inline void set(T *target, T1 data) const {
     memcpy(reinterpret_cast<char*>(target) + offset, (char*)&data, sizeof(T1));
   }
   
   template<class T>
-  s8* get(T *source) const {
+  inline s8* get(T *source) const {
     return reinterpret_cast<s8*>(reinterpret_cast<char*>(source) + offset);
   }
 };
