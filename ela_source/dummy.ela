@@ -1,6 +1,9 @@
 #import core;
 #import raylib;
 
+#import directory;
+#import file;
+
 #compiler_flags "-g"
 
 #foreign usleep :: (c: int);
@@ -142,6 +145,11 @@ sequencer :: () {
 bpm : float = 120;
 
 main :: () {
+  
+  dir := directory_open(".");
+
+  
+  
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
   channels ~= #make(SequenceChannel, {
@@ -152,6 +160,12 @@ main :: () {
   });
   
   SetTargetFPS(1000);
+  
+  for file; dir.files {
+    if string_ends_with(file.data, ".wav") || string_ends_with(file.data, ".mp3") || string_ends_with(file.data, ".ogg") {
+      file_dropdown.options ~= string{file.data};
+    }
+  }
   
   while !WindowShouldClose() {
     ClearBackground(BLACK);
