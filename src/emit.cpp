@@ -238,7 +238,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     type = global_get_type(type->get_true_type());
 
     // We just assume that the type-checker has validated that this struct has a to_string() function
-    if (type->is_kind(TYPE_STRUCT)) {
+    if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
       return "%s";
     }
     if (type->id == charptr_type() ||
@@ -296,12 +296,8 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
     auto type = global_get_type(type_id);
     
-    if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
-      value->accept(this);
-      (*ss) << ".data";
-    } else if (type->is_kind(TYPE_STRUCT)) {
-      auto info = static_cast<StructTypeInfo *>(type->get_info());
-      auto sym = info->scope->lookup("to_string");
+    auto interpolate_to_string_struct_union = [&](Scope *scope) {
+      auto sym = scope->lookup("to_string");
       
       if (!sym) 
         throw_error("Cannot use a struct in an interpolated string without defining a `to_string` function that returns either a char* or a string", value->source_range);
@@ -321,7 +317,17 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions())
       { (*ss) << ".data"; }
       
-        
+    };
+    
+    if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+      value->accept(this);
+      (*ss) << ".data";
+    } else if (type->is_kind(TYPE_STRUCT)) {
+      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      interpolate_to_string_struct_union(info->scope);
+    } else if (type->is_kind(TYPE_UNION)) {
+      auto info = static_cast<UnionTypeInfo *>(type->get_info());
+      interpolate_to_string_struct_union(info->scope);
     } else {
       value->accept(this);
     }

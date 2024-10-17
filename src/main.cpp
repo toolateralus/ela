@@ -92,11 +92,9 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
     ast.close();
   }
 
-  Copier copier;
-  ASTProgram* copy = copier.copy_program(root);
-
   EmitVisitor emit(context, type_visitor);
-  emit.visit(copy);
+  emit.visit(root);
+  
   lower.end("lowering to cpp complete");
   
   std::string program;
