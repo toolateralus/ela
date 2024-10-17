@@ -126,9 +126,7 @@ channels: SequenceChannel[];
 on_file_selected :: (index: int);
 
 file_dropdown : DropDown = {
-  #make(string[], {
-    "snare.wav"
-  }),
+  string[]{},
   Rectangle{0, 250, 125, 30},
   file_dropdown_style,
   -1,
