@@ -35,6 +35,16 @@ subdivision_slider : SliderI = {
   false // held
 };
 
+beats_slider : SliderI = {
+  string{"beats"}, // text
+  Rectangle{150, 110, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  1,  // min
+  20,   // max
+  null,  // value
+  false // held
+};
+
 play_button_style : Style = {
   WHITE,
   CLEAR,
@@ -55,27 +65,9 @@ file_dropdown_style : Style = {
   2.0,
 }
 
-on_file_selected :: (index: int);
-
-file_dropdown : DropDown = {
-  #make(string[], {
-    "File A",
-    "File B",
-    "File C",
-    "File D"
-  }),
-  Rectangle{0, 250, 80, 30},
-  file_dropdown_style,
-  -1,
-  false,
-  &on_file_selected
-};
-
-on_file_selected :: (index: int) {
-  println($"Selected file: {index} :: {file_dropdown.options[index]}");
-}
-
-subdivisions: int = 4;
+subdivisions: int = 1;
+beats: int = 4;
+total_notes: int = 4;
 check_buttons: CheckButton[];
 
 check_button_style: Style = {
@@ -100,22 +92,20 @@ SequenceChannel :: struct {
   check_buttons: CheckButton[];
   sound: Sound;
   active: bool;
-  y_offset: float;
   
-  draw :: () {
-    if subdivisions != check_buttons.length {
-      while subdivisions > check_buttons.length {
-        x : float = (float)(check_buttons.length * 40);
-        y : float = GetScreenHeight() / 2.0 + y_offset;
+  draw :: (x: float, y: float) {
+    if total_notes != check_buttons.length {
+      while total_notes > check_buttons.length {
+        _x : float = x + (float)(check_buttons.length * 40);
         println($"Addd button {check_buttons.length} at: {x}, {y}");
         check_buttons ~= {
           false,
-          Rectangle{x, y, 35, 35},
+          Rectangle{_x, y, 35, 35},
           check_button_style,
           string{null},
         }
       }
-      while check_buttons.length > subdivisions {
+      while check_buttons.length > total_notes {
         button := ~check_buttons;
         println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
       }
@@ -133,12 +123,33 @@ SequenceChannel :: struct {
 
 channels: SequenceChannel[];
 
+on_file_selected :: (index: int);
+
+file_dropdown : DropDown = {
+  #make(string[], {
+    "snare.wav"
+  }),
+  Rectangle{0, 250, 80, 30},
+  file_dropdown_style,
+  -1,
+  false,
+  &on_file_selected
+};
+
+on_file_selected :: (index: int) {
+  channels ~= #make(SequenceChannel, {
+    CheckButton[]{},
+    LoadSound(file_dropdown.options[index].data),
+    true,
+  });
+}
+
 sequencer :: () {
   if playing && timer.tick() {
     for *channel; channels {
       channel.update(index);
     }
-    index = (index + 1 % subdivisions) % subdivisions;
+    index = (index + 1 % total_notes) % total_notes;
   }
 }
 
@@ -152,12 +163,6 @@ main :: () {
   
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
-  channels ~= #make(SequenceChannel, {
-    CheckButton[]{},
-    LoadSound("snare.wav"),
-    true,
-    0.0
-  });
   
   SetTargetFPS(1000);
   
@@ -174,13 +179,20 @@ main :: () {
       bpm_slider.value = &bpm;
       bpm_slider.draw();
 
-      timer.interval = 1 / (bpm / 60);
+      timer.interval = (1 / (bpm / 60)) / subdivisions;
+
+      total_notes = beats * subdivisions;
       
       subdivision_slider.value = &subdivisions;
       subdivision_slider.draw();
-      
+
+      beats_slider.value = &beats;
+      beats_slider.draw();
+      y := GetScreenHeight() / 2.0;
+      x := 0
       for *channel; channels {
-        channel.draw();
+        channel.draw(x, y);
+        y += 40
       }
       
       file_dropdown.draw();
