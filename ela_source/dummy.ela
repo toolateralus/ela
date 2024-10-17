@@ -12,12 +12,12 @@ get_seconds :: (f: float32) -> int {
   return (int)(f * 1_000_000);
 }
 
-interval_slider : SliderF = {
-  "interval", // text
+bpm_slider : SliderF = {
+  "bpm", // text
   Rectangle{0,0, 150, 40}, // rectangle
   Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
-  0.01,  // min
-  3.0,   // max
+  30,  // min
+  240,   // max
   null,  // value
   false, // held
 };
@@ -139,6 +139,8 @@ sequencer :: () {
   }
 }
 
+bpm : float = 120;
+
 main :: () {
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
@@ -155,8 +157,10 @@ main :: () {
     ClearBackground(BLACK);
     BeginDrawing();
       sequencer();
-      interval_slider.value = &timer.interval;
-      interval_slider.draw();
+      bpm_slider.value = &bpm;
+      bpm_slider.draw();
+
+      timer.interval = 1 / (bpm / 60);
       
       subdivision_slider.value = &subdivisions;
       subdivision_slider.draw();
