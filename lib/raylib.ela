@@ -599,8 +599,13 @@ Timer :: struct {
   last_tick_time: float;
   tick :: () -> bool {
     now := GetTime();
-    if now > (last_tick_time + interval) || last_tick_time == 0 {
+    if last_tick_time == 0 {
       last_tick_time = now;
+      return true;
+    }
+    if now > (last_tick_time + interval) {
+      its := (int)((now - last_tick_time) / interval);
+      last_tick_time += (float)its * interval;
       return true;
     }
     return false;
