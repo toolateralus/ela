@@ -137,6 +137,12 @@ Color :: struct {
   #operator(==) :: (other: #self) -> bool {
     return other.a == a && other.r == r && other.g == g && other.b == b;
   }
+  
+  with_alpha :: (a: int) -> #self {
+    color := *this;
+    color.a = (u8)a;
+    return color;
+  }
 }
 
 Texture2D :: struct {
@@ -601,71 +607,174 @@ Timer :: struct {
   }
 }
 
-
-SliderState :: struct {
-  min: float;
-  max: float;
+SliderF :: struct {
+  text: string;
+  rect: Rectangle;
+  style: Style;
+  min_value: float;
+  max_value: float;
   value: float*;
   held : bool;
+  draw :: () {
+    // Draw the slider background
+    DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+
+    slider_width : float = rect.width * clamp((abs(*this.value - min_value) / abs(max_value - min_value)), 0.0, 1.0);
+    slider_rect : Rectangle = {
+      rect.x,
+      rect.y,
+      slider_width,
+      rect.height
+    };
+
+    // Draw the slider foreground
+    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+
+    
+    // Draw the text
+    text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
+    text_y := rect.y + (rect.height - style.font_size) / 2;
+    DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
+
+    // Draw the slider value
+
+    value_text := $"{*this.value}";
+    value_text.data[3] = #char "\0";
+    value_text_x := rect.x + text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
+    DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
+
+
+    adjust_slider_value :: () {
+      increment: float;
+      if IsKeyDown(Key.LeftShift) {
+        increment = (max_value - min_value) / 100;
+      } else {
+        increment = (max_value - min_value) / 50;
+      }
+      if IsKeyPressed(Key.Right) {
+        *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
+      } else if IsKeyPressed(Key.Left) {
+        *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
+      }
+    };
+
+    // Handle mouse input and call the local function for keyboard input
+    mouse_pos := GetMousePosition();
+    if CheckCollisionPointRec(mouse_pos, rect) {
+      if IsMouseButtonPressed(MouseButton.Left) {
+        this.held = true;
+      }
+      adjust_slider_value(); // Call the local function for keyboard input
+    }
+
+    if this.held {
+      if IsMouseButtonUp(MouseButton.Left) {
+        this.held = false;
+      } else {
+        new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
+        *this.value = clamp(new_value, min(min_value, max_value), max(min_value, max_value));
+      }
+    }
+  }
 }
 
-draw_slider :: (text: char*, rect: Rectangle, style: Style, state: SliderState*) {
-  // Draw the slider background
-  DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+SliderI :: struct {
+  text: string;
+  rect: Rectangle;
+  style: Style;
+  min_value: int;
+  max_value: int;
+  value: int*;
+  held : bool;
+  draw :: () {
+    // Draw the slider background
+    DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
-  slider_width : float = rect.width * ((abs(*state.value - state.min)) / abs(state.max - state.min));
-  
-  slider_rect : Rectangle = {
-    rect.x,
-    rect.y,
-    slider_width,
-    rect.height
-  };
+    v_f := (float)*this.value;
+    min_f := (float)min_value;
+    max_f := (float)max_value;
 
-  // Draw the slider foreground
-  DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+    slider_width : float = rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
+    
+    slider_rect : Rectangle = {
+      rect.x,
+      rect.y,
+      slider_width,
+      rect.height
+    };
 
-  // Draw the text
-  text_x := rect.x + (rect.width - MeasureText(text, style.font_size)) / 2;
-  text_y := rect.y + (rect.height - style.font_size) / 2;
-  DrawText(text, (int)text_x, (int)text_y, style.font_size, style.highlighted);
+    // Draw the slider foreground
+    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
 
-  // Draw the slider value
+    // Draw the text
+    text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
+    text_y := rect.y + (rect.height - style.font_size) / 2;
+    DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
 
-  value_text := $"{*state.value}";
-  value_text_x := text_x + MeasureText(value_text.data, style.font_size) + 10; // 10 pixels padding
-  DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
+    // Draw the slider value
+
+    value_text := $"{*this.value}";
+    value_text.data[3] = #char "\0";
+    value_text_x := rect.x + text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
+    DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
 
-  adjust_slider_value :: () {
-    increment: float;
-    if IsKeyDown(Key.LeftShift) {
-      increment = (state.max - state.min) / 100;
-    } else {
-      increment = (state.max - state.min) / 50;
+    adjust_slider_value :: () {
+      increment: float;
+      if IsKeyDown(Key.LeftShift) {
+        increment = (max_value - min_value) / 100;
+      } else {
+        increment = (max_value - min_value) / 50;
+      }
+      if IsKeyPressed(Key.Right) {
+        *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
+      } else if IsKeyPressed(Key.Left) {
+        *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
+      }
+    };
+
+    // Handle mouse input and call the local function for keyboard input
+    mouse_pos := GetMousePosition();
+    if CheckCollisionPointRec(mouse_pos, rect) {
+      if IsMouseButtonPressed(MouseButton.Left) {
+        this.held = true;
+      }
+      adjust_slider_value(); // Call the local function for keyboard input
     }
-    if IsKeyPressed(Key.Right) {
-      *state.value = clamp(*state.value + increment, min(state.min, state.max), max(state.min, state.max));
-    } else if IsKeyPressed(Key.Left) {
-      *state.value = clamp(*state.value - increment, min(state.min, state.max), max(state.min, state.max));
-    }
-  };
 
-  // Handle mouse input and call the local function for keyboard input
-  mouse_pos := GetMousePosition();
-  if CheckCollisionPointRec(mouse_pos, rect) {
-    if IsMouseButtonPressed(MouseButton.Left) {
-      state.held = true;
+    if this.held {
+      if IsMouseButtonUp(MouseButton.Left) {
+        this.held = false;
+      } else {
+        new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
+        *this.value = clamp(new_value, min(min_value, max_value), max(min_value, max_value));
+      }
     }
-    adjust_slider_value(); // Call the local function for keyboard input
   }
+}
 
-  if state.held {
-    if IsMouseButtonUp(MouseButton.Left) {
-      state.held = false;
+
+CheckButton :: struct {
+  value: bool = false;
+  rect: Rectangle;
+  style: Style;
+  text: string;
+  
+  draw :: () {
+    if value {
+      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
     } else {
-      new_value := state.min + ((mouse_pos.x - rect.x) / rect.width) * (state.max - state.min);
-      *state.value = clamp(new_value, min(state.min, state.max), max(state.min, state.max));
+      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+    }
+
+    if text.data {
+      text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
+      text_y := rect.y + (rect.height - style.font_size) / 2;
+      DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+    }
+
+    if CheckCollisionPointRec(GetMousePosition(), rect) && IsMouseButtonPressed(MouseButton.Left) {
+      value = !value;
     }
   }
 }

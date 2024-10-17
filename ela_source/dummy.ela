@@ -4,7 +4,6 @@
 
 snare: Sound;
 
-mutex: Mutex;
 some_global: int;
 
 #foreign usleep :: (c: int);
@@ -16,34 +15,25 @@ get_seconds :: (f: float32) -> int {
   return (int)(f * 1_000_000);
 }
 
-kill_thread := false;
-sequencer_thread :: () {
-  while !kill_thread {
-    mutex.lock();
-    is_playing := playing;
-    
-    if is_playing {
-      PlaySound(snare);
-      usleep(get_seconds(interval));
-    } else {
-      usleep(get_seconds(1.0));
-    }
-  }
-}
 
-slider_style : Style = {
-  WHITE,
-  BLACK,
-  GREEN,
-  16,
-  false,
-  0.0,
-  0.0
+interval_slider : SliderF = {
+  "interval", // text
+  Rectangle{0,0, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  0.01,  // min
+  3.0,   // max
+  null,  // value
+  false, // held
 };
 
-slider_state : SliderState = {
-  0.01,
-  2.0, 
+subdivision_slider : SliderI = {
+  string{"subdivisions"}, // text
+  Rectangle{0, 110, 150, 40}, // rectangle
+  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
+  1,  // min
+  20,   // max
+  null,  // value
+  false // held
 };
 
 play_button_style : Style = {
@@ -60,6 +50,80 @@ play_callback :: () {
   playing = !playing;
 }
 
+subdivisions: int = 4;
+check_buttons: CheckButton[];
+
+check_button_style: Style = {
+  WHITE,
+  RED,
+  GREEN,
+  16,
+  false,
+  5.0,
+  2.0,
+}
+
+kill_thread := false;
+waiting := false;
+
+state : int[];
+index : s32;
+
+state_mutex: Mutex;
+
+
+draw_sequencer_check_buttons :: () {
+  if subdivisions != check_buttons.length {
+    while subdivisions > check_buttons.length {
+      x : float = (float)(check_buttons.length * 40);
+      y : float = GetScreenHeight() / 2.0;
+      println($"Addd button {check_buttons.length} at: {x}, {y}");
+      check_buttons ~= {
+        false,
+        Rectangle{x, y, 35, 35},
+        check_button_style,
+        string{null},
+      }
+      state[check_buttons.length] = 1;
+    }
+    while check_buttons.length > subdivisions {
+      button := ~check_buttons;
+      println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
+      state[check_buttons.length] = 0;
+    }
+  }
+  
+  for *button; check_buttons {
+    button.draw();
+  }
+}
+
+
+sequencer_thread :: () {
+  while !kill_thread {
+    is_playing := playing;
+    
+    while state.length < subdivisions {
+      state ~= 0;
+    }
+    while subdivisions > state.length {
+      _ := ~state;
+    }
+    
+    if is_playing {
+      state_mutex.lock();
+      usleep(get_seconds(interval));
+      index = (index + 1 % subdivisions) % subdivisions;
+      if state[index] {
+        PlaySound(snare);
+      }
+      state_mutex.unlock();
+    } else {
+      usleep(100);
+    }
+  }
+}
+
 main :: () {
   InitAudioDevice();
   snare  = LoadSound("snare.wav");
@@ -69,18 +133,25 @@ main :: () {
   while !WindowShouldClose() {
     ClearBackground(BLACK);
     BeginDrawing();
-    printf("Update, interval=%f\n", interval);
-    slider_state.value = &interval;
-    draw_slider("interval", Rectangle{0, 0, 250, 40}, slider_style, &slider_state);
     
-    if playing {
-      play_button_style.highlighted = RED;
-    } else {
-      play_button_style.highlighted = GREEN;
-    }
-    draw_button("play", {0, 50, 100, 40}, play_button_style, &play_callback);
+      interval_slider.value = &interval;
+      interval_slider.draw();
+      
+      subdivision_slider.value = &subdivisions;
+      subdivision_slider.draw();
+      draw_sequencer_check_buttons();
+      
+      {
+        if playing {
+          play_button_style.highlighted = RED;
+        } else {
+          play_button_style.highlighted = GREEN;
+        }
+        draw_button("play", {0, 50, 100, 40}, play_button_style, &play_callback);
+      }
     EndDrawing();
   }
+  playing = false;
   kill_thread = true;
   thread.join();
 }

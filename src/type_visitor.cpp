@@ -1261,7 +1261,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
-      return s32_type();
+      return s64_type();
     }
     if (right && right->value.value == "data") {
       return get_pointer_to_type(left_ty->get_element_type());
