@@ -784,6 +784,7 @@ DropDown :: struct {
   selected_index: int = -1;
   is_open: bool = false;
   on_selected: void(int)* = null;
+  on_open: void()* = null;
     draw :: () {
       // Draw the dropdown box
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
@@ -798,6 +799,9 @@ DropDown :: struct {
       hit := CheckCollisionPointRec(GetMousePosition(), rect);
       if hit && IsMouseButtonPressed(MouseButton.Left) {
         is_open = !is_open;
+        if is_open && on_open {
+          on_open();
+        }
       }
   
       hit_option := false;
