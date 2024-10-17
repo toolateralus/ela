@@ -52,6 +52,35 @@ play_button_style : Style = {
   2.0,
 };
 
+file_dropdown_style : Style = {
+  WHITE,
+  GRAY,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+}
+
+on_file_selected :: (index: int);
+
+file_dropdown : DropDown = {
+  #make(string[], {
+    "File A",
+    "File B",
+    "File C",
+    "File D"
+  }),
+  Rectangle{0, 250, 80, 30},
+  file_dropdown_style,
+  -1,
+  false,
+  &on_file_selected
+};
+
+on_file_selected :: (index: int) {
+  println($"Selected file: {index} :: {file_dropdown.options[index]}");
+}
 
 subdivisions: int = 1;
 beats: int = 4;
@@ -127,13 +156,14 @@ bpm : float = 120;
 main :: () {
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
-  
   channels ~= #make(SequenceChannel, {
     CheckButton[]{},
     LoadSound("snare.wav"),
     true,
     0.0
   });
+  
+  SetTargetFPS(1000);
   
   while !WindowShouldClose() {
     ClearBackground(BLACK);
@@ -155,6 +185,8 @@ main :: () {
       for *channel; channels {
         channel.draw();
       }
+      
+      file_dropdown.draw();
       
       {
         if playing {

@@ -590,7 +590,6 @@ draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCall
 }
 
 // *########### END BUILTIN UI HELPERS ############### */
-
 // ? A simple timer that can be used in update loops to get a tick every N seconds.
 // * interval: float = seconds between each tick.
 Timer :: struct {
@@ -752,7 +751,6 @@ SliderI :: struct {
   }
 }
 
-
 CheckButton :: struct {
   value: bool = false;
   rect: Rectangle;
@@ -776,5 +774,60 @@ CheckButton :: struct {
     if CheckCollisionPointRec(GetMousePosition(), rect) && IsMouseButtonPressed(MouseButton.Left) {
       value = !value;
     }
+  }
+}
+
+DropDown :: struct {
+  options: string[];
+  rect: Rectangle;
+  style: Style;
+  selected_index: int = -1;
+  is_open: bool = false;
+  on_selected: void(int)* = null;
+    draw :: () {
+      // Draw the dropdown box
+      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+  
+      // Draw the selected option
+      if selected_index >= 0 && selected_index < options.length {
+        text_x := rect.x + (rect.width - MeasureText(options[selected_index].data, style.font_size)) / 2;
+        text_y := rect.y + (rect.height - style.font_size) / 2;
+        DrawText(options[selected_index].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+      }
+  
+      hit := CheckCollisionPointRec(GetMousePosition(), rect);
+      if hit && IsMouseButtonPressed(MouseButton.Left) {
+        is_open = !is_open;
+      }
+  
+      hit_option := false;
+      if is_open {
+        option_rect := rect;
+        option_rect.y += rect.height;
+        for i in 0..options.length {
+          option_color := style.background;
+          if CheckCollisionPointRec(GetMousePosition(), option_rect) {
+            option_color = style.highlighted;
+            hit_option = true;
+          }
+          DrawRectangleV(Vector2{option_rect.x, option_rect.y}, Vector2{option_rect.width, option_rect.height}, option_color);
+          text_x := option_rect.x + (option_rect.width - MeasureText(options[i].data, style.font_size)) / 2;
+          text_y := option_rect.y + (option_rect.height - style.font_size) / 2;
+          DrawText(options[i].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+  
+          if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton.Left) {
+            selected_index = i;
+            is_open = false;
+            if on_selected {
+              on_selected(i);
+            }
+          }
+          option_rect.y += option_rect.height;
+        }
+      }
+      
+      if !hit && !hit_option {
+        is_open = false;
+      }
   }
 }
