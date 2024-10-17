@@ -105,11 +105,18 @@ void Parser::init_directive_routines() {
         {.identifier = "test",
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) static -> Nullable<ASTNode> {
-           auto name = parser->expect(TType::Identifier);
-           parser->expect(TType::DoubleColon);
-           auto func = parser->parse_function_declaration(name);
-           func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
-           return func;
+          // Issue 2
+          // TODO: implement something so we can do 
+          // * #test(group: "My Test Group", expects: false) *
+          // so we can have tests that expect to fail, and so we can use
+          // --filter="My Test Group" // run only test group
+          // --filter=* - "My Test Group" // run all but test group
+        
+          auto name = parser->expect(TType::Identifier);
+          parser->expect(TType::DoubleColon);
+          auto func = parser->parse_function_declaration(name);
+          func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
+          return func;
          }});
   }
 

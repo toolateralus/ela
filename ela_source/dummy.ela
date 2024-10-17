@@ -1,6 +1,29 @@
 #import core;
+#import pthread;
+#import raylib;
 
-main :: () -> int {
-  return 0;
+mutex: Mutex;
+some_global: int;
+
+print_from_thread :: () {
+  while true {
+    mutex.lock();
+    some_global++;
+    mutex.unlock();
+    printf("From thread %d! \n", some_global);
+    sleep(3);
+  }
 }
 
+main :: () {
+  
+  thread := Thread{&print_from_thread};
+  sleep(1);
+  while true {
+    mutex.lock();
+    some_global++;
+    mutex.unlock();
+    printf("Hi..%d\n", some_global);
+    sleep(5);
+  }
+}

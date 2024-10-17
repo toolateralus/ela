@@ -14,6 +14,7 @@
 #include <jstl/memory/arena.hpp>
 #include <unordered_set>
 #include <vector>
+#include <pthread.h>
 
 // this could be a simple boolean.
 enum {

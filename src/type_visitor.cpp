@@ -253,6 +253,9 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       // constructors use anonymous symbol names.
       if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
       auto type = global_get_type(symbol.type_id);
+      
+      if (!type) continue;
+      
       auto info = static_cast<FunctionTypeInfo*>(type->get_info());
       auto &params = info->parameter_types;
       

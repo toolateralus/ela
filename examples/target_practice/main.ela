@@ -92,11 +92,9 @@ spark_color : Color = {
 
 bg_color : Color = BLACK;
 
-
 target_bg_color : Color = {
-  75,75,75,(u8)255,
+  (u8)75, (u8)75, (u8)75,(u8)255,
 }
-
 
 ParticleKind :: enum {
   Smoke,
@@ -126,19 +124,6 @@ Particle :: struct {
   position: Vector2;
   scale: Vector2;
   color: Color = WHITE;
-}
-
-Timer :: struct {
-  last_tick_time: float;
-  interval : float = 0.5;
-  update :: () -> bool {
-    now := GetTime();
-    if now > (last_tick_time + interval) || last_tick_time == 0 {
-      last_tick_time = now;
-      return true;
-    }
-    return false;
-  }
 }
 
 Character :: struct {
@@ -429,7 +414,7 @@ BulletRoutine :: struct {
   interval: float = 0.075;
   spawn :: () -> bool {
     timer.interval = interval;
-    if timer.update() {
+    if timer.tick() {
       count--;
       PlaySound(shot_sound);
       make_bullet(character.rect.x, character.rect.y, character.rotation);
@@ -531,7 +516,7 @@ update_game :: () {
     bullet_routine.count = 0; 
   }
   
-  if timer.update() {
+  if timer.tick() {
     expected_length := 3 * round_index;
     if enemies.length < expected_length  {
       for i in 0..expected_length/2 {

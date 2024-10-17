@@ -8,6 +8,10 @@
 #foreign memset :: (dest: void*, c: int, n: u64) -> void*;
 
 #foreign printf :: (format: char*, ...) -> int;
+#foreign scanf :: (format: char*, ...) -> int;
+
+#foreign sleep :: (seconds: int);
+#foreign getchar :: () -> int;
 
 #foreign fmod :: (l: float, r: float) -> float;
 

@@ -1,0 +1,64 @@
+#alias pthread_t :: u64;
+pthread_attr_t :: union;
+
+#alias ThreadStartRoutine :: void*(void*)*;
+#alias Function :: void()*;
+
+#foreign pthread_create :: (thread: pthread_t*, attr: pthread_attr_t*, start_routine: ThreadStartRoutine, arg: void*) -> int;
+#foreign pthread_join :: (thread: pthread_t*, retval: void**) -> int;
+
+/* forward */ 
+start_thread :: (arg: void*) -> void*;
+
+/* Simple thread struct */
+Thread :: struct {
+  handle: pthread_t;
+  start_function: Function;
+  
+  #ctor :: (function: Function) {
+    this.start_function = function;
+    pthread_create(&this.handle, null, &start_thread, this);  
+  }
+  join :: () -> void* {
+    n : void* = null;
+    pthread_join(&this.handle, &n);
+    return n;
+  }
+  #dtor :: () {
+    join();
+  }
+}
+
+/* wrapper calback to init Thread struct. */ 
+start_thread :: (arg: void*) -> void* {
+  thread : Thread* = arg;
+  if (thread.start_function != null) {
+
+    thread.start_function();
+  }
+  return null;
+}
+
+#alias pthread_mutex_t :: u64;
+#foreign pthread_mutex_init :: (mutex: pthread_mutex_t*, attr: void*) -> int;
+#foreign pthread_mutex_lock :: (mutex: pthread_mutex_t*) -> int;
+#foreign pthread_mutex_unlock :: (mutex: pthread_mutex_t*) -> int;
+#foreign pthread_mutex_destroy :: (mutex: pthread_mutex_t*) -> int;
+
+/* Simple mutex */
+Mutex :: struct {
+  handle: pthread_mutex_t;
+  #ctor :: () {
+    pthread_mutex_init(&this.handle, null);
+  }
+  lock :: () {
+    pthread_mutex_lock(&this.handle);
+  }
+  unlock :: () {
+    pthread_mutex_unlock(&this.handle);
+  }
+  #dtor :: () {
+    pthread_mutex_destroy(&this.handle);
+  }
+}
+
