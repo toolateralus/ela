@@ -204,6 +204,7 @@ main :: () {
       sequencer();
       bpm_slider.value = &bpm;
       bpm_slider.draw();
+      bpm = (float)(int)bpm;
 
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 
