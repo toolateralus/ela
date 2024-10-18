@@ -110,7 +110,7 @@ Context::Context() {
   
   
   for (int i = 0; i < num_types; ++i) {
-    root_scope->types.push_back(i);
+    root_scope->types.insert(i);
   }
   
 }

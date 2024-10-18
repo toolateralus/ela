@@ -76,6 +76,14 @@
       "program": "${workspaceFolder}/bin/ela",
       "args": ["dummy.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source"
+    },
+    {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug sequencer",
+      "program": "${workspaceFolder}/bin/ela",
+      "args": ["main.ela", "--s", "--debug"],
+      "cwd": "${workspaceFolder}/examples/sequencer"
     }
   ]
 }

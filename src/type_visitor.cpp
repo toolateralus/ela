@@ -434,13 +434,18 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     node->flags |= FUNCTION_IS_METHOD;
 
     if (current_struct_decl) {
+      auto ty = current_struct_decl.get()->type->resolved_type;
+      if (ty == -1) {
+        throw_error("Internal compiler error: Failed to get type of 'this' pointer", node->source_range);
+      }
+      
       ctx.scope->insert(
           "this",
-          get_pointer_to_type(current_struct_decl.get()->type->resolved_type));
+          ctx.scope->get_pointer_to_type(ty));
     } else if (current_union_decl) {
       ctx.scope->insert(
           "this",
-          get_pointer_to_type(current_union_decl.get()->type->resolved_type));
+          ctx.scope->get_pointer_to_type(current_union_decl.get()->type->resolved_type));
     }
   }
 
@@ -1089,7 +1094,7 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   }
 
   if (node->op.type == TType::And) {
-    return get_pointer_to_type(operand_ty);
+    return ctx.scope->get_pointer_to_type(operand_ty);
   }
 
   if (node->op.type == TType::Mul) {
@@ -1266,7 +1271,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       return s64_type();
     }
     if (right && right->value.value == "data") {
-      return get_pointer_to_type(left_ty->get_element_type());
+      return ctx.scope->get_pointer_to_type(left_ty->get_element_type());
     }
   }
 

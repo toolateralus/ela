@@ -643,7 +643,11 @@ int get_pointer_to_type(int base) {
   auto type = global_get_type(base);
   auto extensions = type->get_ext();
   extensions.extensions.push_back({TYPE_EXT_POINTER});
-  return global_find_type_id(type->get_base(), extensions);
+  auto id = global_find_type_id(type->get_base(), extensions);
+  if (id == -1) {
+    throw_error("Failed to get pointer to type", {});
+  }
+  return id;
 }
 
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,

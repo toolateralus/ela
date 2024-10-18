@@ -1,4 +1,7 @@
 #import core;
+#import raylib;
+ // we include this to test a large file of various definitions. This will help us catch broader problems without
+// explicitly adding 10000 tests.
 
 #compiler_flags "-g"
 
@@ -99,13 +102,13 @@ Constructible :: struct {
   }
 }
 
-Vector2 :: struct {
+JVector2 :: struct {
   x: float32;
   y: float32;
 }
 
-Vector3 :: struct {
-  vec2: Vector2;
+JVector3 :: struct {
+  vec2: JVector2;
   z: float32;
 }
 
@@ -484,20 +487,20 @@ returns :: () -> s32  {
 }
 
 #test test_struct_single_level :: () {
-  v: Vector2;
+  v: JVector2;
   assert("v.x != 0.0", v.x == 0.0);
   assert("v.y != 0.0", v.y == 0.0);
 }
 
 #test test_struct_nested_once :: () {
-  v: Vector3;
+  v: JVector3;
   assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
   assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
   assert("v.z != 0.0", v.z == 0.0);
 }
 
 #test test_struct_assign_member :: () {
-  v: Vector2;
+  v: JVector2;
   v.x = 10.0;
   v.y = 10.0;
   assert("assigning v.x = 10.0 failed", v.x == 10.0);
@@ -505,7 +508,7 @@ returns :: () -> s32  {
 }
 
 #test test_struct_assign_nested_member :: () {
-  v: Vector3;
+  v: JVector3;
   v.vec2.x = 1.0;
   v.vec2.y = 2.0;
   v.z = 3.0;
@@ -514,12 +517,12 @@ returns :: () -> s32  {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: (v: Vector2)  -> float32 {
+struct_as_param :: (v: JVector2)  -> float32 {
   return v.x;
 }
 
 #test test_struct_as_param :: () {
-  v: Vector2;
+  v: JVector2;
   assert("", struct_as_param(v) == 0.0);
 }
 
@@ -528,7 +531,7 @@ something :: (f: float32) -> float32 {
 }
 
 #test test_struct_member_as_param :: () {
-  v: Vector2;
+  v: JVector2;
   assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 

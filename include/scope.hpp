@@ -3,6 +3,7 @@
 #include "error.hpp"
 #include "type.hpp"
 #include <jstl/memory/arena.hpp>
+#include <set>
 #include <string>
 #include <unordered_map>
 
@@ -44,7 +45,7 @@ struct Scope {
   std::vector<std::string> ordered_symbols;
   std::unordered_map<std::string, Symbol> symbols;
   std::vector<int> aliases;
-  std::vector<int> types;
+  std::set<int> types;
   
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
@@ -93,7 +94,7 @@ struct Scope {
   int create_type_alias(int aliased, const std::string& name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
-    types.push_back(id);
+    types.insert(id);
     if (this == root_scope) {
       type_alias_map[name] = id;
     }
@@ -101,9 +102,15 @@ struct Scope {
   }
   
   Type *get_type(const int id) {
-    for (auto ty: types) 
-      if (id == ty) 
+    if (types.contains(id)) {
+      return global_get_type(id);
+    }
+    
+    for (auto alias: aliases) {
+      if (alias == id) {
         return global_get_type(id);
+      }
+    }
     
     if (parent) return parent->get_type(id);
     else {
@@ -119,31 +126,31 @@ struct Scope {
 
   int create_type(TypeKind kind, const std::string &name, TypeInfo * info = nullptr, const TypeExt &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
-    types.push_back(id);
+    types.insert(id);
     return id;
   }
 
   int create_struct_type(const std::string &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
-    types.push_back(id);
+    types.insert(id);
     return id;
   }
 
   int create_enum_type(const std::string &name, const std::vector<std::string> &fields, bool flags) {
     auto id = global_create_enum_type(name, fields, flags);
-    types.push_back(id);
+    types.insert(id);
     return id;
   }
 
   int create_tuple_type(const std::vector<int> &types, const TypeExt& ext) {
     auto id = global_create_tuple_type(types, ext);
-    this->types.push_back(id);
+    this->types.insert(id);
     return id;
   }
 
   int create_union_type(const std::string &name, Scope *scope, UnionFlags kind) {
     auto id = global_create_union_type(name, scope, kind);
-    types.push_back(id);
+    types.insert(id);
     return id;
   }
   
@@ -153,7 +160,10 @@ struct Scope {
     // void(int) over and over. This may inadvertently allow you to access types that are in your scope,
     // so
     // TODO: verify this isn't terrible.
-    return global_find_function_type_id(name, info, ext);
+    auto id = global_find_function_type_id(name, info, ext);;
+    types.insert(id);
+    root_scope->types.insert(id);
+    return id;
   }
 
   int find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions, bool was_created = false) {
@@ -166,26 +176,17 @@ struct Scope {
     if (num_types > num || was_created) {
       // search for all the types within the tuple.
       for (auto t: tuple_types) {
-        bool found = false;
-        for (auto my_t : types) {
-          if (my_t == t) {
-            found = true;
-            break;
-          }
-        }
-        if (!found) { 
+        if (!types.contains(t)) { 
           was_created = true;
           goto try_find_in_parent;
         }
       }
-      types.push_back(id);
+      types.insert(id);
       return id;
     }
-    for (const auto ty: types) {
-      if (ty == id) {
-        return id;
-      }
-    }
+    
+    if (types.contains(id)) return id;    
+
     try_find_in_parent:
     if (parent) {
       return parent->find_type_id(tuple_types, type_extensions, was_created);
@@ -202,38 +203,34 @@ struct Scope {
       return -1;
     }
     
-    bool has_base = false;
-    
-    for (const auto ty: types) {
-      if (ty == id) {
-        return ty;
-      }
-      if (ty == base_id) {
-        has_base = true;
-      }
+    if (types.contains(id)) {
+      return id;
     }
     
-    if (!has_base) {
-      if (parent) {
-        return parent->find_type_id(name, ext);
-      } else {
-        return -1;
-      }
+    bool has_base = types.contains(base_id);
+    
+    if (has_base) {
+      types.insert(id);
+      return id;
     }
     
-    for (const auto ty: types) {
-      // We own this type, but a new type was created to add extensions.
-      if (ty == base_id) {
-        types.push_back(id);
-        return id;
-      }
-    }
     if (parent) {
       return parent->find_type_id(name, ext);
     }
     return -1;
   }
 
+  int get_pointer_to_type(int base) {
+    auto type = get_type(base);
+    auto extensions = type->get_ext();
+    extensions.extensions.push_back({TYPE_EXT_POINTER});
+    auto num = num_types;
+    auto id = find_type_id(type->get_base(), extensions);
+    if (id == -1) {
+      throw_error("Failed to get pointer to type", {});
+    }
+    return id;
+  }
   
 };
 static Scope *create_child(Scope *parent) {
