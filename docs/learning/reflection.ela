@@ -21,22 +21,17 @@ main :: () {
   println($"default value, instance={instance}");
   
   i : float;
-  for field; type.fields {
-    if strcmp(field.name, "this") == 0
-      then continue;
-    
+  for field; type.fields {    
     // set the field on instance, to value 'i'
     field.set(&instance, i);
     
-    println($"Field descriptor: {field.name}, {field.size}, {field.offset}, {field.type.name}");
+    println($"Field descriptor: name=({field.name}), size=({field.size}), offset=({field.offset}), type_name=({field.type.name})");
     
     i += 0.5;
   }
-  println($"after writes, instance={instance}");
+  
   
   for field; type.fields {
-    if strcmp(field.name, "this") == 0
-      then continue;
     // store the value of the field from instance in 'v'
     // It will return a pointer to the field in the struct for mutation (as a char*)
     // however, we just dereference it.
@@ -44,7 +39,6 @@ main :: () {
     println($"Reading {field.name} = {*v}");
   }
   
-  println($"after reads, instance={instance}");
-  
+  println($"final result :: instance={instance}");
 }
 
