@@ -1,0 +1,57 @@
+/* If statements */
+
+if true {
+  ...
+} else {
+  ...
+}
+
+if false {
+  ...
+} else if true {
+  ...
+} else {
+  ...
+}
+
+
+/* 
+  A single if statement that only has one statement as a body and no else can be shorthanded as 
+*/
+if true then println("Hi!");
+
+
+/* While loop */
+
+while true {
+  if 0 then break;
+  if 1 then continue;
+}
+
+
+/* For loops:  */
+for i: s32; i < 100; ++i {}
+
+// For an incrementing loop, you can use range primitives:
+for _ in 0..1000 {}
+
+// you can use any expression on the left or right of the range.
+for i in 0..get_max() {}
+
+// another example.
+for _ in get_min()..get_max() + 100 {}
+
+
+/* To iterate over a collection, such as an array, you can use: */
+array : #make(s32[], 100); // make a 100 long, zero initialized array.
+
+// iterate and get copies of elements.
+for v; array {
+  println($"{v}");
+}
+
+/* To avoid copies, you can use this syntax to take a pointer to the element you're getting from the iterator */
+for *v; array {
+  println($"{*v}");
+}
+

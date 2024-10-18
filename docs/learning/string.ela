@@ -1,0 +1,74 @@
+/* 
+  We have a couple ways to represent strings to interop well with c: 
+  string literals with `"Hi!"` syntax will compile to a char*
+*/
+
+str: char * = "Hello!";
+
+// char * can implicitly cast to our managed string type.
+
+/* 
+  `string` owns it's own memory and memcpy's input. It does not need to be explicitly freed,
+  and stores length information.
+*/
+str1: string = "Hello!";
+
+// * to access the char * behind the managed string
+str1_data := str1.data;
+
+// * to access the length of the string (which is also null terminated)
+str1_length := str1.length;
+
+/* 
+  * .length and .data are read-write safe, 
+  * so to avoid a memcpy and strlen, you may set them yourself on a default constructed string.
+  * for performance reasons, i.e a big string you just malloc'd or something.
+*/
+
+data : char* = "Wow i am a string";
+
+// * this will get deleted when the string goes out of scope.
+str : string;
+str.data = data;
+str.length = 17;
+
+
+/* Interpolated strings */
+
+/* 
+  * The string interpolation syntax is denoted by a string literal prefixed with `$`
+  * The interpolated will be returned as a 'string' type.
+  * to insert values, you use {my_value_expression} syntax within the string literal.
+  * Any expression may be evaluated in the {}, including arithmetic, etc, unlike rust.
+  * Any struct may be implicitly stringified if it implements a to_string() function that returns either a string or a char*
+*/
+
+my_interpolated_string := $"{str}, {data}"
+
+/* 
+* The easiest way to concatenate two strings is also to use string interpolation.
+*/
+
+a := "Hello ";
+b := "World!";
+my_concatenated_string := $"{a}{b}";
+
+// * my_concatenated_string = "Hello World!";
+
+Hello :: struct {
+  to_string :: () -> string {
+    return "Hello";
+  }
+}
+
+World :: struct {
+  to_string :: () -> string {
+    return " World!";
+  }
+}
+
+a := Hello{};
+b := World{};
+my_concatenated_string := $"{a}{b}";
+
+// * my_concatenated_string = "Hello World!";

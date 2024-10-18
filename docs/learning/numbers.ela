@@ -1,0 +1,53 @@
+
+/* 
+  * We have a nice set of number types, most of them sized, other common aliases.
+*/
+
+x8 : s8;      xchar: char;  // same as 'char'
+x16: s16;
+x32: s32;     xint: int;    // same as 'int'
+x64: s64;
+
+y8 : u8;
+y16: u16;
+y32: u32;
+y64: u64;
+
+f32: float32; ffloat: float; // same as 'float'
+f64: float64;
+
+b: bool;
+
+/* 
+  * you can safely up cast integer/ float types but down casting or casting between integers and floats 
+  * requires an explicit cast.
+*/
+
+
+main :: () {
+  // safe;
+  x64 = x32 = x16 = x8;
+
+  // safe, but requires the explicit casts.
+  x8 = (s8)x16 = (s16)x32 = (s32)x64;
+
+  x32 = (s32)f32;
+  x32 = (s32)f64;
+
+  f32 = (float32)x32;
+  f32 = (float32)x64;
+  f32 = (float32)x16;
+  f32 = (float32)x8;
+}
+
+
+/* 
+  * character literals
+  * right now, it's clunky and bad using #char directive.
+*/
+
+c : char = #char "c";
+
+code := #char "\0";
+
+

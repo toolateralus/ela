@@ -1,0 +1,37 @@
+
+//  ? Ways to invoke constructor:
+//  ? Initializer list:
+  
+//  * parameterized. Will set as many fields as it can, or call a constructor if it finds a match with the types provided.
+some_struct := MyStruct{0, 1, 2};
+  
+//  * empty initializer list. calls default constructor.
+some_struct : MyStruct = {};
+  
+  
+// ? #make directive.
+//  * default constructor.
+some_struct := #make(MyStruct);
+  
+//  * using initializer list in #make. note this uses the same semantics as the init list examples.
+some_struct := #make(MyStruct, {0, 1, 2});
+  
+//  * using a copy constructor.
+some_struct := #make(MyStruct, some_struct);
+  
+//  * calling a constructor without init list. varargs.
+some_struct := #make(MyStruct, 0, 1, 2);
+  
+  
+/* 
+* Casting types.
+*/
+
+f : float;
+
+// C style cast.
+f1 := (int)f;
+
+// using a copy constructor.
+f2 := #make(int, f);
+  

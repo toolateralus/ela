@@ -1,0 +1,54 @@
+
+/* 
+ * For fixed length arrays, use c like syntax. 
+*/
+// ? Note: you cannot pass this type as an argument, it will be casted to s32* and emit a warning.
+fixed : s32[100];
+
+fixed : s32[3] {0, 1, 2};
+
+// * For a dynamic array, similar to rust Vec<T> or c++ std::vector<T>
+dynamic: s32[];
+
+dynamic: s32[]{0, 1, 2, 3, 4};
+
+// ? Note: these operators are temporary and subject to be replaced with methods.
+// ? Arrays lack robust support in the langauge currently.
+
+// * appending to a dynamic array
+dynamic ~= value;
+  
+// * erasing a value from a dynamic array
+dynamic ~~ value;
+  
+// * popping an element off the end of a dynamic array
+value := ~dynamic;
+
+// * Creating a dynamic array with preallocated number of elements
+array_with_100_elements_zero_initalized := #make(int[], 100);
+
+// * of course these types can be decorated with pointers or be multidimensional.
+array_of_pointers: s32*[];
+
+pointer_to_array: s32*[]*;
+
+array_of_arrays: s32[][];
+
+fixed_array_of_arrays: s32[100][100];
+
+/* 
+  * To get a raw pointer to a dynamic array's underlying memory
+  * use '.data'
+*/
+
+array := s32[]{};
+
+ptr: s32* = array.data;
+
+/* 
+  * To get the length of an array, use
+  * '.length'
+  * length is signed at the moment.
+*/
+
+length : s64 = array.length;
