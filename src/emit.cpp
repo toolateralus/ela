@@ -1430,8 +1430,14 @@ std::any EmitVisitor::visit(ASTRange *node) {
   return {};
 }
 std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
+  
+  // TODO: We had to use global_get type in various places here, 
+  // And I don't know if that was the valid move.
+  // It may have just evaded some bugs but caused bad behaviour.
+  // Although, the statements and expressions should've already been type checked already.
+  
   auto id = type->get_true_type();
-  auto new_type = ctx.scope->get_type(id);
+  auto new_type = global_get_type(id);
 
   if (new_type != type) {
     type = new_type;
@@ -1504,7 +1510,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int count = info->keys.size();
     int it = 0;
     for (const auto &name : info->keys) {
-      auto t = ctx.scope->get_type(s32_type());
+      auto t = global_get_type(s32_type());
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",
@@ -1533,7 +1539,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
-      auto t = ctx.scope->get_type(sym.type_id);
+      auto t = global_get_type(sym.type_id);
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",

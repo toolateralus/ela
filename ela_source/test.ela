@@ -1268,8 +1268,6 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   }
 }
 
-
-
 #test test_set_field_with_reflection :: () {
  reflector: Reflector;
  type := #type Reflector;
