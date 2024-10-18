@@ -170,13 +170,69 @@ randf :: () -> float {
   return (float)rand() / (float)Random.Max;
 }
 
-// !BUG can't define this because it's a redefinition of timeval even though we're not including anything that contains it as far as I know.
-// #alias __time_t :: s64;
-// #alias __suseconds_t :: s64;
 
-// timeval :: struct {
-//   tv_sec: __time_t;
-//   tv_usec: __suseconds_t;
-// };
+timespec_t :: struct {
+  tv_sec: s64;
+  tv_nsec: s64;
+}
 
-// #foreign gettimeofday :: (tv : timeval*, timezone: void*) -> int;
+#foreign clock_gettime :: (clock_id: int, tp: timespec_t*) -> int;
+
+// returns the timespec_t 
+get_high_precision_time :: () -> timespec_t {
+  ts: timespec_t;
+  clock_gettime(0, &ts);
+  return ts;
+}
+
+// returns a seconds value from get_high_precision_time
+timef :: () -> float64 {
+  ts := get_high_precision_time();
+  return (float64)ts.tv_sec + (float64)ts.tv_nsec / (float64)1_000_000_000.0;
+}
+
+to_string :: (num: s64) -> string {
+  switch num {
+    0: { return string{"0"}; }
+    1: { return string{"1"}; }
+    2: { return string{"2"}; }
+    3: { return string{"3"}; }
+    4: { return string{"4"}; }
+    5: { return string{"5"}; }
+    6: { return string{"6"}; }
+    7: { return string{"7"}; }
+    8: { return string{"8"}; }
+    9: { return string{"9"}; }
+  }
+  
+  negative := false;
+  if num < 0 {
+    negative = true;
+    num = -num;
+  }
+
+  buffer: char[20];
+  index: int = 0;
+
+  while num > 0 {
+    buffer[index] = #char "0" + (num % 10);
+    num /= 10;
+    index++;
+  }
+
+  if negative {
+    buffer[index] = #char "-";
+    index++;
+  }
+
+  // Reverse the buffer
+  for i in 0..(index / 2) {
+    temp := buffer[i];
+    buffer[i] = buffer[index - i - 1];
+    buffer[index - i - 1] = temp;
+  }
+
+  return string{(char*)buffer, ((char*) buffer) + index};
+  
+  
+}
