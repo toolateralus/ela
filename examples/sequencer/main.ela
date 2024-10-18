@@ -65,6 +65,16 @@ file_dropdown_style : Style = {
   2.0,
 }
 
+sequence_channel_style : Style = {
+  WHITE,
+  GRAY,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+}
+
 subdivisions: int = 1;
 beats: int = 4;
 total_notes: int = 4;
@@ -92,12 +102,13 @@ SequenceChannel :: struct {
   check_buttons: CheckButton[];
   sound: Sound;
   active: bool;
+  name: string;
+  style: Style
   
   draw :: (x: float, y: float) {
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
-        _x : float = x + (float)(check_buttons.length * 40);
-        println($"Addd button {check_buttons.length} at: {x}, {y}");
+        _x : float = x + 150 + (float)(check_buttons.length * 40);
         check_buttons ~= {
           false,
           Rectangle{_x, y, 35, 35},
@@ -107,9 +118,9 @@ SequenceChannel :: struct {
       }
       while check_buttons.length > total_notes {
         button := ~check_buttons;
-        println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
       }
     }
+    DrawText(name.data, (int)x, (int)y, style.font_size, style.highlighted);
     for *button; check_buttons {
       button.draw();
     }
@@ -135,10 +146,13 @@ file_dropdown : DropDown = {
 };
 
 on_file_selected :: (index: int) {
+  fileName := file_dropdown.options[index];
   channels ~= #make(SequenceChannel, {
     CheckButton[]{},
-    LoadSound(file_dropdown.options[index].data),
+    LoadSound(fileName.data),
     true,
+    fileName,
+    sequence_channel_style
   });
 }
 
