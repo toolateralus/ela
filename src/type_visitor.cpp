@@ -106,7 +106,7 @@ int TypeVisitor::generate_generic_function(ASTCall *node,
       assert_types_can_cast_or_equal(
           pointed_to, alias_id, node->source_range,
           "invalid argument types. expected: {}, got: {}",
-          std::format("parameter: {} of function: {}", i, node->name.value));
+          std::format("parameter: {} of function", i));
       info.parameter_types[i] = pointed_to;
       info.params_len++;
       params[i]->accept(this);
@@ -123,7 +123,7 @@ int TypeVisitor::generate_generic_function(ASTCall *node,
     assert_types_can_cast_or_equal(
         arg_tys[i], info.parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
-        std::format("parameter: {} of function: {}", i, node->name.value));
+        std::format("parameter: {} of function", i));
   }
 
   for (const auto &param : func_decl->params->params) {
@@ -170,7 +170,7 @@ void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
     // CLEANUP: fix this, enumerate is slow as balls.
     for (const auto &[i, overload] :
          symbol->function_overload_types | std::ranges::views::enumerate) {
-      auto name = node->name.value;
+      
       auto ovrld_ty = ctx.scope->get_type(overload);
       auto info = static_cast<FunctionTypeInfo *>(ovrld_ty->get_info());
       for (int j = 0; j < info->params_len; ++j) {
@@ -808,34 +808,36 @@ std::any TypeVisitor::visit(ASTWhile *node) {
 // with this function syntax, using #make(Type, ...) is really clunky
 // and annoying;
 std::any TypeVisitor::visit(ASTCall *node) {
-  auto symbol = ctx.scope->lookup(node->name.value);
-
-  if (!symbol)
-    throw_error(std::format("Use of undeclared symbol '{}'", node->name.value),
-                node->source_range);
-
-  Type *type = ctx.scope->get_type(symbol->type_id);
+  auto type = global_get_type(int_from_any(node->function->accept(this)));
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
 
   if (type)
-    declaring_or_assigning_type = symbol->type_id;
+    declaring_or_assigning_type = type->id;
 
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
-
-  if (symbol->declaring_node.is_not_null()) {
-    auto func_decl =
-        static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
-    if (func_decl && (func_decl->flags & FUNCTION_IS_GENERIC) != 0) {
-      return generate_generic_function(node, func_decl, arg_tys);
+  
+  
+  // TODO: we need to find a better way to call generics. We should not depend on having a named generic.
+  // Also, this will cause very cryptic and undefined errors to those who do not understand this limitation
+  // exists in the language. Bad!
+  if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
+    auto identifier = static_cast<ASTIdentifier*>(node->function);
+    auto symbol = ctx.scope->lookup(identifier->value.value);
+    
+    if (symbol->declaring_node.is_not_null()) {
+      auto func_decl = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+      if (func_decl && (func_decl->flags & FUNCTION_IS_GENERIC) != 0) {
+        return generate_generic_function(node, func_decl, arg_tys);
+      }
     }
-  }
 
-  // ! janky and annoying that we can't have const functions because of function
-  // pointers. ! HACK
-  symbol->flags |= SYMBOL_WAS_MUTATED;
+    // ! janky and annoying that we can't have const functions because of function
+    // pointers. ! HACK
+    symbol->flags |= SYMBOL_WAS_MUTATED;
+  }
 
   // the type may be null for a generic function but the if statement above
   // should always take care of that if that was the case.
@@ -847,15 +849,19 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error(
-        std::format(
-            "Unable to call function: {} did not refer to a function typed "
-            "variable. Constructors currently use #make(Type, ...) syntax.",
-            symbol->name),
-        node->source_range);
+        std::format("Unable to call function... target did not refer to a function typed variable. Constructors currently use #make(Type, ...) syntax."), node->source_range);
   }
 
   // Find a suitable function overload to call.
-  find_function_overload(node, symbol, arg_tys, type);
+  // ! Once again, we cannot call overloaded functions via a list of function pointers etc,
+  // ! any unnamed symbol. Unfortuately we wrote it to completely depend on naming, rather than typing,
+  // ! The whole generic and overload system needs to be overhauled for efficiency and cleanliness, as well
+  // ! as effectiveness and reliability.
+  if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
+    auto identifier = static_cast<ASTIdentifier*>(node->function);
+    auto symbol = ctx.scope->lookup(identifier->value.value);
+    find_function_overload(node, symbol, arg_tys, type);
+  }
 
   auto info = static_cast<FunctionTypeInfo *>(type->get_info());
 
@@ -863,9 +869,9 @@ std::any TypeVisitor::visit(ASTCall *node) {
       (arg_tys.size() > info->params_len ||
        arg_tys.size() < info->params_len - info->default_params)) {
     throw_error(
-        std::format("Function call '{}' has incorrect number of arguments. "
+        std::format("Function call has incorrect number of arguments. "
                     "Expected: {}, Found: {}",
-                    node->name.value, info->params_len, arg_tys.size()),
+                    info->params_len, arg_tys.size()),
         node->source_range);
   }
 
@@ -878,7 +884,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
     assert_types_can_cast_or_equal(
         arg_tys[i], info->parameter_types[i], node->source_range,
         "invalid argument types. expected: {}, got: {}",
-        std::format("parameter: {} of function: {}", i, node->name.value));
+        std::format("parameter: {} of function", i));
   }
 
   node->type = info->return_type;
@@ -1151,13 +1157,9 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   
   auto str = node->value.value;
   
-  if (str == "_range" || str == "_tuple" ||
-      str == "get"    || str == "_map"   ||
-      str == "_array" || str == "destruct") {
+  if (str == "_range" || str == "_tuple" || str == "_map"  || str == "_array") {
     throw_error(std::format("Cannot use reserved word : {}", str), node->source_range);
   }
-  
-  
   
   if (ctx.scope->find_type_id(node->value.value, {}) != -1) {
     throw_error("Invalid identifier: a type exists with that name.",
@@ -1280,9 +1282,14 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       node->right->get_node_type() == AST_NODE_CALL) {
     auto right = static_cast<ASTCall *>(node->right);
     // TODO: type check args too, also make sure only one arg
-    if (right && right->name.value == "contains") {
-      return bool_type();
+    
+    if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
+      auto identifier = static_cast<ASTIdentifier*>(right->function);
+      if (right && identifier->value.value == "contains") {
+        return bool_type();
+      }
     }
+    
   }
 
   // CLEANUP(Josh) 10/7/2024, 8:48:23 AM

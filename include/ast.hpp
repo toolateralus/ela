@@ -306,7 +306,7 @@ struct ASTMake : ASTExpr {
   }
 };
 struct ASTCall : ASTExpr {
-  Token name;
+  ASTExpr* function;
   ASTArguments *arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
@@ -438,7 +438,8 @@ struct GenericParameter {
     return type == other.type && is_named == other.is_named && name == other.name;
   }
 };
-
+  
+// TODO: generalize type declarations so all types can have nested types and static methods. Should be much simpler.
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
@@ -678,7 +679,7 @@ struct Parser {
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
-  ASTCall *parse_call(const Token &);
+  ASTCall *parse_call(ASTExpr* function);
   std::vector<GenericParameter> parse_generic_parameters();
 
   // ASTType* parsing routines

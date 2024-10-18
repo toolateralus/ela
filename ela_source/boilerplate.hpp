@@ -288,8 +288,8 @@ struct Field {
 struct Type {
   int id;
   char *name;
-  _array<Field *> fields;
   size_t size;
+  _array<Field *> fields;
 };
 
 #ifdef TESTING

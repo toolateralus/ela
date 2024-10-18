@@ -142,7 +142,7 @@ std::any SerializeVisitor::visit(ASTArguments *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTCall *node) {
-  ss << indent() << "Call " << node->name.value
+  ss << indent() << "Call " << node->function
      << " type: " << global_get_type(node->type)->to_string() << " {\n";
   indentLevel++;
   visit(node->arguments);

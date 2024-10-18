@@ -52,9 +52,12 @@ Context::Context() {
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());
     type_scope->insert("fields", field_arr);
+    type_scope->insert("size", u64_type());
 
     field_scope->insert("name", charptr_type());
     field_scope->insert("type", type_ptr);
+    field_scope->insert("size", u64_type());
+    field_scope->insert("offset", u64_type());
     
     auto get_info = type_alloc<FunctionTypeInfo>();
     get_info->is_varargs = true;

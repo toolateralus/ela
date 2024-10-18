@@ -1,0 +1,44 @@
+/* 
+  * Generic functions are specified by defining parameters with a typ prefix of '$'.
+  * Generic functions must take parameters, and may return generic values as long as one of the parameters defines that generic type.
+*/
+
+/* 
+  This is a generic function that supports any data type that has these three constraints:
+  
+  * Is trivially constructible (no constructor, or a default parameterless function)
+  
+  * A '<' operator.
+  
+  * A '-' unary operator.
+  
+  By default, any numerical types would be supported by this function.
+  
+*/
+abs :: (v: $T) -> $T {
+  _default: T;
+  if v < _default {
+    return -v;
+  }
+  return v;
+}
+
+/* 
+  * Generics can be decorated with array and pointer extensions, and still be shared among other parameters that don't have the same decorators.
+*/
+push :: (array: $T[]*, value: $T) {
+  // implementation ...
+}
+
+
+/* 
+  * You can reflect on generic parameters or do anything that treats the type as first class.
+*/
+get_type_name :: (_: $T) -> char* {
+  type := #type T;
+  /* 
+    This would also be valid... (reflecting on the type provided by the instance)
+    type := #type _;
+  */
+  return type.name;
+}

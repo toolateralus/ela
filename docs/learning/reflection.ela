@@ -1,0 +1,50 @@
+#import core; // import core for interpolated strings.
+
+
+// Define a simple vector structure.
+Vector2 :: struct {
+  // with 2 float fields.
+  x: float;
+  y: float;
+  
+  // Define a to_string so that interpolated strings can print us implicitly.
+  to_string :: () -> string {
+    return $"x={x}, y={y}";
+  }
+}
+
+
+main :: () {
+  // get the Type* that represents Vector2.
+  type := #type Vector2;
+  instance: Vector2;
+  println($"default value, instance={instance}");
+  
+  i : float;
+  for field; type.fields {
+    if strcmp(field.name, "this") == 0
+      then continue;
+    
+    // set the field on instance, to value 'i'
+    field.set(&instance, i);
+    
+    println($"Field descriptor: {field.name}, {field.size}, {field.offset}, {field.type.name}");
+    
+    i += 0.5;
+  }
+  println($"after writes, instance={instance}");
+  
+  for field; type.fields {
+    if strcmp(field.name, "this") == 0
+      then continue;
+    // store the value of the field from instance in 'v'
+    // It will return a pointer to the field in the struct for mutation (as a char*)
+    // however, we just dereference it.
+    v : float* = (float*)field.get(&instance);
+    println($"Reading {field.name} = {*v}");
+  }
+  
+  println($"after reads, instance={instance}");
+  
+}
+

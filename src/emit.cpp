@@ -212,7 +212,7 @@ std::any EmitVisitor::visit(ASTType *node) {
 }
 
 std::any EmitVisitor::visit(ASTCall *node) {
-  (*ss) << node->name.value;
+  node->function->accept(this);
   node->arguments->accept(this);
   return {};
 }
@@ -1159,12 +1159,17 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   if (left_ty->get_ext().is_map() &&
       node->right->get_node_type() == AST_NODE_CALL) {
     auto right = static_cast<ASTCall *>(node->right);
-    if (right && right->name.value == "contains") {
-      node->left->accept(this);
-      (*ss) << op;
-      node->right->accept(this);
-      return {};
+    
+    if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
+      auto identifier = static_cast<ASTIdentifier*>(right->function);
+      if (right && identifier->value.value == "contains") {
+        node->left->accept(this);
+        (*ss) << op;
+        node->right->accept(this);
+        return {};
+      }
     }
+    
   }
 
 
@@ -1428,13 +1433,35 @@ std::any EmitVisitor::visit(ASTRange *node) {
   (*ss) << ")";
   return {};
 }
+
+std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
+  std::stringstream ss;
+  ss << "new Field { "
+     << std::format(".name = \"{}\", ", name)
+     << std::format(".type = {}, ", to_type_struct(type, context));
+  
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    ss << std::format(".size = sizeof({}), ", to_cpp_string(type))
+       << std::format(".offset = offsetof({}, {})", to_cpp_string(parent_type), name);
+  }
+  
+  ss << " }";
+  return ss.str();
+}
+
+std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context, const std::string &fields) {
+  std::stringstream ss;
+  ss << "_type_info[" << id << "] = new Type {"
+     << ".id = " << id << ", "
+     << ".name = \"" << type->to_string() << "\", "
+     << ".size = sizeof(" << to_cpp_string(type) << "), "
+     << ".fields = " << fields
+     << " };";
+  context.type_info_strings.push_back(ss.str());
+  return std::format("_type_info[{}]", id);
+}
+
 std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
-  
-  // TODO: We had to use global_get type in various places here, 
-  // And I don't know if that was the valid move.
-  // It may have just evaded some bugs but caused bad behaviour.
-  // Although, the statements and expressions should've already been type checked already.
-  
   auto id = type->get_true_type();
   auto new_type = global_get_type(id);
 
@@ -1455,39 +1482,23 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   type_cache[id] = true;
 
   std::stringstream fields_ss;
-  if (type->kind == TYPE_UNION) {
+  if (type->kind == TYPE_UNION || type->kind == TYPE_STRUCT) {
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
     if (info->scope->symbols.empty()) {
-      fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << type->to_string() << "\","
-                << ".id = " << id << "}";
-      context.type_info_strings.push_back(fields_ss.str());
-      return std::string("_type_info[") + std::to_string(id) + "]";
+      return get_type_struct(type, id, context, "{}");
     }
     fields_ss << "{";
-
     int count = info->scope->symbols.size();
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
+      
+      if (name == "this") continue;
+      
       auto t = global_get_type(sym.type_id);
       if (!t)
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-                    
-      if ((t->is_kind(TYPE_STRUCT) || t->is_kind(TYPE_UNION)) && name != "this") {
-        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                  << std::format(".type = {},", to_type_struct(t, context))
-                  << std::format(".size = sizeof({}),", to_cpp_string(t))
-                  << std::format(".offset = offsetof({}, {})", to_cpp_string(type), name)
-                  << " }";
-      } else {
-        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                  << std::format(".type = {}", to_type_struct(t, context))
-                  << " }";
-      }
-                    
+        throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      fields_ss << get_field_struct(name, t, type, context);
       ++it;
       if (it < count) {
         fields_ss << ", ";
@@ -1497,64 +1508,16 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   } else if (type->kind == TYPE_ENUM) {
     auto info = static_cast<EnumTypeInfo *>(type->get_info());
     if (info->keys.empty()) {
-      fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << type->to_string() << "\","
-                << ".id = " << id << "}";
-      context.type_info_strings.push_back(fields_ss.str());
-      return std::string("_type_info[") + std::to_string(id) + "]";
+      return get_type_struct(type, id, context, "{}");
     }
-
     fields_ss << "{";
-
     int count = info->keys.size();
     int it = 0;
     for (const auto &name : info->keys) {
       auto t = global_get_type(s32_type());
       if (!t)
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                << std::format(".type = {}", to_type_struct(t, context))
-                << " }";
-      ++it;
-      if (it < count) {
-        fields_ss << ", ";
-      }
-    }
-    fields_ss << "}";
-  } else if (type->kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(type->get_info());
-    if (info->scope->symbols.empty()) {
-      fields_ss << "_type_info[" << id << "] = new Type {"
-                << ".name = \"" << type->to_string() << "\","
-                << ".id = " << id << "}";
-      context.type_info_strings.push_back(fields_ss.str());
-      return std::string("_type_info[") + std::to_string(id) + "]";
-    }
-    fields_ss << "{";
-
-    int count = info->scope->symbols.size();
-    int it = 0;
-    for (const auto &tuple : info->scope->symbols) {
-      auto &[name, sym] = tuple;
-      auto t = global_get_type(sym.type_id);
-      if (!t)
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      if ((t->is_kind(TYPE_STRUCT) || t->is_kind(TYPE_UNION)) && name != "this") {
-        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                  << std::format(".type = {},", to_type_struct(t, context))
-                  << std::format(".size = sizeof({}),", to_cpp_string(t))
-                  << std::format(".offset = offsetof({}, {})", to_cpp_string(type), name)
-                  << " }";
-      } else {
-        fields_ss << "new Field { " << std::format(".name = \"{}\"", name) << ", "
-                  << std::format(".type = {}", to_type_struct(t, context))
-                  << " }";
-      }
-      
+        throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+      fields_ss << get_field_struct(name, t, type, context);
       ++it;
       if (it < count) {
         fields_ss << ", ";
@@ -1562,20 +1525,12 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     }
     fields_ss << "}";
   } else {
-    fields_ss << "_type_info[" << id << "] = new Type {"
-              << ".id = " << id << ",\n"
-              << ".name = \"" << type->to_string() << "\"}";
-    context.type_info_strings.push_back(fields_ss.str());
-    return std::string("_type_info[") + std::to_string(id) + "]";
+    return get_type_struct(type, id, context, "{}");
   }
 
-  context.type_info_strings.push_back(
-      std::format("_type_info[{}] = new Type {{ .id = {}, .name = \"{}\", "
-                  ".fields = {} }};",
-                  id, id, type->to_string(), fields_ss.str()));
-
-  return std::format("_type_info[{}]", id);
+  return get_type_struct(type, id, context, fields_ss.str());
 }
+
 std::any EmitVisitor::visit(ASTSwitch *node) {
   
   if (!node->is_statement) {

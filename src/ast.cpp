@@ -1119,11 +1119,11 @@ ASTArguments *Parser::parse_arguments() {
   return args;
   
 }
-ASTCall *Parser::parse_call(const Token &name) {
+ASTCall *Parser::parse_call(ASTExpr* function) {
   auto range = begin_node();
   auto args = parse_arguments();
   ASTCall *call = ast_alloc<ASTCall>();
-  call->name = name;
+  call->function = function;
   call->arguments = args;
   end_node(call, range);
   return call;
@@ -1170,6 +1170,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::RCurly);
   return node;
 }
+
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
@@ -1234,6 +1235,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   end_node(decl, range);
   return decl;
 }
+
 ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto range = begin_node();
   auto node = ast_alloc<ASTUnionDeclaration>();
@@ -1474,14 +1476,7 @@ ASTExpr *Parser::parse_postfix() {
          peek().type == TType::LParen) {
 
     if (peek().type == TType::LParen) {
-      if (left->get_node_type() == AST_NODE_IDENTIFIER) {
-        auto identifier = static_cast<ASTIdentifier *>(left);
-        auto tok = identifier->value;
-        left = parse_call(tok);
-      } else {
-        end_node(nullptr, range);
-        throw_error("failed to call a non-identifier.", range);
-      }
+      left = parse_call(left);
     } else if (peek().type == TType::Dot) {
       eat();
       auto dot = ast_alloc<ASTDotExpr>();

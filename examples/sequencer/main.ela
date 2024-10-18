@@ -189,7 +189,7 @@ main :: () {
   dir := directory_open(".");
   
   InitAudioDevice();
-  InitWindow(GetScreenWidth(), 600, "Sequencer");
+  InitWindow(0, 0, "Sequencer");
   
   SetWindowState(.WindowResizable);
   SetTargetFPS(1000);

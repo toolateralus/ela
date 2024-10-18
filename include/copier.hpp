@@ -222,7 +222,7 @@ struct Copier {
 
   ASTCall* copy_call(ASTCall* node) {
     auto call = ast_alloc<ASTCall>();
-    call->name = node->name;
+    call->function = node->function;
     call->arguments = static_cast<ASTArguments*>(copy(node->arguments));
     call->type = node->type;
     call->source_range = node->source_range;

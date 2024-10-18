@@ -1,3 +1,2 @@
-xaryu :: () -> <int, int> {
-  return <10, 10>;
-}
+
+
