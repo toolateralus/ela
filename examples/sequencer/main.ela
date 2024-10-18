@@ -61,6 +61,16 @@ file_dropdown_style : Style = {
   2.0,
 }
 
+sequence_channel_style : Style = {
+  WHITE,
+  GRAY,
+  GREEN,
+  16,
+  true,
+  5.0,
+  2.0,
+}
+
 subdivisions: int = 1;
 beats: int = 4;
 total_notes: int = 4;
@@ -102,13 +112,13 @@ SequenceChannel :: struct {
   sound: Sound;
   active: bool;
   style: Style;
-
+  name: string;
   
   draw :: (x: float, y: float) {
     
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
-        _x : float = x + (float)(check_buttons.length * 40);
+        _x : float = x + 150 + (float)(check_buttons.length * 40);
         check_buttons ~= {
           false,
           Rectangle{_x, y, 35, 35},
@@ -120,6 +130,7 @@ SequenceChannel :: struct {
         button := ~check_buttons;
       }
     }
+    DrawText(name.data, (int)x, (int)y, style.font_size, style.highlighted);
     for *button; check_buttons {
       button.draw();
     }
@@ -146,11 +157,14 @@ file_dropdown : DropDown = {
 };
 
 on_file_selected :: (index: int) {
+  fileName := file_dropdown.options[index];
   channels ~= #make(SequenceChannel, {
-    CheckButton[]{},
-    LoadSound(file_dropdown.options[index].data),
+    #make(CheckButton[]),
+    LoadSound(fileName.data),
     true,
     get_sequencer_style(check_button_style),
+    fileName,
+    
   });
 }
 

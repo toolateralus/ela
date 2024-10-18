@@ -665,6 +665,8 @@ SliderF :: struct {
     // Draw the slider foreground
     DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
 
+    DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, style.highlighted);
+
     
     // Draw the text
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
@@ -738,6 +740,8 @@ SliderI :: struct {
     };
 
     DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+
+    DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, style.highlighted);
 
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
     text_y := rect.y + (rect.height - style.font_size) / 2;
