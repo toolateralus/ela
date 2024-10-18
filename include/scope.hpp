@@ -156,28 +156,26 @@ struct Scope {
     return global_find_function_type_id(name, info, ext);
   }
 
-  int find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
+  int find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions, bool was_created = false) {
     auto num = num_types;
     auto id = global_find_type_id(tuple_types, type_extensions);
     
     // if we extended a type, or if we created a new tuple,
     // but we have access to all of thee types within it,
     // we just add the type to our table.
-    if (num_types > num) {
+    if (num_types > num || was_created) {
       // search for all the types within the tuple.
       for (auto t: tuple_types) {
         bool found = false;
         for (auto my_t : types) {
           if (my_t == t) {
-            found =true;
+            found = true;
             break;
           }
         }
-        if (!found) {
-          if (parent) {
-            return parent->find_type_id(tuple_types, type_extensions);
-          }
-          return -1;
+        if (!found) { 
+          was_created = true;
+          goto try_find_in_parent;
         }
       }
       types.push_back(id);
@@ -188,8 +186,9 @@ struct Scope {
         return id;
       }
     }
+    try_find_in_parent:
     if (parent) {
-      return parent->find_type_id(tuple_types, type_extensions);
+      return parent->find_type_id(tuple_types, type_extensions, was_created);
     }
     return -1;
   }
