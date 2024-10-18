@@ -11,10 +11,6 @@
 playing := false;
 timer: Timer;
 
-get_seconds :: (f: float32) -> int {
-  return (int)(f * 1_000_000);
-}
-
 bpm_slider : SliderF = {
   "bpm", // text
   Rectangle{0,0, 150, 40}, // rectangle

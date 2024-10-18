@@ -415,7 +415,7 @@ LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 #foreign DrawTextureRec :: (texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
 #foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
 #foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
-
+#foreign DrawRectangleLines :: (posX: int, posY: int, width: int, height: int, color: Color) -> void;
 #foreign LoadSound :: (fileName: char*) -> Sound;
 #foreign UnloadSound :: (sound: Sound) -> void;
 #foreign PlaySound :: (sound: Sound) -> void;
@@ -758,19 +758,23 @@ CheckButton :: struct {
   text: string;
   id: int;
   on_clicked: void(int)* = null;
-  draw :: () {
+   draw :: () {
     if value {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
     } else {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
     }
-
+  
     if text.data {
       text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
       text_y := rect.y + (rect.height - style.font_size) / 2;
       DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
     }
-
+  
+    if CheckCollisionPointRec(GetMousePosition(), rect) {
+      DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, ORANGE);
+    }
+  
     if CheckCollisionPointRec(GetMousePosition(), rect) && IsMouseButtonPressed(MouseButton.Left) {
       value = !value;
     }
