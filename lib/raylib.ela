@@ -791,9 +791,9 @@ CheckButton :: struct {
   rect: Rectangle;
   style: Style;
   text: string;
-  id: int;
-  on_clicked: void(int)* = null;
-   draw :: () {
+  allow_hold : bool;
+  
+  draw :: () {
     if value {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
     } else {
@@ -809,10 +809,26 @@ CheckButton :: struct {
     if CheckCollisionPointRec(GetMousePosition(), rect) {
       DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, ORANGE);
     }
-  
-    if CheckCollisionPointRec(GetMousePosition(), rect) && IsMouseButtonPressed(MouseButton.Left) {
+    
+    
+    left := false;
+    right := false;
+    hit := CheckCollisionPointRec(GetMousePosition(), rect);
+    
+    if allow_hold {
+      left = IsMouseButtonDown(MouseButton.Left)
+      right = IsMouseButtonDown(MouseButton.Right);
+      if hit && left {
+        value = true;
+      } else if hit && right {
+        value = false;
+      }
+    } else if hit && IsMouseButtonPressed(MouseButton.Left) {
       value = !value;
     }
+    
+    
+    
   }
 }
 
