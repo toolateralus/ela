@@ -107,6 +107,12 @@ Context::Context() {
   
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
+  
+  
+  for (int i = 0; i < num_types; ++i) {
+    root_scope->types.push_back(i);
+  }
+  
 }
 
 

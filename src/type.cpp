@@ -436,7 +436,7 @@ int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
-std::string global_get_function_typename(ASTFunctionDeclaration *decl) {
+std::string get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
   ss << global_get_type(return_type->resolved_type)->to_string();

@@ -166,7 +166,7 @@ void EmitVisitor::emit_function_pointer_type_string(
   }
 
   auto info = static_cast<FunctionTypeInfo *>(type->get_info());
-  auto return_type = global_get_type(info->return_type);
+  auto return_type = ctx.scope->get_type(info->return_type);
 
   (*ss) << to_cpp_string(return_type) << "(*";
 
@@ -177,7 +177,7 @@ void EmitVisitor::emit_function_pointer_type_string(
   (*ss) << ")(";
 
   for (int i = 0; i < info->params_len; ++i) {
-    auto type = global_get_type(info->parameter_types[i]);
+    auto type = ctx.scope->get_type(info->parameter_types[i]);
     (*ss) << to_cpp_string(type);
     if (i != info->params_len - 1) {
       (*ss) << ", ";
@@ -187,7 +187,7 @@ void EmitVisitor::emit_function_pointer_type_string(
 }
 
 std::any EmitVisitor::visit(ASTType *node) {
-  auto type = global_get_type(node->resolved_type);
+  auto type = ctx.scope->get_type(node->resolved_type);
 
   if (!type) {
     throw_error("Internal compiler error: an ASTType* was null when trying to find it's type in the table", node->source_range);
@@ -197,7 +197,7 @@ std::any EmitVisitor::visit(ASTType *node) {
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
     int pointed_to_ty =
         std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
-    (*ss) << to_type_struct(global_get_type(pointed_to_ty), ctx);
+    (*ss) << to_type_struct(ctx.scope->get_type(pointed_to_ty), ctx);
     return {};
   }
 
@@ -234,8 +234,8 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
 
   std::string str;
   auto get_format_str = [&](int type_id) {
-    auto type = global_get_type(type_id);
-    type = global_get_type(type->get_true_type());
+    auto type = ctx.scope->get_type(type_id);
+    type = ctx.scope->get_type(type->get_true_type());
 
     // We just assume that the type-checker has validated that this struct has a to_string() function
     if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
@@ -294,7 +294,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
 
   auto interpolate_value = [&](ASTExpr *value) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-    auto type = global_get_type(type_id);
+    auto type = ctx.scope->get_type(type_id);
     
     auto interpolate_to_string_struct_union = [&](Scope *scope) {
       auto sym = scope->lookup("to_string");
@@ -302,9 +302,9 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
       if (!sym) 
         throw_error("Cannot use a struct in an interpolated string without defining a `to_string` function that returns either a char* or a string", value->source_range);
       
-      auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+      auto sym_ty = static_cast<FunctionTypeInfo *>(ctx.scope->get_type(sym->type_id)->get_info());
                   
-      auto return_ty = global_get_type(sym_ty->return_type);
+      auto return_ty = ctx.scope->get_type(sym_ty->return_type);
       value->accept(this);
       
       auto &extensions = type->get_ext();
@@ -344,7 +344,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
 }
 
 std::any EmitVisitor::visit(ASTLiteral *node) {
-  auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))
+  auto type = ctx.scope->get_type(std::any_cast<int>(node->accept(&type_visitor)))
                   ->to_string();
   std::string output;
   switch (node->tag) {
@@ -389,13 +389,13 @@ std::any EmitVisitor::visit(ASTIdentifier *node) {
 
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Sub) {
-    auto type = global_get_type(
+    auto type = ctx.scope->get_type(
                     std::any_cast<int>(node->operand->accept(&type_visitor)))
                     ->to_string();
     (*ss) << '(' << type << ')';
   }
   auto left_type = std::any_cast<int>(node->operand->accept(&type_visitor));
-  auto type = global_get_type(left_type);
+  auto type = ctx.scope->get_type(left_type);
   if (node->op.type == TType::BitwiseNot && type->get_ext().is_array()) {
     node->operand->accept(this);
     (*ss) << ".pop()";
@@ -423,7 +423,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
     //   (*ss) << "const ";
     // }
     auto id = std::any_cast<int>(node->right->accept(&type_visitor));
-    auto type = global_get_type(id);
+    auto type = ctx.scope->get_type(id);
 
     if (type->is_kind(TYPE_FUNCTION)) {
       std::string identifier =
@@ -481,7 +481,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) << node->op.value;
 
   if (node->op.type == TType::Assign) {
-    auto type = global_get_type(node->resolved_type);
+    auto type = ctx.scope->get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer(1);
     if (isptr)
       (*ss) << "(" << to_cpp_string(type) << ")";
@@ -503,7 +503,7 @@ std::any EmitVisitor::visit(ASTExprStatement *node) {
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*/u8*
 void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = ctx.scope->get_type(node->type->resolved_type);
   if (type->get_ext().is_pointer(1))
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
@@ -582,7 +582,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
 
 std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = ctx.scope->get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
   if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
       !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
@@ -610,7 +610,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
       std::string init = "{";
       for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
         auto elem = type->get_element_type();
-        auto ty = global_get_type(elem);
+        auto ty = ctx.scope->get_type(elem);
         // * We never emit initializers for these sub arrays.
         // TODO: find a way to actually zero initialize all these fixed buffers
         // without hacky lambdas everywhere.
@@ -847,7 +847,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   if ((node->flags & FUNCTION_IS_GENERIC) != 0) {
     auto variants = node->generic_types;
     for (const auto variant : variants) {
-      auto variant_fun_ty = global_get_type(variant);
+      auto variant_fun_ty = ctx.scope->get_type(variant);
       auto fun_info =
           static_cast<FunctionTypeInfo *>(variant_fun_ty->get_info());
 
@@ -889,7 +889,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = ctx.scope->get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
 
   current_struct_decl = node;
@@ -954,7 +954,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   };
   int n = 0;
 
-  auto elem_ty = global_get_type(node->element_type);
+  auto elem_ty = ctx.scope->get_type(node->element_type);
 
   auto type_name = node->type->base;
   for (const auto &[key, value] : node->key_values) {
@@ -1023,7 +1023,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
 }
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = ctx.scope->get_type(node->type->resolved_type);
   
   if (type->is_kind(TYPE_FUNCTION)) {
     get_declaration_type_signature_and_identifier(node->name, type);
@@ -1126,7 +1126,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
 std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto left = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_ty = global_get_type(left);
+  auto left_ty = ctx.scope->get_type(left);
 
   auto op = ".";
 
@@ -1214,7 +1214,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 }
 
 std::any EmitVisitor::visit(ASTMake *node) {
-  auto type = global_get_type(node->type_arg->resolved_type);
+  auto type = ctx.scope->get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
       throw_error("cannot create a pointer currently with #make. it only casts "
@@ -1253,12 +1253,12 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
 std::any EmitVisitor::visit(ASTAllocate *node) {
   switch (node->kind) {
   case ASTAllocate::New: {
-    auto ptr_type = global_get_type(node->type.get()->resolved_type);
+    auto ptr_type = ctx.scope->get_type(node->type.get()->resolved_type);
     (*ss) << "new ";
     auto ext = ptr_type->get_ext();
     ext.extensions.pop_back();
-    auto nonptr = global_find_type_id(ptr_type->get_base(), ext);
-    auto nonptr_ty = global_get_type(nonptr);
+    auto nonptr = ctx.scope->find_type_id(ptr_type->get_base(), ext);
+    auto nonptr_ty = ctx.scope->get_type(nonptr);
     auto str = to_cpp_string(nonptr_ty);
     (*ss) << str;
     if (!node->arguments) {
@@ -1331,7 +1331,7 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
     }
     if (ext == TYPE_EXT_MAP) {
       std::string current = ss.str();
-      auto key_string = to_cpp_string(global_get_type(extensions.key_type));
+      auto key_string = to_cpp_string(ctx.scope->get_type(extensions.key_type));
       ss.str("");
       ss.clear();
       ss << "_map<" << key_string << ", " << current << ">";
@@ -1341,7 +1341,7 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
 }
 
 std::string EmitVisitor::get_cpp_scalar_type(int id) {
-  auto type = global_get_type(id);
+  auto type = ctx.scope->get_type(id);
   std::string name = "";
   if (type->get_base() == "s64")
     name = "int64_t";
@@ -1389,7 +1389,7 @@ std::string EmitVisitor::get_cpp_scalar_type(int id) {
 }
 
 std::string EmitVisitor::to_cpp_string(Type *type) {
-  type = global_get_type(type->get_true_type());
+  type = ctx.scope->get_type(type->get_true_type());
 
   auto output = std::string{};
   switch (type->kind) {
@@ -1431,7 +1431,7 @@ std::any EmitVisitor::visit(ASTRange *node) {
 }
 std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   auto id = type->get_true_type();
-  auto new_type = global_get_type(id);
+  auto new_type = ctx.scope->get_type(id);
 
   if (new_type != type) {
     type = new_type;
@@ -1465,7 +1465,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
-      auto t = global_get_type(sym.type_id);
+      auto t = ctx.scope->get_type(sym.type_id);
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",
@@ -1504,7 +1504,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int count = info->keys.size();
     int it = 0;
     for (const auto &name : info->keys) {
-      auto t = global_get_type(s32_type());
+      auto t = ctx.scope->get_type(s32_type());
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",
@@ -1533,7 +1533,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
-      auto t = global_get_type(sym.type_id);
+      auto t = ctx.scope->get_type(sym.type_id);
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",
@@ -1575,7 +1575,7 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
   
   if (!node->is_statement) {
     (*ss) << "[&] ->";
-    auto type = global_get_type(node->return_type);
+    auto type = ctx.scope->get_type(node->return_type);
     (*ss) << to_cpp_string(type);
     (*ss) << "{\n";;
   }
@@ -1602,7 +1602,7 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
   if (!node->is_statement) {
     (*ss) << "else {";
     
-    auto type = global_get_type(node->return_type);
+    auto type = ctx.scope->get_type(node->return_type);
     (*ss) <<  "return " <<  to_cpp_string(type) << "{};";
     (*ss) << "\n}\n";
     

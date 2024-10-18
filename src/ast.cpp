@@ -341,7 +341,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto enum_decl = parser->parse_enum_declaration(name);
            enum_decl->is_flags = true;
-           auto type = global_get_type(enum_decl->type->resolved_type);
+           auto type = parser->ctx.scope->get_type(enum_decl->type->resolved_type);
            auto info = static_cast<EnumTypeInfo *>(type->get_info());
            info->is_flags = true;
            return enum_decl;
@@ -359,24 +359,29 @@ void Parser::init_directive_routines() {
            auto aliased_type = parser->parse_type();
 
            if (aliased_type->resolved_type != -1) {
-             auto type = global_get_type(aliased_type->resolved_type);
+             auto type = parser->ctx.scope->get_type(aliased_type->resolved_type);
+             
+             if (!type) {
+              throw_error("Failed to get type for alias.", aliased_type->source_range);
+             }
+             
              if (type->is_kind(TYPE_FUNCTION)) {
-               auto id = global_find_function_type_id(
+               auto id = parser->ctx.scope->find_function_type_id(
                    aliased_type->base,
                    *static_cast<FunctionTypeInfo *>(type->get_info()),
                    aliased_type->extension_info);
               
               parser->ctx.scope->create_type_alias(id, name.value);
-              //  auto alias = global_create_type_alias(id, name.value);
+              //  auto alias = ctx.scope->create_type_alias(id, name.value);
               //  parser->ctx.scope->aliases.push_back(alias);
                return ast_alloc<ASTNoop>();
              }
            }
 
-           auto id = global_find_type_id(aliased_type->base,
+           auto id = parser->ctx.scope->find_type_id(aliased_type->base,
                                          aliased_type->extension_info);
 
-           auto type = global_get_type(id);
+           auto type = parser->ctx.scope->get_type(id);
 
            if (!type)  {
             throw_error("Unable to create type alias: target type does not exist.", aliased_type->source_range);
@@ -423,7 +428,7 @@ void Parser::init_directive_routines() {
            parser->expect(TType::DoubleColon);
            auto decl =
                parser->parse_struct_declaration(get_unique_identifier());
-           auto t = global_get_type(decl->type->resolved_type);
+           auto t = parser->ctx.scope->get_type(decl->type->resolved_type);
            auto info = static_cast<StructTypeInfo *>(t->get_info());
            info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
            return decl;
@@ -563,7 +568,7 @@ ASTType *Parser::parse_type() {
         if (size->get_node_type() == AST_NODE_TYPE) {
           extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType*>(size);
-          extension_info.key_type = global_find_type_id(type->base, type->extension_info);
+          extension_info.key_type = ctx.scope->find_type_id(type->base, type->extension_info);
           expect(TType::RBrace);
           continue;
         }
@@ -585,7 +590,6 @@ ASTType *Parser::parse_type() {
     }
   }
   
-  early_return:
   auto node = ast_alloc<ASTType>();
   node->base = base;
   node->extension_info = extension_info;
@@ -889,7 +893,7 @@ ASTStatement *Parser::parse_statement() {
     throw_error(std::format("Unexpected variable {}", tok.value), range);
   }
 
-  if (global_find_type_id(tok.value, {}) == -1) {
+  if (ctx.scope->find_type_id(tok.value, {}) == -1) {
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),
         range);
@@ -907,7 +911,7 @@ ASTDeclaration *Parser::parse_declaration() {
   expect(TType::Colon);
   decl->type = parse_type();
 
-  if (global_find_type_id(iden.value, {}) != -1) {
+  if (ctx.scope->find_type_id(iden.value, {}) != -1) {
     end_node(nullptr, range);
     throw_error("Invalid identifier: a type exists with that name,", range);
   }
@@ -1061,7 +1065,7 @@ ASTParamsDecl *Parser::parse_parameters() {
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
     if (is_type_param || next.type == TType::Directive || !type ||
-        global_find_type_id(next.value, {}) != -1) {
+        ctx.scope->find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
 
@@ -1162,7 +1166,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys_set.insert(key);
   }
   node->type->resolved_type =
-      global_create_enum_type(node->type->base, keys, node->is_flags);
+      ctx.scope->create_enum_type(node->type->base, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
 }
@@ -1170,13 +1174,14 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
 
+  auto old = current_struct_decl;
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
 
-  auto type_id = global_find_type_id(name.value, {});
+  auto type_id = ctx.scope->find_type_id(name.value, {});
   
   if (type_id != -1) {
-    auto type = global_get_type(type_id);
+    auto type = ctx.scope->get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = static_cast<StructTypeInfo*>(type->get_info());
@@ -1187,7 +1192,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = global_create_struct_type(name.value, {});
+    type_id = ctx.scope->create_struct_type(name.value, {});
   }
 
   auto type = ast_alloc<ASTType>();
@@ -1213,19 +1218,19 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     }
     decl->scope = block->scope;
   } else {
-    Type *t = global_get_type(type_id);
+    Type *t = ctx.scope->get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
 
   auto info =
-      static_cast<StructTypeInfo *>(global_get_type(type_id)->get_info());
+      static_cast<StructTypeInfo *>(ctx.scope->get_type(type_id)->get_info());
       
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
 
-  current_struct_decl = nullptr;
+  current_struct_decl = old;
   end_node(decl, range);
   return decl;
 }
@@ -1238,10 +1243,10 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->type = ast_alloc<ASTType>();
   node->type->base = name.value;
 
-  auto id = global_find_type_id(name.value, {});
+  auto id = ctx.scope->find_type_id(name.value, {});
   
   if (id != -1) {
-    auto type = global_get_type(id);
+    auto type = ctx.scope->get_type(id);
     
     if (!type->is_kind(TYPE_UNION)) {
       end_node(nullptr, range);
@@ -1259,8 +1264,8 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   expect(TType::Union);
 
-  auto type_id = global_find_type_id(name.value, {});
-  auto type = global_get_type(type_id);
+  auto type_id = ctx.scope->find_type_id(name.value, {});
+  auto type = ctx.scope->get_type(type_id);
   
   if (type && type->is_kind(TYPE_UNION)) {
     auto info = static_cast<UnionTypeInfo*>(type->get_info());
@@ -1274,13 +1279,13 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     // and resolve the node type, cause might as well.
     type_id = 
     node->type->resolved_type = 
-      global_create_union_type(name.value, nullptr, UNION_IS_NORMAL);  
+      ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);  
   }
       
   if (peek().type == TType::Semi) {
     eat();
     node->is_fwd_decl = true;
-    type = global_get_type(type_id);
+    type = ctx.scope->get_type(type_id);
     auto info = static_cast<UnionTypeInfo*>(type->get_info());
     info->flags |= UNION_IS_FORWARD_DECLARED;
     return node;
@@ -1291,7 +1296,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   std::vector<ASTStructDeclaration *> structs;
   auto block = parse_block();
   block->scope->is_struct_or_union_scope = true;
-
+  
   auto scope = block->scope;
 
   for (auto &statement : block->statements) {
@@ -1301,7 +1306,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
-      auto type = global_get_type(struct_decl->type->resolved_type);
+      auto type = scope->get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         throw_error(
@@ -1322,7 +1327,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->structs = structs;
   node->scope = block->scope;
 
-  type = global_get_type(type_id);
+  type = ctx.scope->get_type(type_id);
   auto info = static_cast<UnionTypeInfo *>(type->get_info());
 
   info->scope = scope;
@@ -1636,7 +1641,7 @@ ASTExpr *Parser::parse_primary() {
     auto range = begin_node();
     auto name = tok.value;
 
-    if (global_find_type_id(tok.value, {}) != -1) {
+    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
       auto type = parse_type();
       if (peek().type == TType::LCurly) {
         auto init_list = parse_expr();
@@ -1715,7 +1720,7 @@ ASTExpr *Parser::parse_primary() {
     eat(); // consume '('
 
     // for (Type)expr;
-    if (global_find_type_id(peek().value, {}) != -1) {
+    if (ctx.scope->find_type_id(peek().value, {}) != -1 || peek().type == TType::LT) {
       // CLEANUP: We probably don't wanna use ASTMake for so many things,
       // but for now it's okay. Actually, we don't want ASTMake at all, it should get
       // eliminated and ASTConstruct and ASTCast should probably be added to replace it.
@@ -1895,7 +1900,7 @@ void Parser::append_type_extensions(ASTType *type) {
         if (size->get_node_type() == AST_NODE_TYPE) {
           type->extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType*>(size);
-          type->extension_info.key_type = global_find_type_id(type->base, type->extension_info);
+          type->extension_info.key_type = ctx.scope->find_type_id(type->base, type->extension_info);
           printf("KEY TYPE: %d\n", type->extension_info.key_type);
           expect(TType::RBrace);
           continue;
@@ -1918,7 +1923,7 @@ ASTType *Parser::parse_function_type(const std::string &base,
 
   FunctionTypeInfo info{};
   info.return_type =
-      global_find_type_id(return_type->base, return_type->extension_info);
+      ctx.scope->find_type_id(return_type->base, return_type->extension_info);
 
   auto param_types = parse_parameter_types();
   std::ostringstream ss;
@@ -1927,10 +1932,10 @@ ASTType *Parser::parse_function_type(const std::string &base,
   {
     ss << "(";
     for (size_t i = 0; i < param_types.size(); ++i) {
-      info.parameter_types[i] = global_find_type_id(
+      info.parameter_types[i] = ctx.scope->find_type_id(
           param_types[i]->base, param_types[i]->extension_info);
       info.params_len++;
-      ss << global_get_type(info.parameter_types[i])->to_string();
+      ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
       if (i != param_types.size() - 1) {
         ss << ", ";
       }
@@ -1938,9 +1943,9 @@ ASTType *Parser::parse_function_type(const std::string &base,
     ss << ")";
   }
 
-  auto type_name = global_get_type(info.return_type)->to_string() + ss.str();
+  auto type_name = ctx.scope->get_type(info.return_type)->to_string() + ss.str();
   return_type->resolved_type =
-      global_find_function_type_id(type_name, info, {});
+      ctx.scope->find_function_type_id(type_name, info, {});
   return_type->base = type_name;
   return_type->extension_info = {};
 

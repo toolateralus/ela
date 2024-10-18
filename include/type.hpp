@@ -409,7 +409,7 @@ struct Type {
 };
 
 struct ASTFunctionDeclaration;
-std::string global_get_function_typename(ASTFunctionDeclaration *);
+std::string get_function_typename(ASTFunctionDeclaration *);
 
 template <class T> T *type_alloc(size_t n = 1) {
   auto mem = type_arena.allocate(sizeof(T) * n);
