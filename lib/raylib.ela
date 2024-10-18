@@ -650,6 +650,7 @@ SliderF :: struct {
   max_value: float;
   value: float*;
   held : bool;
+  digits_to_show: int = 5;
   draw :: () {
     // Draw the slider background
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
@@ -676,8 +677,8 @@ SliderF :: struct {
     // Draw the slider value
 
     value_text := $"{*this.value}";
-    value_text.data[3] = #char "\0";
-    value_text_x := rect.x + text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
+    value_text.data[digits_to_show] = #char "\0";
+    value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
 
@@ -723,6 +724,7 @@ SliderI :: struct {
   max_value: int;
   value: int*;
   held : bool;
+  digits_to_show: int = 3;
   draw :: () {
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
@@ -748,8 +750,8 @@ SliderI :: struct {
     DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
 
     value_text := $"{*this.value}";
-    value_text.data[3] = #char "\0";
-    value_text_x := rect.x + text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
+    value_text.data[digits_to_show] = #char "\0";
+    value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
 
