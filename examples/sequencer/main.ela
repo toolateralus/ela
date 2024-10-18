@@ -31,6 +31,8 @@ subdivision_slider : SliderI = {
   false // held
 };
 
+bg_color := LIGHTCYAN;
+
 beats_slider : SliderI = {
   string{"beats"}, // text
   Rectangle{150, 110, 150, 40}, // rectangle
@@ -185,7 +187,7 @@ main :: () {
   
   
   InitAudioDevice();
-  InitWindow(1200, 600, "Sequencer");
+  InitWindow(GetScreenWidth(), 600, "Sequencer");
   
   SetTargetFPS(1000);
   
@@ -195,8 +197,12 @@ main :: () {
     }
   }
   
+  bg_color.r -= 175;
+  bg_color.g -= 175;
+  bg_color.b -= 175;
+  
   while !WindowShouldClose() {
-    ClearBackground(BLACK);
+    ClearBackground(bg_color);
     BeginDrawing();
       if IsKeyPressed(.Space) then play_callback();
         
