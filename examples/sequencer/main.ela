@@ -182,13 +182,16 @@ sequencer :: () {
 bpm : float = 120;
 
 main :: () {
+  bg_color.r -= 175;
+  bg_color.g -= 175;
+  bg_color.b -= 175;
   
   dir := directory_open(".");
-  
   
   InitAudioDevice();
   InitWindow(GetScreenWidth(), 600, "Sequencer");
   
+  SetWindowState(.WindowResizable);
   SetTargetFPS(1000);
   
   for file; dir.files {
@@ -196,10 +199,6 @@ main :: () {
       file_dropdown.options ~= string{file.data};
     }
   }
-  
-  bg_color.r -= 175;
-  bg_color.g -= 175;
-  bg_color.b -= 175;
   
   while !WindowShouldClose() {
     ClearBackground(bg_color);
