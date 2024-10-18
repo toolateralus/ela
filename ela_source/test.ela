@@ -1270,41 +1270,41 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
 
 
 
-// #test test_function_overloads :: () {
-//   t := #type overloaded(10);
-//   assert("overload with integer arg failed to call", strcmp(t.name, "int") == 0);
-//   t = #type overloaded(12.5);
-//   assert("overload with float arg failed to call", strcmp(t.name, "float") == 0);
-//   xaryu: Xaryu;
-//   xaryu.value = 100;
-//   t = #type overloaded(xaryu);
-//   assert("overload with float arg failed to call", strcmp(t.name, "Xaryu") == 0);
-  
-//   assert("overload with different number of parameters failed", overloaded(1, 2) == 2);
-  
-//   /* 
-//     ! Bug. Overloads fail to get the actual correct overload often when theres a similar first parameter,
-//     ! But there's a different following parameter. There's probably a repro on this.
-//   */
-//   //! assert("overload with different number of parameters failed", overloaded(1, 2.0) == 2);
-  
-// }
+#test test_set_field_with_reflection :: () {
+ reflector: Reflector;
+ type := #type Reflector;
+ field := type.fields[0];
+ integer: int = 100;
+ field.set(&reflector, integer);
+ assert("reflection field.set() failed.", reflector.n == 100);
+}
+
+#test test_get_field_with_reflection :: () {
+ reflector: Reflector;
+ reflector.n = 100;
+ type := #type Reflector;
+ field := type.fields[0];
+ n := *(int*)field.get(&reflector);
+ assert("reflection field.set() failed.", n == 100);
+}
 
 
-// #test test_set_field_with_reflection :: () {
-//  reflector: Reflector;
-//  type := #type Reflector;
-//  field := type.fields[0];
-//  integer: int = 100;
-//  field.set(&reflector, integer);
-//  assert("reflection field.set() failed.", reflector.n == 100);
-// }
-
-// #test test_get_field_with_reflection :: () {
-//  reflector: Reflector;
-//  reflector.n = 100;
-//  type := #type Reflector;
-//  field := type.fields[0];
-//  n := *(int*)field.get(&reflector);
-//  assert("reflection field.set() failed.", n == 100);
-// }
+#test test_function_overloads :: () {
+  t := #type overloaded(10);
+  assert("overload with integer arg failed to call", strcmp(t.name, "int") == 0);
+  t = #type overloaded(12.5);
+  assert("overload with float arg failed to call", strcmp(t.name, "float") == 0);
+  xaryu: Xaryu;
+  xaryu.value = 100;
+  t = #type overloaded(xaryu);
+  assert("overload with float arg failed to call", strcmp(t.name, "Xaryu") == 0);
+  
+  assert("overload with different number of parameters failed", overloaded(1, 2) == 2);
+  
+  /* 
+    ! Bug. Overloads fail to get the actual correct overload often when theres a similar first parameter,
+    ! But there's a different following parameter. There's probably a repro on this.
+  */
+  //! assert("overload with different number of parameters failed", overloaded(1, 2.0) == 2);
+  
+}
