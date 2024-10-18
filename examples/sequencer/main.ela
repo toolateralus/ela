@@ -124,6 +124,7 @@ SequenceChannel :: struct {
           Rectangle{_x, y, 35, 35},
           style,
           string{null},
+          true,
         }
       }
       while check_buttons.length > total_notes {
@@ -164,7 +165,6 @@ on_file_selected :: (index: int) {
     true,
     get_sequencer_style(check_button_style),
     fileName,
-    
   });
 }
 
