@@ -84,32 +84,47 @@ play_callback :: () {
   index = 0;
 }
 
+color_index: s32;
+
+get_sequencer_style :: (style: Style) -> Style {
+  color_index++;
+  index := color_index % All_Colors.length;
+  index_1 := index + 2 % All_Colors.length;
+  
+  style.foreground = All_Colors[index];
+  style.background = All_Colors[index_1].with_alpha(75);
+  style.highlighted = style.background.with_alpha(255);
+  return style;
+}
+
 SequenceChannel :: struct {
   check_buttons: CheckButton[];
   sound: Sound;
   active: bool;
+  style: Style;
+
   
   draw :: (x: float, y: float) {
+    
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
         _x : float = x + (float)(check_buttons.length * 40);
-        println($"Addd button {check_buttons.length} at: {x}, {y}");
         check_buttons ~= {
           false,
           Rectangle{_x, y, 35, 35},
-          check_button_style,
+          style,
           string{null},
         }
       }
       while check_buttons.length > total_notes {
         button := ~check_buttons;
-        println($"Removed button {check_buttons.length} at {button.rect.x}, {button.rect.y}");
       }
     }
     for *button; check_buttons {
       button.draw();
     }
   }
+  
   update :: (index: int) {
     if check_buttons[index].value {
       PlaySound(sound);
@@ -135,6 +150,7 @@ on_file_selected :: (index: int) {
     CheckButton[]{},
     LoadSound(file_dropdown.options[index].data),
     true,
+    get_sequencer_style(check_button_style),
   });
 }
 
@@ -155,7 +171,7 @@ main :: () {
   
   
   InitAudioDevice();
-  InitWindow(800, 600, "Sequencer");
+  InitWindow(1200, 600, "Sequencer");
   
   SetTargetFPS(1000);
   
@@ -168,6 +184,9 @@ main :: () {
   while !WindowShouldClose() {
     ClearBackground(BLACK);
     BeginDrawing();
+      if IsKeyPressed(.Space) then play_callback();
+        
+    
       sequencer();
       bpm_slider.value = &bpm;
       bpm_slider.draw();

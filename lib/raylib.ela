@@ -335,6 +335,37 @@ CYAN: Color = { (u8)0, (u8)255, (u8)255, (u8)255 };
 DARKCYAN: Color = { (u8)0, (u8)139, (u8)139, (u8)255 };
 LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
 
+// Exclude black and white.
+All_Colors : Color[] = {
+  WHITE,
+  RED,
+  GREEN,
+  BLUE,
+  YELLOW,
+  PURPLE,
+  ORANGE,
+  GRAY,
+  DARKGRAY,
+  LIGHTGRAY,
+  BROWN,
+  PINK,
+  LIME,
+  DARKGREEN,
+  SKYBLUE,
+  VIOLET,
+  GOLD,
+  BEIGE,
+  MAGENTA,
+  MAROON,
+  DARKBLUE,
+  DARKPURPLE,
+  DARKBROWN,
+  CYAN,
+  DARKCYAN,
+  LIGHTCYAN,
+}
+
+
 #foreign InitTimer :: () -> void;
 #foreign GetTime :: () -> float64;
 
