@@ -11,6 +11,7 @@
 #foreign scanf :: (format: char*, ...) -> int;
 
 #foreign sleep :: (seconds: int);
+#foreign usleep :: (c: int);
 #foreign getchar :: () -> int;
 
 #foreign fmod :: (l: float, r: float) -> float;
@@ -35,6 +36,14 @@
 
 #foreign atoi :: (v: char*) -> int;
 #foreign atof :: (v: char*) -> float64;
+
+#foreign fabs :: (f: float64) -> float64;
+#foreign isinf :: (arg: float) -> bool;
+#foreign sqrt :: (f: float64) -> float64;
+#foreign cos :: (f: float64) -> float64;
+#foreign sin :: (f: float64) -> float64;
+#foreign rand :: () -> int;
+#foreign srand :: (seed: u32);
 
 str_starts_with :: (str: char*, substr: char*) -> bool {
   if str == null || substr == null 
@@ -105,8 +114,6 @@ println :: (str: char*) {
   printf("%s\n", str);
 }
 
-#foreign fabs :: (f: float64) -> float64;
-
 abs :: (v: $T) -> $T {
   _default: T;
   if v < _default {
@@ -114,14 +121,6 @@ abs :: (v: $T) -> $T {
   }
   return v;
 }
-
-
-#foreign isinf :: (arg: float) -> bool;
-#foreign sqrt :: (f: float64) -> float64;
-#foreign cos :: (f: float64) -> float64;
-#foreign sin :: (f: float64) -> float64;
-#foreign rand :: () -> int;
-#foreign srand :: (seed: u32) -> void;
 
 min :: (a: float, b: float) -> float {
   if a > b then return b;
@@ -169,7 +168,6 @@ Random :: enum {
 randf :: () -> float {
   return (float)rand() / (float)Random.Max;
 }
-
 
 timespec_t :: struct {
   tv_sec: s64;
@@ -235,4 +233,11 @@ to_string :: (num: s64) -> string {
   return string{(char*)buffer, ((char*) buffer) + index};
   
   
+}
+
+milliseconds :: (c: float64) -> int {
+  return (int)(c * 100_000.0);
+}
+seconds :: (c: float64) -> int {
+  return (int)(c * 1_000_000.0);
 }

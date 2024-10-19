@@ -257,7 +257,7 @@ make_particle :: (kind: int, position: Vector2, tint: Color) {
       can_burst = true;
     } 
     
-    particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(), tint, WHITE);
+    particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
     particle.render_info = smoke_particle_render_info;
     particle.lifetime = 1.0;
     particle.scale = smoke_particle_init_scale * randf() * 6400.0;
