@@ -182,17 +182,17 @@ JsonLexer :: struct {
       token.value = #make(string, &input[start], &input[start] + len);
       token.type = JsonTokenType.String;
       return token;
-    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "true" {
+    } else if position + 4 <= length && strncmp(&input[position], "true", 4) == 0 {
       token.value = #make(string, "true");
       token.type = JsonTokenType.True;
       position += 4;
       return token;
-    } else if position + 5 < length && #make(string, &input[position], &input[position] + 5) == "false" {
+    } else if position + 5 <= length && strncmp(&input[position], "false", 5) == 0 {
       token.value = #make(string, "false");
       token.type = JsonTokenType.False;
       position += 5;
       return token;
-    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "null" {
+    } else if position + 4 <= length && strncmp(&input[position], "null", 4) == 0 {
       token.value = #make(string, "null");
       token.type = JsonTokenType.Null;
       position += 4;
