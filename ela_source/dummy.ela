@@ -94,7 +94,9 @@
 #import core;
 #import reflection;
 
-Struct :: struct {}
+Struct :: struct {
+  i: int;
+}
 
 main :: () {
   println($"{type_is_struct(#type Struct*)}");

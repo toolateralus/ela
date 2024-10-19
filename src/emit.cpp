@@ -1441,8 +1441,8 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, T
      << std::format(".type = {}, ", to_type_struct(type, context));
   
   if (!type->is_kind(TYPE_FUNCTION)) {
-    ss << std::format(".size = sizeof({}), ", to_cpp_string(type))
-       << std::format(".offset = offsetof({}, {})", to_cpp_string(parent_type), name);
+    ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+    ss << std::format(".offset = offsetof({}, {})", parent_type->get_base(), name);
   }
   
   ss << " }";
