@@ -346,6 +346,64 @@ JsonValue :: struct {
     }
     return arr[index];
   }
+  is_number :: () -> bool {
+    return type == JsonValueType.Number;
+  }
+
+  is_string :: () -> bool {
+    return type == JsonValueType.String;
+  }
+
+  is_object :: () -> bool {
+    return type == JsonValueType.Object;
+  }
+
+  is_array :: () -> bool {
+    return type == JsonValueType.Array;
+  }
+
+  is_boolean :: () -> bool {
+    return type == JsonValueType.Boolean;
+  }
+
+  is_null :: () -> bool {
+    return type == JsonValueType.Null;
+  }
+
+  as_number :: () -> float64 {
+    if type == JsonValueType.Number {
+      return data.number;
+    }
+    return 0.0; // or handle error
+  }
+
+  as_string :: () -> string {
+    if type == JsonValueType.String {
+      return data._string;
+    }
+    return ""; // or handle error
+  }
+
+  as_object :: () -> JsonKeyValuePair[] {
+    if type == JsonValueType.Object {
+      return data.object;
+    }
+    return {}; // or handle error
+  }
+
+  as_array :: () -> JsonValue*[] {
+    if type == JsonValueType.Array {
+      return data.array;
+    }
+    return {}; // or handle error
+  }
+
+  as_boolean :: () -> bool {
+    if type == JsonValueType.Boolean {
+      return data.boolean;
+    }
+    return false; // or handle error
+  }
 }
 
 json_parse :: (lexer: JsonLexer*) -> JsonValue* {
