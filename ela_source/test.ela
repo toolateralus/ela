@@ -1279,7 +1279,6 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
  assert("reflection field.set() failed.", n == 100);
 }
 
-
 #test test_function_overloads :: () {
   t := #type overloaded(10);
   assert("overload with integer arg failed to call", strcmp(t.name, "int") == 0);
@@ -1400,4 +1399,9 @@ JsonValueDeleter :: struct {
 
   nested_object_val := object_val.get("nested_object");
   assert("deeply_nested_key", nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
+}
+
+#test test_type_id :: () {
+  id := #typeid(s8*);
+  assert("typeid failed.", id == (#type s8).id);
 }

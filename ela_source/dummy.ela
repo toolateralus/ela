@@ -99,5 +99,5 @@ Struct :: struct {
 }
 
 main :: () {
-  println($"{type_is_struct(#type Struct*)}");
+  println($"{type_is_struct(#type s8**)}");
 }

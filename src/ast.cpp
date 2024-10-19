@@ -514,8 +514,11 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
           parser->expect(TType::LParen);
           auto type = parser->parse_type();
+          
           parser->expect(TType::RParen);
-          auto id = global_find_type_id(type->base, type->extension_info);
+          auto visitor = TypeVisitor{parser->ctx};
+          auto id = std::any_cast<int>(type->accept(&visitor));
+          
           auto literal = ast_alloc<ASTLiteral>();
           literal->tag = ASTLiteral::Integer;
           literal->value = std::to_string(id);

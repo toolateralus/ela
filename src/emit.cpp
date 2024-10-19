@@ -1472,7 +1472,6 @@ std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {
     case TYPE_SCALAR: {
-      
       auto sint = type->id == int_type() ||
                   type->id == s8_type()   ||
                   type->id == s16_type()  ||
@@ -1502,10 +1501,7 @@ std::string get_type_flags(Type *type) {
         kind_flags |= TYPE_FLAGS_BOOL;
       } else if (type->get_base() == "string") {
         kind_flags |= TYPE_FLAGS_STRING;
-      } else {
-        throw_error("Internal compiler error: couldn't get the primitive type in 'to_cpp_struct'", {});
-      }
-      break;
+      } 
     }
     case TYPE_FUNCTION:
       kind_flags = TYPE_FLAGS_FUNCTION;
