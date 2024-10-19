@@ -97,14 +97,21 @@
 
 #compiler_flags "-g"
 
-Struct :: struct {
-  i : int = 3;
-  other: int[] = {5, 4, 3};
+Banana :: struct {
+  percentLeft : int = 45;
+}
+
+XarStruct :: struct {
+  bananas : int = 3;
+  handstand_times: float[] = {5.2, 4.1, 339089218.54};
+  lemon_locations: string[3] = {"mouth", "hand", "belly button"};
+  name : string = "XarBar";
+  current_banana_doing_hand_stand_on : Banana;
 }
 
 main :: () {
-  str: Struct;
-  val := json_serialize(&str, #type Struct);
+  str: XarStruct;
+  val := json_serialize(&str, #type XarStruct);
   println(val.to_string());
   delete(val);
 }

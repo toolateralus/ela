@@ -1506,6 +1506,9 @@ std::any TypeVisitor::visit(ASTAllocate *node) {
   // we should probably type check parameters for a constructor
   // but we need a seperate system for that
   auto type = int_from_any(node->type.get()->accept(this));
+  if (type == -1) {
+    throw_error("Use of undeclared type", node->source_range);
+  }
   if (node->arguments)
     node->arguments.get()->accept(this);
 

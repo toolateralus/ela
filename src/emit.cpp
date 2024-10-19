@@ -1646,8 +1646,11 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
       auto &[name, sym] = tuple;
       
       if (name == "this") continue;
-      
+
       auto t = global_get_type(sym.type_id);
+      // TODO: handle methods separately
+      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION)) continue;
+
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
       fields_ss << get_field_struct(name, t, type, context);

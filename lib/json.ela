@@ -521,9 +521,6 @@ json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
         return val;
       }
     }
-  } else if type_is_string(type) {
-    val.type = JsonValueType.String;
-    val.data._string = *(string*)object;
   } else if type_is_bool(type) {
     val.type = JsonValueType.Boolean;
     val.data.boolean = *(bool*)object;
@@ -559,10 +556,17 @@ json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
 }
 
 json_serialize :: (object: void*, type: Type*) -> JsonValue* {
-  if type_is_scalar(type) {
-    return json_serialize_scalar(object, type);
-  } else if type_is_struct(type) {
-    return json_serialize_struct(object, type);
+  if type_has_no_extension(type) {
+    if type.id == #typeid(string) {
+      val := new JsonValue{};
+      val.type = JsonValueType.String;
+      val.data._string = *(string*)object;
+      return val;
+    } else if type_is_scalar(type) {
+      return json_serialize_scalar(object, type);
+    } else if type_is_struct(type) {
+      return json_serialize_struct(object, type);
+    }
   } else if type_is_array(type) || type_is_fixed_array(type) {
     return json_serialize_array(object, type);
   }

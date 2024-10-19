@@ -115,7 +115,6 @@ Context::Context() {
 
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s64_type());
-    str_scope->insert("capacity", s64_type());
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
     
     auto sym = str_scope->local_lookup("[");
