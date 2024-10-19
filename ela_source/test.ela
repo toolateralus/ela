@@ -1402,6 +1402,6 @@ JsonValueDeleter :: struct {
 }
 
 #test test_type_id :: () {
-  id := #typeid(s8*);
-  assert("typeid failed.", id == (#type s8).id);
+  id := #typeid(s8**);
+  assert("typeid failed.", id == (#type s8**).id);
 }

@@ -1,4 +1,5 @@
 #include <cstdint>
+#include <functional>
 #include <unordered_map>
 #include <vector>
 
@@ -289,12 +290,18 @@ struct Field {
   }
 };
 
+struct Element {
+  char *ptr;
+  Type *type;
+};
+
 struct Type {
   int id;
   char* name;
   size_t size;
   u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;
+  std::function<_array<Element>(char*)> elements;
 };
 
 #ifdef TESTING

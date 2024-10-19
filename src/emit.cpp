@@ -1468,6 +1468,20 @@ constexpr auto TYPE_FLAGS_SIGNED          = 16384;
 constexpr auto TYPE_FLAGS_UNSIGNED        = 32768;
 
 
+std::string get_elements_function(const std::string &element_type_name, int element_type_id) {
+  return std::format(R"_(.elements = [&](char * array) -> _array<Element> {{
+    auto arr = reinterpret_cast<_array<{}>*>(array);
+    _array<Element> elements;
+    for (int i = 0; i < arr->length; ++i) {{
+      elements.push({{
+        .ptr = reinterpret_cast<char*>(array + (i * sizeof({}))),
+        .type = __type_table[{}],
+      }});
+    }}
+    return elements;
+  }})_", element_type_name, element_type_name, element_type_id);
+}
+
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {
