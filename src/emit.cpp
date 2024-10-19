@@ -1464,32 +1464,44 @@ constexpr auto TYPE_FLAGS_MAP             = 2048;
 constexpr auto TYPE_FLAGS_FUNCTION        = 4096;
 constexpr auto TYPE_FLAGS_POINTER         = 8192;
 
+constexpr auto TYPE_FLAGS_SIGNED          = 16384;
+constexpr auto TYPE_FLAGS_UNSIGNED        = 32768;
+
+
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {
     case TYPE_SCALAR: {
-      auto integral = type->id == int_type()  ||
-                      type->id == u8_type()   ||
-                      type->id == char_type() ||
-                      type->id == u16_type()  ||
-                      type->id == u32_type()  ||
-                      type->id == u64_type()  ||
-                      type->id == s8_type()   ||
-                      type->id == s16_type()  ||
-                      type->id == s32_type()  ||
-                      type->id == s64_type();
+      
+      auto sint = type->id == int_type() ||
+                  type->id == s8_type()   ||
+                  type->id == s16_type()  ||
+                  type->id == s32_type()  ||
+                  type->id == s64_type();
+                      
+      auto uint = type->id == u8_type()   ||
+                  type->id == u16_type()  ||
+                  type->id == u32_type()  ||
+                  type->id == u64_type();
+
       
       auto floating_pt = type->id == float32_type() ||
                           type->id == float64_type() ||
                           type->id == float_type();
-      if (integral) {
-        kind_flags = TYPE_FLAGS_INTEGER;
+      if (sint) {
+        kind_flags |= TYPE_FLAGS_SIGNED;
+      } else if (uint) {
+        kind_flags |= TYPE_FLAGS_UNSIGNED;
+      }
+                          
+      if (sint || uint) {
+        kind_flags |= TYPE_FLAGS_INTEGER;
       } else if (floating_pt) {
-        kind_flags = TYPE_FLAGS_FLOAT;
+        kind_flags |= TYPE_FLAGS_FLOAT;
       } else if (type->id == bool_type()) {
-        kind_flags = TYPE_FLAGS_BOOL;
+        kind_flags |= TYPE_FLAGS_BOOL;
       } else if (type->get_base() == "string") {
-        kind_flags = TYPE_FLAGS_STRING;
+        kind_flags |= TYPE_FLAGS_STRING;
       } else {
         throw_error("Internal compiler error: couldn't get the primitive type in 'to_cpp_struct'", {});
       }

@@ -273,7 +273,7 @@ extern "C" void *memcpy(void *, void *, size_t);
 
 struct Type;
 struct Field {
-  char *name;
+  char* name;
   Type *type;
   size_t size;
   size_t offset;
@@ -291,7 +291,7 @@ struct Field {
 
 struct Type {
   int id;
-  char *name;
+  char* name;
   size_t size;
   u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;

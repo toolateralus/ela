@@ -1,5 +1,6 @@
 #import core;
 #import file;
+#import reflection;
 
 JsonTokenType :: enum {
   Invalid,
@@ -469,40 +470,40 @@ json_parse_string :: (str: char*) -> JsonValue* {
   return json_parse(&lexer);
 }
 
-json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
-  if type_is_float(type) || type_is_integral(type) {
-    // return number
-  } else if type_is_bool(type) {
-    // return bool;
-  } else if type_is_string(type) {
-    // return string
-  } else { return null; }
-}
+// json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
+//   if type_is_float(type) || type_is_integral(type) {
+//     // return number
+//   } else if type_is_bool(type) {
+//     // return bool;
+//   } else if type_is_string(type) {
+//     // return string
+//   } else { return null; }
+// }
 
-json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
-  for field; type.fields {
-    if type_is_function(field.type) then continue;
-    if type_is_scalar(field.type) {
-      ptr := field.get(object);
+// json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
+//   for field; type.fields {
+//     if type_is_function(field.type) then continue;
+//     if type_is_scalar(field.type) {
+//       ptr := field.get(object);
       
-      if type_is_integral(field.type) {
-        _int: s64 = *(s64*)field.get(object);
-      } else if type_is_bool(field.type) {
-        _bool: bool = *(bool*)field.get(object);
-      } else if type_is_float(field.type) {
-        _float: float64 = *(float64*)field.get(object);
-      }
+//       if type_is_integral(field.type) {
+//         _int: s64 = *(s64*)field.get(object);
+//       } else if type_is_bool(field.type) {
+//         _bool: bool = *(bool*)field.get(object);
+//       } else if type_is_float(field.type) {
+//         _float: float64 = *(float64*)field.get(object);
+//       }
       
-    }
-  }
-}
+//     }
+//   }
+// }
 
-json_serialize :: (object: $T) -> JsonValue* {
-  type := #type T;
+// json_serialize :: (object: $T) -> JsonValue* {
+//   type := #type T;
   
-  value: JsonValue*;
-  value = json_serialize_scalar((void*)&object, type);
-  if value {
-    return value;
-  }
-}
+//   value: JsonValue*;
+//   value = json_serialize_scalar((void*)&object, type);
+//   if value {
+//     return value;
+//   }
+// }

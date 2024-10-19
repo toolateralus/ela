@@ -17,6 +17,8 @@ TypeFlags :: enum {
   MAP             = 2048,
   FUNCTION        = 4096,
   POINTER         = 8192,
+  SIGNED          = 16384,
+  UNSIGNED        = 32768,
 }
 
 type_has_no_extension :: (type: Type*) -> bool {
