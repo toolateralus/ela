@@ -209,6 +209,10 @@ struct string {
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
 
+  string operator[](const _range &range) const {
+    return string(data + range.m_begin, data + range.m_end);
+  }
+
   string(const string &other) {
     if (other.data) {
       length = other.length;

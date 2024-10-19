@@ -1,91 +1,91 @@
 #import core;
+#import pthread;
 
-/* Problem: find the 100th digit from 1 to 100, where 10 is comprised of 2 digits, 1 and 0. */
+#compiler_flags "-g"
 
-naive_solution :: () -> char {
-  str : string;
-  for i in 1..100 {
-    str = $"{str}{i}";
+__background_worker_handler :: (arg: void*) -> void*;
+
+/* Simple thread struct */
+BackgroundWorker :: struct {
+  handle: pthread_t;
+  tasks: ThreadFunction[];
+  alive: bool = true;
+  has_work : bool = false;
+  task_mutex: Mutex;
+  
+  submit :: (task: ThreadFunction) {
+    task_mutex.lock();
+    tasks ~= task;
+    has_work = true;
+    task_mutex.unlock();
   }
-  c : char = str[100];
-  return c;
+  
+  #ctor :: () {
+    pthread_create(&this.handle, null, &__background_worker_handler, this);  
+  }
+  
+  join :: () -> void* {
+    alive = false;
+    n : void* = null;
+    pthread_join(&this.handle, &n);
+    return n;
+  }
+  
+  #dtor :: () {
+    join();
+  }
 }
 
-faster_solution :: () -> char {
-  ctr : int = 0;
-  c: char;
-  for i: s32; i < 100; ++i {
-    if i >= 10 {
-      ctr += 2;
+__background_worker_handler :: (arg: void*) -> void* {
+  worker: BackgroundWorker* = arg;
+  while worker.alive {
+    worker.task_mutex.lock();
+    if worker.tasks.length != 0 {
+      task : ThreadFunction = ~worker.tasks;
+      if task {
+        task();
+      } else {
+        println("\e[33mGot null task in worker");
+      }
     } else {
-      ctr++;
+      worker.has_work = false;
     }
-    if ctr == 100 {
-      v := to_string(i);
-      c = v[0];
-      break;
-    }
+    worker.task_mutex.unlock();
   }
-  return c;
+  return null;
 }
 
-coopers_solution :: (start: s32, pos: s32) -> char {
-  pos -= 1; // convert one index to zero index
-  if start < 10 {
-    if pos < 10 - start {
-      num := start + pos;
-      str := to_string(num);
-      return str[0];
-    } else {
-      pos -= 10 - start;
-      start = 10;
-    }
-  } else if start >= 10 && start < 100 {
-    if pos < 90 * 2 - (start - 10) * 2 {
-      
-    }
-  }
-}
+global_mutex: Mutex;
+counter: int;
 
-cheating_solution :: () -> char {
-  answer := 90 / 2 + 9;
-  v := to_string(answer);
-  c : char = v[0];
-  return c;
+print_delayed :: () {
+  usleep(milliseconds(0.5));
+  println($"Printed from thread .. {counter++}");
 }
 
 main :: () {
-  str: string;
-  str = 
-  println($"{naive_solution()}");
-  start: float64;
-  end: float64;
-  naive_time: float64;
-  faster_time: float64;
-  cheating_time: float64;
-
-  start = timef();
-  for i in 0..1000 {
-    naive_solution();
+  worker: BackgroundWorker;
+  
+  for i in 0..100 {
+    worker.submit(&print_delayed);
   }
-  end = timef();
-  naive_time = end - start;
-
-  start = timef();
-  for i in 0..1000 {
-    faster_solution();
+  
+  while true {
+    worker.task_mutex.lock();
+    
+    if !worker.has_work then { 
+      worker.task_mutex.unlock();
+      break;
+    } else {
+      worker.task_mutex.unlock();
+    }
+    
+    sleep(2);
   }
-  end = timef();
-  faster_time = end - start;
-
-  start = timef();
-  for i in 0..1000 {
-    cheating_solution();
-  }
-  end = timef();
-  cheating_time = end - start;
-
-  println($"Naive solution time: {naive_time}s");
-  println($"Faster solution time: {faster_time}s");
-  println($"Cheating solution time: {cheating_time}s");
+  
+  worker.alive = false;
+  
+  println("Joining");
+  worker.join();
+  
 }
