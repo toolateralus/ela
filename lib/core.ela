@@ -241,3 +241,7 @@ milliseconds :: (c: float64) -> int {
 seconds :: (c: float64) -> int {
   return (int)(c * 1_000_000.0);
 }
+
+streq :: (left: char*, right) -> bool {
+  return strcmp(left, right) == 0;
+}

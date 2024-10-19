@@ -1,0 +1,91 @@
+#import core;
+
+// TODO:
+// ! We should have these baked into the Type *'s so that we can efficiently reflect on the kind of types that we're operating on.
+TypeFlags :: enum {
+  // Scalars.
+  INTEGER         = 2,
+  FLOAT           = 4,
+  BOOL            = 8,
+  STRING          = 16,
+  
+  // Type definitions
+  STRUCT          = 32,
+  UNION           = 64,
+  ENUM            = 128,
+  
+  // Non scalar type extensions
+  TUPLE           = 256,
+  ARRAY           = 512,
+  FIXED_ARRAY     = 1024,
+  MAP             = 2048,
+  FUNCTION        = 4096,
+  POINTER         = 8192,
+}
+
+type_has_no_extension :: (type: Type*) -> bool {
+  return type.flags & .POINTER == 0 &&
+         type.flags & .MAP == 0 &&
+         type.flags & .ARRAY == 0 &&
+         type.flags & .FIXED_ARRAY == 0;
+}
+
+type_is_array :: (type: Type*) -> bool {
+  return type.flags & .ARRAY;
+}
+
+type_is_fixed_array :: (type: Type*) -> bool {
+  return type.flags & .FIXED_ARRAY;
+}
+
+type_is_string :: (type: Type*) -> bool {
+  return type.flags & .STRING;
+}
+
+type_is_scalar :: (type: Type*) -> bool {
+  return type_has_no_extension(type) && 
+         (type.flags & .INTEGER ||
+          type.flags & .FLOAT   ||
+          type.flags & .BOOL    ||
+          type.flags & .STRING);
+}
+
+type_is_struct :: (type: Type*) -> bool {
+  return type.flags & .STRUCT;
+}
+
+type_is_union :: (type: Type*) -> bool {
+  return type.flags & .UNION;
+}
+
+type_is_enum :: (type: Type*) -> bool {
+  return type.flags & .ENUM;
+}
+
+type_is_integral :: (type: Type*) -> bool {
+  return type.flags & .INTEGER;
+}
+
+type_is_float :: (type: Type*) -> bool {
+  return type.flags & .FLOAT;
+}
+
+type_is_bool :: (type: Type*) -> bool {
+  return type.flags & .BOOL;
+}
+
+type_is_tuple :: (type: Type*) -> bool {
+  return type.flags & .TUPLE;
+}
+
+type_is_map :: (type: Type*) -> bool {
+  return type.flags & .MAP;
+}
+
+type_is_function :: (type: Type*) -> bool {
+  return type.flags & .FUNCTION;
+}
+
+type_is_pointer :: (type: Type*) -> bool {
+  return type.flags & .POINTER;
+}

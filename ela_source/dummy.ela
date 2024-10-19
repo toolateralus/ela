@@ -1,91 +1,101 @@
+// #import core;
+// #import pthread;
+
+// #compiler_flags "-g"
+
+// __background_worker_handler :: (arg: void*) -> void*;
+
+// /* Simple thread struct */
+// BackgroundWorker :: struct {
+//   handle: pthread_t;
+//   tasks: ThreadFunction[];
+//   alive: bool = true;
+//   has_work : bool = false;
+//   task_mutex: Mutex;
+  
+//   submit :: (task: ThreadFunction) {
+//     task_mutex.lock();
+//     tasks ~= task;
+//     has_work = true;
+//     task_mutex.unlock();
+//   }
+  
+//   #ctor :: () {
+//     pthread_create(&this.handle, null, &__background_worker_handler, this);  
+//   }
+  
+//   join :: () -> void* {
+//     alive = false;
+//     n : void* = null;
+//     pthread_join(&this.handle, &n);
+//     return n;
+//   }
+  
+//   #dtor :: () {
+//     join();
+//   }
+// }
+
+// __background_worker_handler :: (arg: void*) -> void* {
+//   worker: BackgroundWorker* = arg;
+//   while worker.alive {
+//     worker.task_mutex.lock();
+//     if worker.tasks.length != 0 {
+//       task : ThreadFunction = ~worker.tasks;
+//       if task {
+//         task();
+//       } else {
+//         println("\e[33mGot null task in worker");
+//       }
+//     } else {
+//       worker.has_work = false;
+//     }
+//     worker.task_mutex.unlock();
+//   }
+//   return null;
+// }
+
+// global_mutex: Mutex;
+// counter: int;
+
+// print_delayed :: () {
+//   usleep(milliseconds(0.5));
+//   println($"Printed from thread .. {counter++}");
+// }
+
+// main :: () {
+//   worker: BackgroundWorker;
+  
+//   for i in 0..100 {
+//     worker.submit(&print_delayed);
+//   }
+  
+//   while true {
+//     worker.task_mutex.lock();
+    
+//     if !worker.has_work then { 
+//       worker.task_mutex.unlock();
+//       break;
+//     } else {
+//       worker.task_mutex.unlock();
+//     }
+    
+//     sleep(2);
+//   }
+  
+//   worker.alive = false;
+  
+//   println("Joining");
+//   worker.join();
+  
+// }
+
+
 #import core;
-#import pthread;
+#import reflection;
 
-#compiler_flags "-g"
-
-__background_worker_handler :: (arg: void*) -> void*;
-
-/* Simple thread struct */
-BackgroundWorker :: struct {
-  handle: pthread_t;
-  tasks: ThreadFunction[];
-  alive: bool = true;
-  has_work : bool = false;
-  task_mutex: Mutex;
-  
-  submit :: (task: ThreadFunction) {
-    task_mutex.lock();
-    tasks ~= task;
-    has_work = true;
-    task_mutex.unlock();
-  }
-  
-  #ctor :: () {
-    pthread_create(&this.handle, null, &__background_worker_handler, this);  
-  }
-  
-  join :: () -> void* {
-    alive = false;
-    n : void* = null;
-    pthread_join(&this.handle, &n);
-    return n;
-  }
-  
-  #dtor :: () {
-    join();
-  }
-}
-
-__background_worker_handler :: (arg: void*) -> void* {
-  worker: BackgroundWorker* = arg;
-  while worker.alive {
-    worker.task_mutex.lock();
-    if worker.tasks.length != 0 {
-      task : ThreadFunction = ~worker.tasks;
-      if task {
-        task();
-      } else {
-        println("\e[33mGot null task in worker");
-      }
-    } else {
-      worker.has_work = false;
-    }
-    worker.task_mutex.unlock();
-  }
-  return null;
-}
-
-global_mutex: Mutex;
-counter: int;
-
-print_delayed :: () {
-  usleep(milliseconds(0.5));
-  println($"Printed from thread .. {counter++}");
-}
+Struct :: struct {}
 
 main :: () {
-  worker: BackgroundWorker;
-  
-  for i in 0..100 {
-    worker.submit(&print_delayed);
-  }
-  
-  while true {
-    worker.task_mutex.lock();
-    
-    if !worker.has_work then { 
-      worker.task_mutex.unlock();
-      break;
-    } else {
-      worker.task_mutex.unlock();
-    }
-    
-    sleep(2);
-  }
-  
-  worker.alive = false;
-  
-  println("Joining");
-  worker.join();
-  
+  println($"{type_is_struct(#type Struct*)}");
 }

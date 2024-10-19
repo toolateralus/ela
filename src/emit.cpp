@@ -1449,12 +1449,101 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, T
   return ss.str();
 }
 
+constexpr auto TYPE_FLAGS_INTEGER         = 2;
+constexpr auto TYPE_FLAGS_FLOAT           = 4;
+constexpr auto TYPE_FLAGS_BOOL            = 8;
+constexpr auto TYPE_FLAGS_STRING          = 16;
+constexpr auto TYPE_FLAGS_STRUCT          = 32;
+constexpr auto TYPE_FLAGS_UNION           = 64;
+constexpr auto TYPE_FLAGS_ENUM            = 128;
+constexpr auto TYPE_FLAGS_TUPLE           = 256;
+
+constexpr auto TYPE_FLAGS_ARRAY           = 512;
+constexpr auto TYPE_FLAGS_FIXED_ARRAY     = 1024;
+constexpr auto TYPE_FLAGS_MAP             = 2048;
+constexpr auto TYPE_FLAGS_FUNCTION        = 4096;
+constexpr auto TYPE_FLAGS_POINTER         = 8192;
+
+std::string get_type_flags(Type *type) {
+  int kind_flags = 0;
+  switch (type->kind) {
+    case TYPE_SCALAR: {
+      auto integral = type->id == int_type()  ||
+                      type->id == u8_type()   ||
+                      type->id == char_type() ||
+                      type->id == u16_type()  ||
+                      type->id == u32_type()  ||
+                      type->id == u64_type()  ||
+                      type->id == s8_type()   ||
+                      type->id == s16_type()  ||
+                      type->id == s32_type()  ||
+                      type->id == s64_type();
+      
+      auto floating_pt = type->id == float32_type() ||
+                          type->id == float64_type() ||
+                          type->id == float_type();
+      if (integral) {
+        kind_flags = TYPE_FLAGS_INTEGER;
+      } else if (floating_pt) {
+        kind_flags = TYPE_FLAGS_FLOAT;
+      } else if (type->id == bool_type()) {
+        kind_flags = TYPE_FLAGS_BOOL;
+      } else if (type->get_base() == "string") {
+        kind_flags = TYPE_FLAGS_STRING;
+      } else {
+        throw_error("Internal compiler error: couldn't get the primitive type in 'to_cpp_struct'", {});
+      }
+      break;
+    }
+    case TYPE_FUNCTION:
+      kind_flags = TYPE_FLAGS_FUNCTION;
+      break;
+    case TYPE_STRUCT:
+      kind_flags = TYPE_FLAGS_STRUCT;
+      break;
+    case TYPE_ENUM:
+      kind_flags = TYPE_FLAGS_ENUM;
+      break;
+    case TYPE_UNION:
+      kind_flags = TYPE_FLAGS_UNION;
+      break;
+    case TYPE_TUPLE:
+      kind_flags = TYPE_FLAGS_TUPLE;
+      break;
+  }
+  for (const auto &ext : type->get_ext().extensions) {
+    switch (ext) {
+      case TYPE_EXT_POINTER:
+        kind_flags |= TYPE_FLAGS_POINTER;
+        break;
+      case TYPE_EXT_ARRAY:
+        if (type->get_ext().is_fixed_sized_array()) {
+          kind_flags |= TYPE_FLAGS_FIXED_ARRAY;
+        } else {
+          kind_flags |= TYPE_FLAGS_ARRAY;
+        }
+      
+        break;
+      case TYPE_EXT_MAP:
+        kind_flags |= TYPE_FLAGS_MAP;
+        break;
+    }
+  }
+  return ".flags = " + std::to_string(kind_flags) + "\n";
+}
+
 std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context, const std::string &fields) {
   std::stringstream ss;
+  
+  auto kind = 0;
+  
+  get_type_flags(type);
+  
   ss << "_type_info[" << id << "] = new Type {"
      << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", "
      << ".size = sizeof(" << to_cpp_string(type) << "), "
+     << get_type_flags(type) << ",\n"
      << ".fields = " << fields
      << " };";
   context.type_info_strings.push_back(ss.str());
@@ -1480,6 +1569,10 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   }
 
   type_cache[id] = true;
+
+  // TODO: 
+  // ! This needs serious improvement to be really really useful. It's a great starting point,
+  // ! but it could be far better.
 
   std::stringstream fields_ss;
   if (type->kind == TYPE_UNION || type->kind == TYPE_STRUCT) {

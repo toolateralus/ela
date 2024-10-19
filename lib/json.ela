@@ -366,3 +366,14 @@ json_parse_string :: (str: char*) -> JsonValue* {
   lexer := #make(JsonLexer, "string", str);
   return json_parse(&lexer);
 }
+
+
+json_serialize :: (object: $T) -> JsonValue* {
+  type := #type T;
+  
+  if strcmp(type.name, "bool") == 0 {
+    
+  } else if strcmp(type.name, "")
+  
+  
+}
