@@ -483,14 +483,14 @@ json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   for field; type.fields {
     if type_is_function(field.type) then continue;
     if type_is_scalar(field.type) {
-      ptr := field.get(&object);
+      ptr := field.get(object);
       
       if type_is_integral(field.type) {
-        _int: s64 = *(s64*)field.get(&object);
+        _int: s64 = *(s64*)field.get(object);
       } else if type_is_bool(field.type) {
-        _bool: bool = *(bool*)field.get(&object);
+        _bool: bool = *(bool*)field.get(object);
       } else if type_is_float(field.type) {
-        _float: float64 = *(float64*)field.get(&object);
+        _float: float64 = *(float64*)field.get(object);
       }
       
     }
