@@ -470,40 +470,99 @@ json_parse_string :: (str: char*) -> JsonValue* {
   return json_parse(&lexer);
 }
 
-// json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
-//   if type_is_float(type) || type_is_integral(type) {
-//     // return number
-//   } else if type_is_bool(type) {
-//     // return bool;
-//   } else if type_is_string(type) {
-//     // return string
-//   } else { return null; }
+json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
+  val := new JsonValue{};
+  if type_is_float(type) {
+    val.type = JsonValueType.Number;
+    if type.id == #typeid(float) {
+      val.data.number = *(float*)object;
+      return val;
+    } else if type.id == #typeid(float64) {
+      val.data.number = *(float64*)object;
+      return val;
+    } else if type.id == #typeid(float32) {
+      val.data.number = *(float32*)object;
+      return val;
+    }
+  } else if type_is_integral(type) {
+    val.type = JsonValueType.Number;
+    if type_is_signed(type) {
+      if type.id == #typeid(char) {
+        val.data.number = *(char*)object;
+        return val;
+      } else if type.id == #typeid(s8) {
+        val.data.number = *(s8*)object;
+        return val;
+      } else if type.id == #typeid(s16) {
+        val.data.number = *(s16*)object;
+        return val;
+      } else if type.id == #typeid(s32) {
+        val.data.number = *(s32*)object;
+        return val;
+      } else if type.id == #typeid(s64) {
+        val.data.number = *(s64*)object;
+        return val;
+      } else if type.id == #typeid(int) {
+        val.data.number = *(int*)object;
+        return val;
+      }
+    } else {
+      if type.id == #typeid(u8) {
+        val.data.number = *(u8*)object;
+        return val;
+      } else if type.id == #typeid(u16) {
+        val.data.number = *(u16*)object;
+        return val;
+      } else if type.id == #typeid(u32) {
+        val.data.number = *(u32*)object;
+        return val;
+      } else if type.id == #typeid(u64) {
+        val.data.number = *(u64*)object;
+        return val;
+      }
+    }
+  } else if type_is_string(type) {
+    val.type = JsonValueType.String;
+    val.data._string = *(string*)object;
+  } else if type_is_bool(type) {
+    val.type = JsonValueType.Boolean;
+    val.data.boolean = *(bool*)object;
+  }
+  return null;
+}
+
+json_serialize :: (object: void*, type: Type*) -> JsonValue*;
+
+json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
+  val := new JsonValue{};
+  val.type = JsonValueType.Object;
+  val.data.object = JsonKeyValuePair[]{};
+  for field; type.fields {
+    is_func := field.type.flags & .FUNCTION;
+    if is_func != 0 then continue;
+    field_kvp: JsonKeyValuePair;
+    field_kvp.key = field.name;
+    field_kvp.value = json_serialize((void*)field.get(object), field.type);
+    val.data.object ~= field_kvp;
+  }
+  return val;
+}
+
+// json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
+//   val := new JsonValue{};
+//   val.type = JsonValueType.Array;
+//   val.data.array = JsonValue*[]{};
+//   for elem; type.elements(object) {
+//     val.data.array ~= json_serialize(elem.ptr, elem.type);
+//   }
+//   return val;
 // }
 
-// json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
-//   for field; type.fields {
-//     if type_is_function(field.type) then continue;
-//     if type_is_scalar(field.type) {
-//       ptr := field.get(object);
-      
-//       if type_is_integral(field.type) {
-//         _int: s64 = *(s64*)field.get(object);
-//       } else if type_is_bool(field.type) {
-//         _bool: bool = *(bool*)field.get(object);
-//       } else if type_is_float(field.type) {
-//         _float: float64 = *(float64*)field.get(object);
-//       }
-      
-//     }
-//   }
-// }
-
-// json_serialize :: (object: $T) -> JsonValue* {
-//   type := #type T;
-  
-//   value: JsonValue*;
-//   value = json_serialize_scalar((void*)&object, type);
-//   if value {
-//     return value;
-//   }
-// }
+json_serialize :: (object: void*, type: Type*) -> JsonValue* {
+  if type_is_scalar(type) {
+    return json_serialize_scalar(object, type);
+  } else if type_is_struct(type) {
+    return json_serialize_struct(object, type);
+  }
+  return null;
+}

@@ -93,11 +93,22 @@
 
 #import core;
 #import reflection;
+#import json;
+
+#compiler_flags "-g"
+
+OtherStruct :: struct {
+  i2 : float = 5.5;
+}
 
 Struct :: struct {
-  i: int;
+  i : int = 3;
+  other: OtherStruct;
 }
 
 main :: () {
-  println($"{type_is_struct(#type s8**)}");
+  str: Struct;
+  val := json_serialize(&str, #type Struct);
+  println(val.to_string());
+  delete(val);
 }

@@ -1501,7 +1501,8 @@ std::string get_type_flags(Type *type) {
         kind_flags |= TYPE_FLAGS_BOOL;
       } else if (type->get_base() == "string") {
         kind_flags |= TYPE_FLAGS_STRING;
-      } 
+      }
+      break;
     }
     case TYPE_FUNCTION:
       kind_flags = TYPE_FLAGS_FUNCTION;
