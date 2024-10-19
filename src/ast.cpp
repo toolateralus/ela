@@ -4,12 +4,15 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include "visitor.hpp"
 #include <algorithm>
+#include <any>
 #include <cassert>
 #include <filesystem>
 #include <format>
 #include <fstream>
 #include <set>
+#include <string>
 #include <unordered_set>
 
 // CLEANUP(Josh) 10/2/2024, 9:22:21 AM
@@ -500,6 +503,24 @@ void Parser::init_directive_routines() {
            auto func_decl = parser->parse_function_declaration(name);
            func_decl->flags |= FUNCTION_IS_EXPORTED;
            return func_decl;
+         }});
+  }
+
+  // #typeid
+  {
+    directive_routines.push_back(
+        {.identifier = "typeid",
+         .kind = DIRECTIVE_KIND_EXPRESSION,
+         .run = [](Parser *parser) -> Nullable<ASTNode> {
+          parser->expect(TType::LParen);
+          auto type = parser->parse_type();
+          parser->expect(TType::RParen);
+          auto id = global_find_type_id(type->base, type->extension_info);
+          auto literal = ast_alloc<ASTLiteral>();
+          literal->tag = ASTLiteral::Integer;
+          literal->value = std::to_string(id);
+          literal->source_range = type->source_range;
+          return literal;
          }});
   }
 }
