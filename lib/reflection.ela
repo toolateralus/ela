@@ -1,7 +1,3 @@
-#import core;
-
-// TODO:
-// ! We should have these baked into the Type *'s so that we can efficiently reflect on the kind of types that we're operating on.
 TypeFlags :: enum {
   // Scalars.
   INTEGER         = 2,
