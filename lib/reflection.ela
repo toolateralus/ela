@@ -1,3 +1,4 @@
+// todo: use #flags 
 TypeFlags :: enum {
   // Scalars.
   INTEGER         = 2,
@@ -19,6 +20,14 @@ TypeFlags :: enum {
   POINTER         = 8192,
   SIGNED          = 16384,
   UNSIGNED        = 32768,
+}
+
+type_is_signed :: (type: Type*) -> bool {
+  return type.flags & .SIGNED;
+}
+
+type_is_unsigned :: (type: Type*) -> bool {
+  return type.flags & .UNSIGNED;
 }
 
 type_has_no_extension :: (type: Type*) -> bool {
@@ -87,3 +96,4 @@ type_is_pointer :: (type: Type*) -> bool {
 type_is_fixed_array :: (type: Type*) -> bool {
   return type.flags & .FIXED_ARRAY;
 }
+
