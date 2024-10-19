@@ -97,13 +97,9 @@
 
 #compiler_flags "-g"
 
-OtherStruct :: struct {
-  i2 : float = 5.5;
-}
-
 Struct :: struct {
   i : int = 3;
-  other: OtherStruct;
+  other: int[] = {5, 4, 3};
 }
 
 main :: () {

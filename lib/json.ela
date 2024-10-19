@@ -548,21 +548,23 @@ json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   return val;
 }
 
-// json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
-//   val := new JsonValue{};
-//   val.type = JsonValueType.Array;
-//   val.data.array = JsonValue*[]{};
-//   for elem; type.elements(object) {
-//     val.data.array ~= json_serialize(elem.ptr, elem.type);
-//   }
-//   return val;
-// }
+json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
+  val := new JsonValue{};
+  val.type = JsonValueType.Array;
+  val.data.array = JsonValue*[]{};
+  for elem; type.elements((char*)object) {
+    val.data.array ~= json_serialize(elem.data, elem.type);
+  }
+  return val;
+}
 
 json_serialize :: (object: void*, type: Type*) -> JsonValue* {
   if type_is_scalar(type) {
     return json_serialize_scalar(object, type);
   } else if type_is_struct(type) {
     return json_serialize_struct(object, type);
+  } else if type_is_array(type) || type_is_fixed_array(type) {
+    return json_serialize_array(object, type);
   }
   return null;
 }
