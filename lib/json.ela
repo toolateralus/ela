@@ -415,9 +415,4 @@ json_parse_string :: (str: char*) -> JsonValue* {
 json_serialize :: (object: $T) -> JsonValue* {
   type := #type T;
   
-  if strcmp(type.name, "bool") == 0 {
-    
-  } else if strcmp(type.name, "")
-  
-  
 }

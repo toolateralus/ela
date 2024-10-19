@@ -34,10 +34,6 @@ type_is_array :: (type: Type*) -> bool {
   return type.flags & .ARRAY;
 }
 
-type_is_fixed_array :: (type: Type*) -> bool {
-  return type.flags & .FIXED_ARRAY;
-}
-
 type_is_string :: (type: Type*) -> bool {
   return type.flags & .STRING;
 }
@@ -88,4 +84,8 @@ type_is_function :: (type: Type*) -> bool {
 
 type_is_pointer :: (type: Type*) -> bool {
   return type.flags & .POINTER;
+}
+
+type_is_fixed_array :: (type: Type*) -> bool {
+  return type.flags & .FIXED_ARRAY;
 }
