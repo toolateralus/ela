@@ -3,6 +3,9 @@
 
 JsonTokenType :: enum {
   Invalid,
+  True,
+  False,
+  Null,
   Eof,
   Colon,
   Number,
@@ -24,6 +27,9 @@ JsonToken :: struct {
 JsonLexer :: struct {
   tokenTypeNames : char*[JsonTokenType.Comma + 1] = {
     "Invalid",
+    "True",
+    "False",
+    "Null",
     "Eof",
     "Colon",
     "Number",
@@ -32,8 +38,9 @@ JsonLexer :: struct {
     "RCurly",
     "LBracket",
     "RBracket",
-    "Comma"
+    "Comma",
   };
+
   file: char*;
   line_start: int;
   cur_line: int;
@@ -175,6 +182,21 @@ JsonLexer :: struct {
       token.value = #make(string, &input[start], &input[start] + len);
       token.type = JsonTokenType.String;
       return token;
+    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "true" {
+      token.value = #make(string, "true");
+      token.type = JsonTokenType.True;
+      position += 4;
+      return token;
+    } else if position + 5 < length && #make(string, &input[position], &input[position] + 5) == "false" {
+      token.value = #make(string, "false");
+      token.type = JsonTokenType.False;
+      position += 5;
+      return token;
+    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "null" {
+      token.value = #make(string, "null");
+      token.type = JsonTokenType.Null;
+      position += 4;
+      return token;
     } else {
       return token;
     }
@@ -214,6 +236,8 @@ JsonValueType :: enum {
   Number,
   Object,
   Array,
+  Boolean,
+  Null,
 }
 
 JsonKeyValuePair :: struct;
@@ -230,6 +254,7 @@ JsonKeyValuePair :: struct {
 
 JsonValueUnion :: union {
   number: float64;
+  boolean: bool;
   _string: string;
   object: JsonKeyValuePair[];
   array: JsonValue*[];
@@ -288,6 +313,14 @@ JsonValue :: struct {
       return $"{data.number}";
     } else if type == JsonValueType.String {
       return $"{(char)34}{data._string}{(char)34}";
+    } else if type == JsonValueType.Boolean {
+      if data.boolean == true {
+        return #make(string, "true");
+      } else {
+        return #make(string, "false");
+      }
+    } else if type == JsonValueType.Null {
+      return #make(string, "null");
     } else {
       return #make(string);
     }
@@ -321,7 +354,10 @@ json_parse :: (lexer: JsonLexer*) -> JsonValue* {
     JsonTokenType.LBracket,
     JsonTokenType.LCurly,
     JsonTokenType.Number,
-    JsonTokenType.String
+    JsonTokenType.String,
+    JsonTokenType.True,
+    JsonTokenType.False,
+    JsonTokenType.Null,
   });
   if token.type == JsonTokenType.LBracket {
     value.type = JsonValueType.Array;
@@ -353,6 +389,14 @@ json_parse :: (lexer: JsonLexer*) -> JsonValue* {
   } else if token.type == JsonTokenType.String {
     value.type = JsonValueType.String;
     value.data._string = token.value;
+  } else if token.type == JsonTokenType.True {
+    value.type = JsonValueType.Boolean;
+    value.data.boolean = true;
+  } else if token.type == JsonTokenType.False {
+    value.type = JsonValueType.Boolean;
+    value.data.boolean = false;
+  } else if token.type == JsonTokenType.Null {
+    value.type = JsonValueType.Null;
   }
   return value;
 }
