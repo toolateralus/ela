@@ -182,17 +182,17 @@ JsonLexer :: struct {
       token.value = #make(string, &input[start], &input[start] + len);
       token.type = JsonTokenType.String;
       return token;
-    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "true" {
+    } else if position + 4 <= length && strncmp(&input[position], "true", 4) == 0 {
       token.value = #make(string, "true");
       token.type = JsonTokenType.True;
       position += 4;
       return token;
-    } else if position + 5 < length && #make(string, &input[position], &input[position] + 5) == "false" {
+    } else if position + 5 <= length && strncmp(&input[position], "false", 5) == 0 {
       token.value = #make(string, "false");
       token.type = JsonTokenType.False;
       position += 5;
       return token;
-    } else if position + 4 < length && #make(string, &input[position], &input[position] + 4) == "null" {
+    } else if position + 4 <= length && strncmp(&input[position], "null", 4) == 0 {
       token.value = #make(string, "null");
       token.type = JsonTokenType.Null;
       position += 4;
@@ -345,6 +345,64 @@ JsonValue :: struct {
       return null;
     }
     return arr[index];
+  }
+  is_number :: () -> bool {
+    return type == JsonValueType.Number;
+  }
+
+  is_string :: () -> bool {
+    return type == JsonValueType.String;
+  }
+
+  is_object :: () -> bool {
+    return type == JsonValueType.Object;
+  }
+
+  is_array :: () -> bool {
+    return type == JsonValueType.Array;
+  }
+
+  is_boolean :: () -> bool {
+    return type == JsonValueType.Boolean;
+  }
+
+  is_null :: () -> bool {
+    return type == JsonValueType.Null;
+  }
+
+  as_number :: () -> float64 {
+    if type == JsonValueType.Number {
+      return data.number;
+    }
+    return 0.0; // or handle error
+  }
+
+  as_string :: () -> string {
+    if type == JsonValueType.String {
+      return data._string;
+    }
+    return ""; // or handle error
+  }
+
+  as_object :: () -> JsonKeyValuePair[] {
+    if type == JsonValueType.Object {
+      return data.object;
+    }
+    return {}; // or handle error
+  }
+
+  as_array :: () -> JsonValue*[] {
+    if type == JsonValueType.Array {
+      return data.array;
+    }
+    return {}; // or handle error
+  }
+
+  as_boolean :: () -> bool {
+    if type == JsonValueType.Boolean {
+      return data.boolean;
+    }
+    return false; // or handle error
   }
 }
 
