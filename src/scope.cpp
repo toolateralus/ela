@@ -33,17 +33,26 @@ Context::Context() {
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    
     type_scope->parent = root_scope;
     field_scope->parent = root_scope;
+    element_scope->parent = root_scope;
+
     auto type_id = global_create_struct_type("Type", type_scope);
     auto field_id = global_create_struct_type("Field", field_scope);
+    auto element_id = global_create_struct_type("Element", element_scope);
 
     // Type*
     auto type_ptr =
         global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}});
-    // Field* []
+    // Field*[]
     auto field_arr = global_find_type_id(
         "Field", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
+                  .array_sizes = {nullptr}});
+    // Element[]
+    auto element_arr = global_find_type_id(
+        "Element", {.extensions = {TYPE_EXT_ARRAY},
                   .array_sizes = {nullptr}});
     // Field*
     auto field_ptr =
@@ -59,24 +68,37 @@ Context::Context() {
     field_scope->insert("type", type_ptr);
     field_scope->insert("size", u64_type());
     field_scope->insert("offset", u64_type());
-    
-    auto get_info = type_alloc<FunctionTypeInfo>();
-    get_info->is_varargs = true;
-    get_info->return_type = charptr_type();
-    auto _t = global_find_function_type_id("s8*(...)", *get_info, {});
+
+    element_scope->insert("data", charptr_type());
+    element_scope->insert("type", type_ptr);
+
+    // field.get()
+    auto get_info = FunctionTypeInfo{};
+    get_info.is_varargs = true;
+    get_info.return_type = charptr_type();
+    auto _t = global_find_function_type_id("s8*(...)", get_info, {});
     field_scope->insert("get", _t, SYMBOL_IS_FUNCTION);
     auto get_sym = field_scope->local_lookup("get");
     get_sym->function_overload_types.push_back(_t);
     
-    auto set_info = type_alloc<FunctionTypeInfo>();
-    set_info->is_varargs = true;
-    set_info->return_type = void_type();
-    _t = global_find_function_type_id("void(...)", *set_info, {});
-    
+    // field.set()
+    auto set_info = FunctionTypeInfo{};
+    set_info.is_varargs = true;
+    set_info.return_type = void_type();
+    _t = global_find_function_type_id("void(...)", set_info, {});
     field_scope->insert("set", _t, SYMBOL_IS_FUNCTION);
     auto set_sym = field_scope->local_lookup("set");
     set_sym->function_overload_types.push_back(_t);
-    
+
+    // type.elements()
+    auto elements_info = FunctionTypeInfo{};
+    elements_info.return_type = element_arr;
+    elements_info.params_len = 1;
+    elements_info.parameter_types[0] = charptr_type();
+    _t = global_find_function_type_id("Element[](char*)", elements_info, {});
+    type_scope->insert("elements", _t, SYMBOL_IS_FUNCTION);
+    auto elements_sym = type_scope->local_lookup("elements");
+    elements_sym->function_overload_types.push_back(_t);
   }
 
   // string struct, stores length info.
