@@ -411,7 +411,7 @@ json_parse_string :: (str: char*) -> JsonValue* {
   return json_parse(&lexer);
 }
 
-json_serialize_scalar :: (object: $T, type: Type*) -> JsonValue* {
+json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
   if type_is_float(type) || type_is_integral(type) {
     // return number
   } else if type_is_bool(type) {
@@ -421,7 +421,7 @@ json_serialize_scalar :: (object: $T, type: Type*) -> JsonValue* {
   } else { return null; }
 }
 
-json_serialize_struct :: (object: $T, type: Type*) -> JsonValue* {
+json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   for field; type.fields {
     if type_is_function(field.type) then continue;
     if type_is_scalar(field.type) {
@@ -443,7 +443,7 @@ json_serialize :: (object: $T) -> JsonValue* {
   type := #type T;
   
   value: JsonValue*;
-  value = json_serialize_scalar(object, type);
+  value = json_serialize_scalar((void*)&object, type);
   if value {
     return value;
   }
