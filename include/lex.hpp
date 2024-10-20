@@ -255,10 +255,11 @@ struct Lexer {
       return other.input == input;
     }
 
-    State(const std::string &input, size_t file_idx, size_t input_len)
-        : input(input), file_idx(file_idx), input_len(input_len) {}
+    State(const std::string &input, size_t file_idx, size_t input_len, const std::filesystem::path &path)
+        : input(input), file_idx(file_idx), input_len(input_len), path(path) {}
 
     std::string input{};
+    std::filesystem::path path;
     std::deque<Token> lookahead_buffer{};
     size_t pos = 0;
     size_t col = 1;
@@ -267,13 +268,14 @@ struct Lexer {
     size_t input_len{};
 
     static State from_string(const std::string &input) {
-      return State(input, 0, input.length());
+      return State(input, 0, input.length(), "");
     }
 
     static State from_file(const std::string &input,
                            const std::string &filename) {
       auto canonical = std::filesystem::canonical(filename);
       auto path = canonical.string();
+      std::filesystem::current_path(canonical.parent_path());
       bool found = false;
       size_t file_idx = 0;
       for (const auto &file : SourceLocation::files()) {
@@ -286,7 +288,7 @@ struct Lexer {
       if (!found) {
         SourceLocation::files().push_back(path);
       }
-      return State(input, file_idx, input.length());
+      return State(input, file_idx, input.length(), canonical);
     }
   };
 

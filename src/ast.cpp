@@ -32,7 +32,7 @@ void Parser::init_directive_routines() {
           auto filename = parser->expect(TType::String).value;
           if (!std::filesystem::exists(filename)) {
             throw_error(
-                std::format("Couldn't find included file: {}", filename), {});
+                std::format("Couldn't find included file: {}, current path: {}", filename, std::filesystem::current_path().string()), {});
           }
           std::stringstream ss;
           if (import_set.contains(filename)) {
@@ -627,8 +627,11 @@ ASTProgram *Parser::parse() {
   auto program = ast_alloc<ASTProgram>();
 
   while (true) {
-    if (peek().type == TType::Eof && states.size() > 0) {
+    if (peek().type == TType::Eof && !states.empty()) {
       states.pop_back();
+      if (!states.empty()) {
+        std::filesystem::current_path(states.back().path.parent_path());
+      }
     }
 
     if (semicolon())
@@ -1752,6 +1755,7 @@ Token Parser::eat() {
 
   if (peek().is_eof() && states.size() > 1) {
     states.pop_back();
+    std::filesystem::current_path(states.back().path.parent_path());
     fill_buffer_if_needed();
     return peek();
   }
