@@ -39,7 +39,10 @@
 #foreign atof :: (v: char*) -> float64;
 
 #foreign fabs :: (f: float64) -> float64;
-#foreign isinf :: (arg: float) -> bool;
+
+#foreign isinf :: (arg: float64) -> bool;
+#foreign isnan :: (arg: float64) -> bool;
+
 #foreign sqrt :: (f: float64) -> float64;
 #foreign cos :: (f: float64) -> float64;
 #foreign sin :: (f: float64) -> float64;
