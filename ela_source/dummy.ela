@@ -94,10 +94,12 @@
 #import core;
 #import reflection;
 
-Struct :: struct {
-  i: int;
-}
 
 main :: () {
-  println($"{type_is_struct(#type s8**)}");
+  
+  
+  
+  for field; (#type Struct).fields {
+    println($"field: {field.name}, type: {field.type.name}");
+  }
 }

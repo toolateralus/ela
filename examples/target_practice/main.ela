@@ -411,7 +411,7 @@ draw_game :: () {
 BulletRoutine :: struct {
   count : int = 0;
   timer: Timer;
-  interval: float = 0.075;
+  interval: float = 0.1;
   spawn :: () -> bool {
     timer.interval = interval;
     if timer.tick() {
@@ -552,7 +552,7 @@ update_game :: () {
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
   
   if IsKeyPressed(Key.Space) && bullet_routine.count == 0 {
-    bullet_routine.count = 3 * round_index;
+    bullet_routine.count = 1;
   }
   
   dead_bullets: Bullet*[];

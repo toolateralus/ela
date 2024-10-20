@@ -798,7 +798,7 @@ check_error :: (location: char*) {
   }
 }
 Vec4 :: union {
-  values: float[4] ;
+  values: float[4];
   #anon :: struct {
     x: float;
     y: float;

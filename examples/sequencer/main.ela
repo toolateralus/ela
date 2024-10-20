@@ -6,7 +6,6 @@
 
 #compiler_flags "-g"
 
-#foreign usleep :: (c: int);
 
 playing := false;
 timer: Timer;
@@ -88,6 +87,16 @@ check_button_style: Style = {
   2.0,
 }
 
+reset_button_style : Style = {
+  WHITE,
+  RED,
+  GREEN,
+  16,
+  false,
+  5.0,
+  2.0,
+};
+
 index : s32 = 0;
 
 play_callback :: () {
@@ -148,6 +157,16 @@ SequenceChannel :: struct {
 
 channels: SequenceChannel[];
 
+on_remove_channel :: () {
+  if channels.length > 0 then _ := ~channels;
+}
+
+on_reset :: () {
+  while channels.length > 0 {
+    _ := ~channels;
+  }
+}
+
 on_file_selected :: (index: int);
 
 file_dropdown : DropDown = {
@@ -205,7 +224,7 @@ main :: () {
     BeginDrawing();
       if IsKeyPressed(.Space) then play_callback();
 
-      seq_y := GetScreenHeight() / 2.0;
+      seq_y := GetScreenHeight() / 3.0;
       seq_x := 0.0
       if playing {
         cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0 - 2;
@@ -226,6 +245,10 @@ main :: () {
 
       beats_slider.value = &beats;
       beats_slider.draw();
+      
+      draw_button("reset (no undo)", {(float)GetScreenWidth() - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
+      draw_button("remove channel", Rectangle{0, 215, 125, 30}, reset_button_style, &on_remove_channel);
+      
       for *channel; channels {
         channel.draw(seq_x, seq_y);
         seq_y += 40

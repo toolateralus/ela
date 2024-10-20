@@ -1482,6 +1482,7 @@ std::string get_elements_function(const std::string &element_type_name, int elem
   }})_", element_type_name, element_type_name, element_type_id);
 }
 
+
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {

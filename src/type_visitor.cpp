@@ -252,6 +252,8 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     
     // TODO: re enable this once we can find constructors
     for (const auto &[name, symbol]: info->scope->symbols) {
+      if (name == "this") continue;
+      
       // constructors use anonymous symbol names.
       if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
       auto type = global_get_type(symbol.type_id);

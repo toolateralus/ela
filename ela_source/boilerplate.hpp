@@ -183,7 +183,7 @@ template <class T> struct _array {
 // For now, we'll just use a simple null terminated string.
 struct string {
   char *data = nullptr;
-  int length = 0;
+  s64 length = 0;
   string() {}
   string(char *str) {
     if (str == nullptr) {

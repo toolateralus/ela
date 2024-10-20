@@ -12,6 +12,7 @@
 
 #foreign sleep :: (seconds: int);
 #foreign usleep :: (c: int);
+
 #foreign getchar :: () -> int;
 
 #foreign fmod :: (l: float, r: float) -> float;
