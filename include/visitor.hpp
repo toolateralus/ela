@@ -59,7 +59,6 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  bool ignore_generic_functions = true;
   bool within_dot_expression = false;
   int declaring_or_assigning_type = -1;
 
@@ -107,9 +106,6 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
-  int generate_generic_function(ASTCall *node,
-                                ASTFunctionDeclaration *func_decl,
-                                std::vector<int> arg_tys);
 };
 
 struct EmitVisitor : VisitorBase {

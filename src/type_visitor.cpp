@@ -5,7 +5,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
-#include <algorithm>
 #include <any>
 #include <cassert>
 #include <format>
@@ -69,92 +68,6 @@ void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
   //   auto subscript = static_cast<ASTSubscript *>(node);
   //   report_mutated_if_iden(subscript->left);
   // }
-}
-
-int TypeVisitor::generate_generic_function(ASTCall *node,
-                                           ASTFunctionDeclaration *func_decl,
-                                           std::vector<int> arg_tys) {
-  std::unordered_set<int> type_args_aliased;
-  FunctionTypeInfo info{};
-
-  for (int i = 0; i < func_decl->params->params.size(); ++i) {
-    auto scope = func_decl->block.get()->scope;
-    auto params = func_decl->params->params;
-
-    if (params[i]->is_type_param) {
-      auto param_ext = params[i]->type->extension_info;
-      auto arg_type = ctx.scope->get_type(arg_tys[i]);
-      auto arg_ext = arg_type->get_ext();
-      while (!param_ext.has_no_extensions()) {
-        if (arg_ext.has_no_extensions()) {
-          throw_error("Invalid argument in polymorphic function. Probably "
-                      "expected a T* or T[] but didn't get the right type",
-                      node->source_range);
-        }
-        if (arg_ext.extensions.back() != param_ext.extensions.back()) {
-          throw_error("Invalid argument in polymorphic function. Probably "
-                      "expected a T* or T[] but didn't get the right type.",
-                      node->source_range);
-        }
-        arg_ext = arg_ext.without_back();
-        param_ext = param_ext.without_back();
-      }
-      auto pointed_to = ctx.scope->find_type_id(arg_type->get_base(), arg_ext);
-      auto param = params[i];
-      auto alias_id = ctx.scope->create_type_alias(pointed_to, param->type->base);
-      type_args_aliased.insert(alias_id);
-      assert_types_can_cast_or_equal(
-          pointed_to, alias_id, node->source_range,
-          "invalid argument types. expected: {}, got: {}",
-          std::format("parameter: {} of function", i));
-      info.parameter_types[i] = pointed_to;
-      info.params_len++;
-      params[i]->accept(this);
-      continue;
-    }
-    // !BUG: default parameters evade type checking
-    if (arg_tys.size() <= i) {
-      continue;
-    }
-
-    info.params_len++;
-    info.parameter_types[i] =
-        int_from_any(func_decl->params->params[i]->accept(this));
-    assert_types_can_cast_or_equal(
-        arg_tys[i], info.parameter_types[i], node->source_range,
-        "invalid argument types. expected: {}, got: {}",
-        std::format("parameter: {} of function", i));
-  }
-
-  for (const auto &param : func_decl->params->params) {
-    if (func_decl->block.is_not_null())
-      func_decl->block.get()->scope->insert(param->name,
-                                            param->type->resolved_type);
-  }
-
-  auto return_type_id = node->type = info.return_type =
-      ctx.scope->get_type(int_from_any(func_decl->return_type->accept(this)))
-          ->get_true_type();
-
-  auto type_id = ctx.scope->find_function_type_id(
-      get_function_typename(func_decl), info, {});
-
-  if (std::ranges::find(func_decl->generic_types, type_id) ==
-      func_decl->generic_types.end()) {
-
-    // ? Enable this for debug.
-    // printf("Generating a new generic function id=%d %s\n", type_id,
-    //        ctx.scope->get_type(type_id)->to_string().c_str());
-    func_decl->generic_types.push_back(type_id);
-  }
-
-  // erase the aliases we just created to emit this function
-  for (const auto &alias : type_args_aliased) {
-    auto name = ctx.scope->get_type(alias)->get_base();
-    type_alias_map.erase(name);
-  }
-
-  return return_type_id;
 }
 
 void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
@@ -450,9 +363,6 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
           ctx.scope->get_pointer_to_type(current_union_decl.get()->type->resolved_type));
     }
   }
-
-  if (ignore_generic_functions && (node->flags & FUNCTION_IS_GENERIC) != 0)
-    return {};
 
   node->return_type->accept(this);
   node->params->accept(this);
@@ -820,26 +730,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
 
   std::vector<int> arg_tys =
       std::any_cast<std::vector<int>>(node->arguments->accept(this));
-  
-  
-  // TODO: we need to find a better way to call generics. We should not depend on having a named generic.
-  // Also, this will cause very cryptic and undefined errors to those who do not understand this limitation
-  // exists in the language. Bad!
-  if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
-    auto identifier = static_cast<ASTIdentifier*>(node->function);
-    auto symbol = ctx.scope->lookup(identifier->value.value);
-    
-    if (symbol->declaring_node.is_not_null()) {
-      auto func_decl = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
-      if (func_decl && (func_decl->flags & FUNCTION_IS_GENERIC) != 0) {
-        return generate_generic_function(node, func_decl, arg_tys);
-      }
-    }
 
-    // ! janky and annoying that we can't have const functions because of function
-    // pointers. ! HACK
-    symbol->flags |= SYMBOL_WAS_MUTATED;
-  }
 
   // the type may be null for a generic function but the if statement above
   // should always take care of that if that was the case.
@@ -854,11 +745,6 @@ std::any TypeVisitor::visit(ASTCall *node) {
         std::format("Unable to call function... target did not refer to a function typed variable. Constructors currently use #make(Type, ...) syntax."), node->source_range);
   }
 
-  // Find a suitable function overload to call.
-  // ! Once again, we cannot call overloaded functions via a list of function pointers etc,
-  // ! any unnamed symbol. Unfortuately we wrote it to completely depend on naming, rather than typing,
-  // ! The whole generic and overload system needs to be overhauled for efficiency and cleanliness, as well
-  // ! as effectiveness and reliability.
   if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
     auto identifier = static_cast<ASTIdentifier*>(node->function);
     auto symbol = ctx.scope->lookup(identifier->value.value);

@@ -1,5 +1,4 @@
 #include "ast.hpp"
-#include "copier.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -25,12 +24,12 @@ int num_types;
 jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
 
 // the same for this
-jstl::Arena scope_arena{MB(10)};
+jstl::Arena scope_arena{MB(100)};
 
 std::unordered_map<std::string, int> type_alias_map;
 
 // the same for this
-jstl::Arena ast_arena{MB(10)};
+jstl::Arena ast_arena{MB(100)};
 
 // TODO: remove me, we want file scopes.
 Scope * root_scope;

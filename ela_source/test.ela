@@ -1,8 +1,13 @@
 #import core;
 #import raylib;
 #import json;
- // we include this to test a large file of various definitions. This will help us catch broader problems without
-// explicitly adding 10000 tests.
+#import directory;
+#import file;
+#import dlfcn;
+#import interned_string;
+#import memory;
+#import pthread;
+#import reflection;
 
 #compiler_flags "-g"
 
@@ -1394,3 +1399,4 @@ JsonValueDeleter :: struct {
     ++index;
   }
 }
+

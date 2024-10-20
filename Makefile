@@ -2,7 +2,7 @@ COMPILER := clang++
 
 # MAX_NUM_TYPES should not be a compile time constant, it should be approximated or something.
 # However, 2000 is pretty reasonable, most programs wont exceed triple digits at all.
-COMPILER_FLAGS := -std=c++23 -g -DMAX_NUM_TYPES=2000 -Iinclude
+COMPILER_FLAGS := -std=c++23 -g -DMAX_NUM_TYPES=10000 -Iinclude
 LD_FLAGS := 
 OBJ_DIR := objs
 BIN_DIR := bin

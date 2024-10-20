@@ -123,12 +123,10 @@ struct Copier {
     function->block = static_cast<ASTBlock*>(copy(node->block.get()));
     function->flags = node->flags;
     function->return_type = node->return_type;
-    function->generic_types = node->generic_types;
     function->meta_type = node->meta_type;
     function->name = node->name;
     function->params = static_cast<ASTParamsDecl*>(copy(node->params));
     function->source_range = node->source_range;
-    function->has_generic_return_type = node->has_generic_return_type;
     return function;
   }
 
@@ -147,7 +145,6 @@ struct Copier {
     if (node->default_value)
       param->default_value = static_cast<ASTExpr*>(copy(node->default_value.get()));
     param->name = node->name;
-    param->is_type_param = node->is_type_param;
     param->source_range = node->source_range;
     return param;
   }

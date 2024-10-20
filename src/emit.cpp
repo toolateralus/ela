@@ -837,53 +837,13 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 
   auto symbol = ctx.scope->lookup(node->name.value);
 
-  // for #foreign declarations
   if (node->meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     emit_foreign_function(node);
     return {};
   }
 
-  // emit a bunch of generic funcz
-  if ((node->flags & FUNCTION_IS_GENERIC) != 0) {
-    auto variants = node->generic_types;
-    for (const auto variant : variants) {
-      auto variant_fun_ty = global_get_type(variant);
-      auto fun_info =
-          static_cast<FunctionTypeInfo *>(variant_fun_ty->get_info());
-
-      auto &params = node->params->params;
-      for (int i = 0; i < fun_info->params_len; ++i) {
-        auto &param = params[i];
-        if (param->is_type_param) {
-          type_alias_map[param->type->base] = fun_info->parameter_types[i];
-        }
-      }
-
-      if (node->has_generic_return_type) {
-        type_alias_map[node->return_type->base] = fun_info->return_type;
-      }
-
-      type_visitor.ignore_generic_functions = false;
-      node->accept(&type_visitor);
-      type_visitor.ignore_generic_functions = true;
-
-      // emit the new function
-      emit_various_function_declarations();
-
-      // delete teh dam aliasez
-      for (int i = 0; i < fun_info->params_len; ++i) {
-        if (node->params->params[i]->is_type_param) {
-          type_alias_map.erase(node->params->params[i]->type->base);
-        }
-      }
-
-      if (node->has_generic_return_type) {
-        type_alias_map.erase(node->return_type->base);
-      }
-    }
-  } else {
-    emit_various_function_declarations();
-  }
+  emit_various_function_declarations();
+  
 
   return {};
 }

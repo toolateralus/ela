@@ -249,7 +249,6 @@ struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
   std::string name;
-  bool is_type_param = false;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_PARAM_DECL;
@@ -272,8 +271,6 @@ struct ASTFunctionDeclaration : ASTStatement {
   Nullable<ASTBlock> block;
   Token name;
   ASTType *return_type;
-  bool has_generic_return_type = false;
-  std::vector<int> generic_types;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_FUNCTION_DECLARATION;
@@ -430,15 +427,6 @@ struct ASTSubscript : ASTExpr {
   }
 };
 
-struct GenericParameter {
-  ASTType* type = nullptr;
-  bool is_named = false;
-  std::string name = "";
-  bool operator==(const GenericParameter &other) const {
-    return type == other.type && is_named == other.is_named && name == other.name;
-  }
-};
-  
 // TODO: generalize type declarations so all types can have nested types and static methods. Should be much simpler.
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
@@ -680,7 +668,7 @@ struct Parser {
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
   ASTCall *parse_call(ASTExpr* function);
-  std::vector<GenericParameter> parse_generic_parameters();
+
 
   // ASTType* parsing routines
   

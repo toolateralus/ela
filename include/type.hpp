@@ -87,7 +87,6 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
   FUNCTION_IS_EXPORTED= 1 << 7,
-  FUNCTION_IS_GENERIC = 1 << 8,
   FUNCTION_IS_MUTATING = 1 << 9,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 10,
 };
@@ -202,9 +201,6 @@ struct FunctionTypeInfo : TypeInfo {
   int params_len = 0;
   int default_params = 0; // number of default params, always trailing.
   bool is_varargs = false;
-
-  bool is_generic = false;
-
   // defined in cpp file
   virtual std::string to_string() const override;
 };

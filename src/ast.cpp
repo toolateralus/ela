@@ -1014,25 +1014,10 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     function->return_type = ASTType::get_void();
   } else {
     expect(TType::Arrow);
-    // generic return type, -> $T
-    if (peek().type == TType::Dollar) {
-      function->has_generic_return_type = true;
-      if ((function->flags & FUNCTION_IS_GENERIC) == 0) {
-        end_node(function, range);
-        throw_error("You can't have a generic return type without "
-                    "generic parameter types currently.",
-                    function->source_range);
-      }
-      eat();
-    }
     function->return_type = parse_type();
   }
 
-  if ((function->flags & FUNCTION_IS_GENERIC) != 0) {
-    for (const auto &param : function->params->params) {
-      type_alias_map[param->type->base] = -2;
-    }
-  }
+
   
   if (peek().type == TType::Semi) {
     function->flags |= FUNCTION_IS_FORWARD_DECLARED;
@@ -1042,12 +1027,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
   
   function->block = parse_block();
-
-  if ((function->flags & FUNCTION_IS_GENERIC) != 0) {
-    for (const auto &param : function->params->params) {
-      type_alias_map.erase(param->type->base);
-    }
-  }
 
   end_node(function, range);
   current_func_decl = last_func_decl;
@@ -1078,17 +1057,10 @@ ASTParamsDecl *Parser::parse_parameters() {
     
     auto next = peek();
     
-    bool is_type_param = false;
-    if (peek().type == TType::Dollar) {
-      eat();
-      current_func_decl.get()->flags |= FUNCTION_IS_GENERIC;
-      is_type_param = true;
-    }
-    
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
-    if (is_type_param || next.type == TType::Directive || !type ||
+    if (next.type == TType::Directive || !type ||
         ctx.scope->find_type_id(next.value, {}) != -1) {
       type = parse_type();
     }
@@ -1096,7 +1068,6 @@ ASTParamsDecl *Parser::parse_parameters() {
     auto param = ast_alloc<ASTParamDecl>();
     param->type = type;
     param->name = name;
-    param->is_type_param = is_type_param;
 
     if (peek().type == TType::Assign) {
       eat();
@@ -1153,9 +1124,6 @@ ASTCall *Parser::parse_call(ASTExpr* function) {
   return call;
 }
 
-// CLEANUP(Josh) 10/4/2024, 1:32:37 PM
-// Do we want to just have a generic ASTTypeDeclaration or something since these
-// share so much behaviour? Especailly structs and unions.
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
   auto range = begin_node();
@@ -1871,27 +1839,7 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
 bool ASTExpr::is_constexpr() const {
   return get_node_type() == AST_NODE_LITERAL || m_is_const_expr;
 }
-std::vector<GenericParameter> Parser::parse_generic_parameters() {
-  expect(TType::LT);
-  std::vector<GenericParameter> params;
-  while (peek().type != TType::GT) {
-    params.emplace_back();
-    if (peek().type == TType::Dollar)
-      eat();
 
-    params.back().type = parse_type();
-
-    if (peek().type != TType::Comma && peek().type != TType::GT) {
-      params.back().name = expect(TType::Identifier).value;
-      params.back().is_named = true;
-    }
-    if (peek().type == TType::Comma) {
-      eat();
-    }
-  }
-  expect(TType::GT);
-  return params;
-}
 std::vector<ASTType *> Parser::parse_parameter_types() {
   std::vector<ASTType *> param_types;
   expect(TType::LParen);
