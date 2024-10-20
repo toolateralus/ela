@@ -1,0 +1,11 @@
+Banana :: struct {
+  percentLeft : int = 45;
+}
+
+XarStruct :: struct {
+  bananas : int = 3;
+  handstand_times: float[] = {5.2, 4.1, 339089218.54};
+  lemon_locations: string[3] = {"mouth", "hand", "belly button"};
+  name : string = "XarbieGurl";
+  current_banana_doing_hand_stand_on : Banana;
+}

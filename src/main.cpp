@@ -69,7 +69,7 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
       std::filesystem::canonical(input_path).parent_path());
       
   parse.begin();
-  Parser parser(input, input_path, context);
+  Parser parser(input, input_path.filename(), context);
   ASTProgram *root = parser.parse();
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
   return root;
