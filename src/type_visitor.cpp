@@ -203,6 +203,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     // search for fields within the range of the types provided.
     int i = 0;
     for (const auto &name : info->scope->ordered_symbols) {
+      if (name == "this") continue;
       auto sym = info->scope->symbols[name];
       if (i >= node->types.size()) {
         break;
