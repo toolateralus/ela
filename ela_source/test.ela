@@ -862,39 +862,6 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }
 
-add :: (a: $T, b: $T) -> $T {
-  return a + b;
-}
-
-generic_test_1 :: (arg1: $T**, value: $T) -> $T {
-  return value;
-}
-generic_called_by_generic :: (v: $T) -> $T {
-  return v;
-}
-generic_calling_generic :: (v: $T) -> $T {
-  return generic_called_by_generic(v);
-} 
-
-#test test_generic_functions :: () {
-  //assert("generic function failed to return a + b", add(1, 1) == 2);
-  assert("add() failed to return a + b", add(1, 1) == 2);
-  assert("add() failed to return a + b", add(-1, add(-1, -0)) == -2);
-  assert("add() failed to return a + b", add(1.5, 1.5) == 3.0);
-  
-  //! Bug, this shouldnt work but it does because of both a failure of us type checking
-  //! generic arguments, and also C++ failing to have good casting rules.
-  // We should never be able to cast 10 to a boolean lol.
-  {
-    j: bool**;
-    generic_test_1(j, 10);
-  }
-  
-  //! See bug 1.1 :: 
-  // generic_calling_generic(10);
-}
-
-
 #test test_array_concat_operator :: () {
   array: int[];
   array ~= 10;

@@ -115,9 +115,29 @@ println :: (str: char*) {
   printf("%s\n", str);
 }
 
-abs :: (v: $T) -> $T {
-  _default: T;
-  if v < _default {
+abs :: (v: s64) -> s64 {
+  if v < 0 {
+    return -v;
+  }
+  return v;
+}
+
+abs :: (v: float64) -> float64 {
+  if v < 0.0 {
+    return -v;
+  }
+  return v;
+}
+
+abs :: (v: float) -> float {
+  if v < 0.0 {
+    return -v;
+  }
+  return v;
+}
+
+abs :: (v: int) -> int {
+  if v < 0 {
     return -v;
   }
   return v;
@@ -143,13 +163,13 @@ max :: (a: int, b: int) -> int {
   return b;
 }
 
-clamp :: (v: float, min, max) -> float {
+clamp :: (v: float64, min, max) -> float64 {
   if v < min then return min;
   if v > max then return max;
   return v;
 }
 
-clamp :: (v: float*, min: float, max) {
+clamped :: (v: float*, min: float, max) {
   if *v < min then *v = min;
   if *v > max then *v = max;
 }

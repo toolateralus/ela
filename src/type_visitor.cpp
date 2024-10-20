@@ -845,7 +845,7 @@ std::any TypeVisitor::visit(ASTCall *node) {
   // should always take care of that if that was the case.
   if (type == nullptr) {
     throw_error(
-        "Internal compiler error: type was null when performing a call.",
+        "Use of undeclared function",
         node->source_range);
   }
 
