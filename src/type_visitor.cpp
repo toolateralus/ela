@@ -1438,18 +1438,10 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
   int return_type = void_type();
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   
-  // ! BUG:  add a way to have us return control flow here. 
-  // ! I am not sure how that works @Cooper-Pilot
   for (const auto &_case: node->cases) {
     auto expr_type = int_from_any(_case.expression->accept(this));
     auto block_cf = std::any_cast<ControlFlow>(_case.block->accept(this));
     flags |= block_cf.flags;
-    
-    // TODO: we should be able to return from a function from within a switch, however that conflicts a bit
-    // ? with how we're allowing switches to be an expression. I am sure there is a way we can detect it's a switch 
-    // ? that's a void and visit in a certain way.
-    // ? However for now, I think it's more valuable to have switches act like a expression rather than just a statement.
-    // ? Although, you can use it as a standalone statement.
     if ((block_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
       if (return_type != void_type()) {
         assert_return_type_is_valid(return_type, block_cf.type, node);
