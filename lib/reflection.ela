@@ -1,3 +1,4 @@
+#import core;
 // todo: use #flags 
 TypeFlags :: enum {
   // Scalars.
@@ -95,5 +96,14 @@ type_is_pointer :: (type: Type*) -> bool {
 
 type_is_fixed_array :: (type: Type*) -> bool {
   return type.flags & .FIXED_ARRAY != 0;
+}
+
+type_get_field :: (type: Type*, name: string) -> Field* {
+  for field; type.fields {
+    if strcmp(field.name, name.data) == 0 {
+      return field;
+    }
+  }
+  return null;
 }
 

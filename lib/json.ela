@@ -535,8 +535,6 @@ json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   val.type = JsonValueType.Object;
   val.data.object = JsonKeyValuePair[]{};
   for field; type.fields {
-    is_func := field.type.flags & .FUNCTION;
-    if is_func != 0 then continue;
     field_kvp: JsonKeyValuePair;
     field_kvp.key = field.name;
     field_kvp.value = json_serialize((void*)field.get(object), field.type);
@@ -572,3 +570,112 @@ json_serialize :: (object: void*, type: Type*) -> JsonValue* {
   }
   return null;
 }
+
+JsonError :: struct {
+  has_value : bool = false;
+  message: string;
+}
+
+// json_serialize_scalar :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+//   val := new JsonValue{};
+//   if type_is_float(type) {
+//     val.type = JsonValueType.Number;
+//     if type.id == #typeid(float) {
+//       val.data.number = *(float*)object;
+//       return val;
+//     } else if type.id == #typeid(float64) {
+//       val.data.number = *(float64*)object;
+//       return val;
+//     } else if type.id == #typeid(float32) {
+//       val.data.number = *(float32*)object;
+//       return val;
+//     }
+//   } else if type_is_integral(type) {
+//     val.type = JsonValueType.Number;
+//     if type_is_signed(type) {
+//       if type.id == #typeid(char) {
+//         val.data.number = *(char*)object;
+//         return val;
+//       } else if type.id == #typeid(s8) {
+//         val.data.number = *(s8*)object;
+//         return val;
+//       } else if type.id == #typeid(s16) {
+//         val.data.number = *(s16*)object;
+//         return val;
+//       } else if type.id == #typeid(s32) {
+//         val.data.number = *(s32*)object;
+//         return val;
+//       } else if type.id == #typeid(s64) {
+//         val.data.number = *(s64*)object;
+//         return val;
+//       } else if type.id == #typeid(int) {
+//         val.data.number = *(int*)object;
+//         return val;
+//       }
+//     } else {
+//       if type.id == #typeid(u8) {
+//         val.data.number = *(u8*)object;
+//         return val;
+//       } else if type.id == #typeid(u16) {
+//         val.data.number = *(u16*)object;
+//         return val;
+//       } else if type.id == #typeid(u32) {
+//         val.data.number = *(u32*)object;
+//         return val;
+//       } else if type.id == #typeid(u64) {
+//         val.data.number = *(u64*)object;
+//         return val;
+//       }
+//     }
+//   } else if type_is_bool(type) {
+//     val.type = JsonValueType.Boolean;
+//     val.data.boolean = *(bool*)object;
+//   }
+//   return null;
+// }
+
+json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
+
+// json_deserialize_struct :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+//   for json_field; val.data.object {
+//     struct_field := type_get_field(type, json_field.key);
+//     if !struct_field {
+//       return {true, $"Could not find field {json_field.key} in type {type.name}"};
+//     }
+//     err := json_deserialize(json_field, (void*)struct_field.get(object), struct_field.type);
+//     if err.has_value {
+//       return err;
+//     }
+//   }
+//   return {};
+// }
+
+// json_deserialize_array :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+//   for elem; val.as_array() {
+//     err := json_deserialize(elem.data, type.);
+//     if err.has_value {
+//       return err;
+//     }
+//   }
+//   return {};
+// }
+
+// json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+//   if val.is_string() {
+//     if type.id == #typeid(string) {
+//       *(string*)object = val.as_string();
+//       return {};
+//     } else {
+//       return {true, $"Type mismatch: string to {type.name}"};
+//     }
+//   } else if val.is_object() {
+//     if type_is_struct(type) {
+//       return json_deserialize_struct(val, object, type);
+//     } else {
+//       return {true, $"Type mismatch: object to {type.name}"};
+//     }
+//   } else if val.is_array() {
+//     return {true, $"Array deserialization not yet suported"};
+//   }
+//   return json_deserialize_scalar(val, object, type);
+// }
