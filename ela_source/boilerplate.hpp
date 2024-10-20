@@ -1,13 +1,7 @@
-#include <cstdint>
-#include <functional>
-#include <unordered_map>
-#include <vector>
 
-/* 
-  * This is a bit of boiler-plate or runtime utilities used within Ela.
-  * While we still compile to C++, we will certainly take advantage of being able to compile with
-  * our own library.
-*/
+#if USE_STD_LIB
+
+#include <stdint.h>
 
 using float64 = double;
 using u64 = uint64_t;
@@ -22,6 +16,10 @@ using u16 = uint16_t;
 
 using s8 = int8_t;
 using u8 = uint8_t;
+
+#include <functional>
+#include <unordered_map>
+#include <vector>
 
 extern "C" int printf(const char *format, ...);
 
@@ -365,4 +363,22 @@ struct __COMPILER_GENERATED_TEST {
            failed, passed);                                                    \
   }
 #else
+#endif
+
+#else
+
+using float64 = double;
+using u64 = unsigned long long;
+using s64 = signed long long;
+
+using s32 = signed;
+using u32 = unsigned;
+using float32 = float;
+
+using s16 = short;
+using u16 = unsigned short;
+
+using s8 = signed char;
+using u8 = unsigned char;
+
 #endif

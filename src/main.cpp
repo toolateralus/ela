@@ -116,10 +116,10 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
     
     if (has_flag("--debug") && !extra_flags.contains("-g")) extra_flags += " -g ";
     
-    static std::string ignored_warnings = "-Wno-tautological-compare  -Wno-braced-scalar-init -Wno-return-type-c-linkage -Wno-writable-strings -Wno-constant-logical-operand -Wno-parentheses-equality -Wno-c99-designator";
+    static std::string ignored_warnings = "-w";
     
-    
-    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} -o {} {}", ignored_warnings, output_path.string(), binary_path.string(), extra_flags);
+      std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
     
     printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
     cpp.begin();

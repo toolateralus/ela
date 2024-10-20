@@ -826,6 +826,9 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   current_func_decl = node;
 
   auto test_flag = get_compilation_flag("test");
+  
+  
+  
 
   Defer deferred = {[&]() { current_func_decl = last_func_decl; }};
 
@@ -1042,12 +1045,41 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
   
   const auto testing = get_compilation_flag("test");
+  const auto use_stdlib = !compile_command.compilation_flags.contains("-nostdlib") && !compile_command.compilation_flags.contains("-ffreestanding");
   
-  if (testing) { code << "#define TESTING\n"; }
+  if (use_stdlib) {
+    code << "#define USE_STD_LIB 1\n";
+  } else {
+    for (int i = 0; i < num_types; ++i) {
+      Type *type = type_table[i];
+      TypeExt ext = type->get_ext();
+      
+      if (type->get_base() == "Field") continue;
+      if (type->get_base() == "Element") continue;
+      if (type->get_base() == "Type") continue;
+      
+      if (ext.is_array() && !ext.is_fixed_sized_array()) {
+        throw_error(std::format("You cannot use dynamic arrays in a freestanding or nostdlib environment, due to lack of allocators. Type: {}", type->to_string()), {});
+      }
+      if (ext.is_map()) {
+        throw_error(std::format("You cannot use maps in a freestanding or nostdlib environment, due to lack of allocators. Type: {}", type->to_string()), {});
+      }
+    }
+    
+    if (get_compilation_flag("test")) {
+      throw_error("You cannot use unit tests in a freestanding or nostlib environment due to lack of exception handling", {});
+    }
+    
+  }
   
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
-  code << "extern Type **_type_info;\n";
-  code << "static char *__str_interpolation_buffer = new char[4096];\n";
+  
+  if (use_stdlib) 
+    code << "extern Type **_type_info;\n";
+  
+  if (testing) { 
+    code << "#define TESTING\n";
+  }
   
   for (const auto &statement : node->statements) {
     statement->accept(this);
@@ -1071,7 +1103,8 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   
   // Emit runtime reflection type info for requested types, only when we have actually requested
   // runtime type information.
-  if (!ctx.type_info_strings.empty()) {
+  if (!ctx.type_info_strings.empty() && use_stdlib) {
+    
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
       type_info << str << ";\n";
@@ -1084,6 +1117,10 @@ std::any EmitVisitor::visit(ASTProgram *node) {
       "}}();\n",
       num_types, type_info.str()
     );
+  }
+  
+  if (!use_stdlib && !ctx.type_info_strings.empty()) {
+    throw_error("You cannot use runtime type reflection in a freestanding or nostdlib environment, due to a lack of allocators. To compare types, use #typeid.", {});
   }
 
   return {};

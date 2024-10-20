@@ -618,7 +618,7 @@ update_game :: () {
         amount : int = (int)distance * round_index;
         score += amount
         ui_text_color.a = (u8)255;
-        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, (float)distance));
+        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, (float)clamp(0.5, 3.5, (float)distance));
         break;
       } 
     }

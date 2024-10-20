@@ -59,14 +59,6 @@ JsonLexer :: struct {
     file = _file;
     input = _input;
     length = strlen(input);
-
-    // this doesn't work here
-    // enum_type : Type* = #type JsonTokenType;
-    // i : int;
-    // for key; enum_type.fields {
-    //   tokenTypeNames[i] = key.name;
-    //   ++i;
-    // }
   }
 
   get_token :: () -> JsonToken {
