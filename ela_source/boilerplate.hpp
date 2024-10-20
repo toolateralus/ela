@@ -291,7 +291,7 @@ struct Field {
 };
 
 struct Element {
-  char *ptr;
+  char *data;
   Type *type;
 };
 

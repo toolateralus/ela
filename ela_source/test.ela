@@ -1405,3 +1405,25 @@ JsonValueDeleter :: struct {
   id := #typeid(s8**);
   assert("typeid failed.", id == (#type s8**).id);
 }
+
+#test test_array_reflection :: () {
+  fixed: int[3] = {1, 2, 3};
+  fixed_type := #type fixed;
+  index: int = 0;
+  fixed_elements := fixed_type.elements((char*)&fixed);
+  assert("Fixed array length mismatch", fixed_elements.length == 3);
+  for elem; fixed_elements {
+    assert("Fixed array element mismatch", (*(int*)elem.data) == fixed[index]);
+    ++index;
+  }
+
+  dynamic: int[] = {3, 2, 1};
+  dynamic_type := #type dynamic;
+  index = 0;
+  dynamic_elements := dynamic_type.elements((char*)&dynamic);
+  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
+  for elem; dynamic_elements {
+    assert("Dynamic array element mismatch", (*(int*)elem.data) == dynamic[index]);
+    ++index;
+  }
+}

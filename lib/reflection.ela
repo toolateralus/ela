@@ -1,3 +1,4 @@
+#import core;
 // todo: use #flags 
 TypeFlags :: enum {
   // Scalars.
@@ -23,11 +24,11 @@ TypeFlags :: enum {
 }
 
 type_is_signed :: (type: Type*) -> bool {
-  return type.flags & .SIGNED;
+  return type.flags & .SIGNED != 0;
 }
 
 type_is_unsigned :: (type: Type*) -> bool {
-  return type.flags & .UNSIGNED;
+  return type.flags & .UNSIGNED != 0;
 }
 
 type_has_no_extension :: (type: Type*) -> bool {
@@ -38,62 +39,71 @@ type_has_no_extension :: (type: Type*) -> bool {
 }
 
 type_is_array :: (type: Type*) -> bool {
-  return type.flags & .ARRAY;
+  return type.flags & .ARRAY != 0;
 }
 
 type_is_string :: (type: Type*) -> bool {
-  return type.flags & .STRING;
+  return type.flags & .STRING != 0;
 }
 
 type_is_scalar :: (type: Type*) -> bool {
   return type_has_no_extension(type) && 
-         (type.flags & .INTEGER ||
-          type.flags & .FLOAT   ||
-          type.flags & .BOOL    ||
-          type.flags & .STRING);
+         (type.flags & .INTEGER != 0 ||
+          type.flags & .FLOAT != 0   ||
+          type.flags & .BOOL != 0    ||
+          type.flags & .STRING != 0);
 }
 
 type_is_struct :: (type: Type*) -> bool {
-  return type.flags & .STRUCT;
+  return type.flags & .STRUCT != 0;
 }
 
 type_is_union :: (type: Type*) -> bool {
-  return type.flags & .UNION;
+  return type.flags & .UNION != 0;
 }
 
 type_is_enum :: (type: Type*) -> bool {
-  return type.flags & .ENUM;
+  return type.flags & .ENUM != 0;
 }
 
 type_is_integral :: (type: Type*) -> bool {
-  return type.flags & .INTEGER;
+  return type.flags & .INTEGER != 0;
 }
 
 type_is_float :: (type: Type*) -> bool {
-  return type.flags & .FLOAT;
+  return type.flags & .FLOAT != 0;
 }
 
 type_is_bool :: (type: Type*) -> bool {
-  return type.flags & .BOOL;
+  return type.flags & .BOOL != 0;
 }
 
 type_is_tuple :: (type: Type*) -> bool {
-  return type.flags & .TUPLE;
+  return type.flags & .TUPLE != 0;
 }
 
 type_is_map :: (type: Type*) -> bool {
-  return type.flags & .MAP;
+  return type.flags & .MAP != 0;
 }
 
 type_is_function :: (type: Type*) -> bool {
-  return type.flags & .FUNCTION;
+  return type.flags & .FUNCTION != 0;
 }
 
 type_is_pointer :: (type: Type*) -> bool {
-  return type.flags & .POINTER;
+  return type.flags & .POINTER != 0;
 }
 
 type_is_fixed_array :: (type: Type*) -> bool {
-  return type.flags & .FIXED_ARRAY;
+  return type.flags & .FIXED_ARRAY != 0;
+}
+
+type_get_field :: (type: Type*, name: string) -> Field* {
+  for field; type.fields {
+    if strcmp(field.name, name.data) == 0 {
+      return field;
+    }
+  }
+  return null;
 }
 

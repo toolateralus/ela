@@ -191,6 +191,7 @@ struct EmitVisitor : VisitorBase {
 
   std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
+  std::string get_elements_function(Type *type);
 
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;

@@ -1116,9 +1116,14 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     for (const auto &str : ctx.type_info_strings) {
       type_info << str << ";\n";
     }
-    code << std::format("Type** _type_info = []{{ Type **_type_info = "
-                          "new Type*[{}]; {}; return _type_info; }}();",
-                          num_types, type_info.str());
+    code << std::format(
+      "Type **_type_info = new Type*[{}];\n"
+      "auto __ts_init_func_result__ = []{{\n"
+      "  {};\n"
+      "  return 0;\n"
+      "}}();\n",
+      num_types, type_info.str()
+    );
   }
 
   return {};
@@ -1468,18 +1473,48 @@ constexpr auto TYPE_FLAGS_SIGNED          = 16384;
 constexpr auto TYPE_FLAGS_UNSIGNED        = 32768;
 
 
-std::string get_elements_function(const std::string &element_type_name, int element_type_id) {
-  return std::format(R"_(.elements = [&](char * array) -> _array<Element> {{
-    auto arr = reinterpret_cast<_array<{}>*>(array);
-    _array<Element> elements;
-    for (int i = 0; i < arr->length; ++i) {{
-      elements.push({{
-        .ptr = reinterpret_cast<char*>(array + (i * sizeof({}))),
-        .type = __type_table[{}],
-      }});
-    }}
-    return elements;
-  }})_", element_type_name, element_type_name, element_type_id);
+std::string EmitVisitor::get_elements_function(Type *type) {
+  auto element_type = global_get_type(type->get_element_type());
+  if (!type->get_ext().is_fixed_sized_array()) {
+    return std::format(
+      ".elements = [&](char * array) -> _array<Element> {{\n"
+      "  auto arr = (_array<{}>*)(array);\n"
+      "  _array<Element> elements;\n"
+      "  for (int i = 0; i < arr->length; ++i) {{\n"
+      "    elements.push({{\n"
+      "      .data = (char*)&(*arr)[i],\n"
+      "      .type = {},\n"
+      "    }});\n"
+      "  }}\n"
+      "  return elements;\n"
+      "}}\n",
+      to_cpp_string(element_type),
+      to_type_struct(element_type, ctx)
+    );
+  } else {
+    auto old = this->ss;
+    auto ss = std::stringstream{};
+    this->ss = &ss;
+    type->get_ext().array_sizes.back().get()->accept(this);
+    auto length = ss.str();
+    this->ss = old;
+    return std::format(
+      ".elements = [&](char * array) -> _array<Element> {{\n"
+      "  auto arr = ({}*)(array);\n"
+      "  _array<Element> elements;\n"
+      "  for (int i = 0; i < {}; ++i) {{\n"
+      "    elements.push({{\n"
+      "      .data = (char*)&arr[i],\n"
+      "      .type = {},\n"
+      "    }});\n"
+      "  }}\n"
+      "  return elements;\n"
+      "}}\n",
+      to_cpp_string(element_type),
+      length,
+      to_type_struct(element_type, ctx)
+    );
+  }
 }
 
 
@@ -1517,7 +1552,7 @@ std::string get_type_flags(Type *type) {
       } else if (type->get_base() == "string") {
         kind_flags |= TYPE_FLAGS_STRING;
       }
-
+      break;
     }
     case TYPE_FUNCTION:
       kind_flags = TYPE_FLAGS_FUNCTION;
@@ -1561,15 +1596,16 @@ std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context, c
   
   auto kind = 0;
   
-  get_type_flags(type);
-  
   ss << "_type_info[" << id << "] = new Type {"
      << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", "
      << ".size = sizeof(" << to_cpp_string(type) << "), "
      << get_type_flags(type) << ",\n"
-     << ".fields = " << fields
-     << " };";
+     << ".fields = " << fields << ",\n";
+  if (type->get_ext().is_array()) {
+    ss << get_elements_function(type) << ",\n";
+  }
+  ss << " };";
   context.type_info_strings.push_back(ss.str());
   return std::format("_type_info[{}]", id);
 }
@@ -1611,8 +1647,11 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
       auto &[name, sym] = tuple;
       
       if (name == "this") continue;
-      
+
       auto t = global_get_type(sym.type_id);
+      // TODO: handle methods separately
+      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION)) continue;
+
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
       fields_ss << get_field_struct(name, t, type, context);
