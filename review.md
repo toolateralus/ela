@@ -39,8 +39,10 @@
 ## lowering
   - instead of lowering to C++, we should've lowered to C. this would've lead us to be less lazy in implementing high level features, and also the compiler is muuuch much faster than the C++ compiler. methods a vtables can be implemented easily, constructors can just be global routines or macros. defers can just be goto's to blocks. in this compiler, we got lazy as hell and relied far too much on C++ being high level.
 
+
 ## syntax
   - `fn function_name(arg: type) return_ty` syntax kind of like go would be much preferable. it's clearer, easier to parse,
-  and easier to type.
+  and easier to type. `-> return_type` syntax is clunky and annoying.
+  - function pointer type defs should follow that syntax. in this compiler, `void()` == `func :: () {}` which doesn't match syntactcally. instead we'd have `fn(int) int`
   - `*int` instead of `int*`. pointer to int instead of int pointer.
   - `[100]int` instead of  `int[100]` as well.

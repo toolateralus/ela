@@ -111,7 +111,7 @@ XarStruct :: struct {
 
 main :: () {
   str: XarStruct;
-  val := json_serialize(&str, #type XarStruct);
+  val := json_serialize(&str, #type(XarStruct));
   println(val.to_string());
   delete(val);
 }

@@ -1,0 +1,11 @@
+// compile in a freestanding environment and compile to an object file.
+#compiler_flags "-fPIC -c -m64 -ffreestanding -nostdlib -o main.o"
+
+// our function declared in print.s
+#foreign print :: (f: char *);
+
+// declare main as extern so our assembly program can find it.
+#export main :: () -> int {
+  print("Hello\n");
+  return 0;
+}
