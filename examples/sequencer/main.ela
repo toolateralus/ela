@@ -9,6 +9,10 @@
 
 playing := false;
 timer: Timer;
+bpm : float = 120;
+subdivisions: int = 1;
+beats: int = 4;
+total_notes: int = 4;
 
 bpm_slider : SliderF = {
   "bpm", // text
@@ -16,7 +20,7 @@ bpm_slider : SliderF = {
   Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
   30,  // min
   240,   // max
-  null,  // value
+  &bpm,  // value
   false, // held
 };
 
@@ -26,7 +30,7 @@ subdivision_slider : SliderI = {
   Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
   1,  // min
   20,   // max
-  null,  // value
+  &subdivisions,  // value
   false // held
 };
 
@@ -38,7 +42,7 @@ beats_slider : SliderI = {
   Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
   1,  // min
   20,   // max
-  null,  // value
+  &beats,  // value
   false // held
 };
 
@@ -72,9 +76,6 @@ sequence_channel_style : Style = {
   2.0,
 }
 
-subdivisions: int = 1;
-beats: int = 4;
-total_notes: int = 4;
 check_buttons: CheckButton[];
 
 check_button_style: Style = {
@@ -123,16 +124,29 @@ SequenceChannel :: struct {
   sound: Sound;
   active: bool;
   style: Style;
-  name: string;
-  
+  volume : int = 50;
+  old_volume : int = 50;
+  volume_slider: SliderI;
+  #ctor :: (_sound: Sound, _style: Style, name: string) {
+    sound = _sound;
+    style = _style;
+    volume_slider = {
+      name, // text
+      Rectangle{0, 0, 146, 36}, // rectangle
+      style, // style
+      0,  // min
+      100,   // max
+      null,  // value
+      false, // held
+    }
+  }
   draw :: (x: float, y: float) {
-    
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
-        _x : float = x + 150 + (float)(check_buttons.length * 40);
+        _x : float = x + 150 + (float)(check_buttons.length * 40) + 2;
         check_buttons ~= {
           false,
-          Rectangle{_x, y, 35, 35},
+          Rectangle{_x, y, 36, 36},
           style,
           string{null},
           true,
@@ -142,13 +156,24 @@ SequenceChannel :: struct {
         button := ~check_buttons;
       }
     }
-    DrawText(name.data, (int)x, (int)y, style.font_size, style.highlighted);
+    volume_slider.value = &volume;
+    volume_slider.rect.x = x + 2;
+    volume_slider.rect.y = y + 2;
+    volume_slider.draw();
+    index := 0;
     for *button; check_buttons {
+      button.rect.x = x + 150 + index * 40 + 2;
+      button.rect.y = y + 2;
+      index++;
       button.draw();
     }
   }
   
   update :: (index: int) {
+    if volume != old_volume {
+      old_volume = volume;
+      SetSoundVolume(sound, (float)volume / 100.0);
+    }
     if check_buttons[index].value {
       PlaySound(sound);
     }
@@ -180,13 +205,11 @@ file_dropdown : DropDown = {
 
 on_file_selected :: (index: int) {
   fileName := file_dropdown.options[index];
-  channels ~= #make(SequenceChannel, {
-    #make(CheckButton[]),
+  channels ~= #make(SequenceChannel, 
     LoadSound(fileName.data),
-    true,
     get_sequencer_style(check_button_style),
-    fileName,
-  });
+    fileName
+  );
 }
 
 sequencer :: () {
@@ -197,8 +220,6 @@ sequencer :: () {
     index = (index + 1 % total_notes) % total_notes;
   }
 }
-
-bpm : float = 120;
 
 main :: () {
   bg_color.r -= 175;
@@ -234,12 +255,11 @@ main :: () {
         DrawText(str.data, (int)label_x, (int)(seq_y - 40.0), 12, WHITE);
       }
       if playing {
-        cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0 - 2;
-        DrawRectangleLines((int)cursor_x, seq_y - 2, 40, (int)channels.length * 40, ORANGE);
+        cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0
+        DrawRectangleLines((int)cursor_x, seq_y, 40, (int)channels.length * 40, ORANGE);
       }
 
       sequencer();
-      bpm_slider.value = &bpm;
       bpm_slider.draw();
       bpm = (float)(int)bpm;
 
@@ -247,10 +267,7 @@ main :: () {
 
       total_notes = beats * subdivisions;
       
-      subdivision_slider.value = &subdivisions;
       subdivision_slider.draw();
-
-      beats_slider.value = &beats;
       beats_slider.draw();
       
       draw_button("reset (no undo)", {(float)GetScreenWidth() - 210.0, 10, 200, 40}, reset_button_style, &on_reset);

@@ -808,15 +808,16 @@ CheckButton :: struct {
       text_y := rect.y + (rect.height - style.font_size) / 2;
       DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
     }
+
+    hit := CheckCollisionPointRec(GetMousePosition(), rect);
   
-    if CheckCollisionPointRec(GetMousePosition(), rect) {
+    if hit {
       DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, ORANGE);
     }
     
     
     left := false;
     right := false;
-    hit := CheckCollisionPointRec(GetMousePosition(), rect);
     
     if allow_hold {
       left = IsMouseButtonDown(MouseButton.Left)
@@ -829,9 +830,6 @@ CheckButton :: struct {
     } else if hit && IsMouseButtonPressed(MouseButton.Left) {
       value = !value;
     }
-    
-    
-    
   }
 }
 
