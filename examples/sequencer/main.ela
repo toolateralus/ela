@@ -143,7 +143,11 @@ SequenceChannel :: struct {
       }
     }
     DrawText(name.data, (int)x, (int)y, style.font_size, style.highlighted);
+    index := 0;
     for *button; check_buttons {
+      button.rect.x = x + 150.0 + index * 40.0;
+      button.rect.y = y;
+      index++;
       button.draw();
     }
   }
