@@ -286,6 +286,8 @@ Font :: struct {
 
 #foreign LoadFont :: (fileName: char*) -> Font;
 #foreign DrawTextEx :: (font: Font, text: char*, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
+#foreign MeasureTextEx :: (font: Font, text: char*, fontSize: float, spacing: float) -> Vector2;
+
 // Opaque structs defined in C files in raudio.c;
 rAudioBuffer :: struct;
 rAudioProcessor :: struct;
