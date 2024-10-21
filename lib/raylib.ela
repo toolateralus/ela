@@ -533,6 +533,7 @@ ConfigFlags :: enum {
 #foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
 #foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
 
+#foreign GetCharPressed :: () -> char;
 
 // * ########### BUILTIN UI HELPERS ############### //
 // * Function pointer to use with the `draw_button` function.

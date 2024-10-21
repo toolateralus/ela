@@ -853,9 +853,9 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   // array remove operator.
   if (node->op.type == TType::Erase) {
     report_mutated_if_iden(node->left);
+    
     if (!type->get_ext().is_array()) {
-      throw_error("Cannot use concat operator on a non-array",
-                  node->source_range);
+      throw_error("Cannot use concat operator on a non-array", node->source_range);
     }
     auto element_ty = type->get_element_type();
     assert_types_can_cast_or_equal(
@@ -1272,14 +1272,26 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
+
+  /* 
+    !HACK FIX STRING SLICING THIS IS TERRIBLE
+   */
+   if (left_ty->id == global_find_type_id("string", {})) {
+    if (node->subscript->get_node_type() == AST_NODE_RANGE) {
+      return global_find_type_id("string", {});
+    }
+    auto element_id = char_type();
+    return element_id;
+  }
+
   /// ? CLEANUP(Josh) 10/4/2024, 2:18:42 PM  Remove unwanted operator overloads.
   // delete the subscript operator, call operator, and various other operators
   // we may not want in the languaeg. We want to keep it simple, and having
   // 100-200 lines of code dedicated to things that are never used is not
   // conducive to that prospect.
   {
-    if ((left_ty && left_ty->is_kind(TYPE_STRUCT) &&
-         left_ty->get_ext().has_no_extensions())) {
+    if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
+        left_ty->get_ext().has_no_extensions()) {
       auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
       if (auto sym = info->scope->lookup("[")) {
         auto enclosing_scope = ctx.scope;
@@ -1324,21 +1336,14 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   }
 
   if (left_ty->get_ext().is_array()) {
-    // ? Slice. Right now I just plan on returning a copy of the requested range.
-    // ? Perhaps we'll have a way to return a non-owning slice.
     if (node->subscript->get_node_type() == AST_NODE_RANGE) {
-      if (left_ty->get_ext().is_fixed_sized_array()) {
-        throw_error("Cannot take a slice of a fixed sized array currently.", node->source_range);
-      }
-      
       return left_ty->id;
     }
-    
     auto element_id = left_ty->get_element_type();
     return element_id;
-  } else {
-    return remove_one_pointer_ext(left_ty->id, node->source_range);
   }
+  return remove_one_pointer_ext(left_ty->id, node->source_range);
+  
 }
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));

@@ -401,17 +401,17 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
     (*ss) << ".pop()";
     return {};
   }
-  (*ss) << '(';
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
     node->operand->accept(this);
     (*ss) << node->op.value;
   } else {
+    (*ss) << '(';
     (*ss) << node->op.value;
     node->operand->accept(this);
+    (*ss) << ")";
   }
-  (*ss) << ")";
   return {};
 }
 
@@ -1442,7 +1442,7 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, T
      << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
   
-  if (!type->is_kind(TYPE_FUNCTION)) {
+  if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
     ss << std::format(".offset = offsetof({}, {})", parent_type->get_base(), name);
   }
@@ -1595,9 +1595,12 @@ std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context, c
   
   ss << "_type_info[" << id << "] = new Type {"
      << ".id = " << id << ", "
-     << ".name = \"" << type->to_string() << "\", "
-     << ".size = sizeof(" << to_cpp_string(type) << "), "
-     << get_type_flags(type) << ",\n"
+     << ".name = \"" << type->to_string() << "\", ";
+     
+     if (!type->is_kind(TYPE_ENUM))
+      ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+     
+     ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
   if (type->get_ext().is_array()) {
     ss << get_elements_function(type) << ",\n";
@@ -1697,11 +1700,13 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
     if (!first) {
       (*ss) << " else ";
     }
+    emit_line_directive(target);
     (*ss) << " if (";
     target->accept(this);
     (*ss) << " == ";
     _case.expression->accept(this);
     (*ss) << ") ";
+    emit_line_directive(_case.block);
     _case.block->accept(this);
   };
   

@@ -146,15 +146,6 @@ abs :: (v: int) -> int {
   return v;
 }
 
-min :: (a: float, b: float) -> float {
-  if a > b then return b;
-  return a;
-}
-
-max :: (a: float, b: float) -> float {
-  if a > b then return a;
-  return b;
-}
 
 min :: (a: int, b: int) -> int {
   if a > b then return b;
@@ -165,6 +156,17 @@ max :: (a: int, b: int) -> int {
   if a > b then return a;
   return b;
 }
+
+min :: (a: float, b: float) -> float {
+  if a > b then return b;
+  return a;
+}
+
+max :: (a: float, b: float) -> float {
+  if a > b then return a;
+  return b;
+}
+
 
 clamp :: (v: float64, min, max) -> float64 {
   if v < min then return min;

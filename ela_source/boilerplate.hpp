@@ -212,6 +212,66 @@ struct string {
     return string(data + range.m_begin, data + range.m_end);
   }
 
+  void push(const char &value) {
+    char *new_data = new char[length + 2];
+    std::copy(data, data + length, new_data);
+    new_data[length] = value;
+    new_data[length + 1] = '\0';
+    delete[] data;
+    data = new_data;
+    ++length;
+  }
+
+  void erase_at(int index) {
+    if (index < 0 || index >= length || length <= 0) {
+      return;
+    }
+    char *new_data = new char[length];
+    std::copy(data, data + index, new_data);
+    std::copy(data + index + 1, data + length, new_data + index);
+    delete[] data;
+    data = new_data;
+    --length;
+    data[length] = '\0';
+  }
+  
+  void insert_at(int index, const char &value) {
+    char *new_data = new char[length + 2];
+    std::copy(data, data + index, new_data);
+    new_data[index] = value;
+    std::copy(data + index, data + length, new_data + index + 1);
+    new_data[length + 1] = '\0';
+    delete[] data;
+    data = new_data;
+    ++length;
+  }
+  
+  void insert_substr_at(int index, const string &substr) {
+    int substr_length = substr.length;
+    char *new_data = new char[length + substr_length + 1];
+    std::copy(data, data + index, new_data);
+    std::copy(substr.data, substr.data + substr_length, new_data + index);
+    std::copy(data + index, data + length, new_data + index + substr_length);
+    new_data[length + substr_length] = '\0';
+    delete[] data;
+    data = new_data;
+    length += substr_length;
+  }
+
+  char pop() {
+    if (length <= 0) {
+      return 0;
+    }
+    char value = data[length - 1];
+    char *new_data = new char[length];
+    std::copy(data, data + length - 1, new_data);
+    new_data[length - 1] = '\0';
+    delete[] data;
+    data = new_data;
+    --length;
+    return value;
+  }
+
   string(const string &other) {
     if (other.data) {
       length = other.length;

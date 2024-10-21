@@ -117,6 +117,34 @@ Context::Context() {
     str_scope->insert("length", s64_type());
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
     
+    auto func = FunctionTypeInfo{};
+    func.parameter_types[0] = char_type();
+    func.return_type = void_type();
+    func.params_len=1;
+    
+    str_scope->insert("push", global_find_function_type_id("void(char)", func, {}), SYMBOL_IS_FUNCTION);
+
+    func.parameter_types[0] = -1;
+    func.params_len=0;
+    func.return_type=char_type();
+    str_scope->insert("pop", global_find_function_type_id("char()", func, {}), SYMBOL_IS_FUNCTION);
+    
+    
+    func.parameter_types[0] = int_type();
+    func.params_len=1;
+    func.return_type=void_type();
+    str_scope->insert("erase_at", global_find_function_type_id("void(int)", func, {}), SYMBOL_IS_FUNCTION);
+    
+    func.parameter_types[0] = int_type();
+    func.parameter_types[1] = char_type();
+    func.params_len = 2;
+    func.return_type= void_type();
+    str_scope->insert("insert_at", global_find_function_type_id("void(int, char)", func, {}), SYMBOL_IS_FUNCTION);
+    
+    func.parameter_types[1] = global_find_type_id("string", {});
+    str_scope->insert("insert_substr_at", global_find_function_type_id("void(int, char)", func, {}), SYMBOL_IS_FUNCTION);
+    
+    
     auto sym = str_scope->local_lookup("[");
     auto info = type_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();
