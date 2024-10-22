@@ -1181,42 +1181,30 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
     return {};
   }
 
-  if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
-    throw_error(
-        std::format("cannot use dot expr on non-struct currently, got {}",
-                    left_ty->to_string()),
-        node->source_range);
-  }
-
-  Scope *scope;
+  Scope  *scope = nullptr;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
   } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
   }
-
-  auto previous_scope = ctx.scope;
-
-  auto prev_parent = scope->parent;
-  bool root = !within_dot_expression;
-
-  if (prev_parent && root) {
-    scope->parent = previous_scope;
-    within_dot_expression = true;
+  
+  auto calling_scope = ctx.scope;
+  Scope *dot_parent = scope->parent;
+  
+  
+  if (dot_parent && calling_scope != scope) {
+    scope->parent = calling_scope;
   }
-
+  
   node->left->accept(this);
-
   ctx.set_scope(scope);
   (*ss) << (op);
   node->right->accept(this);
-  ctx.set_scope(previous_scope);
-
-  if (prev_parent && root) {
-    within_dot_expression = false;
-    scope->parent = prev_parent;
+  ctx.set_scope(calling_scope);
+  
+  if (dot_parent && calling_scope != scope) {
+    scope->parent = dot_parent;
   }
-
   return {};
 }
 

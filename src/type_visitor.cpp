@@ -1110,6 +1110,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 std::any TypeVisitor::visit(ASTDotExpr *node) {
+  // .EnumVariant fix ups.
   if (node->left == nullptr) {
     auto identifier = static_cast<ASTIdentifier *>(node->right);
 
@@ -1140,11 +1141,11 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
                   node->source_range);
   }
   
+  // if .EnumVariant failed, error.
   if (node->left == nullptr) {
     throw_error("Internal compiler error: left node in dot expression was null.", node->source_range);
   }
   
-
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
@@ -1226,43 +1227,32 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     // that would help us be safer about typing.
     return s32_type();
   }
-
-  if (left_ty->kind != TYPE_STRUCT && left_ty->kind != TYPE_UNION) {
-    throw_error(
-        std::format("cannot use dot expr on non-struct currently, got {}",
-                    left_ty->to_string()),
-        node->source_range);
-  }
-
-  Scope *scope;
+  
+  Scope  *scope = nullptr;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
-    scope = info->scope;
+      scope = info->scope;
   } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
-    scope = info->scope;
+      scope = info->scope;
+  } else {
+      throw_error("cannot use a dot expression on a non-struct or union.", node->source_range);
   }
-
-  auto previous_scope = ctx.scope;
-  Scope *prev_parent = scope->parent;
-
-  bool root = !within_dot_expression;
-
-  if (prev_parent && root) {
-    scope->parent = previous_scope;
-    within_dot_expression = true;
+  
+  auto calling_scope = ctx.scope;
+  Scope *dot_parent = scope->parent;
+  
+  
+  if (dot_parent && calling_scope != scope) {
+    scope->parent = calling_scope;
   }
-
-  // TODO: we need to check if the function * if it is a function * that we're
-  // calling is const or not. If it's not const, we report mutated. However, for
-  // now, we just report mutation on any dot expression, which is dumb.
-  report_mutated_if_iden(node->left);
+  
   ctx.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
-  ctx.set_scope(previous_scope);
-
-  if (prev_parent && root) {
-    within_dot_expression = false;
-    scope->parent = prev_parent;
+  ctx.set_scope(calling_scope);
+  
+  if (dot_parent && calling_scope != scope) {
+      scope->parent = dot_parent;
   }
+  
   return type;
   throw_error("unable to resolve dot expression type.", node->source_range);
 }
@@ -1272,8 +1262,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
-
-  /* 
+    /* 
     !HACK FIX STRING SLICING THIS IS TERRIBLE
    */
    if (left_ty->id == global_find_type_id("string", {})) {

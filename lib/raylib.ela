@@ -284,9 +284,6 @@ Font :: struct {
   glyphs:       GlyphInfo*;
 }
 
-#foreign LoadFont :: (fileName: char*) -> Font;
-#foreign DrawTextEx :: (font: Font, text: char*, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
-#foreign MeasureTextEx :: (font: Font, text: char*, fontSize: float, spacing: float) -> Vector2;
 
 // Opaque structs defined in C files in raudio.c;
 rAudioBuffer :: struct;
@@ -312,6 +309,48 @@ Sound :: struct {
   stream: AudioStream;
   frameCount: u32;
 } 
+
+Camera :: struct {
+  position:     Vector3;
+  target:       Vector3;
+  up:           Vector3;
+  fovy:         float;
+  projection:   int;
+} 
+
+Camera2D :: struct {
+  offset:         Vector2;
+  target:         Vector2;
+  rotation:       float;
+  zoom:           float = 1.0;
+}
+
+CameraMode :: enum {
+  Custom        = 0,
+  Free          = 1,
+  Orbital       = 2,
+  FirstPerson   = 3,
+  ThirdPerson   = 4
+}
+
+ConfigFlags :: enum {
+  FullscreenMode        = 0x00000002, // 1 << 1
+  WindowResizable       = 0x00000004, // 1 << 2
+  WindowUndecorated     = 0x00000008, // 1 << 3
+  WindowTransparent     = 0x00000010, // 1 << 4
+  Msaa4xHint            = 0x00000020, // 1 << 5
+  VsyncHint             = 0x00000040, // 1 << 6
+  WindowHidden          = 0x00000080, // 1 << 7
+  WindowAlwaysRun       = 0x00000100, // 1 << 8
+  WindowMinimized       = 0x00000200, // 1 << 9
+  WindowMaximized       = 0x00000400, // 1 << 10
+  WindowUnfocused       = 0x00000800, // 1 << 11
+  WindowTopmost         = 0x00001000, // 1 << 12
+  WindowHighdpi         = 0x00002000, // 1 << 13
+  WindowMousePassthrough = 0x00004000, // 1 << 14
+  BorderlessWindowedMode = 0x00008000, // 1 << 15
+  InterlacedHint        = 0x00010000  // 1 << 16
+}
 
 color_with_alpha :: (color: Color, alpha: u8) -> Color {
   color.a = alpha;
@@ -386,7 +425,6 @@ All_Colors : Color[] = {
   LIGHTCYAN,
 }
 
-
 #foreign InitTimer :: () -> void;
 #foreign GetTime :: () -> float64;
 
@@ -408,8 +446,7 @@ All_Colors : Color[] = {
 #foreign Vector2Negate :: (v: Vector2) -> Vector2;
 #foreign Vector2Divide :: (v: Vector2, v1) -> Vector2;
 #foreign Vector2Normalize :: (v: Vector2) -> Vector2;
-// I don't think we have matrices yet.
-// #foreign Vector2Transform :: (v: Vector2, mat: Matrix) -> Vector2;
+
 #foreign Vector2Lerp :: (v: Vector2, v1, amount: float) -> Vector2;
 #foreign Vector2Reflect :: (v: Vector2, normal) -> Vector2;
 #foreign Vector2Min :: (v: Vector2, v1) -> Vector2;
@@ -422,6 +459,7 @@ All_Colors : Color[] = {
 #foreign Vector2Equals :: (p: Vector2, q) -> int;
 #foreign Vector2Refract :: (v: Vector2, n, r: float) -> Vector2;
 
+/* Collision detection */
 #foreign CheckCollisionRecs :: (rec1: Rectangle, rec2: Rectangle) -> bool;
 #foreign CheckCollisionCircles :: (center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
 #foreign CheckCollisionCircleRec :: (center: Vector2, radius: float, rec: Rectangle) -> bool;
@@ -429,10 +467,11 @@ All_Colors : Color[] = {
 #foreign CheckCollisionPointCircle :: (point: Vector2, center: Vector2, radius: float) -> bool;
 #foreign CheckCollisionPointTriangle :: (point: Vector2, p1: Vector2, p2: Vector2, p3: Vector2) -> bool;
 
-
-#foreign GetKeyPressed :: () -> int;
+/* Window stuff */
 #foreign GetScreenWidth :: () -> int;
 #foreign GetScreenHeight :: () -> int;
+
+/* Input stuff */
 #foreign GetMouseWheelMove :: () -> float;
 #foreign GetMouseX :: () -> int;
 #foreign GetMouseY :: () -> int;
@@ -442,16 +481,21 @@ All_Colors : Color[] = {
 #foreign IsMouseButtonReleased :: (button: int) -> bool;
 #foreign IsMouseButtonUp :: (button: int) -> bool;
 
+#foreign GetKeyPressed :: () -> int;
+#foreign GetCharPressed :: () -> char;
+#foreign IsKeyPressed :: (key: int) -> bool;
+#foreign IsKeyDown :: (key: int) -> bool;
+#foreign IsKeyReleased :: (key: int) -> bool;
+#foreign SetExitKey :: (key :int);
+
+/* Drawing functions */
 #foreign InitWindow :: (width: int, height: int, title: char*) -> void;
 #foreign WindowShouldClose :: () -> bool;
 #foreign CloseWindow :: () -> void;
 #foreign BeginDrawing :: () -> void;
 #foreign EndDrawing :: () -> void;
 #foreign ClearBackground :: (color: Color) -> void;
-#foreign DrawText :: (text: char*, posX: int, posY: int, fontSize: int, color: Color) -> void;
-#foreign IsKeyPressed :: (key: int) -> bool;
-#foreign IsKeyDown :: (key: int) -> bool;
-#foreign IsKeyReleased :: (key: int) -> bool;
+
 #foreign SetTargetFPS :: (fps: int) -> void;
 #foreign DrawFPS :: (posX: int, posY: int) -> void;
 #foreign GetFPS :: () -> int;
@@ -468,6 +512,35 @@ All_Colors : Color[] = {
 #foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
 #foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
 #foreign DrawRectangleLines :: (posX: int, posY: int, width: int, height: int, color: Color) -> void;
+#foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
+#foreign IsWindowResized :: () -> bool;      
+#foreign SetWindowState :: (flags: int) -> void;
+#foreign BeginScissorMode :: (x: int, y, w, h);
+#foreign EndScissorMode :: ();
+#foreign Fade :: (color: Color, alpha: float) -> Color;
+#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;
+
+#foreign SetCameraMode :: (camera: Camera2D, mode: int) -> void;
+#foreign UpdateCamera :: (camera: Camera2D*) -> void;
+#foreign BeginMode2D :: (camera: Camera2D) -> void;
+#foreign EndMode2D :: () -> void;
+
+#foreign GetWorldToScreen :: (position: Vector3, camera: Camera) -> Vector2;
+#foreign GetWorldToScreenEx :: (position: Vector3, camera: Camera, width: int, height: int) -> Vector2;
+#foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
+#foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
+
+
+/* Text functions */
+#foreign DrawText :: (text: char*, posX: int, posY: int, fontSize: int, color: Color) -> void;
+#foreign MeasureText :: (text: char*, fontSize: int) -> int;
+#foreign TextFormat :: (format: char*, ...) -> char*;
+#foreign LoadFont :: (fileName: char*) -> Font;
+#foreign DrawTextEx :: (font: Font, text: char*, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
+#foreign MeasureTextEx :: (font: Font, text: char*, fontSize: float, spacing: float) -> Vector2;
+
+
+/* Audio functions */
 #foreign LoadSound :: (fileName: char*) -> Sound;
 #foreign UnloadSound :: (sound: Sound) -> void;
 #foreign PlaySound :: (sound: Sound) -> void;
@@ -490,71 +563,7 @@ All_Colors : Color[] = {
 #foreign CloseAudioDevice :: () -> void;
 #foreign IsAudioDeviceReady :: () -> bool;
 #foreign SetMasterVolume :: (volume: float) -> void;
-#foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
-#foreign SetExitKey :: (key :int);
-#foreign MeasureText :: (text: char*, fontSize: int) -> int;
-#foreign TextFormat :: (format: char*, ...) -> char*;
 
-Camera :: struct {
-  position:     Vector3;
-  target:       Vector3;
-  up:           Vector3;
-  fovy:         float;
-  projection:   int;
-} 
-
-Camera2D :: struct {
-  offset:         Vector2;
-  target:         Vector2;
-  rotation:       float;
-  zoom:           float = 1.0;
-}
-
-CameraMode :: enum {
-  Custom        = 0,
-  Free          = 1,
-  Orbital       = 2,
-  FirstPerson   = 3,
-  ThirdPerson   = 4
-}
-
-ConfigFlags :: enum {
-  FullscreenMode        = 0x00000002, // 1 << 1
-  WindowResizable       = 0x00000004, // 1 << 2
-  WindowUndecorated     = 0x00000008, // 1 << 3
-  WindowTransparent     = 0x00000010, // 1 << 4
-  Msaa4xHint            = 0x00000020, // 1 << 5
-  VsyncHint             = 0x00000040, // 1 << 6
-  WindowHidden          = 0x00000080, // 1 << 7
-  WindowAlwaysRun       = 0x00000100, // 1 << 8
-  WindowMinimized       = 0x00000200, // 1 << 9
-  WindowMaximized       = 0x00000400, // 1 << 10
-  WindowUnfocused       = 0x00000800, // 1 << 11
-  WindowTopmost         = 0x00001000, // 1 << 12
-  WindowHighdpi         = 0x00002000, // 1 << 13
-  WindowMousePassthrough = 0x00004000, // 1 << 14
-  BorderlessWindowedMode = 0x00008000, // 1 << 15
-  InterlacedHint        = 0x00010000  // 1 << 16
-}
-
-#foreign IsWindowResized :: () -> bool;      
-#foreign SetWindowState :: (flags: int) -> void;
-#foreign BeginScissorMode :: (x: int, y, w, h);
-#foreign EndScissorMode :: ();
-#foreign Fade :: (color: Color, alpha: float) -> Color;
-#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;
-
-#foreign SetCameraMode :: (camera: Camera2D, mode: int) -> void;
-#foreign UpdateCamera :: (camera: Camera2D*) -> void;
-#foreign BeginMode2D :: (camera: Camera2D) -> void;
-#foreign EndMode2D :: () -> void;
-
-#foreign GetWorldToScreen :: (position: Vector3, camera: Camera) -> Vector2;
-#foreign GetWorldToScreenEx :: (position: Vector3, camera: Camera, width: int, height: int) -> Vector2;
-#foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
-#foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
-
-#foreign GetCharPressed :: () -> char;
 
 // * ########### BUILTIN UI HELPERS ############### //
 // * Function pointer to use with the `draw_button` function.

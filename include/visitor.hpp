@@ -59,7 +59,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  bool within_dot_expression = false;
+  
   int declaring_or_assigning_type = -1;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
@@ -109,11 +109,9 @@ struct TypeVisitor : VisitorBase {
 };
 
 struct EmitVisitor : VisitorBase {
-  bool within_dot_expression = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
-  
   
   std::vector<std::function<void()>> pending_statements;
 

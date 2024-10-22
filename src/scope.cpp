@@ -112,7 +112,7 @@ Context::Context() {
     static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
         charptr_type(),
     };
-
+  
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s64_type());
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
