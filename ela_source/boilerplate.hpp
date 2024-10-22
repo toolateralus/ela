@@ -22,6 +22,8 @@ using u8 = uint8_t;
 #include <unordered_map>
 
 extern "C" int printf(const char *format, ...);
+extern "C" int snprintf(char *str, size_t size, const char *format, ...);
+extern "C" int sprintf(char *str, const char *format, ...);
 
 #undef RAND_MAX
 #undef assert
@@ -37,7 +39,14 @@ extern "C" int printf(const char *format, ...);
 
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
+
+struct string;
 struct range {
+  range() {}
+  range(const range &other) {
+    first = other.first;
+    last = other.last;
+  }
   int first = 0, last = 0;
   range(int m_begin, int m_end) : first(m_begin), last(m_end) {}
   struct iterator {
@@ -59,6 +68,7 @@ struct range {
   bool operator==(auto number) const {
     return number >= first && number <= last;
   }
+  string to_string() const;
 };
 
 template<class ...T>
@@ -371,7 +381,13 @@ struct string {
   auto end() const { return data + length; }
 };
 
-// Specialize std::hash for your string class
+
+string range::to_string() const {
+  char buffer[50];
+  snprintf(buffer, sizeof(buffer), "%d..%d", first, last);
+  return string(buffer);
+}
+
 namespace std {
 template <> struct hash<string> {
   std::size_t operator()(const string &s) const noexcept {
@@ -382,7 +398,7 @@ template <> struct hash<string> {
     return h;
   }
 };
-} // namespace std
+}
 
 
 extern "C" void *memcpy(void *, void *, size_t);

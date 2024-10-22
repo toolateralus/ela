@@ -226,12 +226,6 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     return;
   }
 
-  if (!import_set.contains("/usr/local/lib/ela/core.ela")) {
-    throw_error("You must '#import core' before you use interpolated strings "
-                "temporarily, due to a dependency on sprintf.",
-                node->source_range);
-  }
-
   std::string str;
   auto get_format_str = [&](int type_id) {
     auto type = global_get_type(type_id);

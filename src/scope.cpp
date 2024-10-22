@@ -1,7 +1,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-#include <cassert>
 #include <dlfcn.h>
 
 Context::Context() {
@@ -175,11 +174,11 @@ Context::Context() {
     auto type = global_create_struct_type("range", range_scope);
     range_scope->insert("first", int_type());
     range_scope->insert("last", int_type());
+    range_scope->parent = root_scope;
     root_scope->types.insert(type);
   }
   
 }
-
 
 void Scope::insert(const std::string &name, int type_id, int flags) {
   auto sym = Symbol{name, type_id, flags};

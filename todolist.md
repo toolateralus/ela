@@ -1,5 +1,59 @@
 ## TODO List
 
+## Add interfaces
+```cpp
+IInterface :: interface {
+  // needs to be implemented by the derived struct.
+  to_string :: () -> string;
+  
+  // implemented by the interface and cannot be overriden.
+  get_something :: () -> int {
+    return 0;
+  }
+  
+  // compile time constant provided by the interface.
+  CONSTANT :: 100;
+  
+  #ctor :: () {
+    // constructor gets called when an object that implements this interface gets constructed.
+  }
+  
+  #dtor :: () {
+    // just like ctor.
+  }
+}
+
+Struct :: struct {
+  x: int;
+  y: int;
+}
+
+impl IInterface for Struct {
+  // we have access to the struct memebers as if we were a method.
+  to_string :: () -> string {
+    return $"x={x}, y={y}";
+  }
+}
+
+// we can take the interface itself as a parameter and anything that
+// implements it can be used in its place. We may or may not have to take it
+// by a pointer, depending on the internal implementation our compiler provides.
+operate_on_interface :: (iinterface: IInterface*) {
+  println(iinterface.to_string()); 
+}
+```
+
+### Constants
+```cpp
+  // We have just totally failed to implement constants.
+  // You can use enums to achieve this, with any type, but this is stll a useful thing to have.
+  CONSTANT :: 100;
+  CONSTANT1 :: "My Char*";
+  // even non-compile time constants can still be const.
+  // just like C++ const semantics, not constexpr.
+  CONSTANT2 :: string{10,20,30};
+```
+
 
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
