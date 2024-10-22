@@ -37,9 +37,9 @@ extern "C" int printf(const char *format, ...);
 
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
-struct _range {
-  int m_begin, m_end;
-  _range(int m_begin, int m_end) : m_begin(m_begin), m_end(m_end) {}
+struct range {
+  int first = 0, last = 0;
+  range(int m_begin, int m_end) : first(m_begin), last(m_end) {}
   struct iterator {
     int current;
     iterator(int start) : current(start) {}
@@ -52,12 +52,12 @@ struct _range {
       return current != other.current;
     }
   };
-  iterator begin() const { return iterator(m_begin); }
-  iterator end() const { return iterator(m_end); }
-  iterator begin() { return iterator(m_begin); }
-  iterator end() { return iterator(m_end); }
+  iterator begin() const { return iterator(first); }
+  iterator end() const { return iterator(last); }
+  iterator begin() { return iterator(first); }
+  iterator end() { return iterator(last); }
   bool operator==(auto number) const {
-    return number >= m_begin && number <= m_end;
+    return number >= first && number <= last;
   }
 };
 
@@ -107,14 +107,11 @@ template <class T> struct _array {
   _array(int length)
       : data(new T[length]), length(length), capacity(length), is_view(false) {}
 
-
   _array(T *array, int len)
       : data(new T[len]), length(len), capacity(len), is_view(false) {
     std::copy(array, array + len, data);
   }
 
-
-  
   _array(const _array &other)
       : data(new T[other.length]), length(other.length),
         capacity(other.capacity), is_view(other.is_view) {
@@ -158,6 +155,13 @@ template <class T> struct _array {
     return *this;
   }
   
+  _array(std::initializer_list<T> list)
+      : data(new T[list.size()]), length(list.size()), capacity(list.size()),
+        is_view(false) {
+    std::copy(list.begin(), list.end(), data);
+    length = list.size();
+  }
+  
 
   ~_array() {
     if (!is_view && data) {
@@ -193,22 +197,15 @@ template <class T> struct _array {
   }
 
   
-  _array(std::initializer_list<T> list)
-      : data(new T[list.size()]), length(list.size()), capacity(list.size()),
-        is_view(false) {
-    std::copy(list.begin(), list.end(), data);
-    length = list.size();
-  }
-  
 
   T &operator[](int n) { return data[n]; }
   
   const T &operator[](int n) const { return data[n]; }
 
-  _array<T> operator[](const _range &range) {
+  _array<T> operator[](const range &range) {
     _array<T> result;
-    result.data = data + range.m_begin;
-    result.length = range.m_end - range.m_begin;
+    result.data = data + range.first;
+    result.length = range.last - range.first;
     result.capacity = result.length;
     result.is_view = true;
     return result;
@@ -267,8 +264,8 @@ struct string {
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
 
-  string operator[](const _range &range) const {
-    string result(data + range.m_begin, data + range.m_end, true);
+  string operator[](const range &range) const {
+    string result(data + range.first, data + range.last, true);
     return result;
   }
 

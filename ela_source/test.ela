@@ -1115,6 +1115,17 @@ switch_helper :: () -> int {
   assert("Returns in switched failed", switch_helper() == 5);
 }
 
+#test test_range_var :: () {
+  r : range = 0..10;
+  assert("range variable failed", r.first == 0 && r.last == 10);
+  
+  i: int;
+  for z in r {
+    assert("range iteration failed", i == z);    
+    i++;
+  }
+}
+
 #test test_string_enum :: () {
   b: bool = EnumOfStrings.A == string{"Hello"};
   assert("String enum failed", b);

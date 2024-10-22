@@ -1,12 +1,7 @@
-
-
-S1 :: struct {
-  b: bool;
-}
-
-S :: struct {
-  s: S1;
-  #ctor :: (b: bool) {
-    this.s.b = b;
+#import core;
+main :: () {
+  r : range = 0..10;
+  for i in r {
+    println(to_string(i))
   }
 }

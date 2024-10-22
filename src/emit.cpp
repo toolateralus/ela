@@ -1416,7 +1416,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
 }
 
 std::any EmitVisitor::visit(ASTRange *node) {
-  (*ss) << "_range(";
+  (*ss) << "range(";
   node->left->accept(this);
   (*ss) << ", ";
   node->right->accept(this);

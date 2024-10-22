@@ -366,7 +366,7 @@ struct ASTFor : ASTStatement {
   union {
     struct {
       ASTExpr* iden;
-      ASTRange* range;
+      ASTExpr* range;
     } range_based;
     struct {
       ValueSemantic value_semantic;

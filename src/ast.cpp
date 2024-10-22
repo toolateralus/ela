@@ -783,11 +783,7 @@ ASTStatement *Parser::parse_statement() {
       node->value.range_based.iden = parse_primary();
       expect(TType::In);
       auto expr = parse_expr();
-      if (expr->get_node_type() != AST_NODE_RANGE) {
-        end_node(nullptr, range);
-        throw_error("for _ in 0..10 {...} (range based) syntax only allows a range like showed here. for collections, use for _ ; collection {...}", range);
-      }
-      node->value.range_based.range = static_cast<ASTRange*>(expr);
+      node->value.range_based.range = expr;
     } else {
       node->tag = ASTFor::CollectionBased;
 
