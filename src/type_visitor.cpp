@@ -1110,8 +1110,6 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   }
 }
 
-
-
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   // .EnumVariant fix ups.
   if (node->left == nullptr) {
@@ -1163,7 +1161,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
     if (right && right->value.value == "length") {
-      return s64_type();
+      return s32_type();
     }
     if (right && right->value.value == "data") {
       return ctx.scope->get_pointer_to_type(left_ty->get_element_type());

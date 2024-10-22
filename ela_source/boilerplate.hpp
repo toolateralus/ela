@@ -1,4 +1,5 @@
 
+#define USE_STD_LIB 1
 #if USE_STD_LIB
 
 #include <stdint.h>
@@ -19,7 +20,6 @@ using u8 = uint8_t;
 
 #include <functional>
 #include <unordered_map>
-#include <vector>
 
 extern "C" int printf(const char *format, ...);
 
@@ -96,92 +96,145 @@ void destruct(T &...t) {
 //   template <class U> operator U() { return static_cast<U>(value); }
 // };
 
-// TODO: get rid of the usage of std::vector. It was a shortcut, 
-// We should easily be able to have our own type to improve compile times.
 template <class T> struct _array {
-  std::vector<T> vector; // ! Get rid of this and just write our own array. This is horrible for compile times.
-  s64 length;
-  s64 capacity;
-  void *data;
+  T *data = nullptr;
+  s32 length = 0;
+  s32 capacity = 0;
+  bool is_view = false;
 
-  void update() {
-    length = vector.size();
-    capacity = vector.capacity();
-    data = vector.data();
+  _array() : data(nullptr), length(0), capacity(0), is_view(false) {}
+
+  _array(int length)
+      : data(new T[length]), length(length), capacity(length), is_view(false) {}
+
+
+  _array(T *array, int len)
+      : data(new T[len]), length(len), capacity(len), is_view(false) {
+    std::copy(array, array + len, data);
+  }
+
+
+  
+  _array(const _array &other)
+      : data(new T[other.length]), length(other.length),
+        capacity(other.capacity), is_view(other.is_view) {
+    std::copy(other.data, other.data + other.length, data);
   }
   
-  _array() {
-    update();
+  _array(_array &&other) noexcept
+    : data(other.data), length(other.length), capacity(other.capacity), is_view(other.is_view) {
+    other.data = nullptr;
+    other.length = 0;
+    other.capacity = 0;
+    other.is_view = false;
   }
   
-  _array(const _array &other) {
-    vector = other.vector;
-    update();
+  _array& operator=(const _array &other) {
+    if (this != &other) {
+      if (data && !is_view)
+        delete[] data;
+      data = new T[other.length];
+      length = other.length;
+      capacity = other.capacity;
+      is_view = other.is_view;
+      std::copy(other.data, other.data + other.length, data);
+    }
+    return *this;
+  }
+
+  _array& operator=(_array &&other) noexcept {
+    if (this != &other) {
+      if (data && !is_view)
+        delete[] data;
+      data = other.data;
+      length = other.length;
+      capacity = other.capacity;
+      is_view = other.is_view;
+      other.data = nullptr;
+      other.length = 0;
+      other.capacity = 0;
+      other.is_view = false;
+    }
+    return *this;
   }
   
-  _array(int length) {
-    vector.resize(length);
-    update();
+
+  ~_array() {
+    if (!is_view && data) {
+      delete[] data;
+      data = nullptr;
+    }
+  }
+
+  void resize(int new_capacity) {
+    if (new_capacity > capacity) {
+      T *new_data = new T[new_capacity];
+      std::move(data, data + length, new_data);
+      delete[] data;
+      data = new_data;
+      capacity = new_capacity;
+    }
+  }
+
+  void push(const T &value) {
+    if (length == capacity) {
+        resize(capacity == 0 ? 1 : capacity * 2);
+    }
+    data[length++] = value;
   }
   
-  _array(T *array, int len) {
-    vector = std::vector(array, array + len);
-    update();
+  T pop() {
+    return data[--length];
   }
-  
-  bool operator==(const _array &other) const { return vector == other.vector; }
-  bool operator!=(const _array &other) const { return vector != other.vector; }
   
   void erase(const T &value) {
-    auto it = std::remove(vector.begin(), vector.end(), value);
-    if (it != vector.end()) {
-      vector.erase(it, vector.end());
-    }
-    update();
-  }
-  
-  auto &operator[](int n) const { return vector[n]; }
-  auto &operator[](int n) { return vector[n]; }
-  
-  template <typename InputIt>
-  _array(InputIt first, InputIt last) {
-    vector = std::vector<T>(first, last);
-    update();
-  }
-  
-  auto operator[](const _range &range) {
-    // TODO: We could probably avoid copying and instead return an actual slice.
-    return _array<T>(vector.data() + range.m_begin, vector.data() + range.m_end);
-  }
-  
-  
-  explicit operator void *() { return (void *)vector.data(); }
-  explicit operator T *() { return (T *)vector.data(); }
-  _array(std::initializer_list<T> list) {
-    vector = std::vector<T>(list);
-    update();
+    auto it = std::remove(data, data + length, value);
+    length = (s32)(it - data);
   }
 
-  auto begin() const { return vector.data(); }
-  auto end() const { return vector.data() + vector.size(); }
-  auto begin() { return vector.data(); }
-  auto end() { return vector.data() + vector.size(); }
-  void push(const T &value) {
-    vector.push_back(value);
-    update();
+  
+  _array(std::initializer_list<T> list)
+      : data(new T[list.size()]), length(list.size()), capacity(list.size()),
+        is_view(false) {
+    std::copy(list.begin(), list.end(), data);
+    length = list.size();
   }
-  auto pop() {
-    auto value = vector.back();
-    vector.pop_back();
-    update();
-    return value;
+  
+
+  T &operator[](int n) { return data[n]; }
+  
+  const T &operator[](int n) const { return data[n]; }
+
+  _array<T> operator[](const _range &range) {
+    _array<T> result;
+    result.data = data + range.m_begin;
+    result.length = range.m_end - range.m_begin;
+    result.capacity = result.length;
+    result.is_view = true;
+    return result;
   }
+
+  bool operator==(const _array &other) const {
+    return length == other.length &&
+           std::equal(data, data + length, other.data);
+  }
+
+  bool operator!=(const _array &other) const { return !(*this == other); }
+
+  explicit operator void *() { return (void *)data; }
+  explicit operator T *() { return (T *)data; }
+
+  auto begin() const { return data; }
+  auto end() const { return data + length; }
+  auto begin() { return data; }
+  auto end() { return data + length; }
 };
 
 // For now, we'll just use a simple null terminated string.
 struct string {
   char *data = nullptr;
-  s64 length = 0;
+  s32 length = 0;
+  bool is_view = false;
   string() {}
   string(char *str) {
     if (str == nullptr) {
@@ -195,21 +248,28 @@ struct string {
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
-  string(char *begin, char *end) {
-    length = std::distance(begin, end);
-    data = new char[length + 1];
-    std::copy(begin, end, data);
-    data[length] = '\0';
+  string(char *begin, char *end, bool is_view = false) {
+    this->is_view = is_view;
+    if (is_view) {
+      data = begin;
+      length = std::distance(begin, end);
+    } else {
+      length = std::distance(begin, end);
+      data = new char[length + 1];
+      std::copy(begin, end, data);
+      data[length] = '\0';
+    }
   }
   ~string() {
-    if (data)
+    if (data && !is_view)
       delete[] data;
   }
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
 
   string operator[](const _range &range) const {
-    return string(data + range.m_begin, data + range.m_end);
+    string result(data + range.m_begin, data + range.m_end, true);
+    return result;
   }
 
   void push(const char &value) {

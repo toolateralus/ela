@@ -47,7 +47,7 @@ JsonLexer :: struct {
   cur_line: int;
   position : int;
   length : int;
-  input : char*;
+  input : string;
   lookahead_buffer : JsonToken[];
 
   err :: (token: JsonToken ,msg: string) {
@@ -55,10 +55,10 @@ JsonLexer :: struct {
     exit(1);
   }
 
-  #ctor :: (_file: char*, _input: char*) {
+  #ctor :: (_file: char*, _input: string) {
     file = _file;
     input = _input;
-    length = strlen(input);
+    length = input.length;
   }
 
   get_token :: () -> JsonToken {

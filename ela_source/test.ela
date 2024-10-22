@@ -9,7 +9,7 @@
 #import pthread;
 #import reflection;
 
-#compiler_flags "-g"
+#compiler_flags "-g -fsanitize=address,leak"
 
 XaryuStruct :: struct {
   f: float ;
@@ -80,7 +80,13 @@ _Vec2 :: union {
 }
 
 CustomIteratorStruct :: struct {
-  value: int* = malloc(sizeof(int) * 10);
+  value: int*;
+  
+  #ctor :: () {
+    value = malloc(sizeof(int) * 10);
+    memset(value, 0, sizeof(int) * 10);
+  }
+  
   begin :: () -> int * {
     return value;
   }
@@ -284,9 +290,6 @@ EnumOfStrings :: enum {
   B = string{"Goodbye"}
 };
 
-#test failure_case :: () {
-  assert("This should fail", false);
-}
 
 #test test_for :: () {
   for i: s32; i < 10; ++i {
@@ -561,9 +564,9 @@ something :: (f: float32) -> float32 {
   node.next = malloc(sizeof(Node));
   other: Node;
   node.next.next = &other;
-
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
+  free(node.next);
 }
 
 // testing conflicting definitons. expected: compiler error if failed.
@@ -691,6 +694,7 @@ something :: (f: float32) -> float32 {
     assert("", n == v);
     ++n;
   }
+  delete(arr);
 }
 
 #test test_custom_iterator :: () {
@@ -723,10 +727,13 @@ something :: (f: float32) -> float32 {
   p: int* = malloc(sizeof(int));
   other: int_ptr  = p;
   assert("alias failed to equal pointed to type field.", p == other);
+  free(p);
 
   pp: int** = #make(int**, malloc(sizeof(int*)));
   other1: int_ptr* = pp;
   assert("alias failed to equal pointed to type field.", pp == other1);
+  
+  free(pp);
 }
 
 #test test_string_interpolation :: () {
@@ -1202,7 +1209,7 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
     a, b := *ptr;
     assert("Calling new with tuple failed", a == 10 && b == 10);
   }
-  
+  delete(ptr);
   // ! Bug: This just completely fails. The type ends up being null during the subscript.
   // ! I am too tired today to fix this.
   // map : <int, int>[string];
@@ -1220,6 +1227,8 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
     a, b := *(ptr_arr[0]);
     assert("Calling new with tuple failed", a == 10 && b == 10);
   }
+  
+  delete(ptr_arr[0]);
   
   {
     a, b := func_returns_tuple();

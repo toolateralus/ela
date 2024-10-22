@@ -33,30 +33,25 @@ file_get_length :: (file: FILE *) -> u32 {
   return #make(u32, len);
 }
 
-file_read_to_string :: (file: FILE*, len: u32*) -> char * {
+file_read_to_string :: (file: FILE*, len: u32*) -> string {
   *len = file_get_length(file);
-  str: char* = malloc(sizeof(char) * (*len + 1));
-  index : int = 0;
-  c: char ;
+  c: char;
+  str: string;
   while ((c = fgetc(file)) != EOF) {
-    str[index] = c;
-    ++index;
+    str.push(c);
   }
-  str[index] = #char "\0";
+  str.push(#char "\0");
   return str;
 }
 
-file_read_to_string :: (filename: char *) -> char * {
+file_read_to_string :: (filename: char *) -> string {
   file := fopen(filename, "r");
-  len := file_get_length(file);
-  str: char* = malloc(sizeof(char) * (len + 1));
-  index : int = 0;
+  str: string;
   c: char;
   while ((c = fgetc(file)) != EOF) {
-    str[index] = c;
-    ++index;
+    str.push(c);
   }
-  str[index] = #char "\0";
+  str.push(#char "\0");
   fclose(file);
   return str;
 }

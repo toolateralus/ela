@@ -1,0 +1,18 @@
+
+
+/* 
+  The compiler crashes in the 
+  this.s.b
+
+*/
+
+S1 :: struct {
+  b: bool;
+}
+
+S :: struct {
+  s: S1;
+  #ctor :: (b: bool) {
+    this.s.b = b;
+  }
+}
