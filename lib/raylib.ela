@@ -508,8 +508,10 @@ All_Colors : Color[] = {
 #foreign UnloadTexture :: (texture: Texture2D) -> void;
 #foreign DrawTexture :: (texture: Texture2D, posX: int, posY: int, tint: Color) -> void;
 #foreign DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
+#foreign DrawRectangleRec :: (rec: Rectangle, color: Color) -> void;
 #foreign DrawTextureRec :: (texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
 #foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
+#foreign DrawRectangleLinesEx :: (rec: Rectangle, lineThick: int, color: Color) -> void;
 #foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
 #foreign DrawRectangleLines :: (posX: int, posY: int, width: int, height: int, color: Color) -> void;
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;

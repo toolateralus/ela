@@ -159,6 +159,29 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 // function pointers have to work in C.
 void EmitVisitor::emit_function_pointer_type_string(
     Type *type, Nullable<std::string> identifier) {
+    
+  auto type_prefix = std::string{"*"}; 
+  
+  // TODO: 
+  // ! We need to be able to take function pointers to member methods.
+  // ! It's certainly possible but the syntax is really hard to wrangle.
+  if (current_struct_decl.is_not_null()) {
+    auto t = global_get_type(current_struct_decl.get()->type->resolved_type);
+    auto info = static_cast<StructTypeInfo*>(t->get_info());
+    for (const auto &[name, sym]: info->scope->symbols) {
+      auto sym_ty = global_get_type(sym.type_id);
+      
+      if ((sym.flags & SYMBOL_IS_FUNCTION) != 0 &&
+           sym_ty == type &&
+           identifier.is_not_null() &&
+           *identifier.get() == name) {
+        type_prefix = to_cpp_string(t) + "::*";
+        *identifier.get() = to_cpp_string(t) + *identifier.get();
+      }
+      
+    }
+  }
+      
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error("Internal compiler error: tried to get a function pointer from "
                 "a non-function type",
@@ -168,7 +191,7 @@ void EmitVisitor::emit_function_pointer_type_string(
   auto info = static_cast<FunctionTypeInfo *>(type->get_info());
   auto return_type = global_get_type(info->return_type);
 
-  (*ss) << to_cpp_string(return_type) << "(*";
+  (*ss) << to_cpp_string(return_type) << "(" << type_prefix;
 
   if (identifier) {
     (*ss) << *identifier.get();

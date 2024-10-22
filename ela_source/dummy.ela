@@ -1,12 +1,6 @@
-#import core;
-main :: () {
-  r : range = 0..10;
-  
-  v : int[] = {15, 25, 44, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13};
-  
-  z := v[r];
-  
-  for i; z {
-    println(to_string(i))
+
+S :: struct {
+  func :: () {
+    function : void()* = &func;
   }
 }

@@ -63,7 +63,7 @@ To search for all info comments in the source just use vscodes regex search with
 - We should be able to do slicing with ranges.
   This shouldn't be too hard to achieve.
   
-```cpp
+```rust
   arr : int[] = {0,1,2,3,4,5};
   slice: arr[0..3]; // {0,1,2};
 ```
