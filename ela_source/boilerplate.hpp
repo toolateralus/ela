@@ -1,5 +1,3 @@
-
-#define USE_STD_LIB 1
 #if USE_STD_LIB
 
 #include <stdint.h>
@@ -303,6 +301,13 @@ struct string {
   }
   
   void insert_at(int index, const char &value) {
+    if (data == nullptr) {
+      data = new char[2];
+      data[0] = value;
+      data[1] = '\0';
+      length = 1;
+      return;
+    }
     char *new_data = new char[length + 2];
     std::copy(data, data + index, new_data);
     new_data[index] = value;
@@ -312,8 +317,15 @@ struct string {
     data = new_data;
     ++length;
   }
-  
+
   void insert_substr_at(int index, const string &substr) {
+    if (data == nullptr) {
+      data = new char[substr.length + 1];
+      std::copy(substr.data, substr.data + substr.length, data);
+      data[substr.length] = '\0';
+      length = substr.length;
+      return;
+    }
     int substr_length = substr.length;
     char *new_data = new char[length + substr_length + 1];
     std::copy(data, data + index, new_data);
