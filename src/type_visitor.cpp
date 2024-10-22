@@ -1109,6 +1109,9 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
     break;
   }
 }
+
+
+
 std::any TypeVisitor::visit(ASTDotExpr *node) {
   // .EnumVariant fix ups.
   if (node->left == nullptr) {
@@ -1241,7 +1244,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   Scope *dot_parent = scope->parent;
   
   
-  if (dot_parent && calling_scope != scope) {
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
     scope->parent = calling_scope;
   }
   
@@ -1249,7 +1252,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   int type = int_from_any(node->right->accept(this));
   ctx.set_scope(calling_scope);
   
-  if (dot_parent && calling_scope != scope) {
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
       scope->parent = dot_parent;
   }
   

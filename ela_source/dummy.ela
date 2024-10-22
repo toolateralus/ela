@@ -1,39 +1,12 @@
-#import core;
 
 
-LEAF_LEN : int = 2;
-
-Rope :: struct {
-  left:     Rope*;
-  right:    Rope*;
-  parent:   Rope*;
-  data:     string;
-  left_len: int;
+S1 :: struct {
+  b: bool;
 }
 
-create_rope :: (parent: Rope*, data: string, l: int, r: int) -> Rope* {
-  temp := new Rope;
-  temp.parent = parent;
-  if r - l > LEAF_LEN {
-    temp.left_len = (r - l) / 2;
-    m := (l + r) / 2;
-    temp.left = create_rope(temp, data, l, m);
-    temp.right = create_rope(temp, data, m+1, r);
-  } else {
-    temp.left_len = r - l;
-    
-    for i: int = l; i <= r; ++i {
-      //! BUG 
-      //! dot expressions work like shiz
-      temp.data.push(data[i]);
-    }
+S :: struct {
+  s: S1;
+  #ctor :: (b: bool) {
+    this.s.b = b;
   }
 }
-
-print :: (r: Rope*) {
-  if !r then return;
-  if !r.left && !r.right then println(r.str);
-  print(r.left);
-  print(r.right);
-}
-main :: (){}
