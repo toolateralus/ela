@@ -127,6 +127,7 @@ SequenceChannel :: struct {
   volume : int = 50;
   old_volume : int = 50;
   volume_slider: SliderI;
+  #ctor :: () {}
   #ctor :: (_sound: Sound, _style: Style, name: string) {
     sound = _sound;
     style = _style;
