@@ -433,7 +433,7 @@ All_Colors : Color[] = {
 #foreign GetKeyPressed :: () -> int;
 #foreign GetScreenWidth :: () -> int;
 #foreign GetScreenHeight :: () -> int;
-
+#foreign GetMouseWheelMove :: () -> float;
 #foreign GetMouseX :: () -> int;
 #foreign GetMouseY :: () -> int;
 #foreign GetMousePosition :: () -> Vector2;
