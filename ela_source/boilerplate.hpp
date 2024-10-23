@@ -9,17 +9,21 @@ void destruct(T &...t) {
 struct string;
 #endif 
 struct range {
+  using value_type = signed long long;
   range() {}
+  range(value_type first, value_type last): first(first), last(last), span(last - first) {}
   range(const range &other) {
     first = other.first;
     last = other.last;
+    span = other.span;
   }
-  int first = 0, last = 0;
-  range(int m_begin, int m_end) : first(m_begin), last(m_end) {}
+  
+  value_type first = 0, last = 0, span = 0;
+  
   struct iterator {
-    int current;
-    iterator(int start) : current(start) {}
-    int operator*() const { return current; }
+    value_type current;
+    iterator(value_type start) : current(start) {}
+    value_type operator*() const { return current; }
     iterator &operator++() {
       ++current;
       return *this;
@@ -32,7 +36,11 @@ struct range {
   iterator end() const { return iterator(last); }
   iterator begin() { return iterator(first); }
   iterator end() { return iterator(last); }
-  bool operator==(auto number) const {
+  bool operator==(const value_type number) const {
+    return number >= first && number <= last;
+  }
+
+  bool contains(const value_type number) {
     return number >= first && number <= last;
   }
   #if USE_STD_LIB

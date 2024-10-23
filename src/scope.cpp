@@ -10,8 +10,15 @@ Context::Context() {
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto type = global_create_struct_type("range", range_scope);
-    range_scope->insert("first", int_type());
-    range_scope->insert("last", int_type());
+    range_scope->insert("first", s64_type());
+    range_scope->insert("last", s64_type());
+    range_scope->insert("span", s64_type());
+    
+    auto func = FunctionTypeInfo{};
+    func.params_len=1;
+    func.parameter_types[0] = s64_type();
+    func.return_type = bool_type();
+    range_scope->insert("contains", global_find_function_type_id("bool(s64)", func, {}));
     range_scope->parent = root_scope;
     root_scope->types.insert(type);
   }
