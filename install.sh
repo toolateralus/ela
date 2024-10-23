@@ -1,8 +1,10 @@
 #!/bin/bash
 
-make clean
-
-make
+mkdir build
+cd build
+cmake .. -G "Ninja"
+ninja -j12
+cd ..
 
 # Create the destination directory if it doesn't exist
 mkdir -p /usr/local/lib/ela
