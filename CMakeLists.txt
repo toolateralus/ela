@@ -22,4 +22,10 @@ file(MAKE_DIRECTORY ${BIN_DIR})
 
 # Executable
 add_executable(ela ${SRCS})
+
+set_target_properties(ela PROPERTIES
+  RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_DIR}
+  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_DIR}
+)
 target_compile_definitions(ela PRIVATE MAX_NUM_TYPES=10000)
