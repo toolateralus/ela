@@ -108,6 +108,8 @@ struct TypeVisitor : VisitorBase {
   std::any visit(ASTTupleDeconstruction *node) override;
 };
 
+#include "string_builder.hpp"
+
 struct EmitVisitor : VisitorBase {
   bool emit_default_init = true;
   bool emit_default_args = false;
@@ -121,9 +123,9 @@ struct EmitVisitor : VisitorBase {
 
   TypeVisitor &type_visitor;
 
-  std::stringstream code{};
-  std::stringstream *ss{};
-  std::stringstream test_functions{};
+  StringBuilder code{};
+  StringBuilder *ss{};
+  StringBuilder test_functions{};
 
   int indentLevel = 0;
   Context &ctx;
@@ -161,7 +163,7 @@ struct EmitVisitor : VisitorBase {
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) {
-    (*ss) << indent() << s << '\n';
+    (*ss) << indent() << s + '\n';
   }
   inline void newline() { (*ss) << '\n'; }
   inline void newline_indented() { (*ss) << '\n' << indent(); }

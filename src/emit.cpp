@@ -450,7 +450,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
       if (ext.is_fixed_sized_array()) {
         identifier += ext.to_string();
       } else if (ext.is_array()) {
-        std::stringstream my_ss;
+        StringBuilder my_ss;
         auto old = ss;
         ss = &my_ss;
         emit_function_pointer_type_string(type, nullptr);
@@ -540,7 +540,7 @@ void EmitVisitor::emit_function_pointer_dynamic_array_declaration(
 
 void EmitVisitor::get_declaration_type_signature_and_identifier(
     const std::string &name, Type *type) {
-  std::stringstream tss;
+  StringBuilder tss;
 
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
@@ -548,7 +548,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
     } else if (ext.is_array()) {
-      std::stringstream my_ss;
+      StringBuilder my_ss;
       auto old = ss;
       ss = &my_ss;
       emit_function_pointer_type_string(type, nullptr);
@@ -574,7 +574,6 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
       array_sizes.pop_back();
       if (size.is_null()) {
         std::string current = tss.str();
-        tss.str("");
         tss.clear();
         tss << "_array<" << current << ">";
       } else {
@@ -1201,7 +1200,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 
 
   if (left_ty->is_kind(TYPE_ENUM)) {
-    (*ss) << left_ty->get_base() << '_';
+    (*ss) << left_ty->get_base() + '_';
     node->right->accept(this);
     return {};
   }
@@ -1326,7 +1325,7 @@ bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
 std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
                                        const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
-  std::stringstream ss;
+  StringBuilder ss;
   ss << base;
   for (const auto ext : extensions.extensions) {
     if (ext == TYPE_EXT_ARRAY) {
@@ -1387,7 +1386,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     output = to_cpp_string(type->get_ext(), type->get_base());
     break;
   case TYPE_FUNCTION: {
-    std::stringstream my_ss;
+    StringBuilder my_ss;
     auto old = ss;
     ss = &my_ss;
     emit_function_pointer_type_string(type);
@@ -1473,7 +1472,7 @@ std::string EmitVisitor::get_elements_function(Type *type) {
     );
   } else {
     auto old = this->ss;
-    auto ss = std::stringstream{};
+    auto ss = StringBuilder{};
     this->ss = &ss;
     type->get_ext().array_sizes.back().get()->accept(this);
     auto length = ss.str();

@@ -49,8 +49,8 @@ my_interpolated_string := $"{str}, {data}"
 * The easiest way to concatenate two strings is also to use string interpolation.
 */
 
-a := "Hello ";
-b := "World!";
+a := "Hello "; // char* 
+b : string = "World!"; // string
 my_concatenated_string := $"{a}{b}";
 
 // * my_concatenated_string = "Hello World!";
