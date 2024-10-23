@@ -276,6 +276,17 @@ struct string {
     string result(data + range.first, data + range.last, true);
     return result;
   }
+  
+  string substr(int start, int end) const {
+    if (start < 0 || end > length || start > end) {
+      return string();
+    }
+    return string(data + start, data + end, false);
+  }
+
+  string substr(const range &r) const {
+    return substr(r.first, r.last);
+  }
 
   void push(const char &value) {
     char *new_data = new char[length + 2];
@@ -513,15 +524,15 @@ struct __COMPILER_GENERATED_TEST {
 #else
 
 using float64 = double;
-using u64 = unsigned long long;
-using s64 = signed long long;
+using u64 = unsigned long long int;
+using s64 = signed long long int;
 
-using s32 = signed;
-using u32 = unsigned;
+using s32 = signed int;
+using u32 = unsigned int;
 using float32 = float;
 
-using s16 = short;
-using u16 = unsigned short;
+using s16 = short int;
+using u16 = unsigned short int;
 
 using s8 = signed char;
 using u8 = unsigned char;

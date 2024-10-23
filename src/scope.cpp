@@ -5,6 +5,17 @@
 
 Context::Context() {
   root_scope = scope;
+  
+  // Range type
+  {
+    auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto type = global_create_struct_type("range", range_scope);
+    range_scope->insert("first", int_type());
+    range_scope->insert("last", int_type());
+    range_scope->parent = root_scope;
+    root_scope->types.insert(type);
+  }
+  
   // define some default functions that may or may not be macros.
   {
     // We still define assert and sizeof manually here, because
@@ -146,12 +157,17 @@ Context::Context() {
     func.parameter_types[1] = global_find_type_id("string", {});
     str_scope->insert("insert_substr_at", global_find_function_type_id("void(int, char)", func, {}), SYMBOL_IS_FUNCTION);
     
+    func.params_len=1;
+    func.return_type = global_find_type_id("string", {});
+    func.parameter_types[0]= global_find_type_id("range", {});
+    str_scope->insert("substr", global_find_function_type_id("string(range)", func, {}), SYMBOL_IS_FUNCTION);
     
     auto sym = str_scope->local_lookup("[");
     auto info = type_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
+    
     
   }
   
@@ -168,15 +184,7 @@ Context::Context() {
     root_scope->types.insert(i);
   }
   
-  // Range type
-  {
-    auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    auto type = global_create_struct_type("range", range_scope);
-    range_scope->insert("first", int_type());
-    range_scope->insert("last", int_type());
-    range_scope->parent = root_scope;
-    root_scope->types.insert(type);
-  }
+  
   
 }
 

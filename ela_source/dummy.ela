@@ -1,6 +1,7 @@
 
-S :: struct {
-  func :: () {
-    function : void()* = &func;
-  }
+#import core;
+main :: () {
+  
+  str : string = "Hello i am string";
+  println(str.substr(0..10));
 }
