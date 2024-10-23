@@ -1,4 +1,14 @@
 section .text
+
+
+global exit
+
+exit:
+  mov rax, 60  ; syscall: exit
+  mov rdi, rdi ; status: argument passed in rdi
+  syscall
+  
+
 global _start
 extern main
 

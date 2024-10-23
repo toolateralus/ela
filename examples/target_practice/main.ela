@@ -27,14 +27,14 @@ Scene :: enum {
 button_style : Style = {
   WHITE,
   CLEAR,
-  color_with_alpha(CYAN, 24),
+  CYAN.with_alpha(24),
   20
 };
 
 jiggly_text_style : Style = {
   WHITE,
   CLEAR,
-  color_with_alpha(CYAN, 24),
+  CYAN.with_alpha(24),
   40
 };
 
@@ -232,15 +232,17 @@ get_random_grayscale_color_with_per_channel_variance :: (_variance: float = 50.0
 }
 
 random_vector2 :: (origin: Vector2, max: float) -> Vector2 {
-  origin.x += randf() * max;
-  origin.y += randf() * max;
+  result: Vector2;
+  result.x = origin.x + randf() * max;
+  result.y = origin.y + randf() * max;
   return origin;
 }
 
 random_vector2 :: (origin: Vector2, min, max) -> Vector2 {
-  origin.x += min.x + randf() * (max.x - min.x);
-  origin.y += min.y + randf() * (max.y - min.y);
-  return origin;
+  result: Vector2;
+  result.x = origin.x + min.x + randf() * (max.x - min.x);
+  result.y = origin.y + min.y + randf() * (max.y - min.y);
+  return result;
 }
 
 make_particle :: (kind: int, position: Vector2, tint: Color) {
@@ -405,7 +407,7 @@ draw_game :: () {
   sprintf(format_buffer,  "Count:            %d", targets_destroyed);
   DrawText(format_buffer, 0, 30, 24, ui_text_color);
   
-  if ui_text_color.a > 0 then ui_text_color = color_with_alpha(ui_text_color, ui_text_color.a - 5);
+  if ui_text_color.a > 0 then ui_text_color = ui_text_color.with_alpha(ui_text_color.a - 5);
 }
 
 BulletRoutine :: struct {

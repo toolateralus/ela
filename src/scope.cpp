@@ -31,7 +31,7 @@ Context::Context() {
         SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
-    sizeof_info.return_type = global_find_type_id("s64", {});
+    sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;
     // no other function will ever use this type. thats why we have a ?, because
     // we have no first class types yet.

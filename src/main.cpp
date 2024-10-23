@@ -49,7 +49,8 @@ std::unordered_set<std::string> import_set;
 
 int main(int argc, char *argv[]) {
   compile_command = CompileCommand(argc, argv);
-  compile_command.print();
+  if (compile_command.has_flag("x")) compile_command.print();
+  
   init_type_system();
   auto result = compile_command.compile();
   
@@ -120,10 +121,11 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
     
     auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
     
-    printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
+    if (compile_command.has_flag("x")) 
+      printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
+    
     cpp.begin();
     result = system(compilation_string.c_str());
-    printf("compiler returned %d\n", result);
     cpp.end("compiling and linking cpp");
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);

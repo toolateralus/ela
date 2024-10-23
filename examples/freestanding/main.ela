@@ -3,9 +3,71 @@
 
 // our function declared in print.s
 #foreign print :: (f: char *);
+#foreign exit :: (code: int);
 
-// declare main as extern so our assembly program can find it.
+memset :: (p: char *, value: u32, len: u32) {
+  for i in 0..len {
+    p[i] = value;
+  }
+}
+
+memcpy :: (dest: char**, src: char*, len: u32) {
+  for i in 0..len {
+    (*dest)[i] = src[i];
+  }
+}
+
+#export strlen :: (s: char*) -> int {
+  i: int;
+  while s[i] != #char "\0" {
+    ++i;
+  }
+  return i;
+}
+
+// A simple linear allocator (aka arena) 
+// for a freestanding environment without allocations.
+Allocator :: struct {
+  mem : char[1024 * 24];
+  ptr : u32;
+  size: u32;
+  #ctor :: () {
+    size = 1024 * 24;
+    memset((char*)mem, 0, size);
+  }
+  alloc :: (size: u32) -> char* {
+    data := &mem[ptr];
+    ptr += size;
+    
+    if (ptr > size) {
+      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n");
+      exit(1);
+    }
+    return data;
+  }
+}
+
+allocator: Allocator;
+
+Vector2 :: struct {
+  x: float;
+  y: float;
+}
+
+// declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.
+// 'export' differs from foreign, because foreign is an external dependency we're importing,
+// and 'export' is declaring an externally visible symbol.
 #export main :: () -> int {
-  print("Hello\n");
+  print("\e[1;4;32mHello Free(standing) World!\e[0m\n");
+  
+  while true {
+    // example of getting a 'dynamically allocated' struct.
+    v: Vector2* = allocator.alloc(sizeof(Vector2));
+    v1: Vector2* = allocator.alloc(sizeof(Vector2));
+    memcpy((char**)&v1, (char*)v, sizeof(Vector2));
+    // we do this in a loop to show that our exit(1) call works to 
+    // 'panic' on an error.
+  }
+  
   return 0;
 }

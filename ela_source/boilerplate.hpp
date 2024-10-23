@@ -1,44 +1,13 @@
+
+//  * Manually call destructor on one or many objects. useful for unions that own non-trivial objects.
+template<class ...T>
+void destruct(T &...t) {
+  (t.~T(), ...);
+}
+
 #if USE_STD_LIB
-
-#include <stdint.h>
-
-using float64 = double;
-using u64 = uint64_t;
-using s64 = int64_t;
-
-using s32 = int32_t;
-using u32 = uint32_t;
-using float32 = float;
-
-using s16 = int16_t;
-using u16 = uint16_t;
-
-using s8 = int8_t;
-using u8 = uint8_t;
-
-#include <functional>
-#include <unordered_map>
-
-extern "C" int printf(const char *format, ...);
-extern "C" int snprintf(char *str, size_t size, const char *format, ...);
-extern "C" int sprintf(char *str, const char *format, ...);
-
-#undef RAND_MAX
-#undef assert
-
-#include <algorithm>
-#include <initializer_list>
-
-/* 
-  * GENERAL GOAL *
-  ? Replace all of these std:: types with our own types. Just using these now because theyre reliable
-  ? And obviously super easy to implement.
-*/
-
-template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
-
-
 struct string;
+#endif 
 struct range {
   range() {}
   range(const range &other) {
@@ -66,11 +35,49 @@ struct range {
   bool operator==(auto number) const {
     return number >= first && number <= last;
   }
+  #if USE_STD_LIB
   string to_string() const;
+  #endif
 };
 
+#if USE_STD_LIB
+
+#include <stdint.h>
+#include <functional>
+#include <unordered_map>
+#include <algorithm>
+#include <initializer_list>
+
+// TODO: replace these with our own types.
+// They may not be faster, but they might be. What will be faster is compilation times.
+template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
+
+// TODO: Have an optimization for 2, 3, 4, 5, 6 member tuples that doens't use recursive template instantiation.
+// TODO: this would improve compile times drastically.
 template<class ...T>
 using _tuple = std::tuple<T...>;
+
+using float64 = double;
+using u64 = uint64_t;
+using s64 = int64_t;
+
+using s32 = int32_t;
+using u32 = uint32_t;
+using float32 = float;
+
+using s16 = int16_t;
+using u16 = uint16_t;
+
+using s8 = int8_t;
+using u8 = uint8_t;
+
+extern "C" int printf(const char *format, ...);
+extern "C" int snprintf(char *str, size_t size, const char *format, ...);
+extern "C" int sprintf(char *str, const char *format, ...);
+extern "C" void *memcpy(void *, void *, size_t);
+
+#undef RAND_MAX
+#undef assert
 
 // * Remove these 'get' functions for tuples. Super type unsafe.
 template<std::size_t I = 0, typename TTuple, typename T1>
@@ -89,12 +96,6 @@ void __get_helper(const TTuple& tuple, int index, T1* value) {
 template<class T, class T1>
 void get(const T& tuple, int index, T1* value) {
   __get_helper(tuple, index, value);
-}
-
-//  * Manually call destructor on one or many objects. useful for unions that own non-trivial objects.
-template<class ...T>
-void destruct(T &...t) {
-  (t.~T(), ...);
 }
 
 // TODO: implement `Any` type... not sure how we want to approach it.
@@ -404,7 +405,6 @@ struct string {
   auto end() const { return data + length; }
 };
 
-
 string range::to_string() const {
   char buffer[50];
   snprintf(buffer, sizeof(buffer), "%d..%d", first, last);
@@ -422,9 +422,6 @@ template <> struct hash<string> {
   }
 };
 }
-
-
-extern "C" void *memcpy(void *, void *, size_t);
 
 struct Type;
 struct Field {
@@ -522,7 +519,6 @@ struct __COMPILER_GENERATED_TEST {
 #endif
 
 #else
-
 using float64 = double;
 using u64 = unsigned long long int;
 using s64 = signed long long int;
@@ -536,5 +532,4 @@ using u16 = unsigned short int;
 
 using s8 = signed char;
 using u8 = unsigned char;
-
 #endif

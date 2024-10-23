@@ -1,4 +1,5 @@
 global print
+extern strlen
 
 print:
   ; Save registers that will be used
@@ -11,11 +12,8 @@ print:
 
   ; Calculate the length of the string
   xor rdx, rdx
-find_len:
-  cmp byte [rsi + rdx], 0
-  je print_string
-  inc rdx
-  jmp find_len
+  call strlen
+  mov rdx, rax
 
 print_string:
   ; Print the format string

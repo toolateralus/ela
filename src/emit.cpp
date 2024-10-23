@@ -618,11 +618,13 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
     return {};
   }
 
+  const auto is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") || compile_command.compilation_flags.contains("-nostdlib");
+
   if (type->get_ext().is_fixed_sized_array()) {
     get_declaration_type_signature_and_identifier(node->name.value, type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
-    } else if (emit_default_init && !type->get_ext().is_pointer()) {
+    } else if (emit_default_init && !type->get_ext().is_pointer() && !is_freestanding) {
       bool cancelled = false;
       std::string init = "{";
       for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
@@ -1009,7 +1011,12 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
     get_declaration_type_signature_and_identifier(node->name, type);
   } else {
     node->type->accept(this);
-    (*ss) << ' ' << node->name;
+    auto sym = ctx.scope->local_lookup(node->name);
+    if (sym && (sym->flags & SYMBOL_WAS_MUTATED) == 0 && type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+      (*ss) << " const& " << node->name;
+    } else { 
+      (*ss) << ' ' << node->name;
+    }
   }
   
   if (node->default_value.is_not_null() && emit_default_args) {
@@ -1018,6 +1025,7 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
   }
   return {};
 }
+
 std::any EmitVisitor::visit(ASTParamsDecl *node) {
   (*ss) << "(";
   int i = 0;
@@ -1355,41 +1363,11 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
 std::string EmitVisitor::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
-  if (type->get_base() == "s64")
-    name = "int64_t";
-  else if (type->get_base() == "s32")
-    name = "int32_t";
-  else if (type->get_base() == "s16")
-    name = "int16_t";
-  else if (type->get_base() == "s8")
-    name = "int8_t";
-  else if (type->get_base() == "u64")
-    name = "size_t";
-  else if (type->get_base() == "u32")
-    name = "uint32_t";
-  else if (type->get_base() == "u16")
-    name = "uint16_t";
-  else if (type->get_base() == "char" && type->get_ext().is_pointer(1))
+  if (type->get_base() == "char" && type->get_ext().is_pointer(1)) {
     name = "const char";
-  else if (type->get_base() == "u8" && type->get_ext().is_pointer(1))
+  } else if (type->get_base() == "u8" && type->get_ext().is_pointer(1)) {
     name = "char";
-  else if (type->get_base() == "u8")
-    name = "uint8_t";
-  else if (type->get_base() == "float32")
-    name = "float";
-  else if (type->get_base() == "float64")
-    name = "double";
-  else if (type->get_base() == "float")
-    name = "float";
-  else if (type->get_base() == "int")
-    name = "int";
-  else if (type->get_base() == "char")
-    name = "char";
-  else if (type->get_base() == "bool")
-    name = "bool";
-  else if (type->get_base() == "void")
-    name = "void";
-  else {
+  } else {
     return to_cpp_string(type);
   }
 

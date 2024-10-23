@@ -352,11 +352,6 @@ ConfigFlags :: enum {
   InterlacedHint        = 0x00010000  // 1 << 16
 }
 
-color_with_alpha :: (color: Color, alpha: u8) -> Color {
-  color.a = alpha;
-  return color;
-}
-
 color_lerp :: (a: Color, b: Color, t: float) -> Color {
   return #make(Color, {
     (u8)clamp(a.r + (b.r - a.r) * t, 0, 255),
@@ -627,12 +622,12 @@ draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCall
     position.x = rect.x - (text_width - rect.width) / 2;
   }
   
-  rect = {position.x, position.y, size.x, size.y};
+  new_rect : Rectangle = {position.x, position.y, size.x, size.y};
   
   text_x := position.x + (size.x - text_width) / 2;
   text_y := position.y + (size.y - text_height) / 2;
   
-  mouse_over := CheckCollisionPointRec(GetMousePosition(), rect);
+  mouse_over := CheckCollisionPointRec(GetMousePosition(), new_rect);
   
   if mouse_over {
     DrawRectangleV(position, size, style.highlighted);
@@ -647,7 +642,7 @@ draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCall
   if !style.use_jiggly_text {
     DrawText(text, (int)text_x, (int)text_y, style.font_size, style.foreground);
   } else {
-    jiggly_text(text, {text_x, text_y, rect.width, rect.height}, style);
+    jiggly_text(text, {text_x, text_y, new_rect.width, new_rect.height}, style);
   }
 
   return false;

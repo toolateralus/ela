@@ -109,14 +109,14 @@ play_callback :: () {
 color_index: s32;
 
 get_sequencer_style :: (style: Style) -> Style {
+  copy := style;
   color_index++;
   index := color_index % All_Colors.length;
   index_1 := index + 2 % All_Colors.length;
-  
-  style.foreground = All_Colors[index];
-  style.background = All_Colors[index_1].with_alpha(75);
-  style.highlighted = style.background.with_alpha(255);
-  return style;
+  copy.foreground = All_Colors[index];
+  copy.background = All_Colors[index_1].with_alpha(75);
+  copy.highlighted = copy.background.with_alpha(255);
+  return copy;
 }
 
 SequenceChannel :: struct {

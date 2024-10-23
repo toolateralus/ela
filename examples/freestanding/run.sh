@@ -7,3 +7,6 @@ ld print.o ert.o main.o -o main
 rm print.o ert.o main.o
 
 ./main
+
+tput sgr0
+echo program exited: $?
