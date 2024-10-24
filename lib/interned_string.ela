@@ -24,7 +24,7 @@ InternedString :: struct {
     else { id = _id; }
   }
 
-  get_string_value :: () -> string {
+  value :: () -> string {
     return __string_storage_cache[id];
   }
 

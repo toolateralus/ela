@@ -175,13 +175,17 @@ Context::Context() {
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
     
-    
   }
   
   auto info = FunctionTypeInfo{};
   info.is_varargs = true;
   info.return_type = void_type();
   root_scope->insert("destruct", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
+  
+  info.is_varargs = true;
+  info.return_type = void_type();
+  root_scope->insert("move", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
+  
   
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);

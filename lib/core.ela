@@ -1,3 +1,5 @@
+
+
 #foreign system :: (cmd: char*) -> int;
 
 #foreign free :: (ptr: void*) -> void;
@@ -66,7 +68,7 @@ str_starts_with :: (str: char*, substr: char*) -> bool {
   return strncmp(str, substr, substr_len) == 0;
 }
 
-string_ends_with :: (str: char*, pattern: char*) -> bool {
+str_ends_with :: (str: char*, pattern: char*) -> bool {
   if !str || !pattern 
     then return false;
     
@@ -77,6 +79,29 @@ string_ends_with :: (str: char*, pattern: char*) -> bool {
     then return false;
     
   return strncmp(str + (len - patlen), pattern, patlen) == 0;
+}
+
+str_replace :: (str: string, pattern: string, replacement: string) -> string {
+  if !str.data || !pattern.data || !replacement.data 
+    then return str;
+  
+  result: string = string{""};
+  str_len: int = strlen(str.data);
+  pattern_len: int = strlen(pattern.data);
+  replacement_len: int = strlen(replacement.data);
+  
+  i: int = 0;
+  while i < str_len {
+    if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
+      result.insert_substr_at(result.length, replacement);
+      i += pattern_len;
+    } else {
+      result.insert_substr_at(result.length, string{str.data + i, str.data + i + 1});
+      i += 1;
+    }
+  }
+  
+  return result;
 }
 
 string_substr :: (src: char*, start: int, end: int) -> string {
@@ -102,6 +127,56 @@ string_substr :: (src: char*, start: int, end: int) -> string {
   free(dest);
   
   return v;
+}
+
+to_string :: (num: s64) -> string {
+  switch num {
+    0: { return string{"0"}; }
+    1: { return string{"1"}; }
+    2: { return string{"2"}; }
+    3: { return string{"3"}; }
+    4: { return string{"4"}; }
+    5: { return string{"5"}; }
+    6: { return string{"6"}; }
+    7: { return string{"7"}; }
+    8: { return string{"8"}; }
+    9: { return string{"9"}; }
+  }
+  
+  negative := false;
+  if num < 0 {
+    negative = true;
+    num = -num;
+  }
+
+  buffer: char[20];
+  index: int = 0;
+
+  while num > 0 {
+    buffer[index] = #char "0" + (num % 10);
+    num /= 10;
+    index++;
+  }
+
+  if negative {
+    buffer[index] = #char "-";
+    index++;
+  }
+
+  // Reverse the buffer
+  for i in 0..(index / 2) {
+    temp := buffer[i];
+    buffer[i] = buffer[index - i - 1];
+    buffer[index - i - 1] = temp;
+  }
+
+  return string{(char*)buffer, ((char*) buffer) + index};
+  
+  
+}
+
+streq :: (left: char*, right) -> bool {
+  return strcmp(left, right) == 0;
 }
 
 print :: (str: string) {
@@ -216,51 +291,6 @@ timef :: () -> float64 {
   return (float64)ts.tv_sec + (float64)ts.tv_nsec / (float64)1_000_000_000.0;
 }
 
-to_string :: (num: s64) -> string {
-  switch num {
-    0: { return string{"0"}; }
-    1: { return string{"1"}; }
-    2: { return string{"2"}; }
-    3: { return string{"3"}; }
-    4: { return string{"4"}; }
-    5: { return string{"5"}; }
-    6: { return string{"6"}; }
-    7: { return string{"7"}; }
-    8: { return string{"8"}; }
-    9: { return string{"9"}; }
-  }
-  
-  negative := false;
-  if num < 0 {
-    negative = true;
-    num = -num;
-  }
-
-  buffer: char[20];
-  index: int = 0;
-
-  while num > 0 {
-    buffer[index] = #char "0" + (num % 10);
-    num /= 10;
-    index++;
-  }
-
-  if negative {
-    buffer[index] = #char "-";
-    index++;
-  }
-
-  // Reverse the buffer
-  for i in 0..(index / 2) {
-    temp := buffer[i];
-    buffer[i] = buffer[index - i - 1];
-    buffer[index - i - 1] = temp;
-  }
-
-  return string{(char*)buffer, ((char*) buffer) + index};
-  
-  
-}
 
 milliseconds :: (c: float64) -> int {
   return (int)(c * 100_000.0);
@@ -269,8 +299,7 @@ seconds :: (c: float64) -> int {
   return (int)(c * 1_000_000.0);
 }
 
-
-
-streq :: (left: char*, right) -> bool {
-  return strcmp(left, right) == 0;
+panic :: (str: string) {
+  println(str);
+  exit(1);
 }

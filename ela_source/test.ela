@@ -1416,3 +1416,11 @@ JsonValueDeleter :: struct {
   }
 }
 
+BitfieldTest :: struct {
+  #bitfield(1) i : u32 = 0;
+}
+
+#test test_bitfield_in_struct :: () {
+  test: BitfieldTest;
+  assert("bitfield failed to equal 0", test.i == 0);
+}

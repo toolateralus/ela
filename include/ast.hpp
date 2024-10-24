@@ -175,6 +175,8 @@ struct ASTDeclaration : ASTStatement {
   Token name;
   ASTType *type;
   Nullable<ASTExpr> value;
+  bool is_bitfield = false;
+  Token bitsize;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_DECLARATION;

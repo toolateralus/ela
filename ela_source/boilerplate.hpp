@@ -1,24 +1,25 @@
-//  * Manually call destructor on one or many objects. useful for unions that own non-trivial objects.
-template<class ...T>
-void destruct(T &...t) {
-  (t.~T(), ...);
-}
+#define USE_STD_LIB 1
+
+//  * Manually call destructor on one or many objects. useful for unions that
+//  own non-trivial objects.
+template <class... T> void destruct(T &...t) { (t.~T(), ...); }
 
 #if USE_STD_LIB
 struct string;
-#endif 
+#endif
 struct Range {
   using value_type = signed long long;
   Range() {}
-  Range(value_type first, value_type last): first(first), last(last), span(last - first) {}
+  Range(value_type first, value_type last)
+      : first(first), last(last), span(last - first) {}
   Range(const Range &other) {
     first = other.first;
     last = other.last;
     span = other.span;
   }
-  
+
   value_type first = 0, last = 0, span = 0;
-  
+
   struct iterator {
     value_type current;
     iterator(value_type start) : current(start) {}
@@ -42,27 +43,30 @@ struct Range {
   bool contains(const value_type number) {
     return number >= first && number <= last;
   }
-  #if USE_STD_LIB
+#if USE_STD_LIB
   string to_string() const;
-  #endif
+#endif
 };
 
 #if USE_STD_LIB
 
-#include <stdint.h>
-#include <functional>
-#include <unordered_map>
 #include <algorithm>
+#include <functional>
 #include <initializer_list>
+#include <stdint.h>
+#include <unordered_map>
 
 // TODO: replace these with our own types.
-// They may not be faster, but they might be. What will be faster is compilation times.
+// They may not be faster, but they might be. What will be faster is compilation
+// times.
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
-// TODO: Have an optimization for 2, 3, 4, 5, 6 member tuples that doens't use recursive template instantiation.
+// TODO: Have an optimization for 2, 3, 4, 5, 6 member tuples that doens't use
+// recursive template instantiation.
 // TODO: this would improve compile times drastically.
-template<class ...T>
-using _tuple = std::tuple<T...>;
+template <class... T> using _tuple = std::tuple<T...>;
+
+template <class T> void move(T *to, const T from) { *to = std::move(from); }
 
 using float64 = double;
 using u64 = uint64_t;
@@ -87,8 +91,8 @@ extern "C" void *memcpy(void *, void *, size_t);
 #undef assert
 
 // * Remove these 'get' functions for tuples. Super type unsafe.
-template<std::size_t I = 0, typename TTuple, typename T1>
-void __get_helper(const TTuple& tuple, int index, T1* value) {
+template <std::size_t I = 0, typename TTuple, typename T1>
+void __get_helper(const TTuple &tuple, int index, T1 *value) {
   if constexpr (I < std::tuple_size_v<TTuple>) {
     if (I == index) {
       *value = std::get<I>(tuple);
@@ -100,8 +104,7 @@ void __get_helper(const TTuple& tuple, int index, T1* value) {
   }
 }
 
-template<class T, class T1>
-void get(const T& tuple, int index, T1* value) {
+template <class T, class T1> void get(const T &tuple, int index, T1 *value) {
   __get_helper(tuple, index, value);
 }
 
@@ -133,29 +136,32 @@ template <class T> struct _array {
         capacity(other.capacity), is_view(other.is_view) {
     std::copy(other.data, other.data + other.length, data);
   }
-  
+
   _array(_array &&other) noexcept
-    : data(other.data), length(other.length), capacity(other.capacity), is_view(other.is_view) {
+      : data(other.data), length(other.length), capacity(other.capacity),
+        is_view(other.is_view) {
     other.data = nullptr;
     other.length = 0;
     other.capacity = 0;
     other.is_view = false;
   }
-  
-  _array& operator=(const _array &other) {
+
+  _array &operator=(const _array &other) {
     if (this != &other) {
-      if (data && !is_view)
+      T *new_data = new T[other.length];
+      std::copy(other.data, other.data + other.length, new_data);
+      if (data && !is_view) {
         delete[] data;
-      data = new T[other.length];
+      }
+      data = new_data;
       length = other.length;
       capacity = other.capacity;
       is_view = other.is_view;
-      std::copy(other.data, other.data + other.length, data);
     }
     return *this;
   }
 
-  _array& operator=(_array &&other) noexcept {
+  _array &operator=(_array &&other) noexcept {
     if (this != &other) {
       if (data && !is_view)
         delete[] data;
@@ -170,14 +176,15 @@ template <class T> struct _array {
     }
     return *this;
   }
-  
+
   _array(std::initializer_list<T> list)
-      : data(new T[list.size()]), length(list.size()), capacity(list.size()),
-        is_view(false) {
-    std::copy(list.begin(), list.end(), data);
+      : length(list.size()), capacity(list.size()), is_view(false) {
+    if (list.size() != 0) {
+      data = new T[list.size()];
+      std::copy(list.begin(), list.end(), data);
+    }
     length = list.size();
   }
-  
 
   ~_array() {
     if (!is_view && data) {
@@ -190,7 +197,9 @@ template <class T> struct _array {
     if (new_capacity > capacity) {
       T *new_data = new T[new_capacity];
       std::move(data, data + length, new_data);
-      delete[] data;
+      if (data && !is_view) {
+        delete[] data;
+      }
       data = new_data;
       capacity = new_capacity;
     }
@@ -198,24 +207,20 @@ template <class T> struct _array {
 
   void push(const T &value) {
     if (length == capacity) {
-        resize(capacity == 0 ? 1 : capacity * 2);
+      resize(capacity == 0 ? 1 : capacity * 2);
     }
     data[length++] = value;
   }
-  
-  T pop() {
-    return data[--length];
-  }
-  
+
+  T pop() { return data[--length]; }
+
   void erase(const T &value) {
     auto it = std::remove(data, data + length, value);
     length = (s32)(it - data);
   }
 
-  
-
   T &operator[](int n) { return data[n]; }
-  
+
   const T &operator[](int n) const { return data[n]; }
 
   _array<T> operator[](const Range &range) {
@@ -284,7 +289,7 @@ struct string {
     string result(data + range.first, data + range.last, true);
     return result;
   }
-  
+
   string substr(int start, int end) const {
     if (start < 0 || end > length || start > end) {
       return string();
@@ -292,9 +297,7 @@ struct string {
     return string(data + start, data + end, false);
   }
 
-  string substr(const Range &r) const {
-    return substr(r.first, r.last);
-  }
+  string substr(const Range &r) const { return substr(r.first, r.last); }
 
   void push(const char &value) {
     char *new_data = new char[length + 2];
@@ -318,7 +321,7 @@ struct string {
     --length;
     data[length] = '\0';
   }
-  
+
   void insert_at(int index, const char &value) {
     if (data == nullptr) {
       data = new char[2];
@@ -428,23 +431,22 @@ template <> struct hash<string> {
     return h;
   }
 };
-}
+} // namespace std
 
 struct Type;
 struct Field {
-  char* name;
+  char *name;
   Type *type;
   size_t size;
   size_t offset;
-  
-  template<class T, class T1>
-  inline void set(T *target, T1 data) const {
-    memcpy(reinterpret_cast<char*>(target) + offset, (char*)&data, sizeof(T1));
+
+  template <class T, class T1> inline void set(T *target, T1 data) const {
+    memcpy(reinterpret_cast<char *>(target) + offset, (char *)&data,
+           sizeof(T1));
   }
-  
-  template<class T>
-  inline s8* get(T *source) const {
-    return reinterpret_cast<s8*>(reinterpret_cast<char*>(source) + offset);
+
+  template <class T> inline s8 *get(T *source) const {
+    return reinterpret_cast<s8 *>(reinterpret_cast<char *>(source) + offset);
   }
 };
 
@@ -455,11 +457,11 @@ struct Element {
 
 struct Type {
   int id;
-  char* name;
+  char *name;
   size_t size;
   u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;
-  std::function<_array<Element>(char*)> elements;
+  std::function<_array<Element>(char *)> elements;
 };
 
 #ifdef TESTING

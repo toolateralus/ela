@@ -528,6 +528,30 @@ void Parser::init_directive_routines() {
           return literal;
          }});
   }
+  
+  
+  //#bitfield, for declaring bitfields. Pretty much only to interop with C: most cases for bitfields are completely useless, and can be replaced with a set of flags.
+  {
+    directive_routines.push_back(
+      {
+        .identifier = "bitfield",
+        .kind = DIRECTIVE_KIND_STATEMENT,
+        .run = [](Parser *parser) -> Nullable<ASTNode> {
+          if (parser->current_struct_decl.is_null()) {
+            throw_error("Cannot declare bitfields outside of a struct declaration.", {});
+          }
+          parser->expect(TType::LParen);
+          auto size = parser->expect(TType::Integer);
+          parser->expect(TType::RParen);
+          ASTDeclaration *decl = parser->parse_declaration();
+          decl->is_bitfield = true;
+          decl->bitsize = size;
+          return decl;
+        }
+    });
+    
+  }
+  
 }
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
                                             const std::string &identifier) {

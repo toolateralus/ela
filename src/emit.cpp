@@ -619,6 +619,22 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 
   const auto is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") || compile_command.compilation_flags.contains("-nostdlib");
 
+  if (node->is_bitfield) {
+    node->type->accept(this);
+    space();
+    (*ss) << node->name.value;
+    space();
+    (*ss) << ": " << node->bitsize.value;
+    if (node->value.is_not_null()) {
+      (*ss) << " = ";
+      cast_pointers_implicit(node);
+      node->value.get()->accept(this);
+    } else if (emit_default_init) {
+      (*ss) << "{}";
+    }
+    return {};
+  }
+
   if (type->get_ext().is_fixed_sized_array()) {
     get_declaration_type_signature_and_identifier(node->name.value, type);
     if (node->value.is_not_null()) {
