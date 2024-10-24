@@ -39,6 +39,7 @@
 #foreign atof :: (v: char*) -> float64;
 
 #foreign fabs :: (f: float64) -> float64;
+#foreign pow :: (base: float64, exponent: float64) -> float64;
 
 #foreign isinf :: (arg: float64) -> bool;
 #foreign isnan :: (arg: float64) -> bool;
