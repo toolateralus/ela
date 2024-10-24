@@ -1046,7 +1046,7 @@ std::any TypeVisitor::visit(ASTIdentifier *node) {
   
   auto str = node->value.value;
   
-  if (str == "range" || str == "_tuple" || str == "_map"  || str == "_array") {
+  if (str == "Range" || str == "_tuple" || str == "_map"  || str == "_array") {
     throw_error(std::format("Cannot use reserved word : {}", str), node->source_range);
   }
   
@@ -1267,7 +1267,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
     !HACK FIX STRING SLICING THIS IS TERRIBLE
    */
    if (left_ty->id == global_find_type_id("string", {})) {
-    if (subscript == global_find_type_id("range", {})) {
+    if (subscript == global_find_type_id("Range", {})) {
       return left_ty->id;
     }
     auto element_id = char_type();
@@ -1326,7 +1326,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   }
 
   if (left_ty->get_ext().is_array()) {
-    if (subscript == global_find_type_id("range", {})) {
+    if (subscript == global_find_type_id("Range", {})) {
       return left_ty->id;
     }
     auto element_id = left_ty->get_element_type();
@@ -1424,7 +1424,7 @@ std::any TypeVisitor::visit(ASTRange *node) {
                 node->source_range);
   }
 
-  return global_find_type_id("range", {});
+  return global_find_type_id("Range", {});
 }
 std::any TypeVisitor::visit(ASTSwitch *node) {
   auto type_id = int_from_any(node->target->accept(this));
@@ -1444,7 +1444,7 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
       return_type = block_cf.type;
     } 
     
-    if (expr_type == global_find_type_id("range", {}) && type_is_numerical(type)) {
+    if (expr_type == global_find_type_id("Range", {}) && type_is_numerical(type)) {
       continue;
     } else {
       assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "got {}, expected {}", "Invalid switch case.");

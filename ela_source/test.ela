@@ -1116,7 +1116,7 @@ switch_helper :: () -> int {
 }
 
 #test test_range_var :: () {
-  r : range = 0..10;
+  r : Range = 0..10;
   assert("range variable failed", r.first == 0 && r.last == 10);
   
   i: int;

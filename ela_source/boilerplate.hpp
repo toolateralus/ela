@@ -1,4 +1,3 @@
-
 //  * Manually call destructor on one or many objects. useful for unions that own non-trivial objects.
 template<class ...T>
 void destruct(T &...t) {
@@ -8,11 +7,11 @@ void destruct(T &...t) {
 #if USE_STD_LIB
 struct string;
 #endif 
-struct range {
+struct Range {
   using value_type = signed long long;
-  range() {}
-  range(value_type first, value_type last): first(first), last(last), span(last - first) {}
-  range(const range &other) {
+  Range() {}
+  Range(value_type first, value_type last): first(first), last(last), span(last - first) {}
+  Range(const Range &other) {
     first = other.first;
     last = other.last;
     span = other.span;
@@ -219,7 +218,7 @@ template <class T> struct _array {
   
   const T &operator[](int n) const { return data[n]; }
 
-  _array<T> operator[](const range &range) {
+  _array<T> operator[](const Range &range) {
     _array<T> result;
     result.data = data + range.first;
     result.length = range.last - range.first;
@@ -281,7 +280,7 @@ struct string {
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
 
-  string operator[](const range &range) const {
+  string operator[](const Range &range) const {
     string result(data + range.first, data + range.last, true);
     return result;
   }
@@ -293,7 +292,7 @@ struct string {
     return string(data + start, data + end, false);
   }
 
-  string substr(const range &r) const {
+  string substr(const Range &r) const {
     return substr(r.first, r.last);
   }
 
@@ -413,7 +412,7 @@ struct string {
   auto end() const { return data + length; }
 };
 
-string range::to_string() const {
+string Range::to_string() const {
   char buffer[50];
   snprintf(buffer, sizeof(buffer), "%d..%d", first, last);
   return string(buffer);

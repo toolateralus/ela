@@ -9,7 +9,7 @@ Context::Context() {
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    auto type = global_create_struct_type("range", range_scope);
+    auto type = global_create_struct_type("Range", range_scope);
     range_scope->insert("first", s64_type());
     range_scope->insert("last", s64_type());
     range_scope->insert("span", s64_type());
@@ -166,8 +166,8 @@ Context::Context() {
     
     func.params_len=1;
     func.return_type = global_find_type_id("string", {});
-    func.parameter_types[0]= global_find_type_id("range", {});
-    str_scope->insert("substr", global_find_function_type_id("string(range)", func, {}), SYMBOL_IS_FUNCTION);
+    func.parameter_types[0]= global_find_type_id("Range", {});
+    str_scope->insert("substr", global_find_function_type_id("string(Range)", func, {}), SYMBOL_IS_FUNCTION);
     
     auto sym = str_scope->local_lookup("[");
     auto info = type_alloc<FunctionTypeInfo>();

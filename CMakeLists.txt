@@ -13,8 +13,8 @@ include_directories(include)
 file(GLOB SRCS "src/*.cpp")
 
 # Output directories
-set(OBJ_DIR ${CMAKE_BINARY_DIR}/objs)
-set(BIN_DIR ${CMAKE_BINARY_DIR}/bin)
+set(OBJ_DIR ${CMAKE_BINARY_DIR}/../objs)
+set(BIN_DIR ${CMAKE_BINARY_DIR}/../bin)
 
 # Create directories
 file(MAKE_DIRECTORY ${OBJ_DIR})
