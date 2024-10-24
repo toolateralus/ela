@@ -6,7 +6,7 @@ A simple compiler that currently transpiles down to C++ code. It features a slig
 > **Note about the C++ backend:**  
 > The end goal is to have our own backend and a bitcode interpreter for CTFE. However, the focus is on refining the type system and front end before considering this. Using Clang and LLVM provides massive optimization with little effort, which is beneficial in the early stages. The ultimate goal is to use LLVM, provided it can be made fast.
 
-For a good idea of what is and isn't in the language, see `source/test.ela` for our end-to-end tests, or `examples/` for some example applications. Documentation is limited as the compiler is brand new, about a week or two in development.
+To learn about some of the basics in the language, see `docs/learning/*` for some examples, or `examples/*` for example projects, like a game, a beat sequencer, a freestanding build, and a tiny dll linked raylib hello world.
 
 > **Key Points:**
 
