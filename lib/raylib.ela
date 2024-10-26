@@ -2,55 +2,55 @@
 #import core;
 
 Key :: enum {
-  Null            = 0,  
-  Apostrophe      = 39, 
-  Comma           = 44, 
-  Minus           = 45, 
-  Period          = 46, 
-  Slash           = 47, 
-  Zero            = 48, 
-  One             = 49, 
-  Two             = 50, 
-  Three           = 51, 
-  Four            = 52, 
-  Five            = 53, 
-  Six             = 54, 
-  Seven           = 55, 
-  Eight           = 56, 
-  Nine            = 57, 
-  Semicolon       = 59, 
-  Equal           = 61, 
-  A               = 65, 
-  B               = 66, 
-  C               = 67, 
-  D               = 68, 
-  E               = 69, 
-  F               = 70, 
-  G               = 71, 
-  H               = 72, 
-  I               = 73, 
-  J               = 74, 
-  K               = 75, 
-  L               = 76, 
-  M               = 77, 
-  N               = 78, 
-  O               = 79, 
-  P               = 80, 
-  Q               = 81, 
-  R               = 82, 
-  S               = 83, 
-  T               = 84, 
-  U               = 85, 
-  V               = 86, 
-  W               = 87, 
-  X               = 88, 
-  Y               = 89, 
-  Z               = 90, 
-  LeftBracket    = 91, 
-  Backslash       = 92, 
-  RightBracket   = 93, 
-  Grave           = 96, 
-  Space           = 32, 
+  Null            = 0,
+  Apostrophe      = 39,
+  Comma           = 44,
+  Minus           = 45,
+  Period          = 46,
+  Slash           = 47,
+  Zero            = 48,
+  One             = 49,
+  Two             = 50,
+  Three           = 51,
+  Four            = 52,
+  Five            = 53,
+  Six             = 54,
+  Seven           = 55,
+  Eight           = 56,
+  Nine            = 57,
+  Semicolon       = 59,
+  Equal           = 61,
+  A               = 65,
+  B               = 66,
+  C               = 67,
+  D               = 68,
+  E               = 69,
+  F               = 70,
+  G               = 71,
+  H               = 72,
+  I               = 73,
+  J               = 74,
+  K               = 75,
+  L               = 76,
+  M               = 77,
+  N               = 78,
+  O               = 79,
+  P               = 80,
+  Q               = 81,
+  R               = 82,
+  S               = 83,
+  T               = 84,
+  U               = 85,
+  V               = 86,
+  W               = 87,
+  X               = 88,
+  Y               = 89,
+  Z               = 90,
+  LeftBracket    = 91,
+  Backslash       = 92,
+  RightBracket   = 93,
+  Grave           = 96,
+  Space           = 32,
   Escape          = 256,
   Enter           = 257,
   Tab             = 258,
@@ -108,10 +108,10 @@ Key :: enum {
   KpAdd          = 334,
   KpEnter        = 335,
   KpEqual        = 336,
-  Back            = 4,  
-  Menu            = 5,  
-  VolumeUp       = 24, 
-  VolumeDown     = 25  
+  Back            = 4,
+  Menu            = 5,
+  VolumeUp       = 24,
+  VolumeDown     = 25
 }
 
 MouseButton :: enum {
@@ -129,15 +129,15 @@ Color :: struct {
   g: u8;
   b: u8;
   a: u8;
-  
+
   to_string :: () -> string {
     return $"r: {r}, g: {g}, b: {b}, a: {a}";
   }
-  
+
   #operator(==) :: (other: #self) -> bool {
     return other.a == a && other.r == r && other.g == g && other.b == b;
   }
-  
+
   with_alpha :: (a: int) -> #self {
     color := *this;
     color.a = (u8)a;
@@ -196,7 +196,7 @@ Vector2 :: struct {
     y /= scalar;
     return *this;
   }
-  
+
   to_string :: () -> string {
     return $"x: {x}, y: {y}"
   }
@@ -206,7 +206,7 @@ Vector3 :: struct {
   x: float;
   y: float;
   z: float;
-  
+
   #operator(+) :: (other: Vector3) -> Vector3 {
     return #make(#self, {x + other.x, y + other.y, z + other.z });
   }
@@ -250,7 +250,7 @@ Vector3 :: struct {
     z /= scalar;
     return *this;
   }
-  
+
   to_string :: () -> string {
     return $"x: {x}, y: {y}, z: {z}"
   }
@@ -261,7 +261,7 @@ Rectangle :: struct {
   y: float;
   width: float;
   height: float;
-  
+
   to_string :: () -> string {
     return $"x: {x}, y: {y}, width: {width}, height: {height}";
   }
@@ -308,7 +308,7 @@ Music :: struct {
 Sound :: struct {
   stream: AudioStream;
   frameCount: u32;
-} 
+}
 
 Camera :: struct {
   position:     Vector3;
@@ -316,7 +316,7 @@ Camera :: struct {
   up:           Vector3;
   fovy:         float;
   projection:   int;
-} 
+}
 
 Camera2D :: struct {
   offset:         Vector2;
@@ -510,7 +510,7 @@ All_Colors : Color[] = {
 #foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
 #foreign DrawRectangleLines :: (posX: int, posY: int, width: int, height: int, color: Color) -> void;
 #foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
-#foreign IsWindowResized :: () -> bool;      
+#foreign IsWindowResized :: () -> bool;
 #foreign SetWindowState :: (flags: int) -> void;
 #foreign BeginScissorMode :: (x: int, y, w, h);
 #foreign EndScissorMode :: ();
@@ -591,10 +591,10 @@ measure_jiggly_text :: (text: char*, style: Style) -> float {
 jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
   time: float = (float)GetTime();
   length: int = strlen(text);
-  
+
   intensity := style.jiggle_intensity;
   rate := style.jiggle_rate;
-  
+
   for i : int = 0; i < length; i++ {
     char_x := rect.x + i * style.font_size;
     char_y := rect.y + intensity * sin(rate * time + i);
@@ -607,28 +607,28 @@ jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
 draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
   position: Vector2 = {rect.x, rect.y};
   size: Vector2 = {rect.width, rect.height};
-  
+
   text_width : float;
   if style.use_jiggly_text {
     text_width = measure_jiggly_text(text, style);
   } else {
     text_width = MeasureText(text, style.font_size);
   }
-  
-  text_height : float = style.font_size; 
-  
+
+  text_height : float = style.font_size;
+
   if text_width > rect.width {
     size.x = text_width;
     position.x = rect.x - (text_width - rect.width) / 2;
   }
-  
+
   new_rect : Rectangle = {position.x, position.y, size.x, size.y};
-  
+
   text_x := position.x + (size.x - text_width) / 2;
   text_y := position.y + (size.y - text_height) / 2;
-  
+
   mouse_over := CheckCollisionPointRec(GetMousePosition(), new_rect);
-  
+
   if mouse_over {
     DrawRectangleV(position, size, style.highlighted);
     if (IsMouseButtonPressed(MouseButton.Left)) {
@@ -638,7 +638,7 @@ draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCall
   } else {
     DrawRectangleV(position, size, style.background);
   }
-  
+
   if !style.use_jiggly_text {
     DrawText(text, (int)text_x, (int)text_y, style.font_size, style.foreground);
   } else {
@@ -696,7 +696,7 @@ SliderF :: struct {
 
     DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, style.highlighted);
 
-    
+
     // Draw the text
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
     text_y := rect.y + (rect.height - style.font_size) / 2;
@@ -727,14 +727,14 @@ SliderF :: struct {
     // Handle mouse input and call the local function for keyboard input
     mouse_pos := GetMousePosition();
     if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonPressed(MouseButton.Left) {
+      if IsMouseButtonDown(MouseButton.Left) {
         this.held = true;
       }
-      adjust_slider_value(); 
+      adjust_slider_value();
     }
 
     if this.held {
-      if IsMouseButtonUp(MouseButton.Left) {
+      if !IsMouseButtonDown(MouseButton.Left) {
         this.held = false;
       } else {
         new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
@@ -761,7 +761,7 @@ SliderI :: struct {
     max_f := (float)max_value;
 
     slider_width : float = rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
-    
+
     slider_rect : Rectangle = {
       rect.x,
       rect.y,
@@ -799,14 +799,14 @@ SliderI :: struct {
 
     mouse_pos := GetMousePosition();
     if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonPressed(MouseButton.Left) {
+      if IsMouseButtonDown(MouseButton.Left) {
         this.held = true;
       }
       adjust_slider_value();
     }
 
     if this.held {
-      if IsMouseButtonUp(MouseButton.Left) {
+      if !IsMouseButtonDown(MouseButton.Left) {
         this.held = false;
       } else {
         new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
@@ -822,14 +822,14 @@ CheckButton :: struct {
   style: Style;
   text: string;
   allow_hold : bool;
-  
+
   draw :: () {
     if value {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
     } else {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
     }
-  
+
     if text.data {
       text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
       text_y := rect.y + (rect.height - style.font_size) / 2;
@@ -837,15 +837,15 @@ CheckButton :: struct {
     }
 
     hit := CheckCollisionPointRec(GetMousePosition(), rect);
-  
+
     if hit {
       DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, ORANGE);
     }
-    
-    
+
+
     left := false;
     right := false;
-    
+
     if allow_hold {
       left = IsMouseButtonDown(MouseButton.Left)
       right = IsMouseButtonDown(MouseButton.Right);
@@ -871,14 +871,14 @@ DropDown :: struct {
     draw :: () {
       // Draw the dropdown box
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
-  
+
       // Draw the selected option
       if selected_index >= 0 && selected_index < options.length {
         text_x := rect.x + (rect.width - MeasureText(options[selected_index].data, style.font_size)) / 2;
         text_y := rect.y + (rect.height - style.font_size) / 2;
         DrawText(options[selected_index].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
       }
-  
+
       hit := CheckCollisionPointRec(GetMousePosition(), rect);
       if hit && IsMouseButtonPressed(MouseButton.Left) {
         is_open = !is_open;
@@ -886,7 +886,7 @@ DropDown :: struct {
           on_open();
         }
       }
-  
+
       hit_option := false;
       if is_open {
         option_rect := rect;
@@ -901,7 +901,7 @@ DropDown :: struct {
           text_x := option_rect.x + (option_rect.width - MeasureText(options[i].data, style.font_size)) / 2;
           text_y := option_rect.y + (option_rect.height - style.font_size) / 2;
           DrawText(options[i].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
-  
+
           if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton.Left) {
             selected_index = i;
             is_open = false;
@@ -912,7 +912,7 @@ DropDown :: struct {
           option_rect.y += option_rect.height;
         }
       }
-      
+
       if !hit && !hit_option {
         is_open = false;
       }
