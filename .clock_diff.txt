@@ -1,26 +1,25 @@
-      16 text files.
-classified 16 files      16 unique files.                              
-       0 files ignored.
-
-----------------------------------------------------------------------------------
-File                                blank        comment           code
-----------------------------------------------------------------------------------
-src/ast.cpp                           202             91           1676
-src/emit.cpp                          232             65           1444
-src/type_visitor.cpp                  192            133           1181
-src/type.cpp                           96             48            667
-include/ast.hpp                        85             21            610
-include/copier.hpp                     38              0            408
-src/visitor.cpp                        32             16            356
-include/type.hpp                       86             18            309
-include/lex.hpp                        33              0            304
-include/core.hpp                       24              2            211
-include/scope.hpp                      44             15            209
-include/visitor.hpp                    25              6            198
-src/lex.cpp                            19              0            185
-src/scope.cpp                          47             21            152
-include/error.hpp                      17              0            122
-src/main.cpp                           39             15            102
-----------------------------------------------------------------------------------
-SUM:                                 1211            451           8134
-----------------------------------------------------------------------------------
+-----------------------------------------------------------------------------------------
+File                                       blank        comment           code
+-----------------------------------------------------------------------------------------
+src/ast.cpp                                  206             92           1695
+src/emit.cpp                                 234             65           1457
+src/type_visitor.cpp                         193            133           1180
+src/type.cpp                                  96             48            667
+include/ast.hpp                               85             21            611
+include/copier.hpp                            38              0            408
+src/visitor.cpp                               33             16            355
+include/type.hpp                              86             18            309
+include/lex.hpp                               33              0            304
+include/core.hpp                              24              2            211
+include/scope.hpp                             44             15            209
+include/visitor.hpp                           26              6            199
+src/lex.cpp                                   19              0            185
+src/scope.cpp                                 49             21            161
+include/error.hpp                             17              0            122
+src/main.cpp                                  40             15            101
+include/interned_string.hpp                    9              0             93
+include/string_builder.hpp                     4              0             73
+include/arena.hpp                              8             12             32
+-----------------------------------------------------------------------------------------
+SUM:                                        1244            464           8372
+-----------------------------------------------------------------------------------------

@@ -5,7 +5,9 @@
 #include <string>
 
 struct StringBuilder {
-  static constexpr auto BLOCK_SIZE = 8192; // rather large block size cause this is just for the emit visitor, and typically it creates pretty large strings.
+  // rather large block size cause this is just for the emit visitor,
+  // and typically it creates pretty large strings.
+  static constexpr auto BLOCK_SIZE = 8192;
   struct Block {
     char data[BLOCK_SIZE];
     size_t length = 0;

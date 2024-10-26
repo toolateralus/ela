@@ -47,12 +47,30 @@ std::unordered_set<std::string> import_set;
   #########################
 */
 
+static bool run_on_finished = false;
+
 int main(int argc, char *argv[]) {
+  if (argc == 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
+    argv = new char*[2] {
+      (char*)"",
+      (char*)"main.ela"
+    };
+    argc = 2;
+    run_on_finished = true;
+  }
+
   compile_command = CompileCommand(argc, argv);
   if (compile_command.has_flag("x")) compile_command.print();
 
   init_type_system();
   auto result = compile_command.compile();
+
+
+  if (run_on_finished) {
+    if (result == 0) {
+      system(("./" + compile_command.binary_path.string()).c_str());
+    }
+  }
 
 
   if (compile_command.has_flag("sanitize")) {
