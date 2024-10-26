@@ -169,7 +169,7 @@ SequenceChannel :: struct {
       button.draw();
     }
   }
-  
+
   update :: (index: int) {
     if volume != old_volume {
       old_volume = volume;
@@ -206,7 +206,7 @@ file_dropdown : DropDown = {
 
 on_file_selected :: (index: int) {
   fileName := file_dropdown.options[index];
-  channels ~= #make(SequenceChannel, 
+  channels ~= #make(SequenceChannel,
     LoadSound(fileName.data),
     get_sequencer_style(check_button_style),
     fileName
@@ -226,21 +226,21 @@ main :: () {
   bg_color.r -= 175;
   bg_color.g -= 175;
   bg_color.b -= 175;
-  
+
   dir := directory_open(".");
-  
+
   InitAudioDevice();
-  InitWindow(0, 0, "Sequencer");
-  
+  InitWindow(800, 600, "Sequencer");
+
   SetWindowState(.WindowResizable);
   SetTargetFPS(1000);
-  
+
   for file; dir.files {
     if str_ends_with(file.data, ".wav") || str_ends_with(file.data, ".mp3") || str_ends_with(file.data, ".ogg") {
       file_dropdown.options ~= string{file.data};
     }
   }
-  
+
   while !WindowShouldClose() {
     ClearBackground(bg_color);
     BeginDrawing();
@@ -267,20 +267,20 @@ main :: () {
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 
       total_notes = beats * subdivisions;
-      
+
       subdivision_slider.draw();
       beats_slider.draw();
-      
+
       draw_button("reset (no undo)", {(float)GetScreenWidth() - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
       draw_button("remove channel", Rectangle{0, 215, 125, 30}, reset_button_style, &on_remove_channel);
-      
+
       for *channel; channels {
         channel.draw(seq_x, seq_y);
         seq_y += 40
       }
-      
+
       file_dropdown.draw();
-      
+
       {
         if playing {
           play_button_style.highlighted = RED;

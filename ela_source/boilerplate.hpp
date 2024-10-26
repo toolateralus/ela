@@ -1,5 +1,3 @@
-#define USE_STD_LIB 1
-
 //  * Manually call destructor on one or many objects. useful for unions that
 //  own non-trivial objects.
 template <class... T> void destruct(T &...t) { (t.~T(), ...); }
