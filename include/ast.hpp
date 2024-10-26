@@ -10,8 +10,7 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
-#include <jstl/containers/vector.hpp>
-#include <jstl/memory/arena.hpp>
+#include "arena.hpp"
 #include <unordered_set>
 #include <vector>
 #include <pthread.h>
@@ -137,16 +136,16 @@ struct ASTType : ASTExpr {
   std::string base;
   // [], *, [string] etc.
   TypeExt extension_info{};
-  
+
   // the actual type this got resolved to in the type checker.
   int resolved_type = Type::invalid_id;
-  
+
   // special info for reflection
   Nullable<ASTExpr> pointing_to;
-  
+
   // special info for tuple types.
   std::vector<ASTType*> tuple_types;
-  
+
   ASTNodeType get_node_type() const override {
     return AST_NODE_TYPE;
   }
@@ -230,7 +229,7 @@ struct ASTLiteral : ASTExpr {
 struct ASTTupleDeconstruction: ASTStatement {
   std::vector<ASTIdentifier*> idens;
   ASTExpr* right;
-  
+
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_TUPLE_DECONSTRUCTION;
@@ -347,7 +346,7 @@ struct ASTContinue : ASTStatement {
 enum ValueSemantic {
   VALUE_SEMANTIC_COPY,
   VALUE_SEMANTIC_POINTER,
-}; 
+};
 
 struct ASTRange: ASTExpr {
   ASTExpr *left;
@@ -433,15 +432,15 @@ struct ASTSubscript : ASTExpr {
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
-  
+
   bool is_fwd_decl = false;
   bool is_extern = false;
-  
+
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
 
   std::any accept(VisitorBase *visitor) override;
-  
+
   ASTNodeType get_node_type() const override {
     return AST_NODE_STRUCT_DECLARATION;
   }
@@ -485,8 +484,8 @@ struct ASTUnionDeclaration : ASTStatement {
 
 struct ASTAllocate : ASTExpr {
   Nullable<ASTType> type;
-  Nullable<ASTArguments> arguments;  
-  
+  Nullable<ASTArguments> arguments;
+
   enum Kind {
     New,
     Delete,
@@ -608,8 +607,8 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTSwitch *node) = 0;                        \
   virtual std::any visit(ASTTuple *node) = 0;                        \
   virtual std::any visit(ASTTupleDeconstruction *node) = 0;                        \
-  
-  
+
+
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
@@ -646,7 +645,7 @@ enum Precedence {
   PRECEDENCE_MULTIPLICATIVE // *, /, %
   // these aren't handled here, but this is the continuation
   // unary
-  // posfix 
+  // posfix
 };
 
 static Precedence get_operator_precedence(Token token);
@@ -673,7 +672,7 @@ struct Parser {
 
 
   // ASTType* parsing routines
-  
+
   ASTType *parse_type();
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *type);
@@ -684,17 +683,17 @@ struct Parser {
                                       const std::string &identifier);
   void init_directive_routines();
   Nullable<ASTExpr> try_parse_directive_expr();
-  
+
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
 
   inline std::deque<Token>& lookahead_buf() { return states.back().lookahead_buffer; }
-  
+
   Token eat();
   Token expect(TType type);
   Token peek() const;
-  
+
   void fill_buffer_if_needed();
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
@@ -706,7 +705,7 @@ struct Parser {
     init_directive_routines();
     fill_buffer_if_needed();
   }
-  
+
   Context &ctx;
   Lexer lexer{};
   std::vector<Lexer::State> states;

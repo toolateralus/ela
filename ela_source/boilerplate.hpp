@@ -61,10 +61,84 @@ struct Range {
 // times.
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
-// TODO: Have an optimization for 2, 3, 4, 5, 6 member tuples that doens't use
-// recursive template instantiation.
-// TODO: this would improve compile times drastically.
-template <class... T> using _tuple = std::tuple<T...>;
+template <typename...>
+struct _tuple {
+    _tuple() = default;
+    ~_tuple() = default;
+};
+
+template <typename Head, typename... Tail>
+struct _tuple<Head, Tail...> {
+    Head head;
+    _tuple<Tail...> tail;
+    _tuple() = default;
+    _tuple(Head h, Tail... t) : head(h), tail(t...) {}
+};
+
+template <typename... Args>
+_tuple(Args...) -> _tuple<Args...>;
+
+
+// Helper to get the size of the tuple
+template <typename T>
+struct tuple_size;
+
+template <typename... Args>
+struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
+
+// Helper to get the type of the element at a specific index
+template <std::size_t I, typename T>
+struct tuple_element;
+
+template <typename Head, typename... Tail>
+struct tuple_element<0, _tuple<Head, Tail...>> {
+    using type = Head;
+};
+
+template <std::size_t I, typename Head, typename... Tail>
+struct tuple_element<I, _tuple<Head, Tail...>> {
+    using type = typename tuple_element<I - 1, _tuple<Tail...>>::type;
+};
+
+// Original get function for lvalue references
+template<std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(_tuple<Head, Tail...>& t) {
+    if constexpr (I == 0) {
+        return t.head;
+    } else {
+        return get<I - 1>(t.tail);
+    }
+}
+
+// Overload for const lvalue references
+template<std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(const _tuple<Head, Tail...>& t) {
+    if constexpr (I == 0) {
+        return t.head;
+    } else {
+        return get<I - 1>(t.tail);
+    }
+}
+
+// Overload for rvalue references
+template<std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(_tuple<Head, Tail...>&& t) {
+    if constexpr (I == 0) {
+        return std::move(t.head);
+    } else {
+        return get<I - 1>(std::move(t.tail));
+    }
+}
+
+namespace std {
+    template <typename... Args>
+    struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
+    template <std::size_t I, typename... Args>
+    struct tuple_element<I, _tuple<Args...>> {
+        using type = typename ::tuple_element<I, _tuple<Args...>>::type;
+    };
+}
+
 
 template <class T> void move(T *to, const T from) { *to = std::move(from); }
 
@@ -89,24 +163,6 @@ extern "C" void *memcpy(void *, void *, size_t);
 
 #undef RAND_MAX
 #undef assert
-
-// * Remove these 'get' functions for tuples. Super type unsafe.
-template <std::size_t I = 0, typename TTuple, typename T1>
-void __get_helper(const TTuple &tuple, int index, T1 *value) {
-  if constexpr (I < std::tuple_size_v<TTuple>) {
-    if (I == index) {
-      *value = std::get<I>(tuple);
-    } else {
-      __get_helper<I + 1>(tuple, index, value);
-    }
-  } else {
-    return;
-  }
-}
-
-template <class T, class T1> void get(const T &tuple, int index, T1 *value) {
-  __get_helper(tuple, index, value);
-}
 
 // TODO: implement `Any` type... not sure how we want to approach it.
 // template <class T> struct Any {

@@ -4,7 +4,7 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include <any>
-#include <jstl/containers/vector.hpp>
+
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
   ss << indent() << "Program {\n";
@@ -33,25 +33,25 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
-  
+
   if ((node->flags & FUNCTION_IS_CTOR) != 0 || (node->flags & FUNCTION_IS_DTOR) != 0) {
     ss << indent() << "constructor: ";
     node->params->accept(this);
     return {};
   }
-  
+
   ss << indent() << "Function " << node->name.value << " {\n";
   indentLevel++;
   auto sym = context.scope->lookup(node->name.value);
   //ss << indent() << "type: " << global_get_type(sym->type_id)->to_string() << '\n';
   visit(node->params);
-  
+
   if (node->block.is_not_null()) {
     context.set_scope(node->block.get()->scope);
     visit(node->block.get());
     context.exit_scope();
   }
-  
+
   ss << indent() << "returns: ";
   visit(node->return_type);
   ss << '\n';
@@ -244,32 +244,32 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
-  
+
   auto t = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo*>(t->get_info());
-  
+
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
-  
-  
+
+
   if (!is_anonymous) {
     ss << indent() << "Struct " << node->type->base << " {\n";
   } else {
     ss << indent() << "anonymous struct" << '\n';
   }
   indentLevel++;
-  
-  
+
+
   context.set_scope(node->scope);
-  
+
   for (auto decl : node->fields) {
     decl->accept(this);
   }
   for (auto method: node->methods) {
     method->accept(this);
   }
-  
+
   context.exit_scope();
-  
+
   indentLevel--;
   ss << indent() << "}\n";
   return {};
@@ -297,11 +297,11 @@ std::any SerializeVisitor::visit(ASTMake *node) {
   indentLevel++;
   ss << "type: \n " << indent();
   node->type_arg->accept(this);
-  
+
   ss << "args: \n" << indent();
   node->arguments->accept(this);
   indentLevel--;
-  
+
   return {};
 }
 std::any SerializeVisitor::visit(ASTInitializerList *node) {
@@ -354,7 +354,7 @@ std::any ASTBreak::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTContinue::accept(VisitorBase *visitor) { return visitor->visit(this); };
 std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTUnionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }  
+std::any ASTUnionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTNoop::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
@@ -380,7 +380,7 @@ std::any SerializeVisitor::visit(ASTUnionDeclaration *node) {
   ss << "union : ";
   context.set_scope(node->scope);
   for (const auto &field: node->fields) {
-    field->accept(this);  
+    field->accept(this);
   }
   for (const auto &method: node->methods) {
     method->accept(this);
@@ -400,5 +400,5 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
 
 // TODO: implement me. Im lazy and this takes a while and uses up my hands!
 std::any SerializeVisitor::visit(ASTTuple *node) {
-  return {}; 
+  return {};
 }

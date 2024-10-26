@@ -1,5 +1,5 @@
 #import core;
-#import raylib;
+// #import raylib;
 #import json;
 #import directory;
 #import file;
@@ -21,7 +21,7 @@ InitListTestCtorStruct :: struct {
     z = n * f;
   }
 }
-  
+
 Reflector :: struct {
   n: int;
 }
@@ -61,7 +61,7 @@ _Vec2 :: union {
   something :: () -> #self {
     return #make(#self);
   }
-  
+
   #ctor :: (_x : int, _y, _z) {
     x = _x;
     y = _y;
@@ -81,12 +81,12 @@ _Vec2 :: union {
 
 CustomIteratorStruct :: struct {
   value: int*;
-  
+
   #ctor :: () {
     value = malloc(sizeof(int) * 10);
     memset(value, 0, sizeof(int) * 10);
   }
-  
+
   begin :: () -> int * {
     return value;
   }
@@ -686,7 +686,7 @@ something :: (f: float32) -> float32 {
     assert("", n == *v);
     ++n;
   }
-  
+
   n = 0;
   // TODO: tidy up the confusing and often strangely inconsistent semantics around construction of types.
   arr : s8[]* = new s8[] ({0,1,2,3});
@@ -732,7 +732,7 @@ something :: (f: float32) -> float32 {
   pp: int** = #make(int**, malloc(sizeof(int*)));
   other1: int_ptr* = pp;
   assert("alias failed to equal pointed to type field.", pp == other1);
-  
+
   free(pp);
 }
 
@@ -825,11 +825,11 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
     arr: int[]  = {0, 1, 2};
     fixed: int[3] = {0, 1, 2};
     str: InitListStruct = {0, 0, 0};
-    
+
     //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
-    //! This line causes it: 
+    //! This line causes it:
     //                    InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
-    
+
     strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
     strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
@@ -912,23 +912,23 @@ New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   n: int;
   ten := 10;
   zero := 0;
-  
+
   for i in 0..10 {
     n = i;
   }
-  
+
   for i in 0..ten {
     n = i;
   }
-  
+
   for i in zero..ten {
     n = i;
   }
-  
+
   for i in zero..10 {
     n = i;
   }
-  
+
   assert("Range based for loop failed.", n == 9);
 }
 
@@ -943,13 +943,13 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
       array[x][y] = x * y;
     }
   }
-  
+
   for x in 0..5 {
     for y in 0..5 {
       assert("multidimensional failure", array[x][y] == x * y);
     }
   }
-  
+
   dynamic : int[][];
   for x in 0..5 {
     dynamic ~= #make(int[]);
@@ -957,16 +957,16 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
       dynamic[x] ~= x * y;
     }
   }
-  
+
   assert("length failed", dynamic.length == 5);
-  
+
   for x in 0..5 {
     for y in 0..5 {
       assert("multidimensional failure", dynamic[x][y] == x * y);
     }
   }
 }
-  
+
 /* //!BUG
   ! when we use `:=` on a function pointer, it just completely fails
   ! the emit visitor is not equipped to handle that case currently.
@@ -975,7 +975,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   ptr: FunctionPointer = &function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 
-  
+
   array: FunctionPointer[] = {&function_pointer_helper};
   from_arr : FunctionPointer = array[0];
   assert("Array of function pointers", from_arr(2, 3) == 6);
@@ -983,13 +983,13 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   fixed: FunctionPointer[12];
   fixed[0] = &function_pointer_helper;
   from_fixed : FunctionPointer = fixed[0];
-  
+
   assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
 
   function :: () -> FunctionPointer {
     return &function_pointer_helper;
   }
-  
+
   returned_ptr : FunctionPointer = function();
   assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 }
@@ -997,11 +997,11 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
 #test test_map_aka_associative_array :: () {
   variables: int[string];
   map1: int*[char*];
-  
+
   str1 := #make(string, "Key1");
   str2 := #make(string, "Key2");
   str3 := #make(string, "shouldn't exist");
-  
+
   variables[str1] = 100;
   variables[str2] = 200;
 
@@ -1028,7 +1028,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
 
   delete(map1["Something"]);
   delete(map1["Another"]);
-  
+
   // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
 }
 
@@ -1044,7 +1044,7 @@ infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
   empty_init_list := InitListTest{};
-  
+
 }
 
 #test subscript_string :: () {
@@ -1063,23 +1063,23 @@ switch_helper :: () -> int {
 
 #test test_switch_statements :: () {
   integer: int;
-  
+
   passed := false;
   switch integer {
     0: { passed = true; }
     1: { assert("Switch on int case failed", false);  }
   }
-  
+
   assert("Failed to hit positive switch case for integer", passed);
   str: string = "Hello!";
-  
+
   passed = false;
   switch str {
     string{"Hello"}: { assert("Switch case on string failed", false); }
     string{"Hello!"}: { passed = true; }
   }
   assert("Failed to hit positive switch case for string", passed);
-  
+
   passed = false;
   switch .SwitchVariant0 {
     .SwitchVariant0: {
@@ -1090,16 +1090,16 @@ switch_helper :: () -> int {
     }
   }
   assert("Failed to hit positive switch case for enum", passed);
-  
+
   /*  With return value as expression :  */
-  
+
   new_int := switch integer {
     0: { return integer; }
     1: { return -1; }
   }
-  
+
   assert("Return value of switch statement failed", new_int == integer);
-  
+
   // test range based shiz.
   passed = false;
   switch 0 {
@@ -1118,10 +1118,10 @@ switch_helper :: () -> int {
 #test test_range_var :: () {
   r : Range = 0..10;
   assert("range variable failed", r.first == 0 && r.last == 10);
-  
+
   i: int;
   for z in r {
-    assert("range iteration failed", i == z);    
+    assert("range iteration failed", i == z);
     i++;
   }
 }
@@ -1134,8 +1134,8 @@ switch_helper :: () -> int {
 #test test_slicing_array :: () {
   arr := #make(s64[], 1000);
   assert("Length", arr.length == 1000);
-  
-  /* 
+
+  /*
     Ranges are always max-exclusive right now.
     0..10 == 0->9;
     We don't currently have a way to represent max inclusive ranges.
@@ -1143,21 +1143,21 @@ switch_helper :: () -> int {
   for i in 0..10 {
     arr[i] = 100;
   }
-  
+
   subarr := arr[0..10];
-  
+
   for i in 0..10 {
     assert("Slice failed", subarr[i] == arr[i]);
   }
-  
+
   assert("Slice failed", subarr.length == 10);
 }
 
 #test test_switch_statement :: () {
   arr := #make(s64[], 1000);
   assert("Length", arr.length == 1000);
-  
-  /* 
+
+  /*
     Ranges are always max-exclusive right now.
     0..10 == 0->9;
     We don't currently have a way to represent max inclusive ranges.
@@ -1165,13 +1165,13 @@ switch_helper :: () -> int {
   for i in 0..10 {
     arr[i] = 100;
   }
-  
+
   subarr := arr[0..10];
-  
+
   for i in 0..10 {
     assert("Slice failed", subarr[i] == arr[i]);
   }
-  
+
   assert("Slice failed", subarr.length == 10);
 }
 
@@ -1195,26 +1195,22 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
     a,b,c := t1;
     assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
   }
-  
+
   t2 := <3, 2, 1, 0>;
-  
+
   {
     a,b,c,d := t2;
     assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
   }
-  
-  n : int;
-  get(t1, 2, &n);
-  assert("using 'get(tuple, index, *out_value)' failed", n == 2);
-  
+
   array : <int, int>[] = {<10, 10>};
   //array ~= <10, 10>;
-  
+
   {
     a, b := array[0];
     assert("Storing tuple in array failed", a == 10 && b == 10);
   }
-  
+
   ptr : <int, int>* = new <int, int>(10, 10);
   {
     a, b := *ptr;
@@ -1226,26 +1222,26 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   // map : <int, int>[string];
   // {
   //   map["Hi"] = <10, 10>;
-    
+
   //   a, b := map["Hi"];
   //   assert("tuple in map failed", a == 10 && b == 10);
   // }
-  
+
   ptr_arr: <int, int>*[];
   ptr_arr ~= new <int, int>(10, 10);
-  
+
   {
     a, b := *(ptr_arr[0]);
     assert("Calling new with tuple failed", a == 10 && b == 10);
   }
-  
+
   delete(ptr_arr[0]);
-  
+
   {
     a, b := func_returns_tuple();
     assert("returning tuple from function failed", a == 10 && b == 10);
   }
-  
+
   {
     tuple := <0, 0>;
     a, b := func_takes_tuple_arg(tuple);
@@ -1280,15 +1276,15 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   xaryu.value = 100;
   t = #type(overloaded(xaryu));
   assert("overload with float arg failed to call", strcmp(t.name, "Xaryu") == 0);
-  
+
   assert("overload with different number of parameters failed", overloaded(1, 2) == 2);
-  
-  /* 
+
+  /*
     ! Bug. Overloads fail to get the actual correct overload often when theres a similar first parameter,
     ! But there's a different following parameter. There's probably a repro on this.
   */
   //! assert("overload with different number of parameters failed", overloaded(1, 2.0) == 2);
-  
+
 }
 
 JsonValueDeleter :: struct {

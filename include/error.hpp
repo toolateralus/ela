@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core.hpp"
-#include <jstl/memory/arena.hpp>
+#include "arena.hpp"
 #include <span>
 #include <sstream>
 #include <stdexcept>
@@ -101,13 +101,13 @@ static std::string format_source_location(const SourceRange &source_range, Error
     if(terminal_supports_color) ss << "\e[0m";
     ss << '\n';
     if (terminal_supports_color) ss << "\e[36;1;30m>> ";
-    for (const auto &tok : span) 
+    for (const auto &tok : span)
         ss << code_color << tok.value << (terminal_supports_color ? " \e[0m" : " ");
     if (terminal_supports_color) ss << "\e[36;1;30m <<";
     if (terminal_supports_color) ss << "\e[90m";
     ss << "\n" << std::string(80, '^');
-    if (terminal_supports_color) ss << "\e[0m"; 
-    
+    if (terminal_supports_color) ss << "\e[0m";
+
     return ss.str();
 }
 

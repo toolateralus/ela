@@ -2,7 +2,7 @@
 
 #include "error.hpp"
 #include "type.hpp"
-#include <jstl/memory/arena.hpp>
+#include "arena.hpp"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -41,12 +41,12 @@ struct Scope {
   }
 
   bool is_struct_or_union_scope = false;
-  
+
   std::vector<std::string> ordered_symbols;
   std::unordered_map<std::string, Symbol> symbols;
   std::vector<int> aliases;
   std::set<int> types;
-  
+
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
 
@@ -62,35 +62,35 @@ struct Scope {
 
   void insert(const std::string &name, int type_id,
               int flags = SYMBOL_IS_VARIABLE);
-              
+
   Symbol *lookup(const std::string &name);
-  
+
   Symbol *local_lookup(const std::string &name) {
     if (symbols.contains(name)) {
       return &symbols[name];
     }
     return nullptr;
   }
-  
+
   void erase(const std::string &name);
-  
-  
+
+
   void on_scope_enter() {
     for (const auto &alias: aliases) {
       auto type = global_get_type(alias);
       type_alias_map[type->get_base()] = alias;
     }
   }
-  
+
   void on_scope_exit() {
     for (const auto &alias: aliases) {
       auto type = global_get_type(alias);
       type_alias_map.erase(type->get_base());
     }
   }
-  
+
   /*  Type interactions  */
-  
+
   int create_type_alias(int aliased, const std::string& name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
@@ -100,18 +100,18 @@ struct Scope {
     }
     return id;
   }
-  
+
   Type *get_type(const int id) {
     if (types.contains(id)) {
       return global_get_type(id);
     }
-    
+
     for (auto alias: aliases) {
       if (alias == id) {
         return global_get_type(id);
       }
     }
-    
+
     if (parent) return parent->get_type(id);
     else {
       //! BUG remove this hack. This should not be neccessary.
@@ -120,7 +120,7 @@ struct Scope {
         return type;
       }
     }
-    
+
     return nullptr;
   }
 
@@ -153,7 +153,7 @@ struct Scope {
     types.insert(id);
     return id;
   }
-  
+
   int find_function_type_id(const std::string &name, const FunctionTypeInfo &info,
                  const TypeExt &ext) {
     // We leave function types as global so that we don't have to recreate things like
@@ -169,14 +169,14 @@ struct Scope {
   int find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions, bool was_created = false) {
     auto num = num_types;
     auto id = global_find_type_id(tuple_types, type_extensions);
-    
+
     // if we extended a type, or if we created a new tuple,
     // but we have access to all of thee types within it,
     // we just add the type to our table.
     if (num_types > num || was_created) {
       // search for all the types within the tuple.
       for (auto t: tuple_types) {
-        if (!types.contains(t)) { 
+        if (!types.contains(t)) {
           was_created = true;
           goto try_find_in_parent;
         }
@@ -184,8 +184,8 @@ struct Scope {
       types.insert(id);
       return id;
     }
-    
-    if (types.contains(id)) return id;    
+
+    if (types.contains(id)) return id;
 
     try_find_in_parent:
     if (parent) {
@@ -197,23 +197,23 @@ struct Scope {
   int find_type_id(const std::string &name, const TypeExt &ext) {
     auto id = global_find_type_id(name, ext);
     auto base_id = global_find_type_id(name, {});
-    
+
     // type does not exist globally.
     if (id == -1 && base_id == -1) {
       return -1;
     }
-    
+
     if (types.contains(id)) {
       return id;
     }
-    
+
     bool has_base = types.contains(base_id);
-    
+
     if (has_base) {
       types.insert(id);
       return id;
     }
-    
+
     if (parent) {
       return parent->find_type_id(name, ext);
     }
@@ -231,7 +231,7 @@ struct Scope {
     }
     return id;
   }
-  
+
 };
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -239,12 +239,12 @@ static Scope *create_child(Scope *parent) {
   return scope;
 }
 struct Context {
-  
+
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
   // This type_info_strings field should be in the emit visitor.
   // That's the only place it's used anyway.
   std::vector<std::string> type_info_strings;
-  
+
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Context();
   inline void set_scope(Scope *in_scope = nullptr) {

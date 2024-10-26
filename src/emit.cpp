@@ -6,7 +6,7 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include <functional>
-#include <jstl/containers/vector.hpp>
+
 #include <sstream>
 #include <string>
 
@@ -159,10 +159,10 @@ std::any EmitVisitor::visit(ASTArguments *node) {
 // function pointers have to work in C.
 void EmitVisitor::emit_function_pointer_type_string(
     Type *type, Nullable<std::string> identifier) {
-    
-  auto type_prefix = std::string{"*"}; 
-  
-  // TODO: 
+
+  auto type_prefix = std::string{"*"};
+
+  // TODO:
   // ! We need to be able to take function pointers to member methods.
   // ! It's certainly possible but the syntax is really hard to wrangle.
   if (current_struct_decl.is_not_null()) {
@@ -170,7 +170,7 @@ void EmitVisitor::emit_function_pointer_type_string(
     auto info = static_cast<StructTypeInfo*>(t->get_info());
     for (const auto &[name, sym]: info->scope->symbols) {
       auto sym_ty = global_get_type(sym.type_id);
-      
+
       if ((sym.flags & SYMBOL_IS_FUNCTION) != 0 &&
            sym_ty == type &&
            identifier.is_not_null() &&
@@ -178,10 +178,10 @@ void EmitVisitor::emit_function_pointer_type_string(
         type_prefix = to_cpp_string(t) + "::*";
         *identifier.get() = to_cpp_string(t) + *identifier.get();
       }
-      
+
     }
   }
-      
+
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error("Internal compiler error: tried to get a function pointer from "
                 "a non-function type",
@@ -267,7 +267,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     }
     if (type->is_kind(TYPE_SCALAR)) {
       if (type->id == char_type()) {
-        return "%c"; 
+        return "%c";
       } else if (type->id == s8_type() || type->id == s16_type() ||
           type->id == s32_type() || type->id == u8_type() ||
           type->id == u16_type() || type->id == u32_type() ||
@@ -312,30 +312,30 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
   auto interpolate_value = [&](ASTExpr *value) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
     auto type = global_get_type(type_id);
-    
+
     auto interpolate_to_string_struct_union = [&](Scope *scope) {
       auto sym = scope->lookup("to_string");
-      
-      if (!sym) 
+
+      if (!sym)
         throw_error("Cannot use a struct in an interpolated string without defining a `to_string` function that returns either a char* or a string", value->source_range);
-      
+
       auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
-                  
+
       auto return_ty = global_get_type(sym_ty->return_type);
       value->accept(this);
-      
+
       auto &extensions = type->get_ext();
       if (extensions.has_extensions() && extensions.extensions.back() == TYPE_EXT_POINTER) {
-        (*ss) << "->to_string()"; 
+        (*ss) << "->to_string()";
       } else {
-        (*ss) << ".to_string()"; 
+        (*ss) << ".to_string()";
       }
-      
+
       if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions())
       { (*ss) << ".data"; }
-      
+
     };
-    
+
     if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
       value->accept(this);
       (*ss) << ".data";
@@ -350,12 +350,12 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
     }
     if (value != node->interpolated_values.back())
       (*ss) << ", ";
-    
+
   };
-  
+
   for (const auto &value : node->interpolated_values)
     interpolate_value(value);
-  
+
   (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
            "strlen(buf); return str; }()";
 }
@@ -459,7 +459,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
         emit_function_pointer_dynamic_array_declaration(type_string, identifier, type);
         return {};
       }
-      
+
       emit_function_pointer_type_string(type, &identifier);
       return {};
     }
@@ -602,7 +602,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   auto symbol = ctx.scope->local_lookup(node->name.value);
   if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
       !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
-        
+
     // ! Removed this because it was causing too many bugs.
     //(*ss) << "const ";
   }
@@ -682,7 +682,7 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   emit_default_args = true;
-  
+
 
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
     (*ss) << "extern \"C\" ";
@@ -711,7 +711,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
-  
+
   (*ss) << "extern \"C\" ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
@@ -860,9 +860,9 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   current_func_decl = node;
 
   auto test_flag = get_compilation_flag("test");
-  
-  
-  
+
+
+
 
   Defer deferred = {[&]() { current_func_decl = last_func_decl; }};
 
@@ -880,7 +880,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   }
 
   emit_various_function_declarations();
-  
+
 
   return {};
 }
@@ -916,14 +916,14 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 
   for (const auto &decl : node->fields) {
     indented("");
-    
+
     decl->accept(this);
     semicolon();
     newline();
   }
   for (const auto &method : node->methods) {
     indented("");
-    
+
     method->accept(this);
     semicolon();
     newline();
@@ -936,7 +936,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
-  
+
   std::string iden;
   int i = 0;
   auto get_next_index = [&] {
@@ -972,14 +972,14 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl)
     return {};
-  
+
   Defer _([&] {
-    current_union_decl = nullptr; 
+    current_union_decl = nullptr;
   });
   current_union_decl = node;
-  
+
   (*ss) << "union " << node->name.value << "{\n";
-  
+
   indentLevel++;
   ctx.set_scope(node->scope);
   emit_default_init = false;
@@ -989,7 +989,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   // this may not pan out, but ideally unions would only be used for stuff like
   // vector3's and ASTnodes.
   for (const auto &field : node->fields) {
-      
+
     if (field == node->fields.front()) {
       emit_default_init = true;
       field->accept(this);
@@ -1000,18 +1000,18 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
 
     (*ss) << ";\n";
   }
-  
+
   for (const auto &method : node->methods) {
     method->accept(this);
     (*ss) << ";\n";
   }
-  
+
   for (const auto &_struct : node->structs) {
-    
+
     _struct->accept(this);
     (*ss) << ";\n";
   }
-  
+
   emit_default_init = true;
   indentLevel--;
   ctx.exit_scope();
@@ -1021,7 +1021,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
 
 std::any EmitVisitor::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
-  
+
   if (type->is_kind(TYPE_FUNCTION)) {
     get_declaration_type_signature_and_identifier(node->name, type);
   } else {
@@ -1029,11 +1029,11 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
     auto sym = ctx.scope->local_lookup(node->name);
     if (sym && (sym->flags & SYMBOL_WAS_MUTATED) == 0 && type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
       (*ss) << " const& " << node->name;
-    } else { 
+    } else {
       (*ss) << ' ' << node->name;
     }
   }
-  
+
   if (node->default_value.is_not_null() && emit_default_args) {
     (*ss) << " = ";
     node->default_value.get()->accept(this);
@@ -1083,21 +1083,21 @@ std::any EmitVisitor::visit(ASTBlock *node) {
 
 std::any EmitVisitor::visit(ASTProgram *node) {
   emit_line_directive(node);
-  
+
   const auto testing = get_compilation_flag("test");
   const auto use_stdlib = !compile_command.compilation_flags.contains("-nostdlib") && !compile_command.compilation_flags.contains("-ffreestanding");
-  
+
   if (use_stdlib) {
     code << "#define USE_STD_LIB 1\n";
   } else {
     for (int i = 0; i < num_types; ++i) {
       Type *type = type_table[i];
       TypeExt ext = type->get_ext();
-      
+
       if (type->get_base() == "Field") continue;
       if (type->get_base() == "Element") continue;
       if (type->get_base() == "Type") continue;
-      
+
       if (ext.is_array() && !ext.is_fixed_sized_array()) {
         throw_error(std::format("You cannot use dynamic arrays in a freestanding or nostdlib environment, due to lack of allocators. Type: {}", type->to_string()), {});
       }
@@ -1105,46 +1105,46 @@ std::any EmitVisitor::visit(ASTProgram *node) {
         throw_error(std::format("You cannot use maps in a freestanding or nostdlib environment, due to lack of allocators. Type: {}", type->to_string()), {});
       }
     }
-    
+
     if (get_compilation_flag("test")) {
       throw_error("You cannot use unit tests in a freestanding or nostlib environment due to lack of exception handling", {});
     }
-    
+
   }
-  
+
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
-  
-  if (use_stdlib) 
+
+  if (use_stdlib)
     code << "extern Type **_type_info;\n";
-  
-  if (testing) { 
+
+  if (testing) {
     code << "#define TESTING\n";
   }
-  
+
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
     newline();
   }
-  
+
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    
+
     // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests,
-                        "{ " + test_init + " };"); 
-                        
+                        "{ " + test_init + " };");
+
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   }
-  
+
   // Emit runtime reflection type info for requested types, only when we have actually requested
   // runtime type information.
   if (!ctx.type_info_strings.empty() && use_stdlib) {
-    
+
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
       type_info << str << ";\n";
@@ -1158,7 +1158,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
       num_types, type_info.str()
     );
   }
-  
+
   if (!use_stdlib && !ctx.type_info_strings.empty()) {
     throw_error("You cannot use runtime type reflection in a freestanding or nostdlib environment, due to a lack of allocators. To compare types, use #typeid.", {});
   }
@@ -1196,12 +1196,12 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
       return {};
     }
   }
-  
+
   // TODO: remove this hack as well
   if (left_ty->get_ext().is_map() &&
       node->right->get_node_type() == AST_NODE_CALL) {
     auto right = static_cast<ASTCall *>(node->right);
-    
+
     if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
       auto identifier = static_cast<ASTIdentifier*>(right->function);
       if (right && identifier->value.value == "contains") {
@@ -1211,7 +1211,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
         return {};
       }
     }
-    
+
   }
 
 
@@ -1227,21 +1227,21 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
     scope = info->scope;
   }
-  
+
   auto calling_scope = ctx.scope;
   Scope *dot_parent = scope->parent;
-  
-  
+
+
   if (dot_parent && calling_scope != scope) {
     scope->parent = calling_scope;
   }
-  
+
   node->left->accept(this);
   ctx.set_scope(scope);
   (*ss) << (op);
   node->right->accept(this);
   ctx.set_scope(calling_scope);
-  
+
   if (dot_parent && calling_scope != scope) {
     scope->parent = dot_parent;
   }
@@ -1439,12 +1439,12 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, T
   ss << "new Field { "
      << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
-  
+
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
     ss << std::format(".offset = offsetof({}, {})", parent_type->get_base(), name);
   }
-  
+
   ss << " }";
   return ss.str();
 }
@@ -1522,13 +1522,13 @@ std::string get_type_flags(Type *type) {
                   type->id == s16_type()  ||
                   type->id == s32_type()  ||
                   type->id == s64_type();
-                      
+
       auto uint = type->id == u8_type()   ||
                   type->id == u16_type()  ||
                   type->id == u32_type()  ||
                   type->id == u64_type();
 
-      
+
       auto floating_pt = type->id == float32_type() ||
                           type->id == float64_type() ||
                           type->id == float_type();
@@ -1537,7 +1537,7 @@ std::string get_type_flags(Type *type) {
       } else if (uint) {
         kind_flags |= TYPE_FLAGS_UNSIGNED;
       }
-                          
+
       if (sint || uint) {
         kind_flags |= TYPE_FLAGS_INTEGER;
       } else if (floating_pt) {
@@ -1576,7 +1576,7 @@ std::string get_type_flags(Type *type) {
         } else {
           kind_flags |= TYPE_FLAGS_ARRAY;
         }
-      
+
         break;
       case TYPE_EXT_MAP:
         kind_flags |= TYPE_FLAGS_MAP;
@@ -1588,16 +1588,16 @@ std::string get_type_flags(Type *type) {
 
 std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context, const std::string &fields) {
   std::stringstream ss;
-  
+
   auto kind = 0;
-  
+
   ss << "_type_info[" << id << "] = new Type {"
      << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
-     
+
      if (!type->is_kind(TYPE_ENUM))
       ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
-     
+
      ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
   if (type->get_ext().is_array()) {
@@ -1628,7 +1628,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 
   type_cache[id] = true;
 
-  // TODO: 
+  // TODO:
   // ! This needs serious improvement to be really really useful. It's a great starting point,
   // ! but it could be far better.
 
@@ -1643,7 +1643,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
     int it = 0;
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
-      
+
       if (name == "this") continue;
 
       auto t = global_get_type(sym.type_id);
@@ -1686,14 +1686,14 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 }
 
 std::any EmitVisitor::visit(ASTSwitch *node) {
-  
+
   if (!node->is_statement) {
     (*ss) << "[&] ->";
     auto type = global_get_type(node->return_type);
     (*ss) << to_cpp_string(type);
     (*ss) << "{\n";;
   }
-  
+
   auto emit_switch_case = [&](ASTExpr* target, const SwitchCase &_case, bool first) {
     if (!first) {
       (*ss) << " else ";
@@ -1707,24 +1707,24 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
     emit_line_directive(_case.block);
     _case.block->accept(this);
   };
-  
+
   bool first = true;
-  
+
   for (const auto &_case: node->cases) {
     emit_switch_case(node->target, _case, first);
     first = false;
   }
-  
+
   if (!node->is_statement) {
     (*ss) << "else {";
-    
+
     auto type = global_get_type(node->return_type);
     (*ss) <<  "return " <<  to_cpp_string(type) << "{};";
     (*ss) << "\n}\n";
-    
+
     (*ss) << "}()";
   }
-  
+
   return {};
 }
 
@@ -1741,7 +1741,7 @@ std::any EmitVisitor::visit(ASTTuple *node) {
 
 
 
-std::any EmitVisitor::visit(ASTTupleDeconstruction *node) { 
+std::any EmitVisitor::visit(ASTTupleDeconstruction *node) {
   (*ss) << "auto [";
   for (auto &iden : node->idens) {
     (*ss) << iden->value.value;

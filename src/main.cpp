@@ -7,7 +7,7 @@
 #include "visitor.hpp"
 #include <cstdlib>
 #include <filesystem>
-#include <jstl/containers/vector.hpp>
+
 #include <unordered_map>
 
 /*
@@ -50,11 +50,11 @@ std::unordered_set<std::string> import_set;
 int main(int argc, char *argv[]) {
   compile_command = CompileCommand(argc, argv);
   if (compile_command.has_flag("x")) compile_command.print();
-  
+
   init_type_system();
   auto result = compile_command.compile();
-  
-  
+
+
   if (compile_command.has_flag("sanitize")) {
     if (report_unfreed_allocations()) {
       return 1;
@@ -66,7 +66,7 @@ int main(int argc, char *argv[]) {
 ASTProgram *CompileCommand::process_ast(Context &context) {
   auto input = read_input_file();
   original_path = std::filesystem::current_path();
-  
+
   parse.begin();
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
@@ -75,7 +75,7 @@ ASTProgram *CompileCommand::process_ast(Context &context) {
 }
 
 int CompileCommand::emit_code(ASTProgram *root, Context &context) {
-  
+
   lower.begin();
   TypeVisitor type_visitor{context};
   type_visitor.visit(root);
@@ -92,9 +92,9 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
 
   EmitVisitor emit(context, type_visitor);
   emit.visit(root);
-  
+
   lower.end("lowering to cpp complete");
-  
+
   std::string program;
   if (compile_command.has_flag("test")) {
     program = "#define TESTING\n" + emit.code.str();
@@ -108,22 +108,22 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output.close();
 
   int result = 0;
-  
+
   if (!has_flag("no-compile")) {
-    
+
     std::string extra_flags = compilation_flags;
-    
+
     if (has_flag("debug")) extra_flags += " -g ";
-    
+
     static std::string ignored_warnings = "-w";
-    
+
     std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
-    
+
     auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
-    
-    if (compile_command.has_flag("x")) 
+
+    if (compile_command.has_flag("x"))
       printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
-    
+
     cpp.begin();
     result = system(compilation_string.c_str());
     cpp.end("compiling and linking cpp");
@@ -131,7 +131,7 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
       std::filesystem::remove(output_path);
     }
   }
-                     
+
   std::filesystem::current_path(original_path);
   return result;
 }

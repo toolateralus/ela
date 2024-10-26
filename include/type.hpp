@@ -11,7 +11,7 @@
 #include <unordered_set>
 #include <vector>
 
-#include <jstl/memory/arena.hpp>
+#include "arena.hpp"
 
 #ifndef MAX_NUM_TYPES
 #define MAX_NUM_TYPES 1000
@@ -109,12 +109,12 @@ struct TypeExt {
   std::vector<TypeExtEnum> extensions{};
   // for each type extension that is [], nullptr == dynamic array, [non-nullptr] == fixed array size.
   std::vector<Nullable<ASTExpr>> array_sizes{};
-  
+
   // This is a key type of a map.
   // so int with a MAP extension and a key type of string,
   // would be like int[string];
   int key_type = -1;
-  
+
   inline bool is_map() const {
     for (const auto ext: extensions) {
       if (ext == TYPE_EXT_MAP) {
@@ -123,7 +123,7 @@ struct TypeExt {
     }
     return false;
   }
-  
+
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
       return std::find(extensions.rbegin(), extensions.rend(), TYPE_EXT_POINTER) != extensions.rend();
@@ -135,37 +135,37 @@ struct TypeExt {
       return ext == TYPE_EXT_POINTER;
     });
   }
-  
+
   inline bool operator==(const TypeExt &other) const { return equals(other); }
-  
+
   bool equals(const TypeExt &other) const;
-  
+
   inline bool has_no_extensions() const {
     return extensions.empty();
   }
-  
+
   inline bool has_extensions() const {
     return !has_no_extensions();
   }
-  
+
   TypeExt append(const TypeExt& to_append) const {
     auto these = *this;
     int sizes_i = 0;
-    
+
     for (auto ext : to_append.extensions) {
       if (ext == TYPE_EXT_ARRAY) {
         these.array_sizes.push_back(to_append.array_sizes[sizes_i]);
         sizes_i++;
       }
-      
+
       if (ext == TYPE_EXT_MAP) {
         these.key_type = to_append.key_type;
       }
-      
+
       these.extensions.push_back(ext);
     }
     return these;
-  }  
+  }
   TypeExt without_back() const {
     auto these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
@@ -174,11 +174,11 @@ struct TypeExt {
     if (these.extensions.back() == TYPE_EXT_MAP) {
       these.key_type = -1;
     }
-    
+
     these.extensions.pop_back();
     return these;
   }
-  
+
   inline bool is_array() const { return !array_sizes.empty(); }
 
   bool is_fixed_sized_array() const;
@@ -192,7 +192,7 @@ struct TypeInfo {
 };
 
 struct FunctionTypeInfo : TypeInfo {
-  FunctionTypeInfo() { 
+  FunctionTypeInfo() {
     memset(parameter_types, -1, 256 * sizeof(int));
   }
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
@@ -308,11 +308,11 @@ struct Type {
   // if this is an alias or something just get the actual real true type.
   int get_true_type() const {
     auto base_no_ext = id;
-    
+
     if (extensions.has_extensions()) {
       base_no_ext = global_find_type_id(get_base(), {});
     }
-    
+
     auto base_type = global_get_type(base_no_ext);
     Type* type = (Type*)this;
     while (type && type->is_alias || base_type->is_alias) {
@@ -331,12 +331,12 @@ struct Type {
   bool is_alias = false;
   // this is the type that this type aliases.
   int alias_id;
-  
+
   // this type has other types that refer to me as an alias.
   bool has_aliases = false;
   // these are the types that refer to me as an alias
   std::vector<int> aliases;
-  
+
   bool has_alias(const std::string &name) const {
     if (!has_aliases) return false;
     for (const auto &alias: aliases) {
@@ -376,7 +376,7 @@ struct Type {
     return info;
   }
 
-  
+
 
   private:
   std::string base;
@@ -397,7 +397,7 @@ struct Type {
   bool operator==(const Type &type) const;
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
-  
+
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;

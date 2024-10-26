@@ -8,7 +8,7 @@
 #include <any>
 #include <cassert>
 #include <format>
-#include <jstl/containers/vector.hpp>
+
 #include <ranges>
 #include <string>
 #include <vector>
@@ -83,7 +83,7 @@ void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
     // CLEANUP: fix this, enumerate is slow as balls.
     for (const auto &[i, overload] :
          symbol->function_overload_types | std::ranges::views::enumerate) {
-      
+
       auto ovrld_ty = ctx.scope->get_type(overload);
       auto info = static_cast<FunctionTypeInfo *>(ovrld_ty->get_info());
       for (int j = 0; j < info->params_len; ++j) {
@@ -162,24 +162,24 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     // this is just a plain scalar type, such as an int.
   } else if (type->is_kind(TYPE_STRUCT)) {
     auto info = static_cast<StructTypeInfo *>(type->get_info());
-    
+
     // TODO: re enable this once we can find constructors
     for (const auto &[name, symbol]: info->scope->symbols) {
       if (name == "this") continue;
-      
+
       // constructors use anonymous symbol names.
       if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
       auto type = global_get_type(symbol.type_id);
-      
+
       if (!type) continue;
-      
+
       auto info = static_cast<FunctionTypeInfo*>(type->get_info());
       auto &params = info->parameter_types;
-      
+
       if (info->params_len != node->expressions.size()) {
         continue;
       }
-      
+
       for (int i = 0; i < info->params_len; ++i) {
         auto type = global_get_type(params[i]);
         auto rule = type_conversion_rule(type, global_get_type(node->types[i]));
@@ -187,12 +187,12 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
           continue;
         }
       }
-      
+
       // TODO: fix this. We need to know if a symbol is a constructor or not, right now we are just assuming if there's
       // TODO: a function that matches the type signature of the init list within the struct, that it's a valid constructor.
       return declaring_type;
     }
-    
+
     // !HACK i used node->expressions.size() to bypass a bug with the types of
     // initlist exceeding the number of expressions.
     // * REMOVE ME *
@@ -305,9 +305,9 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   return {};
 }
 std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
-  
+
   auto elem_type = -1;
-  
+
   for (const auto &[key, value] : node->key_values) {
     if (value.is_null())
       continue;
@@ -321,23 +321,23 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
     auto expr = value.get();
     auto id = int_from_any(value.get()->accept(this));
     auto type = ctx.scope->get_type(id);
-    
+
     if (elem_type == -1) {
       elem_type = id;
     }
-    
+
     assert_types_can_cast_or_equal(id, elem_type, node->source_range,
                                    "expected: {}, got : {}",
                                    "Inconsistent types in enum declaration.");
   }
-  
+
   if (elem_type == void_type())
     throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
-  
+
   if (elem_type == -1) {
     elem_type = s32_type();
   }
-  
+
   node->element_type = elem_type;
   return {};
 }
@@ -354,7 +354,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       if (ty == -1) {
         throw_error("Internal compiler error: Failed to get type of 'this' pointer", node->source_range);
       }
-      
+
       ctx.scope->insert(
           "this",
           ctx.scope->get_pointer_to_type(ty));
@@ -814,21 +814,21 @@ std::any TypeVisitor::visit(ASTExprStatement *node) {
   return ControlFlow{.flags = BLOCK_FLAGS_FALL_THROUGH, .type = void_type()};
 }
 
-std::any TypeVisitor::visit(ASTType *node) {  
+std::any TypeVisitor::visit(ASTType *node) {
   if (!node->tuple_types.empty()) {
     std::vector<int> types;
-    for (const auto &t: node->tuple_types) 
+    for (const auto &t: node->tuple_types)
       types.push_back(int_from_any(t->accept(this)));
     node->resolved_type = ctx.scope->find_type_id(types, node->extension_info);
     node->base = get_tuple_type_name(types);
-    
+
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->resolved_type = int_from_any(node->pointing_to.get()->accept(this));
     node->resolved_type = ctx.scope->find_type_id(node->base, node->extension_info);
   } else {
     node->resolved_type = ctx.scope->find_type_id(node->base, node->extension_info);
   }
-  
+
   return node->resolved_type;
 }
 std::any TypeVisitor::visit(ASTBinExpr *node) {
@@ -853,7 +853,7 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
   // array remove operator.
   if (node->op.type == TType::Erase) {
     report_mutated_if_iden(node->left);
-    
+
     if (!type->get_ext().is_array()) {
       throw_error("Cannot use concat operator on a non-array", node->source_range);
     }
@@ -902,11 +902,11 @@ std::any TypeVisitor::visit(ASTBinExpr *node) {
 
   // ? special case for type inferred declarations
   if (node->op.type == TType::ColonEquals) {
-    
+
     if (right == -1) {
       throw_error("Internal compiler error: type was null in inferred assignment ':=", node->source_range);
     }
-    
+
     if (right == void_type()) {
       throw_error("Cannot assign a variable of type 'void'",
                   node->source_range);
@@ -1043,13 +1043,13 @@ std::any TypeVisitor::visit(ASTUnaryExpr *node) {
   return operand_ty;
 }
 std::any TypeVisitor::visit(ASTIdentifier *node) {
-  
+
   auto str = node->value.value;
-  
+
   if (str == "Range" || str == "_tuple" || str == "_map"  || str == "_array") {
     throw_error(std::format("Cannot use reserved word : {}", str), node->source_range);
   }
-  
+
   if (ctx.scope->find_type_id(node->value.value, {}) != -1) {
     throw_error("Invalid identifier: a type exists with that name.",
                 node->source_range);
@@ -1077,7 +1077,7 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
       base = 2;
     }
     auto n = std::strtoll(node->value.c_str(), nullptr, base);
-    
+
     if (declaring_or_assigning_type != -1) {
       auto type = ctx.scope->get_type(declaring_or_assigning_type);
       if (type->is_kind(TYPE_SCALAR) && type_is_numerical(type)) {
@@ -1141,12 +1141,12 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
                               identifier->value.value),
                   node->source_range);
   }
-  
+
   // if .EnumVariant failed, error.
   if (node->left == nullptr) {
     throw_error("Internal compiler error: left node in dot expression was null.", node->source_range);
   }
-  
+
   auto left = int_from_any(node->left->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
@@ -1173,14 +1173,14 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
       node->right->get_node_type() == AST_NODE_CALL) {
     auto right = static_cast<ASTCall *>(node->right);
     // TODO: type check args too, also make sure only one arg
-    
+
     if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
       auto identifier = static_cast<ASTIdentifier*>(right->function);
       if (right && identifier->value.value == "contains") {
         return bool_type();
       }
     }
-    
+
   }
 
   // CLEANUP(Josh) 10/7/2024, 8:48:23 AM
@@ -1228,7 +1228,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     // that would help us be safer about typing.
     return s32_type();
   }
-  
+
   Scope  *scope = nullptr;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
       scope = info->scope;
@@ -1237,23 +1237,23 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
   } else {
       throw_error("cannot use a dot expression on a non-struct or union.", node->source_range);
   }
-  
+
   auto calling_scope = ctx.scope;
   Scope *dot_parent = scope->parent;
-  
-  
+
+
   if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
     scope->parent = calling_scope;
   }
-  
+
   ctx.set_scope(scope);
   int type = int_from_any(node->right->accept(this));
   ctx.set_scope(calling_scope);
-  
+
   if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
       scope->parent = dot_parent;
   }
-  
+
   return type;
   throw_error("unable to resolve dot expression type.", node->source_range);
 }
@@ -1263,7 +1263,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   auto left_ty = ctx.scope->get_type(left);
 
-    /* 
+    /*
     !HACK FIX STRING SLICING THIS IS TERRIBLE
    */
    if (left_ty->id == global_find_type_id("string", {})) {
@@ -1333,7 +1333,7 @@ std::any TypeVisitor::visit(ASTSubscript *node) {
     return element_id;
   }
   return remove_one_pointer_ext(left_ty->id, node->source_range);
-  
+
 }
 std::any TypeVisitor::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
@@ -1429,10 +1429,10 @@ std::any TypeVisitor::visit(ASTRange *node) {
 std::any TypeVisitor::visit(ASTSwitch *node) {
   auto type_id = int_from_any(node->target->accept(this));
   auto type = ctx.scope->get_type(type_id);
-  
+
   int return_type = void_type();
   int flags = BLOCK_FLAGS_FALL_THROUGH;
-  
+
   for (const auto &_case: node->cases) {
     auto expr_type = int_from_any(_case.expression->accept(this));
     auto block_cf = std::any_cast<ControlFlow>(_case.block->accept(this));
@@ -1442,14 +1442,14 @@ std::any TypeVisitor::visit(ASTSwitch *node) {
         assert_return_type_is_valid(return_type, block_cf.type, node);
       }
       return_type = block_cf.type;
-    } 
-    
+    }
+
     if (expr_type == global_find_type_id("Range", {}) && type_is_numerical(type)) {
       continue;
     } else {
       assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "got {}, expected {}", "Invalid switch case.");
     }
-    
+
   }
   node->return_type = return_type;
   if (node->is_statement) {
@@ -1469,38 +1469,38 @@ std::any TypeVisitor::visit(ASTTuple *node) {
   for (const auto &v: node->values) {
     types.push_back(int_from_any(v->accept(this)));
   }
-  
+
   return node->type->resolved_type = ctx.scope->find_type_id(types, node->type->extension_info);
 }
 
 std::any TypeVisitor::visit(ASTTupleDeconstruction *node) {
   auto type = ctx.scope->get_type(int_from_any(node->right->accept(this)));
-  
+
   if (!type->is_kind(TYPE_TUPLE)) {
     throw_error("Cannot currently destruct a non-tuple. Coming soon for structs.", node->source_range);
   }
-  
+
   auto info = static_cast<TupleTypeInfo*>(type->get_info());
-  
+
   if (node->idens.size() != info->types.size()) {
     throw_error(
-      std::format("Cannot currently partially deconstruct a tuple. expected {} identifiers to assign, got {}", 
+      std::format("Cannot currently partially deconstruct a tuple. expected {} identifiers to assign, got {}",
         info->types.size(), node->idens.size()), node->source_range);
   }
-  
+
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-    
+
     // ! Due to how we're lowering, We have to throw a redefinition here. However I would rather allow this sort of reassignment.
-    
+
     if (ctx.scope->local_lookup(iden->value.value)) {
       throw_error(std::format("Redefinition of a variable is not allowed in a tuple deconstruction yet.\nOffending variable {}", iden->value.value), node->source_range);
     }
-    
-    
+
+
     ctx.scope->insert(iden->value.value, type);
   }
-  
+
   return {};
 };
