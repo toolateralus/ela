@@ -109,12 +109,12 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_STATEMENT,
          .run = [](Parser *parser) static -> Nullable<ASTNode> {
           // Issue 2
-          // TODO: implement something so we can do 
+          // TODO: implement something so we can do
           // * #test(group: "My Test Group", expects: false) *
           // so we can have tests that expect to fail, and so we can use
           // --filter="My Test Group" // run only test group
           // --filter=* - "My Test Group" // run all but test group
-        
+
           auto name = parser->expect(TType::Identifier);
           parser->expect(TType::DoubleColon);
           auto func = parser->parse_function_declaration(name);
@@ -365,17 +365,17 @@ void Parser::init_directive_routines() {
 
            if (aliased_type->resolved_type != -1) {
              auto type = parser->ctx.scope->get_type(aliased_type->resolved_type);
-             
+
              if (!type) {
               throw_error("Failed to get type for alias.", aliased_type->source_range);
              }
-             
+
              if (type->is_kind(TYPE_FUNCTION)) {
                auto id = parser->ctx.scope->find_function_type_id(
                    aliased_type->base,
                    *static_cast<FunctionTypeInfo *>(type->get_info()),
                    aliased_type->extension_info);
-              
+
               parser->ctx.scope->create_type_alias(id, name.value);
               //  auto alias = ctx.scope->create_type_alias(id, name.value);
               //  parser->ctx.scope->aliases.push_back(alias);
@@ -487,7 +487,7 @@ void Parser::init_directive_routines() {
          }});
   }
 
-  
+
   // #export, for exporting a non-mangled name to a dll or C library primarily.
   // Equivalent to marking a function extern "C" in C++.
   {
@@ -516,11 +516,11 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
           parser->expect(TType::LParen);
           auto type = parser->parse_type();
-          
+
           parser->expect(TType::RParen);
           auto visitor = TypeVisitor{parser->ctx};
           auto id = std::any_cast<int>(type->accept(&visitor));
-          
+
           auto literal = ast_alloc<ASTLiteral>();
           literal->tag = ASTLiteral::Integer;
           literal->value = std::to_string(id);
@@ -528,8 +528,8 @@ void Parser::init_directive_routines() {
           return literal;
          }});
   }
-  
-  
+
+
   //#bitfield, for declaring bitfields. Pretty much only to interop with C: most cases for bitfields are completely useless, and can be replaced with a set of flags.
   {
     directive_routines.push_back(
@@ -549,9 +549,9 @@ void Parser::init_directive_routines() {
           return decl;
         }
     });
-    
+
   }
-  
+
 }
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
                                             const std::string &identifier) {
@@ -607,14 +607,14 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   TypeExt extension_info;
 
-  
+
 
   while (true) {
     if (peek().type == TType::LBrace) {
-      expect(TType::LBrace);  
+      expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
         auto size = parse_expr();
-        
+
         if (size->get_node_type() == AST_NODE_TYPE) {
           extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType*>(size);
@@ -622,7 +622,7 @@ ASTType *Parser::parse_type() {
           expect(TType::RBrace);
           continue;
         }
-        
+
         extension_info.extensions.push_back(TYPE_EXT_ARRAY);
         extension_info.array_sizes.push_back(size);
       } else {
@@ -639,7 +639,7 @@ ASTType *Parser::parse_type() {
       break;
     }
   }
-  
+
   auto node = ast_alloc<ASTType>();
   node->base = base;
   node->extension_info = extension_info;
@@ -720,14 +720,14 @@ ASTStatement *Parser::parse_statement() {
   if (tok.type == TType::Eof) {
     return ast_alloc<ASTNoop>();
   }
-  
+
   if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
     return parse_multiple_asssignment();
   }
-  
-  
+
+
   if (tok.type == TType::Identifier &&
-      lookahead_buf()[1].type == TType::Colon) {       
+      lookahead_buf()[1].type == TType::Colon) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -784,12 +784,12 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto node = ast_alloc<ASTFor>();
     tok = peek();
-    
+
     // CLEANUP(Josh) 10/14/2024, 10:10:15 AM
       // * We don't really need C style for loops if we have
       // * for i in 0..10 \\ for i in 10..0 etc.
       // * That's the same thing with a much nicer syntax.
-    
+
     // TODO: add implict assignment here. like for i := 0; i < ...
     if (lookahead_buf()[1].type == TType::Colon) {
       node->tag = ASTFor::CStyle;
@@ -929,25 +929,30 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.family == TFamily::Literal) {
+    eat();
     throw_error(std::format("Unexpected literal: {} .. {}", tok.value,
                             TTypeToString(tok.type)),
                 range);
   }
 
   if (tok.family == TFamily::Keyword) {
+    eat();
     throw_error(std::format("Unexpected keyword: {}", tok.value), range);
   }
 
   if (ctx.scope->lookup(tok.value)) {
+    eat();
     throw_error(std::format("Unexpected variable {}", tok.value), range);
   }
 
   if (ctx.scope->find_type_id(tok.value, {}) == -1) {
+    eat();
     throw_error(
         std::format("Use of an undeclared type or identifier: {}", tok.value),
         range);
   }
 
+  eat();
   throw_error(std::format("Unexpected token when parsing statement: {}.. This "
                           "is likely an undefined type.",
                           tok.value),
@@ -999,7 +1004,7 @@ ASTBlock *Parser::parse_block() {
       end_node(nullptr, range);
       throw_error("Imbalanced '{' and '}'", range);
     }
-    
+
     block->statements.push_back(parse_statement());
     if (semicolon())
       eat();
@@ -1022,7 +1027,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->params = parse_parameters();
 
   auto sym = ctx.scope->local_lookup(name.value);
-  
+
   if (sym) {
     sym->flags |= SYMBOL_HAS_OVERLOADS;
   } else {
@@ -1043,14 +1048,14 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
 
-  
+
   if (peek().type == TType::Semi) {
     function->flags |= FUNCTION_IS_FORWARD_DECLARED;
     end_node(function, range);
     current_func_decl = last_func_decl;
     return function;
   }
-  
+
   function->block = parse_block();
 
   end_node(function, range);
@@ -1076,12 +1081,12 @@ ASTParamsDecl *Parser::parse_parameters() {
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
-    
+
     auto name = expect(TType::Identifier).value;
     if (!type || peek().type == TType::Colon) expect(TType::Colon);
-    
+
     auto next = peek();
-    
+
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: (int a, b, c) {}
@@ -1134,10 +1139,10 @@ ASTArguments *Parser::parse_arguments() {
   expect(TType::RParen);
 
   end_node(args, range);
-  
+
   state = last;
   return args;
-  
+
 }
 ASTCall *Parser::parse_call(ASTExpr* function) {
   auto range = begin_node();
@@ -1197,7 +1202,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   current_struct_decl = decl;
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
-  
+
   if (type_id != -1) {
     auto type = ctx.scope->get_type(type_id);
     end_node(nullptr, range);
@@ -1244,7 +1249,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   auto info =
       static_cast<StructTypeInfo *>(ctx.scope->get_type(type_id)->get_info());
-      
+
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
 
@@ -1263,20 +1268,20 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->type->base = name.value;
 
   auto id = ctx.scope->find_type_id(name.value, {});
-  
+
   if (id != -1) {
     auto type = ctx.scope->get_type(id);
-    
+
     if (!type->is_kind(TYPE_UNION)) {
       end_node(nullptr, range);
       throw_error("cannot redefine already existing type", range);
     }
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
-    
+
     if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
       end_node(nullptr, range);
       throw_error("cannot redefine already existing union type", range);
-    } 
+    }
   }
 
   Defer _([&] { current_union_decl = nullptr; });
@@ -1285,7 +1290,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
   auto type = ctx.scope->get_type(type_id);
-  
+
   if (type && type->is_kind(TYPE_UNION)) {
     auto info = static_cast<UnionTypeInfo*>(type->get_info());
     if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
@@ -1296,11 +1301,11 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   } else {
     // if we didn't find a foward declaration, instantiate a new empty union type,
     // and resolve the node type, cause might as well.
-    type_id = 
-    node->type->resolved_type = 
-      ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);  
+    type_id =
+    node->type->resolved_type =
+      ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
   }
-      
+
   if (peek().type == TType::Semi) {
     eat();
     node->is_fwd_decl = true;
@@ -1315,7 +1320,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   std::vector<ASTStructDeclaration *> structs;
   auto block = parse_block();
   block->scope->is_struct_or_union_scope = true;
-  
+
   auto scope = block->scope;
 
   for (auto &statement : block->statements) {
@@ -1359,9 +1364,9 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
   ASTExpr *left = parse_unary();
   while (true) {
-    
+
        // ! A little hack for tuples.
-    { 
+    {
       // <1, 2, 3>; is valid
       // <1, 2, 3 > 10>; can work too.
       auto lookahead = lookahead_buf();
@@ -1374,7 +1379,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         return left;
       }
     }
-    
+
     // ! Type inferred assignment.
     // TODO: Put this somewhere within the declaration stuff.
     // Right now we cant use n := false in structs, which would be nice terse syntax for declaring members.
@@ -1392,12 +1397,12 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
           throw_error("redefinition of a variable.", range);
         }
         ctx.scope->insert(iden->value.value, -1);
-      }  
+      }
     }
-    
+
     Precedence token_precedence = get_operator_precedence(peek());
-    
-    
+
+
 
     if (token_precedence <= precedence) {
       break;
@@ -1426,7 +1431,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 }
 ASTExpr *Parser::parse_unary() {
   auto range = begin_node();
-  
+
   // bitwise not isa  unary expression because arrays use it as a pop operator, and sometimes
   // you might want to ignore it's result.
   if (peek().type == TType::Add || peek().type == TType::Sub ||
@@ -1568,7 +1573,7 @@ ASTExpr *Parser::parse_primary() {
     expect(TType::Switch);
     auto expr = parse_expr();
     expect(TType::LCurly);
-    std::vector<SwitchCase> cases;    
+    std::vector<SwitchCase> cases;
     while (peek().type != TType::RCurly) {
       SwitchCase _case;
       _case.expression = parse_expr();
@@ -1583,7 +1588,7 @@ ASTExpr *Parser::parse_primary() {
     end_node(node, range);
     return node;
   }
-    
+
   case TType::Dot: {
     eat();
     if (peek().type != TType::Identifier) {
@@ -1737,7 +1742,7 @@ ASTExpr *Parser::parse_primary() {
       // but for now it's okay. Actually, we don't want ASTMake at all, it should get
       // eliminated and ASTConstruct and ASTCast should probably be added to replace it.
       // This would help us have a more consistent and clear syntax.
-      
+
       auto type = parse_type();
       auto node = ast_alloc<ASTMake>();
       expect(TType::RParen);
@@ -1749,7 +1754,7 @@ ASTExpr *Parser::parse_primary() {
     }
 
     auto expr = parse_expr();
-    
+
     if (peek().type != TType::RParen) {
       throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
     }
@@ -1989,5 +1994,3 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
-
-
