@@ -676,7 +676,6 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   return {};
 }
 void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
-
   if ((node->flags & FUNCTION_IS_METHOD) != 0) {
     return;
   }
@@ -847,11 +846,6 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     // the function's block would only be null in a #foreign function
     if (node->block.is_not_null())
       node->block.get()->accept(this);
-
-    // main functions do not get forward declared.
-    if (node->name.value != "main") {
-      emit_forward_declaration(node);
-    }
   };
 
   emit_line_directive(node);
