@@ -2,6 +2,8 @@
 //  own non-trivial objects.
 template <class... T> void destruct(T &...t) { (t.~T(), ...); }
 
+#define USE_STD_LIB 1
+
 #if USE_STD_LIB
 struct string;
 #endif
@@ -48,8 +50,6 @@ struct Range {
 
 #if USE_STD_LIB
 
-#include <algorithm>
-#include <functional>
 #include <initializer_list>
 #include <stdint.h>
 #include <unordered_map>
@@ -275,10 +275,16 @@ template <class T> struct _array {
 
   T pop() { return data[--length]; }
 
-  void erase(const T &value) {
-    auto it = std::remove(data, data + length, value);
-    length = (s32)(it - data);
-  }
+  void erase(const T& value) {
+        std::size_t writeIndex = 0;
+        for (std::size_t readIndex = 0; readIndex < length; ++readIndex) {
+            if (data[readIndex] != value) {
+                data[writeIndex] = data[readIndex];
+                ++writeIndex;
+            }
+        }
+        length = writeIndex;
+    }
 
   T &operator[](int n) { return data[n]; }
 
@@ -476,9 +482,9 @@ struct string {
   auto end() const { return data + length; }
 };
 
-string Range::to_string() const {
+inline string Range::to_string() const {
   char buffer[50];
-  snprintf(buffer, sizeof(buffer), "%d..%d", first, last);
+  snprintf(buffer, sizeof(buffer), "%lld..%lld", first, last);
   return string(buffer);
 }
 
@@ -522,7 +528,7 @@ struct Type {
   size_t size;
   u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;
-  std::function<_array<Element>(char *)> elements;
+  _array<Element>(*elements)(char *);
 };
 
 #ifdef TESTING

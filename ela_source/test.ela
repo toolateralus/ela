@@ -1420,5 +1420,5 @@ BitfieldTest :: struct {
 #test test_bitfield_in_struct :: () {
   test: BitfieldTest;
   assert("bitfield failed to equal 0", test.i == 0);
-  assert("bitfield z failed to equal 2", test.z == 3);
+  assert("bitfield z failed to equal 3", test.z == 3);
 }

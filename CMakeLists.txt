@@ -35,7 +35,6 @@ set_target_properties(ela PROPERTIES
 )
 
 # Set compiler flags for Release mode
-set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto -s")
-set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -flto -s")
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto")
 
 target_compile_definitions(ela PRIVATE MAX_NUM_TYPES=10000)

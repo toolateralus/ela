@@ -966,8 +966,10 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   return {};
 }
 std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
-  if (node->is_fwd_decl)
+  if (node->is_fwd_decl) {
+    (*ss) << "union " << node->name.value.get_str() << ";\n";
     return {};
+  }
 
   Defer _([&] {
     current_union_decl = nullptr;
@@ -1468,7 +1470,7 @@ std::string EmitVisitor::get_elements_function(Type *type) {
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(
-      ".elements = [&](char * array) -> _array<Element> {{\n"
+      ".elements = +[](char * array) -> _array<Element> {{\n"
       "  auto arr = (_array<{}>*)(array);\n"
       "  _array<Element> elements;\n"
       "  for (int i = 0; i < arr->length; ++i) {{\n"
@@ -1490,7 +1492,7 @@ std::string EmitVisitor::get_elements_function(Type *type) {
     auto length = ss.str();
     this->ss = old;
     return std::format(
-      ".elements = [&](char * array) -> _array<Element> {{\n"
+      ".elements = +[](char * array) -> _array<Element> {{\n"
       "  auto arr = ({}*)(array);\n"
       "  _array<Element> elements;\n"
       "  for (int i = 0; i < {}; ++i) {{\n"
