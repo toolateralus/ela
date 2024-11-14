@@ -1,0 +1,73 @@
+
+#import core;
+#import net;
+
+MAX_BUFFER_LENGTH  : int = 80;
+PORT : u16 = 8080;
+
+chatting :: (connfd: int) {
+  buff : char[MAX_BUFFER_LENGTH];
+
+  while true {
+    memset(buff, 0, MAX_BUFFER_LENGTH);
+    read(connfd, buff, MAX_BUFFER_LENGTH);
+    println($"From client: {(char*)buff}   To client : ");
+    memset(buff, 0, MAX_BUFFER_LENGTH);
+    n: int;
+    while n < MAX_BUFFER_LENGTH && ((buff[n++] = getchar()) != #char "\n") {}
+    write(connfd, buff, MAX_BUFFER_LENGTH);
+    if (strncmp("exit", (char*)buff, 4) == 0) {
+      printf("Server Exit...\n");
+      break;
+    }
+  }
+}
+
+main :: () -> int {
+  sockfd : int = socket(AF_INET, SocketType.Stream, 0);
+
+  if sockfd == -1 {
+    panic("socket creation failed...\n");
+  } else {
+    println("Socket successfully created..\n");
+  }
+  
+  servaddr : sockaddr_in;
+  servaddr.sin_family = AF_INET;
+  servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
+  servaddr.sin_port = htons(PORT);
+
+  addr : sockaddr* = &servaddr;
+  result := bind(sockfd, addr, sizeof(sockaddr_in));
+
+  if (result != 0) {
+    panic("socket bind failed...");
+  } else {
+    println("Socket successfully bound..");
+  }
+
+  if listen(sockfd, 5) != 0 {
+    panic("Listen failed...");
+  } else {
+    println("Server listening..");
+  }
+
+  len: socklen_t  = sizeof(sockaddr_in);
+
+  cli: sockaddr_in;
+
+  cliaddr : sockaddr* = &cli;
+  connfd: int = accept(sockfd, cliaddr, &len);
+
+  if connfd < 0 {
+    panic("server accept failed...");
+  } else {
+    println("server accept the client...");
+  }
+
+  chatting(connfd);
+
+  close(sockfd);
+
+  return 0;
+}

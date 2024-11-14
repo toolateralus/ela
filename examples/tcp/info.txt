@@ -1,0 +1,5 @@
+Simply compile & start the 'server.ela' file.
+
+then the same for the 'client.ela' file in a new terminal.
+
+You may then send messages over network between the instances, with a terminal.
