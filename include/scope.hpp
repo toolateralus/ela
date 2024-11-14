@@ -19,7 +19,7 @@ enum SymbolFlags {
 struct ASTNode;
 
 struct Symbol {
-  std::string name;
+  InternedString name;
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
   std::vector<int> function_overload_types;
@@ -32,7 +32,7 @@ struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
 
-  void report_symbol_mutated(const std::string &name) {
+  void report_symbol_mutated(const InternedString &name) {
     if (symbols.contains(name))
       symbols[name].flags |= SYMBOL_WAS_MUTATED;
     else if (parent) {
@@ -42,8 +42,8 @@ struct Scope {
 
   bool is_struct_or_union_scope = false;
 
-  std::vector<std::string> ordered_symbols;
-  std::unordered_map<std::string, Symbol> symbols;
+  std::vector<InternedString> ordered_symbols;
+  std::unordered_map<InternedString, Symbol> symbols;
   std::vector<int> aliases;
   std::set<int> types;
 
@@ -60,19 +60,19 @@ struct Scope {
     return fields;
   }
 
-  void insert(const std::string &name, int type_id,
+  void insert(const InternedString &name, int type_id,
               int flags = SYMBOL_IS_VARIABLE);
 
-  Symbol *lookup(const std::string &name);
+  Symbol *lookup(const InternedString &name);
 
-  Symbol *local_lookup(const std::string &name) {
+  Symbol *local_lookup(const InternedString &name) {
     if (symbols.contains(name)) {
       return &symbols[name];
     }
     return nullptr;
   }
 
-  void erase(const std::string &name);
+  void erase(const InternedString &name);
 
 
   void on_scope_enter() {
@@ -91,7 +91,7 @@ struct Scope {
 
   /*  Type interactions  */
 
-  int create_type_alias(int aliased, const std::string& name) {
+  int create_type_alias(int aliased, const InternedString& name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
     types.insert(id);
@@ -124,19 +124,19 @@ struct Scope {
     return nullptr;
   }
 
-  int create_type(TypeKind kind, const std::string &name, TypeInfo * info = nullptr, const TypeExt &ext = {}) {
+  int create_type(TypeKind kind, const InternedString &name, TypeInfo * info = nullptr, const TypeExt &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
     types.insert(id);
     return id;
   }
 
-  int create_struct_type(const std::string &name, Scope *scope) {
+  int create_struct_type(const InternedString &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
     types.insert(id);
     return id;
   }
 
-  int create_enum_type(const std::string &name, const std::vector<std::string> &fields, bool flags) {
+  int create_enum_type(const InternedString &name, const std::vector<InternedString> &fields, bool flags) {
     auto id = global_create_enum_type(name, fields, flags);
     types.insert(id);
     return id;
@@ -148,13 +148,13 @@ struct Scope {
     return id;
   }
 
-  int create_union_type(const std::string &name, Scope *scope, UnionFlags kind) {
+  int create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
     auto id = global_create_union_type(name, scope, kind);
     types.insert(id);
     return id;
   }
 
-  int find_function_type_id(const std::string &name, const FunctionTypeInfo &info,
+  int find_function_type_id(const InternedString &name, const FunctionTypeInfo &info,
                  const TypeExt &ext) {
     // We leave function types as global so that we don't have to recreate things like
     // void(int) over and over. This may inadvertently allow you to access types that are in your scope,
@@ -194,7 +194,7 @@ struct Scope {
     return -1;
   }
 
-  int find_type_id(const std::string &name, const TypeExt &ext) {
+  int find_type_id(const InternedString &name, const TypeExt &ext) {
     auto id = global_find_type_id(name, ext);
     auto base_id = global_find_type_id(name, {});
 
@@ -243,7 +243,7 @@ struct Context {
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
   // This type_info_strings field should be in the emit visitor.
   // That's the only place it's used anyway.
-  std::vector<std::string> type_info_strings;
+  std::vector<InternedString> type_info_strings;
 
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Context();

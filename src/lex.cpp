@@ -37,7 +37,7 @@ void Lexer::get_token(State &state) {
       lines += (newlinePos != std::string::npos);
       continue;
     }
-    
+
     if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
       pos += 2;
       while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
@@ -148,7 +148,7 @@ void Lexer::get_token(State &state) {
         c = input[pos];
       }
 
-      while (pos < len && 
+      while (pos < len &&
              (std::isdigit(c) || c == '.' || (is_hex && std::isxdigit(c)) ||
               (is_bin && (c == '0' || c == '1')) || c == '_')) {
         if (c == '_') {
@@ -162,7 +162,7 @@ void Lexer::get_token(State &state) {
             pos++;
             state.lookahead_buffer.push_back(
                 Token(location, str, TType::Integer, TFamily::Literal));
-                
+
             state.lookahead_buffer.emplace_back(location, "..", TType::Range,
                                                 TFamily::Operator);
             return;
@@ -172,15 +172,15 @@ void Lexer::get_token(State &state) {
         token.put(c);
         pos++;
         c = input[pos];
-        
+
         if (c == '_') {
           pos++;
           c = input[pos];
         }
-        
+
       }
       auto value = token.str();
-      
+
       if (is_hex) {
         state.lookahead_buffer.push_back(Token(location, "0x" + value, TType::Integer, TFamily::Literal));
       } else if (is_bin) {

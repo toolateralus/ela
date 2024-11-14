@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
@@ -31,7 +32,7 @@ jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
 // the same for this
 jstl::Arena scope_arena{MB(100)};
 
-std::unordered_map<std::string, int> type_alias_map;
+std::unordered_map<InternedString, int> type_alias_map;
 
 // the same for this
 jstl::Arena ast_arena{MB(100)};
@@ -45,7 +46,7 @@ std::vector<Allocation> allocation_info;
 
 std::vector<Token> all_tokens;
 
-std::unordered_set<std::string> import_set;
+std::unordered_set<InternedString> import_set;
 /*
   #########################
   ### PROVIDING EXTERNS ###

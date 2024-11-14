@@ -1,6 +1,7 @@
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
@@ -30,7 +31,7 @@ void Parser::init_directive_routines() {
         .kind = DIRECTIVE_KIND_STATEMENT,
         .run = [](Parser *parser) static {
           auto filename = parser->expect(TType::String).value;
-          if (!std::filesystem::exists(filename)) {
+          if (!std::filesystem::exists(filename.get_str())) {
             throw_error(
                 std::format("Couldn't find included file: {}, current path: {}", filename, std::filesystem::current_path().string()), {});
           }
@@ -39,10 +40,10 @@ void Parser::init_directive_routines() {
             return nullptr;
           }
 
-          std::ifstream isftr(filename);
+          std::ifstream isftr(filename.get_str());
           import_set.insert(filename);
           ss << isftr.rdbuf();
-          parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+          parser->states.push_back(Lexer::State::from_file(ss.str(), filename.get_str()));
           parser->fill_buffer_if_needed();
           return nullptr;
         }});
@@ -56,7 +57,7 @@ void Parser::init_directive_routines() {
         .identifier = "raw",
         .kind = DIRECTIVE_KIND_EXPRESSION,
         .run = [](Parser *parser) -> Nullable<ASTNode> {
-          std::string string;
+          InternedString string;
           while (parser->not_eof()) {
             if (parser->peek().type == TType::Directive &&
                 parser->states.back().lookahead_buffer[1].value == "raw") {
@@ -64,7 +65,7 @@ void Parser::init_directive_routines() {
               parser->eat();
               break;
             }
-            string += parser->eat().value;
+            string = {string.get_str() += parser->eat().value.get_str()};
           }
           auto literal = ast_alloc<ASTLiteral>();
           literal->tag = ASTLiteral::RawString;
@@ -84,12 +85,12 @@ void Parser::init_directive_routines() {
          .kind = DIRECTIVE_KIND_EXPRESSION,
          .run = [](Parser *parser) static {
            auto filename = parser->expect(TType::String).value;
-           if (!std::filesystem::exists(filename)) {
+           if (!std::filesystem::exists(filename.get_str())) {
              throw_error(std::format("Couldn't find 'read' file: {}", filename),
                          {});
            }
            std::stringstream ss;
-           std::ifstream isftr(filename);
+           std::ifstream isftr(filename.get_str());
            ss << isftr.rdbuf();
            auto string = ast_alloc<ASTLiteral>();
            string->tag = ASTLiteral::RawString;
@@ -180,7 +181,7 @@ void Parser::init_directive_routines() {
                          error->source_range);
            }
            auto literal = static_cast<ASTLiteral *>(error);
-           throw_error(literal->value, error->source_range);
+           throw_error(literal->value.get_str(), error->source_range);
            return nullptr;
          }});
   }
@@ -200,7 +201,7 @@ void Parser::init_directive_routines() {
              return std::filesystem::path("/usr/local/lib/ela");
 #endif
            }();
-           auto filename = path.string() + "/" + iden + ".ela";
+           auto filename = path.string() + "/" + iden.get_str() + ".ela";
 
            // Right now, we just return noop if we're double including.
            if (import_set.contains(filename)) {
@@ -328,9 +329,9 @@ void Parser::init_directive_routines() {
          .run = [](Parser *parser) -> Nullable<ASTNode> {
            auto string = parser->expect(TType::String).value;
            if (string == "-g") {
-             compile_command.flags[string] = true;
+             compile_command.flags[string.get_str()] = true;
            }
-           compile_command.add_compilation_flags(string);
+           compile_command.add_compilation_flags(string.get_str());
            return nullptr;
          }});
   }
@@ -554,7 +555,7 @@ void Parser::init_directive_routines() {
 
 }
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
-                                            const std::string &identifier) {
+                                            const InternedString &identifier) {
   auto range = begin_node();
   // compare aganist the kind of the routine with expected type, based on parser
   // location
@@ -634,14 +635,14 @@ ASTType *Parser::parse_type() {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
-      return parse_function_type(base, extension_info);
+      return parse_function_type(base.get_str(), extension_info);
     } else {
       break;
     }
   }
 
   auto node = ast_alloc<ASTType>();
-  node->base = base;
+  node->base = base.get_str();
   node->extension_info = extension_info;
   end_node(node, range);
   return node;
@@ -1177,8 +1178,8 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 
   end_node(node, range);
 
-  std::vector<std::string> keys;
-  std::set<std::string> keys_set;
+  std::vector<InternedString> keys;
+  std::set<InternedString> keys_set;
   for (const auto &[key, value] : node->key_values) {
     if (keys_set.contains(key)) {
       throw_error(std::format("redefinition of enum variant: {}", key),
@@ -1607,7 +1608,7 @@ ASTExpr *Parser::parse_primary() {
     auto str = expect(TType::String);
     auto node = ast_alloc<ASTLiteral>();
     node->tag = ASTLiteral::InterpolatedString;
-    auto lexer_state = Lexer::State::from_string(str.value);
+    auto lexer_state = Lexer::State::from_string(str.value.get_str());
     states.push_back(lexer_state);
     std::vector<ASTExpr *> exprs;
     fill_buffer_if_needed();
@@ -1623,19 +1624,20 @@ ASTExpr *Parser::parse_primary() {
       states.pop_back();
     }
     auto pos = 0;
-    while (pos < str.value.length()) {
-      if (str.value[pos] == '{') {
+    std::string value = str.value.get_str();
+    while (pos < value.length()) {
+      if (value[pos] == '{') {
         pos++;
         auto start = pos;
-        while (str.value[pos] != '}') {
+        while (value[pos] != '}') {
           pos++;
         }
-        str.value.erase(start, pos - start);
+        value.erase(start, pos - start);
       } else {
         ++pos;
       }
     }
-    node->value = str.value;
+    node->value = {value};
     node->interpolated_values = exprs;
     end_node(node, range);
     return node;
@@ -1913,7 +1915,7 @@ void Parser::append_type_extensions(ASTType *type) {
     }
   }
 }
-ASTType *Parser::parse_function_type(const std::string &base,
+ASTType *Parser::parse_function_type(const InternedString &base,
                                      TypeExt extension_info) {
   auto return_type = ast_alloc<ASTType>();
   return_type->base = base;

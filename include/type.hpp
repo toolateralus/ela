@@ -2,6 +2,7 @@
 #pragma once
 
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include <stdio.h>
 #include <stdlib.h>
@@ -29,7 +30,7 @@ extern jstl::Arena type_arena;
 
 // used for emitting typedefs
 
-extern std::unordered_map<std::string, int> type_alias_map;
+extern std::unordered_map<InternedString, int> type_alias_map;
 
 
 enum ConversionRule {
@@ -214,7 +215,7 @@ struct ScalarTypeInfo : TypeInfo {
 
 struct EnumTypeInfo : TypeInfo {
   bool is_flags = false;
-  std::vector<std::string> keys;
+  std::vector<InternedString> keys;
 };
 
 struct UnionTypeInfo : TypeInfo {
@@ -238,19 +239,19 @@ struct TupleTypeInfo : TypeInfo {
 
 Type *global_get_type(const int id);
 
-std::string get_tuple_type_name(const std::vector<int> &types);
+InternedString get_tuple_type_name(const std::vector<int> &types);
 
-int global_create_type(TypeKind, const std::string &, TypeInfo * = nullptr,
+int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
                 const TypeExt & = {});
 
-int global_create_struct_type(const std::string &, Scope *);
+int global_create_struct_type(const InternedString &, Scope *);
 
-int global_create_enum_type(const std::string &, const std::vector<std::string> &,
+int global_create_enum_type(const InternedString &, const std::vector<InternedString> &,
                      bool = false);
 
 int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext);
 
-int global_create_union_type(const std::string &name, Scope *scope, UnionFlags kind);
+int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
 
@@ -275,12 +276,12 @@ int float32_type();
 // char *
 int charptr_type();
 
-int global_find_function_type_id(const std::string &, const FunctionTypeInfo &,
+int global_find_function_type_id(const InternedString &, const FunctionTypeInfo &,
                  const TypeExt &);
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions);
 
-int global_find_type_id(const std::string &, const TypeExt &);
+int global_find_type_id(const InternedString &, const TypeExt &);
 
 struct Token;
 
@@ -298,7 +299,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 
 int get_pointer_to_type(int base);
 
-int global_create_type_alias(int aliased_type, const std::string &name);
+int global_create_type_alias(int aliased_type, const InternedString &name);
 
 int get_map_value_type(Type *map_type);
 
@@ -337,7 +338,7 @@ struct Type {
   // these are the types that refer to me as an alias
   std::vector<int> aliases;
 
-  bool has_alias(const std::string &name) const {
+  bool has_alias(const InternedString &name) const {
     if (!has_aliases) return false;
     for (const auto &alias: aliases) {
       auto type = global_get_type(alias);
@@ -348,7 +349,7 @@ struct Type {
     return false;
   }
 
-  void set_base(const std::string &base) {
+  void set_base(const InternedString &base) {
     this->base = base;
   }
   void set_ext(const TypeExt &ext) {
@@ -357,7 +358,7 @@ struct Type {
   void set_info(TypeInfo *info) {
     this->info = info;
   }
-  std::string const get_base() const {
+  InternedString const get_base() const {
     return base;
   }
   TypeExt const get_ext() const {
@@ -379,12 +380,12 @@ struct Type {
 
 
   private:
-  std::string base;
+  InternedString base;
   TypeExt extensions;
   TypeInfo *info;
   public:
 
-  bool equals(const std::string &name, const TypeExt &type_extensions, std::unordered_set<const Type*> &visited) const;
+  bool equals(const InternedString &name, const TypeExt &type_extensions, std::unordered_set<const Type*> &visited) const;
 
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   Type(){};
@@ -405,7 +406,8 @@ struct Type {
 };
 
 struct ASTFunctionDeclaration;
-std::string get_function_typename(ASTFunctionDeclaration *);
+
+InternedString get_function_typename(ASTFunctionDeclaration *);
 
 template <class T> T *type_alloc(size_t n = 1) {
   auto mem = type_arena.allocate(sizeof(T) * n);

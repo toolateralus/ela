@@ -5,7 +5,7 @@
 
 Context::Context() {
   root_scope = scope;
-  
+
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -13,7 +13,7 @@ Context::Context() {
     range_scope->insert("first", s64_type());
     range_scope->insert("last", s64_type());
     range_scope->insert("span", s64_type());
-    
+
     auto func = FunctionTypeInfo{};
     func.params_len=1;
     func.parameter_types[0] = s64_type();
@@ -22,7 +22,7 @@ Context::Context() {
     range_scope->parent = root_scope;
     root_scope->types.insert(type);
   }
-  
+
   // define some default functions that may or may not be macros.
   {
     // We still define assert and sizeof manually here, because
@@ -52,7 +52,7 @@ Context::Context() {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    
+
     type_scope->parent = root_scope;
     field_scope->parent = root_scope;
     element_scope->parent = root_scope;
@@ -98,7 +98,7 @@ Context::Context() {
     field_scope->insert("get", _t, SYMBOL_IS_FUNCTION);
     auto get_sym = field_scope->local_lookup("get");
     get_sym->function_overload_types.push_back(_t);
-    
+
     // field.set()
     auto set_info = FunctionTypeInfo{};
     set_info.is_varargs = true;
@@ -130,88 +130,88 @@ Context::Context() {
     static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
         charptr_type(),
     };
-  
+
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
     str_scope->insert("is_view", bool_type()); // is this a borrowing copy?
-    
+
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
-    
+
     auto func = FunctionTypeInfo{};
     func.parameter_types[0] = char_type();
     func.return_type = void_type();
     func.params_len=1;
-    
+
     str_scope->insert("push", global_find_function_type_id("void(char)", func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[0] = -1;
     func.params_len=0;
     func.return_type=char_type();
     str_scope->insert("pop", global_find_function_type_id("char()", func, {}), SYMBOL_IS_FUNCTION);
-    
-    
+
+
     func.parameter_types[0] = int_type();
     func.params_len=1;
     func.return_type=void_type();
     str_scope->insert("erase_at", global_find_function_type_id("void(int)", func, {}), SYMBOL_IS_FUNCTION);
-    
+
     func.parameter_types[0] = int_type();
     func.parameter_types[1] = char_type();
     func.params_len = 2;
     func.return_type= void_type();
     str_scope->insert("insert_at", global_find_function_type_id("void(int, char)", func, {}), SYMBOL_IS_FUNCTION);
-    
+
     func.parameter_types[1] = global_find_type_id("string", {});
     str_scope->insert("insert_substr_at", global_find_function_type_id("void(int, char)", func, {}), SYMBOL_IS_FUNCTION);
-    
+
     func.params_len=1;
     func.return_type = global_find_type_id("string", {});
     func.parameter_types[0]= global_find_type_id("Range", {});
     str_scope->insert("substr", global_find_function_type_id("string(Range)", func, {}), SYMBOL_IS_FUNCTION);
-    
+
     auto sym = str_scope->local_lookup("[");
     auto info = type_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
-    
+
   }
-  
+
   auto info = FunctionTypeInfo{};
   info.is_varargs = true;
   info.return_type = void_type();
   root_scope->insert("destruct", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
-  
+
   info.is_varargs = true;
   info.return_type = void_type();
   root_scope->insert("move", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
-  
-  
+
+
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
-  
-  
+
+
   for (int i = 0; i < num_types; ++i) {
     root_scope->types.insert(i);
   }
-  
-  
-  
+
+
+
 }
 
-void Scope::insert(const std::string &name, int type_id, int flags) {
+void Scope::insert(const InternedString &name, int type_id, int flags) {
   auto sym = Symbol{name, type_id, flags};
   symbols[name] = sym;
   ordered_symbols.push_back(name);
 }
 
-/* 
-  !BUG !!! SUPER CRITICAL !!! 
+/*
+  !BUG !!! SUPER CRITICAL !!!
   ! Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
   ! There is a repro for this, with a possible and likely explanation for why this is happening
 */
 
-Symbol *Scope::lookup(const std::string &name) {
+Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];
   } else if (parent) {
@@ -220,12 +220,7 @@ Symbol *Scope::lookup(const std::string &name) {
   return nullptr;
 }
 
-void Scope::erase(const std::string &name) {
+void Scope::erase(const InternedString &name) {
   symbols.erase(name);
   ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
 }
-
-
-
-
-

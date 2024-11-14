@@ -1,5 +1,6 @@
 #pragma once
 
+#include "interned_string.hpp"
 #include <deque>
 #include <filesystem>
 #include <string>
@@ -79,18 +80,18 @@ enum struct TType {
   Directive, // #
   ColonEquals, //  :=
   Dollar, // $
-  
+
   Struct,
   Enum,
   Union,
-  
+
   New,
   Delete,
-  
+
   Then,
   Colon,
   In,
-  
+
   Switch,
 };
 
@@ -232,16 +233,17 @@ struct Token {
   }
 
   Token() {}
-  Token(SourceLocation location, std::string value, TType type, TFamily family)
+
+  Token(SourceLocation location, InternedString value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family),
         location(location) {}
-  std::string value;
+  InternedString value;
   TType type;
   TFamily family;
   SourceLocation location;
   static Token &Eof() {
     static Token eof =
-        Token(SourceLocation(0, 0, 0), "", TType::Eof, TFamily::Operator);
+        Token(SourceLocation(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
     return eof;
   }
 
@@ -296,7 +298,7 @@ struct Lexer {
       {"in", TType::In},         {"switch", TType::Switch},
       {"then", TType::Then},     {"union", TType::Union},
       {"enum", TType::Enum},     {"return", TType::Return},
-      {"break", TType::Break},   {"continue", TType::Continue}, 
+      {"break", TType::Break},   {"continue", TType::Continue},
       {"for", TType::For},       {"while", TType::While},
       {"if", TType::If},         {"else", TType::Else},
       {"struct", TType::Struct}, {"true", TType::True},

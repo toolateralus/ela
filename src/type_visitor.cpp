@@ -168,7 +168,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       if (name == "this") continue;
 
       // constructors use anonymous symbol names.
-      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.contains("__anon_D")) continue;
+      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.get_str().contains("__anon_D")) continue;
       auto type = global_get_type(symbol.type_id);
 
       if (!type) continue;
@@ -426,7 +426,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       auto visited = std::unordered_set<const Type *>();
       if (type->equals(this_type->get_base(), this_type->get_ext(), visited))
         throw_error(
-            std::format("re-definition of function '{}'", node->name.value),
+            std::format("re-definition of function '{}'", node->name.value.get_str()),
             {});
     }
     sym->function_overload_types.push_back(type_id);
@@ -463,7 +463,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
   assert_types_can_cast_or_equal(control_flow.type, info.return_type,
                                  node->source_range,
                                  "invalid return type.. expected '{}', got '{}'",
-                                 std::format("function: '{}'", node->name.value));
+                                 std::format("function: '{}'", node->name.value.get_str()));
   return {};
 }
 std::any TypeVisitor::visit(ASTDeclaration *node) {
@@ -482,7 +482,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
     assert_types_can_cast_or_equal(
         expr_type, node->type->resolved_type, node->source_range,
         "invalid declaration types. expected: {}, got {}",
-        std::format("declaration: {}", node->name.value));
+        std::format("declaration: {}", node->name.value.get_str()));
   }
 
   auto symbol = ctx.scope->lookup(node->name.value);
@@ -491,7 +491,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   if (symbol->type_id == void_type() ||
       node->type->resolved_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}",
-                            node->name.value),
+                            node->name.value.get_str()),
                 node->source_range);
   }
   return {};
@@ -820,7 +820,7 @@ std::any TypeVisitor::visit(ASTType *node) {
     for (const auto &t: node->tuple_types)
       types.push_back(int_from_any(t->accept(this)));
     node->resolved_type = ctx.scope->find_type_id(types, node->extension_info);
-    node->base = get_tuple_type_name(types);
+    node->base = get_tuple_type_name(types).get_str();
 
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->resolved_type = int_from_any(node->pointing_to.get()->accept(this));
@@ -1069,14 +1069,16 @@ std::any TypeVisitor::visit(ASTLiteral *node) {
   switch (node->tag) {
   case ASTLiteral::Integer: {
     int base = 10;
-    if (node->value.starts_with("0x")) {
+    auto value = node->value.get_str();
+    if (value.starts_with("0x")) {
       base = 0;
     }
-    if (node->value.starts_with("0b")) {
-      node->value = node->value.substr(2, node->value.length());
+
+    if (value.starts_with("0b")) {
+      value = value.substr(2, value.length());
       base = 2;
     }
-    auto n = std::strtoll(node->value.c_str(), nullptr, base);
+    auto n = std::strtoll(value.c_str(), nullptr, base);
 
     if (declaring_or_assigning_type != -1) {
       auto type = ctx.scope->get_type(declaring_or_assigning_type);
@@ -1123,10 +1125,10 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
         for (const auto &key : info->keys) {
           if (key == identifier->value.value) {
             if (found) {
-              throw_warning(std::format("Found multiple enum types with variant '{}'.. using the `.{}` syntax will choose the first defined one. (Note: ignored candidate `{}`)", key, key, type->get_base()), node->source_range);
+              throw_warning(std::format("Found multiple enum types with variant '{}'.. using the `.{}` syntax will choose the first defined one. (Note: ignored candidate `{}`)", key.get_str(), key.get_str(), type->get_base().get_str()), node->source_range);
             } else {
               auto ast_type = ast_alloc<ASTType>();
-              ast_type->base = type->get_base();
+              ast_type->base = type->get_base().get_str();
               node->left = ast_type;
               found = true;
             }
@@ -1198,14 +1200,14 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
     */
     std::string name;
     if (node->right->get_node_type() == AST_NODE_TYPE) {
-      name = static_cast<ASTType *>(node->right)->base;
+      name = static_cast<ASTType *>(node->right)->base.get_str();
       // ! HACK HACK Super hacky solution ;; replace the ast with an iden.
       // REMOVE ME HACK
       auto iden = ast_alloc<ASTIdentifier>();
       iden->value = Token({}, name, TType::Identifier, TFamily::Identifier);
       node->right = iden;
     } else if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-      name = static_cast<ASTIdentifier *>(node->right)->value.value;
+      name = static_cast<ASTIdentifier *>(node->right)->value.value.get_str();
     } else {
       throw_error("cannot use a dot expression with a non identifer on the "
                   "right hand side when referring to a enum.",
@@ -1214,7 +1216,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
     bool found = false;
     for (const auto &key : info->keys) {
-      if (name == key) {
+      if (name == key.get_str()) {
         found = true;
         break;
       }

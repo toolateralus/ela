@@ -174,7 +174,7 @@ void EmitVisitor::emit_function_pointer_type_string(
       if ((sym.flags & SYMBOL_IS_FUNCTION) != 0 &&
            sym_ty == type &&
            identifier.is_not_null() &&
-           *identifier.get() == name) {
+           *identifier.get() == name.get_str()) {
         type_prefix = to_cpp_string(t) + "::*";
         *identifier.get() = to_cpp_string(t) + *identifier.get();
       }
@@ -241,7 +241,7 @@ std::any EmitVisitor::visit(ASTCall *node) {
 }
 
 void EmitVisitor::interpolate_string(ASTLiteral *node) {
-  if (node->value.empty()) {
+  if (node->value.get_str().empty()) {
     throw_warning(
         "using an empty interpolated string causes memory leaks right now.",
         node->source_range);
@@ -303,11 +303,13 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
   for (const auto &value : node->interpolated_values) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
     std::string format_specifier = get_format_str(type_id);
-    replace_next_brace_pair(node->value, format_specifier);
+    auto v = node->value.get_str();
+    replace_next_brace_pair(v, format_specifier);
+    node->value = v;
   }
 
   (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \""
-        << node->value << "\",";
+        << node->value.get_str() << "\",";
 
   auto interpolate_value = [&](ASTExpr *value) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
@@ -380,19 +382,19 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
     break;
   case ASTLiteral::Float:
     if (std::any_cast<int>(node->accept(&type_visitor)) != float64_type()) {
-      output = node->value + "f";
+      output = node->value.get_str() + "f";
     } else {
-      output = node->value;
+      output = node->value.get_str();
     }
     break;
   case ASTLiteral::Char:
-    output = '\'' + node->value + '\'';
+    output = '\'' + node->value.get_str() + '\'';
     break;
   case ASTLiteral::Integer:
-    output = node->value;
+    output = node->value.get_str();
     break;
   case ASTLiteral::Bool:
-    output = node->value;
+    output = node->value.get_str();
     break;
   }
   (*ss) << '(' << type << ')' << output;
@@ -400,7 +402,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
 }
 
 std::any EmitVisitor::visit(ASTIdentifier *node) {
-  (*ss) << node->value.value;
+  (*ss) << node->value.value.get_str();
   return {};
 }
 
@@ -422,10 +424,10 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
   // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
     node->operand->accept(this);
-    (*ss) << node->op.value;
+    (*ss) << node->op.value.get_str();
   } else {
     (*ss) << '(';
-    (*ss) << node->op.value;
+    (*ss) << node->op.value.get_str();
     node->operand->accept(this);
     (*ss) << ")";
   }
@@ -444,7 +446,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
 
     if (type->is_kind(TYPE_FUNCTION)) {
       std::string identifier =
-          static_cast<ASTIdentifier *>(node->left)->value.value;
+          static_cast<ASTIdentifier *>(node->left)->value.value.get_str();
       auto &ext = type->get_ext();
 
       if (ext.is_fixed_sized_array()) {
@@ -495,7 +497,7 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) << "(";
   auto left = node->left->accept(this);
   space();
-  (*ss) << node->op.value;
+  (*ss) << node->op.value.get_str();
 
   if (node->op.type == TType::Assign) {
     auto type = global_get_type(node->resolved_type);
@@ -563,7 +565,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
   }
 
   auto array_sizes = type->get_ext().array_sizes;
-  tss << type->get_base();
+  tss << type->get_base().get_str();
   if (!type->get_ext().is_fixed_sized_array()) {
     tss << name << ' ';
   }
@@ -608,7 +610,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node->name.value, type);
+    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
     if (node->value.is_not_null()) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
@@ -622,9 +624,9 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   if (node->is_bitfield) {
     node->type->accept(this);
     space();
-    (*ss) << node->name.value;
+    (*ss) << node->name.value.get_str();
     space();
-    (*ss) << ": " << node->bitsize.value;
+    (*ss) << ": " << node->bitsize.value.get_str();
     if (node->value.is_not_null()) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
@@ -636,7 +638,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    get_declaration_type_signature_and_identifier(node->name.value, type);
+    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init && !type->get_ext().is_pointer() && !is_freestanding) {
@@ -663,7 +665,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   } else {
     node->type->accept(this);
     space();
-    (*ss) << node->name.value;
+    (*ss) << node->name.value.get_str();
     space();
     if (node->value.is_not_null()) {
       (*ss) << " = ";
@@ -688,7 +690,7 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   node->return_type->accept(this);
-  (*ss) << ' ' << node->name.value << ' ';
+  (*ss) << ' ' << node->name.value.get_str() << ' ';
   node->params->accept(this);
   (*ss) << ";\n";
   emit_default_args = false;
@@ -696,7 +698,7 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
 void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   // Right now we just always do a closure on local lambda functions.
   // This probably isn't desirable for simple in-out functions
-  (*ss) << indent() << "auto " << node->name.value << " = [&]";
+  (*ss) << indent() << "auto " << node->name.value.get_str() << " = [&]";
   node->params->accept(this);
   (*ss) << " -> ";
   node->return_type->accept(this);
@@ -714,7 +716,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
   (*ss) << "extern \"C\" ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
-  (*ss) << node->name.value << '(';
+  (*ss) << node->name.value.get_str() << '(';
   for (const auto &param : node->params->params) {
     (*ss) << get_cpp_scalar_type(param->type->resolved_type);
     if (param != node->params->params.back()) {
@@ -746,7 +748,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     if ((node->flags & FUNCTION_IS_DTOR) != 0) {
       auto name = current_struct_decl ? current_struct_decl.get()->type->base
                                       : current_union_decl.get()->type->base;
-      (*ss) << '~' << name;
+      (*ss) << '~' << name.get_str();
       node->params->accept(this);
       if (!node->block) {
         throw_error("Cannot forward declare a constructor", node->source_range);
@@ -758,7 +760,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     if ((node->flags & FUNCTION_IS_CTOR) != 0) {
       auto name = current_struct_decl ? current_struct_decl.get()->type->base
                                       : current_union_decl.get()->type->base;
-      (*ss) << name;
+      (*ss) << name.get_str();
 
       auto is_copy_ctor =
           node->params->params.size() == 1 &&
@@ -768,11 +770,11 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
                    : current_union_decl.get()->type->resolved_type);
 
       if (is_copy_ctor) {
-        (*ss) << "(" << name << " &" << node->params->params[0]->name << ")";
+        (*ss) << "(" << name.get_str() << " &" << node->params->params[0]->name.get_str() << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
-        (*ss) << name;
-        (*ss) << "(const " << name << " &" << node->params->params[0]->name
+        (*ss) << name.get_str();
+        (*ss) << "(const " << name.get_str() << " &" << node->params->params[0]->name.get_str()
               << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
@@ -805,7 +807,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
         op.value = "->";
       }
       node->return_type->accept(this);
-      (*ss) << " operator " << op.value;
+      (*ss) << " operator " << op.value.get_str();
 
       if (op.type == TType::Increment || op.type == TType::Decrement) {
         (*ss) << "(int)";
@@ -834,7 +836,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     }
 
     // emit parameter signature && name.
-    (*ss) << " " + node->name.value;
+    (*ss) << " " + node->name.value.get_str();
     node->params->accept(this);
 
     if ((node->flags & FUNCTION_IS_METHOD) != 0) {
@@ -892,7 +894,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern)
       *ss << "extern \"C\" ";
-    *ss << "struct " << node->type->base << ";\n";
+    *ss << "struct " << node->type->base.get_str() << ";\n";
     return {};
   }
 
@@ -904,7 +906,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
      if (node->is_extern) {
       (*ss) << "extern \"C\" ";
     }
-    (*ss) << "struct " << node->type->base << "{\n";
+    (*ss) << "struct " << node->type->base.get_str() << "{\n";
   }
   indentLevel++;
 
@@ -949,7 +951,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
 
   auto type_name = node->type->base;
   for (const auto &[key, value] : node->key_values) {
-    (*ss) << "const " << to_cpp_string(elem_ty) << " " << type_name << '_' << key;
+    (*ss) << "const " << to_cpp_string(elem_ty) << " " << type_name.get_str() << '_' << key.get_str();
     (*ss) << " = ";
     if (value.is_not_null()) {
       value.get()->accept(this);
@@ -972,7 +974,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   });
   current_union_decl = node;
 
-  (*ss) << "union " << node->name.value << "{\n";
+  (*ss) << "union " << node->name.value.get_str() << "{\n";
 
   indentLevel++;
   ctx.set_scope(node->scope);
@@ -1017,14 +1019,14 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node->name, type);
+    get_declaration_type_signature_and_identifier(node->name.get_str(), type);
   } else {
     node->type->accept(this);
     auto sym = ctx.scope->local_lookup(node->name);
     if (sym && (sym->flags & SYMBOL_WAS_MUTATED) == 0 && type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
-      (*ss) << " const& " << node->name;
+      (*ss) << " const& " << node->name.get_str();
     } else {
-      (*ss) << ' ' << node->name;
+      (*ss) << ' ' << node->name.get_str();
     }
   }
 
@@ -1141,7 +1143,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
-      type_info << str << ";\n";
+      type_info << str.get_str() << ";\n";
     }
     code << std::format(
       "Type **_type_info = new Type*[{}];\n"
@@ -1210,7 +1212,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 
 
   if (left_ty->is_kind(TYPE_ENUM)) {
-    (*ss) << left_ty->get_base() + '_';
+    (*ss) << left_ty->get_base().get_str() + '_';
     node->right->accept(this);
     return {};
   }
@@ -1321,7 +1323,7 @@ bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
     visitor->test_functions << "__COMPILER_GENERATED_TEST(\""
-                            << node->name.value << "\", " << node->name.value
+                            << node->name.value.get_str() << "\", " << node->name.value.get_str()
                             << "),";
     visitor->num_tests++;
   }
@@ -1393,7 +1395,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   switch (type->kind) {
   case TYPE_SCALAR:
   case TYPE_STRUCT:
-    output = to_cpp_string(type->get_ext(), type->get_base());
+    output = to_cpp_string(type->get_ext(), type->get_base().get_str());
     break;
   case TYPE_FUNCTION: {
     StringBuilder my_ss;
@@ -1404,14 +1406,14 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
     return my_ss.str();
   }
   case TYPE_ENUM:
-    output = type->get_base();
+    output = type->get_base().get_str();
     break;
   case TYPE_UNION:
-    output = to_cpp_string(type->get_ext(), type->get_base());
+    output = to_cpp_string(type->get_ext(), type->get_base().get_str());
     break;
   case TYPE_TUPLE: {
     auto info = static_cast<TupleTypeInfo*>(type->get_info());
-    output = "_tuple" + get_tuple_type_name(info->types);
+    output = "_tuple" + get_tuple_type_name(info->types).get_str();
     output = to_cpp_string(type->get_ext(), output);
     break;
   }
@@ -1436,7 +1438,7 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type, T
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
-    ss << std::format(".offset = offsetof({}, {})", parent_type->get_base(), name);
+    ss << std::format(".offset = offsetof({}, {})", parent_type->get_base().get_str(), name);
   }
 
   ss << " }";
@@ -1646,7 +1648,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
 
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
-      fields_ss << get_field_struct(name, t, type, context);
+      fields_ss << get_field_struct(name.get_str(), t, type, context);
       ++it;
       if (it < count) {
         fields_ss << ", ";
@@ -1665,7 +1667,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
       auto t = global_get_type(s32_type());
       if (!t)
         throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
-      fields_ss << get_field_struct(name, t, type, context);
+      fields_ss << get_field_struct(name.get_str(), t, type, context);
       ++it;
       if (it < count) {
         fields_ss << ", ";
@@ -1733,12 +1735,10 @@ std::any EmitVisitor::visit(ASTTuple *node) {
   return {};
 }
 
-
-
 std::any EmitVisitor::visit(ASTTupleDeconstruction *node) {
   (*ss) << "auto [";
   for (auto &iden : node->idens) {
-    (*ss) << iden->value.value;
+    (*ss) << iden->value.value.get_str();
     if (iden != node->idens.back()) {
       (*ss) << ", ";
     }

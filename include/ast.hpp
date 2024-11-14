@@ -1,6 +1,7 @@
 #pragma once
 
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
@@ -30,7 +31,7 @@ template <class T> T *ast_alloc(size_t n = 1) {
 struct VisitorBase;
 
 // used to prevent double includes.
-extern std::unordered_set<std::string> import_set;
+extern std::unordered_set<InternedString> import_set;
 
 enum ASTNodeType {
   AST_NODE_PROGRAM,
@@ -133,7 +134,7 @@ struct ASTExpr : ASTNode {
 struct ASTType : ASTExpr {
   int flags = -1;
   // base name,
-  std::string base;
+  InternedString base;
   // [], *, [string] etc.
   TypeExt extension_info{};
 
@@ -219,7 +220,7 @@ struct ASTLiteral : ASTExpr {
     Null,
   } tag;
   std::vector<ASTExpr*> interpolated_values {};
-  std::string value;
+  InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_LITERAL;
@@ -249,7 +250,7 @@ struct ASTTuple : ASTExpr {
 struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
-  std::string name;
+  InternedString name;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_PARAM_DECL;
@@ -460,7 +461,7 @@ struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
   int element_type;
   ASTType* type;
-  std::vector<std::pair<std::string, Nullable<ASTExpr>>> key_values;
+  std::vector<std::pair<InternedString, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_ENUM_DECLARATION;
@@ -623,7 +624,7 @@ enum ParserState {
 struct Parser;
 struct DirectiveRoutine {
   ~DirectiveRoutine() = default;
-  std::string identifier;
+  InternedString identifier;
   DirectiveKind kind;
   std::function<Nullable<ASTNode>(Parser *parser)> run;
 };
@@ -677,10 +678,10 @@ struct Parser {
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *type);
 
-  ASTType *parse_function_type(const std::string &base, TypeExt extension_info);
+  ASTType *parse_function_type(const InternedString &base, TypeExt extension_info);
 
   Nullable<ASTNode> process_directive(DirectiveKind kind,
-                                      const std::string &identifier);
+                                      const InternedString &identifier);
   void init_directive_routines();
   Nullable<ASTExpr> try_parse_directive_expr();
 

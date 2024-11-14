@@ -21,7 +21,7 @@ struct SerializeVisitor : VisitorBase {
   int indentLevel = 0;
   Context &context;
   std::string indent();
-  
+
   std::any visit(ASTProgram *node) override;
   std::any visit(ASTFunctionDeclaration *node) override;
   std::any visit(ASTBlock *node) override;
@@ -59,7 +59,7 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct TypeVisitor : VisitorBase {
-  
+
   int declaring_or_assigning_type = -1;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
@@ -114,7 +114,7 @@ struct EmitVisitor : VisitorBase {
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
-  
+
   std::vector<std::function<void()>> pending_statements;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
@@ -150,7 +150,7 @@ struct EmitVisitor : VisitorBase {
         return;
       }
 
-      (*ss) << "\n#line " << std::to_string(loc) << " \"" << filename << "\"\n";
+      (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }
   }

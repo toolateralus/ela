@@ -2,6 +2,7 @@
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include <sstream>
@@ -9,7 +10,7 @@
 
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
-  ss << global_get_type(return_type)->get_base();
+  ss << global_get_type(return_type)->get_base().get_str();
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = global_get_type(parameter_types[i]);
@@ -33,7 +34,7 @@ Type *global_get_type(const int id) {
   return type_table[id];
 }
 
-int global_create_type_alias(int aliased_type, const std::string &name) {
+int global_create_type_alias(int aliased_type, const InternedString &name) {
 
   // this type alias already exists so just return the type.
   if (type_alias_map.contains(name)) {
@@ -53,7 +54,7 @@ int global_create_type_alias(int aliased_type, const std::string &name) {
   aliased->aliases.push_back(type->id);
   return type->id;
 }
-int global_find_function_type_id(const std::string &name,
+int global_find_function_type_id(const InternedString &name,
                                  const FunctionTypeInfo &info,
                                  const TypeExt &ext) {
 
@@ -87,7 +88,7 @@ int global_find_function_type_id(const std::string &name,
 // We might want to upgrade to a hash map at a certain number of types or
 // something. I think the linear search is fine but this is certainly one of the
 // slowest functions in the compiler.
-int global_find_type_id(const std::string &name,
+int global_find_type_id(const InternedString &name,
                         const TypeExt &type_extensions) {
   if (type_alias_map.contains(name)) {
     auto alias = type_alias_map[name];
@@ -338,7 +339,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-bool Type::equals(const std::string &name, const TypeExt &type_extensions,
+bool Type::equals(const InternedString &name, const TypeExt &type_extensions,
                   std::unordered_set<const Type *> &visited) const {
   auto type = global_get_type(id);
   if (type->get_base() != name)
@@ -387,10 +388,10 @@ std::string Type::to_string() const {
   case TYPE_STRUCT:
   case TYPE_TUPLE:
   case TYPE_SCALAR:
-    return type->base + type->extensions.to_string();
+    return type->base.get_str() + type->extensions.to_string();
   case TYPE_ENUM:
   case TYPE_UNION:
-    return type->base;
+    return type->base.get_str();
   }
 }
 
@@ -405,7 +406,7 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   ext.extensions.pop_back();
   return global_find_type_id(ty->get_base(), ext);
 }
-int global_create_struct_type(const std::string &name, Scope *scope) {
+int global_create_struct_type(const InternedString &name, Scope *scope) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
   type_table[num_types] = type;
   type->set_base(name);
@@ -415,7 +416,7 @@ int global_create_struct_type(const std::string &name, Scope *scope) {
   num_types++;
   return type->id;
 }
-int global_create_union_type(const std::string &name, Scope *scope,
+int global_create_union_type(const InternedString &name, Scope *scope,
                              UnionFlags kind) {
   auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
   type_table[num_types] = type;
@@ -427,8 +428,8 @@ int global_create_union_type(const std::string &name, Scope *scope,
   num_types++;
   return type->id;
 }
-int global_create_enum_type(const std::string &name,
-                            const std::vector<std::string> &keys,
+int global_create_enum_type(const InternedString &name,
+                            const std::vector<InternedString> &keys,
                             bool is_flags) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
@@ -443,7 +444,7 @@ int global_create_enum_type(const std::string &name,
   num_types += 1;
   return type->id;
 }
-int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
+int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info,
                        const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
   type->set_info(info);
@@ -461,7 +462,7 @@ int global_create_type(TypeKind kind, const std::string &name, TypeInfo *info,
   num_types += 1;
   return type->id;
 }
-std::string get_function_typename(ASTFunctionDeclaration *decl) {
+InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
   ss << global_get_type(return_type->resolved_type)->to_string();
@@ -819,7 +820,7 @@ int global_create_tuple_type(const std::vector<int> &types,
   return type->id;
 }
 
-std::string get_tuple_type_name(const std::vector<int> &types) {
+InternedString get_tuple_type_name(const std::vector<int> &types) {
   std::stringstream ss;
   ss << "<";
   for (auto it = types.begin(); it != types.end(); ++it) {

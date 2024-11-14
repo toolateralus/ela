@@ -1,5 +1,6 @@
 
 
+#include "interned_string.hpp"
 #include <cstddef>
 #include <cstring>
 #include <string>
