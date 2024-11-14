@@ -2,7 +2,13 @@
 
 mkdir -p build
 cd build
-cmake .. -G "Ninja"
+
+if [ "$1" == "Release" ]; then
+    cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release
+else
+    cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Debug
+fi
+
 ninja clean
 ninja -j12
 cd ..

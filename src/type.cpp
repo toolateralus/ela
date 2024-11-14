@@ -102,10 +102,10 @@ int global_find_type_id(const InternedString &name,
           base_type->get_ext_no_compound().append(type_extensions));
     }
   }
+
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    auto visited = std::unordered_set<const Type *>();
-    if (type->equals(name, type_extensions, visited))
+    if (type->equals(name, type_extensions))
       return type->id;
   }
 
@@ -120,6 +120,7 @@ int global_find_type_id(const InternedString &name,
       break;
     }
   }
+
   if (base_id != -1) {
     auto t = global_get_type(base_id);
     return global_create_type((TypeKind)t->kind, name, t->get_info(),
@@ -305,8 +306,7 @@ bool Type::operator==(const Type &type) const {
   for (int i = 0; i < num_types; ++i) {
     auto tinfo = type_table[i];
 
-    auto visited = std::unordered_set<const Type *>();
-    if (tinfo->equals(base, extensions, visited) && type.info &&
+    if (tinfo->equals(base, extensions) && type.info &&
         type_info_equals(type.info, type.kind))
       return true;
   }
@@ -339,8 +339,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-bool Type::equals(const InternedString &name, const TypeExt &type_extensions,
-                  std::unordered_set<const Type *> &visited) const {
+bool Type::equals(const InternedString &name, const TypeExt &type_extensions) const {
   auto type = global_get_type(id);
   if (type->get_base() != name)
     return false;

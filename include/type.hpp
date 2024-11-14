@@ -338,7 +338,7 @@ struct Type {
   // these are the types that refer to me as an alias
   std::vector<int> aliases;
 
-  bool has_alias(const InternedString &name) const {
+ inline  bool has_alias(const InternedString &name) const {
     if (!has_aliases) return false;
     for (const auto &alias: aliases) {
       auto type = global_get_type(alias);
@@ -349,16 +349,16 @@ struct Type {
     return false;
   }
 
-  void set_base(const InternedString &base) {
+  inline void set_base(const InternedString &base) {
     this->base = base;
   }
-  void set_ext(const TypeExt &ext) {
+  inline void set_ext(const TypeExt &ext) {
     this->extensions = ext;
   }
-  void set_info(TypeInfo *info) {
+  inline void set_info(TypeInfo *info) {
     this->info = info;
   }
-  InternedString const get_base() const {
+  inline InternedString const get_base() const {
     return base;
   }
   TypeExt const get_ext() const {
@@ -385,7 +385,7 @@ struct Type {
   TypeInfo *info;
   public:
 
-  bool equals(const InternedString &name, const TypeExt &type_extensions, std::unordered_set<const Type*> &visited) const;
+  bool equals(const InternedString &name, const TypeExt &type_extensions) const;
 
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   Type(){};

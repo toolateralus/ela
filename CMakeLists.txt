@@ -6,6 +6,11 @@ set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Default to Debug build type if not specified
+if(NOT CMAKE_BUILD_TYPE)
+  set(CMAKE_BUILD_TYPE Debug CACHE STRING "Build type" FORCE)
+endif()
+
 # Include directories
 include_directories(include)
 
@@ -28,4 +33,9 @@ set_target_properties(ela PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_DIR}
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_DIR}
 )
+
+# Set compiler flags for Release mode
+set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto -s")
+set(CMAKE_C_FLAGS_RELEASE "${CMAKE_C_FLAGS_RELEASE} -O3 -flto -s")
+
 target_compile_definitions(ela PRIVATE MAX_NUM_TYPES=10000)

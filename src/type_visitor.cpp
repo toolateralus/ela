@@ -423,8 +423,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = ctx.scope->get_type(overload_type_id);
       auto this_type = ctx.scope->get_type(type_id);
-      auto visited = std::unordered_set<const Type *>();
-      if (type->equals(this_type->get_base(), this_type->get_ext(), visited))
+      if (type->equals(this_type->get_base(), this_type->get_ext()))
         throw_error(
             std::format("re-definition of function '{}'", node->name.value.get_str()),
             {});
