@@ -779,9 +779,9 @@ start_game_callback :: () {
   reset_game_state();
   bg_color = BLACK;
   swap_music();
+  round_index = 0;
   round_failed = false;
 }
-
 
 draw_main_menu :: () {
   width : float = 72;

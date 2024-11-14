@@ -5,9 +5,11 @@
 #include "type.hpp"
 
 #include "visitor.hpp"
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 
+#include <ostream>
 #include <unordered_map>
 
 /*
@@ -16,7 +18,10 @@
   #########################
 */
 
-Type **type_table = new Type*[MAX_NUM_TYPES];
+using std::string;
+using std::vector;
+
+Type **type_table = new Type *[MAX_NUM_TYPES];
 int num_types;
 
 // this is just an approximation.
@@ -50,13 +55,41 @@ std::unordered_set<std::string> import_set;
 static bool run_on_finished = false;
 
 int main(int argc, char *argv[]) {
-  if (argc == 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
-    argv = new char*[2] {
-      (char*)"",
-      (char*)"main.ela"
-    };
+
+  for (int i = 0; i < argc; ++i) {
+      if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
+        printf(R"_(
+Ela compiler:
+   compile a file: `ela <filename.ela>`
+   compile & run a 'main.ela' in current directory: `ela run`
+
+   Available flags:
+   --debug       Compile the output source with debug symbols. Use '#compiler_flags "-g" in your program as well for gdb/lldb debugging.
+   --verbose     Write a file and dump the AST representation of your program to 'stdout'.
+   --no-compile  Transpile to C++ but don't invoke the clang++ compiler automatically.
+   --s           Don't delete the `.hpp` and `.cpp` files used to transpile.
+   --metrics     Write performance metrics to stdout.
+   --test        Only emit functions marked `#test` and create a test runner. You still have to run the binary to run the tests.
+)_");
+    return 0;
+      }
+  }
+
+  vector<string> original_args(argv + (argc >= 2 ? 2 : 1), argv + argc);
+
+
+  if (argc >= 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
+    argv[1] = (char*)"main.ela";
     argc = 2;
     run_on_finished = true;
+  }
+
+  if (argc == 2 && (strcmp(argv[1], "init") == 0)) {
+    std::ofstream file("main.ela");
+    file << "main :: (argc: int, argv: char**) {\n\n}\n";
+    file.flush();
+    file.close();
+    return 0;
   }
 
   compile_command = CompileCommand(argc, argv);
@@ -68,7 +101,14 @@ int main(int argc, char *argv[]) {
 
   if (run_on_finished) {
     if (result == 0) {
-      system(("./" + compile_command.binary_path.string()).c_str());
+      string invocation = ("./" + compile_command.binary_path.string());
+      string args = "";
+      for (const auto &arg: original_args) {
+        args += arg + " ";
+      }
+      auto command = invocation + " " + args;
+      std::cout << "Running: " << command << std::endl;
+      system(command.c_str());
     }
   }
 

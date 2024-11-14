@@ -185,6 +185,13 @@ template <class T> struct _array {
     std::copy(array, array + len, data);
   }
 
+  _array(T *begin, T *end) {
+    length = std::distance(end - begin);
+    capacity = length;
+    data = new T[length];
+    std::copy(begin, end, data);
+  }
+
   _array(const _array &other)
       : data(new T[other.length]), length(other.length),
         capacity(other.capacity), is_view(other.is_view) {

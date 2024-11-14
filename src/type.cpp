@@ -128,34 +128,34 @@ int global_find_type_id(const std::string &name,
   return -1;
 }
 
-int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
+int global_find_type_id(std::vector<int> &tuple_types,
+                        const TypeExt &type_extensions) {
   for (int i = 0; i < num_types; ++i) {
     auto type = type_table[i];
-    
+
     if (!type->is_kind(TYPE_TUPLE))
       continue;
-    
-    auto info = static_cast<TupleTypeInfo*>(type->get_info());
-    
+
+    auto info = static_cast<TupleTypeInfo *>(type->get_info());
+
     if (info->types.size() != tuple_types.size())
       continue;
-    
-    for (int i = 0; i < info->types.size(); ++i) 
-      if (info->types[i] != tuple_types[i]) 
+
+    for (int i = 0; i < info->types.size(); ++i)
+      if (info->types[i] != tuple_types[i])
         goto end_of_loop;
-    
+
     if (type->get_ext() == type_extensions) {
       // Found a matching type with the same extensions. Return it.
       return type->id;
     }
-      
-    end_of_loop:
+
+  end_of_loop:
   }
-  
+
   // We didn't find the tuple type. Return a new one.
   return global_create_tuple_type(tuple_types, type_extensions);
 }
-
 
 // CLEANUP(Josh) 10/3/2024, 9:25:36 AM
 // This could be significantly improved for readability
@@ -166,22 +166,25 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_exten
 // is not really going to pay off that much probably.
 ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (!from || !to) {
-    throw_error("Internal Compiler Error: type was null when checking type conversion rules", {});
+    throw_error("Internal Compiler Error: type was null when checking type "
+                "conversion rules",
+                {});
   }
-  
+
   if (from->is_kind(TYPE_TUPLE) && to->is_kind(TYPE_TUPLE)) {
-    auto from_info = static_cast<TupleTypeInfo*>(from->get_info());
-    auto to_info = static_cast<TupleTypeInfo*>(to->get_info());
-    
+    auto from_info = static_cast<TupleTypeInfo *>(from->get_info());
+    auto to_info = static_cast<TupleTypeInfo *>(to->get_info());
+
     if (from_info->types.size() != to_info->types.size()) {
       return CONVERT_PROHIBITED;
     }
-    
+
     ConversionRule rule;
     for (int i = 0; i < from_info->types.size(); ++i) {
       auto from_t = from_info->types[i];
       auto to_t = to_info->types[i];
-      rule = type_conversion_rule(global_get_type(from_t), global_get_type(to_t));
+      rule =
+          type_conversion_rule(global_get_type(from_t), global_get_type(to_t));
       if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
         return rule;
       }
@@ -222,9 +225,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   }
 
   // allow pointer arithmetic
-  if (from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer(-1) &&
-      to->is_kind(TYPE_SCALAR) && type_is_numerical(to) &&
-      to->get_ext().has_no_extensions()) {
+  const auto from_is_scalar_ptr =
+      from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer(-1);
+  const auto to_is_non_ptr_number =
+      type_is_numerical(to) && to->get_ext().has_no_extensions();
+  if (from_is_scalar_ptr && to_is_non_ptr_number) {
     return CONVERT_IMPLICIT;
   }
 
@@ -239,7 +244,29 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 
   // TODO: probably want to fix this. right now we have C style pointer casting:
   // any two pointers of the same depth can cast implicitly
-  if (from->get_ext().is_pointer(1) && to->get_ext().is_pointer(1)) {
+  const auto implicit_ptr_cast =
+      from->get_ext().is_pointer(1) && to->get_ext().is_pointer(1);
+
+
+  // If we have a fixed array such as
+  // char[5] and the argument takes void*
+  // we check if char* can cast to void*, and if it can, we allow the cast.
+  // this obviously works for char* too.
+  const auto implicit_fixed_array_to_ptr_cast = [&]() {
+    // not array, return.
+    if (!from->get_ext().is_fixed_sized_array())
+      return false;
+
+    if (!to->get_ext().is_pointer(1))
+      return false;
+
+    auto element_ty_base = global_get_type(from->get_element_type())->get_base();
+    auto element_ptr_type = global_get_type(global_find_type_id(element_ty_base, {.extensions= {TYPE_EXT_POINTER}}));
+    auto rule = type_conversion_rule(element_ptr_type, to);
+    return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
+  }();
+
+  if (implicit_ptr_cast || implicit_fixed_array_to_ptr_cast) {
     return CONVERT_IMPLICIT;
   }
 
@@ -323,23 +350,22 @@ bool Type::equals(const std::string &name, const TypeExt &type_extensions,
 bool TypeExt::equals(const TypeExt &other) const {
   if (extensions.size() != other.extensions.size())
     return false;
-  
+
   if (array_sizes.size() != other.array_sizes.size())
     return false;
-  
-  
+
   for (int i = 0; i < extensions.size(); ++i)
     if (extensions[i] != other.extensions[i])
       return false;
-    
+
   for (int i = 0; i < array_sizes.size(); ++i)
     if (array_sizes[i] != other.array_sizes[i])
       return false;
-  
+
   if (key_type != other.key_type) {
     return false;
   }
-  
+
   return true;
 }
 
@@ -356,18 +382,17 @@ std::string Type::to_string() const {
   }
 
   switch (kind) {
-    case TYPE_FUNCTION:
-      return type->info->to_string() + type->extensions.to_string();
-    case TYPE_STRUCT:
-    case TYPE_TUPLE:
-    case TYPE_SCALAR:
-      return type->base + type->extensions.to_string();
-    case TYPE_ENUM: 
-    case TYPE_UNION:
-      return type->base;
+  case TYPE_FUNCTION:
+    return type->info->to_string() + type->extensions.to_string();
+  case TYPE_STRUCT:
+  case TYPE_TUPLE:
+  case TYPE_SCALAR:
+    return type->base + type->extensions.to_string();
+  case TYPE_ENUM:
+  case TYPE_UNION:
+    return type->base;
   }
 }
-
 
 int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   auto ty = global_get_type(operand_ty);
@@ -455,7 +480,6 @@ int Type::get_element_type() const {
   if (!extensions.is_array()) {
     return -1;
   }
-
   auto extensions = this->get_ext();
   for (auto it = extensions.extensions.rbegin();
        it != extensions.extensions.rend();) {
@@ -463,18 +487,18 @@ int Type::get_element_type() const {
       it = std::vector<TypeExtEnum>::reverse_iterator(
           extensions.extensions.erase((it + 1).base()));
       extensions.array_sizes.pop_back();
-      
+
       if (is_kind(TYPE_TUPLE)) {
-        auto info = static_cast<TupleTypeInfo*>(get_info());
+        auto info = static_cast<TupleTypeInfo *>(get_info());
         return global_find_type_id(info->types, extensions);
-      }
-      else return global_find_type_id(base, extensions);
-      
+      } else
+        return global_find_type_id(base, extensions);
+
     } else {
       ++it;
     }
   }
-  
+
   return id;
 }
 
@@ -745,7 +769,7 @@ bool TypeExt::is_fixed_sized_array() const {
 std::string TypeExt::to_string() const {
   std::stringstream ss;
   auto array_sizes = this->array_sizes;
-  
+
   for (const auto ext : extensions) {
     switch (ext) {
     case TYPE_EXT_POINTER:
@@ -763,33 +787,34 @@ std::string TypeExt::to_string() const {
     case TYPE_EXT_MAP: {
       ss << "[" << global_get_type(key_type)->to_string() << "]";
     } break;
-    } 
+    }
   }
   return ss.str();
 }
 
-int get_map_value_type(Type *map_type) { 
-  auto id  = global_find_type_id(map_type->get_base(), map_type->get_ext().without_back());
+int get_map_value_type(Type *map_type) {
+  auto id = global_find_type_id(map_type->get_base(),
+                                map_type->get_ext().without_back());
   return id;
 }
 
-
-int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext) {
+int global_create_tuple_type(const std::vector<int> &types,
+                             const TypeExt &ext) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_TUPLE);
   type_table[num_types] = type;
-  
+
   //! BUG: we should allow nested tuples;
   //! right now I doubt that it would generate itself recursively.
-    
+
   type->set_base(get_tuple_type_name(types));
 
   auto info = new (type_alloc<TupleTypeInfo>()) TupleTypeInfo();
   info->types = types;
-  
+
   type->set_info(info);
   type->set_ext(ext);
-  
+
   num_types += 1;
   return type->id;
 }
@@ -799,9 +824,9 @@ std::string get_tuple_type_name(const std::vector<int> &types) {
   ss << "<";
   for (auto it = types.begin(); it != types.end(); ++it) {
     auto type = global_get_type(*it);
-    
+
     ss << type->to_string();
-    
+
     if (it != types.end() - 1) {
       ss << ", ";
     }

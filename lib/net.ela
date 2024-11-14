@@ -1,0 +1,252 @@
+/*
+  ## net module ##
+  Internet utilities.
+
+  Very basic, and needs a lot of additions to be useable.
+  Right now, it barely provides enough to establish a TCP Client & Server connection
+  and send messages back and forth.
+
+*/
+
+/* Protocol families.  */
+PF_UNSPEC : int =	0	/* Unspecified.  */;
+PF_LOCAL : int =	1	/* Local to host (pipes and file-domain).  */;
+PF_UNIX : int =		PF_LOCAL /* POSIX name for PF_LOCAL.  */;
+PF_FILE : int =		PF_LOCAL /* Another non-standard name for PF_LOCAL.  */;
+PF_INET : int =		2	/* IP protocol family.  */;
+PF_AX25 : int =		3	/* Amateur Radio AX.25.  */;
+PF_IPX : int =		4	/* Novell Internet Protocol.  */;
+PF_APPLETALK : int =	5	/* Appletalk DDP.  */;
+PF_NETROM : int =	6	/* Amateur radio NetROM.  */;
+PF_BRIDGE : int =	7	/* Multiprotocol bridge.  */;
+PF_ATMPVC : int =	8	/* ATM PVCs.  */;
+PF_X25 : int =		9	/* Reserved for X.25 project.  */;
+PF_INET6 : int =	10	/* IP version 6.  */;
+PF_ROSE : int =		11	/* Amateur Radio X.25 PLP.  */;
+PF_DECnet : int =	12	/* Reserved for DECnet project.  */;
+PF_NETBEUI : int =	13	/* Reserved for 802.2LLC project.  */;
+PF_SECURITY : int =	14	/* Security callback pseudo AF.  */;
+PF_KEY : int =		15	/* PF_KEY key management API.  */;
+PF_NETLINK : int =	16;
+PF_ROUTE : int =	PF_NETLINK /* Alias to emulate 4.4BSD.  */;
+PF_PACKET : int =	17	/* Packet family.  */;
+PF_ASH : int =		18	/* Ash.  */;
+PF_ECONET : int =	19	/* Acorn Econet.  */;
+PF_ATMSVC : int =	20	/* ATM SVCs.  */;
+PF_RDS : int =		21	/* RDS sockets.  */;
+PF_SNA : int =		22	/* Linux SNA Project */;
+PF_IRDA : int =		23	/* IRDA sockets.  */;
+PF_PPPOX : int =	24	/* PPPoX sockets.  */;
+PF_WANPIPE : int =	25	/* Wanpipe API sockets.  */;
+PF_LLC : int =		26	/* Linux LLC.  */;
+PF_IB : int =		27	/* Native InfiniBand address.  */;
+PF_MPLS : int =		28	/* MPLS.  */;
+PF_CAN : int =		29	/* Controller Area Network.  */;
+PF_TIPC : int =		30	/* TIPC sockets.  */;
+PF_BLUETOOTH : int =	31	/* Bluetooth sockets.  */;
+PF_IUCV : int =		32	/* IUCV sockets.  */;
+PF_RXRPC : int =	33	/* RxRPC sockets.  */;
+PF_ISDN : int =		34	/* mISDN sockets.  */;
+PF_PHONET : int =	35	/* Phonet sockets.  */;
+PF_IEEE802154 : int =	36	/* IEEE 802.15.4 sockets.  */;
+PF_CAIF : int =		37	/* CAIF sockets.  */;
+PF_ALG : int =		38	/* Algorithm sockets.  */;
+PF_NFC : int =		39	/* NFC sockets.  */;
+PF_VSOCK : int =	40	/* vSockets.  */;
+PF_KCM : int =		41	/* Kernel Connection Multiplexor.  */;
+PF_QIPCRTR : int =	42	/* Qualcomm IPC Router.  */;
+PF_SMC : int =		43	/* SMC sockets.  */;
+PF_XDP : int =		44	/* XDP sockets.  */;
+PF_MCTP : int =		45	/* Management component transport protocol.  */;
+PF_MAX : int =		46	/* For now..  */;
+
+/* Address families.  */
+AF_UNSPEC : int =	PF_UNSPEC;
+AF_LOCAL : int =	PF_LOCAL;
+AF_UNIX : int =		PF_UNIX;
+AF_FILE : int =		PF_FILE;
+AF_INET : int =		PF_INET;
+AF_AX25 : int =		PF_AX25;
+AF_IPX : int =		PF_IPX;
+AF_APPLETALK : int =	PF_APPLETALK;
+AF_NETROM : int =	PF_NETROM;
+AF_BRIDGE : int =	PF_BRIDGE;
+AF_ATMPVC : int =	PF_ATMPVC;
+AF_X25 : int =		PF_X25;
+AF_INET6 : int =	PF_INET6;
+AF_ROSE : int =		PF_ROSE;
+AF_DECnet : int =	PF_DECnet;
+AF_NETBEUI : int =	PF_NETBEUI;
+AF_SECURITY : int =	PF_SECURITY;
+AF_KEY : int =		PF_KEY;
+AF_NETLINK : int =	PF_NETLINK;
+AF_ROUTE : int =	PF_ROUTE;
+AF_PACKET : int =	PF_PACKET;
+AF_ASH : int =		PF_ASH;
+AF_ECONET : int =	PF_ECONET;
+AF_ATMSVC : int =	PF_ATMSVC;
+AF_RDS : int =		PF_RDS;
+AF_SNA : int =		PF_SNA;
+AF_IRDA : int =		PF_IRDA;
+AF_PPPOX : int =	PF_PPPOX;
+AF_WANPIPE : int =	PF_WANPIPE;
+AF_LLC : int =		PF_LLC;
+AF_IB : int =		PF_IB;
+AF_MPLS : int =		PF_MPLS;
+AF_CAN : int =		PF_CAN;
+AF_TIPC : int =		PF_TIPC;
+AF_BLUETOOTH : int =	PF_BLUETOOTH;
+AF_IUCV : int =		PF_IUCV;
+AF_RXRPC : int =	PF_RXRPC;
+AF_ISDN : int =		PF_ISDN;
+AF_PHONET : int =	PF_PHONET;
+AF_IEEE802154 : int =	PF_IEEE802154;
+AF_CAIF : int =		PF_CAIF;
+AF_ALG : int =		PF_ALG;
+AF_NFC : int =		PF_NFC;
+AF_VSOCK : int =	PF_VSOCK;
+AF_KCM : int =		PF_KCM;
+AF_QIPCRTR : int =	PF_QIPCRTR;
+AF_SMC : int =		PF_SMC;
+AF_XDP : int =		PF_XDP;
+AF_MCTP : int =		PF_MCTP;
+AF_MAX : int =		PF_MAX;
+
+/* Socket level values.  Others are defined in the appropriate headers.
+   XXX These definitions also should go into the appropriate headers as
+  far as they are available.  */
+SOL_RAW : int = 255;
+SOL_DECNET : int = 261;
+SOL_X25 : int = 262;
+SOL_PACKET : int =	263;
+/* ATM layer (cell level).  */
+SOL_ATM : int =		264;
+/* ATM Adaption Layer (packet level).  */
+SOL_AAL : int =		265;
+
+SOL_IRDA : int =	266;
+SOL_NETBEUI : int =	267;
+SOL_LLC : int =		268;
+SOL_DCCP : int =	269;
+SOL_NETLINK : int =	270;
+SOL_TIPC : int =	271;
+SOL_RXRPC : int =	272;
+SOL_PPPOL2TP : int =	273;
+SOL_BLUETOOTH : int =	274;
+SOL_PNPIPE : int =	275;
+SOL_RDS : int =		276;
+SOL_IUCV : int =	277;
+SOL_CAIF : int =	278;
+SOL_ALG : int =		279;
+SOL_NFC : int =		280;
+SOL_KCM : int =		281;
+SOL_TLS : int =		282;
+SOL_XDP : int =		283;
+SOL_MPTCP : int =	284;
+SOL_MCTP : int =	285;
+SOL_SMC : int =		286;
+SOL_VSOCK : int =	287;
+
+/* Maximum queue length specifiable by listen.  */
+SOMAXCONN : int =	4096;
+
+/* Types of sockets.  */
+SocketType :: enum{
+  Stream = 1,		/* Sequenced, reliable, connection-based byte streams.  */
+  Dgram = 2,		/* Connectionless, unreliable datagrams of fixed maximum length.  */
+  Raw = 3,			/* Raw protocol interface.  */
+  Rdm = 4,			/* Reliably-delivered messages.  */
+  Seqpacket = 5,		/* Sequenced, reliable, connection-based, datagrams of fixed maximum length.  */
+  Dccp = 6,		/* Datagram Congestion Control Protocol.  */
+  Packet = 10,		/* Linux specific way of getting packets at the dev level.  For writing rarp and other similar things on the user level. */
+  /* Flags to be ORed into the type parameter of socket and socketpair and used for the flags parameter of paccept.  */
+  Cloexec = 02000000,	/* Atomically set close-on-exec flag for the new descriptor(s).  */
+  Nonblock = 00004000	/* Atomically mark descriptor(s) as non-blocking.  */
+};
+
+
+#alias sin_family_t :: u16;
+#alias sa_family_t :: u16;
+
+#alias in_port_t    :: u16;
+#alias in_addr_t    :: u32;
+#alias socklen_t    :: u32;
+
+in_addr :: struct {
+  s_addr: in_addr_t;
+};
+
+/* Structure describing an Internet socket address.  */
+sockaddr_in :: struct {
+  sin_family : sin_family_t;
+  sin_port   : in_port_t;			/* Port number.  */
+  sin_addr   : in_addr;		/* Internet address.  */
+
+  /*
+    Pad to size of `struct sockaddr'.
+    The 8 may be platform specific, but all of this code is Linux only anyway.
+  */
+  sin_zero : u8[8];
+};
+
+sockaddr :: struct  {
+  sa_family : sa_family_t; /* Common data: address family and length.  */
+  sa_data   : char[14];   /* Address data.  */
+};
+
+
+INADDR_ANY        : in_addr_t = 0x00000000;
+/* Address to send to all hosts.  */
+INADDR_BROADCAST  : in_addr_t =	0xffffffff;
+/* Address indicating an error return.  */
+INADDR_NONE       : in_addr_t	=	0xffffffff;
+/* Dummy address for source of ICMPv6 errors converted to IPv4 (RFC7600).  */
+INADDR_DUMMY      :	in_addr_t =	0xc000000;
+
+// host to number
+#foreign htonl :: (__hostlong : u32) -> u32;
+#foreign htons :: (__hostshort : u16) -> u16;
+
+
+// Close the file descriptor FD.
+#foreign close :: (__fd: int) ->  int;
+
+// Read NBYTES into BUF from FD.  Return the number read, -1 for errors or 0 for EOF.
+#foreign read :: (__fd: int, __buf: void*, __nbytes: u64) -> u64;
+
+// Write N bytes of BUF to FD.  Return the number written, or -1.
+#foreign write :: (__fd: int, __buf: void*, __n: u64) -> u64;
+
+/* Create a new socket of type TYPE in domain DOMAIN, using
+   protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.
+   Returns a file descriptor for the new socket, or -1 for errors.  */
+#foreign socket :: (__domain: int, __type: int, __protocol: int ) -> int;
+
+/* Give the socket FD the local address ADDR (which is LEN bytes long).  */
+#foreign bind :: (__fd: int, __addr: sockaddr*, __len: socklen_t) -> int;
+
+/* Prepare to accept connections on socket FD.
+   N connection requests will be queued before further requests are refused.
+   Returns 0 on success, -1 for errors.  */
+#foreign listen :: (__fd: int, __n: int) -> int;
+
+/* Await a connection on socket FD.
+   When a connection arrives, open a new socket to communicate with it,
+   set *ADDR (which is *ADDR_LEN bytes long) to the address of the connecting
+   peer and *ADDR_LEN to the address's actual length, and return the
+   new socket's descriptor, or -1 for errors.
+*/
+#foreign accept :: (__fd: int, __addr: sockaddr*, __addr_len: socklen_t*) -> int;
+
+/* Convert Internet host address from numbers-and-dots notation in CP
+   into binary data in network byte order.  */
+#foreign inet_addr :: (__cp: char *) -> in_addr_t;
+
+/* Open a connection on socket FD to peer at ADDR (which LEN bytes long).
+   For connectionless socket types, just set the default address to send to
+   and the only address from which to accept transmissions.
+   Return 0 on success, -1 for errors.
+
+   This function is a cancellation point and therefore not marked with
+   __THROW.  */
+#foreign connect :: (__fd: int, __addr: sockaddr*, __len: socklen_t ) -> int;

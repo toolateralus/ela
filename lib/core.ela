@@ -53,43 +53,43 @@
 #foreign srand :: (seed: u32);
 
 str_starts_with :: (str: char*, substr: char*) -> bool {
-  if str == null || substr == null 
+  if str == null || substr == null
     then return false;
-    
+
   str_len: int = strlen(str);
   substr_len: int = strlen(substr);
-  
-  if str_len < substr_len 
+
+  if str_len < substr_len
     then return false;
-    
+
   if str_len == substr_len && strcmp(str, substr) == 0
     then return true;
-    
+
   return strncmp(str, substr, substr_len) == 0;
 }
 
 str_ends_with :: (str: char*, pattern: char*) -> bool {
-  if !str || !pattern 
+  if !str || !pattern
     then return false;
-    
+
   len: int = strlen(str);
   patlen: int = strlen(pattern);
-  
-  if len < patlen 
+
+  if len < patlen
     then return false;
-    
+
   return strncmp(str + (len - patlen), pattern, patlen) == 0;
 }
 
 str_replace :: (str: string, pattern: string, replacement: string) -> string {
-  if !str.data || !pattern.data || !replacement.data 
+  if !str.data || !pattern.data || !replacement.data
     then return str;
-  
+
   result: string = string{""};
   str_len: int = strlen(str.data);
   pattern_len: int = strlen(pattern.data);
   replacement_len: int = strlen(replacement.data);
-  
+
   i: int = 0;
   while i < str_len {
     if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
@@ -100,32 +100,32 @@ str_replace :: (str: string, pattern: string, replacement: string) -> string {
       i += 1;
     }
   }
-  
+
   return result;
 }
 
 string_substr :: (src: char*, start: int, end: int) -> string {
-  if !src 
+  if !src
     then return string{""};
-    
+
   len: int = strlen(src);
-  
-  if (start > end) 
+
+  if (start > end)
     then return string{""};
-  
-  if (len < end - start) 
+
+  if (len < end - start)
     then return string{""};
-    
+
   dest: char* = malloc(sizeof(char) * (end - start) + 1);
-  
+
   memcpy(dest, src + start, end - start);
-  
+
   dest[(end - start)] = 0;
-  
+
   v: string = string{dest};
-  
+
   free(dest);
-  
+
   return v;
 }
 
@@ -142,7 +142,7 @@ to_string :: (num: s64) -> string {
     8: { return string{"8"}; }
     9: { return string{"9"}; }
   }
-  
+
   negative := false;
   if num < 0 {
     negative = true;
@@ -171,9 +171,74 @@ to_string :: (num: s64) -> string {
   }
 
   return string{(char*)buffer, ((char*) buffer) + index};
-  
-  
+
+
 }
+
+// to_string :: (num: float64) -> string {
+//   if isnan(num) {
+//     return string{"NaN"};
+//   }
+//   if isinf(num) {
+//     if num > 0 {
+//       return string{"Infinity"};
+//     } else {
+//       return string{"-Infinity"};
+//     }
+//   }
+
+//   negative := false;
+//   if num < 0 {
+//     negative = true;
+//     num = -num;
+//   }
+
+//   buffer: char[64];
+//   index: int = 0;
+
+//   // Handle the integer part
+//   int_part: s64 = (s64)num;
+//   frac_part: float64 = num - (float64)int_part;
+
+//   if int_part == 0 {
+//     buffer[index] = #char "0";
+//     index++;
+//   } else {
+//     while int_part > 0 {
+//       buffer[index] = #char "0" + (int_part % 10);
+//       int_part /= 10;
+//       index++;
+//     }
+//     if negative {
+//       buffer[index] = #char "-";
+//       index++;
+//     }
+//     // Reverse the integer part in the buffer
+//     for i in 0..(index / 2) {
+//       temp := buffer[i];
+//       buffer[i] = buffer[index - i - 1];
+//       buffer[index - i - 1] = temp;
+//     }
+//   }
+
+//   // Add the decimal point
+//   buffer[index] = #char ".";
+//   index++;
+
+//   // Handle the fractional part
+//   for i in 0..5 { // limiting to 5 decimal places
+//     frac_part *= 10;
+//     digit: int = (int)frac_part;
+//     buffer[index] = #char "0" + digit;
+//     frac_part -= digit;
+//     index++;
+//   }
+
+//   buffer[index] = 0; // null-terminate the string
+
+//   return string{(char*)buffer, ((char*) buffer) + index};
+// }
+
 
 streq :: (left: char*, right) -> bool {
   return strcmp(left, right) == 0;
@@ -271,6 +336,32 @@ randf :: () -> float {
   return (float)rand() / (float)Random.Max;
 }
 
+split :: (str: string, delimiter: char) -> string[] {
+  if !str.data {
+    return {};
+  }
+
+  result: string[];
+  start: int = 0;
+  str_len: int = str.length;
+
+  for i in 0..str_len {
+    if str.data[i] == delimiter {
+      if i > start {
+        result ~= string{str.data + start, str.data + i};
+      }
+      start = i + 1;
+    }
+  }
+
+  if start < str_len {
+    result ~= string{str.data + start, str.data + str_len};
+  }
+
+  return result;
+}
+
+
 timespec_t :: struct {
   tv_sec: s64;
   tv_nsec: s64;
@@ -278,7 +369,7 @@ timespec_t :: struct {
 
 #foreign clock_gettime :: (clock_id: int, tp: timespec_t*) -> int;
 
-// returns the timespec_t 
+// returns the timespec_t
 get_high_precision_time :: () -> timespec_t {
   ts: timespec_t;
   clock_gettime(0, &ts);
