@@ -7,18 +7,6 @@
 #include <string>
 #include <unordered_map>
 
-namespace std {
-template <> struct hash<std::string> {
-  inline std::size_t operator()(const std::string &s) const noexcept {
-    std::size_t hash = 0;
-    for (const auto ch : s) {
-      hash = hash * 31 + ch;
-    }
-    return hash;
-  }
-};
-} // namespace std
-
 struct InternedString {
   size_t hash;
   using InternedStringTable = std::unordered_map<size_t, std::string>;
@@ -28,7 +16,7 @@ struct InternedString {
     return table;
   }
   std::string get_str() const { return {table()[hash]}; }
-  inline void insert_or_set(std::string value) {
+  inline void insert_or_set(const std::string& value) {
     auto hash = std::hash<std::string>()(value);
     const auto [it, inserted] = table().emplace(hash, value);
     this->hash = it->first;
@@ -44,9 +32,6 @@ struct InternedString {
   inline bool operator<(const InternedString &other) const {
     return hash < other.hash;
   }
-  inline bool operator>(const InternedString &other) const {
-    return hash > other.hash;
-  }
 };
 
 namespace std {
@@ -55,6 +40,7 @@ namespace std {
       return string.hash;
     }
   };
+
   template<>
   struct std::formatter<InternedString, char>
   {

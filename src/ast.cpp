@@ -635,14 +635,14 @@ ASTType *Parser::parse_type() {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
-      return parse_function_type(base.get_str(), extension_info);
+      return parse_function_type(base, extension_info);
     } else {
       break;
     }
   }
 
   auto node = ast_alloc<ASTType>();
-  node->base = base.get_str();
+  node->base = base;
   node->extension_info = extension_info;
   end_node(node, range);
   return node;

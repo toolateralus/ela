@@ -1216,7 +1216,7 @@ std::any TypeVisitor::visit(ASTDotExpr *node) {
 
     bool found = false;
     for (const auto &key : info->keys) {
-      if (name == key.get_str()) {
+      if (InternedString{name} == key) {
         found = true;
         break;
       }
