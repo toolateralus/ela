@@ -162,7 +162,7 @@ SequenceChannel :: struct {
     volume_slider.rect.y = y + 2;
     volume_slider.draw();
     index := 0;
-    for *button; check_buttons {
+    for *button in check_buttons {
       button.rect.x = x + 150 + index * 40 + 2;
       button.rect.y = y + 2;
       index++;
@@ -215,7 +215,7 @@ on_file_selected :: (index: int) {
 
 sequencer :: () {
   if playing && timer.tick() {
-    for *channel; channels {
+    for *channel in channels {
       channel.update(index);
     }
     index = (index + 1 % total_notes) % total_notes;
@@ -235,7 +235,7 @@ main :: () {
   SetWindowState(.WindowResizable);
   SetTargetFPS(1000);
 
-  for file; dir.files {
+  for file in dir.files {
     if str_ends_with(file.data, ".wav") || str_ends_with(file.data, ".mp3") || str_ends_with(file.data, ".ogg") {
       file_dropdown.options ~= string{file.data};
     }
@@ -274,7 +274,7 @@ main :: () {
       draw_button("reset (no undo)", {(float)GetScreenWidth() - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
       draw_button("remove channel", Rectangle{0, 215, 125, 30}, reset_button_style, &on_remove_channel);
 
-      for *channel; channels {
+      for *channel in channels {
         channel.draw(seq_x, seq_y);
         seq_y += 40
       }

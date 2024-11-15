@@ -292,12 +292,18 @@ EnumOfStrings :: enum {
 
 
 #test test_for :: () {
-  for i: s32; i < 10; ++i {
-      assert("i should be less than 10", i < 10);
-      return;
+  for i in 0..10 {
+    assert("i should be less than 10", i < 10);
+    return;
   }
+
+  for i in 10..0 {
+    assert("i should be greater than 0", i > 0);
+    return;
+  }
+
   arr: s32[];
-  for v; arr {
+  for v in arr {
       assert("Unexpected case in array loop", false);
       return;
   }
@@ -571,19 +577,19 @@ something :: (f: float32) -> float32 {
 
 // testing conflicting definitons. expected: compiler error if failed.
 #test for_loop_2 :: () {
-  for i: int; i < 10; ++i {
+  for i in 0..10 {
       i = i;
   }
-  for i: int; i < 10; ++i {
-      i = i;
+  for i in 0..10 {
+    i = i;
   }
 
   array: int[];
 
-  for k; array {
+  for k in array {
     k = k;
   }
-  for k; array {
+  for *k in array {
     k = k;
   }
 }
@@ -679,10 +685,19 @@ something :: (f: float32) -> float32 {
   delete (vec, vec1);
 }
 
+#test custom_iterator_increment :: () {
+  for i in #make(Range, 0, 10, 2) {
+    assert("iter increment failed to be divisible by 2", i % 2 == 0);
+  }
+  for i in #make(Range, 0, 10, 3) {
+    assert("iter increment failed to be divisible by 3", i % 3 == 0);
+  }
+}
+
 #test ptr_iter_range_base :: () {
   array: s8[] = {0,1,2,3};
   n: int ;
-  for *v; array {
+  for *v in array {
     assert("", n == *v);
     ++n;
   }
@@ -690,7 +705,7 @@ something :: (f: float32) -> float32 {
   n = 0;
   // TODO: tidy up the confusing and often strangely inconsistent semantics around construction of types.
   arr : s8[]* = new s8[] ({0,1,2,3});
-  for v; *arr {
+  for v in *arr {
     assert("", n == v);
     ++n;
   }
@@ -700,7 +715,7 @@ something :: (f: float32) -> float32 {
 #test test_custom_iterator :: () {
   iter: CustomIteratorStruct;
   n: int;
-  for k; iter {
+  for k in iter {
     assert("iterator value failed to equal 0", k == 0);
     n++;
   }
@@ -834,12 +849,12 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
     strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
 
     expected_arr: int[] = {0, 1, 2};
-    for i: s32; i < arr.length; i++ {
+    for i in 0..arr.length {
       assert("Array element mismatch", arr[i] == expected_arr[i]);
     }
 
     expected_fixed: int[3] = {0, 1, 2};
-    for i: s32; i < 3; i++ {
+    for i in 0..3 {
       assert("Fixed array element mismatch", fixed[i] == expected_fixed[i]);
     }
 
@@ -848,7 +863,7 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
     assert("Struct element mismatch", str.c == 0);
 
     expected_strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for i: s32; i < strArr.length; i++ {
+    for i in 0..strArr.length {
       assert("Struct array element mismatch", strArr[i].a == expected_strArr[i].a);
       assert("Struct array element mismatch", strArr[i].b == expected_strArr[i].b);
       assert("Struct array element mismatch", strArr[i].c == expected_strArr[i].c);
@@ -856,7 +871,7 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
 
     // Assertions for strArr1
     expected_strArr1: InitListStruct[3]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for i: s32 ; i < 3; i++ {
+    for i in 0..3 {
       assert("Fixed struct array element mismatch", strArr1[i].a == expected_strArr1[i].a);
       assert("Fixed struct array element mismatch", strArr1[i].b == expected_strArr1[i].b);
       assert("Fixed struct array element mismatch", strArr1[i].c == expected_strArr1[i].c);
@@ -882,11 +897,11 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
 
 #test test_array_pop_operator :: () {
   array: int[];
-  for i: s32; i < 100; ++i {
+  for i in 0..100 {
     array ~= 10;
   }
   n: int;
-  for i: s32; i < 100; ++i{
+  for i in 0..100 {
     n = ~array;
   }
   assert("pop operator failed", array.length == 0 && n == 10);
@@ -950,9 +965,9 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
     }
   }
 
-  dynamic : int[][];
+  dynamic : s64[][];
   for x in 0..5 {
-    dynamic ~= #make(int[]);
+    dynamic ~= #make(s64[]);
     for y in 0..5 {
       dynamic[x] ~= x * y;
     }
@@ -1293,7 +1308,7 @@ JsonValueDeleter :: struct {
     vals ~= val;
   }
   #dtor :: () {
-    for val; vals {
+    for val in vals {
       delete(val);
     }
   }
@@ -1396,7 +1411,7 @@ JsonValueDeleter :: struct {
   index: int = 0;
   fixed_elements := fixed_type.elements((char*)&fixed);
   assert("Fixed array length mismatch", fixed_elements.length == 3);
-  for elem; fixed_elements {
+  for elem in fixed_elements {
     assert("Fixed array element mismatch", (*(int*)elem.data) == fixed[index]);
     ++index;
   }
@@ -1406,7 +1421,7 @@ JsonValueDeleter :: struct {
   index = 0;
   dynamic_elements := dynamic_type.elements((char*)&dynamic);
   assert("Dynamic array length mismatch", dynamic_elements.length == 3);
-  for elem; dynamic_elements {
+  for elem in dynamic_elements {
     assert("Dynamic array element mismatch", (*(int*)elem.data) == dynamic[index]);
     ++index;
   }

@@ -359,30 +359,9 @@ struct ASTRange: ASTExpr {
 };
 
 struct ASTFor : ASTStatement {
-  enum ForType {
-    CollectionBased,
-    RangeBased,
-    CStyle,
-  } tag;
-
-  union {
-    struct {
-      ASTExpr* iden;
-      ASTExpr* range;
-    } range_based;
-    struct {
-      ValueSemantic value_semantic;
-      // FEATURE: add a way to use 'for v, idx in collection'
-      ASTExpr *target;
-      ASTExpr *collection;
-    } collection_based;
-    struct {
-      ASTDeclaration *decl;
-      ASTExpr *condition;
-      ASTExpr *increment;
-    } c_style;
-  } value;
-
+  ASTExpr* iden;
+  ASTExpr* range;
+  ValueSemantic value_semantic;
   ASTBlock *block;
 
   std::any accept(VisitorBase *visitor) override;

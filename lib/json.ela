@@ -92,7 +92,7 @@ JsonLexer :: struct {
       token.type = JsonTokenType.Eof;
       return token;
     }
-    
+
     // comments
     if c == #char "/" {
       position++;
@@ -205,7 +205,7 @@ JsonLexer :: struct {
     token := this.get_token();
     types_string: string;
     i : int;
-    for type; types {
+    for type in types {
       if token.type == type then return token;
       if i == 0 {
         types_string = #make(string, tokenTypeNames[type]);
@@ -259,12 +259,12 @@ JsonValue :: struct {
   type : int = JsonValueType.Invalid;
   #dtor :: () {
     if type == JsonValueType.Object {
-      for kvp; data.object {
+      for kvp in data.object {
         delete(kvp.value);
       }
       destruct(data.object);
     } else if type == JsonValueType.Array {
-      for val; data.array {
+      for val in data.array {
         delete(val);
       }
       destruct(data.array);
@@ -278,7 +278,7 @@ JsonValue :: struct {
       len := obj.length;
       rBrack := "}";
       str := #make(string, "{");
-      
+
       for i in 0..len {
         kvp := obj[i];
         if i == 0 {
@@ -322,7 +322,7 @@ JsonValue :: struct {
     if type != JsonValueType.Object {
       return null;
     }
-    for kvp; data.object {
+    for kvp in data.object {
       if kvp.key == key {
         return kvp.value;
       }
@@ -526,7 +526,7 @@ json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType.Object;
   val.data.object = JsonKeyValuePair[]{};
-  for field; type.fields {
+  for field in type.fields {
     field_kvp: JsonKeyValuePair;
     field_kvp.key = field.name;
     field_kvp.value = json_serialize((void*)field.get(object), field.type);
@@ -539,7 +539,7 @@ json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType.Array;
   val.data.array = JsonValue*[]{};
-  for elem; type.elements((char*)object) {
+  for elem in type.elements((char*)object) {
     val.data.array ~= json_serialize(elem.data, elem.type);
   }
   return val;
@@ -629,7 +629,7 @@ JsonError :: struct {
 json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
 
 // json_deserialize_struct :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
-//   for json_field; val.data.object {
+//   for json_field in val.data.object {
 //     struct_field := type_get_field(type, json_field.key);
 //     if !struct_field {
 //       return {true, $"Could not find field {json_field.key} in type {type.name}"};
@@ -643,7 +643,7 @@ json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
 // }
 
 // json_deserialize_array :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
-//   for elem; val.as_array() {
+//   for elem in val.as_array() {
 //     err := json_deserialize(elem.data, type.);
 //     if err.has_value {
 //       return err;

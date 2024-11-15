@@ -171,34 +171,11 @@ std::any SerializeVisitor::visit(ASTBreak *node) {
 std::any SerializeVisitor::visit(ASTFor *node) {
   ss << indent() << "For {\n";
   indentLevel++;
-
-  switch (node->tag) {
-  case ASTFor::CollectionBased: {
-    auto v = node->value.collection_based;
-    ss << indent() << "RangeBased:\n";
-    ss << indent() << "target: ";
-    v.target->accept(this);
-    ss << " -> ";
-    v.collection->accept(this);
-    ss << '\n';
-  } break;
-  case ASTFor::CStyle: {
-    auto v = node->value.c_style;
-    ss << indent() << "CStyle:";
-    v.decl->accept(this);
-    ss << indent() << "condition: ";
-    v.condition->accept(this);
-    ss << '\n' << indent() << "increment: ";
-    v.increment->accept(this);
-    ss << '\n';
-  } break;
-  case ASTFor::RangeBased:
-    ss << "range based implement me no one uses this ast serializer\n";
-    break;
-  }
-
+  node->iden->accept(this);
+  ss << " in ";
+  node->range->accept(this);
+  ss << '\n';
   node->block->accept(this);
-
   indentLevel--;
   ss << indent() << "}\n";
   return {};

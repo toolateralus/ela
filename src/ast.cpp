@@ -784,52 +784,25 @@ ASTStatement *Parser::parse_statement() {
   } else if (tok.type == TType::For) {
     eat();
     auto node = ast_alloc<ASTFor>();
-    tok = peek();
 
-    // CLEANUP(Josh) 10/14/2024, 10:10:15 AM
-      // * We don't really need C style for loops if we have
-      // * for i in 0..10 \\ for i in 10..0 etc.
-      // * That's the same thing with a much nicer syntax.
+    node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
 
-    // TODO: add implict assignment here. like for i := 0; i < ...
-    if (lookahead_buf()[1].type == TType::Colon) {
-      node->tag = ASTFor::CStyle;
+    // reference semantic for iterating over list
+    if (peek().type == TType::Mul) {
+      node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
+      eat();
+    }
 
-      auto decl = parse_declaration();
-      node->value.c_style.decl = decl;
-      ctx.scope->erase(decl->name.value);
-
-      expect(TType::Semi);
-      node->value.c_style.condition = parse_expr();
-      expect(TType::Semi);
-      node->value.c_style.increment = parse_expr();
-    } else if (lookahead_buf()[1].type == TType::In) {
-      node->tag = ASTFor::RangeBased;
-      node->value.range_based.iden = parse_primary();
+    if (lookahead_buf()[1].type == TType::In) {
+      node->iden = parse_primary();
       expect(TType::In);
       auto expr = parse_expr();
-      node->value.range_based.range = expr;
+      node->range = expr;
     } else {
-      node->tag = ASTFor::CollectionBased;
-
-      if (peek().type == TType::Mul) {
-        eat();
-        node->value.collection_based.value_semantic = VALUE_SEMANTIC_POINTER;
-      } else {
-        node->value.collection_based.value_semantic = VALUE_SEMANTIC_COPY;
-      }
-
-      node->value.collection_based.target = parse_expr();
-      expect(TType::Semi);
-      node->value.collection_based.collection = parse_expr();
+      throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in iterable || for *elem in iterable", range);
     }
+
     node->block = parse_block();
-    // TODO: remove this and put it in the type visitor.
-    if (node->tag == ASTFor::CStyle) {
-      ctx.set_scope(node->block->scope);
-      ctx.scope->insert(node->value.c_style.decl->name.value, -1);
-      ctx.exit_scope();
-    }
     end_node(node, range);
     return node;
   } else if (tok.type == TType::While) {

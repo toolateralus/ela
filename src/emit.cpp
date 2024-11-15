@@ -55,66 +55,32 @@ std::any EmitVisitor::visit(ASTIf *node) {
 
 std::any EmitVisitor::visit(ASTFor *node) {
   emit_line_directive(node);
-  const auto emit_collection_based = [&] {
-    auto v = node->value.collection_based;
-
-    switch (v.value_semantic) {
-    case VALUE_SEMANTIC_COPY: {
-      (*ss) << "auto ";
-      v.target->accept(this);
-      (*ss) << " : ";
-      v.collection->accept(this);
-    } break;
-    case VALUE_SEMANTIC_POINTER: {
-      (*ss) << "auto* ";
-      v.target->accept(this);
-      (*ss) << " = ";
-      v.collection->accept(this);
-      (*ss) << ".begin(); ";
-      v.target->accept(this);
-      (*ss) << "!= ";
-      v.collection->accept(this);
-      (*ss) << ".end();";
-      v.target->accept(this);
-      (*ss) << "++";
-
-    } break;
-    }
-  };
-
-  const auto emit_c_style = [&] {
-    auto v = node->value.c_style;
-    v.decl->accept(this);
-    semicolon();
-    space();
-    v.condition->accept(this);
-    semicolon();
-    space();
-    v.increment->accept(this);
-  };
-
-  const auto emit_range_based = [&] {
-    auto v = node->value.range_based;
-    (*ss) << "auto ";
-    v.iden->accept(this);
-    (*ss) << " : ";
-    v.range->accept(this);
-  };
 
   auto old_scope = ctx.scope;
   ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
-  switch (node->tag) {
-  case ASTFor::CollectionBased:
-    emit_collection_based();
-    break;
-  case ASTFor::CStyle:
-    emit_c_style();
-    break;
-  case ASTFor::RangeBased:
-    emit_range_based();
-    break;
+
+  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    // Emit old-style for loop for pointer semantics
+    (*ss) << "auto* ";
+    node->iden->accept(this);
+    (*ss) << " = ";
+    node->range->accept(this);
+    (*ss) << ".begin(); ";
+    node->iden->accept(this);
+    (*ss) << " != ";
+    node->range->accept(this);
+    (*ss) << ".end(); ";
+    node->iden->accept(this);
+    (*ss) << "++";
+  } else {
+    // Emit range-based for loop for copy semantics
+    (*ss) << "auto ";
+    node->iden->accept(this);
+    (*ss) << " : ";
+    node->range->accept(this);
   }
+
   (*ss) << ")";
   node->block->accept(this);
   ctx.set_scope(old_scope);

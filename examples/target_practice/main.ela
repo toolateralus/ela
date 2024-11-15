@@ -377,14 +377,14 @@ draw_background :: () {
 }
 
 draw_game :: () {
-  for bullet; bullets {
+  for bullet in bullets {
     DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);
   }
-  for enemy; enemies {
+  for enemy in enemies {
     DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);
   }
 
-  for particle; particles {
+  for particle in particles {
     rect : Rectangle = {
       particle.position.x,
       particle.position.y,
@@ -394,7 +394,7 @@ draw_game :: () {
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);
   }
 
-  for particle; text_particles {
+  for particle in text_particles {
     DrawText(particle.text.data, (int)particle.position.x, (int)particle.position.y, particle.font_size, particle.color);
   }
 
@@ -561,7 +561,7 @@ update_game :: () {
   dead_enemies: Enemy*[];
 
   // update enemy transforms.
-  for enemy; enemies {
+  for enemy in enemies {
     enemy_move_towards_or_get_new_target(enemy);
     enemy.rotation += enemy_rotation_speed;
 
@@ -577,7 +577,7 @@ update_game :: () {
   };
 
   // update bullets and perform collision against enemies.
-  for bullet; bullets {
+  for bullet in bullets {
     bullet.rect.y += bullet.velocity.y;
     bullet.rect.x += bullet.velocity.x;
     bullet.velocity.x *= bullet_drag;
@@ -596,7 +596,7 @@ update_game :: () {
     bullet_rect.x += bullet_rect.width;
 
     n_enemies_killed_this_frame : int = 0;
-    for enemy; enemies {
+    for enemy in enemies {
       x_diff := enemy.rect.x + enemy.rect.width / 2 - bullet_rect.x;
       y_diff := enemy.rect.y - enemy.rect.height / 2 - bullet_rect.y;
       sqr_dist := x_diff * x_diff + y_diff * y_diff;
@@ -626,29 +626,29 @@ update_game :: () {
     }
   }
 
-  for bullet; dead_bullets {
+  for bullet in dead_bullets {
     bullets ~~ bullet;
     delete(bullet);
   }
 
-  for enemy; dead_enemies {
+  for enemy in dead_enemies {
     enemies ~~ enemy;
     delete(enemy);
   }
 
   dead_particles: Particle*[];
-  for particle; particles {
+  for particle in particles {
     if !update_particle(particle)
       then dead_particles ~= particle;
   }
 
-  for particle; dead_particles {
+  for particle in dead_particles {
     particles ~~ particle;
     delete(particle);
   }
 
   dead_text_particles : TextParticle*[];
-  for particle; text_particles {
+  for particle in text_particles {
     particle.position = Vector2Add(particle.position, {0.1, 0.1});
     now := (float)GetTime();
     particle.color.a = lerp(particle.color.a, 0, (now - particle.spawn_time) / particle.lifetime);
@@ -657,7 +657,7 @@ update_game :: () {
     }
   }
 
-  for particle; dead_text_particles {
+  for particle in dead_text_particles {
     text_particles ~~ particle;
     delete(particle);
   }

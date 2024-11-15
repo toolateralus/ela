@@ -1,17 +1,17 @@
 #import core;
-// todo: use #flags 
+// todo: use #flags
 TypeFlags :: enum {
   // Scalars.
   INTEGER         = 2,
   FLOAT           = 4,
   BOOL            = 8,
   STRING          = 16,
-  
+
   // Type definitions
   STRUCT          = 32,
   UNION           = 64,
   ENUM            = 128,
-  
+
   // Non scalar type extensions
   TUPLE           = 256,
   ARRAY           = 512,
@@ -47,7 +47,7 @@ type_is_string :: (type: Type*) -> bool {
 }
 
 type_is_scalar :: (type: Type*) -> bool {
-  return type_has_no_extension(type) && 
+  return type_has_no_extension(type) &&
          (type.flags & .INTEGER != 0 ||
           type.flags & .FLOAT != 0   ||
           type.flags & .BOOL != 0    ||
@@ -99,11 +99,10 @@ type_is_fixed_array :: (type: Type*) -> bool {
 }
 
 type_get_field :: (type: Type*, name: string) -> Field* {
-  for field; type.fields {
+  for field in type.fields {
     if strcmp(field.name, name.data) == 0 {
       return field;
     }
   }
   return null;
 }
-

@@ -581,7 +581,7 @@ Style :: struct {
 measure_jiggly_text :: (text: char*, style: Style) -> float {
   length: int = strlen(text);
   total_width: float = 0.0;
-  for i : int = 0; i < length; i++ {
+  for i in 0..length {
     total_width += style.font_size;
   }
   return total_width;
@@ -595,9 +595,9 @@ jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
   intensity := style.jiggle_intensity;
   rate := style.jiggle_rate;
 
-  for i : int = 0; i < length; i++ {
-    char_x := rect.x + i * style.font_size;
-    char_y := rect.y + intensity * sin(rate * time + i);
+  for i in 0..length {
+    char_x := rect.x + (float)i * style.font_size;
+    char_y := rect.y + intensity * sin(rate * time + (float)i);
     temp : char[2] = { text[i], #char "\0" };
     DrawText((char*)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
   }
