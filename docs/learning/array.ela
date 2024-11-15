@@ -22,6 +22,7 @@ dynamic ~= value;
 dynamic ~~ value;
   
 // * popping an element off the end of a dynamic array
+// * note that using ~dynamic as a standalone statement does not currently work, so youd need _ := ~dynamic to ignore the value.
 value := ~dynamic;
 
 // * Creating a dynamic array with preallocated number of elements

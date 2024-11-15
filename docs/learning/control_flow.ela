@@ -16,7 +16,7 @@ if false {
 
 
 /* 
-  A single if statement that only has one statement as a body and no else can be shorthanded as 
+  A single-line-bodied if statement that only has one statement as a body and no else can be shorthanded as 
 */
 if true then println("Hi!");
 
