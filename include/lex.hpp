@@ -13,6 +13,7 @@ enum struct TType {
   Integer,
   Float,
   String,
+  Char,
 
   Assign,
   Add,
@@ -101,6 +102,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Char);
     TTYPE_CASE(Colon);
     TTYPE_CASE(Switch);
     TTYPE_CASE(In);

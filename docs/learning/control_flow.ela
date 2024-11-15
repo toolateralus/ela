@@ -30,10 +30,9 @@ while true {
 
 
 /* For loops:  */
-for i: s32; i < 100; ++i {}
 
-// For an incrementing loop, you can use range primitives:
-for _ in 0..1000 {}
+// C equivalent:  for (int i = 0; i < 100; ++i) {}
+for i in 0..100 {}
 
 // you can use any expression on the left or right of the range.
 for i in 0..get_max() {}
@@ -41,17 +40,28 @@ for i in 0..get_max() {}
 // another example.
 for _ in get_min()..get_max() + 100 {}
 
+// C equivalent: for (int i = 100; i >= 0; --i) {}
+for i in 100..0 {}
+
+// To control the increment in a range, you can use Range's initializer list.
+
+// C equivalent: for (int i = 0; i < 100; i += 2) {}
+for i in Range{0, 100, 2} {}
+
+// C equivalent: for (int i = 100; i >= 0; i -= 4) {}
+for i in Range{100, 0, 4} {}
+
 
 /* To iterate over a collection, such as an array, you can use: */
 array : #make(s32[], 100); // make a 100 long, zero initialized array.
 
 // iterate and get copies of elements.
-for v; array {
+for v in array {
   println($"{v}");
 }
 
-/* To avoid copies, you can use this syntax to take a pointer to the element you're getting from the iterator */
-for *v; array {
+/* To avoid copies, or to mutate elements, you can use this syntax to take a pointer to the element you're getting from the iterator */
+for *v in array {
   println($"{*v}");
 }
 

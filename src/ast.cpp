@@ -1562,7 +1562,14 @@ ASTExpr *Parser::parse_primary() {
     end_node(node, range);
     return node;
   }
-
+  case TType::Char: {
+    eat();
+    auto node = ast_alloc<ASTLiteral>();
+    node->tag = ASTLiteral::Char;
+    node->value = tok.value;
+    end_node(node, range);
+    return node;
+  }
   case TType::Dot: {
     eat();
     if (peek().type != TType::Identifier) {

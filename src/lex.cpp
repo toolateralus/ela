@@ -1,4 +1,5 @@
 #include "lex.hpp"
+#include "error.hpp"
 #include <cctype>
 #include <iostream>
 #include <sstream>
@@ -30,6 +31,7 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
+    // single comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '/') {
       pos += 2;
       size_t newlinePos = input.find('\n', pos);
@@ -38,6 +40,7 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
+    // multi line comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
       pos += 2;
       while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
@@ -50,8 +53,32 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
+    // TODO: fix this. We can't assume each line is the same length, this just never works.
+    // It's a fairly simple fix, just need to keep track of the current column and increment i'
     size_t col = lines == 0 ? pos : pos / lines;
     SourceLocation location{state.line, state.col, state.file_idx};
+
+    if (c == '\'')  {
+      auto start = pos;
+      pos++; // move past '
+      c = input[pos];
+      std::string value;
+      if (c == '\\') {
+        value += c; // eat escape characters if present
+        pos++;
+        c = input[pos];
+      }
+      value += c;
+      pos++; // move past character
+      c = input[pos];
+      if (c != '\'') {
+        throw_error("invalid char literal: too many characters", {.begin = (int64_t)start, .end =(int64_t)pos});
+      }
+      pos++; // move past '
+      state.lookahead_buffer.push_back(
+          Token(location, value, TType::Char, TFamily::Literal));
+      return;
+    }
 
     if (c == '"') {
       pos++;

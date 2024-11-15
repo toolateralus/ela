@@ -217,7 +217,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       if (i >= node->types.size()) {
         break;
       }
-      if (!sym.is_function()) {
+      if (!sym.is_function() && !global_get_type(sym.type_id)->is_kind(TYPE_FUNCTION)) {
         assert_types_can_cast_or_equal(
             node->types[i], sym.type_id, node->source_range,
             "expected: {}, got: {}",
@@ -234,7 +234,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
     }
     // search for the first field member and type check against it.
     for (const auto &[name, sym] : info->scope->symbols) {
-      if (!sym.is_function()) {
+      if (!sym.is_function() && !global_get_type(sym.type_id)->is_kind(TYPE_FUNCTION)) {
         assert_types_can_cast_or_equal(
             node->types[0], sym.type_id, node->source_range, "{}, {}",
             "Invalid types in initializer list for union");
@@ -620,7 +620,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
   if (range_type_id == global_find_type_id("Range", {})) {
     iter_ty = int_type(); // ! THIS SHOULD BE S64 BUT IT CAUSES ANNOY BALLS ISSUES.
     if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-      throw_error("Cannot use pointer value semantic with a range. use #make(Range, start, end, increment) syntax to increment by a custom value.", node->source_range);
+      throw_error("Cannot use pointer value semantic with a range. use Range{<start>, <end>, <increment>} syntax to increment by a custom value.", node->source_range);
     }
   } else if (range_type->get_ext().is_array() || range_type->get_ext().is_fixed_sized_array()) {
     iter_ty = range_type->get_element_type();

@@ -1,0 +1,62 @@
+
+
+// C style union
+MyUnion :: union {
+  a: int;
+  b: float;
+}
+
+// unions can use initializer lists, but only one value can ever be provided.
+onion : MyUnion = {10};
+
+NonTrivialUnion :: union {
+  a: int;
+  b: float;
+
+  // using a type that contains a non-trivial constructor or destructor requires you to declare a destructor in your union.
+  // We suggest that you wrap your unions in a struct so you can explicitly call 'destruct(value)' on these objects, otherwise it will likely cause leaks.
+  c: string; 
+
+  // this leaks if a string is inside this, but is neccesary to compile.
+  #dtor :: () {}
+}
+
+NonTrivialTag :: enum {
+  Int,
+  Float,
+  String,
+}
+
+NonTrivialWrapper :: struct {
+  tag: int;
+  onion: NonTrivialUnion;
+
+  // this is how you'd fix the leak caused by the empty destructor in the NonTrivialUnion.
+  #dtor :: () {
+    if tag == .String {
+      destruct(onion.c);
+    }
+  }
+}
+
+
+/* 
+  * We do not yet support tagged unions. But we hope to in the future!
+  * the syntax may look something like this:
+*/
+
+#tagged TaggedUnion :: union {
+  Some { value: string } // tagged unions would be able to destroy themselves without hacky destructors.
+  None,
+}
+
+
+tagged_test :: () {
+  onion: TaggedUnion.Some { "Wee" };
+  if onion is TaggedUnion.Some {value} {
+    println(value);
+  } else {
+    println("None");
+  }
+
+}

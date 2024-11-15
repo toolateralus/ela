@@ -10,20 +10,27 @@ struct Range {
   using value_type = signed long long;
   Range() {}
   Range(value_type first, value_type last, value_type increment = 1)
-      : first(first), last(last), span(last - first), is_reverse(first > last), increment(increment) {}
+      : first(first), last(last), span(last - first), is_reverse(first > last), increment(increment) {
+        if (is_reverse) {
+          first--;
+          span = first - last;
+        }
+      }
   Range(const Range &other) {
     first = other.first;
     last = other.last;
     span = other.span;
     is_reverse = other.is_reverse;
+    increment = other.increment;
   }
   value_type first = 0, last = 0, span = 0, increment = 1;
   bool is_reverse = false;
 
   struct iterator {
-    value_type current, increment;
+    value_type current, end_value, increment;
     bool is_reverse;
-    iterator(value_type start, bool is_reverse, value_type increment) : current(start), is_reverse(is_reverse), increment(increment) {}
+    iterator(value_type start, value_type end_value, bool is_reverse, value_type increment)
+        : current(start), end_value(end_value), is_reverse(is_reverse), increment(increment) {}
     value_type operator*() const { return current; }
 
     iterator &operator++() {
@@ -35,20 +42,19 @@ struct Range {
       return *this;
     }
 
-    // TODO: This probably shouldn't be like this but if it isn't and we use an odd increment starting at 0 we get a permanent hangup.
     bool operator!=(const iterator &other) const {
       if (is_reverse) {
-        return current > other.current;
+        return current > other.end_value;
       } else {
-        return current < other.current;
+        return current < other.end_value;
       }
     }
   };
 
-  iterator begin() const { return iterator(first, is_reverse, increment); }
-  iterator end() const { return iterator(is_reverse ? first - 1 : last, is_reverse, increment); }
-  iterator begin() { return iterator(first, is_reverse, increment); }
-  iterator end() { return iterator(is_reverse ? first - 1 : last, is_reverse, increment); }
+  iterator begin() const  { return iterator(first, last, is_reverse, increment); }
+  iterator end() const    { return iterator(first, last, is_reverse, increment); }
+  iterator begin()        { return iterator(first, last, is_reverse, increment); }
+  iterator end()          { return iterator(first, last, is_reverse, increment); }
 
   bool operator==(const value_type number) const {
     return number >= first && number <= last;
@@ -62,7 +68,6 @@ struct Range {
   string to_string() const;
 #endif
 };
-
 
 #if USE_STD_LIB
 

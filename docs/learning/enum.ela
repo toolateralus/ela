@@ -1,0 +1,44 @@
+
+
+
+/* In ela, an enum is just a set of named constants. You can't currently refer to the type outside of accessing one of its members */
+MyEnum :: enum {
+  Zero,
+  One,
+  Two
+}
+
+/*
+  For a uniquely named enum variant, you can use shorthand syntax of just .VariantName to access an enum variant.
+*/
+
+println($"{.Zero}"); // print 0
+
+
+/* 
+  you can even fill a enum with constant structs since it's just a set of constants.
+*/
+
+StringEnum :: enum {
+  KeyA = string{"Hello"},
+}
+
+/* 
+  By default, enums with no values provided will just be incremented integers. For flags, you can use #flags before the declaration, to get
+  `1 << iota` for each variant provided.
+*/
+
+#flags Flags :: enum {
+  One,                // implicitly 1 << 0,
+  Two,                // implicitly 1 << 1,
+  Three               // implicitly 1 << 2,
+}
+
+
+/* 
+  as of the time writing this, you cannot declare a variable or field or parameter with an enum type. This is to change, but right now,
+  the values are the same type as their underlying type.
+*/
+
+value: MyEnum // illegal.
+value: int = MyEnum.Zero; // legal.
