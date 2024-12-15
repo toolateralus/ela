@@ -289,10 +289,8 @@ split :: (str: string, delimiter: char) -> string[] {
       start = i + 1;
     }
   }
-
-  if start < str_len {
-    result ~= string{str.data + start, str.data + str_len};
-  }
+  
+  result ~= string{str.data + start, str.data + str_len};
 
   return result;
 }

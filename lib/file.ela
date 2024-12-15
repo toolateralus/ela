@@ -40,7 +40,6 @@ file_read_to_string :: (file: FILE*, len: u32*) -> string {
   while ((c = fgetc(file)) != EOF) {
     str.push(c);
   }
-  str.push(#char "\0");
   return str;
 }
 
@@ -51,7 +50,6 @@ file_read_to_string :: (filename: char *) -> string {
   while ((c = fgetc(file)) != EOF) {
     str.push(c);
   }
-  str.push(#char "\0");
   fclose(file);
   return str;
 }
