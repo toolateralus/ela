@@ -530,7 +530,6 @@ void Parser::init_directive_routines() {
          }});
   }
 
-
   //#bitfield, for declaring bitfields. Pretty much only to interop with C: most cases for bitfields are completely useless, and can be replaced with a set of flags.
   {
     directive_routines.push_back(

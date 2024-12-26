@@ -169,10 +169,13 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   int result = 0;
 
   if (!has_flag("no-compile")) {
-
     std::string extra_flags = compilation_flags;
 
-    if (has_flag("debug")) extra_flags += " -g " ;// -ftime-trace for debugging C++ compilation times;
+    // Use '-ftime-trace' for debugging C++ compilation times;
+    // You need google chrome to analyse the JSON results.
+    
+    if (has_flag("release"))  extra_flags += " -O3 ";
+    else extra_flags += " -g " ;
 
     static std::string ignored_warnings = "-w";
 

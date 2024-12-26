@@ -11,7 +11,7 @@
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["main.ela", "--debug"],
-      "cwd": "${workspaceFolder}/ela_source/ed"
+      "cwd": "${workspaceFolder}/repro"
     },
     {
       "type": "lldb",

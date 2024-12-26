@@ -929,7 +929,11 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
 
   auto type_name = node->type->base;
   for (const auto &[key, value] : node->key_values) {
-    (*ss) << "const " << to_cpp_string(elem_ty) << " " << type_name.get_str()
+
+    if (elem_ty->kind == TYPE_SCALAR) {
+      (*ss) << "const ";
+    }
+    (*ss) << to_cpp_string(elem_ty) << " " << type_name.get_str()
           << '_' << key.get_str();
     (*ss) << " = ";
     if (value.is_not_null()) {
@@ -1612,7 +1616,37 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   // starting point, ! but it could be far better.
 
   std::stringstream fields_ss;
-  if (type->kind == TYPE_UNION || type->kind == TYPE_STRUCT) {
+  if (type->kind == TYPE_STRUCT) {
+    auto info = static_cast<StructTypeInfo *>(type->get_info());
+    if (info->scope->symbols.empty()) {
+      return get_type_struct(type, id, context, "{}");
+    }
+    fields_ss << "{";
+    int count = info->scope->symbols.size();
+    int it = 0;
+    for (const auto &tuple : info->scope->symbols) {
+      auto &[name, sym] = tuple;
+
+      if (name == "this")
+        continue;
+
+      auto t = global_get_type(sym.type_id);
+      // TODO: handle methods separately
+      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+        continue;
+
+      if (!t)
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
+      fields_ss << get_field_struct(name.get_str(), t, type, context);
+      ++it;
+      if (it < count) {
+        fields_ss << ", ";
+      }
+    }
+    fields_ss << "}";
+  } else if (type->kind == TYPE_UNION) {
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
     if (info->scope->symbols.empty()) {
       return get_type_struct(type, id, context, "{}");
@@ -1642,7 +1676,8 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
       }
     }
     fields_ss << "}";
-  } else if (type->kind == TYPE_ENUM) {
+  }
+  else if (type->kind == TYPE_ENUM) {
     auto info = static_cast<EnumTypeInfo *>(type->get_info());
     if (info->keys.empty()) {
       return get_type_struct(type, id, context, "{}");

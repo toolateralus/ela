@@ -10,18 +10,10 @@
   ? - High score leaderboard
 */
 
-round_base_num_enemies_to_advance: int = 4;
-round_index : int = 1;
-
-round_failed := false;
-
-camera: Camera2D;
-
 Scene :: enum {
   MainMenu,
   Game,
 }
-
 
 button_style : Style = {
   WHITE,
@@ -37,6 +29,10 @@ jiggly_text_style : Style = {
   40
 };
 
+round_base_num_enemies_to_advance: int = 6;
+round_index : int = 1;
+round_failed := false;
+camera: Camera2D;
 scene: int = Scene.MainMenu;
 
 max_tilt : float = 16;
@@ -59,6 +55,8 @@ score : int  = 0;
 targets_destroyed : int = 0;
 num_enemies_spawned : int = 0;
 can_burst := true;
+
+bullet_max_burst: int = 3;
 
 smoke_particle_init_scale : Vector2 = {15, 15};
 smoke_particle_max_burst := 6;
@@ -359,31 +357,27 @@ make_bullet :: (x: float, y, rotation) {
   make_particle(ParticleKind.Fire, fire_pos, WHITE);
 }
 
-
-move_background_color_towards_white :: () {
-  bg_color = color_lerp(bg_color, target_bg_color, 0.25);
-}
-
 draw_background :: () {
-  move_background_color_towards_white();
+  bg_color = color_lerp(bg_color, target_bg_color, 0.25);
   DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
   now : float = (float)GetTime();
-
   t := (now - game_start_time) / fade_in_length;
   if scene == Scene.Game && t < fade_in_length {
     DrawRectangle(0, 0, (int)screen_width, (int)screen_height, color_lerp(BLACK, CLEAR, t));
-  } else {
   }
 }
 
 draw_game :: () {
+  if IsWindowResized() {
+    character.rect.y = screen_height / 1.2;
+  }
+
   for bullet in bullets {
     DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);
   }
   for enemy in enemies {
     DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);
   }
-
   for particle in particles {
     rect : Rectangle = {
       particle.position.x,
@@ -393,7 +387,6 @@ draw_game :: () {
     };
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);
   }
-
   for particle in text_particles {
     DrawText(particle.text.data, (int)particle.position.x, (int)particle.position.y, particle.font_size, particle.color);
   }
@@ -419,7 +412,7 @@ BulletRoutine :: struct {
     if timer.tick() {
       count--;
       PlaySound(shot_sound);
-      make_bullet(character.rect.x, character.rect.y, character.rotation);
+      make_bullet(character.rect.x, character.rect.y, character.rotation); 
       if count == 0 {
         character.cannon_idx = !character.cannon_idx;
         return true;
@@ -441,17 +434,14 @@ on_bullet_fizzle :: () {
   PlaySound(fail_sound);
   bg_color.r += 55;
 
-  misses_this_round++;
-
-  if misses_this_round >= 3 {
-    println($"misses; {misses_this_round}");
-    round_failed = true;
-    scene = Scene.MainMenu;
-  }
-
+  // :GameFailure
+  // TODO: do we want this?
+  // misses_this_round++;
+  // if misses_this_round >= 3 {
+  //   round_failed = true;
+  //   scene = Scene.MainMenu;
+  // }
 }
-
-
 
 on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
   PlaySound(explosion_sound);
@@ -459,26 +449,21 @@ on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
   for _ in 0..4 {
     make_particle(ParticleKind.Smoke, {enemy.rect.x, enemy.rect.y}, spark_color);
   }
-
   // bonus score.
   if n_enemies_killed_this_frame >= enemies.length {
     bg_color.g += 55;
     score *= 1.2;
   }
-
-
 }
 
 space_down := false;
 
 update_game :: () {
 
+  // advance level.
   if targets_destroyed >= round_base_num_enemies_to_advance * round_index {
-
     if round_finish_start_time == -1.0 { round_finish_start_time  = (float)GetTime(); }
-
     now : float = (float)GetTime();
-
     if now - round_finish_start_time < 2.0 {
       text : string = $"Round: {round_index + 1}...";
       style := jiggly_text_style;
@@ -501,10 +486,6 @@ update_game :: () {
     }
   }
 
-  if IsWindowResized() {
-    character.rect.y = screen_height / 1.2;
-  }
-
   if IsKeyReleased(Key.Space) && space_down {
     space_down = false;
     character.cannon_idx = !character.cannon_idx;
@@ -524,10 +505,13 @@ update_game :: () {
       for i in 0..expected_length/2 {
         make_enemy();
       }
-    } else {
-      round_failed = true;
-      scene = Scene.MainMenu;
     }
+    // :GameFailure
+    // TODO: do we want this failure case? it felt really bad when we added these.
+    // } else {
+    //   round_failed = true;
+    //   scene = Scene.MainMenu;
+    // }
   }
   moved := false;
   if IsKeyDown(Key.A) {
@@ -554,7 +538,7 @@ update_game :: () {
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
 
   if IsKeyPressed(Key.Space) && bullet_routine.count == 0 {
-    bullet_routine.count = 1;
+    bullet_routine.count = bullet_max_burst;
   }
 
   dead_bullets: Bullet*[];
@@ -778,7 +762,6 @@ start_game_callback :: () {
   game_start_time = GetTime();
   reset_game_state();
   bg_color = BLACK;
-  swap_music();
   round_index = 0;
   round_failed = false;
 }
@@ -860,14 +843,13 @@ draw_game_menu :: () {
 
 }
 
-
 main :: () -> int {
   InitWindow(800, 600, "target practice");
   SetTargetFPS(60);
 
   init();
   init_audio();
-  SetWindowState(ConfigFlags.WindowResizable);
+  // SetWindowState(ConfigFlags.WindowResizable);
 
   while !WindowShouldClose() {
     screen_width = GetScreenWidth();

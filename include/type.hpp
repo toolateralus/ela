@@ -214,6 +214,7 @@ struct ScalarTypeInfo : TypeInfo {
 };
 
 struct EnumTypeInfo : TypeInfo {
+  int element_type = 0;
   bool is_flags = false;
   std::vector<InternedString> keys;
 };
@@ -237,24 +238,6 @@ struct TupleTypeInfo : TypeInfo {
   std::vector<int> types;
 };
 
-Type *global_get_type(const int id);
-
-InternedString get_tuple_type_name(const std::vector<int> &types);
-
-int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
-                const TypeExt & = {});
-
-int global_create_struct_type(const InternedString &, Scope *);
-
-int global_create_enum_type(const InternedString &, const std::vector<InternedString> &,
-                     bool = false);
-
-int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext);
-
-int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
-
-ConversionRule type_conversion_rule(const Type *, const Type *);
-
 // helpers to get scalar types for fast comparison
 int voidptr_type();
 int char_type();
@@ -272,6 +255,26 @@ int u64_type();
 int float64_type();
 int float_type();
 int float32_type();
+
+Type *global_get_type(const int id);
+
+InternedString get_tuple_type_name(const std::vector<int> &types);
+
+int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
+                const TypeExt & = {});
+
+int global_create_struct_type(const InternedString &, Scope *);
+
+int global_create_enum_type(const InternedString &, const std::vector<InternedString> &,
+                     bool = false, size_t element_type = s32_type());
+
+int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext);
+
+int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
+
+ConversionRule type_conversion_rule(const Type *, const Type *);
+
+
 
 // char *
 int charptr_type();

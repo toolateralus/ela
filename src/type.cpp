@@ -429,7 +429,7 @@ int global_create_union_type(const InternedString &name, Scope *scope,
 }
 int global_create_enum_type(const InternedString &name,
                             const std::vector<InternedString> &keys,
-                            bool is_flags) {
+                            bool is_flags, size_t element_type) {
   auto id = num_types;
   auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
   type_table[num_types] = type;

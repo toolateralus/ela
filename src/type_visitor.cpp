@@ -349,6 +349,11 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
   }
 
   node->element_type = elem_type;
+
+  auto enum_type = global_get_type(global_find_type_id(node->type->base, {}));
+  auto info = static_cast<EnumTypeInfo*>(enum_type->get_info());
+  info->element_type = elem_type;
+
   return {};
 }
 std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
@@ -1223,10 +1228,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
         throw_error("failed to find key in enum type.", node->source_range);
       }
 
-      // TODO: put the element_type from the ASTEnumDeclaration into the
-      // type info so that we can return that instead of assuming its s32.
-      // that would help us be safer about typing.
-      return s32_type();
+      return info->element_type;
     }
 
     Scope *scope = nullptr;

@@ -1,11 +1,12 @@
-
 #import core;
+#import raylib;
 
-main :: () {
+RopeConstants :: enum {
+  Size = Vector2 {0, 0}
+  // Size = Vector2 {50, 10},
+  // Overlap = Vector2 {5, 5},
+}
 
-
-  for i in Range{100, -1, 25} {
-    println($"{i}");
-  }
-
+main :: (argc: int, argv: char**) {
+  println($"{#type(RopeConstants.Size).name}");
 }
