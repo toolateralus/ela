@@ -1,0 +1,51 @@
+
+
+/* We support a couple basic forms of static variables and functions */
+
+// Your basic static global variable. static initialization.
+#static var : s32 = 0;
+
+
+counter :: () -> s32 {
+  // Static local variables: they maintain state between any calls,
+  // each time this is called it will be incremented.
+
+
+  // call 1: 0
+  // call 2: 1
+  // call 3: 2
+
+  // etc. This is useful for memoizing things in a localized way, or simply just keeping 
+  // a functions state contained within itself.
+
+  #static var : s32 = 0;
+  return var++;
+}
+
+Strukt :: struct {
+  // static functions on structs. Similar usage to the previous static function,
+  #static counter :: () -> s32 {
+    #static var: s32 = 0;
+    return var++;
+  }
+
+  // you can expose static members of a struct for organizational purpose,
+  // by just returning a pointer to the static local. similar to the way singleton's in C++ are typically implemented.
+  #static instance :: () -> Strukt* {
+    #static instance: Strukt
+    return &instance;
+  }
+
+  // you could also use this for rust like stuff.
+  #static Default :: () -> Strukt {
+    return {};
+  }
+
+  // ❌ Illegal!! We don't support static members directly.
+  // ❌ The reason is rooted in the way transpiling to C++ works.
+
+  // ❌ #static var: s32;
+}
+
+main :: () {}
+
