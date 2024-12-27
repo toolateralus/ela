@@ -1704,3 +1704,10 @@ void EmitVisitor::emit_condition_block(ASTNode *node, const std::string &keyword
   }
   block.get()->accept(this);
 }
+
+std::any EmitVisitor::visit(ASTScopeResolution *node) {
+  node->left->accept(this);
+  (*ss) << "::";
+  node->right->accept(this);
+  return {};
+}

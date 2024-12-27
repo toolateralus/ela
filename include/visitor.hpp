@@ -45,6 +45,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTWhile *node) override;
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTDotExpr *node) override;
+  std::any visit(ASTScopeResolution *node) override;
   std::any visit(ASTSubscript *node) override;
   std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
@@ -82,6 +83,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTIdentifier *node) override;
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
+  std::any visit(ASTScopeResolution *node) override;
   void find_function_overload(ASTCall *&node, Symbol *&symbol,
                               std::vector<int> &arg_tys, Type *&type);
   std::any visit(ASTCall *node) override;
@@ -226,4 +228,5 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
+  std::any visit(ASTScopeResolution *node) override;
 };

@@ -6,15 +6,15 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+#include "arena.hpp"
 #include <any>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <functional>
-#include "arena.hpp"
+#include <pthread.h>
 #include <unordered_set>
 #include <vector>
-#include <pthread.h>
 
 // this could be a simple boolean.
 enum {
@@ -58,6 +58,7 @@ enum ASTNodeType {
   AST_NODE_WHILE,
   AST_NODE_STRUCT_DECLARATION,
   AST_NODE_DOT_EXPR,
+  AST_NODE_SCOPE_RESOLUTION,
   AST_NODE_SUBSCRIPT,
   AST_NODE_MAKE,
   AST_NODE_INITIALIZER_LIST,
@@ -112,17 +113,13 @@ struct ASTBlock : ASTStatement {
   Scope *scope;
   std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_BLOCK;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_BLOCK; }
 };
 
 struct ASTProgram : ASTNode {
   std::vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_PROGRAM;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
 struct ASTExpr : ASTNode {
@@ -144,11 +141,9 @@ struct ASTType : ASTExpr {
   Nullable<ASTExpr> pointing_to;
 
   // special info for tuple types.
-  std::vector<ASTType*> tuple_types;
+  std::vector<ASTType *> tuple_types;
 
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_TYPE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void() {
     static ASTType *type = [] {
       ASTType *type = ast_alloc<ASTType>();
@@ -164,12 +159,11 @@ struct ASTType : ASTExpr {
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_EXPR_STATEMENT;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_EXPR_STATEMENT; }
 };
 
-// All of our declarations could inherit from a base declaration. I am not sure if that would be useful.
+// All of our declarations could inherit from a base declaration. I am not sure
+// if that would be useful.
 struct ASTDeclaration : ASTStatement {
   bool is_static = false;
   Token name;
@@ -178,9 +172,7 @@ struct ASTDeclaration : ASTStatement {
   bool is_bitfield = false;
   Token bitsize;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_DECLARATION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -189,24 +181,18 @@ struct ASTBinExpr : ASTExpr {
   Token op;
   int resolved_type;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_BIN_EXPR;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
 struct ASTUnaryExpr : ASTExpr {
   ASTExpr *operand;
   Token op;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_UNARY_EXPR;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
 struct ASTIdentifier : ASTExpr {
   Token value;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_IDENTIFIER;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 };
 struct ASTLiteral : ASTExpr {
   enum Tag {
@@ -219,17 +205,15 @@ struct ASTLiteral : ASTExpr {
     Bool,
     Null,
   } tag;
-  std::vector<ASTExpr*> interpolated_values {};
+  std::vector<ASTExpr *> interpolated_values{};
   InternedString value;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_LITERAL;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
 
-struct ASTTupleDeconstruction: ASTStatement {
-  std::vector<ASTIdentifier*> idens;
-  ASTExpr* right;
+struct ASTTupleDeconstruction : ASTStatement {
+  std::vector<ASTIdentifier *> idens;
+  ASTExpr *right;
 
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
@@ -237,14 +221,11 @@ struct ASTTupleDeconstruction: ASTStatement {
   }
 };
 
-
 struct ASTTuple : ASTExpr {
-  ASTType* type;
-  std::vector<ASTExpr*> values;
+  ASTType *type;
+  std::vector<ASTExpr *> values;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_TUPLE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_TUPLE; }
 };
 
 struct ASTParamDecl : ASTNode {
@@ -252,17 +233,13 @@ struct ASTParamDecl : ASTNode {
   Nullable<ASTExpr> default_value;
   InternedString name;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_PARAM_DECL;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_PARAM_DECL; }
 };
 
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_PARAMS_DECL;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
 struct ASTFunctionDeclaration : ASTStatement {
@@ -282,9 +259,7 @@ struct ASTFunctionDeclaration : ASTStatement {
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_ARGUMENTS;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
 };
 
 // we'll use this node for several things,
@@ -300,48 +275,43 @@ struct ASTMake : ASTExpr {
   ASTType *type_arg;
   ASTArguments *arguments;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_MAKE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_MAKE; }
 };
 struct ASTCall : ASTExpr {
-  ASTExpr* function;
+  ASTExpr *function;
   ASTArguments *arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_CALL;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
 struct ASTDotExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
-  ASTType *type;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_DOT_EXPR;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_DOT_EXPR; }
 };
 
+struct ASTScopeResolution : ASTExpr {
+  ASTExpr *left;
+  ASTExpr *right;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override {
+    return AST_NODE_SCOPE_RESOLUTION;
+  }
+};
 
 struct ASTReturn : ASTStatement {
   Nullable<ASTExpr> expression;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_RETURN;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_RETURN; }
 };
 struct ASTBreak : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_BREAK;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_BREAK; }
 };
 struct ASTContinue : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_CONTINUE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_CONTINUE; }
 };
 
 enum ValueSemantic {
@@ -349,25 +319,21 @@ enum ValueSemantic {
   VALUE_SEMANTIC_POINTER,
 };
 
-struct ASTRange: ASTExpr {
+struct ASTRange : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_RANGE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_RANGE; }
 };
 
 struct ASTFor : ASTStatement {
-  ASTExpr* iden;
-  ASTExpr* range;
+  ASTExpr *iden;
+  ASTExpr *range;
   ValueSemantic value_semantic;
   ASTBlock *block;
 
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_FOR;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_FOR; }
 };
 
 struct ASTElse;
@@ -376,39 +342,32 @@ struct ASTIf : ASTStatement {
   ASTBlock *block;
   Nullable<ASTElse> _else; // just an else.
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_IF;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_IF; }
 };
 
 struct ASTElse : ASTStatement {
   Nullable<ASTIf> _if; // conditional else.
   Nullable<ASTBlock> block;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_ELSE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_ELSE; }
 };
 
 struct ASTWhile : ASTStatement {
   Nullable<ASTExpr> condition;
   ASTBlock *block;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_WHILE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_WHILE; }
 };
 
 struct ASTSubscript : ASTExpr {
   ASTExpr *left;
   ASTExpr *subscript;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_SUBSCRIPT;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
 };
 
-// TODO: generalize type declarations so all types can have nested types and static methods. Should be much simpler.
+// TODO: generalize type declarations so all types can have nested types and
+// static methods. Should be much simpler.
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;
@@ -429,7 +388,7 @@ struct ASTStructDeclaration : ASTStatement {
 struct ASTInitializerList : ASTExpr {
   bool types_are_homogenous = true;
   std::vector<int> types;
-  std::vector<ASTExpr*> expressions;
+  std::vector<ASTExpr *> expressions;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_INITIALIZER_LIST;
@@ -439,7 +398,7 @@ struct ASTInitializerList : ASTExpr {
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
   int element_type;
-  ASTType* type;
+  ASTType *type;
   std::vector<std::pair<InternedString, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
@@ -450,12 +409,12 @@ struct ASTEnumDeclaration : ASTStatement {
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
   Token name;
-  ASTType* type;
+  ASTType *type;
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;
-  std::vector<ASTDeclaration*> fields;
-  std::vector<ASTFunctionDeclaration*> methods;
-  std::vector<ASTStructDeclaration*> structs;
+  std::vector<ASTDeclaration *> fields;
+  std::vector<ASTFunctionDeclaration *> methods;
+  std::vector<ASTStructDeclaration *> structs;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
     return AST_NODE_UNION_DECLARATION;
@@ -471,14 +430,12 @@ struct ASTAllocate : ASTExpr {
     Delete,
   } kind;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_ALLOCATE;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_ALLOCATE; }
 };
 
 struct SwitchCase {
-  ASTExpr* expression;
-  ASTBlock* block;
+  ASTExpr *expression;
+  ASTBlock *block;
 };
 
 struct ASTSwitch : ASTExpr {
@@ -487,29 +444,23 @@ struct ASTSwitch : ASTExpr {
   ASTExpr *target;
   std::vector<SwitchCase> cases;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_SWITCH;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
 };
 
-
-
 struct Allocation {
-  ASTAllocate* alloc;
-  Symbol* symbol;
-  Scope* scope;
+  ASTAllocate *alloc;
+  Symbol *symbol;
+  Scope *scope;
 };
 
 extern std::vector<Allocation> allocation_info;
 
-void insert_allocation(ASTAllocate *in_alloc, Symbol* symbol, Scope* scope);
-void erase_allocation(Symbol* symbol, Scope*scope);
+void insert_allocation(ASTAllocate *in_alloc, Symbol *symbol, Scope *scope);
+void erase_allocation(Symbol *symbol, Scope *scope);
 
 bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_NOOP;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_NOOP; }
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -518,7 +469,7 @@ struct ASTNoop : ASTStatement {
 #define DECLARE_VISIT_METHODS()                                                \
   std::any visit(ASTProgram *node) override {}                                 \
   std::any visit(ASTBlock *node) override {}                                   \
-  std::any visit(ASTFunctionDeclaration *node) override {}                                \
+  std::any visit(ASTFunctionDeclaration *node) override {}                     \
   std::any visit(ASTParamsDecl *node) override {}                              \
   std::any visit(ASTParamDecl *node) override {}                               \
   std::any visit(ASTDeclaration *node) override {}                             \
@@ -548,12 +499,11 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTRange *node) override {};                                  \
   std::any visit(ASTSwitch *node) override {};                                 \
   std::any visit(ASTTuple *node) override {};                                  \
-  std::any visit(ASTTupleDeconstruction *node) override{};                     \
-
-
+  std::any visit(ASTTupleDeconstruction *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   std::any visit(ASTNoop *noop) { return {}; }                                 \
+  virtual std::any visit(ASTScopeResolution *node) = 0;                                 \
   virtual std::any visit(ASTProgram *node) = 0;                                \
   virtual std::any visit(ASTBlock *node) = 0;                                  \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                    \
@@ -581,13 +531,12 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTMake *node) = 0;                                   \
   virtual std::any visit(ASTInitializerList *node) = 0;                        \
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
-  virtual std::any visit(ASTUnionDeclaration *node) = 0;                        \
-  virtual std::any visit(ASTAllocate *node) = 0;                        \
-  virtual std::any visit(ASTRange *node) = 0;                        \
-  virtual std::any visit(ASTSwitch *node) = 0;                        \
-  virtual std::any visit(ASTTuple *node) = 0;                        \
-  virtual std::any visit(ASTTupleDeconstruction *node) = 0;                        \
-
+  virtual std::any visit(ASTUnionDeclaration *node) = 0;                       \
+  virtual std::any visit(ASTAllocate *node) = 0;                               \
+  virtual std::any visit(ASTRange *node) = 0;                                  \
+  virtual std::any visit(ASTSwitch *node) = 0;                                 \
+  virtual std::any visit(ASTTuple *node) = 0;                                  \
+  virtual std::any visit(ASTTupleDeconstruction *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -648,8 +597,7 @@ struct Parser {
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
   ASTExpr *parse_primary();
-  ASTCall *parse_call(ASTExpr* function);
-
+  ASTCall *parse_call(ASTExpr *function);
 
   // ASTType* parsing routines
 
@@ -657,7 +605,8 @@ struct Parser {
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *type);
 
-  ASTType *parse_function_type(const InternedString &base, TypeExt extension_info);
+  ASTType *parse_function_type(const InternedString &base,
+                               TypeExt extension_info);
 
   Nullable<ASTNode> process_directive(DirectiveKind kind,
                                       const InternedString &identifier);
@@ -667,7 +616,9 @@ struct Parser {
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
 
-  inline std::deque<Token>& lookahead_buf() { return states.back().lookahead_buffer; }
+  inline std::deque<Token> &lookahead_buf() {
+    return states.back().lookahead_buffer;
+  }
 
   Token eat();
   Token expect(TType type);
@@ -679,8 +630,7 @@ struct Parser {
 
   Parser(const std::string &contents, const std::string &filename,
          Context &context)
-      : states({Lexer::State::from_file(contents, filename)}),
-        ctx(context) {
+      : states({Lexer::State::from_file(contents, filename)}), ctx(context) {
     fill_buffer_if_needed();
   }
 

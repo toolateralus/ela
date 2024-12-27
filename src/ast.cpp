@@ -707,7 +707,7 @@ ASTStatement *Parser::parse_statement() {
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
              tok.type == TType::Delete || tok.type == TType::LParen ||
-             tok.type == TType::Erase || tok.type == TType::Switch) {
+             tok.type == TType::Erase || tok.type == TType::Switch || (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword && lookahead_buf()[2].family != TFamily::Operator)) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
 
@@ -852,7 +852,7 @@ ASTStatement *Parser::parse_statement() {
     statement->expression = parse_expr();
     end_node(statement, range);
     return statement;
-  }
+  } 
 
   end_node(nullptr, range);
 
@@ -1438,7 +1438,7 @@ ASTExpr *Parser::parse_postfix() {
     return unary;
   }
   // build dot and subscript expressions
-  while (peek().type == TType::Dot || peek().type == TType::LBrace ||
+  while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
          peek().type == TType::LParen) {
 
     if (peek().type == TType::LParen) {
@@ -1446,7 +1446,12 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::Dot) {
       eat();
       auto dot = ast_alloc<ASTDotExpr>();
-      dot->type = ast_alloc<ASTType>();
+      dot->left = left;
+      dot->right = parse_postfix();
+      left = dot;
+    } else if (peek().type == TType::DoubleColon) {
+      eat();
+      auto dot = ast_alloc<ASTScopeResolution>();
       dot->left = left;
       dot->right = parse_postfix();
       left = dot;
@@ -1954,3 +1959,4 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
+

@@ -1253,6 +1253,47 @@ std::any Typer::visit(ASTDotExpr *node) {
   return type;
   throw_error("unable to resolve dot expression type.", node->source_range);
 }
+
+std::any Typer::visit(ASTScopeResolution *node) {
+  auto left_ty = global_get_type(ctx.scope->get_type(int_from_any(node->left->accept(this)))->get_true_type());
+
+  Scope *scope = nullptr;
+  switch(left_ty->kind) {
+    case TYPE_STRUCT: {
+      auto info = static_cast<StructTypeInfo*>(left_ty->get_info());
+      scope = info->scope;
+    } break;
+    case TYPE_UNION: {
+      auto info = static_cast<UnionTypeInfo*>(left_ty->get_info());
+      scope = info->scope;
+    } break;
+    default:
+      throw_error("Unsupported type for scope resolution (:: operator)", node->source_range);
+  }
+
+  if (!scope) {
+    throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
+  }
+
+  auto calling_scope = ctx.scope;
+  Scope *dot_parent = scope->parent;
+
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
+    scope->parent = calling_scope;
+  }
+
+  ctx.set_scope(scope);
+  int type = int_from_any(node->right->accept(this));
+  ctx.set_scope(calling_scope);
+
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
+    scope->parent = dot_parent;
+  }
+
+  return type;
+}
+
+
 std::any Typer::visit(ASTSubscript *node) {
 
   auto left = int_from_any(node->left->accept(this));
