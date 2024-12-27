@@ -316,15 +316,13 @@ timef :: () -> float64 {
   return (float64)ts.tv_sec + (float64)ts.tv_nsec / (float64)1_000_000_000.0;
 }
 
-
 milliseconds :: (c: float64) -> int {
   return (int)(c * 100_000.0);
 }
 seconds :: (c: float64) -> int {
   return (int)(c * 1_000_000.0);
 }
-
-panic :: (str: string) {
+panic :: (msg: string) {
   println(str);
   exit(1);
 }

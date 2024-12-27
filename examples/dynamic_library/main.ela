@@ -2,14 +2,21 @@
 #import dlfcn;
 #include "shared.ela";
 
-#compiler_flags "-g"
+// Use this flag for machines that don't have '.' or '$(pwd)' in 
+// their "LD_LIBRARY_PATH" env-var
+#compiler_flags "-Wl,-rpath,.";
+
 main :: () -> int {
   handle := dlopen("test.so", Rtld.Now);
   
+  if !handle {
+    panic("unable to open library");
+  }
+
   hook: function = dlsym(handle, "test_call");
   
   if !hook {
-    return 1;
+    panic("Failed to open library, or get function from shared lib");
   }
   
   ctx: DrawContext;
