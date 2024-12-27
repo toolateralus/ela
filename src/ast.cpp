@@ -32,16 +32,12 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                      filename, std::filesystem::current_path().string()),
                  {});
            }
-           std::stringstream ss;
            if (import_set.contains(filename)) {
              return nullptr;
            }
-
-           std::ifstream isftr(filename.get_str());
            import_set.insert(filename);
-           ss << isftr.rdbuf();
            parser->states.push_back(
-               Lexer::State::from_file(ss.str(), filename.get_str()));
+               Lexer::State::from_file(filename.get_str()));
            parser->fill_buffer_if_needed();
            return nullptr;
          }},
@@ -198,12 +194,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
          throw_error(std::format("Couldn't find imported module: {}", filename),
                      {});
        }
-       std::stringstream ss;
-       std::ifstream isftr(filename);
-       ss << isftr.rdbuf();
-
        import_set.insert(filename);
-       parser->states.push_back(Lexer::State::from_file(ss.str(), filename));
+       parser->states.push_back(Lexer::State::from_file(filename));
        parser->fill_buffer_if_needed();
 
        return nullptr;
@@ -1175,6 +1167,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         decl->methods.push_back(
             static_cast<ASTFunctionDeclaration *>(statement));
+      } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION || statement->get_node_type() == AST_NODE_ENUM_DECLARATION) {
+        decl->subtypes.push_back(static_cast<ASTStatement*>(statement));
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",

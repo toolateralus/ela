@@ -262,16 +262,16 @@ std::any Typer::visit(ASTStructDeclaration *node) {
   if (info->scope == nullptr) {
     info->scope = node->scope;
   }
-
   ctx.set_scope(info->scope);
-
+  for (auto subtype: node->subtypes) {
+    subtype->accept(this);
+  }
   for (auto decl : node->fields) {
     decl->accept(this);
   }
   for (auto method : node->methods) {
     method->accept(this);
   }
-
   ctx.exit_scope();
   return {};
 }
@@ -1031,9 +1031,9 @@ std::any Typer::visit(ASTIdentifier *node) {
                 node->source_range);
   }
 
-  if (ctx.scope->find_type_id(node->value.value, {}) != -1) {
-    throw_error("Invalid identifier: a type exists with that name.",
-                node->source_range);
+  auto type_id = ctx.scope->find_type_id(node->value.value, {});
+  if (type_id != -1) {
+    return type_id;
   }
 
   auto symbol = ctx.scope->lookup(node->value.value);
@@ -1289,7 +1289,6 @@ std::any Typer::visit(ASTScopeResolution *node) {
   if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
     scope->parent = dot_parent;
   }
-
   return type;
 }
 

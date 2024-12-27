@@ -377,6 +377,7 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
+  std::vector<ASTStatement *> subtypes;
 
   std::any accept(VisitorBase *visitor) override;
 
@@ -628,9 +629,9 @@ struct Parser {
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
 
-  Parser(const std::string &contents, const std::string &filename,
+  Parser(const std::string &filename,
          Context &context)
-      : states({Lexer::State::from_file(contents, filename)}), ctx(context) {
+      : states({Lexer::State::from_file(filename)}), ctx(context) {
     fill_buffer_if_needed();
   }
 

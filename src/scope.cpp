@@ -6,6 +6,8 @@
 Context::Context() {
   root_scope = scope;
 
+
+
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -176,6 +178,22 @@ Context::Context() {
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
 
   }
+
+
+  // Env type
+  {
+    auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    auto type = global_create_struct_type("Env", scope);
+
+    auto func = FunctionTypeInfo{};
+    func.params_len=0;
+    auto str_array = global_find_type_id("string", TypeExt{.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
+    func.return_type = str_array; 
+    scope->insert("args", global_find_function_type_id("string[]()", func, {}));
+    scope->parent = root_scope;
+    root_scope->types.insert(type);
+  }
+
 
   auto info = FunctionTypeInfo{};
   info.is_varargs = true;

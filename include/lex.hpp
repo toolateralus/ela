@@ -3,6 +3,9 @@
 #include "interned_string.hpp"
 #include <deque>
 #include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <sstream>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -277,11 +280,22 @@ struct Lexer {
       return State(input, 0, input.length(), "");
     }
 
-    static State from_file(const std::string &input,
-                           const std::string &filename) {
+    static State from_file(const std::string &filename) {
       auto canonical = std::filesystem::canonical(filename);
       auto path = canonical.string();
       std::filesystem::current_path(canonical.parent_path());
+
+      if (!std::filesystem::exists(canonical)) {
+        printf("File %s does not exist. Quitting..", canonical.string().c_str());
+        exit(1);
+      }
+
+      // We do this to support utf16 in normal chars. for *most* cyrillic and such.
+      std::ifstream file(filename);
+      std::stringstream ss;
+      ss << file.rdbuf();
+      auto input = ss.str();
+
       bool found = false;
       size_t file_idx = 0;
       for (const auto &file : SourceLocation::files()) {

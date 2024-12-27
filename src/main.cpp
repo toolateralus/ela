@@ -88,7 +88,19 @@ Ela compiler:
 
   if (argc == 2 && (strcmp(argv[1], "init") == 0)) {
     std::ofstream file("main.ela");
-    file << "main :: (argc: int, argv: c_string*) {\n\n}\n";
+    file << R"__(
+#import core; // for println among many other common utilities.
+
+main :: () {
+  // 'Env::args()' returns a 'string[]' of the runtime's arguments.
+  for arg in Env::args() {
+    #static i: s32;
+    println($"arg {i++}: {arg}")
+  }
+  println("Hello World!")
+}
+
+)__";
     file.flush();
     file.close();
     return 0;
@@ -131,10 +143,9 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 int CompileCommand::compile() {
   Lexer lexer;
   Context context;
-  auto input = read_input_file();
   original_path = std::filesystem::current_path();
   parse.begin();
-  Parser parser(input, input_path, context);
+  Parser parser(input_path, context);
   ASTProgram *root = parser.parse();
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
 

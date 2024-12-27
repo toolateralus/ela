@@ -552,6 +552,14 @@ struct Type {
   _array<Element> (*elements)(char *);
 };
 
+struct Env {
+  static _array<string> &args() {
+    static _array<string> args;
+    return args;
+  }
+};
+
+
 #ifdef TESTING
 
 #define assert(message, condition)                                             \

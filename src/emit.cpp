@@ -494,18 +494,19 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     // we override main's return value to allow compilation without explicitly
     // returning int from main.
     if (node->name.value == "main") {
-      (*ss) << "int";
+      node->return_type->accept(this);
+      (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
+      node->block.get()->accept(this);
     } else {
       node->return_type->accept(this);
+      // emit parameter signature && name.
+      (*ss) << " " + node->name.value.get_str();
+      node->params->accept(this);
+      // the function's block would only be null in a #foreign function
+      if (node->block.is_not_null())
+        node->block.get()->accept(this);
     }
 
-    // emit parameter signature && name.
-    (*ss) << " " + node->name.value.get_str();
-    node->params->accept(this);
-
-    // the function's block would only be null in a #foreign function
-    if (node->block.is_not_null())
-      node->block.get()->accept(this);
   };
 
   emit_line_directive(node);
@@ -561,10 +562,14 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
     (*ss) << "struct " << node->type->base.get_str() << "{\n";
   }
   indentLevel++;
-
+  for (const auto &subtype: node->subtypes) {
+    indented("");
+    subtype->accept(this);
+    semicolon();
+    newline();
+  }
   for (const auto &decl : node->fields) {
     indented("");
-
     decl->accept(this);
     semicolon();
     newline();
@@ -785,6 +790,9 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
   if (testing) {
     code << "#define TESTING\n";
+  } else {
+
+
   }
 
   for (const auto &statement : node->statements) {
@@ -805,6 +813,18 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
+  } else {
+
+    code << R"__(
+int main (int argc, char** argv) {
+  // Bootstrap the env
+  for (int i = 0; i < argc; ++i) {
+    Env::args().push(string(argv[i]));
+  }
+  // call our user's main function.
+  __ela_main_();
+}
+)__";
   }
 
   // Emit runtime reflection type info for requested types, only when we have
