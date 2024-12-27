@@ -3,9 +3,9 @@
   * We have a nice set of number types, most of them sized, other common aliases.
 */
 
-x8 : s8;      xchar: char;  // same as 'char'
+x8 : s8;      xchar: char;  // s8 is same as 'char'
 x16: s16;
-x32: s32;     xint: int;    // same as 'int'
+x32: s32;     xint: int;    // s32 is the same as 'int'
 x64: s64;
 
 y8 : u8;
@@ -13,10 +13,12 @@ y16: u16;
 y32: u32;
 y64: u64;
 
-f32: float32; ffloat: float; // same as 'float'
+f32: float32; ffloat: float; // f32 is the same as 'float'
 f64: float64;
 
 b: bool;
+
+
 
 /* 
   * you can safely up cast integer/ float types but down casting or casting between integers and floats 
@@ -25,6 +27,8 @@ b: bool;
 
 
 main :: () {
+  // disregard the strange multiple assignment, it's just for brevity. It is legal, however.
+
   // safe;
   x64 = x32 = x16 = x8;
 

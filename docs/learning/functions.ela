@@ -1,0 +1,45 @@
+
+
+/* functions are simply defined with NAME :: (parameters) -> RETURN_TYPE {..block..} syntax. */
+
+add :: (a: s32, b: s32) -> s32 {
+  return a + b;
+}
+
+/*
+  You can omit the type of parameters that are repeat types of the previous param.
+  In the following example, 'b' and 'c' are both 's32' because 'a' is marked 's32'.
+*/
+
+
+// ✅ valid
+add :: (a: s32, b, c) -> s32 {
+  return a + b + c;
+}
+
+// ❌ invalid. we do not use odin-like syntax for doing this.
+add :: (a, b, c: s32) -> s32 {
+ 
+}
+
+
+/* implicit function overloading works much like any other language that supports it.
+  A function overload is designated by a function with the same name, but different parameter/return types.
+  A function cannot be overloaded just by a differing return type.
+*/
+
+// ✅ valid
+add :: (a: s32, b) -> s32 {...}
+
+// ✅ valid
+add :: (a: float, b) -> float {...}
+
+// ✅ valid
+add :: (a: s32, b: s32) -> s32 {...}
+
+// ❌ invalid. This conflicts with our first definition of 'add' which takes two s32's, 
+// and only differs in return type. The compiler wouldn't know which one to call!
+add :: (a: s32, b) -> float {...}
+
+
+

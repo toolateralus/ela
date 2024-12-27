@@ -10,12 +10,13 @@ struct Range {
   using value_type = signed long long;
   Range() {}
   Range(value_type first, value_type last, value_type increment = 1)
-      : first(first), last(last), span(last - first), is_reverse(first > last), increment(increment) {
-        if (is_reverse) {
-          first--;
-          span = first - last;
-        }
-      }
+      : first(first), last(last), span(last - first), is_reverse(first > last),
+        increment(increment) {
+    if (is_reverse) {
+      first--;
+      span = first - last;
+    }
+  }
   Range(const Range &other) {
     first = other.first;
     last = other.last;
@@ -29,8 +30,10 @@ struct Range {
   struct iterator {
     value_type current, end_value, increment;
     bool is_reverse;
-    iterator(value_type start, value_type end_value, bool is_reverse, value_type increment)
-        : current(start), end_value(end_value), is_reverse(is_reverse), increment(increment) {}
+    iterator(value_type start, value_type end_value, bool is_reverse,
+             value_type increment)
+        : current(start), end_value(end_value), is_reverse(is_reverse),
+          increment(increment) {}
     value_type operator*() const { return current; }
 
     iterator &operator++() {
@@ -51,10 +54,12 @@ struct Range {
     }
   };
 
-  iterator begin() const  { return iterator(first, last, is_reverse, increment); }
-  iterator end() const    { return iterator(first, last, is_reverse, increment); }
-  iterator begin()        { return iterator(first, last, is_reverse, increment); }
-  iterator end()          { return iterator(first, last, is_reverse, increment); }
+  iterator begin() const {
+    return iterator(first, last, is_reverse, increment);
+  }
+  iterator end() const { return iterator(first, last, is_reverse, increment); }
+  iterator begin() { return iterator(first, last, is_reverse, increment); }
+  iterator end() { return iterator(first, last, is_reverse, increment); }
 
   bool operator==(const value_type number) const {
     return number >= first && number <= last;
@@ -80,84 +85,79 @@ struct Range {
 // times.
 template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
 
-template <typename...>
-struct _tuple {
-    _tuple() = default;
-    ~_tuple() = default;
+template <typename...> struct _tuple {
+  _tuple() = default;
+  ~_tuple() = default;
 };
 
-template <typename Head, typename... Tail>
-struct _tuple<Head, Tail...> {
-    Head head;
-    _tuple<Tail...> tail;
-    _tuple() = default;
-    _tuple(Head h, Tail... t) : head(h), tail(t...) {}
+template <typename Head, typename... Tail> struct _tuple<Head, Tail...> {
+  Head head;
+  _tuple<Tail...> tail;
+  _tuple() = default;
+  _tuple(Head h, Tail... t) : head(h), tail(t...) {}
 };
 
-template <typename... Args>
-_tuple(Args...) -> _tuple<Args...>;
-
+template <typename... Args> _tuple(Args...) -> _tuple<Args...>;
 
 // Helper to get the size of the tuple
-template <typename T>
-struct tuple_size;
+template <typename T> struct tuple_size;
 
 template <typename... Args>
-struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
+struct tuple_size<_tuple<Args...>>
+    : std::integral_constant<std::size_t, sizeof...(Args)> {};
 
 // Helper to get the type of the element at a specific index
-template <std::size_t I, typename T>
-struct tuple_element;
+template <std::size_t I, typename T> struct tuple_element;
 
 template <typename Head, typename... Tail>
 struct tuple_element<0, _tuple<Head, Tail...>> {
-    using type = Head;
+  using type = Head;
 };
 
 template <std::size_t I, typename Head, typename... Tail>
 struct tuple_element<I, _tuple<Head, Tail...>> {
-    using type = typename tuple_element<I - 1, _tuple<Tail...>>::type;
+  using type = typename tuple_element<I - 1, _tuple<Tail...>>::type;
 };
 
 // Original get function for lvalue references
-template<std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(_tuple<Head, Tail...>& t) {
-    if constexpr (I == 0) {
-        return t.head;
-    } else {
-        return get<I - 1>(t.tail);
-    }
+template <std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(_tuple<Head, Tail...> &t) {
+  if constexpr (I == 0) {
+    return t.head;
+  } else {
+    return get<I - 1>(t.tail);
+  }
 }
 
 // Overload for const lvalue references
-template<std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(const _tuple<Head, Tail...>& t) {
-    if constexpr (I == 0) {
-        return t.head;
-    } else {
-        return get<I - 1>(t.tail);
-    }
+template <std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(const _tuple<Head, Tail...> &t) {
+  if constexpr (I == 0) {
+    return t.head;
+  } else {
+    return get<I - 1>(t.tail);
+  }
 }
 
 // Overload for rvalue references
-template<std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(_tuple<Head, Tail...>&& t) {
-    if constexpr (I == 0) {
-        return std::move(t.head);
-    } else {
-        return get<I - 1>(std::move(t.tail));
-    }
+template <std::size_t I, typename Head, typename... Tail>
+decltype(auto) get(_tuple<Head, Tail...> &&t) {
+  if constexpr (I == 0) {
+    return std::move(t.head);
+  } else {
+    return get<I - 1>(std::move(t.tail));
+  }
 }
 
 namespace std {
-    template <typename... Args>
-    struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
-    template <std::size_t I, typename... Args>
-    struct tuple_element<I, _tuple<Args...>> {
-        using type = typename ::tuple_element<I, _tuple<Args...>>::type;
-    };
-}
-
+template <typename... Args>
+struct tuple_size<_tuple<Args...>>
+    : std::integral_constant<std::size_t, sizeof...(Args)> {};
+template <std::size_t I, typename... Args>
+struct tuple_element<I, _tuple<Args...>> {
+  using type = typename ::tuple_element<I, _tuple<Args...>>::type;
+};
+} // namespace std
 
 template <class T> void move(T *to, const T from) { *to = std::move(from); }
 
@@ -296,16 +296,16 @@ template <class T> struct _array {
 
   T pop() { return data[--length]; }
 
-  void erase(const T& value) {
-        std::size_t writeIndex = 0;
-        for (std::size_t readIndex = 0; readIndex < length; ++readIndex) {
-            if (data[readIndex] != value) {
-                data[writeIndex] = data[readIndex];
-                ++writeIndex;
-            }
-        }
-        length = writeIndex;
+  void erase(const T &value) {
+    std::size_t writeIndex = 0;
+    for (std::size_t readIndex = 0; readIndex < length; ++readIndex) {
+      if (data[readIndex] != value) {
+        data[writeIndex] = data[readIndex];
+        ++writeIndex;
+      }
     }
+    length = writeIndex;
+  }
 
   T &operator[](int n) { return data[n]; }
 
@@ -549,7 +549,7 @@ struct Type {
   size_t size;
   u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;
-  _array<Element>(*elements)(char *);
+  _array<Element> (*elements)(char *);
 };
 
 #ifdef TESTING
@@ -613,6 +613,12 @@ struct __COMPILER_GENERATED_TEST {
            failed, passed);                                                    \
   }
 #else
+#define assert(message, condition)                                             \
+  if (!(condition)) {                                                          \
+    printf("assertion failed: %s\n "#condition"\n", message);                                 \
+    exit(1);                                                                   \
+  }
+
 #endif
 
 #else

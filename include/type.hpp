@@ -90,6 +90,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_EXPORTED= 1 << 7,
   FUNCTION_IS_MUTATING = 1 << 9,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 10,
+  FUNCTION_IS_STATIC = 1 << 11,
 };
 
 enum struct FunctionMetaType {

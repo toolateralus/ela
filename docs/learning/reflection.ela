@@ -4,8 +4,8 @@
 // Define a simple vector structure.
 Vector2 :: struct {
   // with 2 float fields.
-  x: float;
-  y: float;
+  x: float = 0;
+  y: float = 0;
   
   // Define a to_string so that interpolated strings can print us implicitly.
   to_string :: () -> string {
@@ -21,7 +21,7 @@ main :: () {
   println($"default value, instance={instance}");
   
   i : float;
-  for field; type.fields {    
+  for field in type.fields {    
     // set the field on instance, to value 'i'
     field.set(&instance, i);
     
@@ -31,7 +31,7 @@ main :: () {
   }
   
   
-  for field; type.fields {
+  for field in type.fields {
     // store the value of the field from instance in 'v'
     // It will return a pointer to the field in the struct for mutation (as a char*)
     // however, we just dereference it.

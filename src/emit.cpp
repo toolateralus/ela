@@ -349,7 +349,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   return {};
 }
 void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  if ((node->flags & FUNCTION_IS_METHOD) != 0) {
+  if ((node->flags & FUNCTION_IS_METHOD) != 0 || (node->flags & FUNCTION_IS_STATIC) != 0) {
     return;
   }
 
@@ -401,6 +401,10 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
+    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+      (*ss) << "static ";
+    }
+
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
       emit_forward_declaration(node);
       return;

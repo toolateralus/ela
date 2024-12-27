@@ -1439,3 +1439,32 @@ BitfieldTest :: struct {
   assert("bitfield failed to equal 0", test.i == 0);
   assert("bitfield z failed to equal 3", test.z == 3);
 }
+
+
+
+/*
+  Finally function overloading seems to be done! Or so it seems.
+  Please test.
+*/
+
+add :: (a: s32, b: s32) -> s32 { return a + b; }
+add :: (a: float, b: s32) -> s32 { return ((s32)a) + b; }
+add :: (a: s32, b: float) -> s32 { return a + ((s32)b); }
+add :: (a: s32, b: u32) -> s32 { return a + ((s32)b); }
+add :: (a: s32) -> s32 { return a + 2; }
+add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
+
+#test test_function_overload :: () {
+  a := add(1, 1);
+  assert("expected 2",   a == 2);
+  a = add(1.0, 1);
+  assert("expected 2",   a == 2);
+  a = add(1, 1.0);
+  assert("expected {2}", a == 2);
+  a = add(1, (u32)1);
+  assert("expected {2}", a == 2);
+  a = add(1);
+  assert("expected {3}", a == 3);
+  a = add(1, 2, 3);
+  assert("expected {6}", a == 6);
+}

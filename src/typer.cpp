@@ -42,7 +42,6 @@ void assert_return_type_is_valid(int &return_type, int new_type,
                                    "Inconsistent return types in block.");
   }
 };
-
 void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
                                    std::vector<int> &arg_tys, Type *&type) {
   if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
@@ -52,39 +51,57 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
     bool found_implicit_match = false;
     int implicit_match_idx = -1;
 
-    // CLEANUP: fix this, enumerate is slow as balls.
+    // Define the helper macro
+    #define NON_VARARGS_NO_DEFAULT_PARAMS(info) (!info->is_varargs && info->default_params == 0)
+
     for (const auto &[i, overload] :
          symbol->function_overload_types | std::ranges::views::enumerate) {
 
       auto ovrld_ty = ctx.scope->get_type(overload);
       auto info = static_cast<FunctionTypeInfo *>(ovrld_ty->get_info());
-      for (int j = 0; j < info->params_len; ++j) {
-        if (j >= arg_tys.size() &&
-            !(info->is_varargs || info->default_params > 0))
-          goto didnt_match;
-        auto conversion_rule =
-            type_conversion_rule(ctx.scope->get_type(arg_tys[j]),
-                                 ctx.scope->get_type(info->parameter_types[j]));
-        if (conversion_rule == CONVERT_EXPLICIT &&
-            !(info->is_varargs || info->default_params > 0))
-          goto didnt_match;
-        if (conversion_rule == CONVERT_IMPLICIT &&
-            !(info->is_varargs || info->default_params > 0)) {
-          found_implicit_match = true;
-          implicit_match_idx = i;
-        } else if (conversion_rule != CONVERT_NONE_NEEDED)
-          goto didnt_match;
+
+      bool match = true;
+      int required_params = info->params_len - info->default_params;
+      if (arg_tys.size() < required_params || (!info->is_varargs && arg_tys.size() > info->params_len)) {
+        match = false;
+      } else {
+        for (int j = 0; j < arg_tys.size(); ++j) {
+          if (j >= info->params_len) {
+            if (!info->is_varargs) {
+              match = false;
+              break;
+            }
+          } else {
+            auto conversion_rule =
+                type_conversion_rule(ctx.scope->get_type(arg_tys[j]),
+                                     ctx.scope->get_type(info->parameter_types[j]));
+            if (conversion_rule == CONVERT_EXPLICIT &&
+                NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
+              match = false;
+              break;
+            }
+            if (conversion_rule == CONVERT_IMPLICIT &&
+                NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
+              found_implicit_match = true;
+              implicit_match_idx = i;
+            } else if (conversion_rule != CONVERT_NONE_NEEDED) {
+              match = false;
+              break;
+            }
+          }
+        }
       }
-      found_exact_match = true;
-      exact_match_idx = i;
-      break;
-    didnt_match:
+
+      if (match) {
+        found_exact_match = true;
+        exact_match_idx = i;
+        break;
+      }
     }
+
     if (!found_exact_match && !found_implicit_match) {
       std::vector<std::string> names;
       for (auto n : arg_tys) {
-        // Here we use global get type just because we're dumping an error and
-        // it doesn't matter.
         names.push_back(ctx.scope->get_type(n)->to_string());
       }
       throw_error(std::format("No function overload for provided argument "
@@ -92,6 +109,7 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
                               names),
                   node->source_range);
     }
+
     if (found_exact_match) {
       type =
           ctx.scope->get_type(symbol->function_overload_types[exact_match_idx]);
@@ -101,6 +119,8 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
           symbol->function_overload_types[implicit_match_idx]);
       assert(type != nullptr);
     }
+
+    #undef NON_VARARGS_NO_DEFAULT_PARAMS
   }
 }
 
@@ -463,27 +483,26 @@ std::any Typer::visit(ASTDeclaration *node) {
                   node->source_range);
     }
     auto type = global_get_type(value_ty);
-    
-    { // TODO: make sure we even need to do this. Perhaps we just assign the resolved type.
+
+    { // TODO: make sure we even need to do this. Perhaps we just assign the
+      // resolved type.
       node->type = ast_alloc<ASTType>();
       node->type->resolved_type = value_ty;
       node->type->base = type->get_base();
       node->type->extension_info = type->get_ext();
     }
 
-    if (type->is_kind(TYPE_SCALAR) &&
-        type->get_ext().has_no_extensions()) {
+    if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions()) {
       auto info = static_cast<ScalarTypeInfo *>(type->get_info());
-      auto rule =
-          type_conversion_rule(type, ctx.scope->get_type(int_type()));
+      auto rule = type_conversion_rule(type, ctx.scope->get_type(int_type()));
       if (info->is_integral && rule != CONVERT_PROHIBITED &&
           rule != CONVERT_EXPLICIT) {
-        // CLEANUP: again, make sure we need to mock this up to this extent. I can't see whyw e'd look it up again.
+        // CLEANUP: again, make sure we need to mock this up to this extent. I
+        // can't see whyw e'd look it up again.
         node->type->resolved_type = int_type();
         node->type->base = "int";
         node->type->extension_info = {};
       }
-    
     }
   }
 
@@ -1238,8 +1257,8 @@ std::any Typer::visit(ASTSubscript *node) {
 
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
-  // TODO: adding get true type fixed a bug here. This shouldn't really be neccesary, 
-  // The alias system is still crappy.
+  // TODO: adding get true type fixed a bug here. This shouldn't really be
+  // neccesary, The alias system is still crappy.
   auto left_ty = global_get_type(ctx.scope->get_type(left)->get_true_type());
 
   /*

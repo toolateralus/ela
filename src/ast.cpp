@@ -496,9 +496,14 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
     {.identifier = "static",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto decl = parser->parse_declaration();
-       decl->is_static = true;
-       return decl;
+       auto statement = parser->parse_statement();
+       if (auto decl = dynamic_cast<ASTDeclaration *>(statement)) {
+         decl->is_static = true;
+       } else if (auto decl =
+                      dynamic_cast<ASTFunctionDeclaration *>(statement)) {
+         decl->flags |= FUNCTION_IS_STATIC;
+       }
+       return statement;
      }}};
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,

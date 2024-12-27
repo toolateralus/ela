@@ -10,7 +10,7 @@
       "request": "launch",
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", "--debug"],
+      "args": ["main.ela", ""],
       "cwd": "${workspaceFolder}/repro"
     },
     {
@@ -82,7 +82,7 @@
       "request": "launch",
       "name": "Debug sequencer",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", "--s", "--debug"],
+      "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/examples/sequencer"
     }
   ]

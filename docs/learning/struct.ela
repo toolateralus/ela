@@ -56,7 +56,7 @@ MyStruct :: struct {
   }
   
   // You have to define compound assignment operators explicitly.
-  #operator(+=) :: (other: #self) {
+  #operator(+=) :: (other: #self) -> #self {
     // ... implementation.
   }
   
