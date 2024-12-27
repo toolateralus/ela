@@ -18,7 +18,8 @@
 
 std::vector<DirectiveRoutine> Parser::directive_routines = {
     // #include
-    // Just like C's include, just paste a text file right above where the include is used. 
+    // Just like C's include, just paste a text file right above where the
+    // include is used.
     {.identifier = "include",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run =
@@ -43,7 +44,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                Lexer::State::from_file(ss.str(), filename.get_str()));
            parser->fill_buffer_if_needed();
            return nullptr;
-    }},
+         }},
 
     // #raw
     // string literals delimited by #raw and can span multiple lines.
@@ -90,7 +91,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
            string->tag = ASTLiteral::RawString;
            string->value = ss.str();
            return string;
-    }},
+         }},
 
     // #test
     // declare a test function. Only gets compiled into --test builds, and
@@ -113,7 +114,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto func = parser->parse_function_declaration(name);
        func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
        return func;
-    }},
+     }},
 
     // #foreign
     // Declare a foreign function, like C's extern. Super janky and bad because
@@ -437,8 +438,9 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
 
        func_decl->name = op;
-       
-       emit_warnings_or_errors_for_operator_overloads(op.type, func_decl->source_range);
+
+       emit_warnings_or_errors_for_operator_overloads(op.type,
+                                                      func_decl->source_range);
 
        return func_decl;
      }},
@@ -497,6 +499,16 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        ASTDeclaration *decl = parser->parse_declaration();
        decl->is_bitfield = true;
        decl->bitsize = size;
+       return decl;
+     }},
+
+    // #static, used exclusively for static globals, and static locals.
+    // We do not support static methods or static members.
+    {.identifier = "static",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       auto decl = parser->parse_declaration();
+       decl->is_static = true;
        return decl;
      }}};
 
@@ -679,7 +691,8 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.type == TType::Identifier &&
-      lookahead_buf()[1].type == TType::Colon) {
+          lookahead_buf()[1].type == TType::Colon ||
+      lookahead_buf()[1].type == TType::ColonEquals) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -889,18 +902,24 @@ ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
   auto iden = eat();
-  expect(TType::Colon);
-  decl->type = parse_type();
 
-  if (ctx.scope->find_type_id(iden.value, {}) != -1) {
-    end_node(nullptr, range);
-    throw_error("Invalid identifier: a type exists with that name,", range);
-  }
-
-  decl->name = iden;
-  if (peek().type == TType::Assign) {
-    eat();
+  if (peek().type == TType::Colon) {
+    expect(TType::Colon);
+    decl->type = parse_type();
+    if (ctx.scope->find_type_id(iden.value, {}) != -1) {
+      end_node(nullptr, range);
+      throw_error("Invalid identifier: a type exists with that name,", range);
+    }
+    decl->name = iden;
+    if (peek().type == TType::Assign) {
+      eat();
+      auto expr = parse_expr();
+      decl->value = expr;
+    }
+  } else {
+    expect(TType::ColonEquals);
     auto expr = parse_expr();
+    decl->name = iden;
     decl->value = expr;
   }
 
@@ -909,9 +928,7 @@ ASTDeclaration *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value),
                 decl->source_range);
   }
-
   ctx.scope->insert(iden.value, -1);
-
   if (decl->value.get() &&
       decl->value.get()->get_node_type() == AST_NODE_ALLOCATE) {
     auto symbol = ctx.scope->lookup(iden.value);

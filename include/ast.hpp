@@ -172,8 +172,9 @@ struct ASTExprStatement : ASTStatement {
 
 // All of our declarations could inherit from a base declaration. I am not sure if that would be useful.
 struct ASTDeclaration : ASTStatement {
+  bool is_static = false;
   Token name;
-  ASTType *type;
+  ASTType *type = nullptr;
   Nullable<ASTExpr> value;
   bool is_bitfield = false;
   Token bitsize;

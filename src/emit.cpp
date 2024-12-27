@@ -219,45 +219,6 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
   return {};
 }
 std::any EmitVisitor::visit(ASTBinExpr *node) {
-  // type inference assignment.
-  if (node->op.type == TType::ColonEquals) {
-    // !BUG this is annoying and causes problems
-    // if (node->left->is_constexpr()) {
-    //   (*ss) << "const ";
-    // }
-    auto id = std::any_cast<int>(node->right->accept(&type_visitor));
-    auto type = global_get_type(id);
-
-    if (type->is_kind(TYPE_FUNCTION)) {
-      std::string identifier =
-          static_cast<ASTIdentifier *>(node->left)->value.value.get_str();
-      auto &ext = type->get_ext();
-
-      if (ext.is_fixed_sized_array()) {
-        identifier += ext.to_string();
-      } else if (ext.is_array()) {
-        StringBuilder my_ss;
-        auto old = ss;
-        ss = &my_ss;
-        emit_function_pointer_type_string(type, nullptr);
-        ss = old;
-        auto type_string = my_ss.str();
-        emit_function_pointer_dynamic_array_declaration(type_string, identifier,
-                                                        type);
-        return {};
-      }
-
-      emit_function_pointer_type_string(type, &identifier);
-      return {};
-    }
-
-    (*ss) << to_cpp_string(type) << ' ';
-    node->left->accept(this);
-    (*ss) << " = ";
-    node->right->accept(this);
-    return {};
-  }
-
   if (node->op.type == TType::Erase) {
     node->left->accept(this);
     (*ss) << ".erase(";
@@ -306,12 +267,6 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
-  if (symbol && (symbol->flags & SYMBOL_WAS_MUTATED) == 0 &&
-      !ctx.scope->is_struct_or_union_scope && !type->get_ext().is_pointer()) {
-
-    // ! Removed this because it was causing too many bugs.
-    //(*ss) << "const ";
-  }
 
   if (type->is_kind(TYPE_FUNCTION)) {
     get_declaration_type_signature_and_identifier(node->name.value.get_str(),
@@ -371,19 +326,26 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
         (*ss) << init;
       }
     }
-  } else {
-    node->type->accept(this);
-    space();
-    (*ss) << node->name.value.get_str();
-    space();
-    if (node->value.is_not_null()) {
-      (*ss) << " = ";
-      cast_pointers_implicit(node);
-      node->value.get()->accept(this);
-    } else if (emit_default_init) {
-      (*ss) << "{}";
-    }
+    return {};
+  } 
+
+  // TODO: in the type checker, we should assert that this isn't a static member / function.
+  if (node->is_static) {
+    (*ss) << "static ";
   }
+
+  node->type->accept(this);
+  space();
+  (*ss) << node->name.value.get_str();
+  space();
+  if (node->value.is_not_null()) {
+    (*ss) << " = ";
+    cast_pointers_implicit(node);
+    node->value.get()->accept(this);
+  } else if (emit_default_init) {
+    (*ss) << "{}";
+  }
+
   return {};
 }
 void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
