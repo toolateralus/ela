@@ -1,13 +1,15 @@
-#import core;
-// #import raylib;
-#import json;
-#import directory;
-#import file;
-#import dlfcn;
-#import interned_string;
-#import memory;
-#import pthread;
-#import reflection;
+#import core
+#import directory
+#import dlfcn
+#import file
+#import raylib
+#import gl
+#import interned_string
+#import json
+#import memory
+#import net
+#import pthread
+#import reflection
 
 #compiler_flags "-g -fsanitize=address,leak"
 
