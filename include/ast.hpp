@@ -18,6 +18,8 @@
 
 // this could be a simple boolean.
 enum {
+  ASTTYPE_NORMAL,
+  ASTTYPE_FROM_SCOPE_RES,
   ASTTYPE_EMIT_OBJECT,
   ASTTYPE_IS_TUPLE,
 };

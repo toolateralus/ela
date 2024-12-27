@@ -553,6 +553,10 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   TypeExt extension_info;
 
+  // TODO: We need a way to refer to types with :: operator.
+  // Right now it's only used for calling static functions, even in subtypes.
+  // This is okay, but we need concrete way to refer to subtypes, otherwise they're useless.
+  
   while (true) {
     if (peek().type == TType::LBrace) {
       expect(TType::LBrace);

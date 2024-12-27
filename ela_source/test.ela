@@ -1468,3 +1468,20 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   a = add(1, 2, 3);
   assert("expected {6}", a == 6);
 }
+
+#test test_call_statics :: () {
+  Static :: struct {
+    // pop it into a substruct just to test the :: operator. Right now we can only refer to functions with :: though.
+    Substruct :: struct { 
+      #static counter :: () -> s32 {
+        #static i: s32 = 0;
+        return i++;
+      }
+    }
+  }
+
+  for i in 0..10 {
+    assert("Static member method with static local failed", Static::Substruct::counter() == i);
+  }
+
+}
