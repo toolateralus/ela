@@ -1,9 +1,9 @@
 // tiny library for loading and manipulating '.so's' and '.dlls'
 // Note this is linux only as far as I'm aware.
 
-#foreign dlopen :: (filename: char*, flags: int) -> void*;
+#foreign dlopen :: (filename: c_string, flags: int) -> void*;
 #foreign dlclose :: (handle: void*) -> int;
-#foreign dlsym :: (handle: void*, symbol: char*) -> void*;
+#foreign dlsym :: (handle: void*, symbol: c_string) -> void*;
 #foreign dlerror :: () -> char *;
 
 // Flags for 'dlopen'

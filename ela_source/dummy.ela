@@ -1,0 +1,10 @@
+#import core;
+
+L :: struct {
+  n := 0;
+  n1 := false;
+}
+
+main :: (argc: int, argv: char**) {
+  
+}

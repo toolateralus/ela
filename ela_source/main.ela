@@ -1,5 +1,0 @@
-#import core;
-
-main :: (argc: int, argv: char**) {
-  n := 0;
-}

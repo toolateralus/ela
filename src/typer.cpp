@@ -1019,7 +1019,6 @@ std::any Typer::visit(ASTIdentifier *node) {
 
   auto symbol = ctx.scope->lookup(node->value.value);
   if (symbol) {
-    node->m_is_const_expr = (symbol->flags & SYMBOL_WAS_MUTATED) == 0;
     return symbol->type_id;
   } else {
     throw_error(
@@ -1239,7 +1238,9 @@ std::any Typer::visit(ASTSubscript *node) {
 
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
-  auto left_ty = ctx.scope->get_type(left);
+  // TODO: adding get true type fixed a bug here. This shouldn't really be neccesary, 
+  // The alias system is still crappy.
+  auto left_ty = global_get_type(ctx.scope->get_type(left)->get_true_type());
 
   /*
   !HACK FIX STRING SLICING THIS IS TERRIBLE

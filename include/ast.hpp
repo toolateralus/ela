@@ -126,7 +126,6 @@ struct ASTProgram : ASTNode {
 };
 
 struct ASTExpr : ASTNode {
-  bool m_is_const_expr = false;
   bool is_constexpr() const;
   virtual ASTNodeType get_node_type() const = 0;
 };

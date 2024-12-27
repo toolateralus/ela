@@ -1,10 +1,12 @@
+#import core;
+
 #compiler_flags "-lGLEW -lGL -lglfw -lm"
 
 GLFWwindow :: struct;
 
 #foreign glfwInit :: () -> bool;
 #foreign glfwTerminate :: ();
-#foreign glfwCreateWindow :: (w: int, h: int, t: char*, v: void*, v1: void*) -> GLFWwindow*;
+#foreign glfwCreateWindow :: (w: int, h: int, t: c_string, v: void*, v1: void*) -> GLFWwindow*;
 #foreign glfwMakeContextCurrent :: (ctx: void*);
 #foreign glfwWindowShouldClose :: (window: GLFWwindow*) -> bool;
 #foreign glfwPollEvents :: ();
@@ -22,15 +24,15 @@ GLFWwindow :: struct;
 #foreign glClear :: (mask: u32);
 #foreign glGetError :: () -> int;
 #foreign glCreateShader :: (type: u32) -> u32;
-#foreign glShaderSource :: (shader: u32, count: int, string: char**, length: int*);
+#foreign glShaderSource :: (shader: u32, count: int, string: c_string*, length: int*);
 #foreign glCompileShader :: (shader: u32);
 #foreign glGetShaderiv :: (shader: u32, pname, params: int*);
-#foreign glGetShaderInfoLog :: (shader: u32, maxLength: int, length: int*, infoLog: char*);
+#foreign glGetShaderInfoLog :: (shader: u32, maxLength: int, length: int*, infoLog: c_string);
 #foreign glCreateProgram :: () -> u32;
 #foreign glAttachShader :: (program: u32, shader);
 #foreign glLinkProgram :: (program: u32);
 #foreign glGetProgramiv :: (program: u32, pname, params: int*);
-#foreign glGetProgramInfoLog :: (program: u32, maxLength: int, length: int*, infoLog: char*);
+#foreign glGetProgramInfoLog :: (program: u32, maxLength: int, length: int*, infoLog: c_string);
 #foreign glUseProgram :: (program: u32);
 #foreign glDeleteShader :: (shader: s32);
 #foreign glDeleteProgram :: (shader: s32);
@@ -42,7 +44,7 @@ GLFWwindow :: struct;
 #foreign glfwSetCursorPos :: (window: GLFWwindow*, xpos: float, ypos);
 #foreign glfwSetInputMode :: (window: GLFWwindow*, mode: int, value);
 
-#foreign glGetUniformLocation :: (program: u32, name: char*) -> int;
+#foreign glGetUniformLocation :: (program: u32, name: c_string) -> int;
 #foreign glUniform4fv :: (location: int, count, value: float*);
 #foreign glUniform3fv :: (location: int, count, value: float*);
 #foreign glUniform2fv :: (location: int, count, value: float*);
@@ -598,13 +600,13 @@ GL :: enum {
  CLIENT_ALL_ATTRIB_BITS =0xffffffff,
 }
 
-KeyPress :: enum {
+GLKeyPress :: enum {
   Released = 0,
   Pressed = 1,
   Repeating = 2,
 }
 
-Key :: enum {
+GLKey :: enum {
   UNKNOWN = -1,
   SPACE = 32,
   APOSTROPHE = 39,
@@ -729,7 +731,7 @@ Key :: enum {
   LAST = 348,
 }
 
-compile_shader :: (kind: u32, source: char*) -> u32 {
+compile_shader :: (kind: u32, source: c_string) -> u32 {
   shader: u32 = glCreateShader(kind);
   glShaderSource(shader, 1, &source, null);
   glCompileShader(shader);
@@ -739,7 +741,7 @@ compile_shader :: (kind: u32, source: char*) -> u32 {
   if success == 0 {
     length: int;
     glGetShaderiv(shader, GL.INFO_LOG_LENGTH, &length);
-    info_log: char* = malloc(sizeof(char*) * length);
+    info_log: c_string = malloc(sizeof(c_string) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
     free(info_log);
@@ -748,7 +750,7 @@ compile_shader :: (kind: u32, source: char*) -> u32 {
   return shader;
 }
 
-create_program :: (vert_source: char*, frag_source: char*) -> u32 {
+create_program :: (vert_source: c_string, frag_source: c_string) -> u32 {
   vertex_shader: u32 = compile_shader(GL.VERTEX_SHADER, vert_source);
   fragment_shader: u32 = compile_shader(GL.FRAGMENT_SHADER, frag_source);
 
@@ -766,7 +768,7 @@ create_program :: (vert_source: char*, frag_source: char*) -> u32 {
   if success == 0 {
     length: int;
     glGetProgramiv(program, GL.INFO_LOG_LENGTH, &length);
-    info_log: char* = malloc(sizeof(char*) * length);
+    info_log: c_string = malloc(sizeof(c_string) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
     free(info_log);
@@ -779,7 +781,7 @@ create_program :: (vert_source: char*, frag_source: char*) -> u32 {
   return program;
 }
 
-check_error :: (location: char*) {
+check_error :: (location: c_string) {
   err: int = glGetError();
   if err == GL.INVALID_ENUM {
     printf("error: %s, from: %s\n", "GL.INVALID_ENUM", location);
@@ -1071,13 +1073,13 @@ Shader :: struct {
   use :: () {
     glUseProgram(handle);
   }
-  #ctor :: (vertexSource: char*, fragSource: char*) {
+  #ctor :: (vertexSource: c_string, fragSource: c_string) {
     handle = create_program(vertexSource, fragSource);
   }
   #dtor :: () {
     glDeleteProgram(handle);
   }
-  set_Mat4 :: (name: char*, v: Mat4*) {
+  set_Mat4 :: (name: c_string, v: Mat4*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, #make(float*, v.values));
@@ -1086,7 +1088,7 @@ Shader :: struct {
     }
   }
 
-  set_Vec4 :: (name: char*, v: Vec4*) {
+  set_Vec4 :: (name: c_string, v: Vec4*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform4fv(index, 1, #make(float*, v.values));
@@ -1094,7 +1096,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec3 :: (name: char*, v: Vec3*) {
+  set_Vec3 :: (name: c_string, v: Vec3*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform3fv(index, 1, #make(float*, v.values));
@@ -1102,7 +1104,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec2 :: (name: char*, v: Vec2*) {
+  set_Vec2 :: (name: c_string, v: Vec2*) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform2fv(index, 1, #make(float*, v.values));
@@ -1110,7 +1112,7 @@ Shader :: struct {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_float :: (name: char*, v: float) {
+  set_float :: (name: c_string, v: float) {
     index := glGetUniformLocation(handle, name);
     if index != -1 {
       glUniform1f(index, v);
@@ -1121,7 +1123,7 @@ Shader :: struct {
 }
 Window :: struct {
   handle: GLFWwindow*;
-  #ctor :: (width: int, height: int, title: char*) {
+  #ctor :: (width: int, height: int, title: c_string) {
     if !glfwInit() {
       printf("Failed to initialize glfw\n");
       return;

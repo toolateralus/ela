@@ -29,7 +29,7 @@ directory_open :: (path: char *) -> Directory {
   entry : void*;
   while entry = readdir(dir) {
     ent : dirent* = entry;
-    files ~= string{(char*)ent.d_name};
+    files ~= string{(c_string)ent.d_name};
   }
   closedir(dir);
   return {path, files};

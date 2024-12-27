@@ -1,6 +1,6 @@
 
 
-#foreign system :: (cmd: char*) -> int;
+#foreign system :: (cmd: c_string) -> int;
 
 #foreign free :: (ptr: void*) -> void;
 #foreign malloc :: (nbytes: u64) -> void*;
@@ -9,8 +9,8 @@
 #foreign memcpy :: (dest: void*, src: void*, n: u64) -> void*;
 #foreign memset :: (dest: void*, c: int, n: u64) -> void*;
 
-#foreign printf :: (format: char*, ...) -> int;
-#foreign scanf :: (format: char*, ...) -> int;
+#foreign printf :: (format: c_string, ...) -> int;
+#foreign scanf :: (format: c_string, ...) -> int;
 
 #foreign sleep :: (seconds: int);
 #foreign usleep :: (c: int);
@@ -22,12 +22,12 @@
 #foreign time :: (value: void*) -> int;
 #foreign exit :: (code: int);
 
-#foreign strlen :: (str: char*) -> int;
-#foreign strcmp :: (str1: char*, str2: char*) -> int;
-#foreign strcat :: (dest: char*, src: char*) -> char*;
-#foreign snprintf :: (buffer: u8*, buffer_size: u64, format: char*, ...) -> int;
-#foreign sprintf :: (buffer: u8*, format: char*, ...) -> int;
-#foreign strncmp :: (str: char*, str2: char*, len: int) -> int;
+#foreign strlen :: (str: c_string) -> int;
+#foreign strcmp :: (str1: c_string, str2: c_string) -> int;
+#foreign strcat :: (dest: c_string, src: c_string) -> c_string;
+#foreign snprintf :: (buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
+#foreign sprintf :: (buffer: u8*, format: c_string, ...) -> int;
+#foreign strncmp :: (str: c_string, str2: c_string, len: int) -> int;
 #foreign isalnum :: (c: int) -> int;
 #foreign isalpha :: (c: int) -> int;
 #foreign isspace :: (c: int) -> int;
@@ -37,8 +37,8 @@
 #foreign isprint :: (c: int) -> int;
 #foreign ispunct :: (c: int) -> int;
 
-#foreign atoi :: (v: char*) -> int;
-#foreign atof :: (v: char*) -> float64;
+#foreign atoi :: (v: c_string) -> int;
+#foreign atof :: (v: c_string) -> float64;
 
 #foreign fabs :: (f: float64) -> float64;
 #foreign pow :: (base: float64, exponent: float64) -> float64;
@@ -52,7 +52,7 @@
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32);
 
-str_starts_with :: (str: char*, substr: char*) -> bool {
+str_starts_with :: (str: c_string, substr: c_string) -> bool {
   if str == null || substr == null
     then return false;
 
@@ -68,7 +68,7 @@ str_starts_with :: (str: char*, substr: char*) -> bool {
   return strncmp(str, substr, substr_len) == 0;
 }
 
-str_ends_with :: (str: char*, pattern: char*) -> bool {
+str_ends_with :: (str: c_string, pattern: c_string) -> bool {
   if !str || !pattern
     then return false;
 
@@ -104,7 +104,7 @@ str_replace :: (str: string, pattern: string, replacement: string) -> string {
   return result;
 }
 
-string_substr :: (src: char*, start: int, end: int) -> string {
+string_substr :: (src: c_string, start: int, end: int) -> string {
   if !src
     then return string{""};
 
@@ -116,7 +116,7 @@ string_substr :: (src: char*, start: int, end: int) -> string {
   if (len < end - start)
     then return string{""};
 
-  dest: char* = malloc(sizeof(char) * (end - start) + 1);
+  dest: c_string = malloc(sizeof(char) * (end - start) + 1);
 
   memcpy(dest, src + start, end - start);
 
@@ -170,13 +170,13 @@ to_string :: (num: s64) -> string {
     buffer[index - i - 1] = temp;
   }
 
-  return string{(char*)buffer, ((char*) buffer) + index};
+  return string{(c_string)buffer, ((c_string) buffer) + index};
 
 
 }
 
 
-streq :: (left: char*, right) -> bool {
+streq :: (left: c_string, right) -> bool {
   return strcmp(left, right) == 0;
 }
 
@@ -191,7 +191,7 @@ println :: (str: string) {
   printf("%s\n", str.data);
 }
 
-println :: (str: char*) {
+println :: (str: c_string) {
   printf("%s\n", str);
 }
 

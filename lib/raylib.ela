@@ -484,7 +484,7 @@ All_Colors : Color[] = {
 #foreign SetExitKey :: (key :int);
 
 /* Drawing functions */
-#foreign InitWindow :: (width: int, height: int, title: char*) -> void;
+#foreign InitWindow :: (width: int, height: int, title: c_string) -> void;
 #foreign WindowShouldClose :: () -> bool;
 #foreign CloseWindow :: () -> void;
 #foreign BeginDrawing :: () -> void;
@@ -499,7 +499,7 @@ All_Colors : Color[] = {
 #foreign DrawRectangle :: (posX: int, posY, width, height, color: Color) -> void;
 #foreign DrawTriangle :: (v1X: int, v1Y, v2X, v2Y, v3X, v3Y, color: Color) -> void;
 #foreign DrawPoly :: (centerX: int, centerY: int, sides: int, radius: float, rotation: float, color: Color) -> void;
-#foreign LoadTexture :: (fileName: char*) -> Texture2D;
+#foreign LoadTexture :: (fileName: c_string) -> Texture2D;
 #foreign UnloadTexture :: (texture: Texture2D) -> void;
 #foreign DrawTexture :: (texture: Texture2D, posX: int, posY: int, tint: Color) -> void;
 #foreign DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
@@ -529,22 +529,22 @@ All_Colors : Color[] = {
 
 
 /* Text functions */
-#foreign DrawText :: (text: char*, posX: int, posY: int, fontSize: int, color: Color) -> void;
-#foreign MeasureText :: (text: char*, fontSize: int) -> int;
-#foreign TextFormat :: (format: char*, ...) -> char*;
-#foreign LoadFont :: (fileName: char*) -> Font;
-#foreign DrawTextEx :: (font: Font, text: char*, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
-#foreign MeasureTextEx :: (font: Font, text: char*, fontSize: float, spacing: float) -> Vector2;
+#foreign DrawText :: (text: c_string, posX: int, posY: int, fontSize: int, color: Color) -> void;
+#foreign MeasureText :: (text: c_string, fontSize: int) -> int;
+#foreign TextFormat :: (format: c_string, ...) -> c_string;
+#foreign LoadFont :: (fileName: c_string) -> Font;
+#foreign DrawTextEx :: (font: Font, text: c_string, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
+#foreign MeasureTextEx :: (font: Font, text: c_string, fontSize: float, spacing: float) -> Vector2;
 
 
 /* Audio functions */
-#foreign LoadSound :: (fileName: char*) -> Sound;
+#foreign LoadSound :: (fileName: c_string) -> Sound;
 #foreign UnloadSound :: (sound: Sound) -> void;
 #foreign PlaySound :: (sound: Sound) -> void;
 #foreign StopSound :: (sound: Sound) -> void;
 #foreign PauseSound :: (sound: Sound) -> void;
 #foreign ResumeSound :: (sound: Sound) -> void;
-#foreign LoadMusicStream :: (fileName: char*) -> Music;
+#foreign LoadMusicStream :: (fileName: c_string) -> Music;
 #foreign UnloadMusicStream :: (music: Music) -> void;
 #foreign PlayMusicStream :: (music: Music) -> void;
 #foreign UpdateMusicStream :: (music: Music) -> void;
@@ -578,7 +578,7 @@ Style :: struct {
 }
 
 // * Measure the width of a jiggly text of 'text' and 'style'
-measure_jiggly_text :: (text: char*, style: Style) -> float {
+measure_jiggly_text :: (text: c_string, style: Style) -> float {
   length: int = strlen(text);
   total_width: float = 0.0;
   for i in 0..length {
@@ -588,7 +588,7 @@ measure_jiggly_text :: (text: char*, style: Style) -> float {
 }
 
 // * Draw wavy jiggly text.
-jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
+jiggly_text :: (text: c_string, rect: Rectangle, style: Style) {
   time: float = (float)GetTime();
   length: int = strlen(text);
 
@@ -599,12 +599,12 @@ jiggly_text :: (text: char*, rect: Rectangle, style: Style) {
     char_x := rect.x + (float)i * style.font_size;
     char_y := rect.y + intensity * sin(rate * time + (float)i);
     temp : char[2] = { text[i], #char "\0" };
-    DrawText((char*)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
+    DrawText((c_string)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
   }
 }
 
 // * Draw a button with a click callback.
-draw_button :: (text: char*, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
+draw_button :: (text: c_string, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
   position: Vector2 = {rect.x, rect.y};
   size: Vector2 = {rect.width, rect.height};
 

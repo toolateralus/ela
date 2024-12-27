@@ -134,7 +134,7 @@ struct EmitVisitor : VisitorBase {
   // do this.
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
-    static bool is_debugging = compile_command.has_flag("debug");
+    static bool is_debugging = !compile_command.has_flag("release");
     if (!is_debugging) {
       return;
     }

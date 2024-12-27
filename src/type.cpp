@@ -248,7 +248,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   const auto implicit_ptr_cast =
       from->get_ext().is_pointer(1) && to->get_ext().is_pointer(1);
 
-
   // If we have a fixed array such as
   // char[5] and the argument takes void*
   // we check if char* can cast to void*, and if it can, we allow the cast.
@@ -261,8 +260,10 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     if (!to->get_ext().is_pointer(1))
       return false;
 
-    auto element_ty_base = global_get_type(from->get_element_type())->get_base();
-    auto element_ptr_type = global_get_type(global_find_type_id(element_ty_base, {.extensions= {TYPE_EXT_POINTER}}));
+    auto element_ty_base =
+        global_get_type(from->get_element_type())->get_base();
+    auto element_ptr_type = global_get_type(global_find_type_id(
+        element_ty_base, {.extensions = {TYPE_EXT_POINTER}}));
     auto rule = type_conversion_rule(element_ptr_type, to);
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
@@ -338,7 +339,8 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-bool Type::equals(const InternedString &name, const TypeExt &type_extensions) const {
+bool Type::equals(const InternedString &name,
+                  const TypeExt &type_extensions) const {
   auto type = global_get_type(id);
   if (type->get_base() != name)
     return false;
@@ -442,8 +444,8 @@ int global_create_enum_type(const InternedString &name,
   num_types += 1;
   return type->id;
 }
-int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info,
-                       const TypeExt &extensions) {
+int global_create_type(TypeKind kind, const InternedString &name,
+                       TypeInfo *info, const TypeExt &extensions) {
   Type *type = new (type_alloc<Type>()) Type(num_types, kind);
   type->set_info(info);
   type->set_ext(extensions);
@@ -537,6 +539,10 @@ int u16_type() {
 }
 int u32_type() {
   static int type = global_find_type_id("u32", {});
+  return type;
+}
+int c_string_type() {
+  static int type = global_find_type_id("c_string", {});
   return type;
 }
 int u64_type() {
@@ -729,6 +735,9 @@ void init_type_system() {
                        create_scalar_type_info(TYPE_BOOL, 1, true));
     global_create_type(TYPE_SCALAR, "void",
                        create_scalar_type_info(TYPE_VOID, 0));
+
+    auto id = charptr_type();
+    global_create_type_alias(id, "c_string");
   }
 }
 bool type_is_numerical(const Type *t) {
@@ -833,3 +842,5 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ">";
   return ss.str();
 }
+
+

@@ -12,7 +12,6 @@ enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_HAS_OVERLOADS = 1 << 3,
-  SYMBOL_WAS_MUTATED = 1 << 4,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
 };
 
@@ -31,14 +30,6 @@ struct Symbol {
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
-
-  void report_symbol_mutated(const InternedString &name) {
-    if (symbols.contains(name))
-      symbols[name].flags |= SYMBOL_WAS_MUTATED;
-    else if (parent) {
-      parent->report_symbol_mutated(name);
-    }
-  }
 
   bool is_struct_or_union_scope = false;
 

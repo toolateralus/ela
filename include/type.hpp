@@ -255,6 +255,7 @@ int u64_type();
 int float64_type();
 int float_type();
 int float32_type();
+int c_string_type();
 
 Type *global_get_type(const int id);
 

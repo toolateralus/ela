@@ -479,11 +479,6 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       } else {
         node->params->accept(this);
       }
-
-      if ((node->flags & FUNCTION_IS_MUTATING) == 0) {
-        //(*ss) << " const ";
-      }
-
       node->block.get()->accept(this);
       return;
     }
@@ -680,10 +675,10 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
   } else {
     node->type->accept(this);
     auto sym = ctx.scope->local_lookup(node->name);
-    if (sym && (sym->flags & SYMBOL_WAS_MUTATED) == 0 &&
+    if (sym && 
             type->is_kind(TYPE_STRUCT) ||
         type->is_kind(TYPE_UNION)) {
-      (*ss) << " const& " << node->name.get_str();
+      (*ss) << " & " << node->name.get_str();
     } else {
       (*ss) << ' ' << node->name.get_str();
     }
@@ -1604,7 +1599,12 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
                                        const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   StringBuilder ss;
-  ss << base;
+  if (base == "c_string") {
+    ss << "const char *";
+  } else {
+    ss << base;
+  }
+
   for (const auto ext : extensions.extensions) {
     if (ext == TYPE_EXT_ARRAY) {
       auto size = array_sizes.back();
@@ -1640,7 +1640,7 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
 std::string EmitVisitor::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
-  if (type->get_base() == "char" && type->get_ext().is_pointer(1)) {
+  if (id == c_string_type()) {
     name = "const char";
   } else if (type->get_base() == "u8" && type->get_ext().is_pointer(1)) {
     name = "char";
@@ -1657,6 +1657,7 @@ std::string EmitVisitor::get_cpp_scalar_type(int id) {
 
 std::string EmitVisitor::to_cpp_string(Type *type) {
   type = global_get_type(type->get_true_type());
+
   auto output = std::string{};
   switch (type->kind) {
   case TYPE_SCALAR:

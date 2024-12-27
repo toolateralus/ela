@@ -1104,6 +1104,11 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   node->type->base = tok.value;
   expect(TType::LCurly);
 
+  if (global_find_type_id(tok.value, {}) != -1) {
+    end_node(node, range);
+    throw_error("Redefinition of enum " + tok.value.get_str(), range);
+  }
+
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
@@ -1359,8 +1364,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->left = left;
     binexpr->right = right;
     binexpr->op = op;
-    binexpr->m_is_const_expr = left->is_constexpr() && right->is_constexpr();
-
     if (op.type == TType::ColonEquals &&
         left->get_node_type() == AST_NODE_IDENTIFIER &&
         right->get_node_type() == AST_NODE_ALLOCATE) {
@@ -1829,7 +1832,7 @@ void erase_allocation(Symbol *symbol, Scope *scope) {
   }
 }
 bool ASTExpr::is_constexpr() const {
-  return get_node_type() == AST_NODE_LITERAL || m_is_const_expr;
+  return get_node_type() == AST_NODE_LITERAL;
 }
 
 std::vector<ASTType *> Parser::parse_parameter_types() {

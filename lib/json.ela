@@ -26,7 +26,7 @@ JsonToken :: struct {
 }
 
 JsonLexer :: struct {
-  tokenTypeNames : char*[JsonTokenType.Comma + 1] = {
+  tokenTypeNames : string[JsonTokenType.Comma + 1] = {
     "Invalid",
     "True",
     "False",
@@ -42,7 +42,7 @@ JsonLexer :: struct {
     "Comma",
   };
 
-  file: char*;
+  file: string;
   line_start: int;
   cur_line: int;
   position : int;
@@ -55,7 +55,7 @@ JsonLexer :: struct {
     exit(1);
   }
 
-  #ctor :: (_file: char*, _input: string) {
+  #ctor :: (_file: c_string, _input: string) {
     file = _file;
     input = _input;
     length = input.length;
@@ -452,12 +452,12 @@ json_parse :: (lexer: JsonLexer*) -> JsonValue* {
   return value;
 }
 
-json_parse_file :: (file: char*) -> JsonValue* {
+json_parse_file :: (file: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, file, file_read_to_string(file));
   return json_parse(&lexer);
 }
 
-json_parse_string :: (str: char*) -> JsonValue* {
+json_parse_string :: (str: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, "string", str);
   return json_parse(&lexer);
 }
@@ -480,7 +480,7 @@ json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
     val.type = JsonValueType.Number;
     if type_is_signed(type) {
       if type.id == #typeid(char) {
-        val.data.number = *(char*)object;
+        val.data.number = *(c_string)object;
         return val;
       } else if type.id == #typeid(s8) {
         val.data.number = *(s8*)object;
@@ -539,7 +539,7 @@ json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType.Array;
   val.data.array = JsonValue*[]{};
-  for elem in type.elements((char*)object) {
+  for elem in type.elements((c_string)object) {
     val.data.array ~= json_serialize(elem.data, elem.type);
   }
   return val;
@@ -586,7 +586,7 @@ JsonError :: struct {
 //     val.type = JsonValueType.Number;
 //     if type_is_signed(type) {
 //       if type.id == #typeid(char) {
-//         val.data.number = *(char*)object;
+//         val.data.number = *(c_string)object;
 //         return val;
 //       } else if type.id == #typeid(s8) {
 //         val.data.number = *(s8*)object;
