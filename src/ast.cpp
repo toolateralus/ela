@@ -226,17 +226,6 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        return outer;
      }},
 
-    // #char
-    {.identifier = "char",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto string = parser->expect(TType::String).value;
-       auto node = ast_alloc<ASTLiteral>();
-       node->tag = ASTLiteral::Char;
-       node->value = string;
-       return node;
-     }},
-
     // '#ctor' for declaring a constructor for a struct
     {.identifier = "ctor",
      .kind = DIRECTIVE_KIND_STATEMENT,

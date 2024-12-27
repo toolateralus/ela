@@ -598,7 +598,7 @@ jiggly_text :: (text: c_string, rect: Rectangle, style: Style) {
   for i in 0..length {
     char_x := rect.x + (float)i * style.font_size;
     char_y := rect.y + intensity * sin(rate * time + (float)i);
-    temp : char[2] = { text[i], #char "\0" };
+    temp : char[2] = { text[i], '\0' };
     DrawText((c_string)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
   }
 }
@@ -705,7 +705,7 @@ SliderF :: struct {
     // Draw the slider value
 
     value_text := $"{*this.value}";
-    value_text.data[digits_to_show] = #char "\0";
+    value_text.data[digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
@@ -778,7 +778,7 @@ SliderI :: struct {
     DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
 
     value_text := $"{*this.value}";
-    value_text.data[digits_to_show] = #char "\0";
+    value_text.data[digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 

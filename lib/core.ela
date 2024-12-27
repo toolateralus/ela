@@ -153,13 +153,13 @@ to_string :: (num: s64) -> string {
   index: int = 0;
 
   while num > 0 {
-    buffer[index] = #char "0" + (num % 10);
+    buffer[index] = '0' + (num % 10);
     num /= 10;
     index++;
   }
 
   if negative {
-    buffer[index] = #char "-";
+    buffer[index] = '-';
     index++;
   }
 

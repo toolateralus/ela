@@ -43,11 +43,10 @@ main :: () {
 
 /* 
   * character literals
-  * right now, it's clunky and bad using #char directive.
 */
 
-c : char = #char "c";
+c : char = 'c';
 
-code := #char "\0";
+code := '\0';
 
 

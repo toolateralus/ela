@@ -14,7 +14,7 @@ chatting :: (sockfd: int) {
     printf("Enter message : ");
 
     n: int;
-    while n < MAX_BUFFER_LEN && (buffer[n++] = getchar()) != #char "\n" {}
+    while n < MAX_BUFFER_LEN && (buffer[n++] = getchar()) != '\n' {}
     
     write(sockfd, buffer, MAX_BUFFER_LEN);
 

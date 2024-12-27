@@ -76,7 +76,7 @@ JsonLexer :: struct {
 
     // whitespace
     while position < length {
-      if c == #char "\n" || c == #char "\r" {
+      if c == '\n' || c == '\r' {
         line_start = position;
         cur_line++;
       } else if !isspace(c) {
@@ -94,16 +94,16 @@ JsonLexer :: struct {
     }
 
     // comments
-    if c == #char "/" {
+    if c == '/' {
       position++;
       if position >= length {
         err(token, "Unexpected character: {c}");
       }
       c = input[position];
-      if c != #char "/" {
+      if c != '/' {
         err(token, "Unexpected character: {c}");
       }
-      while c != #char "\n" && c != #char "\r" {
+      while c != '\n' && c != '\r' {
         position++;
         if position >= length || input[position] == 0 {
           token.type = JsonTokenType.Eof;
@@ -118,7 +118,7 @@ JsonLexer :: struct {
       // numbers
       len : int;
       start : int = position;
-      while (isdigit(c) || c == #char ".") && position < length {
+      while (isdigit(c) || c == '.') && position < length {
         len++;
         position++;
         c = input[position];
@@ -127,43 +127,43 @@ JsonLexer :: struct {
       token.type = JsonTokenType.Number;
       return token;
       // operators
-    } else if c == #char ":" {
+    } else if c == ':' {
       token.value = #make(string, ":");
       token.type = JsonTokenType.Colon;
       position++;
       return token;
-    } else if c == #char "{" {
+    } else if c == '{' {
       token.value = #make(string, "{");
       token.type = JsonTokenType.LCurly;
       position++;
       return token;
-    } else if c == #char "}" {
+    } else if c == '}' {
       token.value = #make(string, "}");
       token.type = JsonTokenType.RCurly;
       position++;
       return token;
-    } else if c == #char "[" {
+    } else if c == '[' {
       token.value = #make(string, "[");
       token.type = JsonTokenType.LBracket;
       position++;
       return token;
-    } else if c == #char "]" {
+    } else if c == ']' {
       token.value = #make(string, "]");
       token.type = JsonTokenType.RBracket;
       position++;
       return token;
-    } else if c == #char "," {
+    } else if c == ',' {
       token.value = #make(string, ",");
       token.type = JsonTokenType.Comma;
       position++;
       return token;
-    } else if c == 34 {
+    } else if c == '\"' {
       position++;
       c = input[position];
       len : int;
       start : int = position;
-      while c != 34 && position < length {
-        if c == #char "\n" || c == #char "\r" {
+      while c != '\"' && position < length {
+        if c == '\n' || c == '\r' {
           line_start = position;
           cur_line++;
         }

@@ -19,7 +19,7 @@ memcpy :: (dest: char**, src: char*, len: u32) {
 
 #export strlen :: (s: char*) -> int {
   i: int;
-  while s[i] != #char "\0" {
+  while s[i] != '\0' {
     ++i;
   }
   return i;

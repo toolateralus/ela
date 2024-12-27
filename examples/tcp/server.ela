@@ -14,7 +14,7 @@ chatting :: (connfd: int) {
     println($"From client: {(char*)buff}   To client : ");
     memset(buff, 0, MAX_BUFFER_LENGTH);
     n: int;
-    while n < MAX_BUFFER_LENGTH && ((buff[n++] = getchar()) != #char "\n") {}
+    while n < MAX_BUFFER_LENGTH && ((buff[n++] = getchar()) != '\n') {}
     write(connfd, buff, MAX_BUFFER_LENGTH);
     if (strncmp("exit", (char*)buff, 4) == 0) {
       printf("Server Exit...\n");
