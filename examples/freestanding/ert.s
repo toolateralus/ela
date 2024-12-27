@@ -1,6 +1,5 @@
 section .text
 
-
 global exit
 
 exit:
