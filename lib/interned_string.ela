@@ -1,31 +1,28 @@
 #import core;
 
-__string_cache: s64[string];
-__string_storage_cache: string[s64];
-
-__next_str_id: s64 = 1;
-
-__next_interned_string_id :: () -> s64 {
-  return __next_str_id++;
-}
+#static __interned_string_storage_cache: string[s64];
 
 InternedString :: struct {
   id: s64;
+
   #ctor :: () {
     id = 0;
   }
+
   #ctor :: (value: string) {
-    _id := __string_cache[value];
+    #static cache: s64[string];
+    #static next_id: s64 = 1;
+    _id := cache[value];
     if _id == 0 {
-      id = __next_interned_string_id();
-      __string_cache[value] = id;
-      __string_storage_cache[id] = value;
-     }
+      id = next_id++;
+      cache[value] = id;
+      __interned_string_storage_cache[id] = value;
+    }
     else { id = _id; }
   }
 
   value :: () -> string {
-    return __string_storage_cache[id];
+    return __interned_string_storage_cache[id];
   }
 
   #operator(==) :: (other: InternedString) -> bool {
