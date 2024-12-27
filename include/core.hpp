@@ -100,7 +100,7 @@ struct CompileCommand {
                 << "\e[0m: " << (flag.second ? "true" : "false") << std::endl;
     }
   }
-  inline void add_compilation_flags(const std::string &flags)  {
+  inline void add_compilation_flag(const std::string &flags)  {
     this->compilation_flags += flags;
     if (!this->compilation_flags.ends_with(' ')) {
       this->compilation_flags += ' ';
@@ -167,14 +167,11 @@ struct CompileCommand {
     }
     return ss.str();
   }
-  ASTProgram *process_ast(Context &context);
-  int emit_code(ASTProgram *root, Context &context);
   bool has_flag(const std::string &flag) const;
   int compile();
 };
 
 extern CompileCommand compile_command;
-bool get_compilation_flag(const std::string &flag);
 extern std::vector<Token> all_tokens;
 
 struct SourceRange {

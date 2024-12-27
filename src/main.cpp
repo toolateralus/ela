@@ -122,21 +122,23 @@ Ela compiler:
   return result != 0;
 }
 
-ASTProgram *CompileCommand::process_ast(Context &context) {
+bool CompileCommand::has_flag(const std::string &flag) const {
+  auto it = flags.find(flag);
+  return it != flags.end() && it->second;
+}
+
+int CompileCommand::compile() {
+  Lexer lexer;
+  Context context;
   auto input = read_input_file();
   original_path = std::filesystem::current_path();
-
   parse.begin();
   Parser parser(input, input_path, context);
   ASTProgram *root = parser.parse();
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
-  return root;
-}
-
-int CompileCommand::emit_code(ASTProgram *root, Context &context) {
 
   lower.begin();
-  TypeVisitor type_visitor{context};
+  Typer type_visitor{context};
   type_visitor.visit(root);
 
   if (has_flag("verbose")) {
@@ -165,7 +167,6 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   output << program;
   output.flush();
   output.close();
-
   int result = 0;
 
   if (!has_flag("no-compile")) {
@@ -195,24 +196,6 @@ int CompileCommand::emit_code(ASTProgram *root, Context &context) {
   }
 
   std::filesystem::current_path(original_path);
-  return result;
-}
-
-bool CompileCommand::has_flag(const std::string &flag) const {
-  auto it = flags.find(flag);
-  return it != flags.end() && it->second;
-}
-
-int CompileCommand::compile() {
-  Lexer lexer;
-  Context context;
-  ASTProgram *root = process_ast(context);
-
-  auto result = emit_code(root, context);
   print_metrics();
   return result;
-}
-
-bool get_compilation_flag(const std::string &flag) {
-  return compile_command.has_flag(flag);
 }

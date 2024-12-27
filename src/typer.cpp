@@ -43,35 +43,7 @@ void assert_return_type_is_valid(int &return_type, int new_type,
   }
 };
 
-void TypeVisitor::report_mutated_if_iden(ASTExpr *node) {
-  // ! We scrapped all of this
-  // if (node->get_node_type() == AST_NODE_IDENTIFIER) {
-  //   auto iden = static_cast<ASTIdentifier *>(node);
-  //   ctx.scope->report_symbol_mutated(iden->value.value);
-  //   Scope *enclosing_scope = nullptr;
-  //   if (auto str = current_struct_decl.get()) {
-  //     auto type = ctx.scope->get_type(str->type->resolved_type);
-  //     auto info = static_cast<StructTypeInfo *>(type->get_info());
-  //     enclosing_scope = info->scope;
-  //   } else if (auto str = current_union_decl.get()) {
-  //     auto type = ctx.scope->get_type(str->type->resolved_type);
-  //     auto info = static_cast<UnionTypeInfo *>(type->get_info());
-  //     enclosing_scope = info->scope;
-  //   }
-  //   if (current_func_decl && enclosing_scope &&
-  //       enclosing_scope->lookup(iden->value.value)) {
-  //     current_func_decl.get()->flags |= FUNCTION_IS_MUTATING;
-  //   }
-  // } else if (node->get_node_type() == AST_NODE_DOT_EXPR) {
-  //   auto dot = static_cast<ASTDotExpr *>(node);
-  //   report_mutated_if_iden(dot->left);
-  // } else if (node->get_node_type() == AST_NODE_SUBSCRIPT) {
-  //   auto subscript = static_cast<ASTSubscript *>(node);
-  //   report_mutated_if_iden(subscript->left);
-  // }
-}
-
-void TypeVisitor::find_function_overload(ASTCall *&node, Symbol *&symbol,
+void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
                                          std::vector<int> &arg_tys,
                                          Type *&type) {
   if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
@@ -248,13 +220,13 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
   return declaring_type;
 }
 
-std::any TypeVisitor::visit(ASTProgram *node) {
+std::any Typer::visit(ASTProgram *node) {
   for (auto &statement : node->statements)
     statement->accept(this);
   return {};
 }
 
-std::any TypeVisitor::visit(ASTStructDeclaration *node) {
+std::any Typer::visit(ASTStructDeclaration *node) {
   auto last_decl = current_struct_decl;
   current_struct_decl = node;
   Defer _([&] { current_struct_decl = last_decl; });
@@ -282,7 +254,7 @@ std::any TypeVisitor::visit(ASTStructDeclaration *node) {
   ctx.exit_scope();
   return {};
 }
-std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
+std::any Typer::visit(ASTUnionDeclaration *node) {
 
   if (node->is_fwd_decl) {
     return {};
@@ -313,7 +285,7 @@ std::any TypeVisitor::visit(ASTUnionDeclaration *node) {
   ctx.exit_scope();
   return {};
 }
-std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
+std::any Typer::visit(ASTEnumDeclaration *node) {
 
   auto elem_type = -1;
 
@@ -356,7 +328,7 @@ std::any TypeVisitor::visit(ASTEnumDeclaration *node) {
 
   return {};
 }
-std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
+std::any Typer::visit(ASTFunctionDeclaration *node) {
   auto last_decl = current_func_decl;
   current_func_decl = node;
   Defer _([&] { current_func_decl = last_decl; });
@@ -480,7 +452,7 @@ std::any TypeVisitor::visit(ASTFunctionDeclaration *node) {
       std::format("function: '{}'", node->name.value.get_str()));
   return {};
 }
-std::any TypeVisitor::visit(ASTDeclaration *node) {
+std::any Typer::visit(ASTDeclaration *node) {
   node->type->accept(this);
 
   if (node->type->resolved_type == -1) {
@@ -511,7 +483,7 @@ std::any TypeVisitor::visit(ASTDeclaration *node) {
   return {};
 }
 
-std::any TypeVisitor::visit(ASTBlock *node) {
+std::any Typer::visit(ASTBlock *node) {
   ctx.set_scope(node->scope);
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
@@ -538,13 +510,13 @@ std::any TypeVisitor::visit(ASTBlock *node) {
   ctx.exit_scope();
   return block_cf;
 }
-std::any TypeVisitor::visit(ASTParamsDecl *node) {
+std::any Typer::visit(ASTParamsDecl *node) {
   for (auto &param : node->params) {
     param->accept(this);
   }
   return {};
 }
-std::any TypeVisitor::visit(ASTParamDecl *node) {
+std::any Typer::visit(ASTParamDecl *node) {
   auto id = int_from_any(node->type->accept(this));
 
   if (id == -1) {
@@ -591,7 +563,7 @@ std::any TypeVisitor::visit(ASTParamDecl *node) {
   return id;
 }
 
-std::any TypeVisitor::visit(ASTReturn *node) {
+std::any Typer::visit(ASTReturn *node) {
   int type;
   if (node->expression.is_not_null()) {
     type = int_from_any(node->expression.get()->accept(this));
@@ -600,15 +572,15 @@ std::any TypeVisitor::visit(ASTReturn *node) {
   }
   return ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
-std::any TypeVisitor::visit(ASTContinue *node) {
+std::any Typer::visit(ASTContinue *node) {
   return ControlFlow{BLOCK_FLAGS_CONTINUE, -1};
 }
-std::any TypeVisitor::visit(ASTBreak *node) {
+std::any Typer::visit(ASTBreak *node) {
   return ControlFlow{BLOCK_FLAGS_BREAK, -1};
 }
 
 
-std::any TypeVisitor::visit(ASTFor *node) {
+std::any Typer::visit(ASTFor *node) {
   ctx.set_scope(node->block->scope);
 
   auto iden = static_cast<ASTIdentifier *>(node->iden);
@@ -664,7 +636,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   return control_flow;
 }
-  std::any TypeVisitor::visit(ASTIf * node) {
+  std::any Typer::visit(ASTIf * node) {
     auto cond_ty = int_from_any(node->condition->accept(this));
     assert_types_can_cast_or_equal(
         cond_ty, bool_type(), node->source_range, "expected: {}, got {}",
@@ -683,7 +655,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
     return control_flow;
   }
-  std::any TypeVisitor::visit(ASTElse * node) {
+  std::any Typer::visit(ASTElse * node) {
     if (node->_if.is_not_null()) {
       return node->_if.get()->accept(this);
     } else {
@@ -691,7 +663,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
     return {};
   }
-  std::any TypeVisitor::visit(ASTWhile * node) {
+  std::any Typer::visit(ASTWhile * node) {
 
     if (node->condition.is_not_null()) {
       node->condition.get()->accept(this);
@@ -708,7 +680,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
   // FEATURE(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
   // with this function syntax, using #make(Type, ...) is really clunky
   // and annoying;
-  std::any TypeVisitor::visit(ASTCall * node) {
+  std::any Typer::visit(ASTCall * node) {
     auto type = global_get_type(int_from_any(node->function->accept(this)));
 
     auto old_ty = declaring_or_assigning_type;
@@ -766,7 +738,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     node->type = info->return_type;
     return info->return_type;
   }
-  std::any TypeVisitor::visit(ASTArguments * node) {
+  std::any Typer::visit(ASTArguments * node) {
 
     auto type = ctx.scope->get_type(declaring_or_assigning_type);
 
@@ -793,7 +765,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     return argument_types;
   }
 
-  std::any TypeVisitor::visit(ASTExprStatement * node) {
+  std::any Typer::visit(ASTExprStatement * node) {
     auto result = node->expression->accept(this);
     if (auto _switch = dynamic_cast<ASTSwitch *>(node->expression)) {
       return result;
@@ -801,7 +773,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     return ControlFlow{.flags = BLOCK_FLAGS_FALL_THROUGH, .type = void_type()};
   }
 
-  std::any TypeVisitor::visit(ASTType * node) {
+  std::any Typer::visit(ASTType * node) {
     if (!node->tuple_types.empty()) {
       std::vector<int> types;
       for (const auto &t : node->tuple_types)
@@ -821,7 +793,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 
     return node->resolved_type;
   }
-  std::any TypeVisitor::visit(ASTBinExpr * node) {
+  std::any Typer::visit(ASTBinExpr * node) {
     auto left = int_from_any(node->left->accept(this));
 
     auto old_ty = declaring_or_assigning_type;
@@ -842,8 +814,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
 
     // array remove operator.
     if (node->op.type == TType::Erase) {
-      report_mutated_if_iden(node->left);
-
       if (!type->get_ext().is_array()) {
         throw_error("Cannot use concat operator on a non-array",
                     node->source_range);
@@ -931,7 +901,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
 
     // TODO: clean up this hacky mess.
     if (node->op.type == TType::Concat) {
-      report_mutated_if_iden(node->left);
       if (!type->get_ext().is_array()) {
         throw_error("Cannot use concat operator on a non-array",
                     node->source_range);
@@ -944,7 +913,6 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
 
     if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
-      report_mutated_if_iden(node->left);
     }
 
     // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
@@ -974,13 +942,12 @@ std::any TypeVisitor::visit(ASTFor *node) {
     node->resolved_type = left;
     return left;
   }
-  std::any TypeVisitor::visit(ASTUnaryExpr * node) {
+  std::any Typer::visit(ASTUnaryExpr * node) {
     auto operand_ty = int_from_any(node->operand->accept(this));
 
     if (node->op.type == TType::Increment ||
         node->op.type == TType::Decrement || node->op.type == TType::And ||
         node->op.type == TType::Mul || node->op.type == TType::BitwiseNot) {
-      report_mutated_if_iden(node->operand);
     }
 
     if (node->op.type == TType::And) {
@@ -1037,7 +1004,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 
     return operand_ty;
   }
-  std::any TypeVisitor::visit(ASTIdentifier * node) {
+  std::any Typer::visit(ASTIdentifier * node) {
 
     auto str = node->value.value;
 
@@ -1061,7 +1028,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
           node->source_range);
     }
   }
-  std::any TypeVisitor::visit(ASTLiteral * node) {
+  std::any Typer::visit(ASTLiteral * node) {
     switch (node->tag) {
     case ASTLiteral::Integer: {
       int base = 10;
@@ -1108,7 +1075,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
   }
 
-  std::any TypeVisitor::visit(ASTDotExpr * node) {
+  std::any Typer::visit(ASTDotExpr * node) {
     // .EnumVariant fix ups.
     if (node->left == nullptr) {
       auto identifier = static_cast<ASTIdentifier *>(node->right);
@@ -1211,6 +1178,14 @@ std::any TypeVisitor::visit(ASTFor *node) {
         node->right = iden;
       } else if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
         name = static_cast<ASTIdentifier *>(node->right)->value.value.get_str();
+      } else if (node->right->get_node_type() == AST_NODE_DOT_EXPR) {
+        auto dot = static_cast<ASTDotExpr *>(node->right);
+        while (dot->left->get_node_type() == AST_NODE_DOT_EXPR) 
+          dot = static_cast<ASTDotExpr *>(dot->left);
+        if (dot->left->get_node_type() != AST_NODE_IDENTIFIER) 
+          throw_error("Must have an identifier as a dot access for an enum.", dot->source_range);
+        name = static_cast<ASTIdentifier *>(dot->left)->value.value.get_str();
+        // TODO: this needs to somehow modify the dot expression and replace it with the value.
       } else {
         throw_error("cannot use a dot expression with a non identifer on the "
                     "right hand side when referring to a enum.",
@@ -1259,7 +1234,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     return type;
     throw_error("unable to resolve dot expression type.", node->source_range);
   }
-  std::any TypeVisitor::visit(ASTSubscript * node) {
+  std::any Typer::visit(ASTSubscript * node) {
 
     auto left = int_from_any(node->left->accept(this));
     auto subscript = int_from_any(node->subscript->accept(this));
@@ -1337,7 +1312,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
     return remove_one_pointer_ext(left_ty->id, node->source_range);
   }
-  std::any TypeVisitor::visit(ASTMake * node) {
+  std::any Typer::visit(ASTMake * node) {
     auto type = int_from_any(node->type_arg->accept(this));
 
     auto old_ty = declaring_or_assigning_type;
@@ -1352,7 +1327,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
     return type;
   }
-  std::any TypeVisitor::visit(ASTInitializerList * node) {
+  std::any Typer::visit(ASTInitializerList * node) {
     int last_type = -1;
     for (const auto &expr : node->expressions) {
       int type = int_from_any(expr->accept(this));
@@ -1376,7 +1351,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     return assert_type_can_be_assigned_from_init_list(
         node, declaring_or_assigning_type);
   }
-  std::any TypeVisitor::visit(ASTAllocate * node) {
+  std::any Typer::visit(ASTAllocate * node) {
     if (node->kind == ASTAllocate::Delete) {
       if (node->arguments.is_null() ||
           node->arguments.get()->arguments.size() < 1)
@@ -1402,7 +1377,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     auto t = ctx.scope->get_type(type);
     return node->type.get()->resolved_type = t->id;
   }
-  std::any TypeVisitor::visit(ASTRange * node) {
+  std::any Typer::visit(ASTRange * node) {
     auto left = int_from_any(node->left->accept(this));
     auto right = int_from_any(node->right->accept(this));
     if (!type_is_numerical(ctx.scope->get_type(left)) ||
@@ -1431,7 +1406,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
 
     return global_find_type_id("Range", {});
   }
-  std::any TypeVisitor::visit(ASTSwitch * node) {
+  std::any Typer::visit(ASTSwitch * node) {
     auto type_id = int_from_any(node->target->accept(this));
     auto type = ctx.scope->get_type(type_id);
 
@@ -1473,7 +1448,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
     }
   }
 
-  std::any TypeVisitor::visit(ASTTuple * node) {
+  std::any Typer::visit(ASTTuple * node) {
     std::vector<int> types;
     for (const auto &v : node->values) {
       types.push_back(int_from_any(v->accept(this)));
@@ -1483,7 +1458,7 @@ std::any TypeVisitor::visit(ASTFor *node) {
                ctx.scope->find_type_id(types, node->type->extension_info);
   }
 
-  std::any TypeVisitor::visit(ASTTupleDeconstruction * node) {
+  std::any Typer::visit(ASTTupleDeconstruction * node) {
     auto type = ctx.scope->get_type(int_from_any(node->right->accept(this)));
 
     if (!type->is_kind(TYPE_TUPLE)) {

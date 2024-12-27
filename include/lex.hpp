@@ -78,9 +78,9 @@ enum struct TType {
   False,
   Null,
   Varargs,
-  Directive, // #
+  Directive,   // #
   ColonEquals, //  :=
-  Dollar, // $
+  Dollar,      // $
 
   Struct,
   Enum,
@@ -236,7 +236,8 @@ struct Token {
 
   Token() {}
 
-  Token(SourceLocation location, InternedString value, TType type, TFamily family)
+  Token(SourceLocation location, InternedString value, TType type,
+        TFamily family)
       : value(std::move(value)), type(type), family(family),
         location(location) {}
   InternedString value;
@@ -259,7 +260,8 @@ struct Lexer {
       return other.input == input;
     }
 
-    State(const std::string &input, size_t file_idx, size_t input_len, const std::filesystem::path &path)
+    State(const std::string &input, size_t file_idx, size_t input_len,
+          const std::filesystem::path &path)
         : input(input), file_idx(file_idx), input_len(input_len), path(path) {}
 
     std::string input{};
@@ -297,15 +299,28 @@ struct Lexer {
   };
 
   const std::unordered_map<std::string, TType> keywords{
-      {"in", TType::In},         {"switch", TType::Switch},
-      {"then", TType::Then},     {"union", TType::Union},
-      {"enum", TType::Enum},     {"return", TType::Return},
-      {"break", TType::Break},   {"continue", TType::Continue},
-      {"for", TType::For},       {"while", TType::While},
-      {"if", TType::If},         {"else", TType::Else},
-      {"struct", TType::Struct}, {"true", TType::True},
-      {"false", TType::False},   {"null", TType::Null},
-      {"new", TType::New},       {"delete", TType::Delete},
+      // control flow
+      {"in", TType::In},
+      {"switch", TType::Switch},
+      {"then", TType::Then},
+      {"return", TType::Return},
+      {"break", TType::Break},
+      {"continue", TType::Continue},
+      {"for", TType::For},
+      {"while", TType::While},
+      {"if", TType::If},
+      {"else", TType::Else},
+      // type declarations
+      {"struct", TType::Struct},
+      {"union", TType::Union},
+      {"enum", TType::Enum},
+      // literals
+      {"true", TType::True},
+      {"false", TType::False},
+      {"null", TType::Null},
+      // intrinsic functions
+      {"new", TType::New},
+      {"delete", TType::Delete},
   };
 
   const std::unordered_map<std::string, TType> operators{

@@ -661,7 +661,6 @@ struct Parser {
 
   Nullable<ASTNode> process_directive(DirectiveKind kind,
                                       const InternedString &identifier);
-  void init_directive_routines();
   Nullable<ASTExpr> try_parse_directive_expr();
 
   inline bool not_eof() const { return !peek().is_eof(); }
@@ -682,7 +681,6 @@ struct Parser {
          Context &context)
       : states({Lexer::State::from_file(contents, filename)}),
         ctx(context) {
-    init_directive_routines();
     fill_buffer_if_needed();
   }
 
@@ -692,6 +690,6 @@ struct Parser {
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  std::vector<DirectiveRoutine> directive_routines;
+  static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
 };

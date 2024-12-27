@@ -58,7 +58,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTTupleDeconstruction *node) override { return {}; };
 };
 
-struct TypeVisitor : VisitorBase {
+struct Typer : VisitorBase {
 
   int declaring_or_assigning_type = -1;
 
@@ -66,9 +66,7 @@ struct TypeVisitor : VisitorBase {
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
-  void report_mutated_if_iden(ASTExpr *node);
-
-  TypeVisitor(Context &context) : ctx(context) {}
+  Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
@@ -121,7 +119,7 @@ struct EmitVisitor : VisitorBase {
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
-  TypeVisitor &type_visitor;
+  Typer &type_visitor;
 
   StringBuilder code{};
   StringBuilder *ss{};
@@ -136,7 +134,7 @@ struct EmitVisitor : VisitorBase {
   // do this.
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
-    static bool is_debugging = get_compilation_flag("debug");
+    static bool is_debugging = compile_command.has_flag("debug");
     if (!is_debugging) {
       return;
     }
@@ -156,7 +154,7 @@ struct EmitVisitor : VisitorBase {
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline EmitVisitor(Context &context, TypeVisitor &type_visitor)
+  inline EmitVisitor(Context &context, Typer &type_visitor)
       : ctx(context), type_visitor(type_visitor) {
     ss = &code;
   }
@@ -195,7 +193,7 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-
+  void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition, Nullable<ASTBlock> block);
   void emit_function_pointer_dynamic_array_declaration(
       const std::string &type_string, const std::string &name, Type *type);
   void get_declaration_type_signature_and_identifier(const std::string &name,

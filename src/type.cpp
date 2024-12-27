@@ -6,7 +6,6 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include <sstream>
-#include <unordered_set>
 
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
