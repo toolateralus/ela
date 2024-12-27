@@ -63,9 +63,10 @@ int main(int argc, char *argv[]) {
 Ela compiler:
    compile a file: `ela <filename.ela>`
    compile & run a 'main.ela' in current directory: `ela run`
+   initialize a 'main.ela' file in current directory: `ela init`
 
    Available flags:
-   --debug       Compile the output source with debug symbols. Use '#compiler_flags "-g" in your program as well for gdb/lldb debugging.
+   --release     Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
    --verbose     Write a file and dump the AST representation of your program to 'stdout'.
    --no-compile  Transpile to C++ but don't invoke the clang++ compiler automatically.
    --s           Don't delete the `.hpp` and `.cpp` files used to transpile.
@@ -87,7 +88,7 @@ Ela compiler:
 
   if (argc == 2 && (strcmp(argv[1], "init") == 0)) {
     std::ofstream file("main.ela");
-    file << "main :: (argc: int, argv: char**) {\n\n}\n";
+    file << "main :: (argc: int, argv: c_string*) {\n\n}\n";
     file.flush();
     file.close();
     return 0;
