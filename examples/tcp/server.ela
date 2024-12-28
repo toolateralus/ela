@@ -15,11 +15,11 @@ chatting :: (connfd: int) {
     memset(buff, 0, MAX_BUFFER_LENGTH);
     n: int;
     while n < MAX_BUFFER_LENGTH && ((buff[n++] = getchar()) != '\n') {}
-    write(connfd, buff, MAX_BUFFER_LENGTH);
-    if (strncmp("exit", (char*)buff, 4) == 0) {
+    if (n >= 4 && strncmp("exit", (char*)buff, 4) == 0) {
       printf("Server Exit...\n");
       break;
     }
+    write(connfd, buff, MAX_BUFFER_LENGTH);
   }
 }
 
@@ -37,8 +37,7 @@ main :: () -> int {
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   servaddr.sin_port = htons(PORT);
 
-  addr : sockaddr* = &servaddr;
-  result := bind(sockfd, addr, sizeof(sockaddr_in));
+  result := bind(sockfd, (sockaddr*)&servaddr, sizeof(sockaddr_in));
 
   if (result != 0) {
     panic("socket bind failed...");

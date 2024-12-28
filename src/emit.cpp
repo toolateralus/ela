@@ -188,7 +188,7 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
   return {};
 }
 std::any EmitVisitor::visit(ASTIdentifier *node) {
-  (*ss) << node->value.value.get_str();
+  (*ss) << node->value.get_str();
   return {};
 }
 std::any EmitVisitor::visit(ASTUnaryExpr *node) {
@@ -881,13 +881,13 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
       !left_ty->get_ext().is_fixed_sized_array() &&
       node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
-    if (right->value.value == "length") {
+    if (right->value == "length") {
       node->left->accept(this);
       (*ss) << op;
       node->right->accept(this);
       return {};
     }
-    if (right->value.value == "data") {
+    if (right->value == "data") {
       node->left->accept(this);
       (*ss) << op;
       node->right->accept(this);
@@ -902,7 +902,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 
     if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
       auto identifier = static_cast<ASTIdentifier *>(right->function);
-      if (right && identifier->value.value == "contains") {
+      if (right && identifier->value == "contains") {
         node->left->accept(this);
         (*ss) << op;
         node->right->accept(this);
@@ -1072,7 +1072,7 @@ std::any EmitVisitor::visit(ASTTuple *node) {
 std::any EmitVisitor::visit(ASTTupleDeconstruction *node) {
   (*ss) << "auto [";
   for (auto &iden : node->idens) {
-    (*ss) << iden->value.value.get_str();
+    (*ss) << iden->value.get_str();
     if (iden != node->idens.back()) {
       (*ss) << ", ";
     }

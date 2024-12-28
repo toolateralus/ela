@@ -1337,11 +1337,11 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
               range);
         }
         auto iden = static_cast<ASTIdentifier *>(left);
-        if (ctx.scope->local_lookup(iden->value.value)) {
+        if (ctx.scope->local_lookup(iden->value)) {
           end_node(nullptr, range);
           throw_error("redefinition of a variable.", range);
         }
-        ctx.scope->insert(iden->value.value, -1);
+        ctx.scope->insert(iden->value, -1);
       }
     }
 
@@ -1361,7 +1361,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
         right->get_node_type() == AST_NODE_ALLOCATE) {
       auto iden = static_cast<ASTIdentifier *>(left);
       auto alloc = static_cast<ASTAllocate *>(right);
-      auto symbol = ctx.scope->lookup(iden->value.value);
+      auto symbol = ctx.scope->lookup(iden->value);
       insert_allocation(alloc, symbol, ctx.scope);
     }
 
@@ -1632,7 +1632,7 @@ ASTExpr *Parser::parse_primary() {
     }
     eat();
     auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = tok;
+    iden->value = tok.value;
     end_node(iden, range);
     return iden;
   }

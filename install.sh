@@ -11,6 +11,12 @@ fi
 
 ninja clean
 ninja -j12
+
+if [ $? -ne 0 ]; then
+  echo "Ninja build failed"
+  exit 1
+fi
+
 cd ..
 
 # Create the destination directory if it doesn't exist

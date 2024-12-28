@@ -1,5 +1,3 @@
-
-
 #foreign system :: (cmd: c_string) -> int;
 
 #foreign free :: (ptr: void*) -> void;
@@ -28,6 +26,7 @@
 #foreign snprintf :: (buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
 #foreign sprintf :: (buffer: u8*, format: c_string, ...) -> int;
 #foreign strncmp :: (str: c_string, str2: c_string, len: int) -> int;
+
 #foreign isalnum :: (c: int) -> int;
 #foreign isalpha :: (c: int) -> int;
 #foreign isspace :: (c: int) -> int;

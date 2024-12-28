@@ -692,7 +692,7 @@ std::any Typer::visit(ASTFor *node) {
     iter_ty = ctx.scope->find_type_id(type->get_base(), ext);
   }
 
-  ctx.scope->insert(iden->value.value, iter_ty);
+  ctx.scope->insert(iden->value, iter_ty);
   node->iden->accept(this);
   node->range->accept(this);
 
@@ -774,7 +774,7 @@ std::any Typer::visit(ASTCall *node) {
 
   if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
     auto identifier = static_cast<ASTIdentifier *>(node->function);
-    auto symbol = ctx.scope->lookup(identifier->value.value);
+    auto symbol = ctx.scope->lookup(identifier->value);
     find_function_overload(node, symbol, arg_tys, type);
   }
 
@@ -1027,24 +1027,24 @@ std::any Typer::visit(ASTUnaryExpr *node) {
 }
 std::any Typer::visit(ASTIdentifier *node) {
 
-  auto str = node->value.value;
+  auto str = node->value;
 
   if (str == "Range" || str == "_tuple" || str == "_map" || str == "_array") {
     throw_error(std::format("Cannot use reserved word : {}", str),
                 node->source_range);
   }
 
-  auto type_id = ctx.scope->find_type_id(node->value.value, {});
+  auto type_id = ctx.scope->find_type_id(node->value, {});
   if (type_id != -1) {
     return type_id;
   }
 
-  auto symbol = ctx.scope->lookup(node->value.value);
+  auto symbol = ctx.scope->lookup(node->value);
   if (symbol) {
     return symbol->type_id;
   } else {
     throw_error(
-        std::format("Use of undeclared identifier '{}'", node->value.value),
+        std::format("Use of undeclared identifier '{}'", node->value),
         node->source_range);
   }
 }
@@ -1077,7 +1077,7 @@ std::any Typer::visit(ASTLiteral *node) {
     return float32_type();
   case ASTLiteral::RawString:
   case ASTLiteral::String:
-    return charptr_type();
+    return c_string_type();
     break;
   case ASTLiteral::Bool:
     return bool_type();
@@ -1106,7 +1106,7 @@ std::any Typer::visit(ASTDotExpr *node) {
       if (type && type->is_kind(TYPE_ENUM)) {
         auto info = static_cast<EnumTypeInfo *>(type->get_info());
         for (const auto &key : info->keys) {
-          if (key == identifier->value.value) {
+          if (key == identifier->value) {
             if (found) {
               throw_warning(
                   std::format("Found multiple enum types with variant '{}'.. "
@@ -1129,7 +1129,7 @@ std::any Typer::visit(ASTDotExpr *node) {
 
     if (node->left == nullptr)
       throw_error(std::format("Unable to find enum variant {}",
-                              identifier->value.value),
+                              identifier->value),
                   node->source_range);
   }
 
@@ -1153,10 +1153,10 @@ std::any Typer::visit(ASTDotExpr *node) {
   if (left_ty->get_ext().is_array() &&
       node->right->get_node_type() == AST_NODE_IDENTIFIER) {
     auto right = static_cast<ASTIdentifier *>(node->right);
-    if (right && right->value.value == "length") {
+    if (right && right->value == "length") {
       return s32_type();
     }
-    if (right && right->value.value == "data") {
+    if (right && right->value == "data") {
       return ctx.scope->get_pointer_to_type(left_ty->get_element_type());
     }
   }
@@ -1169,7 +1169,7 @@ std::any Typer::visit(ASTDotExpr *node) {
 
     if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
       auto identifier = static_cast<ASTIdentifier *>(right->function);
-      if (right && identifier->value.value == "contains") {
+      if (right && identifier->value == "contains") {
         return bool_type();
       }
     }
@@ -1194,10 +1194,10 @@ std::any Typer::visit(ASTDotExpr *node) {
       // ! HACK HACK Super hacky solution ;; replace the ast with an iden.
       // REMOVE ME HACK
       auto iden = ast_alloc<ASTIdentifier>();
-      iden->value = Token({}, name, TType::Identifier, TFamily::Identifier);
+      iden->value = name;
       node->right = iden;
     } else if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-      name = static_cast<ASTIdentifier *>(node->right)->value.value.get_str();
+      name = static_cast<ASTIdentifier *>(node->right)->value.get_str();
     } else if (node->right->get_node_type() == AST_NODE_DOT_EXPR) {
       auto dot = static_cast<ASTDotExpr *>(node->right);
       while (dot->left->get_node_type() == AST_NODE_DOT_EXPR)
@@ -1205,7 +1205,7 @@ std::any Typer::visit(ASTDotExpr *node) {
       if (dot->left->get_node_type() != AST_NODE_IDENTIFIER)
         throw_error("Must have an identifier as a dot access for an enum.",
                     dot->source_range);
-      name = static_cast<ASTIdentifier *>(dot->left)->value.value.get_str();
+      name = static_cast<ASTIdentifier *>(dot->left)->value.get_str();
       // TODO: this needs to somehow modify the dot expression and replace it
       // with the value.
     } else {
@@ -1424,7 +1424,7 @@ std::any Typer::visit(ASTAllocate *node) {
     for (const auto &arg : node->arguments.get()->arguments)
       if (arg->get_node_type() == AST_NODE_IDENTIFIER)
         erase_allocation(
-            ctx.scope->lookup(static_cast<ASTIdentifier *>(arg)->value.value),
+            ctx.scope->lookup(static_cast<ASTIdentifier *>(arg)->value),
             ctx.scope);
     return void_type();
   }
@@ -1545,15 +1545,15 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
     // ! Due to how we're lowering, We have to throw a redefinition here.
     // However I would rather allow this sort of reassignment.
 
-    if (ctx.scope->local_lookup(iden->value.value)) {
+    if (ctx.scope->local_lookup(iden->value)) {
       throw_error(
           std::format("Redefinition of a variable is not allowed in a tuple "
                       "deconstruction yet.\nOffending variable {}",
-                      iden->value.value),
+                      iden->value),
           node->source_range);
     }
 
-    ctx.scope->insert(iden->value.value, type);
+    ctx.scope->insert(iden->value, type);
   }
 
   return {};

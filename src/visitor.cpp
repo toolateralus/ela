@@ -107,7 +107,7 @@ std::any SerializeVisitor::visit(ASTUnaryExpr *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTIdentifier *node) {
-  ss << node->value.value.get_str();
+  ss << node->value.get_str();
   return {};
 }
 std::any SerializeVisitor::visit(ASTLiteral *node) {

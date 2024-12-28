@@ -192,7 +192,7 @@ struct ASTUnaryExpr : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
 struct ASTIdentifier : ASTExpr {
-  Token value;
+  InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 };
