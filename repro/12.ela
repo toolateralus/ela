@@ -1,3 +1,0 @@
-amain :: () {
-  range := 0..10; // * we don't have a type that represents ranges.
-}

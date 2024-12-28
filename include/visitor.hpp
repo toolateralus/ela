@@ -111,6 +111,7 @@ struct Typer : VisitorBase {
 #include "string_builder.hpp"
 
 struct EmitVisitor : VisitorBase {
+  bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;

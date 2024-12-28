@@ -491,12 +491,27 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
       (*ss) << "extern \"C\" ";
     }
 
+   static auto use_stdlib =
+      !compile_command.compilation_flags.contains("-nostdlib") &&
+      !compile_command.compilation_flags.contains("-ffreestanding");
+
     // we override main's return value to allow compilation without explicitly
     // returning int from main.
-    if (node->name.value == "main") {
+    if (node->name.value == "main" && use_stdlib) {
+      has_user_defined_main = true;
       node->return_type->accept(this);
       (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
       node->block.get()->accept(this);
+// This is for a main function when we're not using the stdlib, so you just take a C style main, since you don't have dynamic arrays.
+    } else if (node->name.value == "main") {
+      (*ss) << "int ";
+      node->return_type->accept(this);
+      // emit parameter signature && name.
+      (*ss) << " " + node->name.value.get_str();
+      node->params->accept(this);
+      // the function's block would only be null in a #foreign function
+      if (node->block.is_not_null())
+        node->block.get()->accept(this);
     } else {
       node->return_type->accept(this);
       // emit parameter signature && name.
@@ -687,7 +702,7 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
     if (sym && 
             type->is_kind(TYPE_STRUCT) ||
         type->is_kind(TYPE_UNION)) {
-      (*ss) << " & " << node->name.get_str();
+      (*ss) << " const& " << node->name.get_str();
     } else {
       (*ss) << ' ' << node->name.get_str();
     }
@@ -790,9 +805,6 @@ std::any EmitVisitor::visit(ASTProgram *node) {
 
   if (testing) {
     code << "#define TESTING\n";
-  } else {
-
-
   }
 
   for (const auto &statement : node->statements) {
@@ -815,7 +827,7 @@ std::any EmitVisitor::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
 
-    code << R"__(
+  if (has_user_defined_main && use_stdlib) code << R"__(
 int main (int argc, char** argv) {
   // Bootstrap the env
   for (int i = 0; i < argc; ++i) {

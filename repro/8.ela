@@ -1,10 +1,18 @@
 
-Object :: struct {
-  arr: int[];
+
+/* 
+  The compiler crashes in the 
+  this.s.b
+
+*/
+
+S1 :: struct {
+  b: bool;
 }
 
-obj: Object;
-
-main :: () {
-  obj.arr ~= 100;
+S :: struct {
+  s: S1;
+  #ctor :: (b: bool) {
+    this.s.b = b;
+  }
 }

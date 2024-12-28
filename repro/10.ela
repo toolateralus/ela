@@ -3,4 +3,7 @@
 main :: () {
 	arr := new int;
 	delete((int*)arr);
+  
+  // this is ok 'delete(arr)'
+  // it's the cast that breaks.
 }

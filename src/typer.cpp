@@ -650,7 +650,10 @@ std::any Typer::visit(ASTFor *node) {
   }
 
   int iter_ty = -1;
-  if (range_type_id == global_find_type_id("Range", {})) {
+
+  if (range_type_id == global_find_type_id("string", {})) {
+    iter_ty = char_type();
+  } else if (range_type_id == global_find_type_id("Range", {})) {
     iter_ty =
         int_type(); // ! THIS SHOULD BE S64 BUT IT CAUSES ANNOY BALLS ISSUES.
     if (node->value_semantic == VALUE_SEMANTIC_POINTER) {

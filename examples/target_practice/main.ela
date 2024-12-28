@@ -248,7 +248,7 @@ make_particle :: (kind: int, position: Vector2, tint: Color) {
   if kind == ParticleKind.Smoke {
     max_vel := 3.0;
     particle.position = random_vector2(position, max_vel);
-    particle.velocity = random_vector2({0.0, 0.0}, {-max_vel, -1.0}, {max_vel, max_vel});
+    particle.velocity = random_vector2(Vector2{0.0, 0.0}, Vector2{-max_vel, -1.0}, Vector2{max_vel, max_vel});
     burst : int = (int)randf() * smoke_particle_max_burst;
     if can_burst && burst > 1 {
       can_burst = false;
@@ -843,13 +843,12 @@ draw_game_menu :: () {
 
 }
 
-main :: () -> int {
+main :: () {
   InitWindow(800, 600, "target practice");
   SetTargetFPS(60);
 
   init();
   init_audio();
-  // SetWindowState(ConfigFlags.WindowResizable);
 
   while !WindowShouldClose() {
     screen_width = GetScreenWidth();
@@ -890,5 +889,5 @@ main :: () -> int {
         enemy_render_info);
 
   free(format_buffer);
-  return 0;
+  return;
 }
