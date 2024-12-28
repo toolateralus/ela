@@ -1,10 +1,9 @@
-
 Struct :: struct {
-  data: void*;
+  data: s32*;
   length: s32;
   #operator(==) :: (other: Struct) -> bool {
-    // Cyclic scope reference happens here
-    // somehow other.data[0] causes us to parent Struct::scope -> Struct::scope;
-    return data[0] != other.data[0];
+    for i in 0..length {
+      return data[i] == other.data[i];
+    }
   }
 }
