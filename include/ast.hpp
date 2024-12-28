@@ -377,7 +377,6 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
-  std::vector<ASTStatement *> subtypes;
 
   std::any accept(VisitorBase *visitor) override;
 

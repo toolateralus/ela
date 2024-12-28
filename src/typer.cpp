@@ -265,9 +265,6 @@ std::any Typer::visit(ASTStructDeclaration *node) {
     info->scope = node->scope;
   }
   ctx.set_scope(info->scope);
-  for (auto subtype : node->subtypes) {
-    subtype->accept(this);
-  }
   for (auto decl : node->fields) {
     decl->accept(this);
   }

@@ -1182,9 +1182,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         decl->methods.push_back(
             static_cast<ASTFunctionDeclaration *>(statement));
-      } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION ||
-                 statement->get_node_type() == AST_NODE_ENUM_DECLARATION) {
-        decl->subtypes.push_back(static_cast<ASTStatement *>(statement));
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",

@@ -581,12 +581,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
     (*ss) << "struct " << type->get_base().get_str() << "{\n";
   }
   indentLevel++;
-  for (const auto &subtype: node->subtypes) {
-    indented("");
-    subtype->accept(this);
-    semicolon();
-    newline();
-  }
+
   for (const auto &decl : node->fields) {
     indented("");
     decl->accept(this);
