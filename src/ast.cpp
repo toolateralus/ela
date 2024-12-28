@@ -549,16 +549,19 @@ ASTType *Parser::parse_type() {
     auto type = static_cast<ASTType *>(expr);
     return type;
   }
-  auto base = eat().value;
+
+  ASTExpr* base = ASTIdentifier::make(eat().value);
   TypeExt extension_info;
 
-  // TODO: We need a way to refer to types with :: operator.
-  // Right now it's only used for calling static functions, even in subtypes.
-  // This is okay, but we need concrete way to refer to subtypes, otherwise
-  // they're useless.
-
   while (true) {
-    if (peek().type == TType::LBrace) {
+    if (peek().type == TType::DoubleColon) {
+      eat();
+      auto right = ASTIdentifier::make(expect(TType::Identifier).value);
+      auto srnode = ast_alloc<ASTScopeResolution>();
+      srnode->left = base;
+      srnode->right = right;
+      base = srnode;
+    } else if (peek().type == TType::LBrace) {
       expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
         auto size = parse_expr();
@@ -582,15 +585,15 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (allow_function_type_parsing && peek().type == TType::LParen) {
-      return parse_function_type(base, extension_info);
+    } else if (allow_function_type_parsing && peek().type == TType::LParen && base->get_node_type() == AST_NODE_IDENTIFIER) {
+      return parse_function_type(static_cast<ASTIdentifier*>(base)->value, extension_info);
     } else {
       break;
     }
   }
 
   auto node = ast_alloc<ASTType>();
-  node->base = ASTIdentifier::make(base);
+  node->base = base;
   node->extension_info = extension_info;
   end_node(node, range);
   return node;

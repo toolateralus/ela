@@ -1241,7 +1241,7 @@ std::any Typer::visit(ASTDotExpr *node) {
 
 std::any Typer::visit(ASTScopeResolution *node) {
   auto left_ty = global_get_type(
-      ctx.scope->get_type(int_from_any(node->left->accept(this)))
+      global_get_type(int_from_any(node->left->accept(this)))
           ->get_true_type());
 
   Scope *scope = nullptr;
@@ -1526,10 +1526,6 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-
-    // ! Due to how we're lowering, We have to throw a redefinition here.
-    // However I would rather allow this sort of reassignment.
-
     if (ctx.scope->local_lookup(iden->value)) {
       throw_error(
           std::format("Redefinition of a variable is not allowed in a tuple "
@@ -1545,6 +1541,6 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 };
 InternedString Typer::type_name(ASTExpr *node) {
   auto base = int_from_any(node->accept(this));
-  auto type = ctx.scope->get_type(base);
+  auto type = global_get_type(base);
   return type->get_base();
 }
