@@ -195,6 +195,12 @@ struct ASTIdentifier : ASTExpr {
   InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
+
+  static ASTIdentifier* make(InternedString str) {
+    auto node = ast_alloc<ASTIdentifier>();
+    node->value = str;
+    return node;
+  }
 };
 struct ASTLiteral : ASTExpr {
   enum Tag {
