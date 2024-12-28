@@ -38,7 +38,7 @@ std::unordered_map<InternedString, int> type_alias_map;
 jstl::Arena ast_arena{MB(100)};
 
 // TODO: remove me, we want file scopes.
-Scope * root_scope;
+Scope *root_scope;
 
 CompileCommand compile_command;
 
@@ -58,8 +58,8 @@ static bool run_on_finished = false;
 int main(int argc, char *argv[]) {
 
   for (int i = 0; i < argc; ++i) {
-      if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
-        printf(R"_(
+    if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
+      printf(R"_(
 Ela compiler:
    compile a file: `ela <filename.ela>`
    compile & run a 'main.ela' in current directory: `ela run`
@@ -73,21 +73,54 @@ Ela compiler:
    --metrics     Write performance metrics to stdout.
    --test        Only emit functions marked `#test` and create a test runner. You still have to run the binary to run the tests.
 )_");
-    return 0;
-      }
+      return 0;
+    }
   }
 
   vector<string> original_args(argv + (argc >= 2 ? 2 : 1), argv + argc);
 
-
   if (argc >= 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
-    argv[1] = (char*)"main.ela";
+    argv[1] = (char *)"main.ela";
     argc = 2;
     run_on_finished = true;
   }
 
-  if (argc == 2 && (strcmp(argv[1], "init") == 0)) {
+  if (argc >= 2 && (strcmp(argv[1], "init") == 0)) {
     std::ofstream file("main.ela");
+    if (argc > 2 && (strcmp(argv[2], "raylib") == 0)) {
+      file << R"__(
+#import core;
+#import raylib;
+
+// See "/usr/local/lib/ela/raylib.ela" for api info.
+
+main :: () {
+  InitWindow(800, 600, "Hello, Raylib");
+
+  style := Style {
+    WHITE, // foreground: Color;
+    CLEAR, // background: Color;
+    CLEAR, // highlighted: Color;
+    16,    // font_size: int;
+    true,  // use_jiggly_text: bool;
+    5.0   // jiggle_intensity: float;
+    4.0    // jiggle_rate: float;
+  };
+
+  while !WindowShouldClose() {
+    BeginDrawing();
+      ClearBackground(BLACK);
+      DrawCircle(400, 300, 100, RED);
+
+      // fun wavy text. DrawText for normal text, of course.
+      jiggly_text("Hello, Raylib", Rectangle{
+        300, 200, 50, 50,
+      }, style)
+    EndDrawing();
+  }
+}
+)__";
+    } else {
     file << R"__(
 #import core; // for println among many other common utilities.
 
@@ -101,23 +134,22 @@ main :: () {
 }
 
 )__";
-    file.flush();
-    file.close();
+    }
     return 0;
   }
 
   compile_command = CompileCommand(argc, argv);
-  if (compile_command.has_flag("x")) compile_command.print();
+  if (compile_command.has_flag("x"))
+    compile_command.print();
 
   init_type_system();
   auto result = compile_command.compile();
-
 
   if (run_on_finished) {
     if (result == 0) {
       string invocation = ("./" + compile_command.binary_path.string());
       string args = "";
-      for (const auto &arg: original_args) {
+      for (const auto &arg : original_args) {
         args += arg + " ";
       }
       auto command = invocation + " " + args;
@@ -125,7 +157,6 @@ main :: () {
       system(command.c_str());
     }
   }
-
 
   if (compile_command.has_flag("sanitize")) {
     if (report_unfreed_allocations()) {
@@ -186,15 +217,22 @@ int CompileCommand::compile() {
 
     // Use '-ftime-trace' for debugging C++ compilation times;
     // You need google chrome to analyse the JSON results.
-    
-    if (has_flag("release"))  extra_flags += " -O3 ";
-    else extra_flags += " -g " ;
+
+    if (has_flag("release"))
+      extra_flags += " -O3 ";
+    else
+      extra_flags += " -g ";
 
     static std::string ignored_warnings = "-w";
 
-    std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+    std::string output_flag =
+        (compilation_flags.find("-o") != std::string::npos)
+            ? ""
+            : "-o " + binary_path.string();
 
-    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
+    auto compilation_string = std::format(
+        "clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
+        output_path.string(), output_flag, extra_flags);
 
     if (compile_command.has_flag("x"))
       printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());

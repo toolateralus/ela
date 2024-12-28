@@ -290,8 +290,7 @@ struct Lexer {
         exit(1);
       }
 
-      // We do this to support utf16 in normal chars. for *most* cyrillic and such.
-      std::ifstream file(filename);
+      std::ifstream file(canonical);
       std::stringstream ss;
       ss << file.rdbuf();
       auto input = ss.str();

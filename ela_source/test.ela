@@ -1471,7 +1471,8 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
 #test test_call_statics :: () {
   Static :: struct {
-    // pop it into a substruct just to test the :: operator. Right now we can only refer to functions with :: though.
+    // pop it into a substruct just to test the :: operator. 
+    // Right now we can only refer to functions with :: though.
     Substruct :: struct { 
       #static counter :: () -> s32 {
         #static i: s32 = 0;

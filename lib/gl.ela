@@ -822,42 +822,46 @@ Vec4 :: union {
   }
 
   #operator(+) :: (other: #self) -> #self {
-    other.x += x;
-    other.y += y;
-    other.z += z;
-    other.w += w;
-    return other;
+    output := other;
+    output.x += x;
+    output.y += y;
+    output.z += z;
+    output.w += w;
+    return output;
   }
 
   #operator(*) :: (other: #self) -> #self {
-    other.x *= x;
-    other.y *= y;
-    other.z *= z;
-    other.w *= w;
-    return other;
+    output := other;
+    output.x *= x;
+    output.y *= y;
+    output.z *= z;
+    output.w *= w;
+    return output;
   }
 
   #operator(/) :: (other: #self) -> #self {
-    other.x /= x;
-    other.y /= y;
-    other.z /= z;
-    other.w /= w;
-    return other;
+    output := other;
+    output.x /= x;
+    output.y /= y;
+    output.z /= z;
+    output.w /= w;
+    return output;
   }
 
   #operator(-) :: (other: #self) -> #self {
-    other.x -= x;
-    other.y -= y;
-    other.z -= z;
-    other.w -= w;
-    return other;
+    output := other
+    output.x -= x;
+    output.y -= y;
+    output.z -= z;
+    output.w -= w;
+    return output;
   }
 
   sqr_mag :: () -> float {
     return x * x + y * y + z * z + w * w;
   }
 }
-
+// TODO: replace these with static methods.
 Vec4_one :: () -> Vec4 {
   return #make(Vec4, 1.0);
 }
@@ -885,31 +889,35 @@ Vec3 :: union {
   }
 
   #operator(+) :: (other: #self) -> #self {
-    other.x += x;
-    other.y += y;
-    other.z += z;
-    return other;
+    output := other;
+    output.x += x;
+    output.y += y;
+    output.z += z;
+    return output;
   }
 
   #operator(*) :: (other: #self) -> #self {
-    other.x *= x;
-    other.y *= y;
-    other.z *= z;
-    return other;
+    output := other;
+    output.x *= x;
+    output.y *= y;
+    output.z *= z;
+    return output;
   }
 
   #operator(/) :: (other: #self) -> #self {
-    other.x /= x;
-    other.y /= y;
-    other.z /= z;
-    return other;
+    output := other;
+    output.x /= x;
+    output.y /= y;
+    output.z /= z;
+    return output;
   }
 
   #operator(-) :: (other: #self) -> #self {
-    other.x -= x;
-    other.y -= y;
-    other.z -= z;
-    return other;
+    output := other;
+    output.x -= x;
+    output.y -= y;
+    output.z -= z;
+    return output;
   }
 
   sqr_mag :: () -> float {
@@ -940,27 +948,31 @@ Vec2 :: union {
     y = value;
   }
   #operator(+) :: (other: #self) -> #self {
-    other.x += x;
-    other.y += y;
-    return other;
+    output := other;
+    output.x += x;
+    output.y += y;
+    return output;
   }
 
   #operator(*) :: (other: #self) -> #self {
-    other.x *= x;
-    other.y *= y;
-    return other;
+    output := other;
+    output.x *= x;
+    output.y *= y;
+    return output;
   }
 
   #operator(/) :: (other: #self) -> #self {
-    other.x /= x;
-    other.y /= y;
-    return other;
+    output := other;
+    output.x /= x;
+    output.y /= y;
+    return output;
   }
 
   #operator(-) :: (other: #self) -> #self {
-    other.x -= x;
-    other.y -= y;
-    return other;
+    output := other;
+    output.x -= x;
+    output.y -= y;
+    return output;
   }
 
   sqr_mag :: () -> float {
