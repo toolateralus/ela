@@ -1240,9 +1240,8 @@ std::any Typer::visit(ASTDotExpr *node) {
 }
 
 std::any Typer::visit(ASTScopeResolution *node) {
-  auto left_ty = global_get_type(
-      global_get_type(int_from_any(node->left->accept(this)))
-          ->get_true_type());
+  auto t = global_get_type(int_from_any(node->left->accept(this)));
+  auto left_ty = global_get_type(t->get_true_type());
 
   Scope *scope = nullptr;
   switch (left_ty->kind) {

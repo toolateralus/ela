@@ -1,17 +1,16 @@
 
-/* 
-  The compiler crashes in the 
-  this.s.b
+#import core; // for println among many other common utilities.
 
-*/
-
-S1 :: struct {
-  b: bool;
-}
-
-S :: struct {
-  s: S1;
-  #ctor :: (b: bool) {
-    this.s.b = b;
+A :: struct {
+  B :: struct {
+    #static Get :: () -> s32 {
+      return 0;
+    }
   }
 }
+
+main :: () {
+  n := A::B::Get();
+  println(to_string(n));
+}
+

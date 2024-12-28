@@ -554,7 +554,7 @@ ASTType *Parser::parse_type() {
   TypeExt extension_info;
 
   while (true) {
-    if (peek().type == TType::DoubleColon) {
+    if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type != TType::LParen) {
       eat();
       auto right = ASTIdentifier::make(expect(TType::Identifier).value);
       auto srnode = ast_alloc<ASTScopeResolution>();
