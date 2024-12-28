@@ -132,7 +132,7 @@ struct ASTExpr : ASTNode {
 struct ASTType : ASTExpr {
   int flags = -1;
   // base name,
-  InternedString base;
+  ASTExpr *base;
   // [], *, [string] etc.
   TypeExt extension_info{};
 
@@ -146,15 +146,7 @@ struct ASTType : ASTExpr {
   std::vector<ASTType *> tuple_types;
 
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
-  static ASTType *get_void() {
-    static ASTType *type = [] {
-      ASTType *type = ast_alloc<ASTType>();
-      type->base = "void";
-      type->resolved_type = void_type();
-      return type;
-    }();
-    return type;
-  }
+  static ASTType *get_void();
 
   std::any accept(VisitorBase *visitor) override;
 };
@@ -588,7 +580,10 @@ enum Precedence {
 
 static Precedence get_operator_precedence(Token token);
 
+struct Typer;
+
 struct Parser {
+  Typer* typer;
   ParserState state;
   bool allow_function_type_parsing = true;
   ASTProgram *parse();
@@ -624,6 +619,7 @@ struct Parser {
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == TType::Semi; }
+  InternedString type_name(ASTExpr *node);
 
   inline std::deque<Token> &lookahead_buf() {
     return states.back().lookahead_buffer;
@@ -637,11 +633,8 @@ struct Parser {
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
 
-  Parser(const std::string &filename,
-         Context &context)
-      : states({Lexer::State::from_file(filename)}), ctx(context) {
-    fill_buffer_if_needed();
-  }
+  Parser(const std::string &filename, Context &context);
+  ~Parser();
 
   Context &ctx;
   Lexer lexer{};

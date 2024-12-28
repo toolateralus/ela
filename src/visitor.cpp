@@ -124,7 +124,7 @@ std::any SerializeVisitor::visit(ASTType *node) {
        << " " << type->get_ext().to_string();
     return {};
   }
-  ss << node->base.get_str();
+  node->base->accept(this);
   ss << node->extension_info.to_string();
   return {};
 }
@@ -222,14 +222,14 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
-
   auto t = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(t->get_info());
-
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
 
   if (!is_anonymous) {
-    ss << indent() << "Struct " << node->type->base.get_str() << " {\n";
+    ss << indent() << "Struct ";
+    node->type->base->accept(this);
+    ss << " {\n";
   } else {
     ss << indent() << "anonymous struct" << '\n';
   }
@@ -291,7 +291,8 @@ std::any SerializeVisitor::visit(ASTInitializerList *node) {
 }
 
 std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
-  ss << "enum : " << node->type->base.get_str();
+  ss << "enum : ";
+  node->type->base->accept(this);
   for (const auto &[key, value] : node->key_values) {
     ss << "\nkey: " << key.get_str();
     ss << "value: ";

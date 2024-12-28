@@ -51,8 +51,9 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
     bool found_implicit_match = false;
     int implicit_match_idx = -1;
 
-    // Define the helper macro
-    #define NON_VARARGS_NO_DEFAULT_PARAMS(info) (!info->is_varargs && info->default_params == 0)
+// Define the helper macro
+#define NON_VARARGS_NO_DEFAULT_PARAMS(info)                                    \
+  (!info->is_varargs && info->default_params == 0)
 
     for (const auto &[i, overload] :
          symbol->function_overload_types | std::ranges::views::enumerate) {
@@ -62,7 +63,8 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
 
       bool match = true;
       int required_params = info->params_len - info->default_params;
-      if (arg_tys.size() < required_params || (!info->is_varargs && arg_tys.size() > info->params_len)) {
+      if (arg_tys.size() < required_params ||
+          (!info->is_varargs && arg_tys.size() > info->params_len)) {
         match = false;
       } else {
         for (int j = 0; j < arg_tys.size(); ++j) {
@@ -72,9 +74,9 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
               break;
             }
           } else {
-            auto conversion_rule =
-                type_conversion_rule(ctx.scope->get_type(arg_tys[j]),
-                                     ctx.scope->get_type(info->parameter_types[j]));
+            auto conversion_rule = type_conversion_rule(
+                ctx.scope->get_type(arg_tys[j]),
+                ctx.scope->get_type(info->parameter_types[j]));
             if (conversion_rule == CONVERT_EXPLICIT &&
                 NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
               match = false;
@@ -120,7 +122,7 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
       assert(type != nullptr);
     }
 
-    #undef NON_VARARGS_NO_DEFAULT_PARAMS
+#undef NON_VARARGS_NO_DEFAULT_PARAMS
   }
 }
 
@@ -263,7 +265,7 @@ std::any Typer::visit(ASTStructDeclaration *node) {
     info->scope = node->scope;
   }
   ctx.set_scope(info->scope);
-  for (auto subtype: node->subtypes) {
+  for (auto subtype : node->subtypes) {
     subtype->accept(this);
   }
   for (auto decl : node->fields) {
@@ -343,7 +345,7 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
 
   node->element_type = elem_type;
 
-  auto enum_type = global_get_type(global_find_type_id(node->type->base, {}));
+  auto enum_type = global_get_type(global_find_type_id(type_name(node->type->base), {}));
   auto info = static_cast<EnumTypeInfo *>(enum_type->get_info());
   info->element_type = elem_type;
 
@@ -488,7 +490,7 @@ std::any Typer::visit(ASTDeclaration *node) {
       // resolved type.
       node->type = ast_alloc<ASTType>();
       node->type->resolved_type = value_ty;
-      node->type->base = type->get_base();
+      node->type->base = ASTIdentifier::make(type->get_base());
       node->type->extension_info = type->get_ext();
     }
 
@@ -500,7 +502,7 @@ std::any Typer::visit(ASTDeclaration *node) {
         // CLEANUP: again, make sure we need to mock this up to this extent. I
         // can't see whyw e'd look it up again.
         node->type->resolved_type = int_type();
-        node->type->base = "int";
+        node->type->base = ASTIdentifier::make("int");
         node->type->extension_info = {};
       }
     }
@@ -845,15 +847,15 @@ std::any Typer::visit(ASTType *node) {
     for (const auto &t : node->tuple_types)
       types.push_back(int_from_any(t->accept(this)));
     node->resolved_type = ctx.scope->find_type_id(types, node->extension_info);
-    node->base = get_tuple_type_name(types).get_str();
+    // node->base = get_tuple_type_name(types).get_str();
 
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
-    node->resolved_type = int_from_any(node->pointing_to.get()->accept(this));
+    node->pointing_to.get()->accept(this);
     node->resolved_type =
-        ctx.scope->find_type_id(node->base, node->extension_info);
+        ctx.scope->find_type_id(type_name(node->base), node->extension_info);
   } else {
     node->resolved_type =
-        ctx.scope->find_type_id(node->base, node->extension_info);
+        ctx.scope->find_type_id(type_name(node->base), node->extension_info);
   }
 
   return node->resolved_type;
@@ -1029,11 +1031,6 @@ std::any Typer::visit(ASTIdentifier *node) {
 
   auto str = node->value;
 
-  if (str == "Range" || str == "_tuple" || str == "_map" || str == "_array") {
-    throw_error(std::format("Cannot use reserved word : {}", str),
-                node->source_range);
-  }
-
   auto type_id = ctx.scope->find_type_id(node->value, {});
   if (type_id != -1) {
     return type_id;
@@ -1043,9 +1040,8 @@ std::any Typer::visit(ASTIdentifier *node) {
   if (symbol) {
     return symbol->type_id;
   } else {
-    throw_error(
-        std::format("Use of undeclared identifier '{}'", node->value),
-        node->source_range);
+    throw_error(std::format("Use of undeclared identifier '{}'", node->value),
+                node->source_range);
   }
 }
 std::any Typer::visit(ASTLiteral *node) {
@@ -1117,7 +1113,7 @@ std::any Typer::visit(ASTDotExpr *node) {
                   node->source_range);
             } else {
               auto ast_type = ast_alloc<ASTType>();
-              ast_type->base = type->get_base().get_str();
+              ast_type->base = ASTIdentifier::make(type->get_base());
               node->left = ast_type;
               found = true;
             }
@@ -1128,9 +1124,9 @@ std::any Typer::visit(ASTDotExpr *node) {
   found_enum_variant:
 
     if (node->left == nullptr)
-      throw_error(std::format("Unable to find enum variant {}",
-                              identifier->value),
-                  node->source_range);
+      throw_error(
+          std::format("Unable to find enum variant {}", identifier->value),
+          node->source_range);
   }
 
   // if .EnumVariant failed, error.
@@ -1181,22 +1177,8 @@ std::any Typer::visit(ASTDotExpr *node) {
   // kind of a FEATURE Get enum variant
   if (left_ty->is_kind(TYPE_ENUM)) {
     auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
-
-    /*
-      ! BUG cannot have enum variants with the same name as a
-      ! type that exists in your program. Super Annoying!!!
-
-      ! Remove the hack i put in just to get this working
-    */
     std::string name;
-    if (node->right->get_node_type() == AST_NODE_TYPE) {
-      name = static_cast<ASTType *>(node->right)->base.get_str();
-      // ! HACK HACK Super hacky solution ;; replace the ast with an iden.
-      // REMOVE ME HACK
-      auto iden = ast_alloc<ASTIdentifier>();
-      iden->value = name;
-      node->right = iden;
-    } else if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
+    if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
       name = static_cast<ASTIdentifier *>(node->right)->value.get_str();
     } else if (node->right->get_node_type() == AST_NODE_DOT_EXPR) {
       auto dot = static_cast<ASTDotExpr *>(node->right);
@@ -1258,24 +1240,28 @@ std::any Typer::visit(ASTDotExpr *node) {
 }
 
 std::any Typer::visit(ASTScopeResolution *node) {
-  auto left_ty = global_get_type(ctx.scope->get_type(int_from_any(node->left->accept(this)))->get_true_type());
+  auto left_ty = global_get_type(
+      ctx.scope->get_type(int_from_any(node->left->accept(this)))
+          ->get_true_type());
 
   Scope *scope = nullptr;
-  switch(left_ty->kind) {
-    case TYPE_STRUCT: {
-      auto info = static_cast<StructTypeInfo*>(left_ty->get_info());
-      scope = info->scope;
-    } break;
-    case TYPE_UNION: {
-      auto info = static_cast<UnionTypeInfo*>(left_ty->get_info());
-      scope = info->scope;
-    } break;
-    default:
-      throw_error("Unsupported type for scope resolution (:: operator)", node->source_range);
+  switch (left_ty->kind) {
+  case TYPE_STRUCT: {
+    auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
+    scope = info->scope;
+  } break;
+  case TYPE_UNION: {
+    auto info = static_cast<UnionTypeInfo *>(left_ty->get_info());
+    scope = info->scope;
+  } break;
+  default:
+    throw_error("Unsupported type for scope resolution (:: operator)",
+                node->source_range);
   }
 
   if (!scope) {
-    throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
+    throw_error("Internal Compiler Error: scope is null for scope resolution",
+                node->source_range);
   }
 
   auto calling_scope = ctx.scope;
@@ -1294,7 +1280,6 @@ std::any Typer::visit(ASTScopeResolution *node) {
   }
   return type;
 }
-
 
 std::any Typer::visit(ASTSubscript *node) {
 
@@ -1558,3 +1543,8 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
   return {};
 };
+InternedString Typer::type_name(ASTExpr *node) {
+  auto base = int_from_any(node->accept(this));
+  auto type = ctx.scope->get_type(base);
+  return type->get_base();
+}

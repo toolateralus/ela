@@ -1,6 +1,7 @@
 #pragma once
 #include "ast.hpp"
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "scope.hpp"
 #include <any>
 #include <sstream>
@@ -106,6 +107,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
+  InternedString type_name(ASTExpr *node);
 };
 
 #include "string_builder.hpp"

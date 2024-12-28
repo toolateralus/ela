@@ -212,7 +212,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        parser->expect(TType::RParen);
        auto outer = ast_alloc<ASTType>();
        outer->flags = ASTTYPE_EMIT_OBJECT;
-       outer->base = "Type";
+       outer->base = ASTIdentifier::make("Type");
        outer->extension_info = {.extensions = {TYPE_EXT_POINTER}};
        outer->pointing_to = type;
        return outer;
@@ -319,7 +319,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
 
          if (type->is_kind(TYPE_FUNCTION)) {
            auto id = parser->ctx.scope->find_function_type_id(
-               aliased_type->base,
+               parser->type_name(aliased_type->base),
                *static_cast<FunctionTypeInfo *>(type->get_info()),
                aliased_type->extension_info);
 
@@ -330,8 +330,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
          }
        }
 
-       auto id = parser->ctx.scope->find_type_id(aliased_type->base,
-                                                 aliased_type->extension_info);
+       auto id = parser->ctx.scope->find_type_id(
+           parser->type_name(aliased_type->base), aliased_type->extension_info);
 
        auto type = parser->ctx.scope->get_type(id);
 
@@ -453,8 +453,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto type = parser->parse_type();
 
        parser->expect(TType::RParen);
-       auto visitor = Typer{parser->ctx};
-       auto id = std::any_cast<int>(type->accept(&visitor));
+       auto id = std::any_cast<int>(type->accept(parser->typer));
 
        auto literal = ast_alloc<ASTLiteral>();
        literal->tag = ASTLiteral::Integer;
@@ -555,8 +554,9 @@ ASTType *Parser::parse_type() {
 
   // TODO: We need a way to refer to types with :: operator.
   // Right now it's only used for calling static functions, even in subtypes.
-  // This is okay, but we need concrete way to refer to subtypes, otherwise they're useless.
-  
+  // This is okay, but we need concrete way to refer to subtypes, otherwise
+  // they're useless.
+
   while (true) {
     if (peek().type == TType::LBrace) {
       expect(TType::LBrace);
@@ -566,8 +566,8 @@ ASTType *Parser::parse_type() {
         if (size->get_node_type() == AST_NODE_TYPE) {
           extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          extension_info.key_type =
-              ctx.scope->find_type_id(type->base, type->extension_info);
+          extension_info.key_type = ctx.scope->find_type_id(
+              type_name(type->base), type->extension_info);
           expect(TType::RBrace);
           continue;
         }
@@ -590,7 +590,7 @@ ASTType *Parser::parse_type() {
   }
 
   auto node = ast_alloc<ASTType>();
-  node->base = base;
+  node->base = ASTIdentifier::make(base);
   node->extension_info = extension_info;
   end_node(node, range);
   return node;
@@ -703,7 +703,10 @@ ASTStatement *Parser::parse_statement() {
     // Increment/ Decrement statements;
   } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
              tok.type == TType::Delete || tok.type == TType::LParen ||
-             tok.type == TType::Erase || tok.type == TType::Switch || (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword && lookahead_buf()[2].family != TFamily::Operator)) {
+             tok.type == TType::Erase || tok.type == TType::Switch ||
+             (lookahead_buf()[1].type == TType::DoubleColon &&
+              lookahead_buf()[2].family != TFamily::Keyword &&
+              lookahead_buf()[2].family != TFamily::Operator)) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
 
@@ -848,7 +851,7 @@ ASTStatement *Parser::parse_statement() {
     statement->expression = parse_expr();
     end_node(statement, range);
     return statement;
-  } 
+  }
 
   end_node(nullptr, range);
 
@@ -1091,7 +1094,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   auto range = begin_node();
   auto node = ast_alloc<ASTEnumDeclaration>();
   node->type = ast_alloc<ASTType>();
-  node->type->base = tok.value;
+  node->type->base = ASTIdentifier::make(tok.value);
   expect(TType::LCurly);
 
   if (global_find_type_id(tok.value, {}) != -1) {
@@ -1124,8 +1127,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys.push_back(key);
     keys_set.insert(key);
   }
+  if (node->type->base->get_node_type() != AST_NODE_IDENTIFIER) {
+    throw_error("Cannot declare enum with non identifier name",
+                node->type->base->source_range);
+  }
+  auto identifer = static_cast<ASTIdentifier *>(node->type->base);
   node->type->resolved_type =
-      ctx.scope->create_enum_type(node->type->base, keys, node->is_flags);
+      ctx.scope->create_enum_type(identifer->value, keys, node->is_flags);
   expect(TType::RCurly);
   return node;
 }
@@ -1158,7 +1166,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   auto type = ast_alloc<ASTType>();
   decl->type = type;
-  decl->type->base = name.value;
+  decl->type->base = ASTIdentifier::make(name.value);
   decl->type->extension_info = {};
   decl->type->resolved_type = type_id;
 
@@ -1171,8 +1179,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         decl->methods.push_back(
             static_cast<ASTFunctionDeclaration *>(statement));
-      } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION || statement->get_node_type() == AST_NODE_ENUM_DECLARATION) {
-        decl->subtypes.push_back(static_cast<ASTStatement*>(statement));
+      } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION ||
+                 statement->get_node_type() == AST_NODE_ENUM_DECLARATION) {
+        decl->subtypes.push_back(static_cast<ASTStatement *>(statement));
       } else {
         throw_error(
             "Non-field or non-method declaration not allowed in struct.",
@@ -1205,7 +1214,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   node->name = name;
   node->type = ast_alloc<ASTType>();
-  node->type->base = name.value;
+  node->type->base = ASTIdentifier::make(name.value);
 
   auto id = ctx.scope->find_type_id(name.value, {});
 
@@ -1436,8 +1445,8 @@ ASTExpr *Parser::parse_postfix() {
     return unary;
   }
   // build dot and subscript expressions
-  while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
-         peek().type == TType::LParen) {
+  while (peek().type == TType::DoubleColon || peek().type == TType::Dot ||
+         peek().type == TType::LBrace || peek().type == TType::LParen) {
 
     if (peek().type == TType::LParen) {
       left = parse_call(left);
@@ -1859,8 +1868,8 @@ void Parser::append_type_extensions(ASTType *type) {
         if (size->get_node_type() == AST_NODE_TYPE) {
           type->extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          type->extension_info.key_type =
-              ctx.scope->find_type_id(type->base, type->extension_info);
+          type->extension_info.key_type = ctx.scope->find_type_id(
+              type_name(type->base), type->extension_info);
           printf("KEY TYPE: %d\n", type->extension_info.key_type);
           expect(TType::RBrace);
           continue;
@@ -1878,12 +1887,12 @@ void Parser::append_type_extensions(ASTType *type) {
 ASTType *Parser::parse_function_type(const InternedString &base,
                                      TypeExt extension_info) {
   auto return_type = ast_alloc<ASTType>();
-  return_type->base = base;
+  return_type->base = ASTIdentifier::make(base);
   return_type->extension_info = extension_info;
 
   FunctionTypeInfo info{};
-  info.return_type =
-      ctx.scope->find_type_id(return_type->base, return_type->extension_info);
+  info.return_type = ctx.scope->find_type_id(type_name(return_type->base),
+                                             return_type->extension_info);
 
   auto param_types = parse_parameter_types();
   std::ostringstream ss;
@@ -1893,7 +1902,7 @@ ASTType *Parser::parse_function_type(const InternedString &base,
     ss << "(";
     for (size_t i = 0; i < param_types.size(); ++i) {
       info.parameter_types[i] = ctx.scope->find_type_id(
-          param_types[i]->base, param_types[i]->extension_info);
+          type_name(param_types[i]->base), param_types[i]->extension_info);
       info.params_len++;
       ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
       if (i != param_types.size() - 1) {
@@ -1907,7 +1916,7 @@ ASTType *Parser::parse_function_type(const InternedString &base,
       ctx.scope->get_type(info.return_type)->to_string() + ss.str();
   return_type->resolved_type =
       ctx.scope->find_function_type_id(type_name, info, {});
-  return_type->base = type_name;
+  return_type->base = ASTIdentifier::make(type_name);
   return_type->extension_info = {};
 
   append_type_extensions(return_type);
@@ -1957,4 +1966,23 @@ static Precedence get_operator_precedence(Token token) {
     return PRECEDENCE_LOWEST;
   }
 }
-
+ASTType *ASTType::get_void() {
+  static ASTType *type = [] {
+    ASTType *type = ast_alloc<ASTType>();
+    type->base = ASTIdentifier::make("void");
+    type->resolved_type = void_type();
+    return type;
+  }();
+  return type;
+}
+Parser::Parser(const std::string &filename, Context &context)
+    : states({Lexer::State::from_file(filename)}), ctx(context) {
+  fill_buffer_if_needed();
+  typer = new Typer(context);
+}
+Parser::~Parser() { delete typer; }
+InternedString Parser::type_name(ASTExpr *node) {
+  auto base = std::any_cast<int>(node->accept(typer));
+  auto base_ty = ctx.scope->get_type(base);
+  return base_ty->get_base();
+}

@@ -418,19 +418,23 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
     }
 
     if ((node->flags & FUNCTION_IS_DTOR) != 0) {
-      auto name = current_struct_decl ? current_struct_decl.get()->type->base
-                                      : current_union_decl.get()->type->base;
+      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
+                                      : current_union_decl.get()->type->resolved_type;
+      auto type = global_get_type(type_id);
+      auto name = type->get_base().get_str();
       // TODO: in the typer, we need to assert that a destructor never takes parameters.
-      (*ss) << '~' << name.get_str() << "()";
+      (*ss) << '~' << name << "()";
       if (!node->block) throw_error("Cannot forward declare a constructor", node->source_range);
       node->block.get()->accept(this);
       return;
     }
 
     if ((node->flags & FUNCTION_IS_CTOR) != 0) {
-      auto name = current_struct_decl ? current_struct_decl.get()->type->base
-                                      : current_union_decl.get()->type->base;
-      (*ss) << name.get_str();
+      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
+                                      : current_union_decl.get()->type->resolved_type;
+      auto type = global_get_type(type_id);
+      auto name = type->get_base().get_str();
+      (*ss) << name;
 
       auto is_copy_ctor =
           node->params->params.size() == 1 &&
@@ -440,12 +444,12 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
                    : current_union_decl.get()->type->resolved_type);
 
       if (is_copy_ctor) {
-        (*ss) << "(" << name.get_str() << " &"
+        (*ss) << "(" << name << " &"
               << node->params->params[0]->name.get_str() << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
-        (*ss) << name.get_str();
-        (*ss) << "(const " << name.get_str() << " &"
+        (*ss) << name;
+        (*ss) << "(const " << name << " &"
               << node->params->params[0]->name.get_str() << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
@@ -562,7 +566,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern)
       *ss << "extern \"C\" ";
-    *ss << "struct " << node->type->base.get_str() << ";\n";
+    *ss << "struct " << type->get_base().get_str() << ";\n";
     return {};
   }
 
@@ -574,7 +578,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
     if (node->is_extern) {
       (*ss) << "extern \"C\" ";
     }
-    (*ss) << "struct " << node->type->base.get_str() << "{\n";
+    (*ss) << "struct " << type->get_base().get_str() << "{\n";
   }
   indentLevel++;
   for (const auto &subtype: node->subtypes) {
@@ -621,13 +625,13 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
 
   auto elem_ty = global_get_type(node->element_type);
 
-  auto type_name = node->type->base;
+  auto type = global_get_type(node->type->resolved_type);
   for (const auto &[key, value] : node->key_values) {
 
     if (elem_ty->kind == TYPE_SCALAR) {
       (*ss) << "const ";
     }
-    (*ss) << to_cpp_string(elem_ty) << " " << type_name.get_str()
+    (*ss) << to_cpp_string(elem_ty) << " " << type->get_base().get_str()
           << '_' << key.get_str();
     (*ss) << " = ";
     if (value.is_not_null()) {
