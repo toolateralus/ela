@@ -926,8 +926,10 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   auto calling_scope = ctx.scope;
   Scope *dot_parent = scope->parent;
 
-  if (dot_parent && calling_scope != scope) {
-    scope->parent = calling_scope;
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
+    if (!scope->is_ancestor(calling_scope)) {
+      scope->parent = calling_scope;
+    }
   }
 
   node->left->accept(this);
@@ -936,9 +938,11 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   node->right->accept(this);
   ctx.set_scope(calling_scope);
 
-  if (dot_parent && calling_scope != scope) {
+
+  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
     scope->parent = dot_parent;
   }
+
   return {};
 }
 std::any EmitVisitor::visit(ASTMake *node) {

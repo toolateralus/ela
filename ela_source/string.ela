@@ -1,9 +1,8 @@
 #import core;
 
-// For now, we'll just use a simple null terminated MyString.
-
-MyString :: struct {
-  data: char *;
+// For now, we'll just use a simple null terminated string.
+struct string {
+  char *data;
   length: s32;
   is_view: bool;
   #ctor :: () {}
@@ -37,17 +36,17 @@ MyString :: struct {
   }
 
   // Slicing a view.
-  #operator([]) :: (range: Range) -> MyString {
+  #operator([])(range: Range) -> string {
     return {data + range.first, data + range.last, true};
   }
 
-  substr :: (start: int , end: int) -> MyString {
+  substr :: (start: int , end: int) -> string {
     // TODO: clamp here? instead of returning empty?.
     if start < 0 || end > length || start > end then return {};
     return {data + start, data + end, false};
   }
 
-  substr :: (r: Range) -> MyString { return substr((int)r.first, (int)r.last); }
+  substr :: (Range r) -> string { return substr(r.first, r.last); }
 
   push :: (value : char) {
     new_data: char* = malloc(sizeof(char) * length + 2);
@@ -87,7 +86,7 @@ MyString :: struct {
     length++;
     data[length] = '\0';
   }
-  insert_substr_at :: (index: int, substr: MyString) {
+  insert_substr_at :: (index: int, substr: string) {
     if (data == null) {
       data = malloc(substr.length + 1);
       memcpy(data, substr.data, substr.length);
@@ -120,7 +119,7 @@ MyString :: struct {
     return value;
   }
 
-  #ctor :: (other: MyString) {
+  #copy :: (other: string) {
     if (other.data) {
       length = other.length;
       data = malloc(length + 1);
@@ -129,9 +128,9 @@ MyString :: struct {
     }
   }
 
-  #operator(=) :: (other: MyString) -> MyString {
+  #operator(=) :: (other: string) -> string {
     if (this != &other) {
-      if data then free(data);
+      if (data) free(data);
       if (other.data) {
         length = other.length;
         data = malloc(length + 1);
@@ -148,7 +147,7 @@ MyString :: struct {
   begin :: () -> char* { return data; }
   end :: () -> char* { return data + length; }
 
-  #operator(==) :: (other: MyString) -> bool {
+  #operator(==) :: (other: string) -> bool {
     if length != other.length then return false;
     for i in 0..length {
       if data[i] != other.data[i] then return false;
@@ -156,7 +155,7 @@ MyString :: struct {
     return true;
   }
 
-  #operator(!=) :: (other: MyString) -> bool { return !(*this == other); }
+  #operator(!=) :: (other: string) -> bool { return !(*this == other); }
 
   begin :: () -> char* { return data; }
   end :: () -> char* { return data + length; }

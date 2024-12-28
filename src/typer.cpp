@@ -342,7 +342,8 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
 
   node->element_type = elem_type;
 
-  auto enum_type = global_get_type(global_find_type_id(type_name(node->type->base), {}));
+  auto enum_type =
+      global_get_type(global_find_type_id(type_name(node->type->base), {}));
   auto info = static_cast<EnumTypeInfo *>(enum_type->get_info());
   info->element_type = elem_type;
 
@@ -1221,7 +1222,9 @@ std::any Typer::visit(ASTDotExpr *node) {
   Scope *dot_parent = scope->parent;
 
   if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
-    scope->parent = calling_scope;
+    if (!scope->is_ancestor(calling_scope)) {
+      scope->parent = calling_scope;
+    }
   }
 
   ctx.set_scope(scope);

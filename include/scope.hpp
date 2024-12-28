@@ -1,8 +1,8 @@
 #pragma once
 
+#include "arena.hpp"
 #include "error.hpp"
 #include "type.hpp"
-#include "arena.hpp"
 #include <set>
 #include <string>
 #include <unordered_map>
@@ -25,7 +25,6 @@ struct Symbol {
   Nullable<ASTNode> declaring_node;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
-
 
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
@@ -65,16 +64,15 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-
   void on_scope_enter() {
-    for (const auto &alias: aliases) {
+    for (const auto &alias : aliases) {
       auto type = global_get_type(alias);
       type_alias_map[type->get_base()] = alias;
     }
   }
 
   void on_scope_exit() {
-    for (const auto &alias: aliases) {
+    for (const auto &alias : aliases) {
       auto type = global_get_type(alias);
       type_alias_map.erase(type->get_base());
     }
@@ -82,7 +80,7 @@ struct Scope {
 
   /*  Type interactions  */
 
-  int create_type_alias(int aliased, const InternedString& name) {
+  int create_type_alias(int aliased, const InternedString &name) {
     auto id = global_create_type_alias(aliased, name);
     aliases.push_back(id);
     types.insert(id);
@@ -92,18 +90,31 @@ struct Scope {
     return id;
   }
 
+  
+  inline bool is_ancestor(Scope *ancestor) {
+    Scope *current = this;
+    while (current != nullptr) {
+      if (current == ancestor) {
+        return true;
+      }
+      current = current->parent;
+    }
+    return false;
+  }
+
   Type *get_type(const int id) {
     if (types.contains(id)) {
       return global_get_type(id);
     }
 
-    for (auto alias: aliases) {
+    for (auto alias : aliases) {
       if (alias == id) {
         return global_get_type(id);
       }
     }
 
-    if (parent) return parent->get_type(id);
+    if (parent)
+      return parent->get_type(id);
     else {
       //! BUG remove this hack. This should not be neccessary.
       auto type = global_get_type(id);
@@ -115,7 +126,8 @@ struct Scope {
     return nullptr;
   }
 
-  int create_type(TypeKind kind, const InternedString &name, TypeInfo * info = nullptr, const TypeExt &ext = {}) {
+  int create_type(TypeKind kind, const InternedString &name,
+                  TypeInfo *info = nullptr, const TypeExt &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
     types.insert(id);
     return id;
@@ -127,37 +139,41 @@ struct Scope {
     return id;
   }
 
-  int create_enum_type(const InternedString &name, const std::vector<InternedString> &fields, bool flags) {
+  int create_enum_type(const InternedString &name,
+                       const std::vector<InternedString> &fields, bool flags) {
     auto id = global_create_enum_type(name, fields, flags);
     types.insert(id);
     return id;
   }
 
-  int create_tuple_type(const std::vector<int> &types, const TypeExt& ext) {
+  int create_tuple_type(const std::vector<int> &types, const TypeExt &ext) {
     auto id = global_create_tuple_type(types, ext);
     this->types.insert(id);
     return id;
   }
 
-  int create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
+  int create_union_type(const InternedString &name, Scope *scope,
+                        UnionFlags kind) {
     auto id = global_create_union_type(name, scope, kind);
     types.insert(id);
     return id;
   }
 
-  int find_function_type_id(const InternedString &name, const FunctionTypeInfo &info,
-                 const TypeExt &ext) {
-    // We leave function types as global so that we don't have to recreate things like
-    // void(int) over and over. This may inadvertently allow you to access types that are in your scope,
-    // so
+  int find_function_type_id(const InternedString &name,
+                            const FunctionTypeInfo &info, const TypeExt &ext) {
+    // We leave function types as global so that we don't have to recreate
+    // things like void(int) over and over. This may inadvertently allow you to
+    // access types that are in your scope, so
     // TODO: verify this isn't terrible.
-    auto id = global_find_function_type_id(name, info, ext);;
+    auto id = global_find_function_type_id(name, info, ext);
+    ;
     types.insert(id);
     root_scope->types.insert(id);
     return id;
   }
 
-  int find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions, bool was_created = false) {
+  int find_type_id(std::vector<int> &tuple_types,
+                   const TypeExt &type_extensions, bool was_created = false) {
     auto num = num_types;
     auto id = global_find_type_id(tuple_types, type_extensions);
 
@@ -166,7 +182,7 @@ struct Scope {
     // we just add the type to our table.
     if (num_types > num || was_created) {
       // search for all the types within the tuple.
-      for (auto t: tuple_types) {
+      for (auto t : tuple_types) {
         if (!types.contains(t)) {
           was_created = true;
           goto try_find_in_parent;
@@ -176,9 +192,10 @@ struct Scope {
       return id;
     }
 
-    if (types.contains(id)) return id;
+    if (types.contains(id))
+      return id;
 
-    try_find_in_parent:
+  try_find_in_parent:
     if (parent) {
       return parent->find_type_id(tuple_types, type_extensions, was_created);
     }
@@ -222,7 +239,6 @@ struct Scope {
     }
     return id;
   }
-
 };
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -247,7 +263,8 @@ struct Context {
   }
   inline Scope *exit_scope() {
     if (scope == root_scope) {
-      throw_error("Internal Compiler Error: attempted to exit the global scope.", {});
+      throw_error(
+          "Internal Compiler Error: attempted to exit the global scope.", {});
     }
     auto old_scope = scope;
     if (scope) {

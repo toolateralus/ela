@@ -10,8 +10,8 @@
       "request": "launch",
       "name": "Debug repro",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", ""],
-      "cwd": "${workspaceFolder}/repro"
+      "cwd": "${workspaceFolder}/repro",
+      "args": ["12.ela"]
     },
     {
       "type": "lldb",

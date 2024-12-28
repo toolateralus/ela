@@ -607,7 +607,7 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range) {
   switch (type) {
-  case TType::Assign:
+  
   case TType::Range:
   case TType::Comma:
   case TType::Semi:
@@ -625,6 +625,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type,
     return;
 
   // Valid
+  case TType::Assign:
   case TType::Add:
   case TType::Sub:
   case TType::Mul:
