@@ -236,7 +236,7 @@ main :: () {
   SetTargetFPS(1000);
 
   for file in dir.files {
-    if str_ends_with(file.data, ".wav") || str_ends_with(file.data, ".mp3") || str_ends_with(file.data, ".ogg") {
+    if Strings::ends_with(file.data, ".wav") || Strings::ends_with(file.data, ".mp3") || Strings::ends_with(file.data, ".ogg") {
       file_dropdown.options ~= string{file.data};
     }
   }
