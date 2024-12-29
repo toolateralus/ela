@@ -1,0 +1,9 @@
+#import core;
+
+add :: (a: $T, b: $T) -> $T {
+
+}
+
+main :: () {
+
+}

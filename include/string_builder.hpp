@@ -1,6 +1,5 @@
 
 
-#include "interned_string.hpp"
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -24,9 +23,7 @@ struct StringBuilder {
   };
   Block *root;
   inline StringBuilder() : root(new Block) {}
-  inline ~StringBuilder() {
-    delete root;
-  }
+  inline ~StringBuilder() { delete root; }
   inline StringBuilder &operator<<(const std::string &str) {
     Block *current = root;
     while (current->next) {

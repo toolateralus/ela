@@ -38,7 +38,7 @@ struct Scope {
   std::set<int> types;
 
   Scope *parent = nullptr;
-  Scope(Scope *parent = nullptr) : parent(parent), symbols({}) {}
+  Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
 
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
@@ -90,7 +90,6 @@ struct Scope {
     return id;
   }
 
-  
   inline bool is_ancestor(Scope *ancestor) {
     Scope *current = this;
     while (current != nullptr) {
@@ -232,7 +231,6 @@ struct Scope {
     auto type = get_type(base);
     auto extensions = type->get_ext();
     extensions.extensions.push_back({TYPE_EXT_POINTER});
-    auto num = num_types;
     auto id = find_type_id(type->get_base(), extensions);
     if (id == -1) {
       throw_error("Failed to get pointer to type", {});

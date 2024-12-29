@@ -16,7 +16,6 @@
 #include <unordered_set>
 #include <vector>
 
-// this could be a simple boolean.
 enum {
   ASTTYPE_NORMAL,
   ASTTYPE_FROM_SCOPE_RES,
@@ -125,7 +124,6 @@ struct ASTProgram : ASTNode {
 };
 
 struct ASTExpr : ASTNode {
-  bool is_constexpr() const;
   virtual ASTNodeType get_node_type() const = 0;
 };
 
@@ -188,7 +186,7 @@ struct ASTIdentifier : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 
-  static ASTIdentifier* make(InternedString str) {
+  static ASTIdentifier *make(InternedString str) {
     auto node = ast_alloc<ASTIdentifier>();
     node->value = str;
     return node;
@@ -447,18 +445,6 @@ struct ASTSwitch : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }
 };
 
-struct Allocation {
-  ASTAllocate *alloc;
-  Symbol *symbol;
-  Scope *scope;
-};
-
-extern std::vector<Allocation> allocation_info;
-
-void insert_allocation(ASTAllocate *in_alloc, Symbol *symbol, Scope *scope);
-void erase_allocation(Symbol *symbol, Scope *scope);
-
-bool report_unfreed_allocations();
 struct ASTNoop : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_NOOP; }
   std::any accept(VisitorBase *visitor) override;
@@ -503,7 +489,7 @@ struct ASTNoop : ASTStatement {
 
 #define DECLARE_VISIT_BASE_METHODS()                                           \
   std::any visit(ASTNoop *noop) { return {}; }                                 \
-  virtual std::any visit(ASTScopeResolution *node) = 0;                                 \
+  virtual std::any visit(ASTScopeResolution *node) = 0;                        \
   virtual std::any visit(ASTProgram *node) = 0;                                \
   virtual std::any visit(ASTBlock *node) = 0;                                  \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                    \
@@ -582,7 +568,7 @@ static Precedence get_operator_precedence(Token token);
 struct Typer;
 
 struct Parser {
-  Typer* typer;
+  Typer *typer;
   ParserState state;
   bool allow_function_type_parsing = true;
   ASTProgram *parse();

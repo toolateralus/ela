@@ -1,18 +1,8 @@
 #pragma once
 
 #include "core.hpp"
-#include "arena.hpp"
 #include <span>
 #include <sstream>
-
-struct Error;
-
-#ifndef MAX_ERRORS
-#define MAX_ERRORS 100
-#endif
-
-static Error *error_table[MAX_ERRORS];
-static int num_errors = 0;
 
 enum ErrorSeverity {
   ERROR_INFO,
@@ -38,17 +28,6 @@ static bool supports_color() {
 }
 
 static bool terminal_supports_color =  supports_color();
-
-struct Error {
-  Error(const std::string &message,
-        const SourceRange source_range)
-      : message(message), source_range(source_range) {}
-
-  const std::string message = "";
-  const SourceRange source_range{};
-};
-
-static jstl::Arena error_arena = {sizeof(Error) * MAX_ERRORS};
 
 static std::string format_message(const std::string &message) {
   std::stringstream formatted;
@@ -112,7 +91,6 @@ static std::string format_source_location(const SourceRange &source_range, Error
 
 static void throw_warning(const std::string message, const SourceRange &source_range) {
     std::stringstream ss;
-    auto span = source_range.get_tokens();
     if (terminal_supports_color) ss << "\e[36m";
     ss << "Warning:\n\t" << format_message(message);
     if (terminal_supports_color) ss << "\e[0m\n";
@@ -123,11 +101,7 @@ static void throw_warning(const std::string message, const SourceRange &source_r
 }
 
 [[noreturn]] static void throw_error(const std::string &message, const SourceRange &source_range) {
-    auto errid = num_errors++;
-    auto memory = (Error *)error_arena.allocate(sizeof(Error));
-    error_table[errid] = new (memory) Error(message, source_range);
     std::stringstream ss;
-    auto span = source_range.get_tokens();
     if (terminal_supports_color) ss << "\e[31m";
     ss << "Error:\n\t" << message;
     if (terminal_supports_color) ss << "\e[0m\n";

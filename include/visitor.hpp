@@ -1,4 +1,5 @@
 #pragma once
+#include "string_builder.hpp"
 #include "ast.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
@@ -110,8 +111,6 @@ struct Typer : VisitorBase {
   InternedString type_name(ASTExpr *node);
 };
 
-#include "string_builder.hpp"
-
 struct EmitVisitor : VisitorBase {
   bool has_user_defined_main = false;
   bool emit_default_init = true;
@@ -133,7 +132,6 @@ struct EmitVisitor : VisitorBase {
   int indentLevel = 0;
   Context &ctx;
 
-
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.
@@ -153,14 +151,15 @@ struct EmitVisitor : VisitorBase {
         return;
       }
 
-      (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
+      (*ss) << std::string{"\n#line "} << std::to_string(loc)
+            << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }
   }
 
   std::string to_type_struct(Type *type, Context &context);
   inline EmitVisitor(Context &context, Typer &type_visitor)
-      : ctx(context), type_visitor(type_visitor) {
+      : type_visitor(type_visitor), ctx(context) {
     ss = &code;
   }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
@@ -188,8 +187,10 @@ struct EmitVisitor : VisitorBase {
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
 
-  std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
-  std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
+  std::string get_type_struct(Type *type, int id, Context &context,
+                              const std::string &fields);
+  std::string get_field_struct(const std::string &name, Type *type,
+                               Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 
   std::any visit(ASTStructDeclaration *node) override;
@@ -198,7 +199,9 @@ struct EmitVisitor : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-  void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition, Nullable<ASTBlock> block);
+  void emit_condition_block(ASTNode *node, const std::string &keyword,
+                            Nullable<ASTExpr> condition,
+                            Nullable<ASTBlock> block);
   void emit_function_pointer_dynamic_array_declaration(
       const std::string &type_string, const std::string &name, Type *type);
   void get_declaration_type_signature_and_identifier(const std::string &name,

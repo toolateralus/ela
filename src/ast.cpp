@@ -122,9 +122,6 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
            auto function = ast_alloc<ASTFunctionDeclaration>();
            auto range = parser->begin_node();
            auto name = parser->expect(TType::Identifier);
-
-           auto v = name.value;
-
            auto last_func_decl = parser->current_func_decl;
            parser->current_func_decl = function;
 
@@ -550,11 +547,13 @@ ASTType *Parser::parse_type() {
     return type;
   }
 
-  ASTExpr* base = ASTIdentifier::make(eat().value);
+  ASTExpr *base = ASTIdentifier::make(eat().value);
   TypeExt extension_info;
 
   while (true) {
-    if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type != TType::LParen) {
+    if (peek().type == TType::DoubleColon &&
+        lookahead_buf()[1].type == TType::Identifier &&
+        lookahead_buf()[2].type != TType::LParen) {
       eat();
       auto right = ASTIdentifier::make(expect(TType::Identifier).value);
       auto srnode = ast_alloc<ASTScopeResolution>();
@@ -585,8 +584,10 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (allow_function_type_parsing && peek().type == TType::LParen && base->get_node_type() == AST_NODE_IDENTIFIER) {
-      return parse_function_type(static_cast<ASTIdentifier*>(base)->value, extension_info);
+    } else if (allow_function_type_parsing && peek().type == TType::LParen &&
+               base->get_node_type() == AST_NODE_IDENTIFIER) {
+      return parse_function_type(static_cast<ASTIdentifier *>(base)->value,
+                                 extension_info);
     } else {
       break;
     }
@@ -684,8 +685,8 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.type == TType::Identifier &&
-          lookahead_buf()[1].type == TType::Colon ||
-      lookahead_buf()[1].type == TType::ColonEquals) {
+      (lookahead_buf()[1].type == TType::Colon ||
+       lookahead_buf()[1].type == TType::ColonEquals)) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -894,6 +895,7 @@ ASTStatement *Parser::parse_statement() {
                           tok.value),
               range);
 }
+
 ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
@@ -925,15 +927,9 @@ ASTDeclaration *Parser::parse_declaration() {
                 decl->source_range);
   }
   ctx.scope->insert(iden.value, -1);
-  if (decl->value.get() &&
-      decl->value.get()->get_node_type() == AST_NODE_ALLOCATE) {
-    auto symbol = ctx.scope->lookup(iden.value);
-    insert_allocation(static_cast<ASTAllocate *>(decl->value.get()), symbol,
-                      ctx.scope);
-  }
-
   return decl;
 }
+
 ASTBlock *Parser::parse_block() {
   auto range = begin_node();
   expect(TType::LCurly);
@@ -954,6 +950,7 @@ ASTBlock *Parser::parse_block() {
   end_node(block, range);
   return block;
 }
+
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   if (range.begin > 0)
@@ -1327,7 +1324,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
           lookahead.size() > 1 && (lookahead[1].family != TFamily::Operator ||
                                    lookahead[1].type != TType::LParen);
       bool is_semi = lookahead.size() > 1 && lookahead[1].type == TType::Semi;
-      if (is_gt && is_not_identifier && is_not_literal && is_not_operator ||
+      if ((is_gt && is_not_identifier && is_not_literal && is_not_operator) ||
           is_semi) {
         return left;
       }
@@ -1365,15 +1362,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     binexpr->left = left;
     binexpr->right = right;
     binexpr->op = op;
-    if (op.type == TType::ColonEquals &&
-        left->get_node_type() == AST_NODE_IDENTIFIER &&
-        right->get_node_type() == AST_NODE_ALLOCATE) {
-      auto iden = static_cast<ASTIdentifier *>(left);
-      auto alloc = static_cast<ASTAllocate *>(right);
-      auto symbol = ctx.scope->lookup(iden->value);
-      insert_allocation(alloc, symbol, ctx.scope);
-    }
-
     left = binexpr;
   }
   end_node(left, range);
@@ -1402,7 +1390,7 @@ ASTExpr *Parser::parse_unary() {
         return false;
       }
       auto make = static_cast<ASTMake *>(expr);
-      if (make && make->kind == MAKE_CTOR || make->kind == MAKE_COPY_CTOR) {
+      if (make && (make->kind == MAKE_CTOR || make->kind == MAKE_COPY_CTOR)) {
         return true;
       }
       return false;
@@ -1623,8 +1611,6 @@ ASTExpr *Parser::parse_primary() {
   }
   case TType::Identifier: {
     auto range = begin_node();
-    auto name = tok.value;
-
     if (ctx.scope->find_type_id(tok.value, {}) != -1) {
       auto type = parse_type();
       if (peek().type == TType::LCurly) {
@@ -1810,36 +1796,6 @@ Token Parser::peek() const {
   }
   return states.back().lookahead_buffer.front();
 }
-void insert_allocation(ASTAllocate *in_alloc, Symbol *symbol, Scope *scope) {
-  allocation_info.push_back({
-      .alloc = in_alloc,
-      .symbol = symbol,
-      .scope = scope,
-  });
-}
-bool report_unfreed_allocations() {
-  bool had_unfreed = !allocation_info.empty();
-  for (const auto &info : allocation_info) {
-    auto formatted_str =
-        format_source_location(info.alloc->source_range, ERROR_FAILURE);
-    std::cerr << "\e[31mUnfreed Allocation:\e[0m\n"; // Red color for the header
-    std::cerr << "\e[33mAllocation:\e[0m " << formatted_str << "\n";
-    std::cerr << "\e[90m" << std::string(80, '-')
-              << "\e[0m\n"; // Gray color for separator
-  }
-  return had_unfreed;
-}
-void erase_allocation(Symbol *symbol, Scope *scope) {
-  for (auto it = allocation_info.begin(); it != allocation_info.end(); ++it) {
-    if (it->scope == scope && it->symbol == symbol) {
-      allocation_info.erase(it);
-      return;
-    }
-  }
-}
-bool ASTExpr::is_constexpr() const {
-  return get_node_type() == AST_NODE_LITERAL;
-}
 
 std::vector<ASTType *> Parser::parse_parameter_types() {
   std::vector<ASTType *> param_types;
@@ -1976,7 +1932,7 @@ ASTType *ASTType::get_void() {
   return type;
 }
 Parser::Parser(const std::string &filename, Context &context)
-    : states({Lexer::State::from_file(filename)}), ctx(context) {
+    : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
   typer = new Typer(context);
 }

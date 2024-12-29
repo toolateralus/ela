@@ -1,8 +1,8 @@
 #pragma once
-#include <format>
 #include <cassert>
 #include <cstddef>
 #include <cstring>
+#include <format>
 #include <functional>
 #include <string>
 #include <unordered_map>
@@ -16,7 +16,7 @@ struct InternedString {
     return table;
   }
   std::string get_str() const { return {table()[hash]}; }
-  inline void insert_or_set(const std::string& value) {
+  inline void insert_or_set(const std::string &value) {
     auto hash = std::hash<std::string>()(value);
     const auto [it, inserted] = table().emplace(hash, value);
     this->hash = it->first;
@@ -35,30 +35,27 @@ struct InternedString {
 };
 
 namespace std {
-  template <> struct hash<InternedString> {
-    inline size_t operator()(const InternedString &string) const {
-      return string.hash;
-    }
-  };
-  
-  template<>
-  struct formatter<InternedString, char>
-  {
-      template<class ParseContext>
-      constexpr typename ParseContext::iterator parse(ParseContext& ctx)
-      {
-          auto it = ctx.begin();
-          auto end = ctx.end();
-          while (it != end && *it != '}') {
-              ++it;
-          }
-          return it;
-      }
+template <> struct hash<InternedString> {
+  inline size_t operator()(const InternedString &string) const {
+    return string.hash;
+  }
+};
 
-      template<class FormatContext>
-      typename FormatContext::iterator format(const InternedString& s, FormatContext& ctx) const
-      {
-          return std::format_to(ctx.out(), "{}", s.get_str());
-      }
-  };
+template <> struct formatter<InternedString, char> {
+  template <class ParseContext>
+  constexpr typename ParseContext::iterator parse(ParseContext &ctx) {
+    auto it = ctx.begin();
+    auto end = ctx.end();
+    while (it != end && *it != '}') {
+      ++it;
+    }
+    return it;
+  }
+
+  template <class FormatContext>
+  typename FormatContext::iterator format(const InternedString &s,
+                                          FormatContext &ctx) const {
+    return std::format_to(ctx.out(), "{}", s.get_str());
+  }
+};
 } // namespace std

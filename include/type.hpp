@@ -320,7 +320,7 @@ struct Type {
 
     auto base_type = global_get_type(base_no_ext);
     Type* type = (Type*)this;
-    while (type && type->is_alias || base_type->is_alias) {
+    while (type && (type->is_alias || base_type->is_alias)) {
       base_type = global_get_type(base_type->alias_id);
       auto old_ext = base_type->get_ext().append(get_ext_no_compound());
       auto new_id = global_find_type_id(base_type->get_base(), old_ext);

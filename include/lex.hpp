@@ -264,7 +264,7 @@ struct Lexer {
 
     State(const std::string &input, size_t file_idx, size_t input_len,
           const std::filesystem::path &path)
-        : input(input), file_idx(file_idx), input_len(input_len), path(path) {}
+        : input(input), file_idx(file_idx), path(path), input_len(input_len) {}
 
     std::string input{};
     std::filesystem::path path;
@@ -285,7 +285,8 @@ struct Lexer {
       std::filesystem::current_path(canonical.parent_path());
 
       if (!std::filesystem::exists(canonical)) {
-        printf("File %s does not exist. Quitting..", canonical.string().c_str());
+        printf("File %s does not exist. Quitting..",
+               canonical.string().c_str());
         exit(1);
       }
 

@@ -53,9 +53,6 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
-    // TODO: fix this. We can't assume each line is the same length, this just never works.
-    // It's a fairly simple fix, just need to keep track of the current column and increment i'
-    size_t col = lines == 0 ? pos : pos / lines;
     SourceLocation location{state.line, state.col, state.file_idx};
 
     if (c == '\'')  {
@@ -163,8 +160,6 @@ void Lexer::get_token(State &state) {
       bool is_float = false;
       bool is_hex = false;
       bool is_bin = false;
-      int startPos = pos;
-
       if (c == '0' && (input[pos + 1] == 'x' || input[pos + 1] == 'X')) {
         is_hex = true;
         pos += 2; // Skip '0x'

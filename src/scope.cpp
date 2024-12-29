@@ -6,8 +6,6 @@
 Context::Context() {
   root_scope = scope;
 
-
-
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -49,7 +47,7 @@ Context::Context() {
                   SYMBOL_IS_FUNCTION);
   }
 
-  // define types used for reflection. Very weak right now.
+  // define types used for reflection.
   {
     auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
     auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -59,13 +57,14 @@ Context::Context() {
     field_scope->parent = root_scope;
     element_scope->parent = root_scope;
 
-    auto type_id = global_create_struct_type("Type", type_scope);
-    auto field_id = global_create_struct_type("Field", field_scope);
-    auto element_id = global_create_struct_type("Element", element_scope);
+    global_create_struct_type("Type", type_scope);
+    global_create_struct_type("Field", field_scope);
+    global_create_struct_type("Element", element_scope);
 
     // Type*
     auto type_ptr =
         global_find_type_id("Type", {.extensions = {TYPE_EXT_POINTER}});
+        
     // Field*[]
     auto field_arr = global_find_type_id(
         "Field", {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
@@ -75,8 +74,7 @@ Context::Context() {
         "Element", {.extensions = {TYPE_EXT_ARRAY},
                   .array_sizes = {nullptr}});
     // Field*
-    auto field_ptr =
-        global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}});
+    global_find_type_id("Field", {.extensions = {TYPE_EXT_POINTER}});
 
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());

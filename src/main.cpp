@@ -42,8 +42,6 @@ Scope *root_scope;
 
 CompileCommand compile_command;
 
-std::vector<Allocation> allocation_info;
-
 std::vector<Token> all_tokens;
 
 std::unordered_set<InternedString> import_set;
@@ -157,12 +155,7 @@ main :: () {
       system(command.c_str());
     }
   }
-
-  if (compile_command.has_flag("sanitize")) {
-    if (report_unfreed_allocations()) {
-      return 1;
-    }
-  }
+  
   return result != 0;
 }
 

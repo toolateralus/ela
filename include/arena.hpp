@@ -28,7 +28,7 @@ namespace jstl {
     Arena &operator=(Arena &&) = delete;
 
     inline Arena(size_t capacity)
-        : data(new char[capacity]), capacity(capacity), ptr(0) {}
+        : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
     inline ~Arena() { delete[] data; }
 
