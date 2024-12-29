@@ -1208,31 +1208,48 @@ std::any Typer::visit(ASTDotExpr *node) {
     return info->element_type;
   }
 
-  Scope *scope = nullptr;
+  Scope *target_scope = nullptr;
   if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
-    scope = info->scope;
+    target_scope = info->scope;
   } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
-    scope = info->scope;
+    target_scope = info->scope;
   } else {
     throw_error("cannot use a dot expression on a non-struct or union.",
                 node->source_range);
   }
 
-  auto calling_scope = ctx.scope;
-  Scope *dot_parent = scope->parent;
+  auto head_scope = ctx.scope;
+  Scope *target_parent = target_scope->parent;
+  Scope *insertion_point = nullptr;
 
-  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
-    if (!scope->is_ancestor(calling_scope)) {
-      scope->parent = calling_scope;
+  // search for target scope in scope stack and remove it if found
+  // then set target as new head with old head as a parent
+  if (head_scope != target_scope) {
+    Scope *current = head_scope;
+
+    while (current && current != target_scope) {
+      insertion_point = current;
+      current = current->parent;
     }
+
+    if (current && insertion_point) {
+      insertion_point->parent = current->parent;
+    } else {
+      insertion_point = nullptr;
+    }
+    target_scope->parent = head_scope;
   }
 
-  ctx.set_scope(scope);
+  ctx.set_scope(target_scope);
   int type = int_from_any(node->right->accept(this));
-  ctx.set_scope(calling_scope);
+  ctx.set_scope(head_scope);
 
-  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
-    scope->parent = dot_parent;
+  // restore scope stack and target scope
+  if (head_scope != target_scope) {
+    if (insertion_point) {
+      insertion_point->parent = target_scope;
+    }
+    target_scope->parent = target_parent;
   }
 
   return type;

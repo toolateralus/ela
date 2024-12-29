@@ -233,6 +233,9 @@ Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];
   } else if (parent) {
+    if (parent->parent == this) {
+      auto x = 2;
+    }
     return parent->lookup(name);
   }
   return nullptr;
