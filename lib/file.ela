@@ -26,30 +26,94 @@ SeekPosition :: enum {
 #foreign fprintf :: (stream: FILE *, format: char *, ...) -> int;
 #foreign fflush :: (f: FILE *);
 
-file_get_length :: (file: FILE *) -> u32 {
-  fseek(file, 0, SeekPosition.End);
-  len := ftell(file);
-  fseek(file, 0, SeekPosition.Begin);
-  return #make(u32, len);
+// TODO: add a way to do Binary stuff.
+#flags FileOpenFlags :: enum {
+  Read,
+  Write,
 }
 
-file_read_to_string :: (file: FILE*, len: u32*) -> string {
-  *len = file_get_length(file);
-  c: char;
-  str: string;
-  while ((c = fgetc(file)) != EOF) {
-    str.push(c);
+File :: struct {
+  #static length :: (file: FILE*) -> u32 {
+    fseek(file, 0, SeekPosition.End);
+    len := ftell(file);
+    fseek(file, 0, SeekPosition.Begin);
+    return #make(u32, len);
   }
-  return str;
-}
+  #static read_all :: (file: FILE*, len: u32*) -> string {
+    *len = File::length(file);
+    c: char;
+    str: string;
+    while ((c = fgetc(file)) != EOF) {
+      str.push(c);
+    }
+    return str;
+  }
+  #static read_all :: (filename: char*) -> string {
+    file := fopen(filename, "r");
+    str: string;
+    c: char;
+    while ((c = fgetc(file)) != EOF) {
+      str.push(c);
+    }
+    fclose(file);
+    return str;
+  }
+  #static read_all :: (filename: string) -> string {
+    file := fopen(filename.data, "r");
+    str: string;
+    c: char;
+    while ((c = fgetc(file)) != EOF) {
+      str.push(c);
+    }
+    fclose(file);
+    return str;
+  }
+  #static write_all :: (filename: string, data: string) -> void {
+    file := fopen(filename.data, "w");
+    fwrite(data.data, sizeof(char), data.length, file);
+    fclose(file);
+  }
+  #static write_all :: (filename: string, data: char*, nbytes: u64) -> void {
+    file := fopen(filename.data, "w");
+    fwrite(data, sizeof(char), nbytes, file);
+    fclose(file);
+  }
+  #static write_all :: (filename: char*, data: char*, nbytes: u64) -> void {
+    file := fopen(filename, "w");
+    fwrite(data, sizeof(char), nbytes, file);
+    fclose(file);
+  }
+  // Used to convert our flag enum to a string for fopen/fclose etc.
+  #static flags_to_string :: (flags: int) -> string {
+    s : string;
+    if (flags & FileOpenFlags.Read != 0) 
+      then s = "r";
+    if (flags & FileOpenFlags.Write != 0)
+      then s = $"{s}w";
+    return s;
+  }
+  #static open :: (filename: string, flags: int = FileOpenFlags.Read | FileOpenFlags.Write) -> File {
+    return {fopen(filename.data, flags_to_string(flags).data)};
+  }
 
-file_read_to_string :: (filename: char *) -> string {
-  file := fopen(filename, "r");
-  str: string;
-  c: char;
-  while ((c = fgetc(file)) != EOF) {
-    str.push(c);
+  /* INSTANCE DATA & METHODS */
+
+  fd: FILE*;
+
+  read :: (buffer: u8*, size: u64) -> u64 {
+    return fread(buffer, 1, size, fd);
   }
-  fclose(file);
-  return str;
+
+  write :: (buffer: u8*, size: u64) -> u64 {
+    return fwrite(buffer, 1, size, fd);
+  }
+
+  flush :: () {
+    fflush(fd);
+  }
+
+  close :: () -> void {
+    fclose(fd);
+    fd = null;
+  }
 }

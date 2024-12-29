@@ -453,7 +453,7 @@ json_parse :: (lexer: JsonLexer*) -> JsonValue* {
 }
 
 json_parse_file :: (file: c_string) -> JsonValue* {
-  lexer := #make(JsonLexer, file, file_read_to_string(file));
+  lexer := #make(JsonLexer, file, File::read_all(file));
   return json_parse(&lexer);
 }
 
