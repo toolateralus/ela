@@ -36,13 +36,13 @@ struct InternedString {
 
 namespace std {
   template <> struct hash<InternedString> {
-    inline std::size_t operator()(const InternedString &string) const {
+    inline size_t operator()(const InternedString &string) const {
       return string.hash;
     }
   };
-
+  
   template<>
-  struct std::formatter<InternedString, char>
+  struct formatter<InternedString, char>
   {
       template<class ParseContext>
       constexpr typename ParseContext::iterator parse(ParseContext& ctx)

@@ -938,7 +938,6 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
   node->right->accept(this);
   ctx.set_scope(calling_scope);
 
-
   if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
     scope->parent = dot_parent;
   }
