@@ -227,7 +227,7 @@ main :: () {
   bg_color.g -= 175;
   bg_color.b -= 175;
 
-  dir := directory_open(".");
+  dir := Directory::open(".");
 
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
@@ -236,8 +236,8 @@ main :: () {
   SetTargetFPS(1000);
 
   for file in dir.files {
-    if Strings::ends_with(file.data, ".wav") || Strings::ends_with(file.data, ".mp3") || Strings::ends_with(file.data, ".ogg") {
-      file_dropdown.options ~= string{file.data};
+    if Strings::ends_with(file, ".wav") || Strings::ends_with(file, ".mp3") || Strings::ends_with(file, ".ogg") {
+      file_dropdown.options ~= file;
     }
   }
 

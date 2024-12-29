@@ -2,10 +2,9 @@
   ## net module ##
   Internet utilities.
 
-  Very basic, and needs a lot of additions to be useable.
+  Very basic, and needs a lot of additions to be usable.
   Right now, it barely provides enough to establish a TCP Client & Server connection
   and send messages back and forth.
-
 */
 
 /* Protocol families.  */

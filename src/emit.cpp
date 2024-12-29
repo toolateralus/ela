@@ -1106,12 +1106,8 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
 
 void EmitVisitor::interpolate_string(ASTLiteral *node) {
   if (node->value.get_str().empty()) {
-    throw_warning(
-        "using an empty interpolated string causes memory leaks right now.",
-        node->source_range);
-    (*ss) << "string(\"\")"; // !BUG: fix this. this will cause memory leaks.
-                             // EDIT: Actually that makes no sense I don't think
-                             // it will.
+    throw_warning("Empty interpolated string.", node->source_range);
+    (*ss) << "string()"; 
     return;
   }
 
