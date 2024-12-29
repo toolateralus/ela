@@ -864,101 +864,22 @@ int main (int argc, char** argv) {
   return {};
 }
 std::any EmitVisitor::visit(ASTDotExpr *node) {
-  auto left = std::any_cast<int>(node->left->accept(&type_visitor));
-  auto left_ty = global_get_type(left);
+  auto base_ty_id = std::any_cast<int>(node->base->accept(&type_visitor));
+  auto base_ty = global_get_type(base_ty_id);
 
   auto op = ".";
 
-  if (!left_ty->get_ext().extensions.empty() &&
-      left_ty->get_ext().extensions.back() == TYPE_EXT_POINTER)
+  if (!base_ty->get_ext().extensions.empty() &&
+      base_ty->get_ext().extensions.back() == TYPE_EXT_POINTER) {
     op = "->";
-
-  // TODO: remove this hack to get array length, or at least make a nicer system
-  // for getting properties of builtin types that aren't considered structs by
-  // the langauge.
-  if (left_ty->get_ext().is_array() &&
-      !left_ty->get_ext().is_fixed_sized_array() &&
-      node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-    auto right = static_cast<ASTIdentifier *>(node->right);
-    if (right->value == "length") {
-      node->left->accept(this);
-      (*ss) << op;
-      node->right->accept(this);
-      return {};
-    }
-    if (right->value == "data") {
-      node->left->accept(this);
-      (*ss) << op;
-      node->right->accept(this);
-      return {};
-    }
   }
 
-  // TODO: remove this hack as well
-  if (left_ty->get_ext().is_map() &&
-      node->right->get_node_type() == AST_NODE_CALL) {
-    auto right = static_cast<ASTCall *>(node->right);
-
-    if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
-      auto identifier = static_cast<ASTIdentifier *>(right->function);
-      if (right && identifier->value == "contains") {
-        node->left->accept(this);
-        (*ss) << op;
-        node->right->accept(this);
-        return {};
-      }
-    }
+  if (base_ty->is_kind(TYPE_ENUM)) {
+    op = "_";
   }
 
-  if (left_ty->is_kind(TYPE_ENUM)) {
-    (*ss) << left_ty->get_base().get_str() + '_';
-    node->right->accept(this);
-    return {};
-  }
-
-  Scope *target_scope = nullptr;
-  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
-    target_scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
-    target_scope = info->scope;
-  }
-
-  auto head_scope = ctx.scope;
-  Scope *target_parent = target_scope->parent;
-  Scope *insertion_point = nullptr;
-
-    // search for target scope in scope stack and remove it if found
-  // then set target as new head with old head as a parent
-  if (head_scope != target_scope) {
-    Scope *current = head_scope;
-
-    while (current && current != target_scope) {
-      insertion_point = current;
-      current = current->parent;
-    }
-
-    if (current && insertion_point) {
-      insertion_point->parent = current->parent;
-    } else {
-      insertion_point = nullptr;
-    }
-    target_scope->parent = head_scope;
-  }
-
-  node->left->accept(this);
-  ctx.set_scope(target_scope);
-  (*ss) << (op);
-  node->right->accept(this);
-  ctx.set_scope(head_scope);
-
-
-  // restore scope stack and target scope
-  if (head_scope != target_scope) {
-    if (insertion_point) {
-      insertion_point->parent = target_scope;
-    }
-    target_scope->parent = target_parent;
-  }
+  node->base->accept(this);
+  (*ss) << op << node->member_name.get_str();
 
   return {};
 }

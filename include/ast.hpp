@@ -283,8 +283,8 @@ struct ASTCall : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
 struct ASTDotExpr : ASTExpr {
-  ASTExpr *left;
-  ASTExpr *right;
+  ASTExpr *base;
+  InternedString member_name;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DOT_EXPR; }
 };

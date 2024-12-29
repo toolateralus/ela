@@ -253,10 +253,10 @@ std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
 std::any SerializeVisitor::visit(ASTDotExpr *node) {
   ss << indent() << "DotExpr {\n";
   indentLevel++;
-  ss << indent() << "object: ";
-  node->left->accept(this);
-  ss << '\n' << indent() << "member: ";
-  node->right->accept(this);
+  ss << indent() << "base: ";
+  node->base->accept(this);
+  ss << '\n' << indent() << "name: ";
+  ss << node->member_name.get_str() << '\n';
   indentLevel--;
   ss << indent() << "}\n";
   return {};

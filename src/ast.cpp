@@ -1441,8 +1441,8 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::Dot) {
       eat();
       auto dot = ast_alloc<ASTDotExpr>();
-      dot->left = left;
-      dot->right = parse_postfix();
+      dot->base = left;
+      dot->member_name = expect(TType::Identifier).value;
       left = dot;
     } else if (peek().type == TType::DoubleColon) {
       eat();
@@ -1550,8 +1550,8 @@ ASTExpr *Parser::parse_primary() {
                   range);
     }
     auto dot = ast_alloc<ASTDotExpr>();
-    dot->left = nullptr;
-    dot->right = parse_primary();
+    dot->base = nullptr;
+    dot->member_name = expect(TType::Identifier).value;
     end_node(dot, range);
     return dot;
   }

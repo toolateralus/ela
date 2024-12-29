@@ -1091,16 +1091,14 @@ std::any Typer::visit(ASTLiteral *node) {
 
 std::any Typer::visit(ASTDotExpr *node) {
   // .EnumVariant fix ups.
-  if (node->left == nullptr) {
-    auto identifier = static_cast<ASTIdentifier *>(node->right);
-
+  if (node->base == nullptr) {
     bool found = false;
     for (auto i = 0; i < num_types; ++i) {
       auto type = ctx.scope->get_type(i);
       if (type && type->is_kind(TYPE_ENUM)) {
         auto info = static_cast<EnumTypeInfo *>(type->get_info());
         for (const auto &key : info->keys) {
-          if (key == identifier->value) {
+          if (key == node->member_name) {
             if (found) {
               throw_warning(
                   std::format("Found multiple enum types with variant '{}'.. "
@@ -1112,148 +1110,72 @@ std::any Typer::visit(ASTDotExpr *node) {
             } else {
               auto ast_type = ast_alloc<ASTType>();
               ast_type->base = ASTIdentifier::make(type->get_base());
-              node->left = ast_type;
+              node->base = ast_type;
               found = true;
             }
           }
         }
       }
     }
-  found_enum_variant:
 
-    if (node->left == nullptr)
+    if (!found)
       throw_error(
-          std::format("Unable to find enum variant {}", identifier->value),
+          std::format("Unable to find enum variant {}", node->member_name),
           node->source_range);
   }
 
-  // if .EnumVariant failed, error.
-  if (node->left == nullptr) {
-    throw_error(
-        "Internal compiler error: left node in dot expression was null.",
-        node->source_range);
-  }
+  auto base_ty_id = int_from_any(node->base->accept(this));
+  auto base_ty = ctx.scope->get_type(base_ty_id);
 
-  auto left = int_from_any(node->left->accept(this));
-  auto left_ty = ctx.scope->get_type(left);
-
-  if (!left_ty) {
+  if (!base_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
                 "expression?",
                 node->source_range);
   }
 
   // TODO: remove this hack to get array length
-  if (left_ty->get_ext().is_array() &&
-      node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-    auto right = static_cast<ASTIdentifier *>(node->right);
-    if (right && right->value == "length") {
+  if (base_ty->get_ext().is_array()) {
+    if (node->member_name == "length") {
       return s32_type();
     }
-    if (right && right->value == "data") {
-      return ctx.scope->get_pointer_to_type(left_ty->get_element_type());
+    if (node->member_name == "data") {
+      return ctx.scope->get_pointer_to_type(base_ty->get_element_type());
     }
   }
 
   // TODO: remove this hack as well
-  if (left_ty->get_ext().is_map() &&
-      node->right->get_node_type() == AST_NODE_CALL) {
-    auto right = static_cast<ASTCall *>(node->right);
-    // TODO: type check args too, also make sure only one arg
-
-    if (right->function->get_node_type() == AST_NODE_IDENTIFIER) {
-      auto identifier = static_cast<ASTIdentifier *>(right->function);
-      if (right && identifier->value == "contains") {
-        return bool_type();
-      }
+  if (base_ty->get_ext().is_map()) {
+    if (node->member_name == "contains") {
+      static auto contains_ty = []{
+        auto func = FunctionTypeInfo{};
+        func.is_varargs = true;
+        func.return_type = global_find_type_id("bool", {});
+        return global_find_function_type_id("bool(...)", func, {});
+      }();
+      return contains_ty;
     }
   }
 
-  // CLEANUP(Josh) 10/7/2024, 8:48:23 AM
-  // We should have a way to do this for any type, so we can access subtypes,
-  // and static variables, however those don't currently exist. So this is
-  // kind of a FEATURE Get enum variant
-  if (left_ty->is_kind(TYPE_ENUM)) {
-    auto info = static_cast<EnumTypeInfo *>(left_ty->get_info());
-    std::string name;
-    if (node->right->get_node_type() == AST_NODE_IDENTIFIER) {
-      name = static_cast<ASTIdentifier *>(node->right)->value.get_str();
-    } else if (node->right->get_node_type() == AST_NODE_DOT_EXPR) {
-      auto dot = static_cast<ASTDotExpr *>(node->right);
-      while (dot->left->get_node_type() == AST_NODE_DOT_EXPR)
-        dot = static_cast<ASTDotExpr *>(dot->left);
-      if (dot->left->get_node_type() != AST_NODE_IDENTIFIER)
-        throw_error("Must have an identifier as a dot access for an enum.",
-                    dot->source_range);
-      name = static_cast<ASTIdentifier *>(dot->left)->value.get_str();
-      // TODO: this needs to somehow modify the dot expression and replace it
-      // with the value.
-    } else {
-      throw_error("cannot use a dot expression with a non identifer on the "
-                  "right hand side when referring to a enum.",
-                  node->source_range);
+  if (base_ty->is_kind(TYPE_ENUM)) {
+    auto info = static_cast<EnumTypeInfo *>(base_ty->get_info());
+    if (std::ranges::find(info->keys, node->member_name) != info->keys.end()) {
+      return info->element_type;
     }
-
-    bool found = false;
-    for (const auto &key : info->keys) {
-      if (InternedString{name} == key) {
-        found = true;
-        break;
-      }
-    }
-    if (!found) {
-      throw_error("failed to find key in enum type.", node->source_range);
-    }
-
-    return info->element_type;
+    throw_error("failed to find key in enum type.", node->source_range);
   }
 
-  Scope *target_scope = nullptr;
-  if (auto info = dynamic_cast<StructTypeInfo *>(left_ty->get_info())) {
-    target_scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(left_ty->get_info())) {
-    target_scope = info->scope;
+  Scope *base_scope = nullptr;
+  if (auto info = dynamic_cast<StructTypeInfo *>(base_ty->get_info())) {
+    base_scope = info->scope;
+  } else if (auto info = dynamic_cast<UnionTypeInfo *>(base_ty->get_info())) {
+    base_scope = info->scope;
   } else {
-    throw_error("cannot use a dot expression on a non-struct or union.",
+    throw_error("Dot expressions can only be used on structs, unions, and enums.",
                 node->source_range);
   }
 
-  auto head_scope = ctx.scope;
-  Scope *target_parent = target_scope->parent;
-  Scope *insertion_point = nullptr;
-
-  // search for target scope in scope stack and remove it if found
-  // then set target as new head with old head as a parent
-  if (head_scope != target_scope) {
-    Scope *current = head_scope;
-
-    while (current && current != target_scope) {
-      insertion_point = current;
-      current = current->parent;
-    }
-
-    if (current && insertion_point) {
-      insertion_point->parent = current->parent;
-    } else {
-      insertion_point = nullptr;
-    }
-    target_scope->parent = head_scope;
-  }
-
-  ctx.set_scope(target_scope);
-  int type = int_from_any(node->right->accept(this));
-  ctx.set_scope(head_scope);
-
-  // restore scope stack and target scope
-  if (head_scope != target_scope) {
-    if (insertion_point) {
-      insertion_point->parent = target_scope;
-    }
-    target_scope->parent = target_parent;
-  }
-
-  return type;
-  throw_error("unable to resolve dot expression type.", node->source_range);
+  auto member = base_scope->lookup(node->member_name);
+  return member->type_id;
 }
 
 std::any Typer::visit(ASTScopeResolution *node) {
