@@ -8,6 +8,25 @@
 #foreign memset :: (dest: void*, c: int, n: u64) -> void*;
 
 #foreign printf :: (format: c_string, ...) -> int;
+#foreign exit :: (code: int);
+
+#static print :: (str: string) {
+  printf("%s", str.data);
+}
+#static print :: (str: char *) {
+  printf("%s", str);
+}
+#static println :: (str: string) {
+  printf("%s\n", str.data);
+}
+#static println :: (str: c_string) {
+  printf("%s\n", str);
+}
+#static panic :: (msg: string) {
+  println(msg);
+  exit(1);
+}
+
 #foreign scanf :: (format: c_string, ...) -> int;
 
 #foreign sleep :: (seconds: int);
@@ -18,7 +37,6 @@
 #foreign fmod :: (l: float, r: float) -> float;
 
 #foreign time :: (value: void*) -> int;
-#foreign exit :: (code: int);
 
 #foreign strlen :: (str: c_string) -> int;
 #foreign strcmp :: (str1: c_string, str2: c_string) -> int;
@@ -51,81 +69,90 @@
 #foreign rand :: () -> int;
 #foreign srand :: (seed: u32);
 
-str_starts_with :: (str: c_string, substr: c_string) -> bool {
-  if str == null || substr == null
-    then return false;
+// api for string manipulation.
+// when dot expressions are fixed we should be able to implement 'string' in language,
+// and we won't need an extra struct to do this.
+Strings :: struct {
+  #static starts_with :: (str: c_string, substr: c_string) -> bool {
+    if str == null || substr == null
+      then return false;
 
-  str_len: int = strlen(str);
-  substr_len: int = strlen(substr);
+    str_len: int = strlen(str);
+    substr_len: int = strlen(substr);
 
-  if str_len < substr_len
-    then return false;
+    if str_len < substr_len
+      then return false;
 
-  if str_len == substr_len && strcmp(str, substr) == 0
-    then return true;
+    if str_len == substr_len && strcmp(str, substr) == 0
+      then return true;
 
-  return strncmp(str, substr, substr_len) == 0;
-}
-
-str_ends_with :: (str: c_string, pattern: c_string) -> bool {
-  if !str || !pattern
-    then return false;
-
-  len: int = strlen(str);
-  patlen: int = strlen(pattern);
-
-  if len < patlen
-    then return false;
-
-  return strncmp(str + (len - patlen), pattern, patlen) == 0;
-}
-
-str_replace :: (str: string, pattern: string, replacement: string) -> string {
-  if !str.data || !pattern.data || !replacement.data
-    then return str;
-
-  result: string = string{""};
-  str_len: int = strlen(str.data);
-  pattern_len: int = strlen(pattern.data);
-  replacement_len: int = strlen(replacement.data);
-
-  i: int = 0;
-  while i < str_len {
-    if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
-      result.insert_substr_at(result.length, replacement);
-      i += pattern_len;
-    } else {
-      result.insert_substr_at(result.length, string{str.data + i, str.data + i + 1});
-      i += 1;
-    }
+    return strncmp(str, substr, substr_len) == 0;
   }
 
-  return result;
-}
+  #static ends_with :: (str: c_string, pattern: c_string) -> bool {
+    if !str || !pattern
+      then return false;
 
-string_substr :: (src: c_string, start: int, end: int) -> string {
-  if !src
-    then return string{""};
+    len: int = strlen(str);
+    patlen: int = strlen(pattern);
 
-  len: int = strlen(src);
+    if len < patlen
+      then return false;
 
-  if (start > end)
-    then return string{""};
+    return strncmp(str + (len - patlen), pattern, patlen) == 0;
+  }
 
-  if (len < end - start)
-    then return string{""};
+  #static replace :: (str: string, pattern: string, replacement: string) -> string {
+    if !str.data || !pattern.data || !replacement.data
+      then return str;
 
-  dest: c_string = malloc(sizeof(char) * (end - start) + 1);
+    result: string = string{""};
+    str_len: int = strlen(str.data);
+    pattern_len: int = strlen(pattern.data);
+    replacement_len: int = strlen(replacement.data);
 
-  memcpy(dest, src + start, end - start);
+    i: int = 0;
+    while i < str_len {
+      if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
+        result.insert_substr_at(result.length, replacement);
+        i += pattern_len;
+      } else {
+        result.insert_substr_at(result.length, string{str.data + i, str.data + i + 1});
+        i += 1;
+      }
+    }
 
-  dest[(end - start)] = 0;
+    return result;
+  }
 
-  v: string = string{dest};
+  #static substr :: (src: c_string, start: int, end: int) -> string {
+    if !src
+      then return string{""};
 
-  free(dest);
+    len: int = strlen(src);
 
-  return v;
+    if (start > end)
+      then return string{""};
+
+    if (len < end - start)
+      then return string{""};
+
+    dest: c_string = malloc(sizeof(char) * (end - start) + 1);
+
+    memcpy(dest, src + start, end - start);
+
+    dest[(end - start)] = 0;
+
+    v: string = string{dest};
+
+    free(dest);
+
+    return v;
+  }
+
+  #static equals :: (a: c_string, b) -> bool {
+    return strcmp(a, b) == 0;
+  }
 }
 
 to_string :: (num: s64) -> string {
@@ -172,26 +199,6 @@ to_string :: (num: s64) -> string {
   return string{(c_string)buffer, ((c_string) buffer) + index};
 
 
-}
-
-
-streq :: (left: c_string, right) -> bool {
-  return strcmp(left, right) == 0;
-}
-
-print :: (str: string) {
-  printf("%s", str.data);
-}
-print :: (str: char *) {
-  printf("%s", str);
-}
-
-println :: (str: string) {
-  printf("%s\n", str.data);
-}
-
-println :: (str: c_string) {
-  printf("%s\n", str);
 }
 
 abs :: (v: s64) -> s64 {
@@ -302,26 +309,56 @@ timespec_t :: struct {
 
 #foreign clock_gettime :: (clock_id: int, tp: timespec_t*) -> int;
 
-// returns the timespec_t
-get_high_precision_time :: () -> timespec_t {
-  ts: timespec_t;
-  clock_gettime(0, &ts);
-  return ts;
-}
 
-// returns a seconds value from get_high_precision_time
-timef :: () -> float64 {
-  ts := get_high_precision_time();
-  return (float64)ts.tv_sec + (float64)ts.tv_nsec / (float64)1_000_000_000.0;
-}
-
-milliseconds :: (c: float64) -> int {
+as_milliseconds :: (c: float64) -> int {
   return (int)(c * 100_000.0);
 }
-seconds :: (c: float64) -> int {
+as_seconds :: (c: float64) -> int {
   return (int)(c * 1_000_000.0);
 }
-panic :: (msg: string) {
-  println(msg);
-  exit(1);
+
+
+Timing :: struct {
+  // returns the timespec_t for the current time since epoch.
+  #static get_timespec_since_epoch :: () -> timespec_t {
+    ts: timespec_t;
+    clock_gettime(0, &ts);
+    return ts;
+  }
+  
+  // returns a seconds value representing time since epoch
+  #static seconds :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) + ((float64)ts.tv_nsec) / (float64)1_000_000_000.0;
+  }
+
+  // returns a milliseconds value representing time since epoch
+  #static milliseconds :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) * 1_000.0 + ((float64)ts.tv_nsec) / 1_000_000.0;
+  }
+
+  // returns a microseconds value representing time since epoch
+  #static microseconds :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) * 1_000_000.0 + ((float64)ts.tv_nsec) / 1_000.0;
+  }
+
+  // returns a minutes value representing time since epoch
+  #static minutes :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) / 60.0 + ((float64)ts.tv_nsec) / (60.0 * 1_000_000_000.0);
+  }
+
+  // returns an hours value representing time since epoch
+  #static hours :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) / 3_600.0 + ((float64)ts.tv_nsec) / (3_600.0 * 1_000_000_000.0);
+  }
+
+  // returns a days value representing time since epoch
+  #static days :: () -> float64 {
+    ts := get_timespec_since_epoch();
+    return ((float64)ts.tv_sec) / 86_400.0 + ((float64)ts.tv_nsec) / (86_400.0 * 1_000_000_000.0);
+  }
 }

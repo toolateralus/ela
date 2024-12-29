@@ -1,0 +1,17 @@
+
+Thing :: struct {
+  a: int;
+  Do :: (other: Thing) {}
+}
+
+main :: () {
+  thing: Thing;
+  a: Thing;
+
+  /* 
+    Error:
+              parameter: 0 of function
+      invalid argument types. expected: Thing, got: int
+  */
+  thing.Do(a); 
+}

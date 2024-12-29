@@ -65,7 +65,7 @@
  * instead of such a function to disable logging.
  */
 
-#alias tsm_log_t :: void(void*, char*, int, char*, char*, u32, char*, ...)*;
+#alias tsm_log_t :: void(void*, c_string, int, c_string, c_string, u32, c_string, ...)*;
 
 /**
  * @defgroup symbols Unicode Helpers
@@ -93,9 +93,9 @@ TSM_UCS4_REPLACEMENT : u64 = 0xfffd
 
 /* ucs4 to utf8 converter */
 
-tsm_ucs4_get_width :: (ucs4: u32) -> u32;
-tsm_ucs4_to_utf8 :: (ucs4: u32, out: char*) -> u64;
-tsm_ucs4_to_utf8_alloc :: (ucs4: u32*, len: u64, len_out: u64*) -> char*;
+#foreign tsm_ucs4_get_width :: (ucs4: u32) -> u32;
+#foreign tsm_ucs4_to_utf8 :: (ucs4: u32, out: c_string) -> u64;
+#foreign tsm_ucs4_to_utf8_alloc :: (ucs4: u32*, len: u64, len_out: u64*) -> c_string;
 
 /* symbols */
 #alias tsm_symbol_t :: u32;
@@ -208,11 +208,9 @@ TSM_SCREEN_ALTERNATE    :=	0x40;
 #foreign tsm_screen_selection_reset :: (con: tsm_screen*) -> void;
 #foreign tsm_screen_selection_start :: (con: tsm_screen*, posx: u32, posy: u32) -> void;
 #foreign tsm_screen_selection_target :: (con: tsm_screen*, posx: u32, posy: u32) -> void;
-#foreign tsm_screen_selection_copy :: (con: tsm_screen*, out: char**) -> int;
+#foreign tsm_screen_selection_copy :: (con: tsm_screen*, out: c_string*) -> int;
 
 #foreign tsm_screen_draw :: (con: tsm_screen*, draw_cb: tsm_screen_draw_cb, data: void*) -> tsm_age_t;
-
-/** @} */
 
 /**
  * @defgroup vte State Machine
@@ -245,15 +243,15 @@ tsm_vte_modifier :: enum {
 /* keep in sync with TSM_INPUT_INVALID */
 TSM_VTE_INVALID : s64 = 0xffffffff
 
-#alias tsm_vte_write_cb :: void(tsm_vte*, char*, u64, void*)*;
+#alias tsm_vte_write_cb :: void(tsm_vte*, c_string, u64, void*)*;
 
-tsm_vte_new :: (out: tsm_vte**, con: tsm_screen*, write_cb: tsm_vte_write_cb, data: void*, log: tsm_log_t, log_data: void*) -> int ;
-tsm_vte_ref :: (vte: tsm_vte*);
-tsm_vte_unref :: (vte: tsm_vte*);
+#foreign tsm_vte_new :: (out: tsm_vte**, con: tsm_screen*, write_cb: tsm_vte_write_cb, data: void*, log: tsm_log_t, log_data: void*) -> int ;
+#foreign tsm_vte_ref :: (vte: tsm_vte*);
+#foreign tsm_vte_unref :: (vte: tsm_vte*);
 
-tsm_vte_set_palette :: (vte: tsm_vte*, palette: char*) -> int ;
+#foreign tsm_vte_set_palette :: (vte: tsm_vte*, palette: c_string) -> int ;
 
-tsm_vte_reset :: (vte: tsm_vte*);
-tsm_vte_hard_reset :: (vte: tsm_vte*);
-tsm_vte_input :: (vte: tsm_vte*, byte : char *, len: u64);
-tsm_vte_handle_keyboard :: (vte: tsm_vte*, keysym: u32, ascii: u32, mods: u32, unicode: u32) -> bool;
+#foreign tsm_vte_reset :: (vte: tsm_vte*);
+#foreign tsm_vte_hard_reset :: (vte: tsm_vte*);
+#foreign tsm_vte_input :: (vte: tsm_vte*, byte : char *, len: u64);
+#foreign tsm_vte_handle_keyboard :: (vte: tsm_vte*, keysym: u32, ascii: u32, mods: u32, unicode: u32) -> bool;

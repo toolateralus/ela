@@ -2,8 +2,12 @@ Struct :: struct {
   data: s32*;
   length: s32;
   #operator(==) :: (other: Struct) -> bool {
-    for i in 0..length {
-      return data[i] == other.data[i];
+    n := 0;
+    {
+      for i in 0..length {
+        ..
+        return data[i] == other.data[n];
+      }
     }
   }
 }

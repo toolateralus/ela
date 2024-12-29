@@ -1718,7 +1718,7 @@ ASTExpr *Parser::parse_primary() {
       node->type_arg = type;
       node->kind = MAKE_CAST;
       node->arguments = ast_alloc<ASTArguments>();
-      node->arguments->arguments.push_back(parse_expr());
+      node->arguments->arguments.push_back(parse_unary());
       return node;
     }
 

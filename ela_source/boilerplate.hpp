@@ -288,7 +288,7 @@ template <class T> struct _array {
   }
 
   void push(const T &value) {
-    if (length == capacity) {
+    if (length >= capacity) {
       resize(capacity == 0 ? 1 : capacity * 2);
     }
     data[length++] = value;
