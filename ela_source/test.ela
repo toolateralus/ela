@@ -843,9 +843,9 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
     fixed: int[3] = {0, 1, 2};
     str: InitListStruct = {0, 0, 0};
 
-    //!BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
-    //! This line causes it:
-    //                    InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
+    //! BUG This thing is broken because we provide too many elements to the init list, however our type checker fails to catch it and you get a C++ massive annoying errer.
+    //! This line causes a segfault:
+    //  InitListStruct[] strArr = {{0, 0, 0, 4}, {0, 0, 0}, {0, 0, 0}};
 
     strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
     strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
@@ -984,14 +984,9 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   }
 }
 
-/* //!BUG
-  ! when we use `:=` on a function pointer, it just completely fails
-  ! the emit visitor is not equipped to handle that case currently.
-*/
 #test test_function_pointer_alias :: () {
-  ptr: FunctionPointer = &function_pointer_helper;
+  ptr := &function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
-
 
   array: FunctionPointer[] = {&function_pointer_helper};
   from_arr : FunctionPointer = array[0];
@@ -1047,6 +1042,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   delete(map1["Another"]);
 
   // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
+  // ! really, maps should be eliminated and be replaced once generics are back in the language.
 }
 
 returns_an_init_list  :: () -> InitListTest {
@@ -1234,15 +1230,15 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
     assert("Calling new with tuple failed", a == 10 && b == 10);
   }
   delete(ptr);
-  // ! Bug: This just completely fails. The type ends up being null during the subscript.
-  // ! I am too tired today to fix this.
-  // map : <int, int>[string];
-  // {
-  //   map["Hi"] = <10, 10>;
 
-  //   a, b := map["Hi"];
-  //   assert("tuple in map failed", a == 10 && b == 10);
-  // }
+  // ! Bug: This just completely fails. The type ends up being null during the subscript.
+  // ! Really every line here is bugged. No idea why, I wish we had generics so we didn't have to do this hackiness.
+  //! map : <int, int>[string];
+  //! {
+  //!   map["Hi"] = <10, 10>;
+  //!   a, b := map["Hi"];
+  //!   assert("tuple in map failed", a == 10 && b == 10);
+  //! }
 
   ptr_arr: <int, int>*[];
   ptr_arr ~= new <int, int>(10, 10);

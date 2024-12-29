@@ -15,22 +15,18 @@ dirent :: struct {
 #foreign closedir :: (dir: void*) -> int;
 
 Directory :: struct {
-  path: char *;
+  path: string;
   files: string[];
-}
-
-directory_open :: (path: char *) -> Directory {
-  dir := opendir(path);
-  if (dir == null) {
-    return Directory{path, string[]{}};
+  #static open :: (path: string) -> Directory {
+    dir := opendir(path.data);
+    if !dir then return {path, string[]{}};
+    files: string[];
+    entry: void*;
+    while entry = readdir(dir) {
+      ent : dirent* = entry;
+      files ~= {(c_string)ent.d_name};
+    }
+    closedir(dir);
+    return {path, files};
   }
-
-  files: string[];
-  entry : void*;
-  while entry = readdir(dir) {
-    ent : dirent* = entry;
-    files ~= string{(c_string)ent.d_name};
-  }
-  closedir(dir);
-  return {path, files};
 }
