@@ -201,6 +201,61 @@ Strings :: struct {
     result ~= string{str + start, str + str_len};
     return result;
   }
+
+  #static contains :: (str: string, ch: char) -> bool {
+    for _ch in str {
+      if _ch == ch {
+        return true;
+      }
+    }
+    return false;
+  }
+  
+  #static contains :: (str: c_string, ch: char) -> bool {
+    for _ch in string{str} {
+      if _ch == ch {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  #static contains :: (str: string, pattern: string) -> bool {
+    if str.data == null || pattern.data == null
+      then return false;
+
+    str_len: int = str.length;
+    pattern_len: int = pattern.length;
+
+    if str_len < pattern_len
+      then return false;
+
+    for i in 0..(str_len - pattern_len + 1) {
+      if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
+        return true;
+      }
+    }
+    return false;
+  }
+
+  #static contains :: (str: c_string, pattern: c_string) -> bool {
+    if str == null || pattern == null
+      then return false;
+
+    str_len: int = strlen(str);
+    pattern_len: int = strlen(pattern);
+
+    if str_len < pattern_len
+      then return false;
+
+    for i in 0..(str_len - pattern_len + 1) {
+      if strncmp(str + i, pattern, pattern_len) == 0 {
+        return true;
+      }
+    }
+    return false;
+  }
+  
 }
 
 to_string :: (num: s64) -> string {

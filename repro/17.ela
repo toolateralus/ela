@@ -1,0 +1,6 @@
+
+
+main :: () {
+  str : string;
+  str.contains("") // ! crashes during compilation;
+}
