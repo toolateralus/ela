@@ -17,76 +17,78 @@
 #include <string>
 #include <unordered_set>
 
-static void parse_if_else_chain(Parser *parser, ASTStatementList *list);
+enum PreprocKind {
+  PREPROC_IF,
+  PREPROC_IFDEF,
+};
 
-static void parse_else(Parser *parser, ASTStatementList *list) {
-  if (parser->peek().type == TType::If) {
-    parser->expect(TType::If);
-    auto elseIfCondition = parser->parse_expr();
-    parser->expect(TType::LCurly);
-    auto elseIfValue = evaluate_constexpr(elseIfCondition, parser->ctx);
-    if (elseIfValue.is_truthy()) {
-      while (parser->peek().type != TType::RCurly) {
-        list->statements.push_back(parser->parse_statement());
-      }
-    } else {
-      while (parser->peek().type != TType::RCurly) {
-        parser->eat();
-      }
-    }
-    parser->expect(TType::RCurly);
-    if (parser->peek().type == TType::Else) {
-      parser->expect(TType::Else);
-      parse_else(parser, list);
-    }
-  } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") {
-    parser->expect(TType::Identifier);
+static void parse_if_else_chain(Parser *parser, ASTStatementList *list,
+                                PreprocKind kind) {
+  bool executed = false;
+
+  if (kind == PREPROC_IFDEF) { // Handling #ifdef
     auto symbol = parser->expect(TType::Identifier).value;
     parser->expect(TType::LCurly);
     if (parser->ctx.scope->defines.contains(symbol)) {
+      executed = true;
       while (parser->peek().type != TType::RCurly) {
         list->statements.push_back(parser->parse_statement());
+        while (parser->peek().type == TType::Semi)
+          parser->eat();
       }
     } else {
       while (parser->peek().type != TType::RCurly) {
         parser->eat();
       }
     }
-    parser->expect(TType::RCurly);
-    if (parser->peek().type == TType::Else) {
-      parser->expect(TType::Else);
-      parse_else(parser, list);
-    }
-  } else {
+  } else { // Handling if
+    auto condition = parser->parse_expr();
     parser->expect(TType::LCurly);
-    while (parser->peek().type != TType::RCurly) {
-      list->statements.push_back(parser->parse_statement());
-    }
-    parser->expect(TType::RCurly);
-  }
-}
-
-static void parse_if_else_chain(Parser *parser, ASTStatementList *list) {
-  auto condition = parser->parse_expr();
-  parser->expect(TType::LCurly);
-  auto value = evaluate_constexpr(condition, parser->ctx);
-  if (value.is_truthy()) {
-    while (parser->peek().type != TType::RCurly) {
-      list->statements.push_back(parser->parse_statement());
-    }
-  } else {
-    while (parser->peek().type != TType::RCurly) {
-      parser->eat();
+    auto value = evaluate_constexpr(condition, parser->ctx);
+    if (value.is_truthy()) {
+      executed = true;
+      while (parser->peek().type != TType::RCurly) {
+        list->statements.push_back(parser->parse_statement());
+        while (parser->peek().type == TType::Semi)
+          parser->eat();
+      }
+    } else {
+      while (parser->peek().type != TType::RCurly) {
+        parser->eat();
+      }
     }
   }
   parser->expect(TType::RCurly);
 
-  if (parser->peek().type == TType::Else) {
+  auto tok = parser->peek();
+  std::cout << "Token : " << TTypeToString(tok.type) << "\n";
+  while (parser->peek().type == TType::Else) {
     parser->expect(TType::Else);
-    parse_else(parser, list);
+    if (!executed) {
+      if (parser->peek().type == TType::If) {
+        parser->expect(TType::If);
+        parse_if_else_chain(parser, list, PREPROC_IF);
+      } else if (parser->peek().type == TType::Identifier &&
+                 parser->peek().value == "ifdef") {
+        parser->expect(TType::Identifier);
+        parse_if_else_chain(parser, list, PREPROC_IFDEF);
+      } else {
+        parser->expect(TType::LCurly);
+        while (parser->peek().type != TType::RCurly) {
+          list->statements.push_back(parser->parse_statement());
+          while (parser->peek().type == TType::Semi)
+            parser->eat();
+        }
+        parser->expect(TType::RCurly);
+      }
+    } else {
+      while (parser->peek().type != TType::RCurly) {
+        parser->eat();
+      }
+      parser->expect(TType::RCurly);
+    }
   }
 }
-
 std::vector<DirectiveRoutine> Parser::directive_routines = {
     // #include
     // Just like C's include, just paste a text file right above where the
@@ -569,6 +571,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        parser->ctx.scope->defines.insert(
            parser->expect(TType::Identifier).value);
+       while (parser->peek().type == TType::Semi)
+         parser->eat();
        return ast_alloc<ASTNoop>();
      }},
     {.identifier = "undef",
@@ -576,31 +580,22 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        parser->ctx.scope->defines.erase(
            parser->expect(TType::Identifier).value);
+       while (parser->peek().type == TType::Semi)
+         parser->eat();
        return ast_alloc<ASTNoop>();
      }},
     {.identifier = "ifdef",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto symbol = parser->expect(TType::Identifier).value;
-       parser->expect(TType::LCurly);
        auto list = ast_alloc<ASTStatementList>();
-       if (parser->ctx.scope->defines.contains(symbol)) {
-         while (parser->peek().type != TType::RCurly) {
-           list->statements.push_back(parser->parse_statement());
-         }
-       } else {
-         while (parser->peek().type != TType::RCurly) {
-           parser->eat();
-         }
-       }
-       parser->expect(TType::RCurly);
+       parse_if_else_chain(parser, list, PREPROC_IFDEF);
        return list;
      }},
     {.identifier = "if",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        auto list = ast_alloc<ASTStatementList>();
-       parse_if_else_chain(parser, list);
+       parse_if_else_chain(parser, list, PREPROC_IF);
        return list;
      }},
 };

@@ -1,6 +1,19 @@
-#import core;
+
+#import core; // for println among many other common utilities.
+
+
+#def HAMBURGER;
+#def CHEESE;
+
+#ifdef HAMBURGER {
+  CONSTANT :: 100;
+} else ifdef CHEESE {
+  CONSTANT :: 20;
+} else if true {
+  CONSTANT :: 10;
+}
 
 main :: () {
-  
+  println($"{CONSTANT}");
 }
 
