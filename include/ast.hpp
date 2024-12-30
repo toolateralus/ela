@@ -82,7 +82,7 @@ struct ASTStatement : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
 };
 
-struct ASTStatementList : ASTNode {
+struct ASTStatementList : ASTStatement {
   std::vector<ASTStatement*> statements;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override;

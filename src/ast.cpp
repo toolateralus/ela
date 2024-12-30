@@ -22,7 +22,7 @@ enum PreprocKind {
   PREPROC_IFDEF,
 };
 
-static void parse_if_else_chain(Parser *parser, ASTStatementList *list,
+static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
                                 PreprocKind kind) {
   bool executed = false;
 
@@ -61,17 +61,16 @@ static void parse_if_else_chain(Parser *parser, ASTStatementList *list,
   parser->expect(TType::RCurly);
 
   auto tok = parser->peek();
-  std::cout << "Token : " << TTypeToString(tok.type) << "\n";
   while (parser->peek().type == TType::Else) {
     parser->expect(TType::Else);
     if (!executed) {
       if (parser->peek().type == TType::If) {
         parser->expect(TType::If);
-        parse_if_else_chain(parser, list, PREPROC_IF);
+        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
       } else if (parser->peek().type == TType::Identifier &&
                  parser->peek().value == "ifdef") {
         parser->expect(TType::Identifier);
-        parse_if_else_chain(parser, list, PREPROC_IFDEF);
+        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
       } else {
         parser->expect(TType::LCurly);
         while (parser->peek().type != TType::RCurly) {
@@ -89,6 +88,7 @@ static void parse_if_else_chain(Parser *parser, ASTStatementList *list,
     }
   }
 }
+
 std::vector<DirectiveRoutine> Parser::directive_routines = {
     // #include
     // Just like C's include, just paste a text file right above where the
@@ -588,14 +588,14 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        auto list = ast_alloc<ASTStatementList>();
-       parse_if_else_chain(parser, list, PREPROC_IFDEF);
+       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
        return list;
      }},
     {.identifier = "if",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        auto list = ast_alloc<ASTStatementList>();
-       parse_if_else_chain(parser, list, PREPROC_IF);
+       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
        return list;
      }},
 };
