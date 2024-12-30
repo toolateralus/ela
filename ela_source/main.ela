@@ -1,6 +1,45 @@
 #import core; // for println among many other common utilities.
 
+// global constexpr's
+CONSTANT :: 1;
+
+Something :: struct {
+  // structs with static constexpr's, accessible with ::
+  CONSTANT :: 1;
+}
+
+#def PLATFORM_LINUX;
+#undef PLATFORM_LINUX;
+
+// Conditional compilation.
+#ifdef PLATFORM_LINUX {
+  // Auto wrapper generator for C headers.
+  #include "unistd.h"
+} else {
+  #include "windows.h"
+}
+
+#if Something::CONSTANT > 256 {
+
+} 
+
+// Macro functions
+#macro max :: (a, b) if a > b { return a } else { return b }
+
+// uses context it's instantiated in just like a C macro.
+#macro another :: () { if a > b then return; }
+
+
+
 main :: () {
-  println("Hello World!")
+  // While's that return.
+  // Must return a value in all code paths.
+  n := while true {
+    return 10;
+  }
+
+  // If's that return.
+  // Must return a value in all code paths.
+  n1 := if true { 1 } else { 0 }
 }
 

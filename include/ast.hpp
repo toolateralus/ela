@@ -128,7 +128,7 @@ struct ASTExpr : ASTNode {
 struct ASTType : ASTExpr {
   int flags = -1;
   // base name,
-  ASTExpr *base;
+  InternedString base;
   // [], *, [string] etc.
   TypeExt extension_info{};
 
@@ -155,14 +155,16 @@ struct ASTExprStatement : ASTStatement {
 // All of our declarations could inherit from a base declaration. I am not sure
 // if that would be useful.
 struct ASTDeclaration : ASTStatement {
-  bool is_static = false;
-  Token name;
+  Token name; // TODO: make these an interned string. No need to hold on to a token.
+  Token bitsize;
   ASTType *type = nullptr;
   Nullable<ASTExpr> value;
-  bool is_bitfield = false;
-  Token bitsize;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
+
+  bool is_constexpr = false;
+  bool is_static = false;
+  bool is_bitfield = false;
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -244,7 +246,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
-  Token name;
+  Token name; // TODO: make this an InternedString not a token
   ASTType *return_type;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override {
@@ -404,7 +406,7 @@ struct ASTEnumDeclaration : ASTStatement {
 
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
-  Token name;
+  Token name; // TODO: make not a token
   ASTType *type;
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;

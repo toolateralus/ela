@@ -332,6 +332,8 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
   // TODO: in the type checker, we should assert that this isn't a static member / function.
   if (node->is_static) {
     (*ss) << "static ";
+  } else if (node->is_constexpr) {
+    (*ss) << "static constexpr ";
   }
 
   node->type->accept(this);

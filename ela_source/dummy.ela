@@ -1,20 +1,10 @@
-#import core;
 
 
-main :: () {
-  a := <1, <2, 3>>; //! Bug, the >> gets recognized as a SHR token and fails to parse.
-  a := <1, <2, 3> >; // !Bug, see error below.
+A :: struct {
+  STATIC :: 100;
 }
 
-/* 
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:13: error: expected expression
-    5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-      |             ^
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:14: error: unexpected type name 's32': expected expression
-      5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-        |              ^
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:23: error: expected unqualified-id
-      5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-        |                       ^
+main :: () {
+  n : int = A::STATIC;
+}
 
-*/
