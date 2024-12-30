@@ -150,8 +150,8 @@ int global_find_type_id(std::vector<int> &tuple_types,
       // Found a matching type with the same extensions. Return it.
       return type->id;
     }
-
   end_of_loop:
+    do {} while (false); // This line just prevents a MSVC syntax error. Silly.
   }
 
   // We didn't find the tuple type. Return a new one.
@@ -689,6 +689,7 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
   return info;
 }
 void init_type_system() {
+  memset(type_table, 0, sizeof(Type*) * MAX_NUM_TYPES);
   // Signed integers
   {
     global_create_type(TYPE_SCALAR, "s64",

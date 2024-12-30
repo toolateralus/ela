@@ -27,7 +27,7 @@ int num_types;
 
 // this is just an approximation.
 // It may be too little since this arena is used a lot.
-jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES)};
+jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES + 250)};
 
 // the same for this
 jstl::Arena scope_arena{MB(100)};
@@ -169,7 +169,7 @@ int CompileCommand::compile() {
   Context context;
   original_path = std::filesystem::current_path();
   parse.begin();
-  Parser parser(input_path, context);
+  Parser parser(input_path.string(), context);
   ASTProgram *root = parser.parse();
   parse.end(std::format("Parsed {} tokens", all_tokens.size()));
 
@@ -228,7 +228,7 @@ int CompileCommand::compile() {
         output_path.string(), output_flag, extra_flags);
 
     if (compile_command.has_flag("x"))
-      printf("\e[1;36m%s\n\e[0m", compilation_string.c_str());
+      printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
 
     cpp.begin();
     result = system(compilation_string.c_str());

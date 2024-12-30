@@ -12,7 +12,6 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
-#include <pthread.h>
 #include <unordered_set>
 #include <vector>
 

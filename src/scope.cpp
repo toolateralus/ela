@@ -1,8 +1,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-#include <dlfcn.h>
-
 Context::Context() {
   root_scope = scope;
 

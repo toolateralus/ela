@@ -335,7 +335,7 @@ struct Type {
   // this type is aliasing another type
   bool is_alias = false;
   // this is the type that this type aliases.
-  int alias_id;
+  int alias_id = Type::invalid_id;
 
   // this type has other types that refer to me as an alias.
   bool has_aliases = false;
