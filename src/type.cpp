@@ -34,7 +34,6 @@ Type *global_get_type(const int id) {
 }
 
 int global_create_type_alias(int aliased_type, const InternedString &name) {
-
   // this type alias already exists so just return the type.
   if (type_alias_map.contains(name)) {
     return type_alias_map[name];

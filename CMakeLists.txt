@@ -3,6 +3,7 @@ cmake_minimum_required(VERSION 3.10)
 project(ela LANGUAGES CXX)
 
 set(CMAKE_CXX_STANDARD 23)
+set(CMAKE_CXX_COMPILER clang++)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 # Default to Debug build type if not specified
