@@ -160,8 +160,8 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 }
 
 int CompileCommand::compile() {
-  Lexer lexer;
-  Context context;
+  Lexer lexer{};
+  Context context{};
   original_path = std::filesystem::current_path();
   parse.begin();
   Parser parser(input_path.string(), context);

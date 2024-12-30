@@ -1,12 +1,6 @@
-
 #import core; // for println among many other common utilities.
 
 main :: () {
-  // 'Env::args()' returns a 'string[]' of the runtime's arguments.
-  for arg in Env::args() {
-    #static i: s32;
-    println($"arg {i++}: {arg}")
-  }
   println("Hello World!")
 }
 
