@@ -762,8 +762,8 @@ std::any EmitVisitor::visit(ASTProgram *node) {
   if (use_stdlib) {
     code << "#define USE_STD_LIB 1\n";
   } else {
-    for (int i = 0; i < num_types; ++i) {
-      Type *type = type_table[i];
+    for (int i = 0; i < type_table.size(); ++i) {
+      Type *type = &type_table[i];
       TypeExt ext = type->get_ext();
 
       if (type->get_base() == "Field")
@@ -851,7 +851,7 @@ int main (int argc, char** argv) {
                         "  {};\n"
                         "  return 0;\n"
                         "}}();\n",
-                        num_types, type_info.str());
+                        type_table.size(), type_info.str());
   }
 
   if (!use_stdlib && !ctx.type_info_strings.empty()) {
@@ -1442,8 +1442,8 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   }
 
   static bool *type_cache = [] {
-    auto arr = new bool[MAX_NUM_TYPES];
-    memset(arr, false, MAX_NUM_TYPES);
+    auto arr = new bool[type_table.size()];
+    memset(arr, 0, type_table.size());
     return arr;
   }();
 

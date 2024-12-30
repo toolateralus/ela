@@ -168,7 +168,7 @@ Context::Context() {
     str_scope->insert("substr", global_find_function_type_id("string(Range)", func, {}), SYMBOL_IS_FUNCTION);
 
     auto sym = str_scope->local_lookup("[");
-    auto info = type_alloc<FunctionTypeInfo>();
+    auto info = type_info_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id("s8(int)", *info, {}));
@@ -205,7 +205,7 @@ Context::Context() {
   root_scope->insert("get", global_find_function_type_id("void(...)", info, {}), SYMBOL_IS_FUNCTION);
 
 
-  for (int i = 0; i < num_types; ++i) {
+  for (int i = 0; i < type_table.size(); ++i) {
     root_scope->types.insert(i);
   }
 

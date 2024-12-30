@@ -3,9 +3,9 @@
 #include "arena.hpp"
 #include "error.hpp"
 #include "type.hpp"
-#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 extern jstl::Arena scope_arena;
 enum SymbolFlags {
@@ -35,7 +35,7 @@ struct Scope {
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::vector<int> aliases;
-  std::set<int> types;
+  std::unordered_set<int> types;
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
@@ -170,16 +170,15 @@ struct Scope {
     root_scope->types.insert(id);
     return id;
   }
-
   int find_type_id(std::vector<int> &tuple_types,
                    const TypeExt &type_extensions, bool was_created = false) {
-    auto num = num_types;
+    auto num = type_table.size();
     auto id = global_find_type_id(tuple_types, type_extensions);
 
     // if we extended a type, or if we created a new tuple,
     // but we have access to all of thee types within it,
     // we just add the type to our table.
-    if (num_types > num || was_created) {
+    if (type_table.size() > num || was_created) {
       // search for all the types within the tuple.
       for (auto t : tuple_types) {
         if (!types.contains(t)) {

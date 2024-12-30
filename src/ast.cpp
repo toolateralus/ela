@@ -1154,7 +1154,7 @@ ASTEnumDeclaration* Parser::parse_enum_declaration(Token tok) {
   std::vector<InternedString> keys;
   std::set<InternedString> keys_set;
   for (const auto& [key, value] : node->key_values) {
-    if (keys_set.contains(key)) {
+    if (keys_set.find(key) != keys_set.end()) {
       throw_error(std::format("redefinition of enum variant: {}", key),
         node->source_range);
     }

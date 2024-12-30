@@ -22,20 +22,15 @@
 using std::string;
 using std::vector;
 
-Type **type_table = new Type *[MAX_NUM_TYPES];
-int num_types;
-
-// this is just an approximation.
-// It may be too little since this arena is used a lot.
-jstl::Arena type_arena{(sizeof(Type) * MAX_NUM_TYPES + 250)};
-
+// This is probably WAYY over allocated but we just want to be sure there's enough space.
+jstl::Arena type_info_arena {MB(333)};
 // the same for this
-jstl::Arena scope_arena{MB(100)};
+jstl::Arena scope_arena{MB(333)};
+// the same for this
+jstl::Arena ast_arena{MB(333)};
 
+std::vector<Type> type_table{};
 std::unordered_map<InternedString, int> type_alias_map;
-
-// the same for this
-jstl::Arena ast_arena{MB(100)};
 
 // TODO: remove me, we want file scopes.
 Scope *root_scope;

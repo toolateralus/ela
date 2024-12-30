@@ -13,24 +13,16 @@
 
 #include "arena.hpp"
 
-#ifndef MAX_NUM_TYPES
-#define MAX_NUM_TYPES 1000
-#endif
-
 // fwd
 struct Type;
 struct ASTDeclaration;
 struct Scope;
 struct Context;
 
-extern Type **type_table;
-extern int num_types;
-extern jstl::Arena type_arena;
-
-// used for emitting typedefs
+extern std::vector<Type> type_table;
+extern jstl::Arena type_info_arena;
 
 extern std::unordered_map<InternedString, int> type_alias_map;
-
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -168,7 +160,7 @@ struct TypeExt {
     return these;
   }
   TypeExt without_back() const {
-    auto these = *this;
+    TypeExt these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
       these.array_sizes.pop_back();
     }
@@ -188,6 +180,7 @@ struct TypeExt {
 };
 
 struct TypeInfo {
+  TypeInfo() {}
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
@@ -207,6 +200,7 @@ struct FunctionTypeInfo : TypeInfo {
 };
 
 struct ScalarTypeInfo : TypeInfo {
+  ScalarTypeInfo() {}
   bool is_integral = false;
   size_t size = 0;
   ScalarType scalar_type;
@@ -217,11 +211,13 @@ struct EnumTypeInfo : TypeInfo {
   int element_type = 0;
   bool is_flags = false;
   std::vector<InternedString> keys;
+  EnumTypeInfo() {};
 };
 
 struct UnionTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
+  UnionTypeInfo() {}
 };
 
 struct StructTypeInfo : TypeInfo {
@@ -232,6 +228,8 @@ struct StructTypeInfo : TypeInfo {
   std::vector<int> explicit_cast_table;
 
   virtual std::string to_string() const override { return ""; }
+
+  StructTypeInfo() {}
 };
 
 struct TupleTypeInfo : TypeInfo {
@@ -308,8 +306,7 @@ int global_create_type_alias(int aliased_type, const InternedString &name);
 int get_map_value_type(Type *map_type);
 
 struct Type {
-  const int id = invalid_id;
-
+  int id = invalid_id;
   // if this is an alias or something just get the actual real true type.
   int get_true_type() const {
     auto base_no_ext = id;
@@ -367,8 +364,8 @@ struct Type {
   }
   TypeExt const get_ext() const {
     if (is_alias) {
-      auto type = global_get_type(alias_id);
-      auto exts = type->extensions;
+      Type* type = global_get_type(alias_id);
+      TypeExt exts = type->extensions;
       return exts.append(extensions);
     }
     return extensions;
@@ -381,31 +378,24 @@ struct Type {
     return info;
   }
 
-
-
   private:
-  InternedString base;
-  TypeExt extensions;
-  TypeInfo *info;
+    TypeInfo* info;
+    InternedString base{};
+    TypeExt extensions{};
   public:
 
   bool equals(const InternedString &name, const TypeExt &type_extensions) const;
 
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
-  Type(){};
-
+  Type() = default;
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
-  Type(const Type &) = delete;
-  Type &operator=(const Type &) = delete;
-  Type(Type &&) = delete;
-  Type &operator=(Type &&) = delete;
   bool operator==(const Type &type) const;
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
 
-
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;
+
   constexpr static int invalid_id = -1;
 };
 
@@ -413,7 +403,8 @@ struct ASTFunctionDeclaration;
 
 InternedString get_function_typename(ASTFunctionDeclaration *);
 
-template <class T> T *type_alloc(size_t n = 1) {
-  auto mem = type_arena.allocate(sizeof(T) * n);
-  return new (mem) T();
+template<class T>
+static inline T* type_info_alloc() {
+  return (T*)type_info_arena.allocate(sizeof(T));
 }
+

@@ -1093,7 +1093,7 @@ std::any Typer::visit(ASTDotExpr *node) {
   // .EnumVariant fix ups.
   if (node->base == nullptr) {
     bool found = false;
-    for (auto i = 0; i < num_types; ++i) {
+    for (auto i = 0; i < type_table.size(); ++i) {
       auto type = ctx.scope->get_type(i);
       if (type && type->is_kind(TYPE_ENUM)) {
         auto info = static_cast<EnumTypeInfo *>(type->get_info());

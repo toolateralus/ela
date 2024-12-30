@@ -1,4 +1,3 @@
-@echo off
 setlocal
 
 :: Check for administrative permissions
@@ -26,7 +25,7 @@ copy /y "%SOURCE_ELA_SOURCE%\boilerplate.hpp" "%TARGET_DIR%\boilerplate.hpp"
 
 echo Files copied successfully.
 
-:: Prompt to press Enter to continue
-pause
+:: Uncomment to pause to see copied files.
+:: pause
 
 endlocal
