@@ -4,6 +4,20 @@
 Context::Context() {
   root_scope = scope;
 
+#if defined(__linux)
+  root_scope->defines.insert("PLATFORM_LINUX");
+#elif defined(_WIN32)
+  root_scope->defines.insert("PLATFORM_WINDOWS");
+#elif defined(__APPLE__)
+  root_scope->defines.insert("PLATFORM_MACOS");
+#elif defined(__ANDROID__)
+  root_scope->defines.insert("PLATFORM_ANDROID");
+#elif defined(__unix__)
+  root_scope->defines.insert("PLATFORM_UNIX");
+#elif defined(__FreeBSD__)
+  root_scope->defines.insert("PLATFORM_FREEBSD");
+#endif
+
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();

@@ -36,6 +36,27 @@ struct Scope {
   std::vector<int> aliases;
   std::unordered_set<int> types;
   std::unordered_set<InternedString> defines;
+  bool add_def(const InternedString &define) {
+    return defines.insert(define).second;
+  }
+
+  bool has_def(const InternedString &define) const {
+    if (defines.contains(define)) {
+      return true;
+    }
+    if (parent) {
+      return parent->has_def(define);
+    }
+    return false;
+  }
+
+  void undef(const InternedString &define) {
+    defines.erase(define);
+    if (parent) {
+      parent->undef(define);
+    }
+  }
+
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}

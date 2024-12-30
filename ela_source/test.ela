@@ -1514,7 +1514,13 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   } else if true {
     CONSTANT2 :: 10;
   }
+
   
   assert("ifdef failed", CONSTANT2 == 10);
 
+  #ifndef HAMBURGER {
+    CONSTANT3 :: 100;
+  } 
+
+  assert("ifndef failed", CONSTANT3 == 100);
 }

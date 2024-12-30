@@ -20,72 +20,91 @@
 enum PreprocKind {
   PREPROC_IF,
   PREPROC_IFDEF,
+  PREPROC_IFNDEF,
 };
-
 static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
-                                PreprocKind kind) {
+                PreprocKind kind) {
   bool executed = false;
 
   if (kind == PREPROC_IFDEF) { // Handling #ifdef
-    auto symbol = parser->expect(TType::Identifier).value;
-    parser->expect(TType::LCurly);
-    if (parser->ctx.scope->defines.contains(symbol)) {
-      executed = true;
-      while (parser->peek().type != TType::RCurly) {
-        list->statements.push_back(parser->parse_statement());
-        while (parser->peek().type == TType::Semi)
-          parser->eat();
-      }
-    } else {
-      while (parser->peek().type != TType::RCurly) {
-        parser->eat();
-      }
+  auto symbol = parser->expect(TType::Identifier).value;
+  parser->expect(TType::LCurly);
+  if (parser->ctx.scope->has_def(symbol)) {
+    executed = true;
+    while (parser->peek().type != TType::RCurly) {
+    list->statements.push_back(parser->parse_statement());
+    while (parser->peek().type == TType::Semi)
+      parser->eat();
     }
+  } else {
+    while (parser->peek().type != TType::RCurly) {
+    parser->eat();
+    }
+  }
+  } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
+  auto symbol = parser->expect(TType::Identifier).value;
+  parser->expect(TType::LCurly);
+  if (!parser->ctx.scope->has_def(symbol)) {
+    executed = true;
+    while (parser->peek().type != TType::RCurly) {
+    list->statements.push_back(parser->parse_statement());
+    while (parser->peek().type == TType::Semi)
+      parser->eat();
+    }
+  } else {
+    while (parser->peek().type != TType::RCurly) {
+    parser->eat();
+    }
+  }
   } else { // Handling if
-    auto condition = parser->parse_expr();
-    parser->expect(TType::LCurly);
-    auto value = evaluate_constexpr(condition, parser->ctx);
-    if (value.is_truthy()) {
-      executed = true;
-      while (parser->peek().type != TType::RCurly) {
-        list->statements.push_back(parser->parse_statement());
-        while (parser->peek().type == TType::Semi)
-          parser->eat();
-      }
-    } else {
-      while (parser->peek().type != TType::RCurly) {
-        parser->eat();
-      }
+  auto condition = parser->parse_expr();
+  parser->expect(TType::LCurly);
+  auto value = evaluate_constexpr(condition, parser->ctx);
+  if (value.is_truthy()) {
+    executed = true;
+    while (parser->peek().type != TType::RCurly) {
+    list->statements.push_back(parser->parse_statement());
+    while (parser->peek().type == TType::Semi)
+      parser->eat();
     }
+  } else {
+    while (parser->peek().type != TType::RCurly) {
+    parser->eat();
+    }
+  }
   }
   parser->expect(TType::RCurly);
 
   auto tok = parser->peek();
   while (parser->peek().type == TType::Else) {
-    parser->expect(TType::Else);
-    if (!executed) {
-      if (parser->peek().type == TType::If) {
-        parser->expect(TType::If);
-        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
-      } else if (parser->peek().type == TType::Identifier &&
-                 parser->peek().value == "ifdef") {
-        parser->expect(TType::Identifier);
-        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
-      } else {
-        parser->expect(TType::LCurly);
-        while (parser->peek().type != TType::RCurly) {
-          list->statements.push_back(parser->parse_statement());
-          while (parser->peek().type == TType::Semi)
-            parser->eat();
-        }
-        parser->expect(TType::RCurly);
-      }
+  parser->expect(TType::Else);
+  if (!executed) {
+    if (parser->peek().type == TType::If) {
+    parser->expect(TType::If);
+    parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
+    } else if (parser->peek().type == TType::Identifier &&
+         parser->peek().value == "ifdef") {
+    parser->expect(TType::Identifier);
+    parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
+    } else if (parser->peek().type == TType::Identifier &&
+         parser->peek().value == "ifndef") {
+    parser->expect(TType::Identifier);
+    parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
     } else {
-      while (parser->peek().type != TType::RCurly) {
-        parser->eat();
-      }
-      parser->expect(TType::RCurly);
+    parser->expect(TType::LCurly);
+    while (parser->peek().type != TType::RCurly) {
+      list->statements.push_back(parser->parse_statement());
+      while (parser->peek().type == TType::Semi)
+      parser->eat();
     }
+    parser->expect(TType::RCurly);
+    }
+  } else {
+    while (parser->peek().type != TType::RCurly) {
+    parser->eat();
+    }
+    parser->expect(TType::RCurly);
+  }
   }
 }
 
@@ -569,8 +588,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
     {.identifier = "def",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->ctx.scope->defines.insert(
-           parser->expect(TType::Identifier).value);
+       parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
        while (parser->peek().type == TType::Semi)
          parser->eat();
        return ast_alloc<ASTNoop>();
@@ -578,17 +596,24 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
     {.identifier = "undef",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->ctx.scope->defines.erase(
-           parser->expect(TType::Identifier).value);
+       parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
        while (parser->peek().type == TType::Semi)
          parser->eat();
        return ast_alloc<ASTNoop>();
      }},
+    
     {.identifier = "ifdef",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        auto list = ast_alloc<ASTStatementList>();
        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
+       return list;
+     }},
+    {.identifier = "ifndef",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       auto list = ast_alloc<ASTStatementList>();
+       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
        return list;
      }},
     {.identifier = "if",
