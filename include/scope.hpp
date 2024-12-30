@@ -2,6 +2,7 @@
 
 #include "arena.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "type.hpp"
 #include <string>
 #include <unordered_map>
@@ -29,13 +30,12 @@ struct Symbol {
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
-
   bool is_struct_or_union_scope = false;
-
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::vector<int> aliases;
   std::unordered_set<int> types;
+  std::unordered_set<InternedString> defines;
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}

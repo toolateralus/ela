@@ -386,3 +386,9 @@ std::any SerializeVisitor::visit(ASTScopeResolution *node) {
 
 // TODO: implement me. Im lazy and this takes a while and uses up my hands!
 std::any SerializeVisitor::visit(ASTTuple *node) { return {}; }
+std::any ASTStatementList::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+ASTNodeType ASTStatementList::get_node_type() const {
+  return AST_NODE_STATEMENT_LIST;
+}

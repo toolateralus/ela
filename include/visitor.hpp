@@ -15,6 +15,13 @@ struct VisitorBase {
   int visitor_flags = FLAG_NO_STATE;
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
+
+  std::any visit(ASTStatementList *node) {
+    for (const auto &stmt: node->statements) {
+      stmt->accept(this);
+    }
+    return {};
+  };
 };
 
 struct SerializeVisitor : VisitorBase {
@@ -59,6 +66,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTSwitch *node) override { return {}; };
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override { return {}; };
+  
 };
 
 struct Typer : VisitorBase {

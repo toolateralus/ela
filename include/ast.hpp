@@ -68,6 +68,7 @@ enum ASTNodeType {
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
+  AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
 
 struct ASTNode {
@@ -79,6 +80,12 @@ struct ASTNode {
 
 struct ASTStatement : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
+};
+
+struct ASTStatementList : ASTNode {
+  std::vector<ASTStatement*> statements;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override;
 };
 
 enum BlockFlags {
@@ -522,7 +529,8 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTRange *node) = 0;                                  \
   virtual std::any visit(ASTSwitch *node) = 0;                                 \
   virtual std::any visit(ASTTuple *node) = 0;                                  \
-  virtual std::any visit(ASTTupleDeconstruction *node) = 0;
+  virtual std::any visit(ASTTupleDeconstruction *node) = 0;\
+
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,

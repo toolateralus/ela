@@ -1,4 +1,5 @@
 #include "ast.hpp"
+#include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -15,6 +16,76 @@
 #include <set>
 #include <string>
 #include <unordered_set>
+
+static void parse_if_else_chain(Parser *parser, ASTStatementList *list);
+
+static void parse_else(Parser *parser, ASTStatementList *list) {
+  if (parser->peek().type == TType::If) {
+    parser->expect(TType::If);
+    auto elseIfCondition = parser->parse_expr();
+    parser->expect(TType::LCurly);
+    auto elseIfValue = evaluate_constexpr(elseIfCondition, parser->ctx);
+    if (elseIfValue.is_truthy()) {
+      while (parser->peek().type != TType::RCurly) {
+        list->statements.push_back(parser->parse_statement());
+      }
+    } else {
+      while (parser->peek().type != TType::RCurly) {
+        parser->eat();
+      }
+    }
+    parser->expect(TType::RCurly);
+    if (parser->peek().type == TType::Else) {
+      parser->expect(TType::Else);
+      parse_else(parser, list);
+    }
+  } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") {
+    parser->expect(TType::Identifier);
+    auto symbol = parser->expect(TType::Identifier).value;
+    parser->expect(TType::LCurly);
+    if (parser->ctx.scope->defines.contains(symbol)) {
+      while (parser->peek().type != TType::RCurly) {
+        list->statements.push_back(parser->parse_statement());
+      }
+    } else {
+      while (parser->peek().type != TType::RCurly) {
+        parser->eat();
+      }
+    }
+    parser->expect(TType::RCurly);
+    if (parser->peek().type == TType::Else) {
+      parser->expect(TType::Else);
+      parse_else(parser, list);
+    }
+  } else {
+    parser->expect(TType::LCurly);
+    while (parser->peek().type != TType::RCurly) {
+      list->statements.push_back(parser->parse_statement());
+    }
+    parser->expect(TType::RCurly);
+  }
+}
+
+static void parse_if_else_chain(Parser *parser, ASTStatementList *list) {
+  auto condition = parser->parse_expr();
+  parser->expect(TType::LCurly);
+  auto value = evaluate_constexpr(condition, parser->ctx);
+  if (value.is_truthy()) {
+    while (parser->peek().type != TType::RCurly) {
+      list->statements.push_back(parser->parse_statement());
+    }
+  } else {
+    while (parser->peek().type != TType::RCurly) {
+      parser->eat();
+    }
+  }
+  parser->expect(TType::RCurly);
+
+  if (parser->peek().type == TType::Else) {
+    parser->expect(TType::Else);
+    parse_else(parser, list);
+  }
+}
 
 std::vector<DirectiveRoutine> Parser::directive_routines = {
     // #include
@@ -326,8 +397,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
          }
        }
 
-       auto id = parser->ctx.scope->find_type_id(
-           aliased_type->base, aliased_type->extension_info);
+       auto id = parser->ctx.scope->find_type_id(aliased_type->base,
+                                                 aliased_type->extension_info);
 
        auto type = parser->ctx.scope->get_type(id);
 
@@ -493,20 +564,45 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        return statement;
      }},
 
-    // TODO:
-    // * add 'def/undef' and 'ifdef/else' directives.
-    // * add 'macro' directive.
-    // * add 'if' directive.
-
-    //  {
-    //   .identifier = "def",
-    //   .kind = DIRECTIVE_KIND_STATEMENT,
-    //   .run = [](Parser *parser) -> Nullable<ASTNode> {
-    //     auto code = parser->expect(TType::Identifier).value;
-
-    //   }
-    //  }
-
+    {.identifier = "def",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       parser->ctx.scope->defines.insert(
+           parser->expect(TType::Identifier).value);
+       return ast_alloc<ASTNoop>();
+     }},
+    {.identifier = "undef",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       parser->ctx.scope->defines.erase(
+           parser->expect(TType::Identifier).value);
+       return ast_alloc<ASTNoop>();
+     }},
+    {.identifier = "ifdef",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       auto symbol = parser->expect(TType::Identifier).value;
+       parser->expect(TType::LCurly);
+       auto list = ast_alloc<ASTStatementList>();
+       if (parser->ctx.scope->defines.contains(symbol)) {
+         while (parser->peek().type != TType::RCurly) {
+           list->statements.push_back(parser->parse_statement());
+         }
+       } else {
+         while (parser->peek().type != TType::RCurly) {
+           parser->eat();
+         }
+       }
+       parser->expect(TType::RCurly);
+       return list;
+     }},
+    {.identifier = "if",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+       auto list = ast_alloc<ASTStatementList>();
+       parse_if_else_chain(parser, list);
+       return list;
+     }},
 };
 
 Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
@@ -574,8 +670,8 @@ ASTType *Parser::parse_type() {
         if (size->get_node_type() == AST_NODE_TYPE) {
           extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          extension_info.key_type = ctx.scope->find_type_id(
-              type->base, type->extension_info);
+          extension_info.key_type =
+              ctx.scope->find_type_id(type->base, type->extension_info);
           expect(TType::RBrace);
           continue;
         }
@@ -591,8 +687,7 @@ ASTType *Parser::parse_type() {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
     } else if (allow_function_type_parsing && peek().type == TType::LParen) {
-      return parse_function_type(base.get_str(),
-                                 extension_info);
+      return parse_function_type(base.get_str(), extension_info);
     } else {
       break;
     }
@@ -693,7 +788,8 @@ ASTStatement *Parser::parse_statement() {
       (lookahead_buf()[1].type == TType::Colon ||
        lookahead_buf()[1].type == TType::ColonEquals ||
        (lookahead_buf()[1].type == TType::DoubleColon &&
-        lookahead_buf()[2].type != TType::LParen && lookahead_buf()[2].family != TFamily::Keyword))) {
+        lookahead_buf()[2].type != TType::LParen &&
+        lookahead_buf()[2].family != TFamily::Keyword))) {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
@@ -1151,7 +1247,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys.push_back(key);
     keys_set.insert(key);
   }
-  
+
   auto identifer = node->type->base;
   node->type->resolved_type =
       ctx.scope->create_enum_type(identifer.get_str(), keys, node->is_flags);
@@ -1851,8 +1947,8 @@ void Parser::append_type_extensions(ASTType *type) {
         if (size->get_node_type() == AST_NODE_TYPE) {
           type->extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          type->extension_info.key_type = ctx.scope->find_type_id(
-              type->base, type->extension_info);
+          type->extension_info.key_type =
+              ctx.scope->find_type_id(type->base, type->extension_info);
           printf("KEY TYPE: %d\n", type->extension_info.key_type);
           expect(TType::RBrace);
           continue;
@@ -1874,8 +1970,8 @@ ASTType *Parser::parse_function_type(const InternedString &base,
   return_type->extension_info = extension_info;
 
   FunctionTypeInfo info{};
-  info.return_type = ctx.scope->find_type_id(return_type->base,
-                                             return_type->extension_info);
+  info.return_type =
+      ctx.scope->find_type_id(return_type->base, return_type->extension_info);
 
   auto param_types = parse_parameter_types();
   std::ostringstream ss;
@@ -1884,7 +1980,8 @@ ASTType *Parser::parse_function_type(const InternedString &base,
   {
     ss << "(";
     for (size_t i = 0; i < param_types.size(); ++i) {
-      info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
+      info.parameter_types[i] = ctx.scope->find_type_id(
+          param_types[i]->base, param_types[i]->extension_info);
       info.params_len++;
       ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
       if (i != param_types.size() - 1) {
@@ -1963,4 +2060,3 @@ Parser::Parser(const std::string &filename, Context &context)
   typer = new Typer(context);
 }
 Parser::~Parser() { delete typer; }
-
