@@ -533,6 +533,14 @@ std::any Typer::visit(ASTDeclaration *node) {
                             node->name.value.get_str()),
                 node->source_range);
   }
+
+
+  if (node->is_constexpr) {
+    auto type = global_get_type(node->type->resolved_type);
+    if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
+      throw_error(std::format("Can only use scalar types (integers, floats, bools) as constant expressions, got {}", type->to_string()), node->value.get()->source_range);
+    }
+  }
   
   return {};
 }

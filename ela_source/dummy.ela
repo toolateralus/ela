@@ -1,10 +1,6 @@
 #import core;
 
-A :: struct {
-  STATIC :: 100;
-}
-
 main :: () {
-  println(to_string(A::STATIC));
+  
 }
 
