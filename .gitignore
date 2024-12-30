@@ -4,3 +4,6 @@
 /objs
 /.cloc_diff.txt
 /build
+/x64
+/.vs
+/out

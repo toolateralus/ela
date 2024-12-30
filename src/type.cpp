@@ -30,24 +30,23 @@ std::string FunctionTypeInfo::to_string() const {
 Type *global_get_type(const int id) {
   [[unlikely]] if (id < 0)
     return nullptr;
-  return type_table[id];
+  return &type_table[id];
 }
 
 int global_create_type_alias(int aliased_type, const InternedString &name) {
-
   // this type alias already exists so just return the type.
   if (type_alias_map.contains(name)) {
     return type_alias_map[name];
   }
 
   auto aliased = global_get_type(aliased_type);
-  auto type = new (type_alloc<Type>()) Type(num_types, aliased->kind);
-  type_table[num_types] = type;
+  type_table.emplace_back(type_table.size(), aliased->kind);
+  auto type = &type_table.back();
+
   type->set_base(name);
   type->set_info(aliased->get_info());
   type->is_alias = true;
   type->alias_id = aliased_type;
-  num_types++;
   type_alias_map[name] = type->id;
   aliased->has_aliases = true;
   aliased->aliases.push_back(type->id);
@@ -69,17 +68,17 @@ int global_find_function_type_id(const InternedString &name,
     }
   }
 
-  for (int i = 0; i < num_types; ++i) {
-    if (type_table[i]->kind != TYPE_FUNCTION)
+  for (int i = 0; i < type_table.size(); ++i) {
+    if (type_table[i].kind != TYPE_FUNCTION)
       continue;
-    const Type *type = type_table[i];
+    const Type *type = &type_table[i];
     if (name == type->get_base() &&
         type->type_info_equals(&info, TYPE_FUNCTION) &&
         ext.equals(type->get_ext())) {
       return type->id;
     }
   }
-  auto info_ptr = new (type_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
+  auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
 
@@ -102,8 +101,8 @@ int global_find_type_id(const InternedString &name,
     }
   }
 
-  for (int i = 0; i < num_types; ++i) {
-    auto type = type_table[i];
+  for (int i = 0; i < type_table.size(); ++i) {
+    auto type = &type_table[i];
     if (type->equals(name, type_extensions))
       return type->id;
   }
@@ -112,8 +111,8 @@ int global_find_type_id(const InternedString &name,
   // types, struct types, and enum types must be created manually this just
   // creates pointer and array types of base 'name'
   int base_id = -1;
-  for (int i = 0; i < num_types; ++i) {
-    auto tinfo = type_table[i];
+  for (int i = 0; i < type_table.size(); ++i) {
+    auto tinfo = &type_table[i];
     if (tinfo->get_base() == name && tinfo->get_ext().has_no_extensions()) {
       base_id = tinfo->id;
       break;
@@ -131,8 +130,8 @@ int global_find_type_id(const InternedString &name,
 
 int global_find_type_id(std::vector<int> &tuple_types,
                         const TypeExt &type_extensions) {
-  for (int i = 0; i < num_types; ++i) {
-    auto type = type_table[i];
+  for (int i = 0; i < type_table.size(); ++i) {
+    auto type = &type_table[i];
 
     if (!type->is_kind(TYPE_TUPLE))
       continue;
@@ -150,8 +149,8 @@ int global_find_type_id(std::vector<int> &tuple_types,
       // Found a matching type with the same extensions. Return it.
       return type->id;
     }
-
   end_of_loop:
+    do {} while (false); // This line just prevents a MSVC syntax error. Silly.
   }
 
   // We didn't find the tuple type. Return a new one.
@@ -303,11 +302,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 }
 
 bool Type::operator==(const Type &type) const {
-  for (int i = 0; i < num_types; ++i) {
-    auto tinfo = type_table[i];
-
-    if (tinfo->equals(base, extensions) && type.info &&
-        type_info_equals(type.info, type.kind))
+  for (int i = 0; i < type_table.size(); ++i) {
+    auto tinfo = &type_table[i];
+    if (tinfo->equals(base, extensions) && type_info_equals(type.get_info(), type.kind))
       return true;
   }
   return false;
@@ -384,7 +381,7 @@ std::string Type::to_string() const {
 
   switch (kind) {
   case TYPE_FUNCTION:
-    return type->info->to_string() + type->extensions.to_string();
+    return type->get_info()->to_string() + type->extensions.to_string();
   case TYPE_STRUCT:
   case TYPE_TUPLE:
   case TYPE_SCALAR:
@@ -407,59 +404,45 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   return global_find_type_id(ty->get_base(), ext);
 }
 int global_create_struct_type(const InternedString &name, Scope *scope) {
-  auto type = new (type_alloc<Type>()) Type(num_types, TYPE_STRUCT);
-  type_table[num_types] = type;
+  type_table.emplace_back(type_table.size(), TYPE_STRUCT);
+  Type *type = &type_table.back();
   type->set_base(name);
-  auto info = type_alloc<StructTypeInfo>();
+  StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
   info->scope = scope;
   type->set_info(info);
-  num_types++;
   return type->id;
 }
 int global_create_union_type(const InternedString &name, Scope *scope,
                              UnionFlags kind) {
-  auto type = new (type_alloc<Type>()) Type(num_types, TYPE_UNION);
-  type_table[num_types] = type;
+  type_table.emplace_back(type_table.size(), TYPE_UNION);
+  Type* type = &type_table.back();
   type->set_base(name);
-  auto info = type_alloc<UnionTypeInfo>();
+  UnionTypeInfo *info = type_info_alloc<UnionTypeInfo>();
   info->flags = kind;
   info->scope = scope;
+  info->scope = scope;
   type->set_info(info);
-  num_types++;
-  return type->id;
+  return type->id; 
 }
 int global_create_enum_type(const InternedString &name,
                             const std::vector<InternedString> &keys,
                             bool is_flags, size_t element_type) {
-  auto id = num_types;
-  auto type = new (type_alloc<Type>()) Type(id, TYPE_ENUM);
-  type_table[num_types] = type;
+  type_table.emplace_back(type_table.size(), TYPE_ENUM);
+  Type* type = &type_table.back();
   type->set_base(name);
-
-  auto info = new (type_alloc<EnumTypeInfo>()) EnumTypeInfo();
+  EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
   info->keys = keys;
   type->set_info(info);
-
-  num_types += 1;
   return type->id;
 }
 int global_create_type(TypeKind kind, const InternedString &name,
                        TypeInfo *info, const TypeExt &extensions) {
-  Type *type = new (type_alloc<Type>()) Type(num_types, kind);
-  type->set_info(info);
+  type_table.emplace_back(type_table.size(), kind);
+  Type* type = &type_table.back();
   type->set_ext(extensions);
   type->set_base(name);
-
-  if (type->id > MAX_NUM_TYPES) {
-    throw_error("Max types exceeded", {});
-  }
-  if (type_table[type->id]) {
-    throw_error("type system created a type with the same ID twice", {});
-  }
-
-  type_table[type->id] = type;
-  num_types += 1;
+  type->set_info(info);
   return type->id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
@@ -809,22 +792,19 @@ int get_map_value_type(Type *map_type) {
 
 int global_create_tuple_type(const std::vector<int> &types,
                              const TypeExt &ext) {
-  auto id = num_types;
-  auto type = new (type_alloc<Type>()) Type(id, TYPE_TUPLE);
-  type_table[num_types] = type;
+  type_table.emplace_back(type_table.size(), TYPE_TUPLE);
+  Type *type = &type_table.back();
 
   //! BUG: we should allow nested tuples;
-  //! right now I doubt that it would generate itself recursively.
+  //! see some of the repros ("repro/14.ela" i think?)
 
   type->set_base(get_tuple_type_name(types));
 
-  auto info = new (type_alloc<TupleTypeInfo>()) TupleTypeInfo();
+  auto info = type_info_alloc<TupleTypeInfo>();
   info->types = types;
 
   type->set_info(info);
   type->set_ext(ext);
-
-  num_types += 1;
   return type->id;
 }
 

@@ -2,10 +2,11 @@
 
 #include "arena.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "type.hpp"
-#include <set>
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 
 extern jstl::Arena scope_arena;
 enum SymbolFlags {
@@ -29,13 +30,33 @@ struct Symbol {
 struct ASTFunctionDeclaration;
 extern Scope *root_scope;
 struct Scope {
-
   bool is_struct_or_union_scope = false;
-
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::vector<int> aliases;
-  std::set<int> types;
+  std::unordered_set<int> types;
+  std::unordered_set<InternedString> defines;
+  bool add_def(const InternedString &define) {
+    return defines.insert(define).second;
+  }
+
+  bool has_def(const InternedString &define) const {
+    if (defines.contains(define)) {
+      return true;
+    }
+    if (parent) {
+      return parent->has_def(define);
+    }
+    return false;
+  }
+
+  void undef(const InternedString &define) {
+    defines.erase(define);
+    if (parent) {
+      parent->undef(define);
+    }
+  }
+
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
@@ -170,16 +191,15 @@ struct Scope {
     root_scope->types.insert(id);
     return id;
   }
-
   int find_type_id(std::vector<int> &tuple_types,
                    const TypeExt &type_extensions, bool was_created = false) {
-    auto num = num_types;
+    auto num = type_table.size();
     auto id = global_find_type_id(tuple_types, type_extensions);
 
     // if we extended a type, or if we created a new tuple,
     // but we have access to all of thee types within it,
     // we just add the type to our table.
-    if (num_types > num || was_created) {
+    if (type_table.size() > num || was_created) {
       // search for all the types within the tuple.
       for (auto t : tuple_types) {
         if (!types.contains(t)) {

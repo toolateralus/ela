@@ -1,5 +1,7 @@
-// tiny library for loading and manipulating '.so's' and '.dlls'
-// Note this is linux only as far as I'm aware.
+#ifndef PLATFORM_LINUX {
+  // TODO: just write equal libraries for other systems.
+  #error "dlfcn.ela is only available on linux.";
+}
 
 #foreign dlopen :: (filename: c_string, flags: int) -> void*;
 #foreign dlclose :: (handle: void*) -> int;

@@ -343,7 +343,7 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
   node->element_type = elem_type;
 
   auto enum_type =
-      global_get_type(global_find_type_id(type_name(node->type->base), {}));
+      global_get_type(global_find_type_id(node->type->base, {}));
   auto info = static_cast<EnumTypeInfo *>(enum_type->get_info());
   info->element_type = elem_type;
 
@@ -488,7 +488,7 @@ std::any Typer::visit(ASTDeclaration *node) {
       // resolved type.
       node->type = ast_alloc<ASTType>();
       node->type->resolved_type = value_ty;
-      node->type->base = ASTIdentifier::make(type->get_base());
+      node->type->base = type->get_base();
       node->type->extension_info = type->get_ext();
     }
 
@@ -500,7 +500,7 @@ std::any Typer::visit(ASTDeclaration *node) {
         // CLEANUP: again, make sure we need to mock this up to this extent. I
         // can't see whyw e'd look it up again.
         node->type->resolved_type = int_type();
-        node->type->base = ASTIdentifier::make("int");
+        node->type->base = "int";
         node->type->extension_info = {};
       }
     }
@@ -533,6 +533,15 @@ std::any Typer::visit(ASTDeclaration *node) {
                             node->name.value.get_str()),
                 node->source_range);
   }
+
+
+  if (node->is_constexpr) {
+    auto type = global_get_type(node->type->resolved_type);
+    if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
+      throw_error(std::format("Can only use scalar types (integers, floats, bools) as constant expressions, got {}", type->to_string()), node->value.get()->source_range);
+    }
+  }
+  
   return {};
 }
 
@@ -845,15 +854,15 @@ std::any Typer::visit(ASTType *node) {
     for (const auto &t : node->tuple_types)
       types.push_back(int_from_any(t->accept(this)));
     node->resolved_type = ctx.scope->find_type_id(types, node->extension_info);
-    // node->base = get_tuple_type_name(types).get_str();
+    // node->base = get_tuple_types).get_str);
 
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
     node->pointing_to.get()->accept(this);
     node->resolved_type =
-        ctx.scope->find_type_id(type_name(node->base), node->extension_info);
+        ctx.scope->find_type_id(node->base, node->extension_info);
   } else {
     node->resolved_type =
-        ctx.scope->find_type_id(type_name(node->base), node->extension_info);
+        ctx.scope->find_type_id(node->base, node->extension_info);
   }
 
   return node->resolved_type;
@@ -1093,7 +1102,7 @@ std::any Typer::visit(ASTDotExpr *node) {
   // .EnumVariant fix ups.
   if (node->base == nullptr) {
     bool found = false;
-    for (auto i = 0; i < num_types; ++i) {
+    for (auto i = 0; i < type_table.size(); ++i) {
       auto type = ctx.scope->get_type(i);
       if (type && type->is_kind(TYPE_ENUM)) {
         auto info = static_cast<EnumTypeInfo *>(type->get_info());
@@ -1109,7 +1118,7 @@ std::any Typer::visit(ASTDotExpr *node) {
                   node->source_range);
             } else {
               auto ast_type = ast_alloc<ASTType>();
-              ast_type->base = ASTIdentifier::make(type->get_base());
+              ast_type->base = type->get_base();
               node->base = ast_type;
               found = true;
             }
@@ -1472,8 +1481,3 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
   return {};
 };
-InternedString Typer::type_name(ASTExpr *node) {
-  auto base = int_from_any(node->accept(this));
-  auto type = global_get_type(base);
-  return type->get_base();
-}

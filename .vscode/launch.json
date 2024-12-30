@@ -85,5 +85,10 @@
       "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/examples/sequencer"
     }
+
+
+
+
+
   ]
 }

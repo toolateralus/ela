@@ -564,7 +564,7 @@ struct Env {
 
 #define assert(message, condition)                                             \
   if (!(condition))                                                            \
-    throw __test_exception("\e[31mAssertion failed: %s, message: %s\e[0m\n",   \
+    throw __test_exception("\033[31mAssertion failed: %s, message: %s\033[0m\n",   \
                            #condition, #message);
 
 extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);

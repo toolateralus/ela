@@ -124,7 +124,7 @@ std::any SerializeVisitor::visit(ASTType *node) {
        << " " << type->get_ext().to_string();
     return {};
   }
-  node->base->accept(this);
+  ss << node->base.get_str();
   ss << node->extension_info.to_string();
   return {};
 }
@@ -228,7 +228,7 @@ std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
 
   if (!is_anonymous) {
     ss << indent() << "Struct ";
-    node->type->base->accept(this);
+    ss << node->type->base.get_str();
     ss << " {\n";
   } else {
     ss << indent() << "anonymous struct" << '\n';
@@ -292,7 +292,7 @@ std::any SerializeVisitor::visit(ASTInitializerList *node) {
 
 std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
   ss << "enum : ";
-  node->type->base->accept(this);
+  ss << node->type->base.get_str();
   for (const auto &[key, value] : node->key_values) {
     ss << "\nkey: " << key.get_str();
     ss << "value: ";
@@ -386,3 +386,9 @@ std::any SerializeVisitor::visit(ASTScopeResolution *node) {
 
 // TODO: implement me. Im lazy and this takes a while and uses up my hands!
 std::any SerializeVisitor::visit(ASTTuple *node) { return {}; }
+std::any ASTStatementList::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+ASTNodeType ASTStatementList::get_node_type() const {
+  return AST_NODE_STATEMENT_LIST;
+}

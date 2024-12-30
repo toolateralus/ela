@@ -91,13 +91,13 @@ struct CompileCommand {
   std::unordered_map<std::string, bool> flags;
   std::string compilation_flags;
   inline void print() const {
-    std::cout << "\e[1;32mInput Path:\e[0m " << input_path << std::endl;
-    std::cout << "\e[1;32mOutput Path:\e[0m " << output_path << std::endl;
-    std::cout << "\e[1;32mBinary Path:\e[0m " << binary_path << std::endl;
-    std::cout << "\e[1;32mFlags:\e[0m" << std::endl;
+    std::cout << "\033[1;32mInput Path:\033[0m " << input_path << std::endl;
+    std::cout << "\033[1;32mOutput Path:\033[0m " << output_path << std::endl;
+    std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;
+    std::cout << "\033[1;32mFlags:\033[0m" << std::endl;
     for (const auto &flag : flags) {
-      std::cout << "  \e[1;34m--" << flag.first
-                << "\e[0m: " << (flag.second ? "true" : "false") << std::endl;
+      std::cout << "  \033[1;34m--" << flag.first
+                << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
     }
   }
   inline void add_compilation_flag(const std::string &flags)  {
@@ -108,8 +108,8 @@ struct CompileCommand {
   }
   inline CompileCommand(int argc, char *argv[]) {
     if (argc < 2) {
-      printf("\e[31mUsage: <input.ela> (optional)::[-o "
-                                  "<output.cpp>] [--flag]\e[0m\n");
+      printf("\033[31mUsage: <input.ela> (optional)::[-o "
+                                  "<output.cpp>] [--flag]\033[0m\n");
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -124,7 +124,7 @@ struct CompileCommand {
     }
 
     if (input_path.empty()) {
-      printf("\e[31mError: No input file specified.\e[0m\n");
+      printf("\033[31mError: No input file specified.\033[0m\n");
       exit(1);
     }
 
@@ -132,14 +132,14 @@ struct CompileCommand {
     
     if (!std::filesystem::exists(input_fs_path)) {
       printf("%s\n", (std::format(
-          "\e[31mError: File '{}' does not exist.\e[0m", input_path.string())).c_str());
+          "\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
       exit(1);
     }
 
     std::filesystem::path parent_path = input_fs_path.parent_path();
     if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
       printf("%s\n", std::format(
-          "\e[31mError: Parent directory '{}' does not exist.\e[0m",
+          "\033[31mError: Parent directory '{}' does not exist.\033[0m",
           parent_path.string()).c_str());
       exit(1);
     }
@@ -162,7 +162,7 @@ struct CompileCommand {
     std::stringstream ss;
     ss << stream.rdbuf();
     if (ss.str().empty()) {
-      printf("%s\n", std::format("\e[31mError: {} is empty.\e[0m", input_path.string()).c_str());
+      printf("%s\n", std::format("\033[31mError: {} is empty.\033[0m", input_path.string()).c_str());
       exit(1);
     }
     return ss.str();
@@ -185,15 +185,15 @@ struct SourceRange {
   }
   int64_t begin, end;
   int64_t begin_loc, end_loc;
-  std::span<Token> get_tokens() const {
+  std::vector<Token> get_tokens() const {
     int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
     int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
     if (valid_end - valid_begin == 0) {
-        valid_begin = std::max(int64_t(0), valid_begin - 2);
-        valid_end = std::min(int64_t(all_tokens.size()), valid_end + 3);
+      valid_begin = std::max(int64_t(0), valid_begin - 2);
+      valid_end = std::min(int64_t(all_tokens.size()), valid_end + 3);
     }
-    return std::span<Token>(all_tokens).subspan(valid_begin, valid_end - valid_begin);
-}
+    return std::vector<Token>(all_tokens.begin() + valid_begin, all_tokens.begin() + valid_end);
+  }
 };
 
 static std::string get_source_filename(const SourceRange &range) {
