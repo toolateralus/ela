@@ -1,10 +1,10 @@
-
+#import core;
 
 A :: struct {
   STATIC :: 100;
 }
 
 main :: () {
-  n : int = A::STATIC;
+  println(to_string(A::STATIC));
 }
 
