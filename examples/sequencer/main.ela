@@ -232,7 +232,7 @@ main :: fn() {
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
 
-  SetWindowState(.WindowResizable);
+  SetWindowState(ConfigFlags::WindowResizable);
   SetTargetFPS(1000);
 
   for file in dir.files {
@@ -244,7 +244,7 @@ main :: fn() {
   while !WindowShouldClose() {
     ClearBackground(bg_color);
     BeginDrawing();
-      if IsKeyPressed(.Space) then play_callback();
+      if IsKeyPressed(Key::Space) then play_callback();
 
       seq_y := GetScreenHeight() / 3.0;
       seq_x := 0.0
