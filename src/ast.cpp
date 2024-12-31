@@ -801,6 +801,9 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   return node;
 }
 
+/*
+  TODO: clean this nasty mess up.
+*/
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();

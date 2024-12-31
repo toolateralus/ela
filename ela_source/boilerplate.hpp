@@ -179,6 +179,7 @@ extern "C" int printf(const char *format, ...);
 extern "C" int snprintf(char *str, size_t size, const char *format, ...);
 extern "C" int sprintf(char *str, const char *format, ...);
 extern "C" void *memcpy(void *, void *, size_t);
+extern "C" void *memset(void*, int, size_t);
 
 #undef RAND_MAX
 #undef assert
