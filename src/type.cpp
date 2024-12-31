@@ -612,7 +612,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type,
   case TType::RBrace:
     throw_error("Operator overload not allowed", range);
   case TType::Arrow:
-    throw_warning("Operator overload: Use '.' instead of '->'", range);
+    throw_warning(WarningUseDotNotArrowOperatorOverload, "Operator overload: Use '.' instead of '->'", range);
     return;
 
   // Valid

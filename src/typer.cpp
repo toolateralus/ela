@@ -606,15 +606,12 @@ std::any Typer::visit(ASTParamDecl *node) {
   auto type = ctx.scope->get_type(id);
 
   if (type->get_ext().is_fixed_sized_array()) {
-    throw_warning("using a fixed array as a function parameter: note, this "
+    throw_warning(WarningDownCastFixedArrayParam, "using a fixed array as a function parameter: note, this "
                   "casts the length information off and gets passed as as "
                   "pointer. Consider using a dynamic array",
                   node->source_range);
     if (node->default_value.is_not_null()) {
-      throw_warning("Cannot currently use default parameters for fixed buffer "
-                    "pointers. Also, length information gets casted off. "
-                    "consider using a dynamic array",
-                    node->source_range);
+      throw_error("Cannot currently use default parameters for fixed buffer pointers.", node->source_range);
     }
 
     // cast off the fixed size array and add a pointer to it,
@@ -1185,7 +1182,7 @@ std::any Typer::visit(ASTScopeResolution *node) {
         for (const auto &key : info->keys) {
           if (key == node->member_name) {
             if (found) {
-              throw_warning(
+              throw_warning(WarningAmbigousVariants,
                   std::format("Found multiple enum types with variant '{}'.. "
                               "using the `.{}` syntax will choose the first "
                               "defined one. (Note: ignored candidate `{}`)",
@@ -1451,7 +1448,7 @@ std::any Typer::visit(ASTSwitch *node) {
     return ControlFlow{flags, return_type};
   } else {
     if ((flags & BLOCK_FLAGS_BREAK) != 0) {
-      throw_warning("You do not need to break from switch cases.",
+      throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.",
                     node->source_range);
     } else if ((flags & BLOCK_FLAGS_CONTINUE) != 0) {
       throw_error("Cannot continue from a switch case: it is not a loop.",

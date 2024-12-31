@@ -925,7 +925,7 @@ ASTStatement *Parser::parse_statement() {
       auto statement = parse_statement();
       node->block->statements = {statement};
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        throw_warning("Inaccesible declared variable", statement->source_range);
+        throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
       }
       node->block->scope = ctx.exit_scope();
     } else {

@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "core.hpp"
+#include "error.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
@@ -11,6 +12,7 @@
 #include <filesystem>
 
 #include <ostream>
+#include <tuple>
 #include <unordered_map>
 
 /*
@@ -45,6 +47,8 @@ std::unordered_set<InternedString> import_set;
   ### PROVIDING EXTERNS ###
   #########################
 */
+
+int ignored_warnings = WarningNone;
 
 static bool run_on_finished = false;
 
@@ -134,6 +138,33 @@ main :: fn() {
   compile_command = CompileCommand(argc, argv);
   if (compile_command.has_flag("x"))
     compile_command.print();
+
+  {
+    if (compile_command.has_flag("--Wignore-all")) {
+      ignored_warnings |= WarningIgnoreAll;
+    }
+    if (compile_command.has_flag("--Wno-arrow-operator")) {
+      ignored_warnings |= WarningUseDotNotArrowOperatorOverload;
+    }
+    if (compile_command.has_flag("--Wno-inaccessible-decl")) {
+      ignored_warnings |= WarningInaccessibleDeclaration;
+    }
+    if (compile_command.has_flag("--Wno-empty-string-interp")) {
+      ignored_warnings |= WarningEmptyStringInterpolation;
+    }
+    if (compile_command.has_flag("--Wno-non-null-deleted")) {
+      ignored_warnings |= WarningNonNullDeletedPointer;
+    }
+    if (compile_command.has_flag("--Wno-ambiguous-variant")) {
+      ignored_warnings |= WarningAmbigousVariants;
+    }
+    if (compile_command.has_flag("--Wno-switch-break")) {
+      ignored_warnings |= WarningSwitchBreak;
+    }
+    if (compile_command.has_flag("--Wno-array-param")) {
+      ignored_warnings |= WarningDownCastFixedArrayParam;
+    }
+  }
 
   init_type_system();
   auto result = compile_command.compile();

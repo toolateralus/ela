@@ -1,7 +1,6 @@
 #pragma once
 
 #include "core.hpp"
-#include <span>
 #include <sstream>
 
 enum ErrorSeverity {
@@ -123,15 +122,31 @@ static std::string format_source_location(const SourceRange &source_range, Error
     return ss.str();
 }
 
-static void throw_warning(const std::string message, const SourceRange &source_range) {
-    std::stringstream ss;
-    if (terminal_supports_color) ss << "\033[36m";
-    ss << "Warning:\n\t" << format_message(message);
-    if (terminal_supports_color) ss << "\033[0m\n";
-    ss << format_source_location(source_range, ERROR_WARNING);
-    const auto token_str = ss.str();
+enum WarningFlags {
+  WarningNone = 0,
+  WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
+  WarningInaccessibleDeclaration        = 1 << 1, // --Wno-inaccessible-decl
+  WarningEmptyStringInterpolation       = 1 << 2, // --Wno-empty-string-interp
+  WarningNonNullDeletedPointer          = 1 << 3, // --Wno-non-null-deleted
+  WarningAmbigousVariants               = 1 << 4, // --Wno-amiguous-variant
+  WarningSwitchBreak                    = 1 << 5, // --Wno-switch-break
+  WarningDownCastFixedArrayParam        = 1 << 6, // --Wno-array-param
+  WarningIgnoreAll                      = 1 << 7, // --Wignore-all
+};
 
-    std::cerr << token_str << std::endl;
+extern int ignored_warnings;
+
+static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
+  if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
+    return;
+  }
+  std::stringstream ss;
+  if (terminal_supports_color) ss << "\033[36m";
+  ss << "Warning:\n\t" << format_message(message);
+  if (terminal_supports_color) ss << "\033[0m\n";
+  ss << format_source_location(source_range, ERROR_WARNING);
+  const auto token_str = ss.str();
+  std::cerr << token_str << std::endl;
 }
 
 [[noreturn]] static void throw_error(const std::string &message, const SourceRange &source_range) {
