@@ -183,6 +183,7 @@ struct TypeInfo {
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
   TypeInfo() {}
+  
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };

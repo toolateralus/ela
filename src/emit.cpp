@@ -603,46 +603,29 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   indentLevel--;
   return {};
 }
+
 std::any Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
-
-  std::string iden;
-  int i = 0;
-  auto get_next_index = [&] {
-    int value;
-    if (node->is_flags) {
-      value = 1 << i;
-    } else {
-      value = i;
-    }
-    i++;
-    return value;
-  };
   int n = 0;
-
-  auto elem_ty = global_get_type(node->element_type);
-
-  auto type = global_get_type(node->type->resolved_type);
+  (*ss) << "enum " << node->type->base.get_str() << " {\n";
   for (const auto &[key, value] : node->key_values) {
-
-    if (elem_ty->kind == TYPE_SCALAR) {
-      (*ss) << "const ";
-    }
-    (*ss) << to_cpp_string(elem_ty) << " " << type->get_base().get_str()
-          << '_' << key.get_str();
-    (*ss) << " = ";
+    (*ss) << key.get_str();
     if (value.is_not_null()) {
+      (*ss) << " = ";
       value.get()->accept(this);
-    } else {
-      (*ss) << std::to_string(get_next_index());
+    } else if (node->is_flags) {
+      (*ss) << " = ";
+      (*ss) << std::to_string(1 << n);
     }
     if (n != node->key_values.size() - 1) {
-      (*ss) << ";\n";
+      (*ss) << ",\n";
     }
     n++;
   }
+  (*ss) << "};\n";
   return {};
 }
+
 std::any Emitter::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl) {
     (*ss) << "union " << node->name.value.get_str() << ";\n";
@@ -874,10 +857,6 @@ std::any Emitter::visit(ASTDotExpr *node) {
   if (!base_ty->get_ext().extensions.empty() &&
       base_ty->get_ext().extensions.back() == TYPE_EXT_POINTER) {
     op = "->";
-  }
-
-  if (base_ty->is_kind(TYPE_ENUM)) {
-    op = "_";
   }
 
   node->base->accept(this);

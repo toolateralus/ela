@@ -1117,6 +1117,60 @@ std::any Typer::visit(ASTLiteral *node) {
 }
 
 std::any Typer::visit(ASTDotExpr *node) {
+  auto base_ty_id = int_from_any(node->base->accept(this));
+  auto base_ty = ctx.scope->get_type(base_ty_id);
+
+  if (!base_ty) {
+    throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
+                "expression?",
+                node->source_range);
+  }
+
+  // TODO: remove this hack to get array length
+  if (base_ty->get_ext().is_array()) {
+    if (node->member_name == "length") {
+      return s32_type();
+    }
+    if (node->member_name == "data") {
+      return ctx.scope->get_pointer_to_type(base_ty->get_element_type());
+    }
+  }
+
+  // TODO: remove this hack as well
+  if (base_ty->get_ext().is_map()) {
+    if (node->member_name == "contains") {
+      static auto contains_ty = [] {
+        auto func = FunctionTypeInfo{};
+        func.is_varargs = true;
+        func.return_type = global_find_type_id("bool", {});
+        return global_find_function_type_id("bool(...)", func, {});
+      }();
+      return contains_ty;
+    }
+  }
+
+  Scope *base_scope = nullptr;
+  if (auto info = dynamic_cast<StructTypeInfo *>(base_ty->get_info())) {
+    base_scope = info->scope;
+  } else if (auto info = dynamic_cast<UnionTypeInfo *>(base_ty->get_info())) {
+    base_scope = info->scope;
+  } else {
+    throw_error(
+        "Dot expressions can only be used on structs, unions, and enums.",
+        node->source_range);
+  }
+
+  auto member = base_scope->lookup(node->member_name);
+  if (auto member = base_scope->lookup(node->member_name)) {
+    return member->type_id;
+  } else {
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"",
+                            node->member_name, base_ty->to_string()),
+                node->source_range);
+  }
+}
+
+std::any Typer::visit(ASTScopeResolution *node) {
   // .EnumVariant fix ups.
   if (node->base == nullptr) {
     bool found = false;
@@ -1151,68 +1205,6 @@ std::any Typer::visit(ASTDotExpr *node) {
           node->source_range);
   }
 
-  auto base_ty_id = int_from_any(node->base->accept(this));
-  auto base_ty = ctx.scope->get_type(base_ty_id);
-
-  if (!base_ty) {
-    throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
-                "expression?",
-                node->source_range);
-  }
-
-  // TODO: remove this hack to get array length
-  if (base_ty->get_ext().is_array()) {
-    if (node->member_name == "length") {
-      return s32_type();
-    }
-    if (node->member_name == "data") {
-      return ctx.scope->get_pointer_to_type(base_ty->get_element_type());
-    }
-  }
-
-  // TODO: remove this hack as well
-  if (base_ty->get_ext().is_map()) {
-    if (node->member_name == "contains") {
-      static auto contains_ty = [] {
-        auto func = FunctionTypeInfo{};
-        func.is_varargs = true;
-        func.return_type = global_find_type_id("bool", {});
-        return global_find_function_type_id("bool(...)", func, {});
-      }();
-      return contains_ty;
-    }
-  }
-
-  if (base_ty->is_kind(TYPE_ENUM)) {
-    auto info = static_cast<EnumTypeInfo *>(base_ty->get_info());
-    if (std::ranges::find(info->keys, node->member_name) != info->keys.end()) {
-      return info->element_type;
-    }
-    throw_error("failed to find key in enum type.", node->source_range);
-  }
-
-  Scope *base_scope = nullptr;
-  if (auto info = dynamic_cast<StructTypeInfo *>(base_ty->get_info())) {
-    base_scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(base_ty->get_info())) {
-    base_scope = info->scope;
-  } else {
-    throw_error(
-        "Dot expressions can only be used on structs, unions, and enums.",
-        node->source_range);
-  }
-
-  auto member = base_scope->lookup(node->member_name);
-  if (auto member = base_scope->lookup(node->member_name)) {
-    return member->type_id;
-  } else {
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"",
-                            node->member_name, base_ty->to_string()),
-                node->source_range);
-  }
-}
-
-std::any Typer::visit(ASTScopeResolution *node) {
   auto base = global_get_type(int_from_any(node->base->accept(this)));
   auto base_ty = global_get_type(base->get_true_type());
 
@@ -1225,6 +1217,13 @@ std::any Typer::visit(ASTScopeResolution *node) {
   case TYPE_UNION: {
     auto info = static_cast<UnionTypeInfo *>(base_ty->get_info());
     scope = info->scope;
+  } break;
+  case TYPE_ENUM: {
+    auto info = static_cast<EnumTypeInfo *>(base_ty->get_info());
+    if (std::ranges::find(info->keys, node->member_name) != info->keys.end()) {
+      return base_ty->id;
+    }
+    throw_error("failed to find key in enum type.", node->source_range);
   } break;
   default:
     throw_error("Unsupported type for scope resolution (:: operator)",

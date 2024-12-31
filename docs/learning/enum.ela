@@ -8,13 +8,6 @@ MyEnum :: enum {
   Two
 }
 
-/*
-  For a uniquely named enum variant, you can use shorthand syntax of just .VariantName to access an enum variant.
-*/
-
-println($"{.Zero}"); // print 0
-
-
 /* 
   you can even fill a enum with constant structs since it's just a set of constants.
 */
