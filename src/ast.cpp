@@ -916,8 +916,13 @@ ASTStatement *Parser::parse_statement() {
     if (peek().type == TType::Then) {
       eat();
       node->block = ast_alloc<ASTBlock>();
-      node->block->scope = create_child(ctx.scope);
-      node->block->statements = {parse_statement()};
+      ctx.set_scope();
+      auto statement = parse_statement();
+      node->block->statements = {statement};
+      if (statement->get_node_type() == AST_NODE_DECLARATION) {
+        throw_warning("Inaccesible declared variable", statement->source_range);
+      }
+      node->block->scope = ctx.exit_scope();
     } else {
       node->block = parse_block();
     }
