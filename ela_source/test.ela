@@ -1094,11 +1094,11 @@ switch_helper :: fn() -> int {
   assert("Failed to hit positive switch case for string", passed);
 
   passed = false;
-  switch .SwitchVariant0 {
-    .SwitchVariant0: {
+  switch SwitchCaseEnum::SwitchVariant0 {
+    SwitchCaseEnum::SwitchVariant0: {
       passed = true;
     }
-    .SwitchVariant1: {
+    SwitchCaseEnum::SwitchVariant1: {
       assert("Switch on enum value failed", false);
     }
   }

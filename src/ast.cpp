@@ -1694,19 +1694,19 @@ ASTExpr *Parser::parse_primary() {
     end_node(node, range);
     return node;
   }
-  case TType::Dot: {
+  case TType::DoubleColon: {
     eat();
     if (peek().type != TType::Identifier) {
       end_node(nullptr, range);
-      throw_error(".Something syntax is only for using enum variants that are "
+      throw_error("::Something syntax is only for using enum variants that are "
                   "in your current scope.",
                   range);
     }
-    auto dot = ast_alloc<ASTDotExpr>();
-    dot->base = nullptr;
-    dot->member_name = expect(TType::Identifier).value;
-    end_node(dot, range);
-    return dot;
+    auto scope_res = ast_alloc<ASTScopeResolution>();
+    scope_res->base = nullptr;
+    scope_res->member_name = expect(TType::Identifier).value;
+    end_node(scope_res, range);
+    return scope_res;
   }
   case TType::Dollar: {
     auto range = begin_node();

@@ -12,10 +12,10 @@ Arena :: struct {
   ptr: u64;
   size: u64;
   memory: u8*;
-  flags: int = .None;
+  flags: ArenaFlags = ArenaFlags::None;
   alignment : int = 8;
   
-  #ctor :: fn(size: u64, flags: int) {
+  #ctor :: fn(size: u64, flags: ArenaFlags) {
     this.size = size;
     this.flags = flags;
     memory = malloc(sizeof(u8) * size);
@@ -31,13 +31,13 @@ Arena :: struct {
     }
     
     aligned_ptr := this.ptr;
-    if this.flags & .AlignAllocations != 0 {
+    if this.flags & ArenaFlags::AlignAllocations != 0 {
       aligned_ptr = (this.ptr + alignment - 1) & ~(alignment - 1);
     }
     
     oom := aligned_ptr + size > this.size;
     
-    if oom && this.flags & .OutOfMemory != 0 {
+    if oom && this.flags & ArenaFlags::OutOfMemory != 0 {
       panic("Arena Allocator: Ran out of memory\n");
     } else if oom {
       return null;

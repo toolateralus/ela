@@ -737,10 +737,10 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
   glCompileShader(shader);
 
   success: int;
-  glGetShaderiv(shader, GL.COMPILE_STATUS, &success);
+  glGetShaderiv(shader, GL::COMPILE_STATUS, &success);
   if success == 0 {
     length: int;
-    glGetShaderiv(shader, GL.INFO_LOG_LENGTH, &length);
+    glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
@@ -751,8 +751,8 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
 }
 
 create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
-  vertex_shader: u32 = compile_shader(GL.VERTEX_SHADER, vert_source);
-  fragment_shader: u32 = compile_shader(GL.FRAGMENT_SHADER, frag_source);
+  vertex_shader: u32 = compile_shader(GL::VERTEX_SHADER, vert_source);
+  fragment_shader: u32 = compile_shader(GL::FRAGMENT_SHADER, frag_source);
 
   if vertex_shader == 0 || fragment_shader == 0 {
     return #make(u32, 0);
@@ -764,10 +764,10 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   glLinkProgram(program);
 
   success: int;
-  glGetProgramiv(program, GL.LINK_STATUS, &success);
+  glGetProgramiv(program, GL::LINK_STATUS, &success);
   if success == 0 {
     length: int;
-    glGetProgramiv(program, GL.INFO_LOG_LENGTH, &length);
+    glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
@@ -783,18 +783,18 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
 
 check_error :: fn(location: c_string) {
   err: int = glGetError();
-  if err == GL.INVALID_ENUM {
-    printf("error: %s, from: %s\n", "GL.INVALID_ENUM", location);
-  } else if err == GL.INVALID_VALUE {
-    printf("error: %s, from: %s\n", "GL.INVALID_VALUE", location);
-  } else if err == GL.INVALID_OPERATION {
-    printf("error: %s, from: %s\n", "GL.INVALID_OPERATION", location);
-  } else if err == GL.STACK_OVERFLOW {
-    printf("error: %s, from: %s\n", "GL.STACK_OVERFLOW", location);
-  } else if err == GL.STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n", "GL.STACK_UNDERFLOW", location);
-  } else if err == GL.OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n", "GL.OUT_OF_MEMORY", location);
+  if err == GL::INVALID_ENUM {
+    printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
+  } else if err == GL::INVALID_VALUE {
+    printf("error: %s, from: %s\n", "GL::INVALID_VALUE", location);
+  } else if err == GL::INVALID_OPERATION {
+    printf("error: %s, from: %s\n", "GL::INVALID_OPERATION", location);
+  } else if err == GL::STACK_OVERFLOW {
+    printf("error: %s, from: %s\n", "GL::STACK_OVERFLOW", location);
+  } else if err == GL::STACK_UNDERFLOW {
+    printf("error: %s, from: %s\n", "GL::STACK_UNDERFLOW", location);
+  } else if err == GL::OUT_OF_MEMORY {
+    printf("error: %s, from: %s\n", "GL::OUT_OF_MEMORY", location);
   } else if err != 0 {
     printf("unknown gl error: %d, from: %s\n", err, location);
   }
@@ -1161,6 +1161,6 @@ Window :: struct {
     glfwPollEvents();
   }
   clear :: fn() {
-    glClear(GL.COLOR_BUFFER_BIT);
+    glClear(GL::COLOR_BUFFER_BIT);
   }
 }

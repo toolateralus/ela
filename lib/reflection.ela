@@ -35,7 +35,7 @@ type_has_no_extension :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags::POINTER == 0 &&
          type.flags & TypeFlags::MAP == 0 &&
          type.flags & TypeFlags::ARRAY == 0 &&
-         type.flags & TypeFlags.FIXED_ARRAY == 0;
+         type.flags & TypeFlags::FIXED_ARRAY == 0;
 }
 
 type_is_array :: fn(type: Type*) -> bool {
@@ -95,7 +95,7 @@ type_is_pointer :: fn(type: Type*) -> bool {
 }
 
 type_is_fixed_array :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.FIXED_ARRAY != 0;
+  return type.flags & TypeFlags::FIXED_ARRAY != 0;
 }
 
 type_get_field :: fn(type: Type*, name: string) -> Field* {

@@ -278,19 +278,19 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return type_conversion_rule(global_get_type(enum_info->element_type), to);
   }
 
-  // search structs for their cast tables.
-  // Not super useful
-  if (to->kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(to->get_info());
-    for (const auto &cast : info->implicit_cast_table) {
-      if (cast == from->id) {
-        return CONVERT_IMPLICIT;
-      }
+  if (from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
+    auto enum_info = static_cast<EnumTypeInfo *>(from->get_info());
+    return type_conversion_rule(global_get_type(enum_info->element_type), to);
+  }
+  auto info = to->get_info();
+  for (const auto &cast : info->implicit_cast_table) {
+    if (cast == from->id) {
+      return CONVERT_IMPLICIT;
     }
-    for (const auto &cast : info->explicit_cast_table) {
-      if (cast == from->id) {
-        return CONVERT_EXPLICIT;
-      }
+  }
+  for (const auto &cast : info->explicit_cast_table) {
+    if (cast == from->id) {
+      return CONVERT_EXPLICIT;
     }
   }
 

@@ -33,7 +33,7 @@ NonTrivialWrapper :: struct {
 
   // this is how you'd fix the leak caused by the empty destructor in the NonTrivialUnion.
   #dtor :: fn() {
-    if tag == .String {
+    if tag == NonTrivialTag.String {
       destruct(onion.c);
     }
   }
