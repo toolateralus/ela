@@ -78,7 +78,8 @@ int global_find_function_type_id(const InternedString &name,
       return type->id;
     }
   }
-  auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
+  auto info_ptr =
+      new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
 }
 
@@ -150,7 +151,8 @@ int global_find_type_id(std::vector<int> &tuple_types,
       return type->id;
     }
   end_of_loop:
-    do {} while (false); // This line just prevents a MSVC syntax error. Silly.
+    do {
+    } while (false); // This line just prevents a MSVC syntax error. Silly.
   }
 
   // We didn't find the tuple type. Return a new one.
@@ -271,6 +273,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return CONVERT_IMPLICIT;
   }
 
+  if (to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions() &&
+      from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
+    auto info = static_cast<ScalarTypeInfo *>(to->get_info());
+    auto enum_info = static_cast<EnumTypeInfo *>(from->get_info());
+    if (info->is_integral) {
+      return type_conversion_rule(global_get_type(enum_info->element_type), to);
+    } else {
+      // TODO: verify that this is what we want to do here.
+      return CONVERT_PROHIBITED;
+    }
+  }
+
   // search structs for their cast tables.
   // Not super useful
   if (to->kind == TYPE_STRUCT) {
@@ -304,7 +318,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 bool Type::operator==(const Type &type) const {
   for (int i = 0; i < type_table.size(); ++i) {
     auto tinfo = &type_table[i];
-    if (tinfo->equals(base, extensions) && type_info_equals(type.get_info(), type.kind))
+    if (tinfo->equals(base, extensions) &&
+        type_info_equals(type.get_info(), type.kind))
       return true;
   }
   return false;
@@ -415,20 +430,20 @@ int global_create_struct_type(const InternedString &name, Scope *scope) {
 int global_create_union_type(const InternedString &name, Scope *scope,
                              UnionFlags kind) {
   type_table.emplace_back(type_table.size(), TYPE_UNION);
-  Type* type = &type_table.back();
+  Type *type = &type_table.back();
   type->set_base(name);
   UnionTypeInfo *info = type_info_alloc<UnionTypeInfo>();
   info->flags = kind;
   info->scope = scope;
   info->scope = scope;
   type->set_info(info);
-  return type->id; 
+  return type->id;
 }
 int global_create_enum_type(const InternedString &name,
                             const std::vector<InternedString> &keys,
                             bool is_flags, size_t element_type) {
   type_table.emplace_back(type_table.size(), TYPE_ENUM);
-  Type* type = &type_table.back();
+  Type *type = &type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
@@ -439,7 +454,7 @@ int global_create_enum_type(const InternedString &name,
 int global_create_type(TypeKind kind, const InternedString &name,
                        TypeInfo *info, const TypeExt &extensions) {
   type_table.emplace_back(type_table.size(), kind);
-  Type* type = &type_table.back();
+  Type *type = &type_table.back();
   type->set_ext(extensions);
   type->set_base(name);
   type->set_info(info);
@@ -590,7 +605,7 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range) {
   switch (type) {
-  
+
   case TType::Range:
   case TType::Comma:
   case TType::Semi:
@@ -823,5 +838,3 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ">";
   return ss.str();
 }
-
-
