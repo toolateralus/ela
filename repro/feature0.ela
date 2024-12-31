@@ -1,0 +1,35 @@
+
+Flag :: enum {
+  Run,
+  Build
+}
+
+// * Make if,while,for expressionable.
+
+main :: () {
+  // Must have an else of course.
+  flag : Flag = if Env::args()[0] == "-run" {
+    return Flag.Run;
+  } else {
+    return Flag.Build;
+  }
+
+  arr : s64[] = {0,1,2};
+  value := 2;
+
+  // How do we handle where this doesn't reutrn a value in all paths.
+  // maybe an #or_else?
+  index_of := for i in 0..arr.length {
+    if arr[i] == value then return i;
+  } #or_else {
+    return 0;
+  }
+
+  // Same thing for these.
+  index_of := while i < arr.length {
+    if arr[i] == value then return i;
+  } #or_else {
+    return 0;
+  } 
+}
+

@@ -41,5 +41,10 @@ main :: () {
   // If's that return.
   // Must return a value in all code paths.
   n1 := if true { 1 } else { 0 }
+
+  n : int;
+
+  n1 : n;
+
 }
 

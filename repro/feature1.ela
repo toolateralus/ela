@@ -1,0 +1,15 @@
+/*
+  This is not going to be in the near future if at all.
+*/
+
+#coroutine run_socket :: (ip: s64 = 8080) -> Socket::Message {
+  socket := Socket::open(ip);
+  while socket.connected() {
+    if socket.has_data() {
+      yield return socket.read();
+    } else {
+      yield Coroutines::wait_for_ms(100);
+    }
+  }
+  yield break;
+}

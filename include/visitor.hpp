@@ -16,7 +16,7 @@ struct VisitorBase {
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
 
-  std::any visit(ASTStatementList *node) {
+  virtual std::any visit(ASTStatementList *node) {
     for (const auto &stmt: node->statements) {
       stmt->accept(this);
     }
@@ -119,7 +119,7 @@ struct Typer : VisitorBase {
   InternedString type_name(ASTExpr *node);
 };
 
-struct EmitVisitor : VisitorBase {
+struct Emitter : VisitorBase {
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
@@ -166,7 +166,7 @@ struct EmitVisitor : VisitorBase {
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline EmitVisitor(Context &context, Typer &type_visitor)
+  inline Emitter(Context &context, Typer &type_visitor)
       : type_visitor(type_visitor), ctx(context) {
     ss = &code;
   }
@@ -185,7 +185,7 @@ struct EmitVisitor : VisitorBase {
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
 
-  bool should_emit_function(EmitVisitor *visitor, ASTFunctionDeclaration *node,
+  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node,
                             bool test_flag);
 
   void
@@ -243,4 +243,12 @@ struct EmitVisitor : VisitorBase {
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTScopeResolution *node) override;
+
+  std::any visit(ASTStatementList *node) override {
+    for (const auto &stmt: node->statements) {
+      stmt->accept(this);
+      (*ss) << ";";
+    }
+    return {};
+  };
 };

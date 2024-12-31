@@ -2,10 +2,12 @@
 
 #foreign free :: (ptr: void*) -> void;
 #foreign malloc :: (nbytes: u64) -> void*;
+#foreign calloc :: (num: u64, size: u64) -> void*;
 #foreign realloc :: (ptr: void*, size: u64) -> void*;
 
 #foreign memcpy :: (dest: void*, src: void*, n: u64) -> void*;
 #foreign memset :: (dest: void*, c: int, n: u64) -> void*;
+#foreign memmove :: (dest: void*, src: void*, nbytes: s64) -> int;
 
 #foreign printf :: (format: c_string, ...) -> int;
 #foreign exit :: (code: int);
@@ -83,7 +85,6 @@ Strings :: struct {
 
     return strncmp(str, substr, substr_len) == 0;
   }
-
   #static ends_with :: (str: c_string, pattern: c_string) -> bool {
     if !str || !pattern
       then return false;
@@ -96,7 +97,6 @@ Strings :: struct {
 
     return strncmp(str + (len - patlen), pattern, patlen) == 0;
   }
-
   #static starts_with :: (str: string, substr: string) -> bool {
     if str.data == null || substr.data == null
       then return false;
@@ -112,7 +112,6 @@ Strings :: struct {
 
     return strncmp(str.data, substr.data, substr_len) == 0;
   }
-
   #static ends_with :: (str: string, pattern: string) -> bool {
     if !str.data || !pattern.data
       then return false;
@@ -125,7 +124,6 @@ Strings :: struct {
 
     return strncmp(str.data + (len - patlen), pattern.data, patlen) == 0;
   }
-
   #static replace :: (str: string, pattern: string, replacement: string) -> string {
     if !str.data || !pattern.data || !replacement.data
       then return str;
@@ -148,7 +146,6 @@ Strings :: struct {
 
     return result;
   }
-
   #static substr :: (src: c_string, start: int, end: int) -> string {
     if !src
       then return {};
@@ -167,11 +164,9 @@ Strings :: struct {
     free(dest);
     return v;
   }
-
   #static equals :: (a: c_string, b) -> bool {
     return strcmp(a, b) == 0;
   }
-
   #static split :: (str: string, delimiter: char) -> string[] {
     if !str.data then return {};
     result: string[];
@@ -186,7 +181,6 @@ Strings :: struct {
     result ~= string{str.data + start, str.data + str_len};
     return result;
   }
-
   #static split :: (str: c_string, delimiter: char) -> string[] {
     if !str then return {};
     result: string[];
@@ -201,7 +195,6 @@ Strings :: struct {
     result ~= string{str + start, str + str_len};
     return result;
   }
-
   #static contains :: (str: string, ch: char) -> bool {
     for _ch in str {
       if _ch == ch {
@@ -210,7 +203,6 @@ Strings :: struct {
     }
     return false;
   }
-  
   #static contains :: (str: c_string, ch: char) -> bool {
     for _ch in string{str} {
       if _ch == ch {
@@ -219,7 +211,6 @@ Strings :: struct {
     }
     return false;
   }
-
   #static contains :: (str: string, pattern: string) -> bool {
     if str.data == null || pattern.data == null
       then return false;
@@ -237,7 +228,6 @@ Strings :: struct {
     }
     return false;
   }
-
   #static contains :: (str: c_string, pattern: c_string) -> bool {
     if str == null || pattern == null
       then return false;
@@ -255,7 +245,6 @@ Strings :: struct {
     }
     return false;
   }
-  
 }
 
 to_string :: (num: s64) -> string {

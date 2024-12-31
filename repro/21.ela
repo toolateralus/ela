@@ -1,0 +1,7 @@
+
+#import core;
+
+main :: () {
+  // Use of undeclared identifier 'args'
+  println(Env::args().data);
+}

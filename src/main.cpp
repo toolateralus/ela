@@ -182,7 +182,7 @@ int CompileCommand::compile() {
     ast.close();
   }
 
-  EmitVisitor emit(context, type_visitor);
+  Emitter emit(context, type_visitor);
   emit.visit(root);
 
   lower.end("lowering to cpp complete");

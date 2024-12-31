@@ -535,6 +535,7 @@ struct ASTNoop : ASTStatement {
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
+  DIRECTIVE_KIND_DONT_CARE,
 };
 
 enum ParserState {

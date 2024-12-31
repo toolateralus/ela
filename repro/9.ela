@@ -1,8 +1,3 @@
-/* 
-  ! Right now enums work just like C enums, except you can never refer to an enum value by it's type name.
-  ! We should have type safe implicitly-convertible-to-integer enums, Like a mix of C++ and C enums.
-*/
-
 Enum :: enum {
   One,
   Two,
