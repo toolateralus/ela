@@ -23,53 +23,68 @@ enum PreprocKind {
   PREPROC_IFNDEF,
 };
 
+void remove_body(Parser *parser) {
+  parser->expect(TType::LCurly);
+  int depth = 1;
+  while (depth > 0) {
+    if (parser->peek().type == TType::LCurly)
+      depth++;
+    if (parser->peek().type == TType::RCurly)
+      depth--;
+    parser->eat();
+  }
+}
+
+void remove_preproc(Parser *parser) {
+  if (parser->peek().type == TType::If ||
+      (parser->peek().type == TType::Identifier &&
+       parser->peek().value == "ifdef") ||
+      (parser->peek().type == TType::Identifier &&
+       parser->peek().value == "ifndef")) {
+    while (parser->peek().type != TType::LCurly) {
+      parser->eat();
+    }
+    remove_body(parser);
+    if (parser->peek().type == TType::Else) {
+      parser->expect(TType::Else);
+      remove_preproc(parser);
+    }
+  } else {
+    remove_body(parser);
+  }
+}
+
 static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
                                          PreprocKind kind) {
   bool executed = false;
 
-#define EAT_DEAD_CODE                                                          \
-  while (parser->peek().type != TType::LCurly) {                               \
-    parser->eat();                                                             \
-  }                                                                            \
-  parser->expect(TType::LCurly);                                               \
-  int depth = 1;                                                               \
-  while (depth > 0) {                                                          \
-    if (parser->peek().type == TType::LCurly)                                  \
-      depth++;                                                                 \
-    if (parser->peek().type == TType::RCurly)                                  \
-      depth--;                                                                 \
-    parser->eat();                                                             \
-  }
-
-#define HANDLE_PREPROC_BLOCK(condition)                                        \
-  if (condition) {                                                             \
-    parser->expect(TType::LCurly);                                             \
-    executed = true;                                                           \
-    while (parser->peek().type != TType::RCurly) {                             \
-      list->statements.push_back(parser->parse_statement());                   \
-      while (parser->peek().type == TType::Semi)                               \
-        parser->eat();                                                         \
-    }                                                                          \
-  } else { /* elim dead code */                                                \
-    EAT_DEAD_CODE                                                              \
-  }
-
   if (kind == PREPROC_IFDEF) { // Handling #ifdef
     auto symbol = parser->expect(TType::Identifier).value;
-    HANDLE_PREPROC_BLOCK(parser->ctx.scope->has_def(symbol));
+    executed = parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
     auto symbol = parser->expect(TType::Identifier).value;
-    HANDLE_PREPROC_BLOCK(!parser->ctx.scope->has_def(symbol));
+    executed = !parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IF) { // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
-    HANDLE_PREPROC_BLOCK(value.is_truthy());
+    executed = value.is_truthy();
   } else {
     throw_error("INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
                 "unrecognized kind.",
                 {});
   }
-  parser->expect(TType::RCurly);
+
+  if (executed) {
+    parser->expect(TType::LCurly);
+    while (parser->peek().type != TType::RCurly) {
+      list->statements.push_back(parser->parse_statement());
+      while (parser->peek().type == TType::Semi)
+        parser->eat();
+    }
+    parser->expect(TType::RCurly);
+  } else {
+    remove_body(parser);
+  }
 
   if (parser->peek().type == TType::Else) {
     parser->expect(TType::Else);
@@ -95,7 +110,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
         parser->expect(TType::RCurly);
       }
     } else { /* No code emitted for this case, eat it up. */
-      EAT_DEAD_CODE;
+      remove_preproc(parser);
     }
   }
 }

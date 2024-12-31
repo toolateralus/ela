@@ -1516,6 +1516,43 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
   assert("ifndef failed", CONSTANT3 == 100);
 
+  #def thing
 
-  n := #if true { 100 } else { 200 };
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", false);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", true);
+  }
+
+  #undef thing;
+  
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", true);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", false);
+  }
 }
