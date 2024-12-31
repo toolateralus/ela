@@ -1,6 +1,6 @@
 // this segfaults, the type is null in the delete satement in the emit visitor
 
-main :: () {
+main :: fn() {
 	arr := new int;
 	delete((int*)arr);
   

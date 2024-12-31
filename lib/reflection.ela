@@ -23,30 +23,30 @@ TypeFlags :: enum {
   UNSIGNED        = 32768,
 }
 
-type_is_signed :: (type: Type*) -> bool {
+type_is_signed :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.SIGNED != 0;
 }
 
-type_is_unsigned :: (type: Type*) -> bool {
+type_is_unsigned :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.UNSIGNED != 0;
 }
 
-type_has_no_extension :: (type: Type*) -> bool {
+type_has_no_extension :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.POINTER == 0 &&
          type.flags & TypeFlags.MAP == 0 &&
          type.flags & TypeFlags.ARRAY == 0 &&
          type.flags & TypeFlags.FIXED_ARRAY == 0;
 }
 
-type_is_array :: (type: Type*) -> bool {
+type_is_array :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.ARRAY != 0;
 }
 
-type_is_string :: (type: Type*) -> bool {
+type_is_string :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.STRING != 0;
 }
 
-type_is_scalar :: (type: Type*) -> bool {
+type_is_scalar :: fn(type: Type*) -> bool {
   return type_has_no_extension(type) &&
          (type.flags & TypeFlags.INTEGER != 0 ||
           type.flags & TypeFlags.FLOAT != 0   ||
@@ -54,51 +54,51 @@ type_is_scalar :: (type: Type*) -> bool {
           type.flags & TypeFlags.STRING != 0);
 }
 
-type_is_struct :: (type: Type*) -> bool {
+type_is_struct :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.STRUCT != 0;
 }
 
-type_is_union :: (type: Type*) -> bool {
+type_is_union :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.UNION != 0;
 }
 
-type_is_enum :: (type: Type*) -> bool {
+type_is_enum :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.ENUM != 0;
 }
 
-type_is_integral :: (type: Type*) -> bool {
+type_is_integral :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.INTEGER != 0;
 }
 
-type_is_float :: (type: Type*) -> bool {
+type_is_float :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.FLOAT != 0;
 }
 
-type_is_bool :: (type: Type*) -> bool {
+type_is_bool :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.BOOL != 0;
 }
 
-type_is_tuple :: (type: Type*) -> bool {
+type_is_tuple :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.TUPLE != 0;
 }
 
-type_is_map :: (type: Type*) -> bool {
+type_is_map :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.MAP != 0;
 }
 
-type_is_function :: (type: Type*) -> bool {
+type_is_function :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.FUNCTION != 0;
 }
 
-type_is_pointer :: (type: Type*) -> bool {
+type_is_pointer :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.POINTER != 0;
 }
 
-type_is_fixed_array :: (type: Type*) -> bool {
+type_is_fixed_array :: fn(type: Type*) -> bool {
   return type.flags & TypeFlags.FIXED_ARRAY != 0;
 }
 
-type_get_field :: (type: Type*, name: string) -> Field* {
+type_get_field :: fn(type: Type*, name: string) -> Field* {
   for field in type.fields {
     if strcmp(field.name, name.data) == 0 {
       return field;

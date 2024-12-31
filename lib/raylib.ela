@@ -130,15 +130,15 @@ Color :: struct {
   b: u8;
   a: u8;
 
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"r: {r}, g: {g}, b: {b}, a: {a}";
   }
 
-  #operator(==) :: (other: #self) -> bool {
+  #operator(==) :: fn(other: #self) -> bool {
     return other.a == a && other.r == r && other.g == g && other.b == b;
   }
 
-  with_alpha :: (a: int) -> #self {
+  with_alpha :: fn(a: int) -> #self {
     color := *this;
     color.a = (u8)a;
     return color;
@@ -157,47 +157,47 @@ Vector2 :: struct {
   x: float;
   y: float;
 
-  #operator(+) :: (other: #self) -> #self {
+  #operator(+) :: fn(other: #self) -> #self {
     return #make(#self, { x + other.x, y + other.y });
   }
 
-  #operator(-) :: (other: #self) -> #self {
+  #operator(-) :: fn(other: #self) -> #self {
     return #make(#self, {x - other.x, y - other.y });
   }
 
-  #operator(*) :: (scalar: float) -> #self {
+  #operator(*) :: fn(scalar: float) -> #self {
     return #make(#self, {x * scalar, y * scalar });
   }
 
-  #operator(/) :: (scalar: float) -> #self {
+  #operator(/) :: fn(scalar: float) -> #self {
     return #make(#self, {x / scalar, y / scalar });
   }
 
-  #operator(+=) :: (other: #self) -> #self {
+  #operator(+=) :: fn(other: #self) -> #self {
     x += other.x;
     y += other.y;
     return *this;
   }
 
-  #operator(-=) :: (other: #self) -> #self {
+  #operator(-=) :: fn(other: #self) -> #self {
     x -= other.x;
     y -= other.y;
     return *this;
   }
 
-  #operator(*=) :: (scalar: float) -> #self {
+  #operator(*=) :: fn(scalar: float) -> #self {
     x *= scalar;
     y *= scalar;
     return *this;
   }
 
-  #operator(/=) :: (scalar: float) -> #self {
+  #operator(/=) :: fn(scalar: float) -> #self {
     x /= scalar;
     y /= scalar;
     return *this;
   }
 
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"x: {x}, y: {y}"
   }
 }
@@ -207,51 +207,51 @@ Vector3 :: struct {
   y: float;
   z: float;
 
-  #operator(+) :: (other: Vector3) -> Vector3 {
+  #operator(+) :: fn(other: Vector3) -> Vector3 {
     return #make(#self, {x + other.x, y + other.y, z + other.z });
   }
 
-  #operator(-) :: (other: Vector3) -> Vector3 {
+  #operator(-) :: fn(other: Vector3) -> Vector3 {
     return #make(#self, {x - other.x, y - other.y, z - other.z });
   }
 
-  #operator(*) :: (scalar: float) -> Vector3 {
+  #operator(*) :: fn(scalar: float) -> Vector3 {
     return #make(#self, {x * scalar, y * scalar, z * scalar });
   }
 
-  #operator(/) :: (scalar: float) -> Vector3 {
+  #operator(/) :: fn(scalar: float) -> Vector3 {
     return #make(#self, {x / scalar, y / scalar, z / scalar });
   }
 
-  #operator(+=) :: (other: Vector3) -> Vector3 {
+  #operator(+=) :: fn(other: Vector3) -> Vector3 {
     x += other.x;
     y += other.y;
     z += other.z;
     return *this;
   }
 
-  #operator(-=) :: (other: Vector3) -> Vector3 {
+  #operator(-=) :: fn(other: Vector3) -> Vector3 {
     x -= other.x;
     y -= other.y;
     z -= other.z;
     return *this;
   }
 
-  #operator(*=) :: (scalar: float) -> Vector3 {
+  #operator(*=) :: fn(scalar: float) -> Vector3 {
     x *= scalar;
     y *= scalar;
     z *= scalar;
     return *this;
   }
 
-  #operator(/=) :: (scalar: float) -> Vector3 {
+  #operator(/=) :: fn(scalar: float) -> Vector3 {
     x /= scalar;
     y /= scalar;
     z /= scalar;
     return *this;
   }
 
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"x: {x}, y: {y}, z: {z}"
   }
 }
@@ -262,7 +262,7 @@ Rectangle :: struct {
   width: float;
   height: float;
 
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"x: {x}, y: {y}, width: {width}, height: {height}";
   }
 }
@@ -352,7 +352,7 @@ ConfigFlags :: enum {
   InterlacedHint        = 0x00010000  // 1 << 16
 }
 
-color_lerp :: (a: Color, b: Color, t: float) -> Color {
+color_lerp :: fn(a: Color, b: Color, t: float) -> Color {
   return #make(Color, {
     (u8)clamp(a.r + (b.r - a.r) * t, 0, 255),
     (u8)clamp(a.g + (b.g - a.g) * t, 0, 255),
@@ -420,146 +420,146 @@ All_Colors : Color[] = {
   LIGHTCYAN,
 }
 
-#foreign InitTimer :: () -> void;
-#foreign GetTime :: () -> float64;
+#foreign InitTimer :: fn() -> void;
+#foreign GetTime :: fn() -> float64;
 
-#foreign Vector2Zero :: () -> Vector2;
-#foreign Vector2One :: () -> Vector2;
-#foreign Vector2Add :: (v: Vector2, v1: Vector2) -> Vector2;
-#foreign Vector2AddValue :: (v: Vector2, add: float) -> Vector2;
-#foreign Vector2Subtract :: (v: Vector2, v1: Vector2) -> Vector2;
-#foreign Vector2SubtractValue :: (v: Vector2, sub: float) -> Vector2;
-#foreign Vector2Length :: (v: Vector2) -> float;
-#foreign Vector2LengthSqr :: (v: Vector2) -> float;
-#foreign Vector2DotProduct :: (v: Vector2, v1: Vector2) -> float;
-#foreign Vector2Distance :: (v: Vector2, v1: Vector2) -> float;
-#foreign Vector2DistanceSqr :: (v: Vector2, v1: Vector2) -> float;
-#foreign Vector2Angle :: (v: Vector2, v1: Vector2) -> float;
-#foreign Vector2LineAngle :: (start: Vector2, end) -> float;
-#foreign Vector2Scale :: (v: Vector2, scale: float) -> Vector2;
-#foreign Vector2Multiply :: (v: Vector2, v1) -> Vector2;
-#foreign Vector2Negate :: (v: Vector2) -> Vector2;
-#foreign Vector2Divide :: (v: Vector2, v1) -> Vector2;
-#foreign Vector2Normalize :: (v: Vector2) -> Vector2;
+#foreign Vector2Zero :: fn() -> Vector2;
+#foreign Vector2One :: fn() -> Vector2;
+#foreign Vector2Add :: fn(v: Vector2, v1: Vector2) -> Vector2;
+#foreign Vector2AddValue :: fn(v: Vector2, add: float) -> Vector2;
+#foreign Vector2Subtract :: fn(v: Vector2, v1: Vector2) -> Vector2;
+#foreign Vector2SubtractValue :: fn(v: Vector2, sub: float) -> Vector2;
+#foreign Vector2Length :: fn(v: Vector2) -> float;
+#foreign Vector2LengthSqr :: fn(v: Vector2) -> float;
+#foreign Vector2DotProduct :: fn(v: Vector2, v1: Vector2) -> float;
+#foreign Vector2Distance :: fn(v: Vector2, v1: Vector2) -> float;
+#foreign Vector2DistanceSqr :: fn(v: Vector2, v1: Vector2) -> float;
+#foreign Vector2Angle :: fn(v: Vector2, v1: Vector2) -> float;
+#foreign Vector2LineAngle :: fn(start: Vector2, end) -> float;
+#foreign Vector2Scale :: fn(v: Vector2, scale: float) -> Vector2;
+#foreign Vector2Multiply :: fn(v: Vector2, v1) -> Vector2;
+#foreign Vector2Negate :: fn(v: Vector2) -> Vector2;
+#foreign Vector2Divide :: fn(v: Vector2, v1) -> Vector2;
+#foreign Vector2Normalize :: fn(v: Vector2) -> Vector2;
 
-#foreign Vector2Lerp :: (v: Vector2, v1, amount: float) -> Vector2;
-#foreign Vector2Reflect :: (v: Vector2, normal) -> Vector2;
-#foreign Vector2Min :: (v: Vector2, v1) -> Vector2;
-#foreign Vector2Max :: (v: Vector2, v1) -> Vector2;
-#foreign Vector2Rotate :: (v: Vector2, angle: float) -> Vector2;
-#foreign Vector2MoveTowards :: (v: Vector2, target, maxDistance: float) -> Vector2;
-#foreign Vector2Invert :: (v: Vector2) -> Vector2;
-#foreign Vector2Clamp :: (v: Vector2, min, max) -> Vector2;
-#foreign Vector2ClampValue :: (v: Vector2, min: float, max) -> Vector2;
-#foreign Vector2Equals :: (p: Vector2, q) -> int;
-#foreign Vector2Refract :: (v: Vector2, n, r: float) -> Vector2;
+#foreign Vector2Lerp :: fn(v: Vector2, v1, amount: float) -> Vector2;
+#foreign Vector2Reflect :: fn(v: Vector2, normal) -> Vector2;
+#foreign Vector2Min :: fn(v: Vector2, v1) -> Vector2;
+#foreign Vector2Max :: fn(v: Vector2, v1) -> Vector2;
+#foreign Vector2Rotate :: fn(v: Vector2, angle: float) -> Vector2;
+#foreign Vector2MoveTowards :: fn(v: Vector2, target, maxDistance: float) -> Vector2;
+#foreign Vector2Invert :: fn(v: Vector2) -> Vector2;
+#foreign Vector2Clamp :: fn(v: Vector2, min, max) -> Vector2;
+#foreign Vector2ClampValue :: fn(v: Vector2, min: float, max) -> Vector2;
+#foreign Vector2Equals :: fn(p: Vector2, q) -> int;
+#foreign Vector2Refract :: fn(v: Vector2, n, r: float) -> Vector2;
 
 /* Collision detection */
-#foreign CheckCollisionRecs :: (rec1: Rectangle, rec2: Rectangle) -> bool;
-#foreign CheckCollisionCircles :: (center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
-#foreign CheckCollisionCircleRec :: (center: Vector2, radius: float, rec: Rectangle) -> bool;
-#foreign CheckCollisionPointRec :: (point: Vector2, rec: Rectangle) -> bool;
-#foreign CheckCollisionPointCircle :: (point: Vector2, center: Vector2, radius: float) -> bool;
-#foreign CheckCollisionPointTriangle :: (point: Vector2, p1: Vector2, p2: Vector2, p3: Vector2) -> bool;
+#foreign CheckCollisionRecs :: fn(rec1: Rectangle, rec2: Rectangle) -> bool;
+#foreign CheckCollisionCircles :: fn(center1: Vector2, radius1: float, center2: Vector2, radius2: float) -> bool;
+#foreign CheckCollisionCircleRec :: fn(center: Vector2, radius: float, rec: Rectangle) -> bool;
+#foreign CheckCollisionPointRec :: fn(point: Vector2, rec: Rectangle) -> bool;
+#foreign CheckCollisionPointCircle :: fn(point: Vector2, center: Vector2, radius: float) -> bool;
+#foreign CheckCollisionPointTriangle :: fn(point: Vector2, p1: Vector2, p2: Vector2, p3: Vector2) -> bool;
 
 /* Window stuff */
-#foreign GetScreenWidth :: () -> int;
-#foreign GetScreenHeight :: () -> int;
+#foreign GetScreenWidth :: fn() -> int;
+#foreign GetScreenHeight :: fn() -> int;
 
 /* Input stuff */
-#foreign GetMouseWheelMove :: () -> float;
-#foreign GetMouseX :: () -> int;
-#foreign GetMouseY :: () -> int;
-#foreign GetMousePosition :: () -> Vector2;
-#foreign IsMouseButtonPressed :: (button: int) -> bool;
-#foreign IsMouseButtonDown :: (button: int) -> bool;
-#foreign IsMouseButtonReleased :: (button: int) -> bool;
-#foreign IsMouseButtonUp :: (button: int) -> bool;
+#foreign GetMouseWheelMove :: fn() -> float;
+#foreign GetMouseX :: fn() -> int;
+#foreign GetMouseY :: fn() -> int;
+#foreign GetMousePosition :: fn() -> Vector2;
+#foreign IsMouseButtonPressed :: fn(button: int) -> bool;
+#foreign IsMouseButtonDown :: fn(button: int) -> bool;
+#foreign IsMouseButtonReleased :: fn(button: int) -> bool;
+#foreign IsMouseButtonUp :: fn(button: int) -> bool;
 
-#foreign GetKeyPressed :: () -> int;
-#foreign GetCharPressed :: () -> char;
-#foreign IsKeyPressed :: (key: int) -> bool;
-#foreign IsKeyDown :: (key: int) -> bool;
-#foreign IsKeyReleased :: (key: int) -> bool;
-#foreign SetExitKey :: (key :int);
+#foreign GetKeyPressed :: fn() -> int;
+#foreign GetCharPressed :: fn() -> char;
+#foreign IsKeyPressed :: fn(key: int) -> bool;
+#foreign IsKeyDown :: fn(key: int) -> bool;
+#foreign IsKeyReleased :: fn(key: int) -> bool;
+#foreign SetExitKey :: fn(key :int);
 
 /* Drawing functions */
-#foreign InitWindow :: (width: int, height: int, title: c_string) -> void;
-#foreign WindowShouldClose :: () -> bool;
-#foreign CloseWindow :: () -> void;
-#foreign BeginDrawing :: () -> void;
-#foreign EndDrawing :: () -> void;
-#foreign ClearBackground :: (color: Color) -> void;
+#foreign InitWindow :: fn(width: int, height: int, title: c_string) -> void;
+#foreign WindowShouldClose :: fn() -> bool;
+#foreign CloseWindow :: fn() -> void;
+#foreign BeginDrawing :: fn() -> void;
+#foreign EndDrawing :: fn() -> void;
+#foreign ClearBackground :: fn(color: Color) -> void;
 
-#foreign SetTargetFPS :: (fps: int) -> void;
-#foreign DrawFPS :: (posX: int, posY: int) -> void;
-#foreign GetFPS :: () -> int;
-#foreign DrawLine :: (startPosX: int, startPosY, endPosX, endPosY, color: Color) -> void;
-#foreign DrawCircle :: (centerX: int, centerY, radius: float, color: Color) -> void;
-#foreign DrawRectangle :: (posX: int, posY, width, height, color: Color) -> void;
-#foreign DrawTriangle :: (v1X: int, v1Y, v2X, v2Y, v3X, v3Y, color: Color) -> void;
-#foreign DrawPoly :: (centerX: int, centerY: int, sides: int, radius: float, rotation: float, color: Color) -> void;
-#foreign LoadTexture :: (fileName: c_string) -> Texture2D;
-#foreign UnloadTexture :: (texture: Texture2D) -> void;
-#foreign DrawTexture :: (texture: Texture2D, posX: int, posY: int, tint: Color) -> void;
-#foreign DrawTextureEx :: (texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
-#foreign DrawRectangleRec :: (rec: Rectangle, color: Color) -> void;
-#foreign DrawTextureRec :: (texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
-#foreign DrawTexturePro :: (texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
-#foreign DrawRectangleLinesEx :: (rec: Rectangle, lineThick: int, color: Color) -> void;
-#foreign DrawRectangleV :: (position: Vector2, size: Vector2, color: Color) -> void;
-#foreign DrawRectangleLines :: (posX: int, posY: int, width: int, height: int, color: Color) -> void;
-#foreign ColorAlphaBlend:: (dst: Color, src, tint) -> Color;
-#foreign IsWindowResized :: () -> bool;
-#foreign SetWindowState :: (flags: int) -> void;
-#foreign BeginScissorMode :: (x: int, y, w, h);
-#foreign EndScissorMode :: ();
-#foreign Fade :: (color: Color, alpha: float) -> Color;
-#foreign ColorFromHSV :: (hue: float, saturation, value) -> Color;
+#foreign SetTargetFPS :: fn(fps: int) -> void;
+#foreign DrawFPS :: fn(posX: int, posY: int) -> void;
+#foreign GetFPS :: fn() -> int;
+#foreign DrawLine :: fn(startPosX: int, startPosY, endPosX, endPosY, color: Color) -> void;
+#foreign DrawCircle :: fn(centerX: int, centerY, radius: float, color: Color) -> void;
+#foreign DrawRectangle :: fn(posX: int, posY, width, height, color: Color) -> void;
+#foreign DrawTriangle :: fn(v1X: int, v1Y, v2X, v2Y, v3X, v3Y, color: Color) -> void;
+#foreign DrawPoly :: fn(centerX: int, centerY: int, sides: int, radius: float, rotation: float, color: Color) -> void;
+#foreign LoadTexture :: fn(fileName: c_string) -> Texture2D;
+#foreign UnloadTexture :: fn(texture: Texture2D) -> void;
+#foreign DrawTexture :: fn(texture: Texture2D, posX: int, posY: int, tint: Color) -> void;
+#foreign DrawTextureEx :: fn(texture: Texture2D, position: Vector2, rotation: float, scale: float, tint: Color) -> void;
+#foreign DrawRectangleRec :: fn(rec: Rectangle, color: Color) -> void;
+#foreign DrawTextureRec :: fn(texture: Texture2D, sourceRec: Rectangle, position: Vector2, tint: Color) -> void;
+#foreign DrawTexturePro :: fn(texture: Texture2D, sourceRec: Rectangle, destRec: Rectangle, origin: Vector2, rotation: float, tint: Color) -> void;
+#foreign DrawRectangleLinesEx :: fn(rec: Rectangle, lineThick: int, color: Color) -> void;
+#foreign DrawRectangleV :: fn(position: Vector2, size: Vector2, color: Color) -> void;
+#foreign DrawRectangleLines :: fn(posX: int, posY: int, width: int, height: int, color: Color) -> void;
+#foreign ColorAlphaBlend:: fn(dst: Color, src, tint) -> Color;
+#foreign IsWindowResized :: fn() -> bool;
+#foreign SetWindowState :: fn(flags: int) -> void;
+#foreign BeginScissorMode :: fn(x: int, y, w, h);
+#foreign EndScissorMode :: fn();
+#foreign Fade :: fn(color: Color, alpha: float) -> Color;
+#foreign ColorFromHSV :: fn(hue: float, saturation, value) -> Color;
 
-#foreign SetCameraMode :: (camera: Camera2D, mode: int) -> void;
-#foreign UpdateCamera :: (camera: Camera2D*) -> void;
-#foreign BeginMode2D :: (camera: Camera2D) -> void;
-#foreign EndMode2D :: () -> void;
+#foreign SetCameraMode :: fn(camera: Camera2D, mode: int) -> void;
+#foreign UpdateCamera :: fn(camera: Camera2D*) -> void;
+#foreign BeginMode2D :: fn(camera: Camera2D) -> void;
+#foreign EndMode2D :: fn() -> void;
 
-#foreign GetWorldToScreen :: (position: Vector3, camera: Camera) -> Vector2;
-#foreign GetWorldToScreenEx :: (position: Vector3, camera: Camera, width: int, height: int) -> Vector2;
-#foreign GetWorldToScreen2D :: (position: Vector2, camera: Camera2D) -> Vector2;
-#foreign GetScreenToWorld2D :: (position: Vector2, camera: Camera2D) -> Vector2;
+#foreign GetWorldToScreen :: fn(position: Vector3, camera: Camera) -> Vector2;
+#foreign GetWorldToScreenEx :: fn(position: Vector3, camera: Camera, width: int, height: int) -> Vector2;
+#foreign GetWorldToScreen2D :: fn(position: Vector2, camera: Camera2D) -> Vector2;
+#foreign GetScreenToWorld2D :: fn(position: Vector2, camera: Camera2D) -> Vector2;
 
 
 /* Text functions */
-#foreign DrawText :: (text: c_string, posX: int, posY: int, fontSize: int, color: Color) -> void;
-#foreign MeasureText :: (text: c_string, fontSize: int) -> int;
-#foreign TextFormat :: (format: c_string, ...) -> c_string;
-#foreign LoadFont :: (fileName: c_string) -> Font;
-#foreign DrawTextEx :: (font: Font, text: c_string, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
-#foreign MeasureTextEx :: (font: Font, text: c_string, fontSize: float, spacing: float) -> Vector2;
+#foreign DrawText :: fn(text: c_string, posX: int, posY: int, fontSize: int, color: Color) -> void;
+#foreign MeasureText :: fn(text: c_string, fontSize: int) -> int;
+#foreign TextFormat :: fn(format: c_string, ...) -> c_string;
+#foreign LoadFont :: fn(fileName: c_string) -> Font;
+#foreign DrawTextEx :: fn(font: Font, text: c_string, position: Vector2, fontSize: float, spacing: float, tint: Color) -> void;
+#foreign MeasureTextEx :: fn(font: Font, text: c_string, fontSize: float, spacing: float) -> Vector2;
 
 
 /* Audio functions */
-#foreign LoadSound :: (fileName: c_string) -> Sound;
-#foreign UnloadSound :: (sound: Sound) -> void;
-#foreign PlaySound :: (sound: Sound) -> void;
-#foreign StopSound :: (sound: Sound) -> void;
-#foreign PauseSound :: (sound: Sound) -> void;
-#foreign ResumeSound :: (sound: Sound) -> void;
-#foreign LoadMusicStream :: (fileName: c_string) -> Music;
-#foreign UnloadMusicStream :: (music: Music) -> void;
-#foreign PlayMusicStream :: (music: Music) -> void;
-#foreign UpdateMusicStream :: (music: Music) -> void;
-#foreign StopMusicStream :: (music: Music) -> void;
-#foreign PauseMusicStream :: (music: Music) -> void;
-#foreign ResumeMusicStream :: (music: Music) -> void;
-#foreign SetMusicVolume :: (music: Music, volume: float);
-#foreign SetSoundVolume :: (sound: Sound, volume: float);
-#foreign IsMusicStreamPlaying :: (music: Music) -> bool;
-#foreign SetAudioStreamPitch :: (music: Music, pitch: float);
-#foreign SetSoundPitch :: (sound: Sound, pitch: float) -> void;
-#foreign InitAudioDevice :: () -> void;
-#foreign CloseAudioDevice :: () -> void;
-#foreign IsAudioDeviceReady :: () -> bool;
-#foreign SetMasterVolume :: (volume: float) -> void;
+#foreign LoadSound :: fn(fileName: c_string) -> Sound;
+#foreign UnloadSound :: fn(sound: Sound) -> void;
+#foreign PlaySound :: fn(sound: Sound) -> void;
+#foreign StopSound :: fn(sound: Sound) -> void;
+#foreign PauseSound :: fn(sound: Sound) -> void;
+#foreign ResumeSound :: fn(sound: Sound) -> void;
+#foreign LoadMusicStream :: fn(fileName: c_string) -> Music;
+#foreign UnloadMusicStream :: fn(music: Music) -> void;
+#foreign PlayMusicStream :: fn(music: Music) -> void;
+#foreign UpdateMusicStream :: fn(music: Music) -> void;
+#foreign StopMusicStream :: fn(music: Music) -> void;
+#foreign PauseMusicStream :: fn(music: Music) -> void;
+#foreign ResumeMusicStream :: fn(music: Music) -> void;
+#foreign SetMusicVolume :: fn(music: Music, volume: float);
+#foreign SetSoundVolume :: fn(sound: Sound, volume: float);
+#foreign IsMusicStreamPlaying :: fn(music: Music) -> bool;
+#foreign SetAudioStreamPitch :: fn(music: Music, pitch: float);
+#foreign SetSoundPitch :: fn(sound: Sound, pitch: float) -> void;
+#foreign InitAudioDevice :: fn() -> void;
+#foreign CloseAudioDevice :: fn() -> void;
+#foreign IsAudioDeviceReady :: fn() -> bool;
+#foreign SetMasterVolume :: fn(volume: float) -> void;
 
 
 // * ########### BUILTIN UI HELPERS ############### //
@@ -578,7 +578,7 @@ Style :: struct {
 }
 
 // * Measure the width of a jiggly text of 'text' and 'style'
-measure_jiggly_text :: (text: c_string, style: Style) -> float {
+measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
   length: int = strlen(text);
   total_width: float = 0.0;
   for i in 0..length {
@@ -588,7 +588,7 @@ measure_jiggly_text :: (text: c_string, style: Style) -> float {
 }
 
 // * Draw wavy jiggly text.
-jiggly_text :: (text: c_string, rect: Rectangle, style: Style) {
+jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
   time: float = (float)GetTime();
   length: int = strlen(text);
 
@@ -604,7 +604,7 @@ jiggly_text :: (text: c_string, rect: Rectangle, style: Style) {
 }
 
 // * Draw a button with a click callback.
-draw_button :: (text: c_string, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
+draw_button :: fn(text: c_string, rect: Rectangle, style: Style, callback: ButtonCallback) -> bool {
   position: Vector2 = {rect.x, rect.y};
   size: Vector2 = {rect.width, rect.height};
 
@@ -655,7 +655,7 @@ Timer :: struct {
   interval : float = 0.5;
   // Returns true if the timer has exceeded the interval time relative to the last tick time.
   last_tick_time: float;
-  tick :: () -> bool {
+  tick :: fn() -> bool {
     now := GetTime();
     if last_tick_time == 0 {
       last_tick_time = now;
@@ -679,7 +679,7 @@ SliderF :: struct {
   value: float*;
   held : bool;
   digits_to_show: int = 5;
-  draw :: () {
+  draw :: fn() {
     // Draw the slider background
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
@@ -710,7 +710,7 @@ SliderF :: struct {
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
 
-    adjust_slider_value :: () {
+    adjust_slider_value :: fn() {
       increment: float;
       if IsKeyDown(Key.LeftShift) {
         increment = (max_value - min_value) / 100;
@@ -753,7 +753,7 @@ SliderI :: struct {
   value: int*;
   held : bool;
   digits_to_show: int = 3;
-  draw :: () {
+  draw :: fn() {
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
     v_f := (float)*this.value;
@@ -783,7 +783,7 @@ SliderI :: struct {
     DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
 
 
-    adjust_slider_value :: () {
+    adjust_slider_value :: fn() {
       increment: float;
       if IsKeyDown(Key.LeftShift) {
         increment = (max_value - min_value) / 100;
@@ -823,7 +823,7 @@ CheckButton :: struct {
   text: string;
   allow_hold : bool;
 
-  draw :: () {
+  draw :: fn() {
     if value {
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
     } else {
@@ -868,7 +868,7 @@ DropDown :: struct {
   is_open: bool = false;
   on_selected: void(int)* = null;
   on_open: void()* = null;
-    draw :: () {
+    draw :: fn() {
       // Draw the dropdown box
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 

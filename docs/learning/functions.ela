@@ -1,8 +1,8 @@
 
 
-/* functions are simply defined with NAME :: (parameters) -> RETURN_TYPE {..block..} syntax. */
+/* functions are simply defined with NAME :: fn(parameters) -> RETURN_TYPE {..block..} syntax. */
 
-add :: (a: s32, b: s32) -> s32 {
+add :: fn(a: s32, b: s32) -> s32 {
   return a + b;
 }
 
@@ -13,12 +13,12 @@ add :: (a: s32, b: s32) -> s32 {
 
 
 // ✅ valid
-add :: (a: s32, b, c) -> s32 {
+add :: fn(a: s32, b, c) -> s32 {
   return a + b + c;
 }
 
 // ❌ invalid. we do not use odin-like syntax for doing this.
-add :: (a, b, c: s32) -> s32 {
+add :: fn(a, b, c: s32) -> s32 {
  
 }
 
@@ -29,17 +29,17 @@ add :: (a, b, c: s32) -> s32 {
 */
 
 // ✅ valid
-add :: (a: s32, b) -> s32 {...}
+add :: fn(a: s32, b) -> s32 {...}
 
 // ✅ valid
-add :: (a: float, b) -> float {...}
+add :: fn(a: float, b) -> float {...}
 
 // ✅ valid
-add :: (a: s32, b: s32) -> s32 {...}
+add :: fn(a: s32, b: s32) -> s32 {...}
 
 // ❌ invalid. This conflicts with our first definition of 'add' which takes two s32's, 
 // and only differs in return type. The compiler wouldn't know which one to call!
-add :: (a: s32, b) -> float {...}
+add :: fn(a: s32, b) -> float {...}
 
 
 

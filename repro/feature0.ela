@@ -6,7 +6,7 @@ Flag :: enum {
 
 // * Make if,while,for expressionable.
 
-main :: () {
+main :: fn() {
   // Must have an else of course.
   flag : Flag = if Env::args()[0] == "-run" {
     return Flag.Run;

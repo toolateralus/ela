@@ -4,21 +4,21 @@
 ```cpp
 IInterface :: interface {
   // needs to be implemented by the derived struct.
-  to_string :: () -> string;
+  to_string :: fn() -> string;
   
   // implemented by the interface and cannot be overriden.
-  get_something :: () -> int {
+  get_something :: fn() -> int {
     return 0;
   }
   
   // compile time constant provided by the interface.
   CONSTANT :: 100;
   
-  #ctor :: () {
+  #ctor :: fn() {
     // constructor gets called when an object that implements this interface gets constructed.
   }
   
-  #dtor :: () {
+  #dtor :: fn() {
     // just like ctor.
   }
 }
@@ -30,7 +30,7 @@ Struct :: struct {
 
 impl IInterface for Struct {
   // we have access to the struct memebers as if we were a method.
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"x={x}, y={y}";
   }
 }
@@ -38,7 +38,7 @@ impl IInterface for Struct {
 // we can take the interface itself as a parameter and anything that
 // implements it can be used in its place. We may or may not have to take it
 // by a pointer, depending on the internal implementation our compiler provides.
-operate_on_interface :: (iinterface: IInterface*) {
+operate_on_interface :: fn(iinterface: IInterface*) {
   println(iinterface.to_string()); 
 }
 ```
@@ -114,7 +114,7 @@ To search for all info comments in the source just use vscodes regex search with
 
 ### Imports & FFI
 - We should have a way to rename FFI functions and imported symbols.
-`#foreign DrawBackground :: (...) as "draw_background";
+`#foreign DrawBackground :: fn(...) as "draw_background";
 
 > So we can have libraries conform to our own naming conventions.
 

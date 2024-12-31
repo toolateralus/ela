@@ -26,7 +26,7 @@ b: bool;
 */
 
 
-main :: () {
+main :: fn() {
   // disregard the strange multiple assignment, it's just for brevity. It is legal, however.
 
   // safe;

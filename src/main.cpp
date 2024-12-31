@@ -87,7 +87,7 @@ Ela compiler:
 
 // See "/usr/local/lib/ela/raylib.ela" for api info.
 
-main :: () {
+main :: fn() {
   InitWindow(800, 600, "Hello, Raylib");
 
   style := Style {
@@ -117,7 +117,7 @@ main :: () {
     file << R"__(
 #import core; // for println among many other common utilities.
 
-main :: () {
+main :: fn() {
   // 'Env::args()' returns a 'string[]' of the runtime's arguments.
   for arg in Env::args() {
     #static i: s32;

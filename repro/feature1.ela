@@ -2,7 +2,7 @@
   This is not going to be in the near future if at all.
 */
 
-#coroutine run_socket :: (ip: s64 = 8080) -> Socket::Message {
+#coroutine run_socket :: fn(ip: s64 = 8080) -> Socket::Message {
   socket := Socket::open(ip);
   while socket.connected() {
     if socket.has_data() {

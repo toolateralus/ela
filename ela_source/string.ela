@@ -6,9 +6,9 @@ MyString :: struct {
   data: char *;
   length: s32;
   is_view: bool;
-  #ctor :: () {}
+  #ctor :: fn() {}
 
-  #ctor :: (str: char*) {
+  #ctor :: fn(str: char*) {
     if str == null then return;
     length = 0;
     while (str[length] != '\0') {
@@ -19,7 +19,7 @@ MyString :: struct {
     memcpy(data, str, length);
   }
 
-  #ctor :: (begin: char*, end: char*, is_view: bool = false) {
+  #ctor :: fn(begin: char*, end: char*, is_view: bool = false) {
     this.is_view = is_view;
     length = end - begin;
     if (is_view) {
@@ -31,28 +31,28 @@ MyString :: struct {
     }
   }
 
-  #dtor :: () {
+  #dtor :: fn() {
     if (data && !is_view) then free(data);
   }
 
-  #operator([]) :: (n: int) -> char {
+  #operator([]) :: fn(n: int) -> char {
     return data[n];
   }
 
   // Slicing a view.
-  #operator([]) :: (range: Range) -> MyString {
+  #operator([]) :: fn(range: Range) -> MyString {
     return {data + range.first, data + range.last, true};
   }
 
-  substr :: (start: int , end: int) -> MyString {
+  substr :: fn(start: int , end: int) -> MyString {
     // TODO: clamp here? instead of returning empty?.
     if start < 0 || end > length || start > end then return {};
     return {data + start, data + end, false};
   }
 
-  substr :: (r: Range) -> MyString { return substr((int)r.first, (int)r.last); }
+  substr :: fn(r: Range) -> MyString { return substr((int)r.first, (int)r.last); }
 
-  push :: (value : char) {
+  push :: fn(value : char) {
     new_data: char* = malloc(sizeof(char) * length + 2);
     memcpy(new_data, data, length);
     new_data[length] = value;
@@ -62,7 +62,7 @@ MyString :: struct {
     length++;
   }
 
-  erase_at :: (index: int) {
+  erase_at :: fn(index: int) {
     if (index < 0 || index >= length || length <= 0) then return;
     new_data: char* = malloc(sizeof(char) * length);
     memcpy(new_data, data, index * sizeof(char));
@@ -73,7 +73,7 @@ MyString :: struct {
     data[length] = '\0';
   }
 
-  insert_at :: (index: int, value: char) {
+  insert_at :: fn(index: int, value: char) {
     if (data == null) {
       data = malloc(2);
       data[0] = value;
@@ -90,7 +90,7 @@ MyString :: struct {
     length++;
     data[length] = '\0';
   }
-  insert_substr_at :: (index: int, substr: MyString) {
+  insert_substr_at :: fn(index: int, substr: MyString) {
     if (data == null) {
       data = malloc(substr.length + 1);
       memcpy(data, substr.data, substr.length);
@@ -109,7 +109,7 @@ MyString :: struct {
     data[length] = '\0';
   }
 
-  pop :: () -> char {
+  pop :: fn() -> char {
     if (length <= 0) {
       return 0;
     }
@@ -123,7 +123,7 @@ MyString :: struct {
     return value;
   }
 
-  #ctor :: (other: MyString) {
+  #ctor :: fn(other: MyString) {
     if (other.data) {
       length = other.length;
       data = malloc(length + 1);
@@ -132,7 +132,7 @@ MyString :: struct {
     }
   }
 
-  #operator(=) :: (other: MyString) -> MyString {
+  #operator(=) :: fn(other: MyString) -> MyString {
     if (this != &other) {
       if data then free(data);
       if (other.data) {
@@ -148,10 +148,10 @@ MyString :: struct {
     return *this;
   }
 
-  begin :: () -> char* { return data; }
-  end :: () -> char* { return data + length; }
+  begin :: fn() -> char* { return data; }
+  end :: fn() -> char* { return data + length; }
 
-  #operator(==) :: (other: MyString) -> bool {
+  #operator(==) :: fn(other: MyString) -> bool {
     if length != other.length then return false;
     for i in 0..length {
       if data[i] != other.data[i] then return false;
@@ -159,5 +159,5 @@ MyString :: struct {
     return true;
   }
 
-  #operator(!=) :: (other: MyString) -> bool { return !(*this == other); }
+  #operator(!=) :: fn(other: MyString) -> bool { return !(*this == other); }
 };

@@ -8,13 +8,13 @@ Vector2 :: struct {
   y: float = 0;
   
   // Define a to_string so that interpolated strings can print us implicitly.
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return $"x={x}, y={y}";
   }
 }
 
 
-main :: () {
+main :: fn() {
   // get the Type* that represents Vector2.
   type := #type(Vector2);
   instance: Vector2;

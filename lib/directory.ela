@@ -10,14 +10,14 @@ dirent :: struct {
   d_name: char[256];
 }
 
-#foreign opendir :: (name: char *) -> DIR*;
-#foreign readdir :: (dir: DIR*) -> dirent*;
-#foreign closedir :: (dir: void*) -> int;
+#foreign opendir :: fn(name: char *) -> DIR*;
+#foreign readdir :: fn(dir: DIR*) -> dirent*;
+#foreign closedir :: fn(dir: void*) -> int;
 
 Directory :: struct {
   path: string;
   files: string[];
-  #static open :: (path: string) -> Directory {
+  #static open :: fn(path: string) -> Directory {
     dir := opendir(path.data);
     if !dir then return {path, string[]{}};
     files: string[];

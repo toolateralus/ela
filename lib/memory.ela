@@ -15,17 +15,17 @@ Arena :: struct {
   flags: int = .None;
   alignment : int = 8;
   
-  #ctor :: (size: u64, flags: int) {
+  #ctor :: fn(size: u64, flags: int) {
     this.size = size;
     this.flags = flags;
     memory = malloc(sizeof(u8) * size);
   }
-  #dtor :: () {
+  #dtor :: fn() {
     free(memory);
     memory = null;
   }
   
-  allocate :: (size: u64) -> u8* {
+  allocate :: fn(size: u64) -> u8* {
     if size == 0 {
       return null;
     }

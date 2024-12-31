@@ -18,7 +18,7 @@ NonTrivialUnion :: union {
   c: string; 
 
   // this leaks if a string is inside this, but is neccesary to compile.
-  #dtor :: () {}
+  #dtor :: fn() {}
 }
 
 NonTrivialTag :: enum {
@@ -32,7 +32,7 @@ NonTrivialWrapper :: struct {
   onion: NonTrivialUnion;
 
   // this is how you'd fix the leak caused by the empty destructor in the NonTrivialUnion.
-  #dtor :: () {
+  #dtor :: fn() {
     if tag == .String {
       destruct(onion.c);
     }
@@ -51,7 +51,7 @@ NonTrivialWrapper :: struct {
 }
 
 
-tagged_test :: () {
+tagged_test :: fn() {
   onion: TaggedUnion.Some { "Wee" };
   if onion is TaggedUnion.Some {value} {
     println(value);

@@ -13,7 +13,7 @@
   CONSTANT :: 10;
 }
 
-main :: () {
+main :: fn() {
   println($"{CONSTANT}");
 }
 

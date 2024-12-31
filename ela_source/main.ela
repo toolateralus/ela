@@ -24,14 +24,14 @@ Something :: struct {
 } 
 
 // Macro functions
-#macro max :: (a, b) if a > b { return a } else { return b }
+#macro max :: fn(a, b) if a > b { return a } else { return b }
 
 // uses context it's instantiated in just like a C macro.
-#macro another :: () { if a > b then return; }
+#macro another :: fn() { if a > b then return; }
 
 
 
-main :: () {
+main :: fn() {
   // While's that return.
   // Must return a value in all code paths.
   n := while true {

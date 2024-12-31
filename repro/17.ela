@@ -1,6 +1,6 @@
 
 
-main :: () {
+main :: fn() {
   str : string;
   str.contains("") // ! crashes during compilation;
 }

@@ -1,7 +1,7 @@
 #import core;
 
 
-main :: () {
+main :: fn() {
   a := <1, <2, 3>>;  //! Bug, the >> gets recognized as a SHR token and fails to parse.
   a := <1, <2, 3> >; // !Bug, see error below.
 }

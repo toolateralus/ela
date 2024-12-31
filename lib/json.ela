@@ -50,18 +50,18 @@ JsonLexer :: struct {
   input : string;
   lookahead_buffer : JsonToken[];
 
-  err :: (token: JsonToken ,msg: string) {
+  err :: fn(token: JsonToken ,msg: string) {
     println($"[{file}:{token.line}:{token.column}] {msg}");
     exit(1);
   }
 
-  #ctor :: (_file: c_string, _input: string) {
+  #ctor :: fn(_file: c_string, _input: string) {
     file = _file;
     input = _input;
     length = input.length;
   }
 
-  get_token :: () -> JsonToken {
+  get_token :: fn() -> JsonToken {
     if lookahead_buffer.length != 0 {
       return ~lookahead_buffer;
     }
@@ -195,13 +195,13 @@ JsonLexer :: struct {
     }
   }
 
-  peek_token :: () -> JsonToken {
+  peek_token :: fn() -> JsonToken {
     token : JsonToken = get_token();
     lookahead_buffer ~= token;
     return token;
   }
 
-  expect_types :: (types: s32[]) -> JsonToken {
+  expect_types :: fn(types: s32[]) -> JsonToken {
     token := this.get_token();
     types_string: string;
     i : int;
@@ -218,7 +218,7 @@ JsonLexer :: struct {
     return {#make(string, ""), JsonTokenType.Invalid};
   }
 
-  expect_type :: (type: s32) -> JsonToken {
+  expect_type :: fn(type: s32) -> JsonToken {
     return this.expect_types({type});
   }
 }
@@ -251,13 +251,13 @@ JsonValueUnion :: union {
   _string: string;
   object: JsonKeyValuePair[];
   array: JsonValue*[];
-  #dtor :: () {}
+  #dtor :: fn() {}
 }
 
 JsonValue :: struct {
   data: JsonValueUnion;
   type : int = JsonValueType.Invalid;
-  #dtor :: () {
+  #dtor :: fn() {
     if type == JsonValueType.Object {
       for kvp in data.object {
         delete(kvp.value);
@@ -272,7 +272,7 @@ JsonValue :: struct {
       destruct(data._string);
     }
   }
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     if type == JsonValueType.Object {
       obj := data.object;
       len := obj.length;
@@ -318,7 +318,7 @@ JsonValue :: struct {
       return #make(string);
     }
   }
-  get :: (key: string) -> JsonValue* {
+  get :: fn(key: string) -> JsonValue* {
     if type != JsonValueType.Object {
       return null;
     }
@@ -329,7 +329,7 @@ JsonValue :: struct {
     }
     return null;
   }
-  get :: (index: int) -> JsonValue* {
+  get :: fn(index: int) -> JsonValue* {
     if type != JsonValueType.Array {
       return null;
     }
@@ -339,59 +339,59 @@ JsonValue :: struct {
     }
     return arr[index];
   }
-  is_number :: () -> bool {
+  is_number :: fn() -> bool {
     return type == JsonValueType.Number;
   }
 
-  is_string :: () -> bool {
+  is_string :: fn() -> bool {
     return type == JsonValueType.String;
   }
 
-  is_object :: () -> bool {
+  is_object :: fn() -> bool {
     return type == JsonValueType.Object;
   }
 
-  is_array :: () -> bool {
+  is_array :: fn() -> bool {
     return type == JsonValueType.Array;
   }
 
-  is_boolean :: () -> bool {
+  is_boolean :: fn() -> bool {
     return type == JsonValueType.Boolean;
   }
 
-  is_null :: () -> bool {
+  is_null :: fn() -> bool {
     return type == JsonValueType.Null;
   }
 
-  as_number :: () -> float64 {
+  as_number :: fn() -> float64 {
     if type == JsonValueType.Number {
       return data.number;
     }
     return 0.0; // or handle error
   }
 
-  as_string :: () -> string {
+  as_string :: fn() -> string {
     if type == JsonValueType.String {
       return data._string;
     }
     return ""; // or handle error
   }
 
-  as_object :: () -> JsonKeyValuePair[] {
+  as_object :: fn() -> JsonKeyValuePair[] {
     if type == JsonValueType.Object {
       return data.object;
     }
     return {}; // or handle error
   }
 
-  as_array :: () -> JsonValue*[] {
+  as_array :: fn() -> JsonValue*[] {
     if type == JsonValueType.Array {
       return data.array;
     }
     return {}; // or handle error
   }
 
-  as_boolean :: () -> bool {
+  as_boolean :: fn() -> bool {
     if type == JsonValueType.Boolean {
       return data.boolean;
     }
@@ -399,7 +399,7 @@ JsonValue :: struct {
   }
 }
 
-json_parse :: (lexer: JsonLexer*) -> JsonValue* {
+json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
   value := new JsonValue;
   token := lexer.expect_types({
     JsonTokenType.LBracket,
@@ -452,17 +452,17 @@ json_parse :: (lexer: JsonLexer*) -> JsonValue* {
   return value;
 }
 
-json_parse_file :: (file: c_string) -> JsonValue* {
+json_parse_file :: fn(file: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, file, File::read_all(file));
   return json_parse(&lexer);
 }
 
-json_parse_string :: (str: c_string) -> JsonValue* {
+json_parse_string :: fn(str: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, "string", str);
   return json_parse(&lexer);
 }
 
-json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
+json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   if type_is_float(type) {
     val.type = JsonValueType.Number;
@@ -520,9 +520,9 @@ json_serialize_scalar :: (object: void*, type: Type*) -> JsonValue* {
   return null;
 }
 
-json_serialize :: (object: void*, type: Type*) -> JsonValue*;
+json_serialize :: fn(object: void*, type: Type*) -> JsonValue*;
 
-json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
+json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType.Object;
   val.data.object = JsonKeyValuePair[]{};
@@ -535,7 +535,7 @@ json_serialize_struct :: (object: void*, type: Type*) -> JsonValue* {
   return val;
 }
 
-json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
+json_serialize_array :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType.Array;
   val.data.array = JsonValue*[]{};
@@ -545,7 +545,7 @@ json_serialize_array :: (object: void*, type: Type*) -> JsonValue* {
   return val;
 }
 
-json_serialize :: (object: void*, type: Type*) -> JsonValue* {
+json_serialize :: fn(object: void*, type: Type*) -> JsonValue* {
   if type_has_no_extension(type) {
     if type.id == #typeid(string) {
       val := new JsonValue{};
@@ -568,7 +568,7 @@ JsonError :: struct {
   message: string;
 }
 
-// json_serialize_scalar :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+// json_serialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
 //   val := new JsonValue{};
 //   if type_is_float(type) {
 //     val.type = JsonValueType.Number;
@@ -626,9 +626,9 @@ JsonError :: struct {
 //   return null;
 // }
 
-json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
+json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError;
 
-// json_deserialize_struct :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+// json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
 //   for json_field in val.data.object {
 //     struct_field := type_get_field(type, json_field.key);
 //     if !struct_field {
@@ -642,7 +642,7 @@ json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
 //   return {};
 // }
 
-// json_deserialize_array :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+// json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
 //   for elem in val.as_array() {
 //     err := json_deserialize(elem.data, type.);
 //     if err.has_value {
@@ -652,7 +652,7 @@ json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError;
 //   return {};
 // }
 
-// json_deserialize :: (val: JsonValue*, object: void*, type: Type*) -> JsonError {
+// json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
 //   if val.is_string() {
 //     if type.id == #typeid(string) {
 //       *(string*)object = val.as_string();

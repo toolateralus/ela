@@ -1,68 +1,68 @@
-#foreign system :: (cmd: c_string) -> int;
+#foreign system :: fn(cmd: c_string) -> int;
 
-#foreign free :: (ptr: void*) -> void;
-#foreign malloc :: (nbytes: u64) -> void*;
-#foreign calloc :: (num: u64, size: u64) -> void*;
-#foreign realloc :: (ptr: void*, size: u64) -> void*;
+#foreign free :: fn(ptr: void*) -> void;
+#foreign malloc :: fn(nbytes: u64) -> void*;
+#foreign calloc :: fn(num: u64, size: u64) -> void*;
+#foreign realloc :: fn(ptr: void*, size: u64) -> void*;
 
-#foreign memcpy :: (dest: void*, src: void*, n: u64) -> void*;
-#foreign memset :: (dest: void*, c: int, n: u64) -> void*;
-#foreign memmove :: (dest: void*, src: void*, nbytes: s64) -> int;
+#foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+#foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
+#foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
 
-#foreign printf :: (format: c_string, ...) -> int;
-#foreign exit :: (code: int);
+#foreign printf :: fn(format: c_string, ...) -> int;
+#foreign exit :: fn(code: int);
 
-#static print :: (str: string) {
+#static print :: fn(str: string) {
   printf("%s", str.data);
 }
-#static print :: (str: char *) {
+#static print :: fn(str: char *) {
   printf("%s", str);
 }
-#static println :: (str: string) {
+#static println :: fn(str: string) {
   printf("%s\n", str.data);
 }
-#static println :: (str: c_string) {
+#static println :: fn(str: c_string) {
   printf("%s\n", str);
 }
-#static panic :: (msg: string) {
+#static panic :: fn(msg: string) {
   println(msg);
   exit(1);
 }
 
-#foreign scanf :: (format: c_string, ...) -> int;
-#foreign getchar :: () -> int;
+#foreign scanf :: fn(format: c_string, ...) -> int;
+#foreign getchar :: fn() -> int;
 
-#foreign sleep :: (seconds: int);
-#foreign usleep :: (c: int);
+#foreign sleep :: fn(seconds: int);
+#foreign usleep :: fn(c: int);
 
 
-#foreign strlen :: (str: c_string) -> int;
-#foreign strcmp :: (str1: c_string, str2: c_string) -> int;
-#foreign strcat :: (dest: c_string, src: c_string) -> c_string;
-#foreign snprintf :: (buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
-#foreign sprintf :: (buffer: u8*, format: c_string, ...) -> int;
-#foreign strncmp :: (str: c_string, str2: c_string, len: int) -> int;
+#foreign strlen :: fn(str: c_string) -> int;
+#foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
+#foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
+#foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
+#foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
+#foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
 
-#foreign isalnum :: (c: int) -> int;
-#foreign isalpha :: (c: int) -> int;
-#foreign isspace :: (c: int) -> int;
-#foreign isdigit :: (c: int) -> int;
-#foreign islower :: (c: int) -> int;
-#foreign isupper :: (c: int) -> int;
-#foreign isprint :: (c: int) -> int;
-#foreign ispunct :: (c: int) -> int;
+#foreign isalnum :: fn(c: int) -> int;
+#foreign isalpha :: fn(c: int) -> int;
+#foreign isspace :: fn(c: int) -> int;
+#foreign isdigit :: fn(c: int) -> int;
+#foreign islower :: fn(c: int) -> int;
+#foreign isupper :: fn(c: int) -> int;
+#foreign isprint :: fn(c: int) -> int;
+#foreign ispunct :: fn(c: int) -> int;
 
-#foreign atoi :: (v: c_string) -> int;
-#foreign atof :: (v: c_string) -> float64;
+#foreign atoi :: fn(v: c_string) -> int;
+#foreign atof :: fn(v: c_string) -> float64;
 
 
 
 Random :: enum {
   Max = 2147483647,
 }
-#foreign rand :: () -> int;
-#foreign srand :: (seed: u32);
-#static randf :: () -> float {
+#foreign rand :: fn() -> int;
+#foreign srand :: fn(seed: u32);
+#static randf :: fn() -> float {
   return (float)rand() / (float)Random.Max;
 }
 
@@ -70,7 +70,7 @@ Random :: enum {
 // when dot expressions are fixed we should be able to implement 'string' in language,
 // and we won't need an extra struct to do this.
 Strings :: struct {
-  #static starts_with :: (str: c_string, substr: c_string) -> bool {
+  #static starts_with :: fn(str: c_string, substr: c_string) -> bool {
     if str == null || substr == null
       then return false;
 
@@ -85,7 +85,7 @@ Strings :: struct {
 
     return strncmp(str, substr, substr_len) == 0;
   }
-  #static ends_with :: (str: c_string, pattern: c_string) -> bool {
+  #static ends_with :: fn(str: c_string, pattern: c_string) -> bool {
     if !str || !pattern
       then return false;
 
@@ -97,7 +97,7 @@ Strings :: struct {
 
     return strncmp(str + (len - patlen), pattern, patlen) == 0;
   }
-  #static starts_with :: (str: string, substr: string) -> bool {
+  #static starts_with :: fn(str: string, substr: string) -> bool {
     if str.data == null || substr.data == null
       then return false;
 
@@ -112,7 +112,7 @@ Strings :: struct {
 
     return strncmp(str.data, substr.data, substr_len) == 0;
   }
-  #static ends_with :: (str: string, pattern: string) -> bool {
+  #static ends_with :: fn(str: string, pattern: string) -> bool {
     if !str.data || !pattern.data
       then return false;
 
@@ -124,7 +124,7 @@ Strings :: struct {
 
     return strncmp(str.data + (len - patlen), pattern.data, patlen) == 0;
   }
-  #static replace :: (str: string, pattern: string, replacement: string) -> string {
+  #static replace :: fn(str: string, pattern: string, replacement: string) -> string {
     if !str.data || !pattern.data || !replacement.data
       then return str;
 
@@ -146,7 +146,7 @@ Strings :: struct {
 
     return result;
   }
-  #static substr :: (src: c_string, start: int, end: int) -> string {
+  #static substr :: fn(src: c_string, start: int, end: int) -> string {
     if !src
       then return {};
 
@@ -164,10 +164,10 @@ Strings :: struct {
     free(dest);
     return v;
   }
-  #static equals :: (a: c_string, b) -> bool {
+  #static equals :: fn(a: c_string, b) -> bool {
     return strcmp(a, b) == 0;
   }
-  #static split :: (str: string, delimiter: char) -> string[] {
+  #static split :: fn(str: string, delimiter: char) -> string[] {
     if !str.data then return {};
     result: string[];
     start: int = 0;
@@ -181,7 +181,7 @@ Strings :: struct {
     result ~= string{str.data + start, str.data + str_len};
     return result;
   }
-  #static split :: (str: c_string, delimiter: char) -> string[] {
+  #static split :: fn(str: c_string, delimiter: char) -> string[] {
     if !str then return {};
     result: string[];
     start: int = 0;
@@ -195,7 +195,7 @@ Strings :: struct {
     result ~= string{str + start, str + str_len};
     return result;
   }
-  #static contains :: (str: string, ch: char) -> bool {
+  #static contains :: fn(str: string, ch: char) -> bool {
     for _ch in str {
       if _ch == ch {
         return true;
@@ -203,7 +203,7 @@ Strings :: struct {
     }
     return false;
   }
-  #static contains :: (str: c_string, ch: char) -> bool {
+  #static contains :: fn(str: c_string, ch: char) -> bool {
     for _ch in string{str} {
       if _ch == ch {
         return true;
@@ -211,7 +211,7 @@ Strings :: struct {
     }
     return false;
   }
-  #static contains :: (str: string, pattern: string) -> bool {
+  #static contains :: fn(str: string, pattern: string) -> bool {
     if str.data == null || pattern.data == null
       then return false;
 
@@ -228,7 +228,7 @@ Strings :: struct {
     }
     return false;
   }
-  #static contains :: (str: c_string, pattern: c_string) -> bool {
+  #static contains :: fn(str: c_string, pattern: c_string) -> bool {
     if str == null || pattern == null
       then return false;
 
@@ -247,7 +247,7 @@ Strings :: struct {
   }
 }
 
-to_string :: (num: s64) -> string {
+to_string :: fn(num: s64) -> string {
   switch num {
     0: { return string{"0"}; }
     1: { return string{"1"}; }
@@ -293,38 +293,38 @@ to_string :: (num: s64) -> string {
 
 }
 
-#foreign fmod :: (l: float, r: float) -> float;
-#foreign fabs :: (f: float64) -> float64;
-#foreign isinf :: (arg: float64) -> bool;
-#foreign isnan :: (arg: float64) -> bool;
+#foreign fmod :: fn(l: float, r: float) -> float;
+#foreign fabs :: fn(f: float64) -> float64;
+#foreign isinf :: fn(arg: float64) -> bool;
+#foreign isnan :: fn(arg: float64) -> bool;
 
-#foreign pow :: (base: float64, exponent: float64) -> float64;
-#foreign sqrt :: (f: float64) -> float64;
-#foreign cos :: (f: float64) -> float64;
-#foreign sin :: (f: float64) -> float64;
+#foreign pow :: fn(base: float64, exponent: float64) -> float64;
+#foreign sqrt :: fn(f: float64) -> float64;
+#foreign cos :: fn(f: float64) -> float64;
+#foreign sin :: fn(f: float64) -> float64;
 
-abs :: (v: s64) -> s64 {
+abs :: fn(v: s64) -> s64 {
   if v < 0 {
     return -v;
   }
   return v;
 }
 
-abs :: (v: float64) -> float64 {
+abs :: fn(v: float64) -> float64 {
   if v < 0.0 {
     return -v;
   }
   return v;
 }
 
-abs :: (v: float) -> float {
+abs :: fn(v: float) -> float {
   if v < 0.0 {
     return -v;
   }
   return v;
 }
 
-abs :: (v: int) -> int {
+abs :: fn(v: int) -> int {
   if v < 0 {
     return -v;
   }
@@ -332,105 +332,105 @@ abs :: (v: int) -> int {
 }
 
 
-min :: (a: int, b: int) -> int {
+min :: fn(a: int, b: int) -> int {
   if a > b then return b;
   return a;
 }
 
-max :: (a: int, b: int) -> int {
+max :: fn(a: int, b: int) -> int {
   if a > b then return a;
   return b;
 }
 
-min :: (a: float, b: float) -> float {
+min :: fn(a: float, b: float) -> float {
   if a > b then return b;
   return a;
 }
 
-max :: (a: float, b: float) -> float {
+max :: fn(a: float, b: float) -> float {
   if a > b then return a;
   return b;
 }
 
 
-clamp :: (v: float64, min, max) -> float64 {
+clamp :: fn(v: float64, min, max) -> float64 {
   if v < min then return min;
   if v > max then return max;
   return v;
 }
 
-clamped :: (v: float*, min: float, max) {
+clamped :: fn(v: float*, min: float, max) {
   if *v < min then *v = min;
   if *v > max then *v = max;
 }
 
-lerp :: (a: float, b, t) -> float {
+lerp :: fn(a: float, b, t) -> float {
   return (a * (1.0 - t)) + (b * t);
 }
 
-lerp :: (a: int, b, t: float) -> int {
+lerp :: fn(a: int, b, t: float) -> int {
   return (int)(a * (1.0 - t)) + (b * t) + 0.5;
 }
 
 
 
-#foreign time :: (value: void*) -> int;
+#foreign time :: fn(value: void*) -> int;
 timespec_t :: struct {
   tv_sec: s64;
   tv_nsec: s64;
 }
 
-#foreign clock_gettime :: (clock_id: int, tp: timespec_t*) -> int;
+#foreign clock_gettime :: fn(clock_id: int, tp: timespec_t*) -> int;
 
 
-as_milliseconds :: (c: float64) -> int {
+as_milliseconds :: fn(c: float64) -> int {
   return (int)(c * 100_000.0);
 }
-as_seconds :: (c: float64) -> int {
+as_seconds :: fn(c: float64) -> int {
   return (int)(c * 1_000_000.0);
 }
 
 
 Timing :: struct {
   // returns the timespec_t for the current time since epoch.
-  #static get_timespec_since_epoch :: () -> timespec_t {
+  #static get_timespec_since_epoch :: fn() -> timespec_t {
     ts: timespec_t;
     clock_gettime(0, &ts);
     return ts;
   }
   
   // returns a seconds value representing time since epoch
-  #static seconds :: () -> float64 {
+  #static seconds :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec + (float64)ts.tv_nsec / (float64)1_000_000_000.0;
   }
 
   // returns a milliseconds value representing time since epoch
-  #static milliseconds :: () -> float64 {
+  #static milliseconds :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec * 1_000.0 + (float64)ts.tv_nsec / 1_000_000.0;
   }
 
   // returns a microseconds value representing time since epoch
-  #static microseconds :: () -> float64 {
+  #static microseconds :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec * 1_000_000.0 + (float64)ts.tv_nsec / 1_000.0;
   }
 
   // returns a minutes value representing time since epoch
-  #static minutes :: () -> float64 {
+  #static minutes :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec / 60.0 + (float64)ts.tv_nsec / (60.0 * 1_000_000_000.0);
   }
 
   // returns an hours value representing time since epoch
-  #static hours :: () -> float64 {
+  #static hours :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec / 3_600.0 + (float64)ts.tv_nsec / (3_600.0 * 1_000_000_000.0);
   }
 
   // returns a days value representing time since epoch
-  #static days :: () -> float64 {
+  #static days :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec / 86_400.0 + (float64)ts.tv_nsec / (86_400.0 * 1_000_000_000.0);
   }

@@ -3,10 +3,10 @@
   #error "dlfcn.ela is only available on linux.";
 }
 
-#foreign dlopen :: (filename: c_string, flags: int) -> void*;
-#foreign dlclose :: (handle: void*) -> int;
-#foreign dlsym :: (handle: void*, symbol: c_string) -> void*;
-#foreign dlerror :: () -> char *;
+#foreign dlopen :: fn(filename: c_string, flags: int) -> void*;
+#foreign dlclose :: fn(handle: void*) -> int;
+#foreign dlsym :: fn(handle: void*, symbol: c_string) -> void*;
+#foreign dlerror :: fn() -> char *;
 
 // Flags for 'dlopen'
 // Of course the later flags are completely arbitrary, so we can't use #flags.

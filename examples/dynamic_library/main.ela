@@ -6,7 +6,7 @@
 // their "LD_LIBRARY_PATH" env-var
 #compiler_flags "-Wl,-rpath,.";
 
-main :: () -> int {
+main :: fn() -> int {
   handle := dlopen("test.so", Rtld.Now);
   
   if !handle {

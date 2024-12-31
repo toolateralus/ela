@@ -11,7 +11,7 @@ DrawContext :: struct {
   commands: DrawCommand[];
   inputState: bool[256];
   
-  draw :: () {
+  draw :: fn() {
     while commands.length > 0 {
       command := ~commands;
       DrawRectangle((int)command.rect.x, (int)command.rect.y, (int)command.rect.width, (int)command.rect.height, command.color);

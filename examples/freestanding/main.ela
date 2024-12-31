@@ -2,22 +2,22 @@
 #compiler_flags "-fPIC -c -m64 -ffreestanding -fno-stack-protector -nostdlib -o main.o"
 
 // our function declared in print.s
-#foreign print :: (f: char *);
-#foreign exit :: (code: int);
+#foreign print :: fn(f: char *);
+#foreign exit :: fn(code: int);
 
-memset :: (p: char *, value: u32, len: u32) {
+memset :: fn(p: char *, value: u32, len: u32) {
   for i in 0..len {
     p[i] = value;
   }
 }
 
-memcpy :: (dest: char**, src: char*, len: u32) {
+memcpy :: fn(dest: char**, src: char*, len: u32) {
   for i in 0..len {
     (*dest)[i] = src[i];
   }
 }
 
-#export strlen :: (s: char*) -> int {
+#export strlen :: fn(s: char*) -> int {
   i: int;
   while s[i] != '\0' {
     ++i;
@@ -31,11 +31,11 @@ Allocator :: struct {
   mem : char[1024 * 24];
   ptr : u32;
   size: u32;
-  #ctor :: () {
+  #ctor :: fn() {
     size = 1024 * 24;
     memset((char*)mem, 0, size);
   }
-  alloc :: (size: u32) -> char* {
+  alloc :: fn(size: u32) -> char* {
     data := &mem[ptr];
     ptr += size;
     
@@ -57,7 +57,7 @@ Vector2 :: struct {
 // declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
 // and 'export' is declaring an externally visible symbol.
-#export main :: () -> int {
+#export main :: fn() -> int {
   print("\e[1;4;32mHello Free(standing) World!\e[0m\n");
   
   while true {

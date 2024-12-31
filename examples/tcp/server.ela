@@ -5,7 +5,7 @@
 MAX_BUFFER_LENGTH  : int = 80;
 PORT : u16 = 8080;
 
-chatting :: (connfd: int) {
+chatting :: fn(connfd: int) {
   buff : char[MAX_BUFFER_LENGTH];
 
   while true {
@@ -23,7 +23,7 @@ chatting :: (connfd: int) {
   }
 }
 
-main :: () -> int {
+main :: fn() -> int {
   sockfd : int = socket(AF_INET, SocketType.Stream, 0);
 
   if sockfd == -1 {

@@ -265,6 +265,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                  range);
 
            parser->expect(TType::DoubleColon);
+           parser->expect(TType::Fn);
+           
            function->params = parser->parse_parameters();
            function->name = name;
            if (parser->peek().type != TType::Arrow) {
@@ -964,7 +966,7 @@ ASTStatement *Parser::parse_statement() {
   } else if (lookahead_buf()[1].type == TType::DoubleColon) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
-    if (peek().type == TType::LParen) {
+    if (peek().type == TType::Fn) {
       auto node = parse_function_declaration(tok);
       end_node(node, range);
       return node;
@@ -1105,6 +1107,7 @@ ASTBlock *Parser::parse_block() {
 }
 
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
+  expect(TType::Fn);
   auto range = begin_node();
   if (range.begin > 0)
     range.begin = range.begin - 1;
@@ -1178,7 +1181,7 @@ ASTParamsDecl *Parser::parse_parameters() {
 
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
-    // this should allow us to do things like func :: (int a, b, c) {}
+    // this should allow us to do things like func :: fn(int a, b, c) {}
     if (next.type == TType::Directive || !type ||
         ctx.scope->find_type_id(next.value, {}) != -1) {
       type = parse_type();

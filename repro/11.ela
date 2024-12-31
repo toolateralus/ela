@@ -2,7 +2,7 @@
 // ! Really the entire system is completely screwed,
 // ! every single line in here reveals a bug.
 
-main :: () {
+main :: fn() {
   map : <int, int>[string]; // ! Segfault before compile finishes.
   {
     //map["Hi"] = <10, 10>; // ! Null type

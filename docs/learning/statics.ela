@@ -6,7 +6,7 @@
 #static var : s32 = 0;
 
 
-counter :: () -> s32 {
+counter :: fn() -> s32 {
   // Static local variables: they maintain state between any calls,
   // each time this is called it will be incremented.
 
@@ -24,20 +24,20 @@ counter :: () -> s32 {
 
 Strukt :: struct {
   // static functions on structs. Similar usage to the previous static function,
-  #static counter :: () -> s32 {
+  #static counter :: fn() -> s32 {
     #static var: s32 = 0;
     return var++;
   }
 
   // you can expose static members of a struct for organizational purpose,
   // by just returning a pointer to the static local. similar to the way singleton's in C++ are typically implemented.
-  #static instance :: () -> Strukt* {
+  #static instance :: fn() -> Strukt* {
     #static instance: Strukt
     return &instance;
   }
 
   // you could also use this for rust like stuff.
-  #static Default :: () -> Strukt {
+  #static Default :: fn() -> Strukt {
     return {};
   }
 
@@ -47,5 +47,5 @@ Strukt :: struct {
   // ❌ #static var: s32;
 }
 
-main :: () {}
+main :: fn() {}
 

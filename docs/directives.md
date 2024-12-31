@@ -39,7 +39,7 @@
   - Only compiled into `--test` builds.
 - **Example**:
   ```cpp
-  #test test_function :: () { ... }
+  #test test_function :: fn() { ... }
   ```
 
 #### `#foreign`
@@ -48,8 +48,8 @@
   - Declares a foreign function, similar to C's `extern`.
 - **Example**:
   ```cpp
-  #foreign foreign_function :: (char *, ...);
-  #foreign foreign_function :: (int) -> int;
+  #foreign foreign_function :: fn(char *, ...);
+  #foreign foreign_function :: fn(int) -> int;
   ```
 
 #### `#import`
@@ -76,8 +76,8 @@
   - Declares constructor (`#ctor`) and destructor (`#dtor`) functions.
 - **Example**:
   ```cpp
-  #ctor :: () { ... }
-  #dtor :: () { ... }
+  #ctor :: fn() { ... }
+  #dtor :: fn() { ... }
   ```
 
 #### `#make`
@@ -150,7 +150,7 @@
     x: float;
     y: float;
     // Note: you have to manually override both + and += if you want them both supported.
-    #operator(+) :: (other: #self) -> #self {
+    #operator(+) :: fn(other: #self) -> #self {
       // at the time of writing this, you have to use
       // #make(#self, {..init_list..}) for return types.
       // however for parameters, arguments, and all other declarations,
@@ -175,7 +175,7 @@
   - Declares a function as being available to dynamic libraries. This is mandatory for creating a visible function within a dynamic library on both linux and windows.
 - **Example**:
   ```cpp
-  #export some_function_that_is_in_a_dll :: () -> int {
+  #export some_function_that_is_in_a_dll :: fn() -> int {
     return 0;
   }
   ```

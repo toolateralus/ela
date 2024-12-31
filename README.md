@@ -99,15 +99,15 @@ Color :: enum {
 ### Functions
 
 ```cpp
-add :: (a: int, b: int) -> int {
+add :: fn(a: int, b: int) -> int {
   return a + b;
 }
 
-multiply :: (x: float32, y: float32) -> float32 {
+multiply :: fn(x: float32, y: float32) -> float32 {
   return x * y;
 }
 
-get_value :: () -> int {
+get_value :: fn() -> int {
   return 42;
 }
 ```
@@ -119,11 +119,11 @@ Rectangle :: struct {
   width: float32;
   height: float32;
 
-  area :: () -> float32 {
+  area :: fn() -> float32 {
     return width * height;
   }
 
-  scale :: (factor: float32) {
+  scale :: fn(factor: float32) {
     width *= factor;
     height *= factor;
   }
@@ -136,11 +136,11 @@ Rectangle :: struct {
 Resource :: struct {
   data: int*;
 
-  #ctor :: () {
+  #ctor :: fn() {
     data = malloc(sizeof(int));
   }
 
-  #dtor :: () {
+  #dtor :: fn() {
     free(data);
   }
 }
@@ -211,12 +211,12 @@ delete(n, n1);
 ### Tests
 
 ```cpp
-#test test_addition :: () {
+#test test_addition :: fn() {
   result: int = add(2, 3);
   assert("result == 5", result == 5);
 }
 
-#test test_struct_initialization :: () {
+#test test_struct_initialization :: fn() {
   vec: Vector2;
   assert("vec.x == 0.0", vec.x == 0.0);
   assert("vec.y == 0.0", vec.y == 0.0);

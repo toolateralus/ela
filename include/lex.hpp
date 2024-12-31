@@ -96,6 +96,8 @@ enum struct TType {
   In,
 
   Switch,
+  Fn,
+
 };
 
 #define TTYPE_CASE(type)                                                       \
@@ -105,6 +107,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Char);
+    TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
     TTYPE_CASE(Switch);
     TTYPE_CASE(In);
@@ -258,6 +261,7 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
       // control flow
       {"in", TType::In},
+      {"fn", TType::Fn},
       {"switch", TType::Switch},
       {"then", TType::Then},
       {"return", TType::Return},

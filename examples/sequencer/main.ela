@@ -100,7 +100,7 @@ reset_button_style : Style = {
 
 index : s32 = 0;
 
-play_callback :: () {
+play_callback :: fn() {
   playing = !playing;
   timer.last_tick_time = 0;
   index = 0;
@@ -108,7 +108,7 @@ play_callback :: () {
 
 color_index: s32;
 
-get_sequencer_style :: (style: Style) -> Style {
+get_sequencer_style :: fn(style: Style) -> Style {
   copy := style;
   color_index++;
   index := color_index % All_Colors.length;
@@ -127,8 +127,8 @@ SequenceChannel :: struct {
   volume : int = 50;
   old_volume : int = 50;
   volume_slider: SliderI;
-  #ctor :: () {}
-  #ctor :: (_sound: Sound, _style: Style, name: string) {
+  #ctor :: fn() {}
+  #ctor :: fn(_sound: Sound, _style: Style, name: string) {
     sound = _sound;
     style = _style;
     volume_slider = {
@@ -141,7 +141,7 @@ SequenceChannel :: struct {
       false, // held
     }
   }
-  draw :: (x: float, y: float) {
+  draw :: fn(x: float, y: float) {
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
         _x : float = x + 150 + (float)(check_buttons.length * 40) + 2;
@@ -170,7 +170,7 @@ SequenceChannel :: struct {
     }
   }
 
-  update :: (index: int) {
+  update :: fn(index: int) {
     if volume != old_volume {
       old_volume = volume;
       SetSoundVolume(sound, (float)volume / 100.0);
@@ -183,17 +183,17 @@ SequenceChannel :: struct {
 
 channels: SequenceChannel[];
 
-on_remove_channel :: () {
+on_remove_channel :: fn() {
   if channels.length > 0 then _ := ~channels;
 }
 
-on_reset :: () {
+on_reset :: fn() {
   while channels.length > 0 {
     _ := ~channels;
   }
 }
 
-on_file_selected :: (index: int);
+on_file_selected :: fn(index: int);
 
 file_dropdown : DropDown = {
   string[]{},
@@ -204,7 +204,7 @@ file_dropdown : DropDown = {
   &on_file_selected
 };
 
-on_file_selected :: (index: int) {
+on_file_selected :: fn(index: int) {
   fileName := file_dropdown.options[index];
   channels ~= #make(SequenceChannel,
     LoadSound(fileName.data),
@@ -213,7 +213,7 @@ on_file_selected :: (index: int) {
   );
 }
 
-sequencer :: () {
+sequencer :: fn() {
   if playing && timer.tick() {
     for *channel in channels {
       channel.update(index);
@@ -222,7 +222,7 @@ sequencer :: () {
   }
 }
 
-main :: () {
+main :: fn() {
   bg_color.r -= 175;
   bg_color.g -= 175;
   bg_color.b -= 175;

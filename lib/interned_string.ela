@@ -5,11 +5,11 @@
 InternedString :: struct {
   id: s64;
 
-  #ctor :: () {
+  #ctor :: fn() {
     id = 0;
   }
 
-  #ctor :: (value: string) {
+  #ctor :: fn(value: string) {
     #static cache: s64[string];
     #static next_id: s64 = 1;
     _id := cache[value];
@@ -21,11 +21,11 @@ InternedString :: struct {
     else { id = _id; }
   }
 
-  value :: () -> string {
+  value :: fn() -> string {
     return __interned_string_storage_cache[id];
   }
 
-  #operator(==) :: (other: InternedString) -> bool {
+  #operator(==) :: fn(other: InternedString) -> bool {
     return other.id == id;
   }
 }

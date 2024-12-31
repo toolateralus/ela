@@ -14,7 +14,7 @@ MyStruct :: struct {
   field2: #self *;
   
   // method
-  my_method :: () -> float {
+  my_method :: fn() -> float {
     // implicit this pointer,
     return field;
     
@@ -24,20 +24,20 @@ MyStruct :: struct {
   
   //? constructors
   // * See docs/learning/constructing.ela for more info about calling constructors.
-  #ctor :: () {
+  #ctor :: fn() {
     field = 100.0;
     field1 = 200.0;
     field2 = new #self{}; // this would obviously infinitely recurse, but just an example.
   }
   
   //? Parameterized constructor
-  #ctor :: (f: float, f1, next: #self*) {
+  #ctor :: fn(f: float, f1, next: #self*) {
     this.field = f;
     this.field1 = f1;
   }
   
   //? destructors
-  #dtor :: () {
+  #dtor :: fn() {
     if field2 then
       delete(field2);
   }
@@ -48,7 +48,7 @@ MyStruct :: struct {
       Right now, mostly all the operators allowed in C++ are allowed here.
       However, we will certainly ban many of them, and only allow the most neccesary ones.
   */
-  #operator(+) :: (other: MyStruct) -> MyStruct {
+  #operator(+) :: fn(other: MyStruct) -> MyStruct {
     output: MyStruct;
     output.field = other.field + field;
     output.field1 = other.field1 + field1;
@@ -56,18 +56,18 @@ MyStruct :: struct {
   }
   
   // You have to define compound assignment operators explicitly.
-  #operator(+=) :: (other: #self) -> #self {
+  #operator(+=) :: fn(other: #self) -> #self {
     // ... implementation.
   }
   
   
   //? to_string allows us to implicitly be stringified by interpolated strings.
   //? this can also return a char*, but a string is preferred to not cause memory leaks.
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return "";
   }
   
-  // to_string :: () -> char* {
+  // to_string :: fn() -> char* {
   //   return "";
   // }
   

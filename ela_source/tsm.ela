@@ -93,9 +93,9 @@ TSM_UCS4_REPLACEMENT : u64 = 0xfffd
 
 /* ucs4 to utf8 converter */
 
-#foreign tsm_ucs4_get_width :: (ucs4: u32) -> u32;
-#foreign tsm_ucs4_to_utf8 :: (ucs4: u32, out: c_string) -> u64;
-#foreign tsm_ucs4_to_utf8_alloc :: (ucs4: u32*, len: u64, len_out: u64*) -> c_string;
+#foreign tsm_ucs4_get_width :: fn(ucs4: u32) -> u32;
+#foreign tsm_ucs4_to_utf8 :: fn(ucs4: u32, out: c_string) -> u64;
+#foreign tsm_ucs4_to_utf8_alloc :: fn(ucs4: u32*, len: u64, len_out: u64*) -> c_string;
 
 /* symbols */
 #alias tsm_symbol_t :: u32;
@@ -149,68 +149,68 @@ TSM_SCREEN_ALTERNATE    :=	0x40;
 
 #alias tsm_screen_draw_cb :: int(tsm_screen*, u32, u32*, u64, u32, u32, u32, tsm_screen_attr*, tsm_age_t*, void*);
 
-#foreign tsm_screen_new :: (out: tsm_screen*, log: tsm_log_t, log_data: void*) -> int;
-#foreign tsm_screen_ref :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_unref :: (con: tsm_screen*) -> void;
+#foreign tsm_screen_new :: fn(out: tsm_screen*, log: tsm_log_t, log_data: void*) -> int;
+#foreign tsm_screen_ref :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_unref :: fn(con: tsm_screen*) -> void;
 
-#foreign tsm_screen_get_width :: (con: tsm_screen*) -> u32;
-#foreign tsm_screen_get_height :: (con: tsm_screen*) -> u32;
-#foreign tsm_screen_resize :: (con: tsm_screen*, x: u32, y: u32) -> int;
-#foreign tsm_screen_set_margins :: (con: tsm_screen*, top: u32, bottom: u32) -> int;
-#foreign tsm_screen_set_max_sb :: (con: tsm_screen*, max: u32) -> void;
-#foreign tsm_screen_clear_sb :: (con: tsm_screen*) -> void;
+#foreign tsm_screen_get_width :: fn(con: tsm_screen*) -> u32;
+#foreign tsm_screen_get_height :: fn(con: tsm_screen*) -> u32;
+#foreign tsm_screen_resize :: fn(con: tsm_screen*, x: u32, y: u32) -> int;
+#foreign tsm_screen_set_margins :: fn(con: tsm_screen*, top: u32, bottom: u32) -> int;
+#foreign tsm_screen_set_max_sb :: fn(con: tsm_screen*, max: u32) -> void;
+#foreign tsm_screen_clear_sb :: fn(con: tsm_screen*) -> void;
 
-#foreign tsm_screen_sb_up :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_sb_down :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_sb_page_up :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_sb_page_down :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_sb_reset :: (con: tsm_screen*) -> void;
+#foreign tsm_screen_sb_up :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_sb_down :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_sb_page_up :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_sb_page_down :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_sb_reset :: fn(con: tsm_screen*) -> void;
 
-#foreign tsm_screen_set_def_attr :: (con: tsm_screen*, attr: tsm_screen_attr*) -> void;
-#foreign tsm_screen_reset :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_set_flags :: (con: tsm_screen*, flags: u32) -> void;
-#foreign tsm_screen_reset_flags :: (con: tsm_screen*, flags: u32) -> void;
-#foreign tsm_screen_get_flags :: (con: tsm_screen*) -> u32;
+#foreign tsm_screen_set_def_attr :: fn(con: tsm_screen*, attr: tsm_screen_attr*) -> void;
+#foreign tsm_screen_reset :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_set_flags :: fn(con: tsm_screen*, flags: u32) -> void;
+#foreign tsm_screen_reset_flags :: fn(con: tsm_screen*, flags: u32) -> void;
+#foreign tsm_screen_get_flags :: fn(con: tsm_screen*) -> u32;
 
-#foreign tsm_screen_get_cursor_x :: (con: tsm_screen*) -> u32;
-#foreign tsm_screen_get_cursor_y :: (con: tsm_screen*) -> u32;
+#foreign tsm_screen_get_cursor_x :: fn(con: tsm_screen*) -> u32;
+#foreign tsm_screen_get_cursor_y :: fn(con: tsm_screen*) -> u32;
 
-#foreign tsm_screen_set_tabstop :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_reset_tabstop :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_reset_all_tabstops :: (con: tsm_screen*) -> void;
+#foreign tsm_screen_set_tabstop :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_reset_tabstop :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_reset_all_tabstops :: fn(con: tsm_screen*) -> void;
 
-#foreign tsm_screen_write :: (con: tsm_screen*, ch: tsm_symbol_t, attr: tsm_screen_attr*) -> void;
-#foreign tsm_screen_newline :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_scroll_up :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_scroll_down :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_move_to :: (con: tsm_screen*, x: u32, y: u32) -> void;
-#foreign tsm_screen_move_up :: (con: tsm_screen*, num: u32, scroll: bool) -> void;
-#foreign tsm_screen_move_down :: (con: tsm_screen*, num: u32, scroll: bool) -> void;
-#foreign tsm_screen_move_left :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_move_right :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_move_line_end :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_move_line_home :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_tab_right :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_tab_left :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_insert_lines :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_delete_lines :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_insert_chars :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_delete_chars :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_erase_cursor :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_erase_chars :: (con: tsm_screen*, num: u32) -> void;
-#foreign tsm_screen_erase_cursor_to_end :: (con: tsm_screen*, protect: bool) -> void;
-#foreign tsm_screen_erase_home_to_cursor :: (con: tsm_screen*, protect: bool) -> void;
-#foreign tsm_screen_erase_current_line :: (con: tsm_screen*, protect: bool) -> void;
-#foreign tsm_screen_erase_screen_to_cursor :: (con: tsm_screen*, protect: bool) -> void;
-#foreign tsm_screen_erase_cursor_to_screen :: (con: tsm_screen*, protect: bool) -> void;
-#foreign tsm_screen_erase_screen :: (con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_write :: fn(con: tsm_screen*, ch: tsm_symbol_t, attr: tsm_screen_attr*) -> void;
+#foreign tsm_screen_newline :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_scroll_up :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_scroll_down :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_move_to :: fn(con: tsm_screen*, x: u32, y: u32) -> void;
+#foreign tsm_screen_move_up :: fn(con: tsm_screen*, num: u32, scroll: bool) -> void;
+#foreign tsm_screen_move_down :: fn(con: tsm_screen*, num: u32, scroll: bool) -> void;
+#foreign tsm_screen_move_left :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_move_right :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_move_line_end :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_move_line_home :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_tab_right :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_tab_left :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_insert_lines :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_delete_lines :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_insert_chars :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_delete_chars :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_erase_cursor :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_erase_chars :: fn(con: tsm_screen*, num: u32) -> void;
+#foreign tsm_screen_erase_cursor_to_end :: fn(con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_erase_home_to_cursor :: fn(con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_erase_current_line :: fn(con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_erase_screen_to_cursor :: fn(con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_erase_cursor_to_screen :: fn(con: tsm_screen*, protect: bool) -> void;
+#foreign tsm_screen_erase_screen :: fn(con: tsm_screen*, protect: bool) -> void;
 
-#foreign tsm_screen_selection_reset :: (con: tsm_screen*) -> void;
-#foreign tsm_screen_selection_start :: (con: tsm_screen*, posx: u32, posy: u32) -> void;
-#foreign tsm_screen_selection_target :: (con: tsm_screen*, posx: u32, posy: u32) -> void;
-#foreign tsm_screen_selection_copy :: (con: tsm_screen*, out: c_string*) -> int;
+#foreign tsm_screen_selection_reset :: fn(con: tsm_screen*) -> void;
+#foreign tsm_screen_selection_start :: fn(con: tsm_screen*, posx: u32, posy: u32) -> void;
+#foreign tsm_screen_selection_target :: fn(con: tsm_screen*, posx: u32, posy: u32) -> void;
+#foreign tsm_screen_selection_copy :: fn(con: tsm_screen*, out: c_string*) -> int;
 
-#foreign tsm_screen_draw :: (con: tsm_screen*, draw_cb: tsm_screen_draw_cb, data: void*) -> tsm_age_t;
+#foreign tsm_screen_draw :: fn(con: tsm_screen*, draw_cb: tsm_screen_draw_cb, data: void*) -> tsm_age_t;
 
 /**
  * @defgroup vte State Machine
@@ -245,13 +245,13 @@ TSM_VTE_INVALID : s64 = 0xffffffff
 
 #alias tsm_vte_write_cb :: void(tsm_vte*, c_string, u64, void*)*;
 
-#foreign tsm_vte_new :: (out: tsm_vte**, con: tsm_screen*, write_cb: tsm_vte_write_cb, data: void*, log: tsm_log_t, log_data: void*) -> int ;
-#foreign tsm_vte_ref :: (vte: tsm_vte*);
-#foreign tsm_vte_unref :: (vte: tsm_vte*);
+#foreign tsm_vte_new :: fn(out: tsm_vte**, con: tsm_screen*, write_cb: tsm_vte_write_cb, data: void*, log: tsm_log_t, log_data: void*) -> int ;
+#foreign tsm_vte_ref :: fn(vte: tsm_vte*);
+#foreign tsm_vte_unref :: fn(vte: tsm_vte*);
 
-#foreign tsm_vte_set_palette :: (vte: tsm_vte*, palette: c_string) -> int ;
+#foreign tsm_vte_set_palette :: fn(vte: tsm_vte*, palette: c_string) -> int ;
 
-#foreign tsm_vte_reset :: (vte: tsm_vte*);
-#foreign tsm_vte_hard_reset :: (vte: tsm_vte*);
-#foreign tsm_vte_input :: (vte: tsm_vte*, byte : char *, len: u64);
-#foreign tsm_vte_handle_keyboard :: (vte: tsm_vte*, keysym: u32, ascii: u32, mods: u32, unicode: u32) -> bool;
+#foreign tsm_vte_reset :: fn(vte: tsm_vte*);
+#foreign tsm_vte_hard_reset :: fn(vte: tsm_vte*);
+#foreign tsm_vte_input :: fn(vte: tsm_vte*, byte : char *, len: u64);
+#foreign tsm_vte_handle_keyboard :: fn(vte: tsm_vte*, keysym: u32, ascii: u32, mods: u32, unicode: u32) -> bool;

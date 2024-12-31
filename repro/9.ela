@@ -3,6 +3,6 @@ Enum :: enum {
   Two,
 }
 
-main :: () {
+main :: fn() {
   e: Enum = Enum.One;
 }

@@ -5,7 +5,7 @@ Strukt :: struct {
   c: string;
 }
 
-main :: () {
+main :: fn() {
   a : Strukt;
   // We should have a default implemented to_string on all structs,
   // unless the implementer provides one.

@@ -19,7 +19,7 @@ XaryuStruct :: struct {
 
 InitListTestCtorStruct :: struct {
   z : int;
-  #ctor :: (n : int, f: int) {
+  #ctor :: fn(n : int, f: int) {
     z = n * f;
   }
 }
@@ -38,13 +38,13 @@ Union :: union {
   a: int;
   b: int;
   c: int;
-  method :: (n: int) {
+  method :: fn(n: int) {
     assert("union equality check in method failed", n == a && n == b && n == c);
   }
-  #ctor :: () {
+  #ctor :: fn() {
     a = -1;
   }
-  #dtor :: () {
+  #dtor :: fn() {
   }
 }
 _Vec2 :: union {
@@ -55,60 +55,60 @@ _Vec2 :: union {
   };
   values: int[3] ;
 
-  method :: (n: int) {
+  method :: fn(n: int) {
     assert("union equality check in method failed", n == x && n == y && n == z);
     assert("union equality check in method failed", n == values[0] && n == values[1] && n == values[2]);
   }
 
-  something :: () -> #self {
+  something :: fn() -> #self {
     return #make(#self);
   }
 
-  #ctor :: (_x : int, _y, _z) {
+  #ctor :: fn(_x : int, _y, _z) {
     x = _x;
     y = _y;
     z = _z;
   }
 
-  #ctor :: () {
+  #ctor :: fn() {
     memset(#make(void*, values), 0, sizeof(int) * 3);
     x=0;
     y=0;
     z=0;
   }
 
-  #dtor :: () {
+  #dtor :: fn() {
   }
 }
 
 CustomIteratorStruct :: struct {
   value: int*;
 
-  #ctor :: () {
+  #ctor :: fn() {
     value = malloc(sizeof(int) * 10);
     memset(value, 0, sizeof(int) * 10);
   }
 
-  begin :: () -> int * {
+  begin :: fn() -> int * {
     return value;
   }
-  end :: () -> int * {
+  end :: fn() -> int * {
     return value + 10;
   }
-  #dtor :: () {
+  #dtor :: fn() {
     free(value);
   }
 }
 
 Constructible :: struct {
   x: float32;
-  #ctor :: (_x: float32) {
+  #ctor :: fn(_x: float32) {
       x = _x;
   }
-  #ctor :: (other: Constructible) {
+  #ctor :: fn(other: Constructible) {
       x = other.x;
   }
-  #ctor :: () {
+  #ctor :: fn() {
     x = 10.0;
   }
 }
@@ -132,10 +132,10 @@ Array :: struct {
 }
 
 IHaveAMethod :: struct {
-  method :: () -> float32 {
+  method :: fn() -> float32 {
       return 0.0;
   }
-  parameter_method :: (x: float32) -> float32 {
+  parameter_method :: fn(x: float32) -> float32 {
       return x;
   }
 }
@@ -149,115 +149,115 @@ XarBarInitListTestStruct :: struct {
 }
 Xaryu :: struct {
   value: int;
-  to_string :: () -> string {
+  to_string :: fn() -> string {
     return "XarBar";
   }
 }
 OperatorOverloadTest :: struct {
   value: int = 0;
 
-  #operator(+) :: (something: OperatorOverloadTest) -> int {
+  #operator(+) :: fn(something: OperatorOverloadTest) -> int {
     return value + something.value;
   }
-  #operator(-) :: (something: OperatorOverloadTest) -> int {
+  #operator(-) :: fn(something: OperatorOverloadTest) -> int {
     return value - something.value;
   }
-  #operator(*) :: (something: OperatorOverloadTest) -> int {
+  #operator(*) :: fn(something: OperatorOverloadTest) -> int {
     return value * something.value;
   }
-  #operator(/) :: (something: OperatorOverloadTest) -> int {
+  #operator(/) :: fn(something: OperatorOverloadTest) -> int {
     return value / something.value;
   }
-  #operator(%) :: (something: OperatorOverloadTest) -> int {
+  #operator(%) :: fn(something: OperatorOverloadTest) -> int {
     return value % something.value;
   }
-  #operator(&) :: (something: OperatorOverloadTest) -> int {
+  #operator(&) :: fn(something: OperatorOverloadTest) -> int {
     return value & something.value;
   }
-  #operator(|) :: (something: OperatorOverloadTest) -> int {
+  #operator(|) :: fn(something: OperatorOverloadTest) -> int {
     return value | something.value;
   }
-  #operator(^) :: (something: OperatorOverloadTest) -> int {
+  #operator(^) :: fn(something: OperatorOverloadTest) -> int {
     return value ^ something.value;
   }
-  #operator(~) :: () -> int {
+  #operator(~) :: fn() -> int {
     return ~value;
   }
-  #operator(<<) :: (something: OperatorOverloadTest) -> int {
+  #operator(<<) :: fn(something: OperatorOverloadTest) -> int {
     return value << something.value;
   }
-  #operator(>>) :: (something: OperatorOverloadTest) -> int {
+  #operator(>>) :: fn(something: OperatorOverloadTest) -> int {
     return value >> something.value;
   }
-  #operator(+=) :: (something: OperatorOverloadTest) -> int {
+  #operator(+=) :: fn(something: OperatorOverloadTest) -> int {
     value += something.value;
     return value;
   }
-  #operator(-=) :: (something: OperatorOverloadTest) -> int {
+  #operator(-=) :: fn(something: OperatorOverloadTest) -> int {
     value -= something.value;
     return value;
   }
-  #operator(*=) :: (something: OperatorOverloadTest) -> int {
+  #operator(*=) :: fn(something: OperatorOverloadTest) -> int {
     value *= something.value;
     return value;
   }
-  #operator(/=) :: (something: OperatorOverloadTest) -> int {
+  #operator(/=) :: fn(something: OperatorOverloadTest) -> int {
     value /= something.value;
     return value;
   }
-  #operator(%=) :: (something: OperatorOverloadTest) -> int {
+  #operator(%=) :: fn(something: OperatorOverloadTest) -> int {
     value %= something.value;
     return value;
   }
-  #operator(&=) :: (something: OperatorOverloadTest) -> int {
+  #operator(&=) :: fn(something: OperatorOverloadTest) -> int {
     value &= something.value;
     return value;
   }
-  #operator(|=) :: (something: OperatorOverloadTest) -> int {
+  #operator(|=) :: fn(something: OperatorOverloadTest) -> int {
     value |= something.value;
     return value;
   }
-  #operator(^=) :: (something: OperatorOverloadTest) -> int {
+  #operator(^=) :: fn(something: OperatorOverloadTest) -> int {
     value ^= something.value;
     return value;
   }
-  #operator(<<=) :: (something: OperatorOverloadTest) -> int {
+  #operator(<<=) :: fn(something: OperatorOverloadTest) -> int {
     value <<= something.value;
     return value;
   }
-  #operator(>>=) :: (something: OperatorOverloadTest) -> int {
+  #operator(>>=) :: fn(something: OperatorOverloadTest) -> int {
     value >>= something.value;
     return value;
   }
-  #operator(++) :: () -> int {
+  #operator(++) :: fn() -> int {
     return ++value;
   }
-  #operator(--) :: () -> int {
+  #operator(--) :: fn() -> int {
     return --value;
   }
-  #operator(==) :: (something: OperatorOverloadTest) -> bool {
+  #operator(==) :: fn(something: OperatorOverloadTest) -> bool {
     return value == something.value;
   }
-  #operator(!=) :: (something: OperatorOverloadTest) -> bool {
+  #operator(!=) :: fn(something: OperatorOverloadTest) -> bool {
     return value != something.value;
   }
-  #operator(<) :: (something: OperatorOverloadTest) -> bool {
+  #operator(<) :: fn(something: OperatorOverloadTest) -> bool {
     return value < something.value;
   }
-  #operator(<=) :: (something: OperatorOverloadTest) -> bool {
+  #operator(<=) :: fn(something: OperatorOverloadTest) -> bool {
     return value <= something.value;
   }
-  #operator(>) :: (something: OperatorOverloadTest) -> bool {
+  #operator(>) :: fn(something: OperatorOverloadTest) -> bool {
     return value > something.value;
   }
-  #operator(>=) :: (something: OperatorOverloadTest) -> bool {
+  #operator(>=) :: fn(something: OperatorOverloadTest) -> bool {
     return value >= something.value;
   }
-  #operator([]) :: (n: int) -> int {
+  #operator([]) :: fn(n: int) -> int {
     base: int = 10;
     return n + base;
   }
-  to_string :: () -> char *  {
+  to_string :: fn() -> char *  {
     str: char* = malloc(sizeof(char *) * 1);
     sprintf(str, "%d", value);
     return str;
@@ -293,7 +293,7 @@ EnumOfStrings :: enum {
 };
 
 
-#test test_for :: () {
+#test test_for :: fn() {
   for i in 0..10 {
     assert("i should be less than 10", i < 10);
     return;
@@ -312,7 +312,7 @@ EnumOfStrings :: enum {
   assert("End of test_for reached", true);
 }
 
-#test test_while :: () {
+#test test_while :: fn() {
   b: bool = true;
   while b {
       assert("while condition == true", b == true);
@@ -321,7 +321,7 @@ EnumOfStrings :: enum {
   assert("End of test_while reached", true);
 }
 
-#test test_if_1 :: () {
+#test test_if_1 :: fn() {
   v: bool = true;
   hit: bool = false;
   if v {
@@ -333,7 +333,7 @@ EnumOfStrings :: enum {
   assert("failed to fall through if statement", hit);
 }
 
-#test test_if_2 :: () {
+#test test_if_2 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
@@ -344,7 +344,7 @@ EnumOfStrings :: enum {
   assert("fell through if else, but didn't set the variable", hit);
 }
 
-#test test_if_3 :: () {
+#test test_if_3 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
@@ -357,7 +357,7 @@ EnumOfStrings :: enum {
   assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
-#test test_comp_assign :: () {
+#test test_comp_assign :: fn() {
   deref: s32 = 1;
   deref += deref;
   assert("+=", deref == 2);
@@ -383,7 +383,7 @@ EnumOfStrings :: enum {
   assert(">>=", deref == 0);
 }
 
-#test test_operators :: () {
+#test test_operators :: fn() {
   left: s32 = 1;
   right: s32 = 1;
   result: s32;
@@ -427,7 +427,7 @@ EnumOfStrings :: enum {
   assert("left >> right should be 0", result == 0);
 }
 
-#test test_relational_results :: () {
+#test test_relational_results :: fn() {
   test1: bool = (1 == 1 + 2) || 1 == 2;
   test2: bool = (3 > 2) && (2 < 4);
   test3: bool = !(5 <= 5) || (6 >= 6);
@@ -438,7 +438,7 @@ EnumOfStrings :: enum {
   assert("test4 should be true", test4 == true);
 }
 
-#test test_address_of :: () {
+#test test_address_of :: fn() {
   v: s32 = 0;
   addr_of_v: s32* = &v;
   assert("address of grabbed a non-null ptr", addr_of_v != null);
@@ -446,7 +446,7 @@ EnumOfStrings :: enum {
   assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
 
-#test test_malloc :: () {
+#test test_malloc :: fn() {
   ptr: s32* = malloc(4);
   assert("malloc'd pointer was null", ptr != null);
   free(ptr);
@@ -454,24 +454,24 @@ EnumOfStrings :: enum {
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: (a: float32, b, c, d) -> float32 {
+many_params :: fn(a: float32, b, c, d) -> float32 {
   return a * b * c * d;
 }
 
-mul_params :: (n: float32, f) -> float32 {
+mul_params :: fn(n: float32, f) -> float32 {
   return n * f;
 }
 
-#test test_param :: () {
+#test test_param :: fn() {
   assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
   assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0, 1.0) == 8.0);
 }
 
-returns :: () -> s32  {
+returns :: fn() -> s32  {
   return 1;
 }
 
-#test test_implicit_numerical_casting :: () {
+#test test_implicit_numerical_casting :: fn() {
   u1: u8;
   u2: u16 = u1;
   u3: u32 = u2;
@@ -489,24 +489,24 @@ returns :: () -> s32  {
   assert("unable to upcast successfully", f == f1);
 }
 
-#test test_return_value :: () {
+#test test_return_value :: fn() {
   assert("function expected to return 1", returns() == 1);
 }
 
-#test test_struct_single_level :: () {
+#test test_struct_single_level :: fn() {
   v: JVector2;
   assert("v.x != 0.0", v.x == 0.0);
   assert("v.y != 0.0", v.y == 0.0);
 }
 
-#test test_struct_nested_once :: () {
+#test test_struct_nested_once :: fn() {
   v: JVector3;
   assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
   assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
   assert("v.z != 0.0", v.z == 0.0);
 }
 
-#test test_struct_assign_member :: () {
+#test test_struct_assign_member :: fn() {
   v: JVector2;
   v.x = 10.0;
   v.y = 10.0;
@@ -514,7 +514,7 @@ returns :: () -> s32  {
   assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }
 
-#test test_struct_assign_nested_member :: () {
+#test test_struct_assign_nested_member :: fn() {
   v: JVector3;
   v.vec2.x = 1.0;
   v.vec2.y = 2.0;
@@ -524,32 +524,32 @@ returns :: () -> s32  {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: (v: JVector2)  -> float32 {
+struct_as_param :: fn(v: JVector2)  -> float32 {
   return v.x;
 }
 
-#test test_struct_as_param :: () {
+#test test_struct_as_param :: fn() {
   v: JVector2;
   assert("", struct_as_param(v) == 0.0);
 }
 
-something :: (f: float32) -> float32 {
+something :: fn(f: float32) -> float32 {
   return f;
 }
 
-#test test_struct_member_as_param :: () {
+#test test_struct_member_as_param :: fn() {
   v: JVector2;
   assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 
-#test test_local_function :: () {
-  local_function :: () -> s32 {
+#test test_local_function :: fn() {
+  local_function :: fn() -> s32 {
       return 0;
   }
   assert("failed to get 0 from local function call", local_function() == 0);
 }
 
-#test test_chained_dot_subscript :: () {
+#test test_chained_dot_subscript :: fn() {
   a: Array;
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
@@ -559,7 +559,7 @@ something :: (f: float32) -> float32 {
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
-#test test_subscript :: () {
+#test test_subscript :: fn() {
   arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
@@ -567,7 +567,7 @@ something :: (f: float32) -> float32 {
   ++n;
 }
 
-#test test_referencing_pointer :: () {
+#test test_referencing_pointer :: fn() {
   node: Node;
   node.next = malloc(sizeof(Node));
   other: Node;
@@ -578,7 +578,7 @@ something :: (f: float32) -> float32 {
 }
 
 // testing conflicting definitons. expected: compiler error if failed.
-#test for_loop_2 :: () {
+#test for_loop_2 :: fn() {
   for i in 0..10 {
       i = i;
   }
@@ -596,37 +596,37 @@ something :: (f: float32) -> float32 {
   }
 }
 
-#test make_parameterless :: () {
+#test make_parameterless :: fn() {
   n := #make(Constructible);
   assert("default construction failed.", n.x == 10.0);
 }
 
-#test test_copy_make :: () {
+#test test_copy_make :: fn() {
   c: Constructible;
   c1: Constructible = #make(Constructible, c);
   assert("failed to copy construct Constructible (struct)", c1.x == c.x);
 }
 
 
-#test test_make :: () {
+#test test_make :: fn() {
   c := Constructible{10.0};
   ms2 := MakeStruct2{0.0, 10};
   assert("failed to construct", c.x == 10.0);
 }
 
-#test test_make_cast :: () {
+#test test_make_cast :: fn() {
   big: u16 = #make(u16, 65365);
   small: u8 = #make(u8, big);
   assert("failed to down cast", small == (big % 255));
 }
 
-#test test_method :: () {
+#test test_method :: fn() {
   owner: IHaveAMethod ;
   assert("failed to get 0.0 from method.", owner.method() == 0.0);
   assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }
 
-#test test_enum_flags :: () {
+#test test_enum_flags :: fn() {
   flags := Banana.Unripe | Banana.Overripe;
   assert("flags & Banana.Unripe failed.", (flags & Banana.Unripe) != 0);
 }
@@ -636,20 +636,20 @@ something :: (f: float32) -> float32 {
 // We should be able to do MyEnum value = MyEnum.Some;
 // This will also allow us to do other stuff, like type safe enums.
 
-#test test_regular_enum :: () {
+#test test_regular_enum :: fn() {
   value := MyEnum.Some;
   value1 := MyEnum.Value;
   assert("MyEnum.Value failed to == 100 * 2", value1 == 100 * 2);
   assert("Zero case of enum did not equal 0", value == 0);
 }
 
-#test test_type_alias :: () {
+#test test_type_alias :: fn() {
   #alias XaryuBarSchnar :: int;
   i: XaryuBarSchnar = 0;
   assert("type alias failed", i == 0);
 }
 
-#test test_comp_assign_non_iden :: () {
+#test test_comp_assign_non_iden :: fn() {
   arr: float32[12];
   arr[0] = 10;
   arr[0] += 10;
@@ -661,33 +661,33 @@ something :: (f: float32) -> float32 {
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
 
-#test test_union_type :: () {
+#test test_union_type :: fn() {
   test_union: Union;
   test_union.a = 10;
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
   test_union.method(10);
 }
 
-#test test_two_way_implicit_conversion_bin_ops :: () {
+#test test_two_way_implicit_conversion_bin_ops :: fn() {
   v: s32;
   v1: s8;
   f: float32;
   assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
 }
 
-#test test_union_type_anonymous_sub_struct :: () {
+#test test_union_type_anonymous_sub_struct :: fn() {
   vec: _Vec2;
   vec.method(0); // this does the assertions
 }
 
-#test test_new :: () {
+#test test_new :: fn() {
   vec: _Vec2* = new _Vec2(10, 10, 10);
   vec1: _Vec2* = new _Vec2(10, 10, 10);
   assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
   delete (vec, vec1);
 }
 
-#test custom_iterator_increment :: () {
+#test custom_iterator_increment :: fn() {
   for i in #make(Range, 0, 10, 2) {
     assert("iter increment failed to be divisible by 2", i % 2 == 0);
   }
@@ -696,7 +696,7 @@ something :: (f: float32) -> float32 {
   }
 }
 
-#test ptr_iter_range_base :: () {
+#test ptr_iter_range_base :: fn() {
   array: s8[] = {0,1,2,3};
   n: int ;
   for *v in array {
@@ -714,7 +714,7 @@ something :: (f: float32) -> float32 {
   delete(arr);
 }
 
-#test test_custom_iterator :: () {
+#test test_custom_iterator :: fn() {
   iter: CustomIteratorStruct;
   n: int;
   for k in iter {
@@ -724,12 +724,12 @@ something :: (f: float32) -> float32 {
   assert("failed to iterate the appropriate number of times", n == 10);
 }
 
-#test test_string :: () {
+#test test_string :: fn() {
   my_string : string = "Xaryu Baryu";
   assert("string length failed to equal expected value", my_string.length == 11);
 }
 
-#test test_array :: () {
+#test test_array :: fn() {
   array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
   // !BUG: we need to fix this.
@@ -739,7 +739,7 @@ something :: (f: float32) -> float32 {
   // !bool[] arr = {0,1,2,3,4,5};
 }
 
-#test test_aliasing :: () {
+#test test_aliasing :: fn() {
   #alias int_ptr :: int*;
   p: int* = malloc(sizeof(int));
   other: int_ptr  = p;
@@ -753,7 +753,7 @@ something :: (f: float32) -> float32 {
   free(pp);
 }
 
-#test test_string_interpolation :: () {
+#test test_string_interpolation :: fn() {
   xarbar: Xaryu;
   interp: string = $"{xarbar}";
   assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
@@ -761,28 +761,28 @@ something :: (f: float32) -> float32 {
   assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
 }
 
-overloaded :: (n: int , y) -> int {
+overloaded :: fn(n: int , y) -> int {
   return n * y;
 }
 
-overloaded :: (n: int) -> int {
+overloaded :: fn(n: int) -> int {
   return n;
 }
 
-overloaded :: (n: int, y: float) -> float {
+overloaded :: fn(n: int, y: float) -> float {
   return n * y;
 }
 
-overloaded :: (f: float ) -> float {
+overloaded :: fn(f: float ) -> float {
   return f;
 }
 
-overloaded :: (xaryu: Xaryu ) -> Xaryu {
+overloaded :: fn(xaryu: Xaryu ) -> Xaryu {
   return xaryu;
 }
 
 
-#test test_operator_overload :: () {
+#test test_operator_overload :: fn() {
   opstr1: OperatorOverloadTest;
   opstr2: OperatorOverloadTest;
   opstr1.value = 10;
@@ -810,7 +810,7 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   assert("Greater than or equal operator overload failed",      opstr1 >= opstr2 == true);
   assert("Subscript operator didn't return '30'",               opstr1[20] == 30);
 }
-#test test_comp_assign_overloads :: () {
+#test test_comp_assign_overloads :: fn() {
   opstr1: OperatorOverloadTest;
   opstr2: OperatorOverloadTest;
   opstr1.value = 10;
@@ -837,7 +837,7 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   assert("Right shift assignment operator overload failed",     opstr1.value == 0);
 }
 
-#test test_initializer_lists :: () {
+#test test_initializer_lists :: fn() {
     scalar: int = {0};
     arr: int[]  = {0, 1, 2};
     fixed: int[3] = {0, 1, 2};
@@ -880,24 +880,24 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
     }
 }
 
-#test test_cast :: () {
+#test test_cast :: fn() {
   n: int = 10;
   f: float  = (float)n;
   assert("Cast failed", f == 10.0);
 }
 
-#test test_underscores_in_number_literals :: () {
+#test test_underscores_in_number_literals :: fn() {
   n: int = 1_000_000;
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }
 
-#test test_array_concat_operator :: () {
+#test test_array_concat_operator :: fn() {
   array: int[];
   array ~= 10;
   assert("concat operator failed", array.length == 1);
 }
 
-#test test_array_pop_operator :: () {
+#test test_array_pop_operator :: fn() {
   array: int[];
   for i in 0..100 {
     array ~= 10;
@@ -909,23 +909,23 @@ overloaded :: (xaryu: Xaryu ) -> Xaryu {
   assert("pop operator failed", array.length == 0 && n == 10);
 }
 
-#test test_array_erase_operator :: () {
+#test test_array_erase_operator :: fn() {
   array: int[] ;
   array ~= 10;
   array ~~ 10;
   assert("failed to erase element from array with ~~", array.length == 0);
 }
 
-New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
+New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   return v;
 }
 
-#test test_init_list_as_implicit_parameter :: () {
+#test test_init_list_as_implicit_parameter :: fn() {
   v := New({0.0, 0.0});
   assert("failed", v.x == 0.0 && v.y == 0.0);
 }
 
-#test test_range_based_for_loop_exclusive :: () {
+#test test_range_based_for_loop_exclusive :: fn() {
   n: int;
   ten := 10;
   zero := 0;
@@ -951,9 +951,9 @@ New :: (v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 
 #alias FunctionPointer :: int(int, int)*;
 
-function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
+function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
 
-#test test_multidimensional_arrays :: () {
+#test test_multidimensional_arrays :: fn() {
   array: int[5][5];
   for x in 0..5 {
     for y in 0..5 {
@@ -984,7 +984,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   }
 }
 
-#test test_function_pointer_alias :: () {
+#test test_function_pointer_alias :: fn() {
   ptr := &function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 
@@ -998,7 +998,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
 
   assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
 
-  function :: () -> FunctionPointer {
+  function :: fn() -> FunctionPointer {
     return &function_pointer_helper;
   }
 
@@ -1006,7 +1006,7 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 }
 
-#test test_map_aka_associative_array :: () {
+#test test_map_aka_associative_array :: fn() {
   variables: int[string];
   map1: int*[char*];
 
@@ -1045,27 +1045,27 @@ function_pointer_helper :: (x: int, y: int) -> int { return x * y; }
   // ! really, maps should be eliminated and be replaced once generics are back in the language.
 }
 
-returns_an_init_list  :: () -> InitListTest {
+returns_an_init_list  :: fn() -> InitListTest {
   return {0};
 }
 
-infers_argument_from_init_list :: (t: InitListTest) -> InitListTest {
+infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
   return t;
 }
 
-#test test_init_list_comprehensive :: () {
+#test test_init_list_comprehensive :: fn() {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
   empty_init_list := InitListTest{};
 
 }
 
-#test subscript_string :: () {
+#test subscript_string :: fn() {
   s: string = #make(string, "0,1,2,3");
   s[0] = 10;
 }
 
-switch_helper :: () -> int {
+switch_helper :: fn() -> int {
   number := 5;
   switch number {
     0: { return 0; }
@@ -1074,7 +1074,7 @@ switch_helper :: () -> int {
   return 1;
 }
 
-#test test_switch_statements :: () {
+#test test_switch_statements :: fn() {
   integer: int;
 
   passed := false;
@@ -1128,7 +1128,7 @@ switch_helper :: () -> int {
   assert("Returns in switched failed", switch_helper() == 5);
 }
 
-#test test_range_var :: () {
+#test test_range_var :: fn() {
   r : Range = 0..10;
   assert("range variable failed", r.first == 0 && r.last == 10);
 
@@ -1139,12 +1139,12 @@ switch_helper :: () -> int {
   }
 }
 
-#test test_string_enum :: () {
+#test test_string_enum :: fn() {
   b: bool = EnumOfStrings.A == string{"Hello"};
   assert("String enum failed", b);
 }
 
-#test test_slicing_array :: () {
+#test test_slicing_array :: fn() {
   arr := #make(s64[], 1000);
   assert("Length", arr.length == 1000);
 
@@ -1166,7 +1166,7 @@ switch_helper :: () -> int {
   assert("Slice failed", subarr.length == 10);
 }
 
-#test test_switch_statement :: () {
+#test test_switch_statement :: fn() {
   arr := #make(s64[], 1000);
   assert("Length", arr.length == 1000);
 
@@ -1188,21 +1188,21 @@ switch_helper :: () -> int {
   assert("Slice failed", subarr.length == 10);
 }
 
-#test test_init_list_ctor :: () {
+#test test_init_list_ctor :: fn() {
   i : InitListTestCtorStruct = {5, 5};
   assert("init list calling ctor failed", i.z == 25);
 }
 
-func_returns_tuple :: () -> <int, int> {
+func_returns_tuple :: fn() -> <int, int> {
   return <10, 10>;
 }
 
-func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
+func_takes_tuple_arg :: fn(tuple: <int, int>) -> <int, int> {
   a, b := tuple;
   return <a + 10, b + 10>;
 }
 
-#test test_tuples :: () {
+#test test_tuples :: fn() {
   t1 : <int, int, int> = <0, 1, 2>;
   {
     a,b,c := t1;
@@ -1262,7 +1262,7 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
   }
 }
 
-#test test_set_field_with_reflection :: () {
+#test test_set_field_with_reflection :: fn() {
  reflector: Reflector;
  type := #type(Reflector);
  field := type.fields[0];
@@ -1271,7 +1271,7 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
  assert("reflection field.set() failed.", reflector.n == 100);
 }
 
-#test test_get_field_with_reflection :: () {
+#test test_get_field_with_reflection :: fn() {
  reflector: Reflector;
  reflector.n = 100;
  type := #type(Reflector);
@@ -1280,7 +1280,7 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
  assert("reflection field.set() failed.", n == 100);
 }
 
-#test test_function_overloads :: () {
+#test test_function_overloads :: fn() {
   t := #type(overloaded(10));
   assert("overload with integer arg failed to call", strcmp(t.name, "int") == 0);
   t = #type(overloaded(12.5));
@@ -1302,17 +1302,17 @@ func_takes_tuple_arg :: (tuple: <int, int>) -> <int, int> {
 
 JsonValueDeleter :: struct {
   vals: JsonValue*[];
-  add ::(val: JsonValue*) {
+  add :: fn(val: JsonValue*) {
     vals ~= val;
   }
-  #dtor :: () {
+  #dtor :: fn() {
     for val in vals {
       delete(val);
     }
   }
 }
 
-#test test_json_types :: () {
+#test test_json_types :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
 
@@ -1341,7 +1341,7 @@ JsonValueDeleter :: struct {
   assert("null", val.is_null());
 }
 
-#test test_json_values :: () {
+#test test_json_values :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
 
@@ -1369,7 +1369,7 @@ JsonValueDeleter :: struct {
   assert("object key", val.get("key").as_string() == "value");
 }
 
-#test test_json_comprehensive :: () {
+#test test_json_comprehensive :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
 
@@ -1403,7 +1403,7 @@ JsonValueDeleter :: struct {
 }
 
 
-#test test_array_reflection :: () {
+#test test_array_reflection :: fn() {
   fixed: int[3] = {1, 2, 3};
   fixed_type := #type(fixed);
   index: int = 0;
@@ -1430,20 +1430,20 @@ BitfieldTest :: struct {
   #bitfield(2) z: u32 = 3;
 }
 
-#test test_bitfield_in_struct :: () {
+#test test_bitfield_in_struct :: fn() {
   test: BitfieldTest;
   assert("bitfield failed to equal 0", test.i == 0);
   assert("bitfield z failed to equal 3", test.z == 3);
 }
 
-add :: (a: s32, b: s32) -> s32 { return a + b; }
-add :: (a: float, b: s32) -> s32 { return ((s32)a) + b; }
-add :: (a: s32, b: float) -> s32 { return a + ((s32)b); }
-add :: (a: s32, b: u32) -> s32 { return a + ((s32)b); }
-add :: (a: s32) -> s32 { return a + 2; }
-add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
+add :: fn(a: s32, b: s32) -> s32 { return a + b; }
+add :: fn(a: float, b: s32) -> s32 { return ((s32)a) + b; }
+add :: fn(a: s32, b: float) -> s32 { return a + ((s32)b); }
+add :: fn(a: s32, b: u32) -> s32 { return a + ((s32)b); }
+add :: fn(a: s32) -> s32 { return a + 2; }
+add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
-#test test_function_overload :: () {
+#test test_function_overload :: fn() {
   a := add(1, 1);
   assert("expected 2",   a == 2);
   a = add(1.0, 1);
@@ -1459,9 +1459,9 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
 }
 
-#test test_call_statics :: () {
+#test test_call_statics :: fn() {
   Static :: struct {
-    #static counter :: () -> s32 {
+    #static counter :: fn() -> s32 {
       #static i: s32 = 0;
       return i++;
     }
@@ -1471,7 +1471,7 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   }
 }
 
-#test test_conditional_compilation :: () {
+#test test_conditional_compilation :: fn() {
   #def CHEESE;
 
   #ifdef HAMBURGER {

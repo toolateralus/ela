@@ -4,22 +4,22 @@
 */
 
 /* So this is valid.. */
-main :: () {
+main :: fn() {
   if 1 then return;
   return;
 }
 
 /* As well as this.. */
-main :: () { }
+main :: fn() { }
 
 /* And this is valid.. */
-main :: () -> int {
+main :: fn() -> int {
   if 1 then return 1;
   return 0;
 }
 
 /* But this is not. */
-main :: () -> int {
+main :: fn() -> int {
   if 1 {
     return 1;
   }

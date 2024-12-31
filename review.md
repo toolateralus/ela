@@ -43,6 +43,6 @@
 ## syntax
   - `fn function_name(arg: type) return_ty` syntax kind of like go would be much preferable. it's clearer, easier to parse,
   and easier to type. `-> return_type` syntax is clunky and annoying.
-  - function pointer type defs should follow that syntax. in this compiler, `void()` == `func :: () {}` which doesn't match syntactcally. instead we'd have `fn(int) int`
+  - function pointer type defs should follow that syntax. in this compiler, `void()` == `func :: fn() {}` which doesn't match syntactcally. instead we'd have `fn(int) int`
   - `*int` instead of `int*`. pointer to int instead of int pointer.
   - `[100]int` instead of  `int[100]` as well.

@@ -101,7 +101,7 @@ ParticleKind :: enum {
 RenderInfo :: struct {
   texture: Texture2D;
   tex_rect : Rectangle;
-  #ctor :: (tex: Texture2D) {
+  #ctor :: fn(tex: Texture2D) {
     w := (float)tex.width;
     h := (float)tex.height;
     tex_rect = {
@@ -142,7 +142,7 @@ Bullet :: struct {
   render_info: RenderInfo*;
   origin: Vector2;
   rect: Rectangle;
-  #ctor :: (_rect: Rectangle, info: RenderInfo*, vel : Vector2, rot: float) {
+  #ctor :: fn(_rect: Rectangle, info: RenderInfo*, vel : Vector2, rot: float) {
     rotation = rot;
     render_info = info;
     rect = _rect;
@@ -160,7 +160,7 @@ Enemy :: struct {
   target: Vector2;
   rotation: float;
   speed: float;
-  #ctor :: (_rect: Rectangle, info: RenderInfo*) {
+  #ctor :: fn(_rect: Rectangle, info: RenderInfo*) {
     render_info = info;
     rect = _rect;
     origin = { rect.width / 2, rect.height / 2 };
@@ -199,7 +199,7 @@ fail_sound: Sound;
 
 ui_text_color : Color = WHITE;
 
-get_center_screen_rect:: (width: float, height, offset: Vector2) -> Rectangle {
+get_center_screen_rect:: fn(width: float, height, offset: Vector2) -> Rectangle {
   return #make(Rectangle, {
     screen_width / 2 + offset.x,
     screen_width / 2 + offset.y,
@@ -208,7 +208,7 @@ get_center_screen_rect:: (width: float, height, offset: Vector2) -> Rectangle {
   });
 }
 
-make_text_particle :: (text: string, font_size: int, position: Vector2, lifetime: float) {
+make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifetime: float) {
   particle := new TextParticle();
   particle.position = position;
   particle.font_size = font_size;
@@ -219,30 +219,30 @@ make_text_particle :: (text: string, font_size: int, position: Vector2, lifetime
 }
 
 // great function name
-get_random_grayscale_color_with_per_channel_variance :: (_variance: float = 50.0) -> Color {
+get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
   gray_value : u8 = (u8) clamp(randf() * 255.0, 0, 255);
-  variance :: () -> u8 { return (u8)randf() * _variance; };
+  variance :: fn() -> u8 { return (u8)randf() * _variance; };
   r : u8 = (u8) clamp(gray_value + variance(), 0, 255);
   g : u8 = (u8) clamp(gray_value + variance(), 0, 255);
   b : u8 = (u8) clamp(gray_value + variance(), 0, 255);
   return #make(Color, {r, g, b, (u8)255});
 }
 
-random_vector2 :: (origin: Vector2, max: float) -> Vector2 {
+random_vector2 :: fn(origin: Vector2, max: float) -> Vector2 {
   result: Vector2;
   result.x = origin.x + randf() * max;
   result.y = origin.y + randf() * max;
   return origin;
 }
 
-random_vector2 :: (origin: Vector2, min, max) -> Vector2 {
+random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
   result: Vector2;
   result.x = origin.x + min.x + randf() * (max.x - min.x);
   result.y = origin.y + min.y + randf() * (max.y - min.y);
   return result;
 }
 
-make_particle :: (kind: int, position: Vector2, tint: Color) {
+make_particle :: fn(kind: int, position: Vector2, tint: Color) {
   particle := new Particle;
 
   if kind == ParticleKind.Smoke {
@@ -283,7 +283,7 @@ make_particle :: (kind: int, position: Vector2, tint: Color) {
   particles ~= particle;
 }
 
-update_particle :: (particle: Particle*) -> bool {
+update_particle :: fn(particle: Particle*) -> bool {
   time := GetTime();
   if particle.kind == ParticleKind.Smoke {
     particle.position = Vector2Add(particle.position, particle.velocity);
@@ -306,7 +306,7 @@ update_particle :: (particle: Particle*) -> bool {
   return true;
 }
 
-enemy_move_towards_or_get_new_target :: (enemy: Enemy*) {
+enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
   position : Vector2 = {enemy.rect.x, enemy.rect.y};
   if Vector2Distance(position, enemy.target) < 5 || Vector2Equals(zero, enemy.target) {
     enemy.target = { randf() * screen_width, randf() * screen_height };
@@ -321,7 +321,7 @@ enemy_move_towards_or_get_new_target :: (enemy: Enemy*) {
   }
 }
 
-make_enemy :: () {
+make_enemy :: fn() {
   x := randf() * screen_width;
   y := randf() * screen_height;
   rect : Rectangle = {x, y, enemy_scale, enemy_scale};
@@ -340,7 +340,7 @@ make_enemy :: () {
   enemies ~= enemy;
 }
 
-make_bullet :: (x: float, y, rotation) {
+make_bullet :: fn(x: float, y, rotation) {
   offset: float;
   if character.cannon_idx == 0 {
     offset = -(bullet_scale / 2.0)
@@ -357,7 +357,7 @@ make_bullet :: (x: float, y, rotation) {
   make_particle(ParticleKind.Fire, fire_pos, WHITE);
 }
 
-draw_background :: () {
+draw_background :: fn() {
   bg_color = color_lerp(bg_color, target_bg_color, 0.25);
   DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
   now : float = (float)GetTime();
@@ -367,7 +367,7 @@ draw_background :: () {
   }
 }
 
-draw_game :: () {
+draw_game :: fn() {
   if IsWindowResized() {
     character.rect.y = screen_height / 1.2;
   }
@@ -407,7 +407,7 @@ BulletRoutine :: struct {
   count : int = 0;
   timer: Timer;
   interval: float = 0.1;
-  spawn :: () -> bool {
+  spawn :: fn() -> bool {
     timer.interval = interval;
     if timer.tick() {
       count--;
@@ -427,7 +427,7 @@ BulletRoutine :: struct {
 bullet_routine : BulletRoutine;
 
 
-on_bullet_fizzle :: () {
+on_bullet_fizzle :: fn() {
   score *= 0.85;
   ui_text_color.a = 255;
   PlaySound(thud_sound);
@@ -443,7 +443,7 @@ on_bullet_fizzle :: () {
   // }
 }
 
-on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
+on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: int) {
   PlaySound(explosion_sound);
   make_particle(ParticleKind.Fire, {enemy.rect.x, enemy.rect.y}, WHITE);
   for _ in 0..4 {
@@ -458,7 +458,7 @@ on_enemy_killed :: (enemy: Enemy*, n_enemies_killed_this_frame: int) {
 
 space_down := false;
 
-update_game :: () {
+update_game :: fn() {
 
   // advance level.
   if targets_destroyed >= round_base_num_enemies_to_advance * round_index {
@@ -648,7 +648,7 @@ update_game :: () {
 
 }
 
-init :: () {
+init :: fn() {
 
 
 
@@ -692,7 +692,7 @@ init :: () {
 
 }
 
-init_audio :: () {
+init_audio :: fn() {
   InitAudioDevice();
   if !IsAudioDeviceReady() {
     printf("Failed to initialize audio device.\n");
@@ -724,7 +724,7 @@ init_audio :: () {
   SetMasterVolume(0.75);
 }
 
-reset_game_state :: () {
+reset_game_state :: fn() {
   misses_this_round = 0;
   score = 0;
   targets_destroyed = 0;
@@ -747,7 +747,7 @@ reset_game_state :: () {
   }
 }
 
-swap_music :: () {
+swap_music :: fn() {
   StopMusicStream(*current_music);
   if scene == Scene.MainMenu {
     current_music = &menu_music;
@@ -757,7 +757,7 @@ swap_music :: () {
   PlayMusicStream(*current_music);
 }
 
-start_game_callback :: () {
+start_game_callback :: fn() {
   scene = !scene;
   game_start_time = GetTime();
   reset_game_state();
@@ -766,7 +766,7 @@ start_game_callback :: () {
   round_failed = false;
 }
 
-draw_main_menu :: () {
+draw_main_menu :: fn() {
   width : float = 72;
   height : float = 48;
   draw_button("Start game", {screen_width / 2 - (width / 2), screen_height / 1.2 - (height / 2), width, height}, button_style, &start_game_callback);
@@ -805,7 +805,7 @@ draw_main_menu :: () {
   }
 }
 
-switch_music_callback :: () {
+switch_music_callback :: fn() {
   StopMusicStream(*current_music);
   if current_music == &game_music {
     current_music = &menu_music;
@@ -817,7 +817,7 @@ switch_music_callback :: () {
 }
 
 music_muted := false;
-mute_music_callback :: () {
+mute_music_callback :: fn() {
   if music_muted {
     PlayMusicStream(*current_music);
     music_muted = false;
@@ -827,7 +827,7 @@ mute_music_callback :: () {
   }
 }
 
-draw_game_menu :: () {
+draw_game_menu :: fn() {
   width : float = 72 / 3;
   height : float = 48 / 3;
 
@@ -843,7 +843,7 @@ draw_game_menu :: () {
 
 }
 
-main :: () {
+main :: fn() {
   InitWindow(800, 600, "target practice");
   SetTargetFPS(60);
 
