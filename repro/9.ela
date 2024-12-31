@@ -1,8 +1,0 @@
-Enum :: enum {
-  One,
-  Two,
-}
-
-main :: fn() {
-  e: Enum = Enum::One;
-}
