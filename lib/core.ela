@@ -2,10 +2,12 @@
 
 #foreign free :: (ptr: void*) -> void;
 #foreign malloc :: (nbytes: u64) -> void*;
+#foreign calloc :: (num: u64, size: u64) -> void*;
 #foreign realloc :: (ptr: void*, size: u64) -> void*;
 
 #foreign memcpy :: (dest: void*, src: void*, n: u64) -> void*;
 #foreign memset :: (dest: void*, c: int, n: u64) -> void*;
+#foreign memmove :: (dest: void*, src: void*, nbytes: s64) -> int;
 
 #foreign printf :: (format: c_string, ...) -> int;
 #foreign exit :: (code: int);
