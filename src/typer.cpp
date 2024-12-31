@@ -478,7 +478,10 @@ std::any Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
-      throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+      auto type = static_cast<ASTType*>(node->value.get());
+      if ((type->flags & ASTTYPE_EMIT_OBJECT) == 0) {
+        throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+      }
     }
 
     auto value_ty = int_from_any(node->value.get()->accept(this));
@@ -520,7 +523,10 @@ std::any Typer::visit(ASTDeclaration *node) {
   if (node->value.is_not_null()) {
 
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
-      throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+      auto type = static_cast<ASTType*>(node->value.get());
+      if ((type->flags & ASTTYPE_EMIT_OBJECT) == 0) {
+        throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+      }
     }
 
     auto old_ty = declaring_or_assigning_type;
