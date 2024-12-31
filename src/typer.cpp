@@ -867,6 +867,10 @@ std::any Typer::visit(ASTExprStatement *node) {
 }
 
 std::any Typer::visit(ASTType *node) {
+  for (auto& arr_size : node->extension_info.array_sizes) {
+    if (arr_size.is_null()) continue;
+    arr_size.get()->accept(this);
+  }
   if (!node->tuple_types.empty()) {
     std::vector<int> types;
     for (const auto &t : node->tuple_types)

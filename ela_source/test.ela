@@ -287,10 +287,6 @@ SwitchCaseEnum :: enum {
   SwitchVariant1,
 }
 
-EnumOfStrings :: enum {
-  A = string{"Hello"},
-  B = string{"Goodbye"}
-};
 
 
 #test test_for :: fn() {
@@ -1137,11 +1133,6 @@ switch_helper :: fn() -> int {
     assert("range iteration failed", i == z);
     i++;
   }
-}
-
-#test test_string_enum :: fn() {
-  b: bool = EnumOfStrings::A == string{"Hello"};
-  assert("String enum failed", b);
 }
 
 #test test_slicing_array :: fn() {

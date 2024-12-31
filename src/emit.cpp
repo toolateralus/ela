@@ -5,6 +5,7 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
+#include <any>
 #include <functional>
 
 #include <sstream>
@@ -137,6 +138,13 @@ std::any Emitter::visit(ASTType *node) {
 
   if (type->is_kind(TYPE_FUNCTION)) {
     emit_function_pointer_type_string(type);
+    return {};
+  }
+
+  if (type->is_kind(TYPE_ENUM)) {
+    auto enum_info = static_cast<EnumTypeInfo *>(type->get_info());
+    auto elem_ty = global_get_type(enum_info->element_type);
+    (*ss) << to_cpp_string(elem_ty);
     return {};
   }
 
@@ -327,9 +335,10 @@ std::any Emitter::visit(ASTDeclaration *node) {
       }
     }
     return {};
-  } 
+  }
 
-  // TODO: in the type checker, we should assert that this isn't a static member / function.
+  // TODO: in the type checker, we should assert that this isn't a static member
+  // / function.
   if (node->is_static) {
     (*ss) << "static ";
   } else if (node->is_constexpr) {
@@ -351,7 +360,8 @@ std::any Emitter::visit(ASTDeclaration *node) {
   return {};
 }
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  if ((node->flags & FUNCTION_IS_METHOD) != 0 || (node->flags & FUNCTION_IS_STATIC) != 0) {
+  if ((node->flags & FUNCTION_IS_METHOD) != 0 ||
+      (node->flags & FUNCTION_IS_STATIC) != 0) {
     return;
   }
 
@@ -420,20 +430,24 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     }
 
     if ((node->flags & FUNCTION_IS_DTOR) != 0) {
-      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                      : current_union_decl.get()->type->resolved_type;
+      auto type_id = current_struct_decl
+                         ? current_struct_decl.get()->type->resolved_type
+                         : current_union_decl.get()->type->resolved_type;
       auto type = global_get_type(type_id);
       auto name = type->get_base().get_str();
-      // TODO: in the typer, we need to assert that a destructor never takes parameters.
+      // TODO: in the typer, we need to assert that a destructor never takes
+      // parameters.
       (*ss) << '~' << name << "()";
-      if (!node->block) throw_error("Cannot forward declare a constructor", node->source_range);
+      if (!node->block)
+        throw_error("Cannot forward declare a constructor", node->source_range);
       node->block.get()->accept(this);
       return;
     }
 
     if ((node->flags & FUNCTION_IS_CTOR) != 0) {
-      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                      : current_union_decl.get()->type->resolved_type;
+      auto type_id = current_struct_decl
+                         ? current_struct_decl.get()->type->resolved_type
+                         : current_union_decl.get()->type->resolved_type;
       auto type = global_get_type(type_id);
       auto name = type->get_base().get_str();
       (*ss) << name;
@@ -446,8 +460,8 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
                    : current_union_decl.get()->type->resolved_type);
 
       if (is_copy_ctor) {
-        (*ss) << "(" << name << " &"
-              << node->params->params[0]->name.get_str() << ")";
+        (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str()
+              << ")";
         node->block.get()->accept(this);
         (*ss) << ";\n";
         (*ss) << name;
@@ -470,7 +484,6 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
     if ((node->flags & FUNCTION_IS_OPERATOR) != 0) {
       auto op = node->name;
-      
 
       if (op.type == TType::LParen) {
         op.value = "()";
@@ -497,9 +510,9 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "extern \"C\" ";
     }
 
-   static auto use_stdlib =
-      !compile_command.compilation_flags.contains("-nostdlib") &&
-      !compile_command.compilation_flags.contains("-ffreestanding");
+    static auto use_stdlib =
+        !compile_command.compilation_flags.contains("-nostdlib") &&
+        !compile_command.compilation_flags.contains("-ffreestanding");
 
     // we override main's return value to allow compilation without explicitly
     // returning int from main.
@@ -508,7 +521,8 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       node->return_type->accept(this);
       (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
       node->block.get()->accept(this);
-// This is for a main function when we're not using the stdlib, so you just take a C style main, since you don't have dynamic arrays.
+      // This is for a main function when we're not using the stdlib, so you
+      // just take a C style main, since you don't have dynamic arrays.
     } else if (node->name.value == "main") {
       (*ss) << "int ";
       node->return_type->accept(this);
@@ -527,7 +541,6 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       if (node->block.is_not_null())
         node->block.get()->accept(this);
     }
-
   };
 
   emit_line_directive(node);
@@ -606,10 +619,11 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
 
 std::any Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
+  auto type_name = node->type->base.get_str();
   int n = 0;
-  (*ss) << "enum " << node->type->base.get_str() << " {\n";
+  (*ss) << "enum " << type_name << " {\n";
   for (const auto &[key, value] : node->key_values) {
-    (*ss) << key.get_str();
+    (*ss) << type_name << "_" << key.get_str();
     if (value.is_not_null()) {
       (*ss) << " = ";
       value.get()->accept(this);
@@ -683,9 +697,7 @@ std::any Emitter::visit(ASTParamDecl *node) {
   } else {
     node->type->accept(this);
     auto sym = ctx.scope->local_lookup(node->name);
-    if (sym && 
-            type->is_kind(TYPE_STRUCT) ||
-        type->is_kind(TYPE_UNION)) {
+    if (sym && type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
       (*ss) << " const& " << node->name.get_str();
     } else {
       (*ss) << ' ' << node->name.get_str();
@@ -811,7 +823,8 @@ std::any Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
 
-  if (has_user_defined_main && use_stdlib) code << R"__(
+    if (has_user_defined_main && use_stdlib)
+      code << R"__(
 int main (int argc, char** argv) {
   // Bootstrap the env
   for (int i = 0; i < argc; ++i) {
@@ -1005,7 +1018,6 @@ std::any Emitter::visit(ASTTupleDeconstruction *node) {
   return {};
 };
 
-
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*/u8*
 void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
@@ -1088,7 +1100,7 @@ void Emitter::get_declaration_type_signature_and_identifier(
 void Emitter::interpolate_string(ASTLiteral *node) {
   if (node->value.get_str().empty()) {
     throw_warning("Empty interpolated string.", node->source_range);
-    (*ss) << "string()"; 
+    (*ss) << "string()";
     return;
   }
 
@@ -1194,8 +1206,8 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     if (type->id == bool_type()) {
       value->accept(this);
       (*ss) << " ? \"true\" : \"false\"";
-    }
-    else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+    } else if (type->get_base() == "string" &&
+               type->get_ext().has_no_extensions()) {
       value->accept(this);
       (*ss) << ".data";
     } else if (type->is_kind(TYPE_STRUCT)) {
@@ -1270,7 +1282,7 @@ void Emitter::emit_function_pointer_type_string(
 }
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type,
-                                          Type *parent_type, Context &context) {
+                                      Type *parent_type, Context &context) {
   std::stringstream ss;
   ss << "new Field { " << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
@@ -1392,13 +1404,12 @@ std::string get_type_flags(Type *type) {
 }
 
 std::string Emitter::get_type_struct(Type *type, int id, Context &context,
-                                         const std::string &fields) {
+                                     const std::string &fields) {
   std::stringstream ss;
 
   auto kind = 0;
 
-  ss << "_type_info[" << id << "] = new Type {"
-     << ".id = " << id << ", "
+  ss << "_type_info[" << id << "] = new Type {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
 
   if (!type->is_kind(TYPE_ENUM))
@@ -1499,8 +1510,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
       }
     }
     fields_ss << "}";
-  }
-  else if (type->kind == TYPE_ENUM) {
+  } else if (type->kind == TYPE_ENUM) {
     auto info = static_cast<EnumTypeInfo *>(type->get_info());
     if (info->keys.empty()) {
       return get_type_struct(type, id, context, "{}");
@@ -1529,8 +1539,8 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 }
 
 bool Emitter::should_emit_function(Emitter *visitor,
-                                       ASTFunctionDeclaration *node,
-                                       bool test_flag) {
+                                   ASTFunctionDeclaration *node,
+                                   bool test_flag) {
   // if we're not testing, don't emit for test functions
   if (!test_flag && node->flags & FUNCTION_IS_TEST) {
     return false;
@@ -1550,7 +1560,7 @@ bool Emitter::should_emit_function(Emitter *visitor,
 }
 
 std::string Emitter::to_cpp_string(const TypeExt &extensions,
-                                       const std::string &base) {
+                                   const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   StringBuilder ss;
   if (base == "c_string") {
@@ -1642,7 +1652,9 @@ std::string Emitter::to_cpp_string(Type *type) {
   return output;
 }
 
-void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition, Nullable<ASTBlock> block) {
+void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword,
+                                   Nullable<ASTExpr> condition,
+                                   Nullable<ASTBlock> block) {
   emit_line_directive(node);
   (*ss) << indent() << keyword << " ";
   if (condition.is_not_null()) {
@@ -1656,7 +1668,27 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 }
 
 std::any Emitter::visit(ASTScopeResolution *node) {
-  node->base->accept(this);
-  (*ss) << "::" << node->member_name.get_str();
+
+  bool emitted = false;
+
+  if (node->base->get_node_type() == AST_NODE_TYPE) {
+    auto t = static_cast<ASTType*>(node->base);
+    auto type = global_get_type(t->resolved_type);
+    if (type->is_kind(TYPE_ENUM)) {
+      (*ss) << type->get_base().get_str();
+      emitted = true;
+    }
+  }
+
+  if (!emitted) {
+    node->base->accept(this);
+  }
+
+  auto op = "::";
+  auto type_id = std::any_cast<int>(node->base->accept(&type_visitor));
+  if (global_get_type(type_id)->is_kind(TYPE_ENUM)) {
+    op = "_";
+  }
+  (*ss) << op << node->member_name.get_str();
   return {};
 }
