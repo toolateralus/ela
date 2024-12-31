@@ -342,8 +342,7 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
 
   node->element_type = elem_type;
 
-  auto enum_type =
-      global_get_type(global_find_type_id(node->type->base, {}));
+  auto enum_type = global_get_type(global_find_type_id(node->type->base, {}));
   auto info = static_cast<EnumTypeInfo *>(enum_type->get_info());
   info->element_type = elem_type;
 
@@ -478,9 +477,10 @@ std::any Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
-      auto type = static_cast<ASTType*>(node->value.get());
+      auto type = static_cast<ASTType *>(node->value.get());
       if ((type->flags & ASTTYPE_EMIT_OBJECT) == 0) {
-        throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+        throw_error("Cannot use a type as a value.",
+                    node->value.get()->source_range);
       }
     }
 
@@ -523,9 +523,10 @@ std::any Typer::visit(ASTDeclaration *node) {
   if (node->value.is_not_null()) {
 
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
-      auto type = static_cast<ASTType*>(node->value.get());
+      auto type = static_cast<ASTType *>(node->value.get());
       if ((type->flags & ASTTYPE_EMIT_OBJECT) == 0) {
-        throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+        throw_error("Cannot use a type as a value.",
+                    node->value.get()->source_range);
       }
     }
 
@@ -549,14 +550,16 @@ std::any Typer::visit(ASTDeclaration *node) {
                 node->source_range);
   }
 
-
   if (node->is_constexpr) {
     auto type = global_get_type(node->type->resolved_type);
     if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
-      throw_error(std::format("Can only use scalar types (integers, floats, bools) as constant expressions, got {}", type->to_string()), node->value.get()->source_range);
+      throw_error(std::format("Can only use scalar types (integers, floats, "
+                              "bools) as constant expressions, got {}",
+                              type->to_string()),
+                  node->value.get()->source_range);
     }
   }
-  
+
   return {};
 }
 
@@ -1170,7 +1173,7 @@ std::any Typer::visit(ASTDotExpr *node) {
   // TODO: remove this hack as well
   if (base_ty->get_ext().is_map()) {
     if (node->member_name == "contains") {
-      static auto contains_ty = []{
+      static auto contains_ty = [] {
         auto func = FunctionTypeInfo{};
         func.is_varargs = true;
         func.return_type = global_find_type_id("bool", {});
@@ -1194,26 +1197,33 @@ std::any Typer::visit(ASTDotExpr *node) {
   } else if (auto info = dynamic_cast<UnionTypeInfo *>(base_ty->get_info())) {
     base_scope = info->scope;
   } else {
-    throw_error("Dot expressions can only be used on structs, unions, and enums.",
-                node->source_range);
+    throw_error(
+        "Dot expressions can only be used on structs, unions, and enums.",
+        node->source_range);
   }
 
   auto member = base_scope->lookup(node->member_name);
-  return member->type_id;
+  if (auto member = base_scope->lookup(node->member_name)) {
+    return member->type_id;
+  } else {
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"",
+                            node->member_name, base_ty->to_string()),
+                node->source_range);
+  }
 }
 
 std::any Typer::visit(ASTScopeResolution *node) {
-  auto t = global_get_type(int_from_any(node->left->accept(this)));
-  auto left_ty = global_get_type(t->get_true_type());
+  auto base = global_get_type(int_from_any(node->base->accept(this)));
+  auto base_ty = global_get_type(base->get_true_type());
 
   Scope *scope = nullptr;
-  switch (left_ty->kind) {
+  switch (base_ty->kind) {
   case TYPE_STRUCT: {
-    auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
+    auto info = static_cast<StructTypeInfo *>(base_ty->get_info());
     scope = info->scope;
   } break;
   case TYPE_UNION: {
-    auto info = static_cast<UnionTypeInfo *>(left_ty->get_info());
+    auto info = static_cast<UnionTypeInfo *>(base_ty->get_info());
     scope = info->scope;
   } break;
   default:
@@ -1226,21 +1236,14 @@ std::any Typer::visit(ASTScopeResolution *node) {
                 node->source_range);
   }
 
-  auto calling_scope = ctx.scope;
-  Scope *dot_parent = scope->parent;
-
-  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
-    scope->parent = calling_scope;
+  auto member = scope->lookup(node->member_name);
+  if (auto member = scope->lookup(node->member_name)) {
+    return member->type_id;
+  } else {
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"",
+                            node->member_name, base_ty->to_string()),
+                node->source_range);
   }
-
-  ctx.set_scope(scope);
-  int type = int_from_any(node->right->accept(this));
-  ctx.set_scope(calling_scope);
-
-  if (dot_parent && calling_scope != scope && dot_parent != calling_scope) {
-    scope->parent = dot_parent;
-  }
-  return type;
 }
 
 std::any Typer::visit(ASTSubscript *node) {

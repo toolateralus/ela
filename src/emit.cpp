@@ -1677,8 +1677,7 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 }
 
 std::any Emitter::visit(ASTScopeResolution *node) {
-  node->left->accept(this);
-  (*ss) << "::";
-  node->right->accept(this);
+  node->base->accept(this);
+  (*ss) << "::" << node->member_name.get_str();
   return {};
 }

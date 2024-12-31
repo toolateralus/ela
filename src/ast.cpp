@@ -1597,8 +1597,8 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::DoubleColon) {
       eat();
       auto dot = ast_alloc<ASTScopeResolution>();
-      dot->left = left;
-      dot->right = parse_postfix();
+      dot->base = left;
+      dot->member_name = expect(TType::Identifier).value;
       left = dot;
     } else {
       eat();

@@ -377,9 +377,8 @@ std::any SerializeVisitor::visit(ASTAllocate *node) {
 }
 
 std::any SerializeVisitor::visit(ASTScopeResolution *node) {
-  node->left->accept(this);
-  ss << "::";
-  node->right->accept(this);
+  node->base->accept(this);
+  ss << "::" << node->member_name.get_str();
   return {};
 }
 
