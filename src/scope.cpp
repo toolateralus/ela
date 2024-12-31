@@ -189,7 +189,6 @@ Context::Context() {
 
   }
 
-
   // Env type
   {
     auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();

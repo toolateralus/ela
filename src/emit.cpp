@@ -34,18 +34,18 @@ constexpr auto TYPE_FLAGS_POINTER = 8192;
 constexpr auto TYPE_FLAGS_SIGNED = 16384;
 constexpr auto TYPE_FLAGS_UNSIGNED = 32768;
 
-std::any EmitVisitor::visit(ASTWhile *node) {
+std::any Emitter::visit(ASTWhile *node) {
   emit_condition_block(node, "while", node->condition, node->block);
   return {};
 }
-std::any EmitVisitor::visit(ASTIf *node) {
+std::any Emitter::visit(ASTIf *node) {
   emit_condition_block(node, "if", node->condition, node->block);
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTElse *node) {
+std::any Emitter::visit(ASTElse *node) {
   emit_line_directive(node);
   (*ss) << " else ";
   if (node->_if.is_not_null()) {
@@ -55,7 +55,7 @@ std::any EmitVisitor::visit(ASTElse *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTFor *node) {
+std::any Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
 
   auto old_scope = ctx.scope;
@@ -88,17 +88,17 @@ std::any EmitVisitor::visit(ASTFor *node) {
   ctx.set_scope(old_scope);
   return {};
 }
-std::any EmitVisitor::visit(ASTBreak *node) {
+std::any Emitter::visit(ASTBreak *node) {
   emit_line_directive(node);
   indented("break");
   return {};
 }
-std::any EmitVisitor::visit(ASTContinue *node) {
+std::any Emitter::visit(ASTContinue *node) {
   emit_line_directive(node);
   indented("continue");
   return {};
 }
-std::any EmitVisitor::visit(ASTReturn *node) {
+std::any Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
   indented("return");
   if (node->expression.is_not_null()) {
@@ -107,7 +107,7 @@ std::any EmitVisitor::visit(ASTReturn *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTArguments *node) {
+std::any Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
     node->arguments[i]->accept(this);
@@ -118,7 +118,7 @@ std::any EmitVisitor::visit(ASTArguments *node) {
   (*ss) << ")";
   return {};
 }
-std::any EmitVisitor::visit(ASTType *node) {
+std::any Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
 
   if (!type) {
@@ -144,12 +144,12 @@ std::any EmitVisitor::visit(ASTType *node) {
   (*ss) << type_string;
   return {};
 }
-std::any EmitVisitor::visit(ASTCall *node) {
+std::any Emitter::visit(ASTCall *node) {
   node->function->accept(this);
   node->arguments->accept(this);
   return {};
 }
-std::any EmitVisitor::visit(ASTLiteral *node) {
+std::any Emitter::visit(ASTLiteral *node) {
   auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))
                   ->to_string();
   std::string output;
@@ -187,11 +187,11 @@ std::any EmitVisitor::visit(ASTLiteral *node) {
   (*ss) << '(' << type << ')' << output;
   return {};
 }
-std::any EmitVisitor::visit(ASTIdentifier *node) {
+std::any Emitter::visit(ASTIdentifier *node) {
   (*ss) << node->value.get_str();
   return {};
 }
-std::any EmitVisitor::visit(ASTUnaryExpr *node) {
+std::any Emitter::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Sub) {
     auto type = global_get_type(
                     std::any_cast<int>(node->operand->accept(&type_visitor)))
@@ -218,7 +218,7 @@ std::any EmitVisitor::visit(ASTUnaryExpr *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTBinExpr *node) {
+std::any Emitter::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Erase) {
     node->left->accept(this);
     (*ss) << ".erase(";
@@ -257,13 +257,13 @@ std::any EmitVisitor::visit(ASTBinExpr *node) {
   (*ss) << ")";
   return {};
 }
-std::any EmitVisitor::visit(ASTExprStatement *node) {
+std::any Emitter::visit(ASTExprStatement *node) {
   emit_line_directive(node);
   (*ss) << indent();
   node->expression->accept(this);
   return {};
 }
-std::any EmitVisitor::visit(ASTDeclaration *node) {
+std::any Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
@@ -350,7 +350,7 @@ std::any EmitVisitor::visit(ASTDeclaration *node) {
 
   return {};
 }
-void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
+void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   if ((node->flags & FUNCTION_IS_METHOD) != 0 || (node->flags & FUNCTION_IS_STATIC) != 0) {
     return;
   }
@@ -367,7 +367,7 @@ void EmitVisitor::emit_forward_declaration(ASTFunctionDeclaration *node) {
   (*ss) << ";\n";
   emit_default_args = false;
 }
-void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
+void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
   // Right now we just always do a closure on local lambda functions.
   // This probably isn't desirable for simple in-out functions
   (*ss) << indent() << "auto " << node->name.value.get_str() << " = [&]";
@@ -379,7 +379,7 @@ void EmitVisitor::emit_local_function(ASTFunctionDeclaration *node) {
   }
   node->block.get()->accept(this);
 }
-void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
+void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name.value == "main") {
     throw_error("main function cannot be foreign", node->source_range);
   }
@@ -401,7 +401,7 @@ void EmitVisitor::emit_foreign_function(ASTFunctionDeclaration *node) {
     (*ss) << ");";
   }
 }
-std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
+std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
     if ((node->flags & FUNCTION_IS_STATIC) != 0) {
       (*ss) << "static ";
@@ -556,7 +556,7 @@ std::any EmitVisitor::visit(ASTFunctionDeclaration *node) {
 
   return {};
 }
-std::any EmitVisitor::visit(ASTStructDeclaration *node) {
+std::any Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto info = static_cast<StructTypeInfo *>(type->get_info());
@@ -603,7 +603,7 @@ std::any EmitVisitor::visit(ASTStructDeclaration *node) {
   indentLevel--;
   return {};
 }
-std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
+std::any Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
 
   std::string iden;
@@ -643,7 +643,7 @@ std::any EmitVisitor::visit(ASTEnumDeclaration *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
+std::any Emitter::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl) {
     (*ss) << "union " << node->name.value.get_str() << ";\n";
     return {};
@@ -692,7 +692,7 @@ std::any EmitVisitor::visit(ASTUnionDeclaration *node) {
   (*ss) << "};\n";
   return {};
 }
-std::any EmitVisitor::visit(ASTParamDecl *node) {
+std::any Emitter::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
 
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -715,7 +715,7 @@ std::any EmitVisitor::visit(ASTParamDecl *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTParamsDecl *node) {
+std::any Emitter::visit(ASTParamsDecl *node) {
   (*ss) << "(";
   int i = 0;
   for (const auto &param : node->params) {
@@ -735,7 +735,7 @@ std::any EmitVisitor::visit(ASTParamsDecl *node) {
   (*ss) << ")";
   return {};
 }
-std::any EmitVisitor::visit(ASTBlock *node) {
+std::any Emitter::visit(ASTBlock *node) {
   emit_line_directive(node);
   (*ss) << (" {\n");
   indentLevel++;
@@ -753,7 +753,7 @@ std::any EmitVisitor::visit(ASTBlock *node) {
   ctx.exit_scope();
   return {};
 }
-std::any EmitVisitor::visit(ASTProgram *node) {
+std::any Emitter::visit(ASTProgram *node) {
   emit_line_directive(node);
 
   const auto testing = compile_command.has_flag("test");
@@ -865,7 +865,7 @@ int main (int argc, char** argv) {
 
   return {};
 }
-std::any EmitVisitor::visit(ASTDotExpr *node) {
+std::any Emitter::visit(ASTDotExpr *node) {
   auto base_ty_id = std::any_cast<int>(node->base->accept(&type_visitor));
   auto base_ty = global_get_type(base_ty_id);
 
@@ -885,7 +885,7 @@ std::any EmitVisitor::visit(ASTDotExpr *node) {
 
   return {};
 }
-std::any EmitVisitor::visit(ASTMake *node) {
+std::any Emitter::visit(ASTMake *node) {
   auto type = global_get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
@@ -901,14 +901,14 @@ std::any EmitVisitor::visit(ASTMake *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTSubscript *node) {
+std::any Emitter::visit(ASTSubscript *node) {
   node->left->accept(this);
   (*ss) << '[';
   node->subscript->accept(this);
   (*ss) << ']';
   return {};
 }
-std::any EmitVisitor::visit(ASTInitializerList *node) {
+std::any Emitter::visit(ASTInitializerList *node) {
   (*ss) << "{";
   for (const auto &expr : node->expressions) {
     expr->accept(this);
@@ -919,7 +919,7 @@ std::any EmitVisitor::visit(ASTInitializerList *node) {
   (*ss) << "}";
   return {};
 }
-std::any EmitVisitor::visit(ASTAllocate *node) {
+std::any Emitter::visit(ASTAllocate *node) {
   switch (node->kind) {
   case ASTAllocate::New: {
     auto ptr_type = global_get_type(node->type.get()->resolved_type);
@@ -950,7 +950,7 @@ std::any EmitVisitor::visit(ASTAllocate *node) {
   }
   return {};
 }
-std::any EmitVisitor::visit(ASTRange *node) {
+std::any Emitter::visit(ASTRange *node) {
   (*ss) << "Range(";
   node->left->accept(this);
   (*ss) << ", ";
@@ -958,7 +958,7 @@ std::any EmitVisitor::visit(ASTRange *node) {
   (*ss) << ")";
   return {};
 }
-std::any EmitVisitor::visit(ASTSwitch *node) {
+std::any Emitter::visit(ASTSwitch *node) {
 
   if (!node->is_statement) {
     (*ss) << "[&] ->";
@@ -1002,7 +1002,7 @@ std::any EmitVisitor::visit(ASTSwitch *node) {
 
   return {};
 }
-std::any EmitVisitor::visit(ASTTuple *node) {
+std::any Emitter::visit(ASTTuple *node) {
   (*ss) << "_tuple(";
   for (const auto &value : node->values) {
     value->accept(this);
@@ -1012,7 +1012,7 @@ std::any EmitVisitor::visit(ASTTuple *node) {
   (*ss) << ")";
   return {};
 }
-std::any EmitVisitor::visit(ASTTupleDeconstruction *node) {
+std::any Emitter::visit(ASTTupleDeconstruction *node) {
   (*ss) << "auto [";
   for (auto &iden : node->idens) {
     (*ss) << iden->value.get_str();
@@ -1029,13 +1029,13 @@ std::any EmitVisitor::visit(ASTTupleDeconstruction *node) {
 
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*/u8*
-void EmitVisitor::cast_pointers_implicit(ASTDeclaration *&node) {
+void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
   if (type->get_ext().is_pointer(1))
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-void EmitVisitor::emit_function_pointer_dynamic_array_declaration(
+void Emitter::emit_function_pointer_dynamic_array_declaration(
     const std::string &type_string, const std::string &name, Type *type) {
   //? type string will equal something like void(*)();
   //? we need to emit _array<void(*)()>
@@ -1048,7 +1048,7 @@ void EmitVisitor::emit_function_pointer_dynamic_array_declaration(
   }
 }
 
-void EmitVisitor::get_declaration_type_signature_and_identifier(
+void Emitter::get_declaration_type_signature_and_identifier(
     const std::string &name, Type *type) {
   StringBuilder tss;
 
@@ -1106,7 +1106,7 @@ void EmitVisitor::get_declaration_type_signature_and_identifier(
   (*ss) << tss.str();
 }
 
-void EmitVisitor::interpolate_string(ASTLiteral *node) {
+void Emitter::interpolate_string(ASTLiteral *node) {
   if (node->value.get_str().empty()) {
     throw_warning("Empty interpolated string.", node->source_range);
     (*ss) << "string()"; 
@@ -1241,7 +1241,7 @@ void EmitVisitor::interpolate_string(ASTLiteral *node) {
 
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
-void EmitVisitor::emit_function_pointer_type_string(
+void Emitter::emit_function_pointer_type_string(
     Type *type, Nullable<std::string> identifier) {
 
   auto type_prefix = std::string{"*"};
@@ -1290,7 +1290,7 @@ void EmitVisitor::emit_function_pointer_type_string(
   (*ss) << ")";
 }
 
-std::string EmitVisitor::get_field_struct(const std::string &name, Type *type,
+std::string Emitter::get_field_struct(const std::string &name, Type *type,
                                           Type *parent_type, Context &context) {
   std::stringstream ss;
   ss << "new Field { " << std::format(".name = \"{}\", ", name)
@@ -1306,7 +1306,7 @@ std::string EmitVisitor::get_field_struct(const std::string &name, Type *type,
   return ss.str();
 }
 
-std::string EmitVisitor::get_elements_function(Type *type) {
+std::string Emitter::get_elements_function(Type *type) {
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
@@ -1412,7 +1412,7 @@ std::string get_type_flags(Type *type) {
   return ".flags = " + std::to_string(kind_flags) + "\n";
 }
 
-std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context,
+std::string Emitter::get_type_struct(Type *type, int id, Context &context,
                                          const std::string &fields) {
   std::stringstream ss;
 
@@ -1435,7 +1435,7 @@ std::string EmitVisitor::get_type_struct(Type *type, int id, Context &context,
   return std::format("_type_info[{}]", id);
 }
 
-std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
+std::string Emitter::to_type_struct(Type *type, Context &context) {
   auto id = type->get_true_type();
   auto new_type = global_get_type(id);
 
@@ -1549,7 +1549,7 @@ std::string EmitVisitor::to_type_struct(Type *type, Context &context) {
   return get_type_struct(type, id, context, fields_ss.str());
 }
 
-bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
+bool Emitter::should_emit_function(Emitter *visitor,
                                        ASTFunctionDeclaration *node,
                                        bool test_flag) {
   // if we're not testing, don't emit for test functions
@@ -1570,7 +1570,7 @@ bool EmitVisitor::should_emit_function(EmitVisitor *visitor,
   return true;
 }
 
-std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
+std::string Emitter::to_cpp_string(const TypeExt &extensions,
                                        const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   StringBuilder ss;
@@ -1612,7 +1612,7 @@ std::string EmitVisitor::to_cpp_string(const TypeExt &extensions,
   return ss.str();
 }
 
-std::string EmitVisitor::get_cpp_scalar_type(int id) {
+std::string Emitter::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
   if (id == c_string_type()) {
@@ -1630,7 +1630,7 @@ std::string EmitVisitor::get_cpp_scalar_type(int id) {
   return to_cpp_string(type->get_ext(), name);
 }
 
-std::string EmitVisitor::to_cpp_string(Type *type) {
+std::string Emitter::to_cpp_string(Type *type) {
   type = global_get_type(type->get_true_type());
 
   auto output = std::string{};
@@ -1663,7 +1663,7 @@ std::string EmitVisitor::to_cpp_string(Type *type) {
   return output;
 }
 
-void EmitVisitor::emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition, Nullable<ASTBlock> block) {
+void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition, Nullable<ASTBlock> block) {
   emit_line_directive(node);
   (*ss) << indent() << keyword << " ";
   if (condition.is_not_null()) {
@@ -1676,7 +1676,7 @@ void EmitVisitor::emit_condition_block(ASTNode *node, const std::string &keyword
   block.get()->accept(this);
 }
 
-std::any EmitVisitor::visit(ASTScopeResolution *node) {
+std::any Emitter::visit(ASTScopeResolution *node) {
   node->left->accept(this);
   (*ss) << "::";
   node->right->accept(this);

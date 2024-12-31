@@ -1478,7 +1478,7 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
     CONSTANT0 :: 100;
   } else ifdef CHEESE {
     CONSTANT0 :: 20;
-  } else if true {
+  } else {
     CONSTANT0 :: 10;
   }
   
@@ -1503,7 +1503,7 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
     CONSTANT2 :: 100;
   } else ifdef CHEESE {
     CONSTANT2 :: 20;
-  } else if true {
+  } else  {
     CONSTANT2 :: 10;
   }
 
@@ -1515,4 +1515,7 @@ add :: (a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   } 
 
   assert("ifndef failed", CONSTANT3 == 100);
+
+
+  n := #if true { 100 } else { 200 };
 }
