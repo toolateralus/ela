@@ -934,9 +934,21 @@ std::any Emitter::visit(ASTAllocate *node) {
       (*ss) << "delete ";
       arg->accept(this);
       (*ss) << ";\n" << indent();
-      arg->accept(this);
-      (*ss) << " = nullptr";
-      (*ss) << ";\n" << indent();
+      switch (arg->get_node_type()) {
+      case AST_NODE_IDENTIFIER:
+      case AST_NODE_DOT_EXPR:
+      case AST_NODE_SCOPE_RESOLUTION:
+      case AST_NODE_SUBSCRIPT: {
+        arg->accept(this);
+        (*ss) << " = nullptr";
+        (*ss) << ";\n" << indent();
+      } break;
+      default: {
+        throw_warning("Cannot set deleted pointer to null. Delete as a "
+                      "variable to silence this.",
+                      arg->source_range);
+      }
+      }
     }
     break;
   }
@@ -1141,7 +1153,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       } else if (type->id == bool_type()) {
         return "%d";
       }
-    } 
+    }
     if (type->is_kind(TYPE_ENUM)) {
       return "%d";
     }
@@ -1675,7 +1687,7 @@ std::any Emitter::visit(ASTScopeResolution *node) {
   bool emitted = false;
 
   if (node->base->get_node_type() == AST_NODE_TYPE) {
-    auto t = static_cast<ASTType*>(node->base);
+    auto t = static_cast<ASTType *>(node->base);
     auto type = global_get_type(t->resolved_type);
     if (type->is_kind(TYPE_ENUM)) {
       (*ss) << type->get_base().get_str();

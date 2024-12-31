@@ -683,6 +683,13 @@ something :: fn(f: float32) -> float32 {
   delete (vec, vec1);
 }
 
+#test test_delete :: fn() {
+	arr := new int;
+	arr2 := new int;
+	delete(arr, arr2);
+  assert("delete", arr == null && arr2 == null);
+}
+
 #test custom_iterator_increment :: fn() {
   for i in #make(Range, 0, 10, 2) {
     assert("iter increment failed to be divisible by 2", i % 2 == 0);

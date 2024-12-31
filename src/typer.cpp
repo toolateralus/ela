@@ -1374,6 +1374,9 @@ std::any Typer::visit(ASTAllocate *node) {
         node->arguments.get()->arguments.size() < 1)
       throw_error("invalid delete statement: you need at least one argument",
                   node->source_range);
+    for (auto& arg : node->arguments.get()->arguments) {
+      arg->accept(this);
+    }
     return void_type();
   }
   // just type check them, no need to return
