@@ -273,16 +273,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return CONVERT_IMPLICIT;
   }
 
-  if (to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions() &&
-      from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
-    auto info = static_cast<ScalarTypeInfo *>(to->get_info());
+  if (from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
     auto enum_info = static_cast<EnumTypeInfo *>(from->get_info());
-    if (info->is_integral) {
-      return type_conversion_rule(global_get_type(enum_info->element_type), to);
-    } else {
-      // TODO: verify that this is what we want to do here.
-      return CONVERT_PROHIBITED;
-    }
+    return type_conversion_rule(global_get_type(enum_info->element_type), to);
   }
 
   // search structs for their cast tables.
