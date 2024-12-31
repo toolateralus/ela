@@ -8,10 +8,10 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug repro",
+      "name": "Debug current file compilation",
       "program": "${workspaceFolder}/bin/ela",
-      "cwd": "${workspaceFolder}/repro",
-      "args": ["12.ela"]
+      "cwd": "${fileDirname}",
+      "args": ["${file}"]
     },
     {
       "type": "lldb",
