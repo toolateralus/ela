@@ -1129,6 +1129,9 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       } else if (type->id == bool_type()) {
         return "%d";
       }
+    } 
+    if (type->is_kind(TYPE_ENUM)) {
+      return "%d";
     }
     throw_error(std::format("Cannot deduce a format specifier for interpolated "
                             "string. type: {}",
