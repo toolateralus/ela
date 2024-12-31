@@ -33,7 +33,7 @@ round_base_num_enemies_to_advance: int = 6;
 round_index : int = 1;
 round_failed := false;
 camera: Camera2D;
-scene: int = Scene.MainMenu;
+scene: int = Scene::MainMenu;
 
 max_tilt : float = 16;
 screen_width : float;
@@ -245,7 +245,7 @@ random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
 make_particle :: fn(kind: int, position: Vector2, tint: Color) {
   particle := new Particle;
 
-  if kind == ParticleKind.Smoke {
+  if kind == ParticleKind::Smoke {
     max_vel := 3.0;
     particle.position = random_vector2(position, max_vel);
     particle.velocity = random_vector2(Vector2{0.0, 0.0}, Vector2{-max_vel, -1.0}, Vector2{max_vel, max_vel});
@@ -261,7 +261,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.lifetime = 1.0;
     particle.scale = smoke_particle_init_scale * randf() * 6400.0;
     particle.spawn_time = GetTime();
-  } else if kind == ParticleKind.Fire {
+  } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
     particle.position = random_vector2(position, max_spread);
 
@@ -285,7 +285,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
 
 update_particle :: fn(particle: Particle*) -> bool {
   time := GetTime();
-  if particle.kind == ParticleKind.Smoke {
+  if particle.kind == ParticleKind::Smoke {
     particle.position = Vector2Add(particle.position, particle.velocity);
     particle.velocity = Vector2Scale(particle.velocity, 0.98)
     t := particle.spawn_time / time;
@@ -296,7 +296,7 @@ update_particle :: fn(particle: Particle*) -> bool {
       return t < 0.1 && particle.color.a == 0;
     }
     particle.scale = {scale, scale};
-  } else if  particle.kind == ParticleKind.Fire {
+  } else if  particle.kind == ParticleKind::Fire {
     particle.scale.x *= 0.95;
     particle.scale.y *= 0.95;
     if particle.color.a > 0 {
@@ -333,7 +333,7 @@ make_enemy :: fn() {
   enemy_move_towards_or_get_new_target(enemy);
 
   for _ in 0..10 {
-    make_particle(ParticleKind.Smoke, {rect.x, rect.y}, BLUE);
+    make_particle(ParticleKind::Smoke, {rect.x, rect.y}, BLUE);
   }
 
   enemy.id = enemies.length;
@@ -352,9 +352,9 @@ make_bullet :: fn(x: float, y, rotation) {
   direction : Vector2 = {-(float)sin(radians), (float)cos(radians)};
   start_velocity := Vector2Scale(direction, bullet_start_velocity);
   bullets ~= new Bullet(rect, bullet_render_info, start_velocity, rotation);
-  make_particle(ParticleKind.Smoke, {rect.x, rect.y}, PINK);
+  make_particle(ParticleKind::Smoke, {rect.x, rect.y}, PINK);
   fire_pos : Vector2 = {rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, rect.y - bullet_scale};
-  make_particle(ParticleKind.Fire, fire_pos, WHITE);
+  make_particle(ParticleKind::Fire, fire_pos, WHITE);
 }
 
 draw_background :: fn() {
@@ -362,7 +362,7 @@ draw_background :: fn() {
   DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
   now : float = (float)GetTime();
   t := (now - game_start_time) / fade_in_length;
-  if scene == Scene.Game && t < fade_in_length {
+  if scene == Scene::Game && t < fade_in_length {
     DrawRectangle(0, 0, (int)screen_width, (int)screen_height, color_lerp(BLACK, CLEAR, t));
   }
 }
@@ -439,15 +439,15 @@ on_bullet_fizzle :: fn() {
   // misses_this_round++;
   // if misses_this_round >= 3 {
   //   round_failed = true;
-  //   scene = Scene.MainMenu;
+  //   scene = Scene::MainMenu;
   // }
 }
 
 on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: int) {
   PlaySound(explosion_sound);
-  make_particle(ParticleKind.Fire, {enemy.rect.x, enemy.rect.y}, WHITE);
+  make_particle(ParticleKind::Fire, {enemy.rect.x, enemy.rect.y}, WHITE);
   for _ in 0..4 {
-    make_particle(ParticleKind.Smoke, {enemy.rect.x, enemy.rect.y}, spark_color);
+    make_particle(ParticleKind::Smoke, {enemy.rect.x, enemy.rect.y}, spark_color);
   }
   // bonus score.
   if n_enemies_killed_this_frame >= enemies.length {
@@ -486,12 +486,12 @@ update_game :: fn() {
     }
   }
 
-  if IsKeyReleased(Key.Space) && space_down {
+  if IsKeyReleased(Key::Space) && space_down {
     space_down = false;
     character.cannon_idx = !character.cannon_idx;
   }
 
-  if bullet_routine.count > 0 && IsKeyDown(Key.Space) {
+  if bullet_routine.count > 0 && IsKeyDown(Key::Space) {
     space_down = true;
     bullet_routine.spawn();
   } else {
@@ -510,22 +510,22 @@ update_game :: fn() {
     // TODO: do we want this failure case? it felt really bad when we added these.
     // } else {
     //   round_failed = true;
-    //   scene = Scene.MainMenu;
+    //   scene = Scene::MainMenu;
     // }
   }
   moved := false;
-  if IsKeyDown(Key.A) {
+  if IsKeyDown(Key::A) {
     character.horizontal_velocity -= character.speed;
     moved = true;
   }
-  if IsKeyDown(Key.D) {
+  if IsKeyDown(Key::D) {
     character.horizontal_velocity += character.speed;
     moved = true;
   }
 
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
     for i in 0..(int)fabs(character.horizontal_velocity * smoke_particle_density) {
-      make_particle(ParticleKind.Smoke, {
+      make_particle(ParticleKind::Smoke, {
         character.rect.x - 10,
         character.rect.y + (character.rect.height / 3),
       }, player_smoke_color);
@@ -537,7 +537,7 @@ update_game :: fn() {
   tilt := (character.horizontal_velocity / character.speed) * max_tilt / 4;
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
 
-  if IsKeyPressed(Key.Space) && bullet_routine.count == 0 {
+  if IsKeyPressed(Key::Space) && bullet_routine.count == 0 {
     bullet_routine.count = bullet_max_burst;
   }
 
@@ -749,7 +749,7 @@ reset_game_state :: fn() {
 
 swap_music :: fn() {
   StopMusicStream(*current_music);
-  if scene == Scene.MainMenu {
+  if scene == Scene::MainMenu {
     current_music = &menu_music;
   } else {
     current_music = &game_music;
@@ -863,13 +863,13 @@ main :: fn() {
 
       // ? DrawFPS(0, 72); For debugging framerate.
 
-      if scene == Scene.MainMenu {
+      if scene == Scene::MainMenu {
 
         draw_main_menu();
       } else {
 
-        if IsKeyPressed(Key.Backspace) {
-          scene = Scene.MainMenu;
+        if IsKeyPressed(Key::Backspace) {
+          scene = Scene::MainMenu;
           swap_music();
         }
 

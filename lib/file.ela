@@ -34,9 +34,9 @@ SeekPosition :: enum {
 
 File :: struct {
   #static length :: fn(file: FILE*) -> u32 {
-    fseek(file, 0, SeekPosition.End);
+    fseek(file, 0, SeekPosition::End);
     len := ftell(file);
-    fseek(file, 0, SeekPosition.Begin);
+    fseek(file, 0, SeekPosition::Begin);
     return #make(u32, len);
   }
   #static read_all :: fn(file: FILE*, len: u32*) -> string {
@@ -86,13 +86,13 @@ File :: struct {
   // Used to convert our flag enum to a string for fopen/fclose etc.
   #static flags_to_string :: fn(flags: int) -> string {
     s : string;
-    if (flags & FileOpenFlags.Read != 0) 
+    if (flags & FileOpenFlags::Read != 0) 
       then s = "r";
-    if (flags & FileOpenFlags.Write != 0)
+    if (flags & FileOpenFlags::Write != 0)
       then s = $"{s}w";
     return s;
   }
-  #static open :: fn(filename: string, flags: int = FileOpenFlags.Read | FileOpenFlags.Write) -> File {
+  #static open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
     return {fopen(filename.data, flags_to_string(flags).data)};
   }
 

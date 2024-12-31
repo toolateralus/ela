@@ -627,19 +627,19 @@ something :: fn(f: float32) -> float32 {
 }
 
 #test test_enum_flags :: fn() {
-  flags := Banana.Unripe | Banana.Overripe;
-  assert("flags & Banana.Unripe failed.", (flags & Banana.Unripe) != 0);
+  flags := Banana::Unripe | Banana::Overripe;
+  assert("flags & Banana::Unripe failed.", (flags & Banana::Unripe) != 0);
 }
 
 // TODO(Josh) 10/1/2024, 10:08:18 AM :: we need to allow declarations of variables with their enum type.
 // Right now we just cast enums to int always.
-// We should be able to do MyEnum value = MyEnum.Some;
+// We should be able to do MyEnum value = MyEnum::Some;
 // This will also allow us to do other stuff, like type safe enums.
 
 #test test_regular_enum :: fn() {
-  value := MyEnum.Some;
-  value1 := MyEnum.Value;
-  assert("MyEnum.Value failed to == 100 * 2", value1 == 100 * 2);
+  value := MyEnum::Some;
+  value1 := MyEnum::Value;
+  assert("MyEnum::Value failed to == 100 * 2", value1 == 100 * 2);
   assert("Zero case of enum did not equal 0", value == 0);
 }
 
@@ -1140,7 +1140,7 @@ switch_helper :: fn() -> int {
 }
 
 #test test_string_enum :: fn() {
-  b: bool = EnumOfStrings.A == string{"Hello"};
+  b: bool = EnumOfStrings::A == string{"Hello"};
   assert("String enum failed", b);
 }
 

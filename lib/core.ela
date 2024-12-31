@@ -63,7 +63,7 @@ Random :: enum {
 #foreign rand :: fn() -> int;
 #foreign srand :: fn(seed: u32);
 #static randf :: fn() -> float {
-  return (float)rand() / (float)Random.Max;
+  return (float)rand() / (float)Random::Max;
 }
 
 // api for string manipulation.

@@ -52,8 +52,8 @@ NonTrivialWrapper :: struct {
 
 
 tagged_test :: fn() {
-  onion: TaggedUnion.Some { "Wee" };
-  if onion is TaggedUnion.Some {value} {
+  onion: TaggedUnion::Some { "Wee" };
+  if onion is TaggedUnion::Some {value} {
     println(value);
   } else {
     println("None");

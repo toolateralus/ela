@@ -41,4 +41,4 @@ StringEnum :: enum {
 */
 
 value: MyEnum // illegal.
-value: int = MyEnum.Zero; // legal.
+value: int = MyEnum::Zero; // legal.

@@ -631,7 +631,7 @@ draw_button :: fn(text: c_string, rect: Rectangle, style: Style, callback: Butto
 
   if mouse_over {
     DrawRectangleV(position, size, style.highlighted);
-    if (IsMouseButtonPressed(MouseButton.Left)) {
+    if (IsMouseButtonPressed(MouseButton::Left)) {
       callback();
       return true;
     }
@@ -712,14 +712,14 @@ SliderF :: struct {
 
     adjust_slider_value :: fn() {
       increment: float;
-      if IsKeyDown(Key.LeftShift) {
+      if IsKeyDown(Key::LeftShift) {
         increment = (max_value - min_value) / 100;
       } else {
         increment = (max_value - min_value) / 50;
       }
-      if IsKeyPressed(Key.Right) {
+      if IsKeyPressed(Key::Right) {
         *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
-      } else if IsKeyPressed(Key.Left) {
+      } else if IsKeyPressed(Key::Left) {
         *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
       }
     };
@@ -727,14 +727,14 @@ SliderF :: struct {
     // Handle mouse input and call the local function for keyboard input
     mouse_pos := GetMousePosition();
     if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonDown(MouseButton.Left) {
+      if IsMouseButtonDown(MouseButton::Left) {
         this.held = true;
       }
       adjust_slider_value();
     }
 
     if this.held {
-      if !IsMouseButtonDown(MouseButton.Left) {
+      if !IsMouseButtonDown(MouseButton::Left) {
         this.held = false;
       } else {
         new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
@@ -785,28 +785,28 @@ SliderI :: struct {
 
     adjust_slider_value :: fn() {
       increment: float;
-      if IsKeyDown(Key.LeftShift) {
+      if IsKeyDown(Key::LeftShift) {
         increment = (max_value - min_value) / 100;
       } else {
         increment = (max_value - min_value) / 50;
       }
-      if IsKeyPressed(Key.Right) {
+      if IsKeyPressed(Key::Right) {
         *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
-      } else if IsKeyPressed(Key.Left) {
+      } else if IsKeyPressed(Key::Left) {
         *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
       }
     };
 
     mouse_pos := GetMousePosition();
     if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonDown(MouseButton.Left) {
+      if IsMouseButtonDown(MouseButton::Left) {
         this.held = true;
       }
       adjust_slider_value();
     }
 
     if this.held {
-      if !IsMouseButtonDown(MouseButton.Left) {
+      if !IsMouseButtonDown(MouseButton::Left) {
         this.held = false;
       } else {
         new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
@@ -847,14 +847,14 @@ CheckButton :: struct {
     right := false;
 
     if allow_hold {
-      left = IsMouseButtonDown(MouseButton.Left)
-      right = IsMouseButtonDown(MouseButton.Right);
+      left = IsMouseButtonDown(MouseButton::Left)
+      right = IsMouseButtonDown(MouseButton::Right);
       if hit && left {
         value = true;
       } else if hit && right {
         value = false;
       }
-    } else if hit && IsMouseButtonPressed(MouseButton.Left) {
+    } else if hit && IsMouseButtonPressed(MouseButton::Left) {
       value = !value;
     }
   }
@@ -880,7 +880,7 @@ DropDown :: struct {
       }
 
       hit := CheckCollisionPointRec(GetMousePosition(), rect);
-      if hit && IsMouseButtonPressed(MouseButton.Left) {
+      if hit && IsMouseButtonPressed(MouseButton::Left) {
         is_open = !is_open;
         if is_open && on_open {
           on_open();
@@ -902,7 +902,7 @@ DropDown :: struct {
           text_y := option_rect.y + (option_rect.height - style.font_size) / 2;
           DrawText(options[i].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
 
-          if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton.Left) {
+          if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton::Left) {
             selected_index = i;
             is_open = false;
             if on_selected {

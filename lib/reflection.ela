@@ -24,74 +24,74 @@ TypeFlags :: enum {
 }
 
 type_is_signed :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.SIGNED != 0;
+  return type.flags & TypeFlags::SIGNED != 0;
 }
 
 type_is_unsigned :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.UNSIGNED != 0;
+  return type.flags & TypeFlags::UNSIGNED != 0;
 }
 
 type_has_no_extension :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.POINTER == 0 &&
-         type.flags & TypeFlags.MAP == 0 &&
-         type.flags & TypeFlags.ARRAY == 0 &&
+  return type.flags & TypeFlags::POINTER == 0 &&
+         type.flags & TypeFlags::MAP == 0 &&
+         type.flags & TypeFlags::ARRAY == 0 &&
          type.flags & TypeFlags.FIXED_ARRAY == 0;
 }
 
 type_is_array :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.ARRAY != 0;
+  return type.flags & TypeFlags::ARRAY != 0;
 }
 
 type_is_string :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.STRING != 0;
+  return type.flags & TypeFlags::STRING != 0;
 }
 
 type_is_scalar :: fn(type: Type*) -> bool {
   return type_has_no_extension(type) &&
-         (type.flags & TypeFlags.INTEGER != 0 ||
-          type.flags & TypeFlags.FLOAT != 0   ||
-          type.flags & TypeFlags.BOOL != 0    ||
-          type.flags & TypeFlags.STRING != 0);
+         (type.flags & TypeFlags::INTEGER != 0 ||
+          type.flags & TypeFlags::FLOAT != 0   ||
+          type.flags & TypeFlags::BOOL != 0    ||
+          type.flags & TypeFlags::STRING != 0);
 }
 
 type_is_struct :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.STRUCT != 0;
+  return type.flags & TypeFlags::STRUCT != 0;
 }
 
 type_is_union :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.UNION != 0;
+  return type.flags & TypeFlags::UNION != 0;
 }
 
 type_is_enum :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.ENUM != 0;
+  return type.flags & TypeFlags::ENUM != 0;
 }
 
 type_is_integral :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.INTEGER != 0;
+  return type.flags & TypeFlags::INTEGER != 0;
 }
 
 type_is_float :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.FLOAT != 0;
+  return type.flags & TypeFlags::FLOAT != 0;
 }
 
 type_is_bool :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.BOOL != 0;
+  return type.flags & TypeFlags::BOOL != 0;
 }
 
 type_is_tuple :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.TUPLE != 0;
+  return type.flags & TypeFlags::TUPLE != 0;
 }
 
 type_is_map :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.MAP != 0;
+  return type.flags & TypeFlags::MAP != 0;
 }
 
 type_is_function :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.FUNCTION != 0;
+  return type.flags & TypeFlags::FUNCTION != 0;
 }
 
 type_is_pointer :: fn(type: Type*) -> bool {
-  return type.flags & TypeFlags.POINTER != 0;
+  return type.flags & TypeFlags::POINTER != 0;
 }
 
 type_is_fixed_array :: fn(type: Type*) -> bool {

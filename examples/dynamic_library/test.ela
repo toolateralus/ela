@@ -5,10 +5,10 @@
 position : Vector2;
 
 #export test_call :: fn(ctx: DrawContext *) {
-  if ctx.inputState[Key.W] then position.y -= 1;
-  if ctx.inputState[Key.S] then position.y += 1;
-  if ctx.inputState[Key.A] then position.x -= 1;
-  if ctx.inputState[Key.D] then position.x += 1;
+  if ctx.inputState[Key::W] then position.y -= 1;
+  if ctx.inputState[Key::S] then position.y += 1;
+  if ctx.inputState[Key::A] then position.x -= 1;
+  if ctx.inputState[Key::D] then position.x += 1;
     
   command: DrawCommand;
   command.rect = {

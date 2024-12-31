@@ -7,7 +7,7 @@
 #compiler_flags "-Wl,-rpath,.";
 
 main :: fn() -> int {
-  handle := dlopen("test.so", Rtld.Now);
+  handle := dlopen("test.so", Rtld::Now);
   
   if !handle {
     panic("unable to open library");

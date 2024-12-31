@@ -28,7 +28,7 @@ chatting :: fn(sockfd: int) {
 }
 
 main :: fn() {
-  sockfd : int = socket(AF_INET, SocketType.Stream, 0);
+  sockfd : int = socket(AF_INET, SocketType::Stream, 0);
   if (sockfd == -1) {
     panic("socket creation failed...");
   } else {

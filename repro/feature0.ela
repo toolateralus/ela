@@ -9,9 +9,9 @@ Flag :: enum {
 main :: fn() {
   // Must have an else of course.
   flag : Flag = if Env::args()[0] == "-run" {
-    return Flag.Run;
+    return Flag::Run;
   } else {
-    return Flag.Build;
+    return Flag::Build;
   }
 
   arr : s64[] = {0,1,2};

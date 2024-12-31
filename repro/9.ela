@@ -4,5 +4,5 @@ Enum :: enum {
 }
 
 main :: fn() {
-  e: Enum = Enum.One;
+  e: Enum = Enum::One;
 }
