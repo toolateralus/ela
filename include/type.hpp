@@ -259,7 +259,7 @@ Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
-                const TypeExt & = {});
+                const TypeExt & = {}, const int = -1);
 
 int global_create_struct_type(const InternedString &, Scope *);
 
@@ -277,12 +277,12 @@ ConversionRule type_conversion_rule(const Type *, const Type *);
 // char *
 int charptr_type();
 
-int global_find_function_type_id(const InternedString &, const FunctionTypeInfo &,
+int global_find_function_type_id(const int, const FunctionTypeInfo &,
                  const TypeExt &);
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions);
 
-int global_find_type_id(const InternedString &, const TypeExt &);
+int global_find_type_id(const int, const TypeExt &);
 
 struct Token;
 
@@ -304,6 +304,7 @@ int get_map_value_type(Type *map_type);
 
 struct Type {
   int id = invalid_id;
+  int base_id = invalid_id;
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
@@ -337,7 +338,7 @@ struct Type {
     TypeExt extensions{};
   public:
 
-  bool equals(const InternedString &name, const TypeExt &type_extensions) const;
+  bool equals(const int base, const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
   
   Type() = default;

@@ -33,8 +33,7 @@ struct Scope {
   bool is_struct_or_union_scope = false;
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
-
-  std::unordered_set<int> types;
+  std::unordered_map<InternedString, int> types;
 
   static std::unordered_set<InternedString> &defines() {
     static std::unordered_set<InternedString> defines;
@@ -83,53 +82,36 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  Type *get_type(const int id) {
-    if (types.contains(id)) {
-      return global_get_type(id);
-    }
-    if (parent)
-      return parent->get_type(id);
-    else {
-      //! BUG remove this hack. This should not be neccessary.
-      auto type = global_get_type(id);
-      if (type && type->is_kind(TYPE_FUNCTION)) {
-        return type;
-      }
-    }
-
-    return nullptr;
-  }
-
   int create_type(TypeKind kind, const InternedString &name,
                   TypeInfo *info = nullptr, const TypeExt &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
-    types.insert(id);
+    types[name] = id;
     return id;
   }
 
   int create_struct_type(const InternedString &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
-    types.insert(id);
+    types[name] = id;
     return id;
   }
 
   int create_enum_type(const InternedString &name,
                        const std::vector<InternedString> &fields, bool flags) {
     auto id = global_create_enum_type(name, fields, flags);
-    types.insert(id);
+    types[name] = id;
     return id;
   }
 
   int create_tuple_type(const std::vector<int> &types, const TypeExt &ext) {
     auto id = global_create_tuple_type(types, ext);
-    this->types.insert(id);
+    this->types[get_tuple_type_name(types)] = id;
     return id;
   }
 
   int create_union_type(const InternedString &name, Scope *scope,
                         UnionFlags kind) {
     auto id = global_create_union_type(name, scope, kind);
-    types.insert(id);
+    types[name] = id;
     return id;
   }
 
@@ -139,77 +121,25 @@ struct Scope {
     // things like void(int) over and over. This may inadvertently allow you to
     // access types that are in your scope, so
     // TODO: verify this isn't terrible.
-    auto id = global_find_function_type_id(name, info, ext);
-    ;
-    types.insert(id);
-    root_scope->types.insert(id);
-    return id;
-  }
-  int find_type_id(std::vector<int> &tuple_types,
-                   const TypeExt &type_extensions, bool was_created = false) {
-    auto num = type_table.size();
-    auto id = global_find_type_id(tuple_types, type_extensions);
-
-    // if we extended a type, or if we created a new tuple,
-    // but we have access to all of thee types within it,
-    // we just add the type to our table.
-    if (type_table.size() > num || was_created) {
-      // search for all the types within the tuple.
-      for (auto t : tuple_types) {
-        if (!types.contains(t)) {
-          was_created = true;
-          goto try_find_in_parent;
-        }
+    if (!types.contains(name)) {
+      if (parent) {
+        return parent->find_function_type_id(name, info, ext);
+      } else {
+        return Type::invalid_id;
       }
-      types.insert(id);
-      return id;
     }
-
-    if (types.contains(id))
-      return id;
-
-  try_find_in_parent:
-    if (parent) {
-      return parent->find_type_id(tuple_types, type_extensions, was_created);
-    }
-    return -1;
+    return global_find_function_type_id(types[name], info, ext);
   }
-
+  
   int find_type_id(const InternedString &name, const TypeExt &ext) {
-    auto id = global_find_type_id(name, ext);
-    auto base_id = global_find_type_id(name, {});
-
-    // type does not exist globally.
-    if (id == -1 && base_id == -1) {
-      return -1;
+    if (!types.contains(name)) {
+      if (parent) {
+        return parent->find_type_id(name, ext);
+      } else {
+        return Type::invalid_id;
+      }
     }
-
-    if (types.contains(id)) {
-      return id;
-    }
-
-    bool has_base = types.contains(base_id);
-
-    if (has_base) {
-      types.insert(id);
-      return id;
-    }
-
-    if (parent) {
-      return parent->find_type_id(name, ext);
-    }
-    return -1;
-  }
-
-  int get_pointer_to_type(int base) {
-    auto type = get_type(base);
-    auto extensions = type->get_ext();
-    extensions.extensions.push_back({TYPE_EXT_POINTER});
-    auto id = find_type_id(type->get_base(), extensions);
-    if (id == -1) {
-      throw_error("Failed to get pointer to type", {});
-    }
-    return id;
+    return global_find_type_id(types[name], ext);
   }
 };
 

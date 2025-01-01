@@ -58,55 +58,55 @@ Type *global_get_type(const int id) {
   return &type_table[id];
 }
 
-int global_find_function_type_id(const InternedString &name,
+int global_find_function_type_id(const int base_id,
                                  const FunctionTypeInfo &info,
-                                 const TypeExt &ext) {
+                                 const TypeExt &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].kind != TYPE_FUNCTION)
       continue;
     const Type *type = &type_table[i];
-    if (name == type->get_base() &&
-        type->type_info_equals(&info, TYPE_FUNCTION) &&
-        ext.equals(type->get_ext())) {
+    if (type->equals(base_id, type_extensions) &&
+        type->type_info_equals(&info, TYPE_FUNCTION)) {
       return type->id;
     }
   }
+  auto base_t = &type_table[base_id];
+  auto ext = type_extensions;
+  while (base_t->base_id != Type::invalid_id) {
+    ext = base_t->get_ext().append(ext);
+    base_t = &type_table[base_t->base_id];
+  }
   auto info_ptr =
       new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
-  return global_create_type(TYPE_FUNCTION, name, info_ptr, ext);
+  return global_create_type(TYPE_FUNCTION, base_t->get_base(), info_ptr, ext,
+                            base_t->base_id);
 }
 
 // PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
 // We might want to upgrade to a hash map at a certain number of types or
 // something. I think the linear search is fine but this is certainly one of the
 // slowest functions in the compiler.
-int global_find_type_id(const InternedString &name,
-                        const TypeExt &type_extensions) {
+int global_find_type_id(const int base, const TypeExt &type_extensions) {
+  if (!type_extensions.has_extensions()) {
+    return base;
+  }
   for (int i = 0; i < type_table.size(); ++i) {
     auto type = &type_table[i];
-    if (type->equals(name, type_extensions))
+    if (type->equals(base, type_extensions))
       return type->id;
   }
 
   // NOTE:below is just for creating types with new extensions. new function
   // types, struct types, and enum types must be created manually this just
   // creates pointer and array types of base 'name'
-  int base_id = -1;
-  for (int i = 0; i < type_table.size(); ++i) {
-    auto tinfo = &type_table[i];
-    if (tinfo->get_base() == name && tinfo->get_ext().has_no_extensions()) {
-      base_id = tinfo->id;
-      break;
-    }
+  auto base_t = &type_table[base];
+  auto ext = type_extensions;
+  while (base_t->base_id != Type::invalid_id) {
+    ext = base_t->get_ext().append(ext);
+    base_t = &type_table[base_t->base_id];
   }
-
-  if (base_id != -1) {
-    auto t = global_get_type(base_id);
-    return global_create_type((TypeKind)t->kind, name, t->get_info(),
-                              type_extensions);
-  }
-
-  return -1;
+  return global_create_type(base_t->kind, base_t->get_base(),
+                            base_t->get_info(), type_extensions, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types,
@@ -225,8 +225,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     if (!to->get_ext().is_pointer(1))
       return false;
 
-    auto element_ty_base =
-        global_get_type(from->get_element_type())->get_base();
+    auto element_ty_base = from->get_element_type();
     auto element_ptr_type = global_get_type(global_find_type_id(
         element_ty_base, {.extensions = {TYPE_EXT_POINTER}}));
     auto rule = type_conversion_rule(element_ptr_type, to);
@@ -259,9 +258,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   if (from->get_ext().has_extensions() && to->get_ext().has_extensions() &&
       from->get_ext().extensions.back() == to->get_ext().extensions.back()) {
     auto from_base = global_get_type(
-        global_find_type_id(from->get_base(), from->get_ext().without_back()));
+        global_find_type_id(from->base_id, from->get_ext().without_back()));
     auto to_base = global_get_type(
-        global_find_type_id(to->get_base(), to->get_ext().without_back()));
+        global_find_type_id(to->base_id, to->get_ext().without_back()));
     return type_conversion_rule(from_base, to_base);
   }
 
@@ -271,7 +270,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
 bool Type::operator==(const Type &type) const {
   for (int i = 0; i < type_table.size(); ++i) {
     auto tinfo = &type_table[i];
-    if (tinfo->equals(base, extensions) &&
+    if (tinfo->equals(base_id, extensions) &&
         type_info_equals(type.get_info(), type.kind))
       return true;
   }
@@ -304,13 +303,8 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-bool Type::equals(const InternedString &name,
-                  const TypeExt &type_extensions) const {
-  auto type = global_get_type(id);
-  if (type->get_base() != name)
-    return false;
-
-  return type_extensions == type->get_ext();
+bool Type::equals(const int base, const TypeExt &type_extensions) const {
+  return base_id == base && type_extensions == get_ext();
 }
 
 bool TypeExt::equals(const TypeExt &other) const {
@@ -338,8 +332,7 @@ bool TypeExt::equals(const TypeExt &other) const {
 std::string Type::to_string() const {
   switch (kind) {
   case TYPE_FUNCTION:
-    return static_cast<FunctionTypeInfo *>(get_info())
-               ->to_string(extensions) +
+    return static_cast<FunctionTypeInfo *>(get_info())->to_string(extensions) +
            extensions.to_string();
   case TYPE_STRUCT:
   case TYPE_TUPLE:
@@ -360,7 +353,7 @@ int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
   }
 
   ext.extensions.pop_back();
-  return global_find_type_id(ty->get_base(), ext);
+  return global_find_type_id(ty->base_id, ext);
 }
 int global_create_struct_type(const InternedString &name, Scope *scope) {
   type_table.emplace_back(type_table.size(), TYPE_STRUCT);
@@ -396,13 +389,14 @@ int global_create_enum_type(const InternedString &name,
   return type->id;
 }
 int global_create_type(TypeKind kind, const InternedString &name,
-                       TypeInfo *info, const TypeExt &extensions) {
-  type_table.emplace_back(type_table.size(), kind);
-  Type *type = &type_table.back();
-  type->set_ext(extensions);
-  type->set_base(name);
-  type->set_info(info);
-  return type->id;
+                       TypeInfo *info, const TypeExt &extensions,
+                       const int base_id) {
+  auto type = type_table.emplace_back(type_table.size(), kind);
+  type.base_id = base_id;
+  type.set_ext(extensions);
+  type.set_base(name);
+  type.set_info(info);
+  return type.id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
@@ -436,7 +430,7 @@ int Type::get_element_type() const {
         auto info = static_cast<TupleTypeInfo *>(get_info());
         return global_find_type_id(info->types, extensions);
       } else
-        return global_find_type_id(base, extensions);
+        return global_find_type_id(base_id, extensions);
 
     } else {
       ++it;
@@ -455,78 +449,104 @@ Token get_unique_identifier() {
   return tok;
 }
 
-int char_type() {
-  static int type = global_find_type_id("char", {});
-  return type;
+ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
+                                        bool is_integral = false) {
+  auto info = ast_alloc<ScalarTypeInfo>();
+  info->scalar_type = type;
+  info->size = size;
+  info->is_integral = is_integral;
+  return info;
 }
-int voidptr_type() {
-  static int type = global_find_type_id(
-      "void", TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
+
+int char_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
   return type;
 }
 int bool_type() {
-  static int type = global_find_type_id("bool", {});
+  static int type = global_create_type(
+      TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
   return type;
 }
 int void_type() {
-  static int type = global_find_type_id("void", {});
-  return type;
-}
-int u8_type() {
-  static int type = global_find_type_id("u8", {});
-  return type;
-}
-int u16_type() {
-  static int type = global_find_type_id("u16", {});
-  return type;
-}
-int u32_type() {
-  static int type = global_find_type_id("u32", {});
-  return type;
-}
-int c_string_type() {
-  static int type = global_find_type_id("c_string", {});
+  static int type = global_create_type(TYPE_SCALAR, "void",
+                                       create_scalar_type_info(TYPE_VOID, 0));
   return type;
 }
 int u64_type() {
-  static int type = global_find_type_id("u64", {});
+  static int type = global_create_type(
+      TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
   return type;
 }
-int s8_type() {
-  static int type = global_find_type_id("s8", {});
+int u32_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
   return type;
 }
-int s16_type() {
-  static int type = global_find_type_id("s16", {});
+int u16_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
   return type;
 }
-int s32_type() {
-  static int type = global_find_type_id("s32", {});
+int u8_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
   return type;
 }
 int s64_type() {
-  static int type = global_find_type_id("s64", {});
+  static int type = global_create_type(
+      TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
+  return type;
+}
+int s32_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
+  return type;
+}
+int s16_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
+  return type;
+}
+int s8_type() {
+  static int type = global_create_type(
+      TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
+  return type;
+}
+int float32_type() {
+  static int type = global_create_type(TYPE_SCALAR, "float32",
+                                       create_scalar_type_info(TYPE_FLOAT, 4));
+  return type;
+}
+int float64_type() {
+  static int type = global_create_type(TYPE_SCALAR, "float64",
+                                       create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
 int int_type() {
-  static int type = global_find_type_id("int", {});
+  static int type = global_create_type(
+      TYPE_SCALAR, "int", create_scalar_type_info(TYPE_S32, 4, true));
+  return type;
+}
+int float_type() {
+  static int type = global_create_type(TYPE_SCALAR, "float",
+                                       create_scalar_type_info(TYPE_FLOAT, 4));
+  return type;
+}
+int voidptr_type() {
+  static int type =
+      global_find_type_id(void_type(), TypeExt{.extensions = {TYPE_EXT_POINTER},
+                                               .array_sizes = {}});
+  return type;
+}
+int c_string_type() {
+  static int type =
+      global_find_type_id(char_type(), {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
 int charptr_type() {
   static int type =
-      global_find_type_id("char", {.extensions = {TYPE_EXT_POINTER}});
-  return type;
-}
-int float32_type() {
-  static int type = global_find_type_id("float32", {});
-  return type;
-}
-int float64_type() {
-  static int type = global_find_type_id("float64", {});
-  return type;
-}
-int float_type() {
-  static int type = global_find_type_id("float", {});
+      global_find_type_id(char_type(), {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
 
@@ -617,69 +637,45 @@ int get_pointer_to_type(int base) {
   auto type = global_get_type(base);
   auto extensions = type->get_ext();
   extensions.extensions.push_back({TYPE_EXT_POINTER});
-  auto id = global_find_type_id(type->get_base(), extensions);
+  auto id = global_find_type_id(type->base_id, extensions);
   if (id == -1) {
     throw_error("Failed to get pointer to type", {});
   }
   return id;
 }
-
-ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size,
-                                        bool is_integral = false) {
-  auto info = ast_alloc<ScalarTypeInfo>();
-  info->scalar_type = type;
-  info->size = size;
-  info->is_integral = is_integral;
-  return info;
-}
 void init_type_system() {
   // Signed integers
   {
-    global_create_type(TYPE_SCALAR, "s64",
-                       create_scalar_type_info(TYPE_S64, 8, true));
-    global_create_type(TYPE_SCALAR, "s32",
-                       create_scalar_type_info(TYPE_S32, 4, true));
-    global_create_type(TYPE_SCALAR, "s16",
-                       create_scalar_type_info(TYPE_S16, 2, true));
-    global_create_type(TYPE_SCALAR, "s8",
-                       create_scalar_type_info(TYPE_S16, 1, true));
+    s64_type();
+    s32_type();
+    s16_type();
+    s8_type();
   }
 
   // Unsigned integers
   {
-    global_create_type(TYPE_SCALAR, "u64",
-                       create_scalar_type_info(TYPE_U64, 8, true));
-    global_create_type(TYPE_SCALAR, "u32",
-                       create_scalar_type_info(TYPE_U32, 4, true));
-    global_create_type(TYPE_SCALAR, "u16",
-                       create_scalar_type_info(TYPE_U16, 2, true));
-    global_create_type(TYPE_SCALAR, "u8",
-                       create_scalar_type_info(TYPE_U16, 1, true));
+    u64_type();
+    u32_type();
+    u16_type();
+    u8_type();
   }
 
   // Floats
   {
-    global_create_type(TYPE_SCALAR, "float32",
-                       create_scalar_type_info(TYPE_FLOAT, 4));
-    global_create_type(TYPE_SCALAR, "float64",
-                       create_scalar_type_info(TYPE_DOUBLE, 8));
+    float64_type();
+    float32_type();
   }
 
   // Other
   {
+    char_type();
+    bool_type();
+    void_type();
+
     // Other
     // CLEANUP: alias these, don't generate new types.
-    global_create_type(TYPE_SCALAR, "float",
-                       create_scalar_type_info(TYPE_FLOAT, 4));
-    global_create_type(TYPE_SCALAR, "int",
-                       create_scalar_type_info(TYPE_S32, 4, true));
-
-    global_create_type(TYPE_SCALAR, "char",
-                       create_scalar_type_info(TYPE_U8, 1, true));
-    global_create_type(TYPE_SCALAR, "bool",
-                       create_scalar_type_info(TYPE_BOOL, 1, true));
-    global_create_type(TYPE_SCALAR, "void",
-                       create_scalar_type_info(TYPE_VOID, 0));
+    int_type();
+    float_type();
 
     // TODO: declare type alias here.
     // auto id = charptr_type();
@@ -747,7 +743,7 @@ std::string TypeExt::to_string() const {
 }
 
 int get_map_value_type(Type *map_type) {
-  auto id = global_find_type_id(map_type->get_base(),
+  auto id = global_find_type_id(map_type->base_id,
                                 map_type->get_ext().without_back());
   return id;
 }
