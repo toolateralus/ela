@@ -1252,48 +1252,41 @@ void Emitter::emit_function_pointer_type_string(
 
   auto type_prefix = std::string{"*"};
 
-  // TODO:
-  // ! We need to be able to take function pointers to member methods.
-  // ! It's certainly possible but the syntax is really hard to wrangle.
-  if (current_struct_decl.is_not_null()) {
-    auto t = global_get_type(current_struct_decl.get()->type->resolved_type);
-    auto info = static_cast<StructTypeInfo *>(t->get_info());
-    for (const auto &[name, sym] : info->scope->symbols) {
-      auto sym_ty = global_get_type(sym.type_id);
-
-      if ((sym.flags & SYMBOL_IS_FUNCTION) != 0 && sym_ty == type &&
-          identifier.is_not_null() && *identifier.get() == name.get_str()) {
-        type_prefix = to_cpp_string(t) + "::*";
-        *identifier.get() = to_cpp_string(t) + *identifier.get();
-      }
-    }
-  }
-
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error("Internal compiler error: tried to get a function pointer from "
                 "a non-function type",
                 {});
   }
 
+  std::stringstream ss;
+
   auto info = static_cast<FunctionTypeInfo *>(type->get_info());
   auto return_type = global_get_type(info->return_type);
 
-  (*ss) << to_cpp_string(return_type) << "(" << type_prefix;
+  ss << to_cpp_string(return_type) << "(" << type_prefix;
 
   if (identifier) {
-    (*ss) << *identifier.get();
+    ss << *identifier.get();
   }
 
-  (*ss) << ")(";
+  ss << ")(";
 
   for (int i = 0; i < info->params_len; ++i) {
     auto type = global_get_type(info->parameter_types[i]);
-    (*ss) << to_cpp_string(type);
+    ss << to_cpp_string(type);
     if (i != info->params_len - 1) {
-      (*ss) << ", ";
+      ss << ", ";
     }
   }
-  (*ss) << ")";
+  ss << ")";
+
+  if (identifier)
+    std::cout << "emitting \"" << ss.str() << "\" for identifier \"" << *identifier.get() << "\"\n";
+  else {
+    std::cout << "emitting \"" << ss.str() << "\" for type \"" << type->to_string() << "\"\n";
+  }
+
+  (*this->ss) << ss.str();
 }
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type,
@@ -1619,6 +1612,7 @@ std::string Emitter::to_cpp_string(const TypeExt &extensions,
 std::string Emitter::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
+
   if (id == c_string_type()) {
     name = "const char";
   } else if (type->get_base() == "u8" && type->get_ext().is_pointer(1)) {

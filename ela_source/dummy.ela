@@ -1,7 +1,38 @@
-JsonTokenType :: enum {
-  Comma,
+#alias pthread_t :: u64;
+
+pthread_attr_t :: union;
+
+#alias ThreadFunction :: fn* ();
+#alias ThreadStartRoutine :: fn* (void*) -> void*;
+
+#foreign pthread_create :: fn(thread: pthread_t*, attr: pthread_attr_t*, start_routine: ThreadStartRoutine, arg: void*) -> int;
+#foreign pthread_join :: fn(thread: pthread_t*, retval: void**) -> int;
+
+/* forward */ 
+start_thread :: fn(arg: void*) -> void*;
+
+/* Simple thread struct */
+Thread :: struct {
+  handle: pthread_t;
+  start_function: ThreadFunction;
+  
+  start :: fn(function: ThreadFunction, arg: void*) {
+    this.start_function = function;
+    pthread_create(&this.handle, null, &start_thread, arg);  
+  }
+  
+  #ctor :: fn() {}
+  #ctor :: fn(function: ThreadFunction) {
+    start(function, (void*)this);
+  }
+  
+  join :: fn() -> void* {
+    n : void* = null;
+    pthread_join(&this.handle, &n);
+    return n;
+  }
+  #dtor :: fn() {
+    join();
+  }
 }
 
-main :: fn() {
-  tokenTypeNames : int[JsonTokenType::Comma + 1];
-}

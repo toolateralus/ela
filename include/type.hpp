@@ -200,6 +200,7 @@ struct FunctionTypeInfo : TypeInfo {
   bool is_varargs = false;
   // defined in cpp file
   virtual std::string to_string() const override;
+  std::string to_string(const TypeExt &ext) const;
 };
 
 struct ScalarTypeInfo : TypeInfo {
@@ -226,8 +227,6 @@ struct UnionTypeInfo : TypeInfo {
 struct StructTypeInfo : TypeInfo {
   int flags;
   Scope *scope;
-
-
 
   virtual std::string to_string() const override { return ""; }
 
@@ -311,20 +310,30 @@ struct Type {
   int id = invalid_id;
   // if this is an alias or something just get the actual real true type.
   int get_true_type() const {
+    if (!is_alias) return id;
+
     auto base_no_ext = id;
 
     if (extensions.has_extensions()) {
       base_no_ext = global_find_type_id(get_base(), {});
     }
 
+    if (base_no_ext == -1) {
+      return id;
+    }
+
     auto base_type = global_get_type(base_no_ext);
     Type* type = (Type*)this;
-    while (type && (type->is_alias || base_type->is_alias)) {
+
+    while ((type && base_type) && type->is_alias || base_type->is_alias) {
       base_type = global_get_type(base_type->alias_id);
       auto old_ext = base_type->get_ext().append(get_ext_no_compound());
       auto new_id = global_find_type_id(base_type->get_base(), old_ext);
-      type = global_get_type(new_id);
+      auto t = global_get_type(new_id);
+      if (!t) break;
+      type = t;
     }
+
     return type->id;
   }
 

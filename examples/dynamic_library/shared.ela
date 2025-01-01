@@ -20,4 +20,4 @@ DrawContext :: struct {
 }
 
 
-#alias function :: void(DrawContext*)*;
+#alias function :: fn* (DrawContext*);

@@ -688,8 +688,15 @@ ASTType *Parser::parse_type() {
     return type;
   }
 
+  if (allow_function_type_parsing && peek().type == TType::Fn) {
+    expect(TType::Fn);
+    return parse_function_type();
+  } 
+
   auto base = eat().value;
   TypeExt extension_info;
+
+
 
   while (true) {
     if (peek().type == TType::LBrace) {
@@ -716,8 +723,6 @@ ASTType *Parser::parse_type() {
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
       extension_info.extensions.push_back(TYPE_EXT_POINTER);
-    } else if (allow_function_type_parsing && peek().type == TType::LParen) {
-      return parse_function_type(base.get_str(), extension_info);
     } else {
       break;
     }
@@ -1974,6 +1979,7 @@ std::vector<ASTType *> Parser::parse_parameter_types() {
   expect(TType::RParen);
   return param_types;
 }
+
 void Parser::append_type_extensions(ASTType *type) {
   while (peek().type == TType::Mul || peek().type == TType::LBrace) {
     if (peek().type == TType::Mul) {
@@ -2002,25 +2008,29 @@ void Parser::append_type_extensions(ASTType *type) {
     }
   }
 }
-ASTType *Parser::parse_function_type(const InternedString &base,
-                                     TypeExt extension_info) {
-  auto return_type = ast_alloc<ASTType>();
-  return_type->base = base;
-  return_type->extension_info = extension_info;
 
+ASTType *Parser::parse_function_type() {
+  auto output_type = ast_alloc<ASTType>();
+  append_type_extensions(output_type);
   FunctionTypeInfo info{};
-  info.return_type =
-      ctx.scope->find_type_id(return_type->base, return_type->extension_info);
-
   auto param_types = parse_parameter_types();
-  std::ostringstream ss;
+  
+  if (peek().type == TType::Arrow) {
+    eat();
+    auto return_type = parse_type();
+    info.return_type = ctx.scope->find_type_id(return_type->base, return_type->extension_info);
+  } else {
+    info.return_type = void_type();
+  }
+
+  std::stringstream ss;
+  ss << "fn" << output_type->extension_info.to_string() << " ";
 
   // convert parameter types to a string
   {
     ss << "(";
     for (size_t i = 0; i < param_types.size(); ++i) {
-      info.parameter_types[i] = ctx.scope->find_type_id(
-          param_types[i]->base, param_types[i]->extension_info);
+      info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
       info.params_len++;
       ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
       if (i != param_types.size() - 1) {
@@ -2030,16 +2040,11 @@ ASTType *Parser::parse_function_type(const InternedString &base,
     ss << ")";
   }
 
-  auto type_name =
-      ctx.scope->get_type(info.return_type)->to_string() + ss.str();
-  return_type->resolved_type =
-      ctx.scope->find_function_type_id(type_name, info, {});
-  return_type->base = type_name;
-  return_type->extension_info = {};
-
-  append_type_extensions(return_type);
-
-  return return_type;
+  output_type->resolved_type = ctx.scope->find_function_type_id(ss.str(), info, output_type->extension_info);
+  auto t = global_get_type(output_type->resolved_type);
+  std::cout << "function type \"" <<  t->to_string() << "\"\n";
+  
+  return output_type;
 }
 static Precedence get_operator_precedence(Token token) {
   if (token.is_comp_assign()) {

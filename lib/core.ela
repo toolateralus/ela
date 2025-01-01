@@ -167,20 +167,6 @@ Strings :: struct {
   #static equals :: fn(a: c_string, b) -> bool {
     return strcmp(a, b) == 0;
   }
-  #static split :: fn(str: string, delimiter: char) -> string[] {
-    if !str.data then return {};
-    result: string[];
-    start: int = 0;
-    str_len: int = str.length;
-    for i in 0..str_len {
-      if str.data[i] == delimiter {
-        if i > start then result ~= string{str.data + start, str.data + i};
-        start = i + 1;
-      }
-    }
-    result ~= string{str.data + start, str.data + str_len};
-    return result;
-  }
   #static split :: fn(str: c_string, delimiter: char) -> string[] {
     if !str then return {};
     result: string[];
@@ -193,6 +179,20 @@ Strings :: struct {
       }
     }
     result ~= string{str + start, str + str_len};
+    return result;
+  }
+  #static split :: fn(str: string, delimiter: char) -> string[] {
+    if !str.data then return {};
+    result: string[];
+    start: int = 0;
+    str_len: int = str.length;
+    for i in 0..str_len {
+      if str.data[i] == delimiter {
+        if i > start then result ~= string{str.data + start, str.data + i};
+        start = i + 1;
+      }
+    }
+    result ~= string{str.data + start, str.data + str_len};
     return result;
   }
   #static contains :: fn(str: string, ch: char) -> bool {

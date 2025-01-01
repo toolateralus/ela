@@ -139,8 +139,9 @@ Context::Context() {
     auto type_id = global_create_struct_type("string", str_scope);
     auto type = global_get_type(type_id);
 
-    static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
-        charptr_type(),
+    static_cast<StructTypeInfo*>(type->get_info())->implicit_cast_table = {
+      charptr_type(),
+      c_string_type(),
     };
 
     str_scope->insert("data", charptr_type());
