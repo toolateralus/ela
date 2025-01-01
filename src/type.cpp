@@ -6,7 +6,6 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include <ostream>
-#include <print>
 #include <sstream>
 
 std::string FunctionTypeInfo::to_string(const TypeExt &ext) const {
