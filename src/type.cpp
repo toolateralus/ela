@@ -59,41 +59,9 @@ Type *global_get_type(const int id) {
   return &type_table[id];
 }
 
-int global_create_type_alias(int aliased_type, const InternedString &name) {
-  // this type alias already exists so just return the type.
-  if (type_alias_map.contains(name)) {
-    return type_alias_map[name];
-  }
-
-  auto aliased = global_get_type(aliased_type);
-  type_table.emplace_back(type_table.size(), aliased->kind);
-  auto type = &type_table.back();
-
-  type->set_base(name);
-  type->set_info(aliased->get_info());
-  type->is_alias = true;
-  type->alias_id = aliased_type;
-  type_alias_map[name] = type->id;
-  aliased->has_aliases = true;
-  aliased->aliases.push_back(type->id);
-  return type->id;
-}
 int global_find_function_type_id(const InternedString &name,
                                  const FunctionTypeInfo &info,
                                  const TypeExt &ext) {
-
-  if (type_alias_map.contains(name)) {
-    auto alias = type_alias_map[name];
-    if (ext.has_no_extensions())
-      return alias;
-    else {
-      auto base_type = global_get_type(alias);
-      return global_create_type((TypeKind)base_type->kind,
-                                base_type->get_base(), base_type->get_info(),
-                                ext);
-    }
-  }
-
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].kind != TYPE_FUNCTION)
       continue;
@@ -115,19 +83,6 @@ int global_find_function_type_id(const InternedString &name,
 // slowest functions in the compiler.
 int global_find_type_id(const InternedString &name,
                         const TypeExt &type_extensions) {
-  if (type_alias_map.contains(name)) {
-    auto alias = type_alias_map[name];
-    if (type_extensions.has_no_extensions())
-      return alias;
-    else {
-      auto base_type = global_get_type(alias);
-      return global_create_type(
-          (TypeKind)base_type->kind, base_type->get_base(),
-          base_type->get_info(),
-          base_type->get_ext_no_compound().append(type_extensions));
-    }
-  }
-
   for (int i = 0; i < type_table.size(); ++i) {
     auto type = &type_table[i];
     if (type->equals(name, type_extensions))
@@ -223,22 +178,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   // same exact type. no cast needed.
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
-
-  if (from->is_alias) {
-    auto aliasType = global_get_type(type_alias_map[from->get_base()]);
-    auto pointed_to = global_get_type(aliasType->alias_id);
-    auto fullType = global_get_type(
-        global_find_type_id(pointed_to->get_base(), from->get_ext()));
-    return type_conversion_rule(fullType, to);
-  }
-
-  if (to->is_alias) {
-    auto aliasType = global_get_type(type_alias_map[to->get_base()]);
-    auto pointed_to = global_get_type(aliasType->alias_id);
-    auto fullType = global_get_type(
-        global_find_type_id(pointed_to->get_base(), to->get_ext()));
-    return type_conversion_rule(from, fullType);
-  }
 
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
@@ -398,17 +337,18 @@ bool TypeExt::equals(const TypeExt &other) const {
 }
 
 std::string Type::to_string() const {
-  auto type = global_get_type(get_true_type());
   switch (kind) {
   case TYPE_FUNCTION:
-    return static_cast<FunctionTypeInfo*>(type->get_info())->to_string(extensions) + type->extensions.to_string();
+    return static_cast<FunctionTypeInfo *>(get_info())
+               ->to_string(extensions) +
+           extensions.to_string();
   case TYPE_STRUCT:
   case TYPE_TUPLE:
   case TYPE_SCALAR:
-    return type->base.get_str() + type->extensions.to_string();
+    return base.get_str() + extensions.to_string();
   case TYPE_ENUM:
   case TYPE_UNION:
-    return type->base.get_str();
+    return base.get_str();
   }
 }
 
@@ -742,8 +682,9 @@ void init_type_system() {
     global_create_type(TYPE_SCALAR, "void",
                        create_scalar_type_info(TYPE_VOID, 0));
 
-    auto id = charptr_type();
-    global_create_type_alias(id, "c_string");
+    // TODO: declare type alias here.
+    // auto id = charptr_type();
+    // global_create_type_alias(id, "c_string");
   }
 }
 bool type_is_numerical(const Type *t) {

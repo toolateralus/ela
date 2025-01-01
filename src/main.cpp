@@ -31,7 +31,6 @@ jstl::Arena scope_arena{MB(333)};
 jstl::Arena ast_arena{MB(333)};
 
 std::vector<Type> type_table{};
-std::unordered_map<InternedString, int> type_alias_map;
 
 // TODO: remove me, we want file scopes.
 Scope *root_scope;

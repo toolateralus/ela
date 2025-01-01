@@ -1210,8 +1210,7 @@ std::any Typer::visit(ASTScopeResolution *node) {
           node->source_range);
   }
 
-  auto base = global_get_type(int_from_any(node->base->accept(this)));
-  auto base_ty = global_get_type(base->get_true_type());
+  auto base_ty = global_get_type(int_from_any(node->base->accept(this)));
 
   Scope *scope = nullptr;
   switch (base_ty->kind) {
@@ -1256,7 +1255,7 @@ std::any Typer::visit(ASTSubscript *node) {
   auto subscript = int_from_any(node->subscript->accept(this));
   // TODO: adding get true type fixed a bug here. This shouldn't really be
   // neccesary, The alias system is still crappy.
-  auto left_ty = global_get_type(ctx.scope->get_type(left)->get_true_type());
+  auto left_ty = ctx.scope->get_type(left);
 
   /*
   !HACK FIX STRING SLICING THIS IS TERRIBLE

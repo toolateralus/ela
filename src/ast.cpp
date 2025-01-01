@@ -420,7 +420,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                *static_cast<FunctionTypeInfo *>(type->get_info()),
                aliased_type->extension_info);
 
-           parser->ctx.scope->create_type_alias(id, name.value);
+          // TODO: declare type alias here.
+          //  parser->ctx.scope->create_type_alias(id, name.value);
            //  auto alias = ctx.scope->create_type_alias(id, name.value);
            //  parser->ctx.scope->aliases.push_back(alias);
            return ast_alloc<ASTNoop>();
@@ -442,7 +443,8 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                      "types, as well as declare function pointers.",
                      aliased_type->source_range);
 
-       parser->ctx.scope->create_type_alias(id, name.value);
+      // TODO: declare type alias here.
+      //  parser->ctx.scope->create_type_alias(id, name.value);
        return ast_alloc<ASTNoop>();
      }},
 

@@ -8,7 +8,6 @@
 #include <stdlib.h>
 #include <string.h>
 #include <string>
-#include <unordered_map>
 #include <vector>
 
 #include "arena.hpp"
@@ -22,7 +21,6 @@ struct Context;
 extern std::vector<Type> type_table;
 extern jstl::Arena type_info_arena;
 
-extern std::unordered_map<InternedString, int> type_alias_map;
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -302,65 +300,14 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 
 int get_pointer_to_type(int base);
 
-int global_create_type_alias(int aliased_type, const InternedString &name);
-
 int get_map_value_type(Type *map_type);
 
 struct Type {
   int id = invalid_id;
   // if this is an alias or something just get the actual real true type.
-  int get_true_type() const {
-    if (!is_alias) return id;
-
-    auto base_no_ext = id;
-
-    if (extensions.has_extensions() && kind != TYPE_FUNCTION) {
-      base_no_ext = global_find_type_id(get_base(), {});
-    }
-
-    if (base_no_ext == -1) {
-      return id;
-    }
-
-    auto base_type = global_get_type(base_no_ext);
-    Type* type = (Type*)this;
-
-    while ((type && base_type) && type->is_alias || base_type->is_alias) {
-      base_type = global_get_type(base_type->alias_id);
-      auto old_ext = base_type->get_ext().append(get_ext_no_compound());
-      auto new_id = global_find_type_id(base_type->get_base(), old_ext);
-      auto t = global_get_type(new_id);
-      if (!t) break;
-      type = t;
-    }
-
-    return type->id;
-  }
-
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
-
-  // this type is aliasing another type
-  bool is_alias = false;
-  // this is the type that this type aliases.
-  int alias_id = Type::invalid_id;
-
-  // this type has other types that refer to me as an alias.
-  bool has_aliases = false;
-  // these are the types that refer to me as an alias
-  std::vector<int> aliases;
-
- inline  bool has_alias(const InternedString &name) const {
-    if (!has_aliases) return false;
-    for (const auto &alias: aliases) {
-      auto type = global_get_type(alias);
-      if (type->get_base() == name) {
-        return true;
-      }
-    }
-    return false;
-  }
-
+ 
   inline void set_base(const InternedString &base) {
     this->base = base;
   }
@@ -374,11 +321,6 @@ struct Type {
     return base;
   }
   TypeExt const get_ext() const {
-    if (is_alias) {
-      Type* type = global_get_type(alias_id);
-      TypeExt exts = type->extensions;
-      return exts.append(extensions);
-    }
     return extensions;
   }
   TypeExt const get_ext_no_compound() const {
