@@ -58,28 +58,20 @@ Type *global_get_type(const int id) {
   return &type_table[id];
 }
 
-int global_find_function_type_id(const int base_id,
-                                 const FunctionTypeInfo &info,
+int global_find_function_type_id(const FunctionTypeInfo &info,
                                  const TypeExt &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].kind != TYPE_FUNCTION)
       continue;
     const Type *type = &type_table[i];
-    if (type->equals(base_id, type_extensions) &&
-        type->type_info_equals(&info, TYPE_FUNCTION)) {
+    if (type->type_info_equals(&info, TYPE_FUNCTION) &&
+        type->get_ext() == type_extensions) {
       return type->id;
     }
   }
-  auto base_t = &type_table[base_id];
-  auto ext = type_extensions;
-  while (base_t->base_id != Type::invalid_id) {
-    ext = base_t->get_ext().append(ext);
-    base_t = &type_table[base_t->base_id];
-  }
   auto info_ptr =
       new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
-  return global_create_type(TYPE_FUNCTION, base_t->get_base(), info_ptr, ext,
-                            base_t->base_id);
+  return global_create_type(TYPE_FUNCTION, info.to_string(), info_ptr, type_extensions);
 }
 
 // PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM

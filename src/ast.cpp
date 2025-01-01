@@ -392,7 +392,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        parser->expect(TType::DoubleColon);
        auto enum_decl = parser->parse_enum_declaration(name);
        enum_decl->is_flags = true;
-       auto type = parser->ctx.scope->get_type(enum_decl->type->resolved_type);
+       auto type = global_get_type(enum_decl->type->resolved_type);
        auto info = static_cast<EnumTypeInfo *>(type->get_info());
        info->is_flags = true;
        return enum_decl;
@@ -407,7 +407,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto aliased_type = parser->parse_type();
 
        if (aliased_type->resolved_type != -1) {
-         auto type = parser->ctx.scope->get_type(aliased_type->resolved_type);
+         auto type = global_get_type(aliased_type->resolved_type);
 
          if (!type) {
            throw_error("Failed to get type for alias.",
@@ -415,8 +415,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
          }
 
          if (type->is_kind(TYPE_FUNCTION)) {
-           auto id = parser->ctx.scope->find_function_type_id(
-               aliased_type->base,
+           auto id = global_find_function_type_id(
                *static_cast<FunctionTypeInfo *>(type->get_info()),
                aliased_type->extension_info);
 
@@ -431,7 +430,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto id = parser->ctx.scope->find_type_id(aliased_type->base,
                                                  aliased_type->extension_info);
 
-       auto type = parser->ctx.scope->get_type(id);
+       auto type = global_get_type(id);
 
        if (!type) {
          throw_error("Unable to create type alias: target type does not exist.",
@@ -472,7 +471,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
      .run = [](Parser *parser) -> Nullable<ASTNode> {
        parser->expect(TType::DoubleColon);
        auto decl = parser->parse_struct_declaration(get_unique_identifier());
-       auto t = parser->ctx.scope->get_type(decl->type->resolved_type);
+       auto t = global_get_type(decl->type->resolved_type);
        auto info = static_cast<StructTypeInfo *>(t->get_info());
        info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
        return decl;
@@ -1264,7 +1263,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   node->type->base = tok.value;
   expect(TType::LCurly);
 
-  if (global_find_type_id(tok.value, {}) != -1) {
+  if (ctx.scope->find_type_id(tok.value, {}) != -1) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
@@ -1313,7 +1312,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto type_id = ctx.scope->find_type_id(name.value, {});
 
   if (type_id != -1) {
-    auto type = ctx.scope->get_type(type_id);
+    auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = static_cast<StructTypeInfo *>(type->get_info());
@@ -1351,14 +1350,14 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     }
     decl->scope = block->scope;
   } else {
-    Type *t = ctx.scope->get_type(type_id);
+    Type *t = global_get_type(type_id);
     auto info = static_cast<StructTypeInfo *>(t->get_info());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
 
   auto info =
-      static_cast<StructTypeInfo *>(ctx.scope->get_type(type_id)->get_info());
+      static_cast<StructTypeInfo *>(global_get_type(type_id)->get_info());
 
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
@@ -1380,7 +1379,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto id = ctx.scope->find_type_id(name.value, {});
 
   if (id != -1) {
-    auto type = ctx.scope->get_type(id);
+    auto type = global_get_type(id);
 
     if (!type->is_kind(TYPE_UNION)) {
       end_node(nullptr, range);
@@ -1399,7 +1398,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   expect(TType::Union);
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
-  auto type = ctx.scope->get_type(type_id);
+  auto type = global_get_type(type_id);
 
   if (type && type->is_kind(TYPE_UNION)) {
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
@@ -1418,7 +1417,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   if (peek().type == TType::Semi) {
     eat();
     node->is_fwd_decl = true;
-    type = ctx.scope->get_type(type_id);
+    type = global_get_type(type_id);
     auto info = static_cast<UnionTypeInfo *>(type->get_info());
     info->flags |= UNION_IS_FORWARD_DECLARED;
     return node;
@@ -1439,7 +1438,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
-      auto type = scope->get_type(struct_decl->type->resolved_type);
+      auto type = global_get_type(struct_decl->type->resolved_type);
       auto info = static_cast<StructTypeInfo *>(type->get_info());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         throw_error(
@@ -1460,7 +1459,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->structs = structs;
   node->scope = block->scope;
 
-  type = ctx.scope->get_type(type_id);
+  type = global_get_type(type_id);
   auto info = static_cast<UnionTypeInfo *>(type->get_info());
 
   info->scope = scope;
@@ -2026,27 +2025,13 @@ ASTType *Parser::parse_function_type() {
     info.return_type = void_type();
   }
 
-  std::stringstream ss;
-  ss << "fn" << output_type->extension_info.to_string() << " ";
-
-  // convert parameter types to a string
-  {
-    ss << "(";
-    for (size_t i = 0; i < param_types.size(); ++i) {
-      info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
-      info.params_len++;
-      ss << ctx.scope->get_type(info.parameter_types[i])->to_string();
-      if (i != param_types.size() - 1) {
-        ss << ", ";
-      }
-    }
-    ss << ")";
+  for (size_t i = 0; i < param_types.size(); ++i) {
+    info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
+    info.params_len++;
   }
 
-  output_type->resolved_type = ctx.scope->find_function_type_id(ss.str(), info, output_type->extension_info);
+  output_type->resolved_type = global_find_function_type_id(info, output_type->extension_info);
   auto t = global_get_type(output_type->resolved_type);
-  std::cout << "function type \"" <<  t->to_string() << "\"\n";
-  
   return output_type;
 }
 static Precedence get_operator_precedence(Token token) {

@@ -918,7 +918,7 @@ std::any Emitter::visit(ASTAllocate *node) {
     (*ss) << "new ";
     auto ext = ptr_type->get_ext();
     ext.extensions.pop_back();
-    auto nonptr = global_find_type_id(ptr_type->get_base(), ext);
+    auto nonptr = global_find_type_id(ptr_type->base_id, ext);
     auto nonptr_ty = global_get_type(nonptr);
     auto str = to_cpp_string(nonptr_ty);
     (*ss) << str;

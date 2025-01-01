@@ -407,7 +407,7 @@ std::any Typer::visit(ASTFunctionDeclaration *node) {
   }
 
   auto type_id =
-      ctx.scope->find_function_type_id(get_function_typename(node), info, {});
+      global_find_function_type_id(info, {});
 
   // TODO: we need to support fwd decls of overloaded functions
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
@@ -680,6 +680,7 @@ std::any Typer::visit(ASTFor *node) {
   if (range_type_id == ctx.scope->find_type_id("string", {})) {
     iter_ty = char_type();
   } else if (range_type_id == ctx.scope->find_type_id("Range", {})) {
+  } else if (range_type_id == ctx.scope->find_type_id("Range", {})) {
     iter_ty =
         int_type(); // ! THIS SHOULD BE S64 BUT IT CAUSES ANNOY BALLS ISSUES.
     if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
@@ -878,7 +879,7 @@ std::any Typer::visit(ASTType *node) {
     std::vector<int> types;
     for (const auto &t : node->tuple_types)
       types.push_back(int_from_any(t->accept(this)));
-    node->resolved_type = ctx.scope->find_type_id(types, node->extension_info);
+    node->resolved_type = global_find_type_id(types, node->extension_info);
     // node->base = get_tuple_types).get_str);
 
   } else if (node->flags == ASTTYPE_EMIT_OBJECT) {
@@ -1149,8 +1150,8 @@ std::any Typer::visit(ASTDotExpr *node) {
       static auto contains_ty = [] {
         auto func = FunctionTypeInfo{};
         func.is_varargs = true;
-        func.return_type = global_find_type_id("bool", {});
-        return global_find_function_type_id("bool(...)", func, {});
+        func.return_type = bool_type();
+        return global_find_function_type_id(func, {});
       }();
       return contains_ty;
     }
@@ -1470,7 +1471,7 @@ std::any Typer::visit(ASTTuple *node) {
   }
 
   return node->type->resolved_type =
-             ctx.scope->find_type_id(types, node->type->extension_info);
+             global_find_type_id(types, node->type->extension_info);
 }
 
 std::any Typer::visit(ASTTupleDeconstruction *node) {

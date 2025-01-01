@@ -114,22 +114,6 @@ struct Scope {
     types[name] = id;
     return id;
   }
-
-  int find_function_type_id(const InternedString &name,
-                            const FunctionTypeInfo &info, const TypeExt &ext) {
-    // We leave function types as global so that we don't have to recreate
-    // things like void(int) over and over. This may inadvertently allow you to
-    // access types that are in your scope, so
-    // TODO: verify this isn't terrible.
-    if (!types.contains(name)) {
-      if (parent) {
-        return parent->find_function_type_id(name, info, ext);
-      } else {
-        return Type::invalid_id;
-      }
-    }
-    return global_find_function_type_id(types[name], info, ext);
-  }
   
   int find_type_id(const InternedString &name, const TypeExt &ext) {
     if (!types.contains(name)) {

@@ -21,7 +21,6 @@ struct Context;
 extern std::vector<Type> type_table;
 extern jstl::Arena type_info_arena;
 
-
 enum ConversionRule {
   CONVERT_PROHIBITED,
   CONVERT_NONE_NEEDED,
@@ -76,7 +75,7 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_DTOR = 1 << 4,
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
-  FUNCTION_IS_EXPORTED= 1 << 7,
+  FUNCTION_IS_EXPORTED = 1 << 7,
   FUNCTION_IS_MUTATING = 1 << 9,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 10,
   FUNCTION_IS_STATIC = 1 << 11,
@@ -88,7 +87,9 @@ enum struct FunctionMetaType {
 };
 
 enum UnionFlags {
-  UNION_IS_NORMAL = 1 << 0, // this and the next flag should never be present at the same itme.
+  UNION_IS_NORMAL =
+      1
+      << 0, // this and the next flag should never be present at the same itme.
   UNION_IS_SUM_TYPE = 1 << 1,
   UNION_IS_FORWARD_DECLARED = 1 << 2,
 };
@@ -98,7 +99,8 @@ struct ASTExpr;
 struct TypeExt {
   // this stores things like * and [], [20] etc.
   std::vector<TypeExtEnum> extensions{};
-  // for each type extension that is [], nullptr == dynamic array, [non-nullptr] == fixed array size.
+  // for each type extension that is [], nullptr == dynamic array, [non-nullptr]
+  // == fixed array size.
   std::vector<Nullable<ASTExpr>> array_sizes{};
 
   // This is a key type of a map.
@@ -107,7 +109,7 @@ struct TypeExt {
   int key_type = -1;
 
   inline bool is_map() const {
-    for (const auto ext: extensions) {
+    for (const auto ext : extensions) {
       if (ext == TYPE_EXT_MAP) {
         return true;
       }
@@ -117,29 +119,25 @@ struct TypeExt {
 
   inline bool is_pointer(int depth = -1) const {
     if (depth == -1) {
-      return std::find(extensions.rbegin(), extensions.rend(), TYPE_EXT_POINTER) != extensions.rend();
+      return std::find(extensions.rbegin(), extensions.rend(),
+                       TYPE_EXT_POINTER) != extensions.rend();
     }
     if (depth > extensions.size()) {
       return false;
     }
-    return std::all_of(extensions.rbegin(), extensions.rbegin() + depth, [](TypeExtEnum ext) {
-      return ext == TYPE_EXT_POINTER;
-    });
+    return std::all_of(extensions.rbegin(), extensions.rbegin() + depth,
+                       [](TypeExtEnum ext) { return ext == TYPE_EXT_POINTER; });
   }
 
   inline bool operator==(const TypeExt &other) const { return equals(other); }
 
   bool equals(const TypeExt &other) const;
 
-  inline bool has_no_extensions() const {
-    return extensions.empty();
-  }
+  inline bool has_no_extensions() const { return extensions.empty(); }
 
-  inline bool has_extensions() const {
-    return !has_no_extensions();
-  }
+  inline bool has_extensions() const { return !has_no_extensions(); }
 
-  TypeExt append(const TypeExt& to_append) const {
+  TypeExt append(const TypeExt &to_append) const {
     auto these = *this;
     int sizes_i = 0;
 
@@ -181,15 +179,13 @@ struct TypeInfo {
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
   TypeInfo() {}
-  
+
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
 struct FunctionTypeInfo : TypeInfo {
-  FunctionTypeInfo() {
-    memset(parameter_types, -1, 256 * sizeof(int));
-  }
+  FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
@@ -264,28 +260,28 @@ Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
-                const TypeExt & = {}, const int = -1);
+                       const TypeExt & = {}, const int = -1);
 
 int global_create_struct_type(const InternedString &, Scope *);
 
-int global_create_enum_type(const InternedString &, const std::vector<InternedString> &,
-                     bool = false, size_t element_type = s32_type());
+int global_create_enum_type(const InternedString &,
+                            const std::vector<InternedString> &, bool = false,
+                            size_t element_type = s32_type());
 
-int global_create_tuple_type(const std::vector<int> &types, const TypeExt& ext);
+int global_create_tuple_type(const std::vector<int> &types, const TypeExt &ext);
 
-int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
+int global_create_union_type(const InternedString &name, Scope *scope,
+                             UnionFlags kind);
 
 ConversionRule type_conversion_rule(const Type *, const Type *);
-
-
 
 // char *
 int charptr_type();
 
-int global_find_function_type_id(const int, const FunctionTypeInfo &,
-                 const TypeExt &);
+int global_find_function_type_id(const FunctionTypeInfo &, const TypeExt &);
 
-int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions);
+int global_find_type_id(std::vector<int> &tuple_types,
+                        const TypeExt &type_extensions);
 
 int global_find_type_id(const int, const TypeExt &);
 
@@ -301,7 +297,8 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 // returns false for failure, else true and passed param signature as out.
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 
-void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
+void emit_warnings_or_errors_for_operator_overloads(const TType type,
+                                                    SourceRange &range);
 
 int get_pointer_to_type(int base);
 
@@ -316,39 +313,25 @@ struct Type {
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
- 
-  inline void set_base(const InternedString &base) {
-    this->base = base;
-  }
-  inline void set_ext(const TypeExt &ext) {
-    this->extensions = ext;
-  }
-  inline void set_info(TypeInfo *info) {
-    this->info = info;
-  }
-  inline InternedString const get_base() const {
-    return base;
-  }
-  TypeExt const get_ext() const {
-    return extensions;
-  }
-  TypeExt const get_ext_no_compound() const {
-    return extensions;
-  }
 
-  TypeInfo *get_info() const {
-    return info;
-  }
+  inline void set_base(const InternedString &base) { this->base = base; }
+  inline void set_ext(const TypeExt &ext) { this->extensions = ext; }
+  inline void set_info(TypeInfo *info) { this->info = info; }
+  inline InternedString const get_base() const { return base; }
+  TypeExt const get_ext() const { return extensions; }
+  TypeExt const get_ext_no_compound() const { return extensions; }
 
-  private:
-    TypeInfo* info;
-    InternedString base{};
-    TypeExt extensions{};
-  public:
+  TypeInfo *get_info() const { return info; }
 
+private:
+  TypeInfo *info;
+  InternedString base{};
+  TypeExt extensions{};
+
+public:
   bool equals(const int base, const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
-  
+
   Type() = default;
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   bool operator==(const Type &type) const;
@@ -365,8 +348,6 @@ struct ASTFunctionDeclaration;
 
 InternedString get_function_typename(ASTFunctionDeclaration *);
 
-template<class T>
-static inline T* type_info_alloc() {
+template <class T> static inline T *type_info_alloc() {
   return new (type_info_arena.allocate(sizeof(T))) T();
 }
-
