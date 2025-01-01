@@ -34,7 +34,6 @@ struct Scope {
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
 
-  std::vector<int> aliases;
   std::unordered_set<int> types;
 
   static std::unordered_set<InternedString> &defines() {
@@ -88,13 +87,6 @@ struct Scope {
     if (types.contains(id)) {
       return global_get_type(id);
     }
-
-    for (auto alias : aliases) {
-      if (alias == id) {
-        return global_get_type(id);
-      }
-    }
-
     if (parent)
       return parent->get_type(id);
     else {
