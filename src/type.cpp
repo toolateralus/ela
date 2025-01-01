@@ -5,11 +5,14 @@
 #include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
+#include <ostream>
+#include <print>
 #include <sstream>
 
-std::string FunctionTypeInfo::to_string() const {
+std::string FunctionTypeInfo::to_string(const TypeExt &ext) const {
   std::stringstream ss;
-  ss << global_get_type(return_type)->get_base().get_str();
+  ss << "fn ";
+  ss << ext.to_string() << ' ';
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = global_get_type(parameter_types[i]);
@@ -23,6 +26,29 @@ std::string FunctionTypeInfo::to_string() const {
     ss << ", ...)";
   else
     ss << ')';
+
+  ss << " -> " << global_get_type(return_type)->get_base().get_str();
+
+  return ss.str();
+}
+std::string FunctionTypeInfo::to_string() const {
+  std::stringstream ss;
+  ss << "fn ";
+  ss << "(";
+  for (int i = 0; i < params_len; ++i) {
+    auto t = global_get_type(parameter_types[i]);
+    ss << t->to_string();
+    if (i < params_len - 1) {
+      ss << ", ";
+    }
+  }
+
+  if (is_varargs)
+    ss << ", ...)";
+  else
+    ss << ')';
+
+  ss << " -> " << global_get_type(return_type)->get_base().get_str();
 
   return ss.str();
 }
@@ -278,13 +304,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     return type_conversion_rule(global_get_type(enum_info->element_type), to);
   }
 
-  if (from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
-    auto enum_info = static_cast<EnumTypeInfo *>(from->get_info());
-    return type_conversion_rule(global_get_type(enum_info->element_type), to);
-  }
   auto info = to->get_info();
   for (const auto &cast : info->implicit_cast_table) {
     if (cast == from->id) {
+      std::cout << "Implicit cast found from type " << from->to_string()
+                << " to type " << to->to_string() << std::endl;
       return CONVERT_IMPLICIT;
     }
   }
@@ -376,20 +400,10 @@ bool TypeExt::equals(const TypeExt &other) const {
 }
 
 std::string Type::to_string() const {
-  auto base_no_ext = global_find_type_id(get_base(), {});
-  auto base_type = global_get_type(base_no_ext);
-
-  Type *type = (Type *)this;
-  if (type->is_alias || base_type->is_alias) {
-    base_type = global_get_type(base_type->alias_id);
-    auto old_ext = base_type->get_ext().append(get_ext_no_compound());
-    auto new_id = global_find_type_id(base_type->get_base(), old_ext);
-    type = global_get_type(new_id);
-  }
-
+  auto type = global_get_type(get_true_type());
   switch (kind) {
   case TYPE_FUNCTION:
-    return type->get_info()->to_string() + type->extensions.to_string();
+    return static_cast<FunctionTypeInfo*>(type->get_info())->to_string(extensions) + type->extensions.to_string();
   case TYPE_STRUCT:
   case TYPE_TUPLE:
   case TYPE_SCALAR:
@@ -612,7 +626,8 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type,
   case TType::RBrace:
     throw_error("Operator overload not allowed", range);
   case TType::Arrow:
-    throw_warning(WarningUseDotNotArrowOperatorOverload, "Operator overload: Use '.' instead of '->'", range);
+    throw_warning(WarningUseDotNotArrowOperatorOverload,
+                  "Operator overload: Use '.' instead of '->'", range);
     return;
 
   // Valid

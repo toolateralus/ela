@@ -808,8 +808,8 @@ std::any Typer::visit(ASTCall *node) {
       (arg_tys.size() > info->params_len ||
        arg_tys.size() < info->params_len - info->default_params)) {
     throw_error(std::format("Function call has incorrect number of arguments. "
-                            "Expected: {}, Found: {}",
-                            info->params_len, arg_tys.size()),
+                            "Expected: {}, Found: {}\n type: {}",
+                            info->params_len, arg_tys.size(), type->to_string()),
                 node->source_range);
   }
 
@@ -864,6 +864,10 @@ std::any Typer::visit(ASTExprStatement *node) {
 }
 
 std::any Typer::visit(ASTType *node) {
+  if (node->resolved_type != Type::invalid_id) {
+    return node->resolved_type;
+  }
+
   for (auto& arr_size : node->extension_info.array_sizes) {
     if (arr_size.is_null()) continue;
     arr_size.get()->accept(this);

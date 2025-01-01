@@ -564,7 +564,7 @@ All_Colors : Color[] = {
 
 // * ########### BUILTIN UI HELPERS ############### //
 // * Function pointer to use with the `draw_button` function.
-#alias ButtonCallback :: void()*;
+#alias ButtonCallback :: fn* () -> void;
 
 // * Style struct used for UI styling.
 Style :: struct {
@@ -866,8 +866,8 @@ DropDown :: struct {
   style: Style;
   selected_index: int = -1;
   is_open: bool = false;
-  on_selected: void(int)* = null;
-  on_open: void()* = null;
+  on_selected: fn*(int) = null;
+  on_open: fn*() = null;
     draw :: fn() {
       // Draw the dropdown box
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
