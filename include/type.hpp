@@ -310,6 +310,8 @@ struct Type {
   int id = invalid_id;
   // if this is an alias or something just get the actual real true type.
   int get_true_type() const {
+    if (!is_alias) return id;
+
     auto base_no_ext = id;
 
     if (extensions.has_extensions()) {
