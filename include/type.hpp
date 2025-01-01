@@ -314,7 +314,7 @@ struct Type {
 
     auto base_no_ext = id;
 
-    if (extensions.has_extensions()) {
+    if (extensions.has_extensions() && kind != TYPE_FUNCTION) {
       base_no_ext = global_find_type_id(get_base(), {});
     }
 
@@ -396,8 +396,8 @@ struct Type {
   public:
 
   bool equals(const InternedString &name, const TypeExt &type_extensions) const;
-
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
+  
   Type() = default;
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
   bool operator==(const Type &type) const;

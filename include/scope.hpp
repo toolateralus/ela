@@ -33,6 +33,7 @@ struct Scope {
   bool is_struct_or_union_scope = false;
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
+
   std::vector<int> aliases;
   std::unordered_set<int> types;
 
@@ -107,17 +108,6 @@ struct Scope {
       type_alias_map[name] = id;
     }
     return id;
-  }
-
-  inline bool is_ancestor(Scope *ancestor) {
-    Scope *current = this;
-    while (current != nullptr) {
-      if (current == ancestor) {
-        return true;
-      }
-      current = current->parent;
-    }
-    return false;
   }
 
   Type *get_type(const int id) {
@@ -256,11 +246,13 @@ struct Scope {
     return id;
   }
 };
+
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   scope->parent = parent;
   return scope;
 }
+
 struct Context {
 
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM

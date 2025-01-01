@@ -307,8 +307,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   auto info = to->get_info();
   for (const auto &cast : info->implicit_cast_table) {
     if (cast == from->id) {
-      std::cout << "Implicit cast found from type " << from->to_string()
-                << " to type " << to->to_string() << std::endl;
       return CONVERT_IMPLICIT;
     }
   }
@@ -470,7 +468,7 @@ int global_create_type(TypeKind kind, const InternedString &name,
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;
-  ss << global_get_type(return_type->resolved_type)->to_string();
+  ss << "fn ";
   ss << "(";
   for (const auto &param : decl->params->params) {
     ss << global_get_type(param->type->resolved_type)->to_string();
@@ -479,6 +477,7 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
     }
   }
   ss << ")";
+  ss << " -> " << global_get_type(return_type->resolved_type)->to_string();
   return ss.str();
 }
 
