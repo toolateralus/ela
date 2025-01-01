@@ -1119,8 +1119,6 @@ void Emitter::interpolate_string(ASTLiteral *node) {
   std::string str;
   auto get_format_str = [&](int type_id) {
     auto type = global_get_type(type_id);
-    type = global_get_type(type->get_true_type());
-
     // We just assume that the type-checker has validated that this struct has a
     // to_string() function
     if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
@@ -1434,12 +1432,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context,
 }
 
 std::string Emitter::to_type_struct(Type *type, Context &context) {
-  auto id = type->get_true_type();
-  auto new_type = global_get_type(id);
-
-  if (new_type != type) {
-    type = new_type;
-  }
+  auto id = type->id;
 
   static bool *type_cache = [] {
     auto arr = new bool[type_table.size()];
@@ -1629,8 +1622,6 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 }
 
 std::string Emitter::to_cpp_string(Type *type) {
-  type = global_get_type(type->get_true_type());
-
   auto output = std::string{};
   switch (type->kind) {
   case TYPE_SCALAR:

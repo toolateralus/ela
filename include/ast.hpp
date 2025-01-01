@@ -251,6 +251,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
+  
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
   Token name; // TODO: make this an InternedString not a token

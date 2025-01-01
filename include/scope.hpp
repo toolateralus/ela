@@ -33,7 +33,7 @@ struct Scope {
   bool is_struct_or_union_scope = false;
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
-  std::vector<int> aliases;
+
   std::unordered_set<int> types;
 
   static std::unordered_set<InternedString> &defines() {
@@ -83,54 +83,10 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  void on_scope_enter() {
-    for (const auto &alias : aliases) {
-      auto type = global_get_type(alias);
-      type_alias_map[type->get_base()] = alias;
-    }
-  }
-
-  void on_scope_exit() {
-    for (const auto &alias : aliases) {
-      auto type = global_get_type(alias);
-      type_alias_map.erase(type->get_base());
-    }
-  }
-
-  /*  Type interactions  */
-
-  int create_type_alias(int aliased, const InternedString &name) {
-    auto id = global_create_type_alias(aliased, name);
-    aliases.push_back(id);
-    types.insert(id);
-    if (this == root_scope) {
-      type_alias_map[name] = id;
-    }
-    return id;
-  }
-
-  inline bool is_ancestor(Scope *ancestor) {
-    Scope *current = this;
-    while (current != nullptr) {
-      if (current == ancestor) {
-        return true;
-      }
-      current = current->parent;
-    }
-    return false;
-  }
-
   Type *get_type(const int id) {
     if (types.contains(id)) {
       return global_get_type(id);
     }
-
-    for (auto alias : aliases) {
-      if (alias == id) {
-        return global_get_type(id);
-      }
-    }
-
     if (parent)
       return parent->get_type(id);
     else {
@@ -256,11 +212,13 @@ struct Scope {
     return id;
   }
 };
+
 static Scope *create_child(Scope *parent) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   scope->parent = parent;
   return scope;
 }
+
 struct Context {
 
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
@@ -275,7 +233,6 @@ struct Context {
       in_scope = create_child(scope);
     }
     scope = in_scope;
-    scope->on_scope_enter();
   }
   inline Scope *exit_scope() {
     if (scope == root_scope) {
@@ -284,7 +241,6 @@ struct Context {
     }
     auto old_scope = scope;
     if (scope) {
-      scope->on_scope_exit();
       scope = scope->parent;
     }
     return old_scope;
