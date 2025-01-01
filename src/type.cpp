@@ -781,3 +781,21 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ">";
   return ss.str();
 }
+
+int global_create_function_type(const InternedString &name,
+                                const FunctionTypeInfo &info) {
+  auto id = global_create_type(TYPE_FUNCTION, name);
+  auto type = global_get_type(id);
+  type->set_info(new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info));
+  return id;
+}
+
+int &range_type() {
+  static int type;
+  return type;
+}
+
+int &string_type() {
+  static int type;
+  return type;
+}

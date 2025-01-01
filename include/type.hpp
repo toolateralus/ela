@@ -254,6 +254,11 @@ int float_type();
 int float32_type();
 int c_string_type();
 
+// assigned by the Context.
+int &string_type();
+
+int &range_type();
+
 Type *global_get_type(const int id);
 
 InternedString get_tuple_type_name(const std::vector<int> &types);
@@ -301,6 +306,9 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 int get_pointer_to_type(int base);
 
 int get_map_value_type(Type *map_type);
+
+int global_create_function_type(const InternedString &name,
+                                const FunctionTypeInfo &info);
 
 struct Type {
   int id = invalid_id;

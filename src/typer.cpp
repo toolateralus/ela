@@ -679,7 +679,7 @@ std::any Typer::visit(ASTFor *node) {
 
   if (range_type_id == ctx.scope->find_type_id("string", {})) {
     iter_ty = char_type();
-  } else if (range_type_id == global_find_type_id("Range", {})) {
+  } else if (range_type_id == ctx.scope->find_type_id("Range", {})) {
     iter_ty =
         int_type(); // ! THIS SHOULD BE S64 BUT IT CAUSES ANNOY BALLS ISSUES.
     if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
@@ -1262,8 +1262,8 @@ std::any Typer::visit(ASTSubscript *node) {
   /*
   !HACK FIX STRING SLICING THIS IS TERRIBLE
  */
-  if (left_ty->id == global_find_type_id("string", {})) {
-    if (subscript == global_find_type_id("Range", {})) {
+  if (left_ty->id == string_type()) {
+    if (subscript == range_type()) {
       return left_ty->id;
     }
     auto element_id = char_type();
@@ -1323,7 +1323,7 @@ std::any Typer::visit(ASTSubscript *node) {
   }
 
   if (left_ty->get_ext().is_array()) {
-    if (subscript == global_find_type_id("Range", {})) {
+    if (subscript == range_type()) {
       return left_ty->id;
     }
     auto element_id = left_ty->get_element_type();
@@ -1419,7 +1419,7 @@ std::any Typer::visit(ASTRange *node) {
                 node->source_range);
   }
 
-  return global_find_type_id("Range", {});
+  return range_type();
 }
 std::any Typer::visit(ASTSwitch *node) {
   auto type_id = int_from_any(node->target->accept(this));
@@ -1439,7 +1439,7 @@ std::any Typer::visit(ASTSwitch *node) {
       return_type = block_cf.type;
     }
 
-    if (expr_type == global_find_type_id("Range", {}) &&
+    if (expr_type == range_type() &&
         type_is_numerical(type)) {
       continue;
     } else {
