@@ -552,6 +552,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return statement;
     }},
 
+    // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
@@ -560,6 +561,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return ast_alloc<ASTNoop>();
     }},
 
+    // #undef, remove a #def
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
@@ -568,6 +570,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return ast_alloc<ASTNoop>();
     }},
 
+    // #ifdef, conditional compilation based on a #def being present.
     {.identifier = "ifdef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
@@ -576,6 +579,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return list;
     }},
 
+    // #ifndef, conditional compilation based on a #def not being present.
     {.identifier = "ifndef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
@@ -584,13 +588,34 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return list;
     }},
 
+    // #if, conditional compilation based on compile time value.
     {.identifier = "if",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto list = ast_alloc<ASTStatementList>();
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
-    }}, 
+    }},
+
+    // #region, for named/unnnamed regions. just for organization, has no compilation implications.
+    // can have anything between the #region directive and the {} block
+    // #region My code region 1 {...} is legal.
+    {.identifier = "region",
+      .kind = DIRECTIVE_KIND_STATEMENT,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        while (parser->peek().type != TType::LCurly) {
+          parser->eat();
+        }
+        auto list = ast_alloc<ASTStatementList>();
+        parser->expect(TType::LCurly);
+        while (parser->peek().type != TType::RCurly) {
+          list->statements.push_back(parser->parse_statement());
+          while (parser->peek().type == TType::Semi) parser->eat();
+        }
+        parser->expect(TType::RCurly);
+        return list;
+      }
+    },
 };
 // clang-format on
 

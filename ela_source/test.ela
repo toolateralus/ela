@@ -1527,9 +1527,15 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   }
 }
 
-// ! THESE TWO FUNCTIONS HAVE NOT BEEN ABLE TO PASS SINCE THE TYPE SYSTEM REFACTOR
+#test test_scope_resolution_statement :: fn() {
+  Strings::contains("Hi!", 'H'); // just test that this compiles.
+}
+
+
+#region Dysfunctional Tests {
+
 // ! @Cooper-Pilot
-// * FUNCTION TYPES CANT CONVERT TO POINTERS?
+// ! FUNCTION TYPES CANT CONVERT TO POINTERS?
 
 // #test test_function_pointer_alias :: fn() {
 //   #alias FunctionPointer :: fn* (int, int) -> int;
@@ -1554,3 +1560,5 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 //   returned_ptr : FunctionPointer = function();
 //   assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 // }
+
+}
