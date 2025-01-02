@@ -925,8 +925,7 @@ std::any Typer::visit(ASTBinExpr *node) {
 
     if (((conv_rule_0 == CONVERT_PROHIBITED) && (conv_rule_1 == CONVERT_PROHIBITED)) ||
         ((conv_rule_0 == CONVERT_EXPLICIT) && (conv_rule_1 == CONVERT_EXPLICIT))) {
-      throw_error(std::format("Type error in binary expression: cannot convert "
-                              "between {} and {}",
+      throw_error(std::format("Type error in binary expression: cannot convert between {} and {}",
                               left_t->to_string(), right_t->to_string()),
                   node->source_range);
     }
