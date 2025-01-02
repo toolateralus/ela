@@ -243,9 +243,10 @@ std::any Emitter::visit(ASTBinExpr *node) {
   }
 
   auto op_ty = node->op.type;
-  auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And || op_ty == TType::Xor || op_ty == TType::Or;
+  // auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And || op_ty == TType::Xor || op_ty == TType::Or;
 
-  if (needs_parens) (*ss) << "(";
+  // if (needs_parens) 
+  (*ss) << "(";
   auto left = node->left->accept(this);
   space();
   (*ss) << node->op.value.get_str();
@@ -258,7 +259,8 @@ std::any Emitter::visit(ASTBinExpr *node) {
 
   space();
   auto right = node->right->accept(this);
-  if (needs_parens) (*ss) << ")";
+  // if (needs_parens) 
+  (*ss) << ")";
   return {};
 }
 std::any Emitter::visit(ASTExprStatement *node) {
