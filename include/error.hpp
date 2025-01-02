@@ -1,8 +1,9 @@
 #pragma once
 
+#include <sstream>
+
 #include "core.hpp"
 #include "lex.hpp"
-#include <sstream>
 
 enum ErrorSeverity {
   ERROR_INFO,
@@ -45,10 +46,9 @@ static bool supports_color() {
     return false;
   }
   const char *term = getenv("TERM");
-  if (term == NULL)
-    return false;
-  return strstr(term, "color") != NULL || strstr(term, "xterm") != NULL ||
-         strstr(term, "screen") != NULL || strstr(term, "tmux") != NULL;
+  if (term == NULL) return false;
+  return strstr(term, "color") != NULL || strstr(term, "xterm") != NULL || strstr(term, "screen") != NULL ||
+         strstr(term, "tmux") != NULL;
 }
 #endif
 
@@ -63,8 +63,7 @@ static std::string format_message(const std::string &message) {
     if (ch == '\n') {
       formatted << '\t';
     }
-    if (width > 50 && message.length() > size + 1 &&
-        std::isspace(message[size + 1])) {
+    if (width > 50 && message.length() > size + 1 && std::isspace(message[size + 1])) {
       formatted << "\n\t";
       width = 0;
     }
@@ -73,8 +72,7 @@ static std::string format_message(const std::string &message) {
   }
   return formatted.str();
 }
-static std::string format_source_location(const SourceRange &source_range,
-                                          ErrorSeverity severity) {
+static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity) {
   const char *color = "";
   const char *code_color = "";
 
@@ -82,18 +80,18 @@ static std::string format_source_location(const SourceRange &source_range,
 
   if (terminal_supports_color) {
     switch (severity) {
-    case ERROR_INFO:
-      color = "\033[36m";        // Cyan
-      code_color = "\033[1;36m"; // Bold Cyan
-      break;
-    case ERROR_WARNING:
-      color = "\033[33m";        // Yellow
-      code_color = "\033[1;33m"; // Bold Yellow
-      break;
-    case ERROR_FAILURE:
-      color = "\033[31m";        // Red
-      code_color = "\033[1;31m"; // Bold Red
-      break;
+      case ERROR_INFO:
+        color = "\033[36m";         // Cyan
+        code_color = "\033[1;36m";  // Bold Cyan
+        break;
+      case ERROR_WARNING:
+        color = "\033[33m";         // Yellow
+        code_color = "\033[1;33m";  // Bold Yellow
+        break;
+      case ERROR_FAILURE:
+        color = "\033[31m";         // Red
+        code_color = "\033[1;31m";  // Bold Red
+        break;
     }
   }
 
@@ -103,32 +101,26 @@ static std::string format_source_location(const SourceRange &source_range,
   }
 
   std::stringstream ss;
-  if (terminal_supports_color)
-    ss << "\033[90m";
+  if (terminal_supports_color) ss << "\033[90m";
   ss << std::string(80, '-');
-  if (terminal_supports_color)
-    ss << "\033[0m\n";
+  if (terminal_supports_color) ss << "\033[0m\n";
   ss << '\n';
-  ss << color << span.front().location.ToString()
-     << (terminal_supports_color ? "\033[0m\n" : "\n");
-  if (terminal_supports_color)
-    ss << "\033[90m";
+  ss << color << span.front().location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
+  if (terminal_supports_color) ss << "\033[90m";
   ss << std::string(80, '-');
-  if (terminal_supports_color)
-    ss << "\033[0m";
+  if (terminal_supports_color) ss << "\033[0m";
   ss << '\n';
 
   // Read the source file
   auto first = span.front();
   auto last = span.back();
-  
+
   std::ifstream src_file(SourceLocation::files()[first.location.file]);
   if (!src_file.is_open()) {
     return "Error: Unable to open source file\n";
   }
 
-  std::string file_content((std::istreambuf_iterator<char>(src_file)),
-                           std::istreambuf_iterator<char>());
+  std::string file_content((std::istreambuf_iterator<char>(src_file)), std::istreambuf_iterator<char>());
   src_file.close();
 
   std::stringstream source_code;
@@ -160,61 +152,50 @@ static std::string format_source_location(const SourceRange &source_range,
   caret_indicator = std::string(first.location.column - 1, ' ');
   caret_indicator += std::string(first.value.get_str().length(), '^');
 
-
-  if (terminal_supports_color)
-    ss << "\033[34m";
+  if (terminal_supports_color) ss << "\033[34m";
 
   ss << source_code.str();
 
-  if (terminal_supports_color)
-    ss << "\033[32m";
-  
+  if (terminal_supports_color) ss << "\033[32m";
+
   ss << caret_indicator << '\n';
 
-  if (terminal_supports_color)
-    ss << "\033[0m";
+  if (terminal_supports_color) ss << "\033[0m";
 
   return ss.str();
 }
 enum WarningFlags {
   WarningNone = 0,
-  WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
-  WarningInaccessibleDeclaration = 1 << 1,        // --Wno-inaccessible-decl
-  WarningEmptyStringInterpolation = 1 << 2,       // --Wno-empty-string-interp
-  WarningNonNullDeletedPointer = 1 << 3,          // --Wno-non-null-deleted
-  WarningAmbigousVariants = 1 << 4,               // --Wno-amiguous-variant
-  WarningSwitchBreak = 1 << 5,                    // --Wno-switch-break
-  WarningDownCastFixedArrayParam = 1 << 6,        // --Wno-array-param
-  WarningIgnoreAll = 1 << 7,                      // --Wignore-all
+  WarningUseDotNotArrowOperatorOverload = 1 << 0,  // --Wno-arrow-operator
+  WarningInaccessibleDeclaration = 1 << 1,         // --Wno-inaccessible-decl
+  WarningEmptyStringInterpolation = 1 << 2,        // --Wno-empty-string-interp
+  WarningNonNullDeletedPointer = 1 << 3,           // --Wno-non-null-deleted
+  WarningAmbigousVariants = 1 << 4,                // --Wno-amiguous-variant
+  WarningSwitchBreak = 1 << 5,                     // --Wno-switch-break
+  WarningDownCastFixedArrayParam = 1 << 6,         // --Wno-array-param
+  WarningIgnoreAll = 1 << 7,                       // --Wignore-all
 };
 
 extern int ignored_warnings;
 
-static void throw_warning(const WarningFlags id, const std::string message,
-                          const SourceRange &source_range) {
-  if ((ignored_warnings & id) != 0 ||
-      (ignored_warnings & WarningIgnoreAll) != 0) {
+static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
+  if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
     return;
   }
   std::stringstream ss;
-  if (terminal_supports_color)
-    ss << "\033[36m";
+  if (terminal_supports_color) ss << "\033[36m";
   ss << "Warning:\n\t" << format_message(message);
-  if (terminal_supports_color)
-    ss << "\033[0m\n";
+  if (terminal_supports_color) ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_WARNING);
   const auto token_str = ss.str();
   std::cerr << token_str << std::endl;
 }
 
-[[noreturn]] static void throw_error(const std::string &message,
-                                     const SourceRange &source_range) {
+[[noreturn]] static void throw_error(const std::string &message, const SourceRange &source_range) {
   std::stringstream ss;
-  if (terminal_supports_color)
-    ss << "\033[31m";
+  if (terminal_supports_color) ss << "\033[31m";
   ss << "Error:\n\t" << message;
-  if (terminal_supports_color)
-    ss << "\033[0m\n";
+  if (terminal_supports_color) ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_FAILURE);
   const auto token_str = ss.str();
   printf("%s\n", token_str.c_str());

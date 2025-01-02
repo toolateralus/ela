@@ -1,18 +1,18 @@
 #pragma once
 
-#include "core.hpp"
-#include "interned_string.hpp"
-#include "lex.hpp"
-#include "scope.hpp"
-#include "type.hpp"
-
-#include "arena.hpp"
 #include <any>
 #include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <functional>
 #include <vector>
+
+#include "arena.hpp"
+#include "core.hpp"
+#include "interned_string.hpp"
+#include "lex.hpp"
+#include "scope.hpp"
+#include "type.hpp"
 
 enum {
   ASTTYPE_NORMAL,
@@ -23,7 +23,8 @@ enum {
 
 extern jstl::Arena ast_arena;
 
-template <class T> T *ast_alloc(size_t n = 1) {
+template <class T>
+T *ast_alloc(size_t n = 1) {
   return new (ast_arena.allocate(sizeof(T) * n)) T();
 }
 
@@ -68,7 +69,7 @@ enum ASTNodeType {
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
-  AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
+  AST_NODE_STATEMENT_LIST,  // Used just to return a bunch of statments from a single directive.s
 };
 
 struct ASTNode {
@@ -83,7 +84,7 @@ struct ASTStatement : ASTNode {
 };
 
 struct ASTStatementList : ASTStatement {
-  std::vector<ASTStatement*> statements;
+  std::vector<ASTStatement *> statements;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override;
 };
@@ -100,9 +101,8 @@ struct ControlFlow {
   int type;
 };
 
-#define BLOCK_FLAG_TO_STRING(flag)                                             \
-  if (flags & flag)                                                            \
-    result += #flag " ";
+#define BLOCK_FLAG_TO_STRING(flag) \
+  if (flags & flag) result += #flag " ";
 
 inline static std::string block_flags_to_string(int flags) {
   std::string result;
@@ -162,7 +162,7 @@ struct ASTExprStatement : ASTStatement {
 // All of our declarations could inherit from a base declaration. I am not sure
 // if that would be useful.
 struct ASTDeclaration : ASTStatement {
-  Token name; // TODO: make these an interned string. No need to hold on to a token.
+  Token name;  // TODO: make these an interned string. No need to hold on to a token.
   Token bitsize;
   ASTType *type = nullptr;
   Nullable<ASTExpr> value;
@@ -221,9 +221,7 @@ struct ASTTupleDeconstruction : ASTStatement {
   ASTExpr *right;
 
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_TUPLE_DECONSTRUCTION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_TUPLE_DECONSTRUCTION; }
 };
 
 struct ASTTuple : ASTExpr {
@@ -251,15 +249,13 @@ struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
-  
+
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
-  Token name; // TODO: make this an InternedString not a token
+  Token name;  // TODO: make this an InternedString not a token
   ASTType *return_type;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_FUNCTION_DECLARATION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_FUNCTION_DECLARATION; }
 };
 
 struct ASTArguments : ASTNode {
@@ -301,9 +297,7 @@ struct ASTScopeResolution : ASTExpr {
   ASTExpr *base;
   InternedString member_name;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_SCOPE_RESOLUTION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_SCOPE_RESOLUTION; }
 };
 
 struct ASTReturn : ASTStatement {
@@ -346,13 +340,13 @@ struct ASTElse;
 struct ASTIf : ASTStatement {
   ASTExpr *condition;
   ASTBlock *block;
-  Nullable<ASTElse> _else; // just an else.
+  Nullable<ASTElse> _else;  // just an else.
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IF; }
 };
 
 struct ASTElse : ASTStatement {
-  Nullable<ASTIf> _if; // conditional else.
+  Nullable<ASTIf> _if;  // conditional else.
   Nullable<ASTBlock> block;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ELSE; }
@@ -386,9 +380,7 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::any accept(VisitorBase *visitor) override;
 
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_STRUCT_DECLARATION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };
 
 struct ASTInitializerList : ASTExpr {
@@ -396,9 +388,7 @@ struct ASTInitializerList : ASTExpr {
   std::vector<int> types;
   std::vector<ASTExpr *> expressions;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_INITIALIZER_LIST;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
 
 struct ASTEnumDeclaration : ASTStatement {
@@ -407,14 +397,12 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTType *type;
   std::vector<std::pair<InternedString, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_ENUM_DECLARATION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
-  Token name; // TODO: make not a token
+  Token name;  // TODO: make not a token
   ASTType *type;
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;
@@ -422,9 +410,7 @@ struct ASTUnionDeclaration : ASTStatement {
   std::vector<ASTFunctionDeclaration *> methods;
   std::vector<ASTStructDeclaration *> structs;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_UNION_DECLARATION;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
 };
 
 struct ASTAllocate : ASTExpr {
@@ -460,78 +446,77 @@ struct ASTNoop : ASTStatement {
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
-#define DECLARE_VISIT_METHODS()                                                \
-  std::any visit(ASTProgram *node) override {}                                 \
-  std::any visit(ASTBlock *node) override {}                                   \
-  std::any visit(ASTFunctionDeclaration *node) override {}                     \
-  std::any visit(ASTParamsDecl *node) override {}                              \
-  std::any visit(ASTParamDecl *node) override {}                               \
-  std::any visit(ASTDeclaration *node) override {}                             \
-  std::any visit(ASTExprStatement *node) override {}                           \
-  std::any visit(ASTBinExpr *node) override {}                                 \
-  std::any visit(ASTUnaryExpr *node) override {}                               \
-  std::any visit(ASTIdentifier *node) override {}                              \
-  std::any visit(ASTLiteral *node) override {}                                 \
-  std::any visit(ASTType *node) override {}                                    \
-  std::any visit(ASTCall *node) override {}                                    \
-  std::any visit(ASTArguments *node) override {}                               \
-  std::any visit(ASTReturn *node) override {}                                  \
-  std::any visit(ASTContinue *node) override {}                                \
-  std::any visit(ASTBreak *node) override {}                                   \
-  std::any visit(ASTFor *node) override {}                                     \
-  std::any visit(ASTIf *node) override {}                                      \
-  std::any visit(ASTElse *node) override {}                                    \
-  std::any visit(ASTWhile *node) override {}                                   \
-  std::any visit(ASTStructDeclaration *node) override {}                       \
-  std::any visit(ASTDotExpr *node) override {}                                 \
-  std::any visit(ASTSubscript *node) override {}                               \
-  std::any visit(ASTMake *node) override {}                                    \
-  std::any visit(ASTInitializerList *node) override {}                         \
-  std::any visit(ASTEnumDeclaration *node) override {}                         \
-  std::any visit(ASTUnionDeclaration *node) override {}                        \
-  std::any visit(ASTAllocate *node) override {};                               \
-  std::any visit(ASTRange *node) override {};                                  \
-  std::any visit(ASTSwitch *node) override {};                                 \
-  std::any visit(ASTTuple *node) override {};                                  \
+#define DECLARE_VISIT_METHODS()                            \
+  std::any visit(ASTProgram *node) override {}             \
+  std::any visit(ASTBlock *node) override {}               \
+  std::any visit(ASTFunctionDeclaration *node) override {} \
+  std::any visit(ASTParamsDecl *node) override {}          \
+  std::any visit(ASTParamDecl *node) override {}           \
+  std::any visit(ASTDeclaration *node) override {}         \
+  std::any visit(ASTExprStatement *node) override {}       \
+  std::any visit(ASTBinExpr *node) override {}             \
+  std::any visit(ASTUnaryExpr *node) override {}           \
+  std::any visit(ASTIdentifier *node) override {}          \
+  std::any visit(ASTLiteral *node) override {}             \
+  std::any visit(ASTType *node) override {}                \
+  std::any visit(ASTCall *node) override {}                \
+  std::any visit(ASTArguments *node) override {}           \
+  std::any visit(ASTReturn *node) override {}              \
+  std::any visit(ASTContinue *node) override {}            \
+  std::any visit(ASTBreak *node) override {}               \
+  std::any visit(ASTFor *node) override {}                 \
+  std::any visit(ASTIf *node) override {}                  \
+  std::any visit(ASTElse *node) override {}                \
+  std::any visit(ASTWhile *node) override {}               \
+  std::any visit(ASTStructDeclaration *node) override {}   \
+  std::any visit(ASTDotExpr *node) override {}             \
+  std::any visit(ASTSubscript *node) override {}           \
+  std::any visit(ASTMake *node) override {}                \
+  std::any visit(ASTInitializerList *node) override {}     \
+  std::any visit(ASTEnumDeclaration *node) override {}     \
+  std::any visit(ASTUnionDeclaration *node) override {}    \
+  std::any visit(ASTAllocate *node) override {};           \
+  std::any visit(ASTRange *node) override {};              \
+  std::any visit(ASTSwitch *node) override {};             \
+  std::any visit(ASTTuple *node) override {};              \
   std::any visit(ASTTupleDeconstruction *node) override {};
 
-#define DECLARE_VISIT_BASE_METHODS()                                           \
-  std::any visit(ASTNoop *noop) { return {}; }                                 \
-  virtual std::any visit(ASTScopeResolution *node) = 0;                        \
-  virtual std::any visit(ASTProgram *node) = 0;                                \
-  virtual std::any visit(ASTBlock *node) = 0;                                  \
-  virtual std::any visit(ASTFunctionDeclaration *node) = 0;                    \
-  virtual std::any visit(ASTParamsDecl *node) = 0;                             \
-  virtual std::any visit(ASTParamDecl *node) = 0;                              \
-  virtual std::any visit(ASTDeclaration *node) = 0;                            \
-  virtual std::any visit(ASTExprStatement *node) = 0;                          \
-  virtual std::any visit(ASTBinExpr *node) = 0;                                \
-  virtual std::any visit(ASTUnaryExpr *node) = 0;                              \
-  virtual std::any visit(ASTIdentifier *node) = 0;                             \
-  virtual std::any visit(ASTLiteral *node) = 0;                                \
-  virtual std::any visit(ASTType *node) = 0;                                   \
-  virtual std::any visit(ASTCall *node) = 0;                                   \
-  virtual std::any visit(ASTArguments *node) = 0;                              \
-  virtual std::any visit(ASTReturn *node) = 0;                                 \
-  virtual std::any visit(ASTContinue *node) = 0;                               \
-  virtual std::any visit(ASTBreak *node) = 0;                                  \
-  virtual std::any visit(ASTFor *node) = 0;                                    \
-  virtual std::any visit(ASTIf *node) = 0;                                     \
-  virtual std::any visit(ASTElse *node) = 0;                                   \
-  virtual std::any visit(ASTWhile *node) = 0;                                  \
-  virtual std::any visit(ASTStructDeclaration *node) = 0;                      \
-  virtual std::any visit(ASTDotExpr *node) = 0;                                \
-  virtual std::any visit(ASTSubscript *node) = 0;                              \
-  virtual std::any visit(ASTMake *node) = 0;                                   \
-  virtual std::any visit(ASTInitializerList *node) = 0;                        \
-  virtual std::any visit(ASTEnumDeclaration *node) = 0;                        \
-  virtual std::any visit(ASTUnionDeclaration *node) = 0;                       \
-  virtual std::any visit(ASTAllocate *node) = 0;                               \
-  virtual std::any visit(ASTRange *node) = 0;                                  \
-  virtual std::any visit(ASTSwitch *node) = 0;                                 \
-  virtual std::any visit(ASTTuple *node) = 0;                                  \
-  virtual std::any visit(ASTTupleDeconstruction *node) = 0;\
-
+#define DECLARE_VISIT_BASE_METHODS()                        \
+  std::any visit(ASTNoop *noop) { return {}; }              \
+  virtual std::any visit(ASTScopeResolution *node) = 0;     \
+  virtual std::any visit(ASTProgram *node) = 0;             \
+  virtual std::any visit(ASTBlock *node) = 0;               \
+  virtual std::any visit(ASTFunctionDeclaration *node) = 0; \
+  virtual std::any visit(ASTParamsDecl *node) = 0;          \
+  virtual std::any visit(ASTParamDecl *node) = 0;           \
+  virtual std::any visit(ASTDeclaration *node) = 0;         \
+  virtual std::any visit(ASTExprStatement *node) = 0;       \
+  virtual std::any visit(ASTBinExpr *node) = 0;             \
+  virtual std::any visit(ASTUnaryExpr *node) = 0;           \
+  virtual std::any visit(ASTIdentifier *node) = 0;          \
+  virtual std::any visit(ASTLiteral *node) = 0;             \
+  virtual std::any visit(ASTType *node) = 0;                \
+  virtual std::any visit(ASTCall *node) = 0;                \
+  virtual std::any visit(ASTArguments *node) = 0;           \
+  virtual std::any visit(ASTReturn *node) = 0;              \
+  virtual std::any visit(ASTContinue *node) = 0;            \
+  virtual std::any visit(ASTBreak *node) = 0;               \
+  virtual std::any visit(ASTFor *node) = 0;                 \
+  virtual std::any visit(ASTIf *node) = 0;                  \
+  virtual std::any visit(ASTElse *node) = 0;                \
+  virtual std::any visit(ASTWhile *node) = 0;               \
+  virtual std::any visit(ASTStructDeclaration *node) = 0;   \
+  virtual std::any visit(ASTDotExpr *node) = 0;             \
+  virtual std::any visit(ASTSubscript *node) = 0;           \
+  virtual std::any visit(ASTMake *node) = 0;                \
+  virtual std::any visit(ASTInitializerList *node) = 0;     \
+  virtual std::any visit(ASTEnumDeclaration *node) = 0;     \
+  virtual std::any visit(ASTUnionDeclaration *node) = 0;    \
+  virtual std::any visit(ASTAllocate *node) = 0;            \
+  virtual std::any visit(ASTRange *node) = 0;               \
+  virtual std::any visit(ASTSwitch *node) = 0;              \
+  virtual std::any visit(ASTTuple *node) = 0;               \
+  virtual std::any visit(ASTTupleDeconstruction *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -557,17 +542,17 @@ struct DirectiveRoutine {
 // make sure that this precedence scheme makes sense.
 enum Precedence {
   PRECEDENCE_LOWEST,
-  PRECEDENCE_ASSIGNMENT,    // =, :=
-  PRECEDENCE_LOGICALOR,     // ||
-  PRECEDENCE_LOGICALAND,    // &&
-  PRECEDENCE_EQUALITY,      // ==, !=
-  PRECEDENCE_RELATIONAL,    // <, >, <=, >=
-  PRECEDENCE_BITWISEOR,     // |
-  PRECEDENCE_BITWISEXOR,    // ^
-  PRECEDENCE_BITWISEAND,    // &
-  PRECEDENCE_SHIFT,         // <<, >>
-  PRECEDENCE_ADDITIVE,      // +, -
-  PRECEDENCE_MULTIPLICATIVE // *, /, %
+  PRECEDENCE_ASSIGNMENT,     // =, :=
+  PRECEDENCE_LOGICALOR,      // ||
+  PRECEDENCE_LOGICALAND,     // &&
+  PRECEDENCE_EQUALITY,       // ==, !=
+  PRECEDENCE_RELATIONAL,     // <, >, <=, >=
+  PRECEDENCE_BITWISEOR,      // |
+  PRECEDENCE_BITWISEXOR,     // ^
+  PRECEDENCE_BITWISEAND,     // &
+  PRECEDENCE_SHIFT,          // <<, >>
+  PRECEDENCE_ADDITIVE,       // +, -
+  PRECEDENCE_MULTIPLICATIVE  // *, /, %
   // these aren't handled here, but this is the continuation
   // unary
   // posfix
@@ -606,8 +591,7 @@ struct Parser {
 
   ASTType *parse_function_type();
 
-  Nullable<ASTNode> process_directive(DirectiveKind kind,
-                                      const InternedString &identifier);
+  Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<ASTExpr> try_parse_directive_expr();
 
   inline bool not_eof() const { return !peek().is_eof(); }
@@ -615,9 +599,7 @@ struct Parser {
   inline bool semicolon() const { return peek().type == TType::Semi; }
   InternedString type_name(ASTExpr *node);
 
-  inline std::deque<Token> &lookahead_buf() {
-    return states.back().lookahead_buffer;
-  }
+  inline std::deque<Token> &lookahead_buf() { return states.back().lookahead_buffer; }
 
   Token eat();
   Token expect(TType type);

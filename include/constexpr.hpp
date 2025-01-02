@@ -19,38 +19,37 @@ struct Value {
   };
 
   bool is_truthy() {
-    switch (tag){
-    case INTEGER:
-      return integer;
-    case FLOATING:
-      return floating;
-    case BOOLEAN:
-      return boolean;
-      break;
+    switch (tag) {
+      case INTEGER:
+        return integer;
+      case FLOATING:
+        return floating;
+      case BOOLEAN:
+        return boolean;
+        break;
     }
   }
 
-  static Value Int(const InternedString& str) {
+  static Value Int(const InternedString &str) {
     Value val;
     val.tag = INTEGER;
     val.integer = std::stoll(str.get_str());
     return val;
   }
 
-  static Value Float(const InternedString& str) {
+  static Value Float(const InternedString &str) {
     Value val;
     val.tag = FLOATING;
     val.floating = std::stod(str.get_str());
     return val;
   }
 
-  static Value Bool(const InternedString& str) {
+  static Value Bool(const InternedString &str) {
     Value val;
     val.tag = BOOLEAN;
     val.boolean = (str.get_str() == "true");
     return val;
   }
-
 
   Value operator-() {
     if (tag == INTEGER) {
@@ -244,7 +243,6 @@ struct Value {
     }
     throw_error("Invalid types for greater than or equal comparison", {});
   }
-
 };
 
 Value evaluate_constexpr(ASTExpr *node, Context &ctx);

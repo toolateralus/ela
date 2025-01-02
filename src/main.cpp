@@ -1,3 +1,9 @@
+#include <cstdio>
+#include <cstdlib>
+#include <filesystem>
+#include <ostream>
+#include <unordered_map>
+
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -5,14 +11,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-
 #include "visitor.hpp"
-#include <cstdio>
-#include <cstdlib>
-#include <filesystem>
-
-#include <ostream>
-#include <unordered_map>
 
 /*
   #########################
@@ -24,7 +23,7 @@ using std::string;
 using std::vector;
 
 // This is probably WAYY over allocated but we just want to be sure there's enough space.
-jstl::Arena type_info_arena {MB(333)};
+jstl::Arena type_info_arena{MB(333)};
 // the same for this
 jstl::Arena scope_arena{MB(333)};
 // the same for this
@@ -51,7 +50,6 @@ int ignored_warnings = WarningNone;
 static bool run_on_finished = false;
 
 int main(int argc, char *argv[]) {
-
   for (int i = 0; i < argc; ++i) {
     if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
       printf(R"_(
@@ -116,7 +114,7 @@ main :: fn() {
 }
 )__";
     } else {
-    file << R"__(
+      file << R"__(
 #import core; // for println among many other common utilities.
 
 main :: fn() {
@@ -134,8 +132,7 @@ main :: fn() {
   }
 
   compile_command = CompileCommand(argc, argv);
-  if (compile_command.has_flag("x"))
-    compile_command.print();
+  if (compile_command.has_flag("x")) compile_command.print();
 
   {
     if (compile_command.has_flag("--Wignore-all")) {
@@ -179,7 +176,7 @@ main :: fn() {
       system(command.c_str());
     }
   }
-  
+
   return result != 0;
 }
 
@@ -242,17 +239,12 @@ int CompileCommand::compile() {
 
     static std::string ignored_warnings = "-w";
 
-    std::string output_flag =
-        (compilation_flags.find("-o") != std::string::npos)
-            ? ""
-            : "-o " + binary_path.string();
+    std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-    auto compilation_string = std::format(
-        "clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
-        output_path.string(), output_flag, extra_flags);
+    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
+                                          output_path.string(), output_flag, extra_flags);
 
-    if (compile_command.has_flag("x"))
-      printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
+    if (compile_command.has_flag("x")) printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
 
     cpp.begin();
     result = system(compilation_string.c_str());

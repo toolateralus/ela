@@ -1,16 +1,17 @@
 
 #pragma once
 
-#include "core.hpp"
-#include "interned_string.hpp"
-#include "lex.hpp"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+
 #include <string>
 #include <vector>
 
 #include "arena.hpp"
+#include "core.hpp"
+#include "interned_string.hpp"
+#include "lex.hpp"
 
 // fwd
 struct Type;
@@ -87,9 +88,8 @@ enum struct FunctionMetaType {
 };
 
 enum UnionFlags {
-  UNION_IS_NORMAL =
-      1
-      << 0, // this and the next flag should never be present at the same itme.
+  // this and UNION_IS_SUM_TYPE should never be present at the same itme.
+  UNION_IS_NORMAL = 1 << 0,
   UNION_IS_SUM_TYPE = 1 << 1,
   UNION_IS_FORWARD_DECLARED = 1 << 2,
 };
@@ -117,9 +117,7 @@ struct TypeExt {
     return false;
   }
 
-  inline bool is_pointer() const {
-    return has_extensions() && extensions.back() == TYPE_EXT_POINTER;
-  }
+  inline bool is_pointer() const { return has_extensions() && extensions.back() == TYPE_EXT_POINTER; }
 
   inline bool operator==(const TypeExt &other) const { return equals(other); }
 
@@ -147,7 +145,7 @@ struct TypeExt {
     }
     return these;
   }
-  
+
   inline TypeExt without_back() const {
     TypeExt these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
@@ -174,10 +172,10 @@ struct TypeInfo {
   TypeInfo() {}
 
   // Use this instead of the clunky static casts everywhere.
-  template<class T>
-  requires std::derived_from<T, TypeInfo>
-  inline T* as() {
-    return static_cast<T*>(this);
+  template <class T>
+    requires std::derived_from<T, TypeInfo>
+  inline T *as() {
+    return static_cast<T *>(this);
   }
 
   virtual ~TypeInfo() = default;
@@ -188,9 +186,9 @@ struct FunctionTypeInfo : TypeInfo {
   FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
-  int parameter_types[256]; // max no of params in c++.
+  int parameter_types[256];  // max no of params in c++.
   int params_len = 0;
-  int default_params = 0; // number of default params, always trailing.
+  int default_params = 0;  // number of default params, always trailing.
   bool is_varargs = false;
   // defined in cpp file
   virtual std::string to_string() const override;
@@ -248,56 +246,33 @@ int u64_type();
 int float64_type();
 int float_type();
 int float32_type();
+
+// These 3 type getters are assigned by the Context constructor.
 int &c_string_type();
-
-// assigned by the Context.
 int &string_type();
-
 int &range_type();
 
 Type *global_get_type(const int id);
-
 InternedString get_tuple_type_name(const std::vector<int> &types);
-
-int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
-                       const TypeExt & = {}, const int = -1);
-
+int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExt & = {}, const int = -1);
 int global_create_struct_type(const InternedString &, Scope *);
-
-int global_create_enum_type(const InternedString &,
-                            const std::vector<InternedString> &, bool = false,
+int global_create_enum_type(const InternedString &, const std::vector<InternedString> &, bool = false,
                             size_t element_type = s32_type());
-
 int global_create_tuple_type(const std::vector<int> &types, const TypeExt &ext);
-
-int global_create_union_type(const InternedString &name, Scope *scope,
-                             UnionFlags kind);
-
-ConversionRule type_conversion_rule(const Type *, const Type *, const SourceRange& = {});
-
+int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
+ConversionRule type_conversion_rule(const Type *, const Type *, const SourceRange & = {});
 // char *
 int charptr_type();
-
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExt &);
-
-int global_find_type_id(std::vector<int> &tuple_types,
-                        const TypeExt &type_extensions);
-
+int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions);
 int global_find_type_id(const int, const TypeExt &);
-
 struct Token;
-
-
 void init_type_system();
-
 bool type_is_numerical(const Type *t);
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
-
 // returns false for failure, else true and passed param signature as out.
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
-
-void emit_warnings_or_errors_for_operator_overloads(const TType type,
-                                                    SourceRange &range);
+void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
 
 struct Type {
   int id = invalid_id;
@@ -315,12 +290,12 @@ struct Type {
 
   TypeInfo *get_info() const { return info; }
 
-private:
+ private:
   TypeInfo *info;
   InternedString base{};
   TypeExt extensions{};
 
-public:
+ public:
   bool equals(const int base, const TypeExt &type_extensions) const;
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
@@ -337,9 +312,8 @@ public:
 };
 
 struct ASTFunctionDeclaration;
-
 InternedString get_function_typename(ASTFunctionDeclaration *);
-
-template <class T> static inline T *type_info_alloc() {
+template <class T>
+static inline T *type_info_alloc() {
   return new (type_info_arena.allocate(sizeof(T))) T();
 }

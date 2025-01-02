@@ -23,25 +23,19 @@ struct InternedString {
   }
   inline InternedString(const std::string &value) { insert_or_set(value); }
   inline InternedString(const char *str) { insert_or_set(std::string{str}); }
-  inline bool operator==(const InternedString &other) const {
-    return hash == other.hash;
-  }
-  inline bool operator!=(const InternedString &other) const {
-    return hash != other.hash;
-  }
-  inline bool operator<(const InternedString &other) const {
-    return hash < other.hash;
-  }
+  inline bool operator==(const InternedString &other) const { return hash == other.hash; }
+  inline bool operator!=(const InternedString &other) const { return hash != other.hash; }
+  inline bool operator<(const InternedString &other) const { return hash < other.hash; }
 };
 
 namespace std {
-template <> struct hash<InternedString> {
-  inline size_t operator()(const InternedString &string) const {
-    return string.hash;
-  }
+template <>
+struct hash<InternedString> {
+  inline size_t operator()(const InternedString &string) const { return string.hash; }
 };
 
-template <> struct formatter<InternedString, char> {
+template <>
+struct formatter<InternedString, char> {
   template <class ParseContext>
   constexpr typename ParseContext::iterator parse(ParseContext &ctx) {
     auto it = ctx.begin();
@@ -53,9 +47,8 @@ template <> struct formatter<InternedString, char> {
   }
 
   template <class FormatContext>
-  typename FormatContext::iterator format(const InternedString &s,
-                                          FormatContext &ctx) const {
+  typename FormatContext::iterator format(const InternedString &s, FormatContext &ctx) const {
     return std::format_to(ctx.out(), "{}", s.get_str());
   }
 };
-} // namespace std
+}  // namespace std

@@ -1,12 +1,5 @@
 #include "ast.hpp"
-#include "constexpr.hpp"
-#include "core.hpp"
-#include "error.hpp"
-#include "interned_string.hpp"
-#include "lex.hpp"
-#include "scope.hpp"
-#include "type.hpp"
-#include "visitor.hpp"
+
 #include <algorithm>
 #include <any>
 #include <cassert>
@@ -16,6 +9,15 @@
 #include <set>
 #include <string>
 #include <unordered_set>
+
+#include "constexpr.hpp"
+#include "core.hpp"
+#include "error.hpp"
+#include "interned_string.hpp"
+#include "lex.hpp"
+#include "scope.hpp"
+#include "type.hpp"
+#include "visitor.hpp"
 
 enum PreprocKind {
   PREPROC_IF,
@@ -27,20 +29,16 @@ void remove_body(Parser *parser) {
   parser->expect(TType::LCurly);
   int depth = 1;
   while (depth > 0) {
-    if (parser->peek().type == TType::LCurly)
-      depth++;
-    if (parser->peek().type == TType::RCurly)
-      depth--;
+    if (parser->peek().type == TType::LCurly) depth++;
+    if (parser->peek().type == TType::RCurly) depth--;
     parser->eat();
   }
 }
 
 void remove_preproc(Parser *parser) {
   if (parser->peek().type == TType::If ||
-      (parser->peek().type == TType::Identifier &&
-       parser->peek().value == "ifdef") ||
-      (parser->peek().type == TType::Identifier &&
-       parser->peek().value == "ifndef")) {
+      (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") ||
+      (parser->peek().type == TType::Identifier && parser->peek().value == "ifndef")) {
     while (parser->peek().type != TType::LCurly) {
       parser->eat();
     }
@@ -54,32 +52,31 @@ void remove_preproc(Parser *parser) {
   }
 }
 
-static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
-                                         PreprocKind kind) {
+static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list, PreprocKind kind) {
   bool executed = false;
 
-  if (kind == PREPROC_IFDEF) { // Handling #ifdef
+  if (kind == PREPROC_IFDEF) {  // Handling #ifdef
     auto symbol = parser->expect(TType::Identifier).value;
     executed = parser->ctx.scope->has_def(symbol);
-  } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
+  } else if (kind == PREPROC_IFNDEF) {  // Handling #ifndef
     auto symbol = parser->expect(TType::Identifier).value;
     executed = !parser->ctx.scope->has_def(symbol);
-  } else if (kind == PREPROC_IF) { // Handling #if
+  } else if (kind == PREPROC_IF) {  // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
     executed = value.is_truthy();
   } else {
-    throw_error("INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
-                "unrecognized kind.",
-                {});
+    throw_error(
+        "INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
+        "unrecognized kind.",
+        {});
   }
 
   if (executed) {
     parser->expect(TType::LCurly);
     while (parser->peek().type != TType::RCurly) {
       list->statements.push_back(parser->parse_statement());
-      while (parser->peek().type == TType::Semi)
-        parser->eat();
+      while (parser->peek().type == TType::Semi) parser->eat();
     }
     parser->expect(TType::RCurly);
   } else {
@@ -92,20 +89,17 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
       if (parser->peek().type == TType::If) {
         parser->expect(TType::If);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
-      } else if (parser->peek().type == TType::Identifier &&
-                 parser->peek().value == "ifdef") {
+      } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") {
         parser->expect(TType::Identifier);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
-      } else if (parser->peek().type == TType::Identifier &&
-                 parser->peek().value == "ifndef") {
+      } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifndef") {
         parser->expect(TType::Identifier);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
       } else {
         parser->expect(TType::LCurly);
         while (parser->peek().type != TType::RCurly) {
           list->statements.push_back(parser->parse_statement());
-          while (parser->peek().type == TType::Semi)
-            parser->eat();
+          while (parser->peek().type == TType::Semi) parser->eat();
         }
         parser->expect(TType::RCurly);
       }
@@ -115,538 +109,516 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   }
 }
 
-std::vector<DirectiveRoutine> Parser::directive_routines = {
-    // #include
-    // Just like C's include, just paste a text file right above where the
-    // include is used.
-    {.identifier = "include",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run =
-         [](Parser *parser) {
-           auto filename = parser->expect(TType::String).value;
-           if (!std::filesystem::exists(filename.get_str())) {
-             throw_error(
-                 std::format(
-                     "Couldn't find included file: {}, current path: {}",
-                     filename, std::filesystem::current_path().string()),
-                 {});
-           }
-           if (import_set.contains(filename)) {
-             return nullptr;
-           }
-           import_set.insert(filename);
-           parser->states.push_back(
-               Lexer::State::from_file(filename.get_str()));
-           parser->fill_buffer_if_needed();
-           return nullptr;
-         }},
-    // #import
-    // Imports from usr/local/lib/ela by identifier and no file ext.
-    {.identifier = "import",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto iden = parser->expect(TType::Identifier).value;
+std::
+    vector<DirectiveRoutine>
+        Parser::
+            directive_routines =
+                {
+                    // #include
+                    // Just like C's include, just paste a text file right above where the
+                    // include is used.
+                    {.identifier = "include",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run =
+                         [](Parser *parser) {
+                           auto filename = parser->expect(TType::String).value;
+                           if (!std::filesystem::exists(filename.get_str())) {
+                             throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
+                                                     std::filesystem::current_path().string()),
+                                         {});
+                           }
+                           if (import_set.contains(filename)) {
+                             return nullptr;
+                           }
+                           import_set.insert(filename);
+                           parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+                           parser->fill_buffer_if_needed();
+                           return nullptr;
+                         }},
+                    // #import
+                    // Imports from usr/local/lib/ela by identifier and no file ext.
+                    {.identifier = "import",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto iden = parser->expect(TType::Identifier).value;
 
 #ifdef _WIN32
-       auto filename =
-           std::filesystem::path("C:\\Program Files\\ela").string() + "\\" +
-           iden.get_str() + ".ela";
+                       auto filename =
+                           std::filesystem::path("C:\\Program Files\\ela").string() + "\\" + iden.get_str() + ".ela";
 #else
-       auto filename = std::filesystem::path("/usr/local/lib/ela").string() +
-                       "/" + iden.get_str() + ".ela";
+                       auto filename =
+                           std::filesystem::path("/usr/local/lib/ela").string() + "/" + iden.get_str() + ".ela";
 #endif
 
-       // Right now, we just return noop if we're double including.
-       if (import_set.contains(filename)) {
-         return nullptr;
-       }
+                       // Right now, we just return noop if we're double including.
+                       if (import_set.contains(filename)) {
+                         return nullptr;
+                       }
 
-       if (!std::filesystem::exists(filename)) {
-         throw_error(std::format("Couldn't find imported module: {}", filename),
-                     {});
-       }
-       import_set.insert(filename);
-       parser->states.push_back(Lexer::State::from_file(filename));
-       parser->fill_buffer_if_needed();
+                       if (!std::filesystem::exists(filename)) {
+                         throw_error(std::format("Couldn't find imported module: {}", filename), {});
+                       }
+                       import_set.insert(filename);
+                       parser->states.push_back(Lexer::State::from_file(filename));
+                       parser->fill_buffer_if_needed();
 
-       return nullptr;
-     }},
-    // #raw
-    // string literals delimited by #raw and can span multiple lines.
-    // u8 *string = #raw string literal goes here #raw
-    {
-        .identifier = "raw",
-        .kind = DIRECTIVE_KIND_EXPRESSION,
-        .run = [](Parser *parser) -> Nullable<ASTNode> {
-          InternedString string;
-          while (parser->not_eof()) {
-            if (parser->peek().type == TType::Directive &&
-                parser->states.back().lookahead_buffer[1].value == "raw") {
-              parser->eat();
-              parser->eat();
-              break;
-            }
-            string = {string.get_str() += parser->eat().value.get_str()};
-          }
-          auto literal = ast_alloc<ASTLiteral>();
-          literal->tag = ASTLiteral::RawString;
-          literal->value = string;
-          return literal;
-        },
-    },
+                       return nullptr;
+                     }},
+                    // #raw
+                    // string literals delimited by #raw and can span multiple lines.
+                    // u8 *string = #raw string literal goes here #raw
+                    {
+                        .identifier = "raw",
+                        .kind = DIRECTIVE_KIND_EXPRESSION,
+                        .run = [](Parser *parser) -> Nullable<ASTNode> {
+                          InternedString string;
+                          while (parser->not_eof()) {
+                            if (parser->peek().type == TType::Directive &&
+                                parser->states.back().lookahead_buffer[1].value == "raw") {
+                              parser->eat();
+                              parser->eat();
+                              break;
+                            }
+                            string = {string.get_str() += parser->eat().value.get_str()};
+                          }
+                          auto literal = ast_alloc<ASTLiteral>();
+                          literal->tag = ASTLiteral::RawString;
+                          literal->value = string;
+                          return literal;
+                        },
+                    },
 
-    // #read
-    // Read a file into a string at compile time. Nice for embedding resources
-    // into your program.
-    // FEATURE: add a binary mode, where its just an array of chars or
-    // something.
-    {.identifier = "read",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run =
-         [](Parser *parser) {
-           auto filename = parser->expect(TType::String).value;
-           if (!std::filesystem::exists(filename.get_str())) {
-             throw_error(std::format("Couldn't find 'read' file: {}", filename),
-                         {});
-           }
-           std::stringstream ss;
-           std::ifstream isftr(filename.get_str());
-           ss << isftr.rdbuf();
-           auto string = ast_alloc<ASTLiteral>();
-           string->tag = ASTLiteral::RawString;
-           string->value = ss.str();
-           return string;
-         }},
+                    // #read
+                    // Read a file into a string at compile time. Nice for embedding resources
+                    // into your program.
+                    // FEATURE: add a binary mode, where its just an array of chars or
+                    // something.
+                    {.identifier = "read",
+                     .kind = DIRECTIVE_KIND_EXPRESSION,
+                     .run =
+                         [](Parser *parser) {
+                           auto filename = parser->expect(TType::String).value;
+                           if (!std::filesystem::exists(filename.get_str())) {
+                             throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
+                           }
+                           std::stringstream ss;
+                           std::ifstream isftr(filename.get_str());
+                           ss << isftr.rdbuf();
+                           auto string = ast_alloc<ASTLiteral>();
+                           string->tag = ASTLiteral::RawString;
+                           string->value = ss.str();
+                           return string;
+                         }},
 
-    // #test
-    // declare a test function. Only gets compiled into --test builds, and
-    // produces a test main, a builtin test suite.
-    // FEATURE: add categories and extra naming stuff to these. would be nice
-    // for
-    // filtering etc.
-    {.identifier = "test",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       // Issue 2
-       // TODO: implement something so we can do
-       // * #test(group: "My Test Group", expects: false) *
-       // so we can have tests that expect to fail, and so we can use
-       // --filter="My Test Group" // run only test group
-       // --filter=* - "My Test Group" // run all but test group
+                    // #test
+                    // declare a test function. Only gets compiled into --test builds, and
+                    // produces a test main, a builtin test suite.
+                    // FEATURE: add categories and extra naming stuff to these. would be nice
+                    // for
+                    // filtering etc.
+                    {.identifier = "test",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       // Issue 2
+                       // TODO: implement something so we can do
+                       // * #test(group: "My Test Group", expects: false) *
+                       // so we can have tests that expect to fail, and so we can use
+                       // --filter="My Test Group" // run only test group
+                       // --filter=* - "My Test Group" // run all but test group
 
-       auto name = parser->expect(TType::Identifier);
-       parser->expect(TType::DoubleColon);
-       auto func = parser->parse_function_declaration(name);
-       func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
-       return func;
-     }},
+                       auto name = parser->expect(TType::Identifier);
+                       parser->expect(TType::DoubleColon);
+                       auto func = parser->parse_function_declaration(name);
+                       func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
+                       return func;
+                     }},
 
-    // #foreign
-    // Declare a foreign function, like C's extern. Super janky and bad because
-    // our boilerplate is crap and uses stdlib stuff.
-    {.identifier = "foreign",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run =
-         [](Parser *parser) {
-           auto function = ast_alloc<ASTFunctionDeclaration>();
-           auto range = parser->begin_node();
-           auto name = parser->expect(TType::Identifier);
-           auto last_func_decl = parser->current_func_decl;
-           parser->current_func_decl = function;
+                    // #foreign
+                    // Declare a foreign function, like C's extern. Super janky and bad because
+                    // our boilerplate is crap and uses stdlib stuff.
+                    {.identifier = "foreign",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run =
+                         [](Parser *parser) {
+                           auto function = ast_alloc<ASTFunctionDeclaration>();
+                           auto range = parser->begin_node();
+                           auto name = parser->expect(TType::Identifier);
+                           auto last_func_decl = parser->current_func_decl;
+                           parser->current_func_decl = function;
 
-           Defer deferred = {
-               [&] { parser->current_func_decl = last_func_decl; }};
+                           Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
 
-           if (parser->ctx.scope != root_scope)
-             throw_error(
-                 std::format(
-                     "cannot declare a non-top level foreign function:: {}",
-                     name.value),
-                 range);
+                           if (parser->ctx.scope != root_scope)
+                             throw_error(
+                                 std::format("cannot declare a non-top level foreign function:: {}", name.value),
+                                 range);
 
-           parser->expect(TType::DoubleColon);
-           parser->expect(TType::Fn);
+                           parser->expect(TType::DoubleColon);
+                           parser->expect(TType::Fn);
 
-           function->params = parser->parse_parameters();
-           function->name = name;
-           if (parser->peek().type != TType::Arrow) {
-             function->return_type = ASTType::get_void();
-           } else {
-             parser->expect(TType::Arrow);
-             function->return_type = parser->parse_type();
-           }
-           function->meta_type = FunctionMetaType::FUNCTION_TYPE_FOREIGN;
+                           function->params = parser->parse_parameters();
+                           function->name = name;
+                           if (parser->peek().type != TType::Arrow) {
+                             function->return_type = ASTType::get_void();
+                           } else {
+                             parser->expect(TType::Arrow);
+                             function->return_type = parser->parse_type();
+                           }
+                           function->meta_type = FunctionMetaType::FUNCTION_TYPE_FOREIGN;
 
-           parser->expect(TType::Semi);
+                           parser->expect(TType::Semi);
 
-           parser->end_node(function, range);
-           return function;
-         }},
+                           parser->end_node(function, range);
+                           return function;
+                         }},
 
-    // #error, for throwing compiler errors.
-    {.identifier = "error",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run =
-         [](Parser *parser) {
-           auto error = parser->parse_primary();
-           if (error->get_node_type() != AST_NODE_LITERAL) {
-             throw_error("Can only throw a literal as a error",
-                         error->source_range);
-           }
-           auto literal = static_cast<ASTLiteral *>(error);
-           throw_error(literal->value.get_str(), error->source_range);
-           return nullptr;
-         }},
+                    // #error, for throwing compiler errors.
+                    {.identifier = "error",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run =
+                         [](Parser *parser) {
+                           auto error = parser->parse_primary();
+                           if (error->get_node_type() != AST_NODE_LITERAL) {
+                             throw_error("Can only throw a literal as a error", error->source_range);
+                           }
+                           auto literal = static_cast<ASTLiteral *>(error);
+                           throw_error(literal->value.get_str(), error->source_range);
+                           return nullptr;
+                         }},
 
-    // #type
-    // get a 'Type *' struct ptr to reflect on a given type.
-    // has .fields and .size only currently
-    {.identifier = "type",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->expect(TType::LParen);
-       auto type = parser->parse_expr();
-       parser->expect(TType::RParen);
-       auto outer = ast_alloc<ASTType>();
-       outer->flags = ASTTYPE_EMIT_OBJECT;
-       outer->base = "Type";
-       outer->extension_info = {.extensions = {TYPE_EXT_POINTER}};
-       outer->pointing_to = type;
-       return outer;
-     }},
+                    // #type
+                    // get a 'Type *' struct ptr to reflect on a given type.
+                    // has .fields and .size only currently
+                    {.identifier = "type",
+                     .kind = DIRECTIVE_KIND_EXPRESSION,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->expect(TType::LParen);
+                       auto type = parser->parse_expr();
+                       parser->expect(TType::RParen);
+                       auto outer = ast_alloc<ASTType>();
+                       outer->flags = ASTTYPE_EMIT_OBJECT;
+                       outer->base = "Type";
+                       outer->extension_info = {.extensions = {TYPE_EXT_POINTER}};
+                       outer->pointing_to = type;
+                       return outer;
+                     }},
 
-    // '#ctor' for declaring a constructor for a struct
-    {.identifier = "ctor",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->expect(TType::DoubleColon);
+                    // '#ctor' for declaring a constructor for a struct
+                    {.identifier = "ctor",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->expect(TType::DoubleColon);
 
-       auto func_decl =
-           parser->parse_function_declaration(get_unique_identifier());
-       func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
+                       auto func_decl = parser->parse_function_declaration(get_unique_identifier());
+                       func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
 
-       return func_decl;
-     }},
+                       return func_decl;
+                     }},
 
-    // '#dtor' for declaring a destructor for a struct
-    {.identifier = "dtor",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->expect(TType::DoubleColon);
-       auto func_decl =
-           parser->parse_function_declaration(get_unique_identifier());
-       func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
-       return func_decl;
-     }},
+                    // '#dtor' for declaring a destructor for a struct
+                    {.identifier = "dtor",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->expect(TType::DoubleColon);
+                       auto func_decl = parser->parse_function_declaration(get_unique_identifier());
+                       func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
+                       return func_decl;
+                     }},
 
-    // #make, which also serves as a casting and copy construction method, as
-    // well
-    // as normal ctors.
-    {.identifier = "make",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto range = parser->begin_node();
-       auto args = parser->parse_arguments();
-       auto type = args->arguments[0];
-       if (type->get_node_type() != AST_NODE_TYPE) {
-         parser->end_node(type, range);
-         throw_error("Expect a type as the first argument in a #make call.",
-                     range);
-       }
-       auto type_arg = static_cast<ASTType *>(type);
-       args->arguments.erase(args->arguments.begin());
-       auto make = ast_alloc<ASTMake>();
-       make->type_arg = type_arg;
-       make->arguments = args;
-       make->kind = MAKE_CTOR;
-       parser->end_node(make, range);
+                    // #make, which also serves as a casting and copy construction method, as
+                    // well
+                    // as normal ctors.
+                    {.identifier = "make",
+                     .kind = DIRECTIVE_KIND_EXPRESSION,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto range = parser->begin_node();
+                       auto args = parser->parse_arguments();
+                       auto type = args->arguments[0];
+                       if (type->get_node_type() != AST_NODE_TYPE) {
+                         parser->end_node(type, range);
+                         throw_error("Expect a type as the first argument in a #make call.", range);
+                       }
+                       auto type_arg = static_cast<ASTType *>(type);
+                       args->arguments.erase(args->arguments.begin());
+                       auto make = ast_alloc<ASTMake>();
+                       make->type_arg = type_arg;
+                       make->arguments = args;
+                       make->kind = MAKE_CTOR;
+                       parser->end_node(make, range);
 
-       if (type_arg->extension_info.is_pointer()) {
-         make->kind = MAKE_CAST;
-       }
-       if (type_arg->extension_info.is_fixed_sized_array()) {
-         throw_error("Cannot use #make on fixed array types.", range);
-       }
-       return make;
-     }},
+                       if (type_arg->extension_info.is_pointer()) {
+                         make->kind = MAKE_CAST;
+                       }
+                       if (type_arg->extension_info.is_fixed_sized_array()) {
+                         throw_error("Cannot use #make on fixed array types.", range);
+                       }
+                       return make;
+                     }},
 
-    // #compiler_flags, for adding stuff like linker options, -g etc from within
-    // your program or header.
-    {.identifier = "compiler_flags",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto string = parser->expect(TType::String).value;
-       if (string == "-g") {
-         compile_command.flags[string.get_str()] = true;
-       }
-       compile_command.add_compilation_flag(string.get_str());
-       return nullptr;
-     }},
+                    // #compiler_flags, for adding stuff like linker options, -g etc from within
+                    // your program or header.
+                    {.identifier = "compiler_flags",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto string = parser->expect(TType::String).value;
+                       if (string == "-g") {
+                         compile_command.flags[string.get_str()] = true;
+                       }
+                       compile_command.add_compilation_flag(string.get_str());
+                       return nullptr;
+                     }},
 
-    // #flags, for making an enum declaration auto increment with a flags value.
-    // #flags MyEnum :: enum {...};
-    {.identifier = "flags",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto name = parser->expect(TType::Identifier);
-       parser->expect(TType::DoubleColon);
-       auto enum_decl = parser->parse_enum_declaration(name);
-       enum_decl->is_flags = true;
-       auto type = global_get_type(enum_decl->type->resolved_type);
-       auto info = (type->get_info()->as<EnumTypeInfo>());
-       info->is_flags = true;
-       return enum_decl;
-     }},
+                    // #flags, for making an enum declaration auto increment with a flags value.
+                    // #flags MyEnum :: enum {...};
+                    {.identifier = "flags",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto name = parser->expect(TType::Identifier);
+                       parser->expect(TType::DoubleColon);
+                       auto enum_decl = parser->parse_enum_declaration(name);
+                       enum_decl->is_flags = true;
+                       auto type = global_get_type(enum_decl->type->resolved_type);
+                       auto info = (type->get_info()->as<EnumTypeInfo>());
+                       info->is_flags = true;
+                       return enum_decl;
+                     }},
 
-    // #alias for making type aliases. #alias NewName :: OldName;
-    {.identifier = "alias",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto name = parser->expect(TType::Identifier);
-       parser->expect(TType::DoubleColon);
-       auto aliased_type = parser->parse_type();
-       if (parser->ctx.scope->types.contains(name.value)) {
-         throw_error("Redefinition of type. ", aliased_type->source_range);
-       }
+                    // #alias for making type aliases. #alias NewName :: OldName;
+                    {.identifier = "alias",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto name = parser->expect(TType::Identifier);
+                       parser->expect(TType::DoubleColon);
+                       auto aliased_type = parser->parse_type();
+                       if (parser->ctx.scope->types.contains(name.value)) {
+                         throw_error("Redefinition of type. ", aliased_type->source_range);
+                       }
 
-       if (aliased_type->resolved_type != -1) {
-         auto type = global_get_type(aliased_type->resolved_type);
+                       if (aliased_type->resolved_type != -1) {
+                         auto type = global_get_type(aliased_type->resolved_type);
 
-         if (!type) {
-           throw_error("Failed to get type for alias.",
-                       aliased_type->source_range);
-         }
+                         if (!type) {
+                           throw_error("Failed to get type for alias.", aliased_type->source_range);
+                         }
 
-         if (type->is_kind(TYPE_FUNCTION)) {
-           auto id = global_find_function_type_id(
-               *(type->get_info()->as<FunctionTypeInfo>()),
-               aliased_type->extension_info);
+                         if (type->is_kind(TYPE_FUNCTION)) {
+                           auto id = global_find_function_type_id(*(type->get_info()->as<FunctionTypeInfo>()),
+                                                                  aliased_type->extension_info);
 
-           parser->ctx.scope->types[name.value] = id;
-           return ast_alloc<ASTNoop>();
-         }
-       }
+                           parser->ctx.scope->types[name.value] = id;
+                           return ast_alloc<ASTNoop>();
+                         }
+                       }
 
-       auto id = parser->ctx.scope->find_type_id(aliased_type->base,
-                                                 aliased_type->extension_info);
+                       auto id = parser->ctx.scope->find_type_id(aliased_type->base, aliased_type->extension_info);
 
-       auto type = global_get_type(id);
+                       auto type = global_get_type(id);
 
-       if (!type) {
-         throw_error("Unable to create type alias: target type does not exist.",
-                     aliased_type->source_range);
-       }
+                       if (!type) {
+                         throw_error("Unable to create type alias: target type does not exist.",
+                                     aliased_type->source_range);
+                       }
 
-       parser->ctx.scope->types[name.value] = id;
-       return ast_alloc<ASTNoop>();
-     }},
+                       parser->ctx.scope->types[name.value] = id;
+                       return ast_alloc<ASTNoop>();
+                     }},
 
-    // #self, return the type of the current declaring struct or union
-    {.identifier = "self",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       ASTType *type;
-       if (parser->current_union_decl) {
-         type = parser->current_union_decl.get()->type;
-       } else if (parser->current_struct_decl) {
-         type = parser->current_struct_decl.get()->type;
-       } else {
-         throw_error("can only use #self in unions and structs to get the "
-                     "type name of the current declaring type",
-                     {});
-       }
-       parser->append_type_extensions(type);
-       return type;
-     }},
+                    // #self, return the type of the current declaring struct or union
+                    {.identifier = "self",
+                     .kind = DIRECTIVE_KIND_EXPRESSION,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       ASTType *type;
+                       if (parser->current_union_decl) {
+                         type = parser->current_union_decl.get()->type;
+                       } else if (parser->current_struct_decl) {
+                         type = parser->current_struct_decl.get()->type;
+                       } else {
+                         throw_error(
+                             "can only use #self in unions and structs to get the "
+                             "type name of the current declaring type",
+                             {});
+                       }
+                       parser->append_type_extensions(type);
+                       return type;
+                     }},
 
-    // #anon, for declaring anonymous sub-structs in unions primarily.
-    {.identifier = "anon",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->expect(TType::DoubleColon);
-       auto decl = parser->parse_struct_declaration(get_unique_identifier());
-       auto t = global_get_type(decl->type->resolved_type);
-       auto info = (t->get_info()->as<StructTypeInfo>());
-       info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
-       return decl;
-     }},
+                    // #anon, for declaring anonymous sub-structs in unions primarily.
+                    {.identifier = "anon",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->expect(TType::DoubleColon);
+                       auto decl = parser->parse_struct_declaration(get_unique_identifier());
+                       auto t = global_get_type(decl->type->resolved_type);
+                       auto info = (t->get_info()->as<StructTypeInfo>());
+                       info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+                       return decl;
+                     }},
 
-    // #operator, for operator overloads.
-    {.identifier = "operator",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto range = parser->begin_node();
-       parser->expect(TType::LParen);
-       auto op = parser->eat();
+                    // #operator, for operator overloads.
+                    {.identifier = "operator",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto range = parser->begin_node();
+                       parser->expect(TType::LParen);
+                       auto op = parser->eat();
 
-       if (parser->peek().type == TType::RParen &&
-           parser->lookahead_buf()[1].type == TType::RParen) {
-         parser->eat();
-       } else if (parser->peek().type == TType::RBrace) {
-         parser->eat();
-       }
+                       if (parser->peek().type == TType::RParen && parser->lookahead_buf()[1].type == TType::RParen) {
+                         parser->eat();
+                       } else if (parser->peek().type == TType::RBrace) {
+                         parser->eat();
+                       }
 
-       parser->expect(TType::RParen);
+                       parser->expect(TType::RParen);
 
-       if (op.family != TFamily::Operator) {
-         parser->end_node(nullptr, range);
-         throw_error(std::format("Operator overload failed; {} was not a "
-                                 "valid operator to overload",
-                                 op.value),
-                     range);
-       }
+                       if (op.family != TFamily::Operator) {
+                         parser->end_node(nullptr, range);
+                         throw_error(std::format("Operator overload failed; {} was not a "
+                                                 "valid operator to overload",
+                                                 op.value),
+                                     range);
+                       }
 
-       parser->expect(TType::DoubleColon);
-       Token token;
+                       parser->expect(TType::DoubleColon);
+                       Token token;
 
-       // Do we want to do it with the unique identifier?
-       auto func_decl =
-           parser->parse_function_declaration(get_unique_identifier());
+                       // Do we want to do it with the unique identifier?
+                       auto func_decl = parser->parse_function_declaration(get_unique_identifier());
 
-       if (op.is_comp_assign() || op.type == TType::Increment ||
-           op.type == TType::Decrement) {
-         func_decl->flags |= FUNCTION_IS_MUTATING;
-       }
+                       if (op.is_comp_assign() || op.type == TType::Increment || op.type == TType::Decrement) {
+                         func_decl->flags |= FUNCTION_IS_MUTATING;
+                       }
 
-       func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
+                       func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
 
-       func_decl->name = op;
+                       func_decl->name = op;
 
-       emit_warnings_or_errors_for_operator_overloads(op.type,
-                                                      func_decl->source_range);
+                       emit_warnings_or_errors_for_operator_overloads(op.type, func_decl->source_range);
 
-       return func_decl;
-     }},
+                       return func_decl;
+                     }},
 
-    // #export, for exporting a non-mangled name to a dll or C library
-    // primarily.
-    // Equivalent to marking a function extern "C" in C++.
-    {.identifier = "export",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto name = parser->expect(TType::Identifier);
-       parser->expect(TType::DoubleColon);
-       if (parser->peek().type == TType::Struct) {
-         auto decl = parser->parse_struct_declaration(name);
-         decl->is_extern = true;
-         return decl;
-       }
-       auto func_decl = parser->parse_function_declaration(name);
-       func_decl->flags |= FUNCTION_IS_EXPORTED;
-       return func_decl;
-     }},
+                    // #export, for exporting a non-mangled name to a dll or C library
+                    // primarily.
+                    // Equivalent to marking a function extern "C" in C++.
+                    {.identifier = "export",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto name = parser->expect(TType::Identifier);
+                       parser->expect(TType::DoubleColon);
+                       if (parser->peek().type == TType::Struct) {
+                         auto decl = parser->parse_struct_declaration(name);
+                         decl->is_extern = true;
+                         return decl;
+                       }
+                       auto func_decl = parser->parse_function_declaration(name);
+                       func_decl->flags |= FUNCTION_IS_EXPORTED;
+                       return func_decl;
+                     }},
 
-    // #typeid, integer version of #type. can be used to compare types without
-    // the pointers.
-    {.identifier = "typeid",
-     .kind = DIRECTIVE_KIND_EXPRESSION,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->expect(TType::LParen);
-       auto type = parser->parse_type();
+                    // #typeid, integer version of #type. can be used to compare types without
+                    // the pointers.
+                    {.identifier = "typeid",
+                     .kind = DIRECTIVE_KIND_EXPRESSION,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->expect(TType::LParen);
+                       auto type = parser->parse_type();
 
-       parser->expect(TType::RParen);
-       auto id = std::any_cast<int>(type->accept(parser->typer));
+                       parser->expect(TType::RParen);
+                       auto id = std::any_cast<int>(type->accept(parser->typer));
 
-       auto literal = ast_alloc<ASTLiteral>();
-       literal->tag = ASTLiteral::Integer;
-       literal->value = std::to_string(id);
-       literal->source_range = type->source_range;
-       return literal;
-     }},
+                       auto literal = ast_alloc<ASTLiteral>();
+                       literal->tag = ASTLiteral::Integer;
+                       literal->value = std::to_string(id);
+                       literal->source_range = type->source_range;
+                       return literal;
+                     }},
 
-    // #bitfield, for declaring bitfields. Pretty much only to interop with C:
-    // most cases for bitfields are completely useless, and can be replaced with
-    // a
-    // set of flags.
-    {.identifier = "bitfield",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       if (parser->current_struct_decl.is_null()) {
-         throw_error(
-             "Cannot declare bitfields outside of a struct declaration.", {});
-       }
-       parser->expect(TType::LParen);
-       auto size = parser->expect(TType::Integer);
-       parser->expect(TType::RParen);
-       ASTDeclaration *decl = parser->parse_declaration();
-       decl->is_bitfield = true;
-       decl->bitsize = size;
-       return decl;
-     }},
+                    // #bitfield, for declaring bitfields. Pretty much only to interop with C:
+                    // most cases for bitfields are completely useless, and can be replaced with
+                    // a
+                    // set of flags.
+                    {.identifier = "bitfield",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       if (parser->current_struct_decl.is_null()) {
+                         throw_error("Cannot declare bitfields outside of a struct declaration.", {});
+                       }
+                       parser->expect(TType::LParen);
+                       auto size = parser->expect(TType::Integer);
+                       parser->expect(TType::RParen);
+                       ASTDeclaration *decl = parser->parse_declaration();
+                       decl->is_bitfield = true;
+                       decl->bitsize = size;
+                       return decl;
+                     }},
 
-    // #static, used exclusively for static globals, and static locals.
-    // We do not support static methods or static members.
-    {.identifier = "static",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto statement = parser->parse_statement();
-       if (auto decl = dynamic_cast<ASTDeclaration *>(statement)) {
-         decl->is_static = true;
-       } else if (auto decl =
-                      dynamic_cast<ASTFunctionDeclaration *>(statement)) {
-         decl->flags |= FUNCTION_IS_STATIC;
-       }
-       return statement;
-     }},
+                    // #static, used exclusively for static globals, and static locals.
+                    // We do not support static methods or static members.
+                    {.identifier = "static",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto statement = parser->parse_statement();
+                       if (auto decl = dynamic_cast<ASTDeclaration *>(statement)) {
+                         decl->is_static = true;
+                       } else if (auto decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
+                         decl->flags |= FUNCTION_IS_STATIC;
+                       }
+                       return statement;
+                     }},
 
-    {.identifier = "def",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
-       while (parser->peek().type == TType::Semi)
-         parser->eat();
-       return ast_alloc<ASTNoop>();
-     }},
-    {.identifier = "undef",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
-       while (parser->peek().type == TType::Semi)
-         parser->eat();
-       return ast_alloc<ASTNoop>();
-     }},
+                    {.identifier = "def",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
+                       while (parser->peek().type == TType::Semi) parser->eat();
+                       return ast_alloc<ASTNoop>();
+                     }},
+                    {.identifier = "undef",
+                     .kind = DIRECTIVE_KIND_STATEMENT,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
+                       while (parser->peek().type == TType::Semi) parser->eat();
+                       return ast_alloc<ASTNoop>();
+                     }},
 
-    {.identifier = "ifdef",
-     .kind = DIRECTIVE_KIND_DONT_CARE,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto list = ast_alloc<ASTStatementList>();
-       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
-       return list;
-     }},
-    {.identifier = "ifndef",
-     .kind = DIRECTIVE_KIND_DONT_CARE,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto list = ast_alloc<ASTStatementList>();
-       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
-       return list;
-     }},
-    {.identifier = "if",
-     .kind = DIRECTIVE_KIND_DONT_CARE,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-       auto list = ast_alloc<ASTStatementList>();
-       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
-       return list;
-     }},
+                    {.identifier = "ifdef",
+                     .kind = DIRECTIVE_KIND_DONT_CARE,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto list = ast_alloc<ASTStatementList>();
+                       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
+                       return list;
+                     }},
+                    {.identifier = "ifndef",
+                     .kind = DIRECTIVE_KIND_DONT_CARE,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto list = ast_alloc<ASTStatementList>();
+                       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
+                       return list;
+                     }},
+                    {.identifier = "if",
+                     .kind = DIRECTIVE_KIND_DONT_CARE,
+                     .run = [](Parser *parser) -> Nullable<ASTNode> {
+                       auto list = ast_alloc<ASTStatementList>();
+                       parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
+                       return list;
+                     }},
 };
 
-Nullable<ASTNode> Parser::process_directive(DirectiveKind kind,
-                                            const InternedString &identifier) {
+Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedString &identifier) {
   auto range = begin_node();
   // compare aganist the kind of the routine with expected type, based on parser
   // location
   for (const auto &routine : directive_routines) {
-    if ((routine.kind == DIRECTIVE_KIND_DONT_CARE || routine.kind == kind) &&
-        routine.identifier == identifier) {
+    if ((routine.kind == DIRECTIVE_KIND_DONT_CARE || routine.kind == kind) && routine.identifier == identifier) {
       auto result = routine.run(this);
       end_node(result.get(), range);
       return result;
     }
   }
-  throw_error(
-      std::format("failed to call unknown directive routine, or an expression "
-                  "routine was used as a statement, or vice versa: {}",
-                  identifier),
-      range);
+  throw_error(std::format("failed to call unknown directive routine, or an expression "
+                          "routine was used as a statement, or vice versa: {}",
+                          identifier),
+              range);
 }
 
 ASTType *Parser::parse_type() {
@@ -657,8 +629,7 @@ ASTType *Parser::parse_type() {
     std::vector<ASTType *> types;
     while (peek().type != TType::GT) {
       types.push_back(parse_type());
-      if (peek().type == TType::Comma)
-        eat();
+      if (peek().type == TType::Comma) eat();
     }
     expect(TType::GT);
     auto node = ast_alloc<ASTType>();
@@ -675,9 +646,10 @@ ASTType *Parser::parse_type() {
   if (peek().type == TType::Directive) {
     auto expr = try_parse_directive_expr().get();
     if (expr->get_node_type() != AST_NODE_TYPE) {
-      throw_error("unable to get type from directive expression where a type "
-                  "was expected.",
-                  range);
+      throw_error(
+          "unable to get type from directive expression where a type "
+          "was expected.",
+          range);
     }
     auto type = static_cast<ASTType *>(expr);
     return type;
@@ -700,8 +672,7 @@ ASTType *Parser::parse_type() {
         if (size->get_node_type() == AST_NODE_TYPE) {
           extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          extension_info.key_type =
-              ctx.scope->find_type_id(type->base, type->extension_info);
+          extension_info.key_type = ctx.scope->find_type_id(type->base, type->extension_info);
           expect(TType::RBrace);
           continue;
         }
@@ -740,8 +711,7 @@ ASTProgram *Parser::parse() {
       }
     }
 
-    if (semicolon())
-      eat();
+    if (semicolon()) eat();
 
     if (peek().type == TType::Eof && states.empty()) {
       break;
@@ -757,13 +727,11 @@ ASTProgram *Parser::parse() {
           program->statements.push_back(statement);
         }
       }
-      if (semicolon())
-        eat();
+      if (semicolon()) eat();
       continue;
     }
     program->statements.push_back(parse_statement());
-    if (semicolon())
-      eat();
+    if (semicolon()) eat();
   }
   end_node(program, range);
   return program;
@@ -781,9 +749,10 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
       node->idens.push_back(iden);
     } else {
       end_node(nullptr, range);
-      throw_error("Can only have identifiers on the left hand side of a tuple "
-                  "deconstruction expressions",
-                  range);
+      throw_error(
+          "Can only have identifiers on the left hand side of a tuple "
+          "deconstruction expressions",
+          range);
     }
   }
   if (peek().type == TType::ColonEquals) {
@@ -792,9 +761,10 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   } else {
     // TODO: allow typed tuple deconstructions.
     end_node(nullptr, range);
-    throw_error("Currently, you cannot have an explicitly typed tuple "
-                "deconstruction. Use a, b, c := ....",
-                range);
+    throw_error(
+        "Currently, you cannot have an explicitly typed tuple "
+        "deconstruction. Use a, b, c := ....",
+        range);
   }
   return node;
 }
@@ -810,16 +780,13 @@ ASTStatement *Parser::parse_statement() {
     return ast_alloc<ASTNoop>();
   }
 
-  if (tok.type == TType::Identifier &&
-      lookahead_buf()[1].type == TType::Comma) {
+  if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
     return parse_multiple_asssignment();
   }
 
   if (tok.type == TType::Identifier &&
-      (lookahead_buf()[1].type == TType::Colon ||
-       lookahead_buf()[1].type == TType::ColonEquals ||
-       (lookahead_buf()[1].type == TType::DoubleColon &&
-        lookahead_buf()[2].type != TType::LParen &&
+      (lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals ||
+       (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].type != TType::LParen &&
         lookahead_buf()[2].family != TFamily::Keyword))) {
     auto decl = parse_declaration();
     end_node(decl, range);
@@ -827,23 +794,16 @@ ASTStatement *Parser::parse_statement() {
   } else if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
-        process_directive(DIRECTIVE_KIND_STATEMENT,
-                          expect(TType::Identifier).value)
-            .get());
+        process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value).get());
     if (!statement) {
-      throw_error(
-          std::format("Directive '{}' did not return a valid statement node",
-                      tok.value),
-          range);
+      throw_error(std::format("Directive '{}' did not return a valid statement node", tok.value), range);
     }
     end_node(statement, range);
     return statement;
     // Increment/ Decrement statements;
-  } else if (tok.type == TType::Increment || tok.type == TType::Decrement ||
-             tok.type == TType::Delete || tok.type == TType::LParen ||
-             tok.type == TType::Erase || tok.type == TType::Switch ||
-             (lookahead_buf()[1].type == TType::DoubleColon &&
-              lookahead_buf()[2].family != TFamily::Keyword &&
+  } else if (tok.type == TType::Increment || tok.type == TType::Decrement || tok.type == TType::Delete ||
+             tok.type == TType::LParen || tok.type == TType::Erase || tok.type == TType::Switch ||
+             (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword &&
               lookahead_buf()[2].family != TFamily::Operator)) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
@@ -894,9 +854,10 @@ ASTStatement *Parser::parse_statement() {
       auto expr = parse_expr();
       node->range = expr;
     } else {
-      throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in "
-                  "iterable || for *elem in iterable",
-                  range);
+      throw_error(
+          "Invalid for syntax. expected 'for i in 0..10 || for elem in "
+          "iterable || for *elem in iterable",
+          range);
     }
 
     node->block = parse_block();
@@ -923,8 +884,7 @@ ASTStatement *Parser::parse_statement() {
       auto statement = parse_statement();
       node->block->statements = {statement};
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        throw_warning(WarningInaccessibleDeclaration,
-                      "Inaccesible declared variable", statement->source_range);
+        throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
       }
       node->block->scope = ctx.exit_scope();
     } else {
@@ -952,14 +912,10 @@ ASTStatement *Parser::parse_statement() {
     end_node(statement, range);
     return statement;
     // subscript assignment
-  } else if ((tok.type == TType::Identifier &&
-              lookahead_buf()[1].type == TType::LBrace) ||
-             (tok.type == TType::Identifier &&
-              lookahead_buf()[1].type == TType::Dot) ||
-             lookahead_buf()[1].type == TType::Assign ||
-             lookahead_buf()[1].type == TType::ColonEquals ||
-             lookahead_buf()[1].type == TType::Comma ||
-             lookahead_buf()[1].type == TType::LParen ||
+  } else if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::LBrace) ||
+             (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Dot) ||
+             lookahead_buf()[1].type == TType::Assign || lookahead_buf()[1].type == TType::ColonEquals ||
+             lookahead_buf()[1].type == TType::Comma || lookahead_buf()[1].type == TType::LParen ||
              lookahead_buf()[1].is_comp_assign()) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
@@ -985,12 +941,12 @@ ASTStatement *Parser::parse_statement() {
       end_node(union_decl, range);
       return union_decl;
     } else {
-      throw_error("invalid :: statement, expected '(' (for a function), "
-                  "'struct', or 'enum",
-                  range);
+      throw_error(
+          "invalid :: statement, expected '(' (for a function), "
+          "'struct', or 'enum",
+          range);
     }
-  } else if (lookahead_buf()[1].type == TType::Increment ||
-             lookahead_buf()[1].type == TType::Decrement) {
+  } else if (lookahead_buf()[1].type == TType::Increment || lookahead_buf()[1].type == TType::Decrement) {
     auto statement = ast_alloc<ASTExprStatement>();
     statement->expression = parse_expr();
     end_node(statement, range);
@@ -1000,16 +956,12 @@ ASTStatement *Parser::parse_statement() {
   end_node(nullptr, range);
 
   if (tok.family == TFamily::Operator) {
-    throw_error(std::format("Unexpected operator: {} '{}'",
-                            TTypeToString(tok.type), tok.value),
-                range);
+    throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), range);
   }
 
   if (tok.family == TFamily::Literal) {
     eat();
-    throw_error(std::format("Unexpected literal: {} .. {}", tok.value,
-                            TTypeToString(tok.type)),
-                range);
+    throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), range);
   }
 
   if (tok.family == TFamily::Keyword) {
@@ -1024,9 +976,7 @@ ASTStatement *Parser::parse_statement() {
 
   if (ctx.scope->find_type_id(tok.value, {}) == -1) {
     eat();
-    throw_error(
-        std::format("Use of an undeclared type or identifier: {}", tok.value),
-        range);
+    throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), range);
   }
 
   eat();
@@ -1043,22 +993,19 @@ ASTDeclaration *Parser::parse_declaration() {
   decl->name = iden;
 
   static std::set<std::string> reserved = {
-      "asm",      "double",   "new",       "switch", "auto",     "else",
-      "operator", "template", "break",     "enum",   "private",  "this",
-      "case",     "extern",   "protected", "throw",  "catch",    "float",
-      "public",   "try",      "char",      "for",    "register", "typedef",
-      "class",    "friend",   "return",    "union",  "const",    "goto",
-      "short",    "unsigned", "continue",  "if",     "signed",   "virtual",
-      "default",  "inline",   "sizeof",    "void",   "delete",   "int",
-      "static",   "volatile", "do",        "long",   "struct",   "while"};
+      "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
+      "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
+      "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
+      "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
+      "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
 
-  if (ctx.scope->find_type_id(iden.value, {}) != -1 ||
-      keywords.contains(iden.value.get_str()) ||
+  if (ctx.scope->find_type_id(iden.value, {}) != -1 || keywords.contains(iden.value.get_str()) ||
       reserved.contains(iden.value.get_str())) {
     end_node(nullptr, range);
-    throw_error("Invalid variable declaration: a type or keyword exists with "
-                "that name,",
-                range);
+    throw_error(
+        "Invalid variable declaration: a type or keyword exists with "
+        "that name,",
+        range);
   }
 
   if (peek().type == TType::Colon) {
@@ -1080,8 +1027,7 @@ ASTDeclaration *Parser::parse_declaration() {
 
   end_node(decl, range);
   if (ctx.scope->local_lookup(iden.value)) {
-    throw_error(std::format("re-definition of '{}'", iden.value),
-                decl->source_range);
+    throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
   ctx.scope->insert(iden.value, -1);
   return decl;
@@ -1099,8 +1045,7 @@ ASTBlock *Parser::parse_block() {
     }
 
     block->statements.push_back(parse_statement());
-    if (semicolon())
-      eat();
+    if (semicolon()) eat();
   }
   expect(TType::RCurly);
   block->scope = ctx.exit_scope();
@@ -1111,8 +1056,7 @@ ASTBlock *Parser::parse_block() {
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   expect(TType::Fn);
   auto range = begin_node();
-  if (range.begin > 0)
-    range.begin = range.begin - 1;
+  if (range.begin > 0) range.begin = range.begin - 1;
 
   auto function = ast_alloc<ASTFunctionDeclaration>();
 
@@ -1167,25 +1111,24 @@ ASTParamsDecl *Parser::parse_parameters() {
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
-        throw_error("Cannot use varargs outside of a function declaration. "
-                    "Only use this for #foreign functions.",
-                    range);
+        throw_error(
+            "Cannot use varargs outside of a function declaration. "
+            "Only use this for #foreign functions.",
+            range);
       }
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
 
     auto name = expect(TType::Identifier).value;
-    if (!type || peek().type == TType::Colon)
-      expect(TType::Colon);
+    if (!type || peek().type == TType::Colon) expect(TType::Colon);
 
     auto next = peek();
 
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: fn(int a, b, c) {}
-    if (next.type == TType::Directive || !type ||
-        ctx.scope->find_type_id(next.value, {}) != -1 ||
+    if (next.type == TType::Directive || !type || ctx.scope->find_type_id(next.value, {}) != -1 ||
         next.type == TType::Fn) {
       type = parse_type();
     }
@@ -1280,16 +1223,14 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   std::set<InternedString> keys_set;
   for (const auto &[key, value] : node->key_values) {
     if (keys_set.find(key) != keys_set.end()) {
-      throw_error(std::format("redefinition of enum variant: {}", key),
-                  node->source_range);
+      throw_error(std::format("redefinition of enum variant: {}", key), node->source_range);
     }
     keys.push_back(key);
     keys_set.insert(key);
   }
 
   auto identifer = node->type->base;
-  node->type->resolved_type =
-      ctx.scope->create_enum_type(identifer.get_str(), keys, node->is_flags);
+  node->type->resolved_type = ctx.scope->create_enum_type(identifer.get_str(), keys, node->is_flags);
   expect(TType::RCurly);
   return node;
 }
@@ -1309,8 +1250,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = (type->get_info()->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 &&
-          info->scope != nullptr) {
+      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 && info->scope != nullptr) {
         throw_error("Redefinition of struct", range);
       }
     } else {
@@ -1333,12 +1273,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
         decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        decl->methods.push_back(
-            static_cast<ASTFunctionDeclaration *>(statement));
+        decl->methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
       } else {
-        throw_error(
-            "Non-field or non-method declaration not allowed in struct.",
-            statement->source_range);
+        throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
       }
     }
     decl->scope = block->scope;
@@ -1402,8 +1339,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   } else {
     // if we didn't find a foward declaration, instantiate a new empty union
     // type, and resolve the node type, cause might as well.
-    type_id = node->type->resolved_type =
-        ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
+    type_id = node->type->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
   }
 
   if (peek().type == TType::Semi) {
@@ -1433,9 +1369,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       auto type = global_get_type(struct_decl->type->resolved_type);
       auto info = (type->get_info()->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        throw_error(
-            "can only use #anon struct declarations within union types.",
-            node->source_range);
+        throw_error("can only use #anon struct declarations within union types.", node->source_range);
       }
       structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
@@ -1464,23 +1398,18 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
   ASTExpr *left = parse_unary();
   while (true) {
-
     // ! A little hack for tuples.
     {
       // <1, 2, 3>; is valid
       // <1, 2, 3 > 10>; can work too.
       auto lookahead = lookahead_buf();
       bool is_gt = peek().type == TType::GT;
-      bool is_not_identifier =
-          lookahead.size() > 1 && lookahead[1].type != TType::Identifier;
-      bool is_not_literal =
-          lookahead.size() > 1 && lookahead[1].family != TFamily::Literal;
+      bool is_not_identifier = lookahead.size() > 1 && lookahead[1].type != TType::Identifier;
+      bool is_not_literal = lookahead.size() > 1 && lookahead[1].family != TFamily::Literal;
       bool is_not_operator =
-          lookahead.size() > 1 && (lookahead[1].family != TFamily::Operator ||
-                                   lookahead[1].type != TType::LParen);
+          lookahead.size() > 1 && (lookahead[1].family != TFamily::Operator || lookahead[1].type != TType::LParen);
       bool is_semi = lookahead.size() > 1 && lookahead[1].type == TType::Semi;
-      if ((is_gt && is_not_identifier && is_not_literal && is_not_operator) ||
-          is_semi) {
+      if ((is_gt && is_not_identifier && is_not_literal && is_not_operator) || is_semi) {
         return left;
       }
     }
@@ -1493,9 +1422,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       if (peek().type == TType::ColonEquals) {
         if (left->get_node_type() != AST_NODE_IDENTIFIER) {
           end_node(left, range);
-          throw_error(
-              "Cannot use type inference assignment ':=' on non-identifiers.",
-              range);
+          throw_error("Cannot use type inference assignment ':=' on non-identifiers.", range);
         }
         auto iden = static_cast<ASTIdentifier *>(left);
         if (ctx.scope->local_lookup(iden->value)) {
@@ -1527,17 +1454,14 @@ ASTExpr *Parser::parse_unary() {
 
   // bitwise not isa  unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
-  if (peek().type == TType::Add || peek().type == TType::Sub ||
-      peek().type == TType::Not || peek().type == TType::BitwiseNot ||
-      peek().type == TType::Increment || peek().type == TType::Decrement ||
-      peek().type == TType::Mul || peek().type == TType::And ||
-      peek().type == TType::BitwiseNot) {
+  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::Not ||
+      peek().type == TType::BitwiseNot || peek().type == TType::Increment || peek().type == TType::Decrement ||
+      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::BitwiseNot) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
 
-    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL ||
-                     expr->get_node_type() == AST_NODE_CALL;
+    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || expr->get_node_type() == AST_NODE_CALL;
 
     // don't need to do this if we already got one of the previous ones.
     auto ctor = is_rvalue || [&] {
@@ -1551,14 +1475,14 @@ ASTExpr *Parser::parse_unary() {
       return false;
     }();
 
-    if ((is_rvalue || ctor) &&
-        (op.type == TType::And || op.type == TType::Mul)) {
+    if ((is_rvalue || ctor) && (op.type == TType::And || op.type == TType::Mul)) {
       end_node(nullptr, range);
-      throw_error("Cannot take the address of, or dereference a literal or "
-                  "'rvalue'\nlike a function result or constructor result. It "
-                  "is a temporary value\nand would be invalid once this "
-                  "statement completed executing",
-                  range);
+      throw_error(
+          "Cannot take the address of, or dereference a literal or "
+          "'rvalue'\nlike a function result or constructor result. It "
+          "is a temporary value\nand would be invalid once this "
+          "statement completed executing",
+          range);
     }
 
     unaryexpr->op = op;
@@ -1588,9 +1512,8 @@ ASTExpr *Parser::parse_postfix() {
     return unary;
   }
   // build dot and subscript expressions
-  while (peek().type == TType::DoubleColon || peek().type == TType::Dot ||
-         peek().type == TType::LBrace || peek().type == TType::LParen) {
-
+  while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
+         peek().type == TType::LParen) {
     if (peek().type == TType::LParen) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -1630,8 +1553,7 @@ ASTExpr *Parser::parse_primary() {
   // special unary for allocation, new delete.
   if (tok.type == TType::New || tok.type == TType::Delete) {
     eat();
-    ASTAllocate::Kind kind = tok.type == TType::New ? ASTAllocate::Kind::New
-                                                    : ASTAllocate::Kind::Delete;
+    ASTAllocate::Kind kind = tok.type == TType::New ? ASTAllocate::Kind::New : ASTAllocate::Kind::Delete;
     auto node = ast_alloc<ASTAllocate>();
 
     if (kind == ASTAllocate::New) {
@@ -1655,230 +1577,228 @@ ASTExpr *Parser::parse_primary() {
   auto range = begin_node();
 
   switch (tok.type) {
-  case TType::LT: {
-    eat(); // <
-    auto exprs = std::vector<ASTExpr *>();
-    while (peek().type != TType::GT) {
-      exprs.push_back(parse_expr());
-      if (peek().type == TType::Comma)
-        eat();
-    }
-    expect(TType::GT); // >
-    auto tuple = ast_alloc<ASTTuple>();
-    tuple->values = exprs;
-    tuple->type = ast_alloc<ASTType>();
-    return tuple;
-  }
-  case TType::Switch: {
-    expect(TType::Switch);
-    auto expr = parse_expr();
-    expect(TType::LCurly);
-    std::vector<SwitchCase> cases;
-    while (peek().type != TType::RCurly) {
-      SwitchCase _case;
-      _case.expression = parse_expr();
-      expect(TType::Colon);
-      _case.block = parse_block();
-      cases.push_back(_case);
-    }
-    expect(TType::RCurly);
-    auto node = ast_alloc<ASTSwitch>();
-    node->cases = cases;
-    node->target = expr;
-    end_node(node, range);
-    return node;
-  }
-  case TType::Char: {
-    eat();
-    auto node = ast_alloc<ASTLiteral>();
-    node->tag = ASTLiteral::Char;
-    node->value = tok.value;
-    end_node(node, range);
-    return node;
-  }
-  case TType::DoubleColon: {
-    eat();
-    if (peek().type != TType::Identifier) {
-      end_node(nullptr, range);
-      throw_error("::Something syntax is only for using enum variants that are "
-                  "in your current scope.",
-                  range);
-    }
-    auto scope_res = ast_alloc<ASTScopeResolution>();
-    scope_res->base = nullptr;
-    scope_res->member_name = expect(TType::Identifier).value;
-    end_node(scope_res, range);
-    return scope_res;
-  }
-  case TType::Dollar: {
-    auto range = begin_node();
-    eat();
-    auto str = expect(TType::String);
-    auto node = ast_alloc<ASTLiteral>();
-    node->tag = ASTLiteral::InterpolatedString;
-    auto lexer_state = Lexer::State::from_string(str.value.get_str());
-    states.push_back(lexer_state);
-    std::vector<ASTExpr *> exprs;
-    fill_buffer_if_needed();
-    while (lexer_state == states.back() && peek().type != TType::Eof) {
-      if (peek().type == TType::LCurly) {
-        eat();
+    case TType::LT: {
+      eat();  // <
+      auto exprs = std::vector<ASTExpr *>();
+      while (peek().type != TType::GT) {
         exprs.push_back(parse_expr());
-      } else {
-        eat();
+        if (peek().type == TType::Comma) eat();
       }
+      expect(TType::GT);  // >
+      auto tuple = ast_alloc<ASTTuple>();
+      tuple->values = exprs;
+      tuple->type = ast_alloc<ASTType>();
+      return tuple;
     }
-    if (states.back() == lexer_state) {
-      states.pop_back();
-    }
-    auto pos = 0;
-    std::string value = str.value.get_str();
-    while (pos < value.length()) {
-      if (value[pos] == '{') {
-        pos++;
-        auto start = pos;
-        while (value[pos] != '}') {
-          pos++;
-        }
-        value.erase(start, pos - start);
-      } else {
-        ++pos;
+    case TType::Switch: {
+      expect(TType::Switch);
+      auto expr = parse_expr();
+      expect(TType::LCurly);
+      std::vector<SwitchCase> cases;
+      while (peek().type != TType::RCurly) {
+        SwitchCase _case;
+        _case.expression = parse_expr();
+        expect(TType::Colon);
+        _case.block = parse_block();
+        cases.push_back(_case);
       }
-    }
-    node->value = {value};
-    node->interpolated_values = exprs;
-    end_node(node, range);
-    return node;
-  }
-  case TType::LCurly: {
-    auto range = begin_node();
-    eat();
-    auto init_list = ast_alloc<ASTInitializerList>();
-    while (peek().type != TType::RCurly) {
-      init_list->expressions.push_back(parse_expr());
-      if (peek().type == TType::Comma) {
-        eat();
-      }
-    }
-    expect(TType::RCurly);
-    end_node(init_list, range);
-    return init_list;
-  }
-  case TType::Identifier: {
-    auto range = begin_node();
-    if (ctx.scope->find_type_id(tok.value, {}) != -1) {
-      auto type = parse_type();
-      if (peek().type == TType::LCurly) {
-        auto init_list = parse_expr();
-        auto make = ast_alloc<ASTMake>();
-        auto args = ast_alloc<ASTArguments>();
-        args->arguments.push_back(init_list);
-        make->type_arg = type;
-        make->arguments = args;
-        return make;
-      } else {
-        return type;
-      }
-    }
-    eat();
-    auto iden = ast_alloc<ASTIdentifier>();
-    iden->value = tok.value;
-    end_node(iden, range);
-    return iden;
-  }
-  case TType::Null: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::Null;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::True: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::Bool;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::False: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::Bool;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::Integer: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::Integer;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::Float: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::Float;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::String: {
-    auto range = begin_node();
-    eat();
-    auto literal = ast_alloc<ASTLiteral>();
-    literal->tag = ASTLiteral::String;
-    literal->value = tok.value;
-    end_node(literal, range);
-    return literal;
-  }
-  case TType::LParen: {
-    auto range = begin_node();
-    eat(); // consume '('
-
-    // for (Type)expr;
-    if (ctx.scope->find_type_id(peek().value, {}) != -1 ||
-        peek().type == TType::LT) {
-      // CLEANUP: We probably don't wanna use ASTMake for so many things,
-      // but for now it's okay. Actually, we don't want ASTMake at all, it
-      // should get eliminated and ASTConstruct and ASTCast should probably be
-      // added to replace it. This would help us have a more consistent and
-      // clear syntax.
-
-      auto type = parse_type();
-      auto node = ast_alloc<ASTMake>();
-      expect(TType::RParen);
-      node->type_arg = type;
-      node->kind = MAKE_CAST;
-      node->arguments = ast_alloc<ASTArguments>();
-      node->arguments->arguments.push_back(parse_unary());
+      expect(TType::RCurly);
+      auto node = ast_alloc<ASTSwitch>();
+      node->cases = cases;
+      node->target = expr;
+      end_node(node, range);
       return node;
     }
-
-    auto expr = parse_expr();
-
-    if (peek().type != TType::RParen) {
-      throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
+    case TType::Char: {
+      eat();
+      auto node = ast_alloc<ASTLiteral>();
+      node->tag = ASTLiteral::Char;
+      node->value = tok.value;
+      end_node(node, range);
+      return node;
     }
-    eat(); // consume ')'
-    end_node(expr, range);
-    return expr;
-  }
-  default: {
-    throw_error(
-        std::format("Invalid primary expression. Token: '{}'... Type: '{}'",
-                    tok.value, TTypeToString(tok.type)),
-        {token_idx - 5, token_idx});
-    return nullptr;
-  }
+    case TType::DoubleColon: {
+      eat();
+      if (peek().type != TType::Identifier) {
+        end_node(nullptr, range);
+        throw_error(
+            "::Something syntax is only for using enum variants that are "
+            "in your current scope.",
+            range);
+      }
+      auto scope_res = ast_alloc<ASTScopeResolution>();
+      scope_res->base = nullptr;
+      scope_res->member_name = expect(TType::Identifier).value;
+      end_node(scope_res, range);
+      return scope_res;
+    }
+    case TType::Dollar: {
+      auto range = begin_node();
+      eat();
+      auto str = expect(TType::String);
+      auto node = ast_alloc<ASTLiteral>();
+      node->tag = ASTLiteral::InterpolatedString;
+      auto lexer_state = Lexer::State::from_string(str.value.get_str());
+      states.push_back(lexer_state);
+      std::vector<ASTExpr *> exprs;
+      fill_buffer_if_needed();
+      while (lexer_state == states.back() && peek().type != TType::Eof) {
+        if (peek().type == TType::LCurly) {
+          eat();
+          exprs.push_back(parse_expr());
+        } else {
+          eat();
+        }
+      }
+      if (states.back() == lexer_state) {
+        states.pop_back();
+      }
+      auto pos = 0;
+      std::string value = str.value.get_str();
+      while (pos < value.length()) {
+        if (value[pos] == '{') {
+          pos++;
+          auto start = pos;
+          while (value[pos] != '}') {
+            pos++;
+          }
+          value.erase(start, pos - start);
+        } else {
+          ++pos;
+        }
+      }
+      node->value = {value};
+      node->interpolated_values = exprs;
+      end_node(node, range);
+      return node;
+    }
+    case TType::LCurly: {
+      auto range = begin_node();
+      eat();
+      auto init_list = ast_alloc<ASTInitializerList>();
+      while (peek().type != TType::RCurly) {
+        init_list->expressions.push_back(parse_expr());
+        if (peek().type == TType::Comma) {
+          eat();
+        }
+      }
+      expect(TType::RCurly);
+      end_node(init_list, range);
+      return init_list;
+    }
+    case TType::Identifier: {
+      auto range = begin_node();
+      if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+        auto type = parse_type();
+        if (peek().type == TType::LCurly) {
+          auto init_list = parse_expr();
+          auto make = ast_alloc<ASTMake>();
+          auto args = ast_alloc<ASTArguments>();
+          args->arguments.push_back(init_list);
+          make->type_arg = type;
+          make->arguments = args;
+          return make;
+        } else {
+          return type;
+        }
+      }
+      eat();
+      auto iden = ast_alloc<ASTIdentifier>();
+      iden->value = tok.value;
+      end_node(iden, range);
+      return iden;
+    }
+    case TType::Null: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Null;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::True: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Bool;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::False: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Bool;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::Integer: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Integer;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::Float: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::Float;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::String: {
+      auto range = begin_node();
+      eat();
+      auto literal = ast_alloc<ASTLiteral>();
+      literal->tag = ASTLiteral::String;
+      literal->value = tok.value;
+      end_node(literal, range);
+      return literal;
+    }
+    case TType::LParen: {
+      auto range = begin_node();
+      eat();  // consume '('
+
+      // for (Type)expr;
+      if (ctx.scope->find_type_id(peek().value, {}) != -1 || peek().type == TType::LT) {
+        // CLEANUP: We probably don't wanna use ASTMake for so many things,
+        // but for now it's okay. Actually, we don't want ASTMake at all, it
+        // should get eliminated and ASTConstruct and ASTCast should probably be
+        // added to replace it. This would help us have a more consistent and
+        // clear syntax.
+
+        auto type = parse_type();
+        auto node = ast_alloc<ASTMake>();
+        expect(TType::RParen);
+        node->type_arg = type;
+        node->kind = MAKE_CAST;
+        node->arguments = ast_alloc<ASTArguments>();
+        node->arguments->arguments.push_back(parse_unary());
+        return node;
+      }
+
+      auto expr = parse_expr();
+
+      if (peek().type != TType::RParen) {
+        throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
+      }
+      eat();  // consume ')'
+      end_node(expr, range);
+      return expr;
+    }
+    default: {
+      throw_error(
+          std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
+          {token_idx - 5, token_idx});
+      return nullptr;
+    }
   }
 }
 
@@ -1909,8 +1829,7 @@ Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
     SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
-    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type),
-                            TTypeToString(peek().type), peek().value),
+    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
   }
   return eat();
@@ -1919,31 +1838,26 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
   if (peek().type == TType::Directive) {
     eat();
     auto identifier = expect(TType::Identifier);
-    Nullable<ASTNode> node =
-        process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
+    Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
 
     auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
     if (expr.is_not_null()) {
       return expr;
     } else {
-      throw_error("Invalid directive in expression: directives in "
-                  "expressions must return a value.",
+      throw_error(
+          "Invalid directive in expression: directives in "
+          "expressions must return a value.",
 
-                  {std::max(token_idx - 5, int64_t()),
-                   std::max(token_idx + 5, int64_t())});
+          {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
     }
   }
   return nullptr;
 }
-SourceRange Parser::begin_node() {
-  return SourceRange{.begin = token_idx,
-                     .begin_loc = (int64_t)peek().location.line};
-}
+SourceRange Parser::begin_node() { return SourceRange{.begin = token_idx, .begin_loc = (int64_t)peek().location.line}; }
 void Parser::end_node(ASTNode *node, SourceRange &range) {
   range.end = token_idx;
   range.end_loc = peek().location.line;
-  if (node)
-    node->source_range = range;
+  if (node) node->source_range = range;
 }
 Token Parser::peek() const {
   if (states.empty()) {
@@ -1986,8 +1900,7 @@ void Parser::append_type_extensions(ASTType *type) {
         if (size->get_node_type() == AST_NODE_TYPE) {
           type->extension_info.extensions.push_back(TYPE_EXT_MAP);
           auto type = static_cast<ASTType *>(size);
-          type->extension_info.key_type =
-              ctx.scope->find_type_id(type->base, type->extension_info);
+          type->extension_info.key_type = ctx.scope->find_type_id(type->base, type->extension_info);
           printf("KEY TYPE: %d\n", type->extension_info.key_type);
           expect(TType::RBrace);
           continue;
@@ -2012,20 +1925,17 @@ ASTType *Parser::parse_function_type() {
   if (peek().type == TType::Arrow) {
     eat();
     auto return_type = parse_type();
-    info.return_type =
-        ctx.scope->find_type_id(return_type->base, return_type->extension_info);
+    info.return_type = ctx.scope->find_type_id(return_type->base, return_type->extension_info);
   } else {
     info.return_type = void_type();
   }
 
   for (size_t i = 0; i < param_types.size(); ++i) {
-    info.parameter_types[i] = ctx.scope->find_type_id(
-        param_types[i]->base, param_types[i]->extension_info);
+    info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
     info.params_len++;
   }
 
-  output_type->resolved_type =
-      global_find_function_type_id(info, output_type->extension_info);
+  output_type->resolved_type = global_find_function_type_id(info, output_type->extension_info);
   auto t = global_get_type(output_type->resolved_type);
   return output_type;
 }
@@ -2035,41 +1945,41 @@ static Precedence get_operator_precedence(Token token) {
   }
   auto type = token.type;
   switch (type) {
-  case TType::Assign:
-  case TType::ColonEquals:
-  case TType::Concat: // this is for appending to arrays
-  case TType::Erase:  // this is for erase elements for arrays
-    return PRECEDENCE_ASSIGNMENT;
-  case TType::LogicalOr:
-    return PRECEDENCE_LOGICALOR;
-  case TType::LogicalAnd:
-    return PRECEDENCE_LOGICALAND;
-  case TType::Or:
-    return PRECEDENCE_BITWISEOR;
-  case TType::Xor:
-    return PRECEDENCE_BITWISEXOR;
-  case TType::And:
-    return PRECEDENCE_BITWISEAND;
-  case TType::EQ:
-  case TType::NEQ:
-    return PRECEDENCE_EQUALITY;
-  case TType::LT:
-  case TType::GT:
-  case TType::LE:
-  case TType::GE:
-    return PRECEDENCE_RELATIONAL;
-  case TType::SHL:
-  case TType::SHR:
-    return PRECEDENCE_SHIFT;
-  case TType::Add:
-  case TType::Sub:
-    return PRECEDENCE_ADDITIVE;
-  case TType::Mul:
-  case TType::Div:
-  case TType::Modulo:
-    return PRECEDENCE_MULTIPLICATIVE;
-  default:
-    return PRECEDENCE_LOWEST;
+    case TType::Assign:
+    case TType::ColonEquals:
+    case TType::Concat:  // this is for appending to arrays
+    case TType::Erase:   // this is for erase elements for arrays
+      return PRECEDENCE_ASSIGNMENT;
+    case TType::LogicalOr:
+      return PRECEDENCE_LOGICALOR;
+    case TType::LogicalAnd:
+      return PRECEDENCE_LOGICALAND;
+    case TType::Or:
+      return PRECEDENCE_BITWISEOR;
+    case TType::Xor:
+      return PRECEDENCE_BITWISEXOR;
+    case TType::And:
+      return PRECEDENCE_BITWISEAND;
+    case TType::EQ:
+    case TType::NEQ:
+      return PRECEDENCE_EQUALITY;
+    case TType::LT:
+    case TType::GT:
+    case TType::LE:
+    case TType::GE:
+      return PRECEDENCE_RELATIONAL;
+    case TType::SHL:
+    case TType::SHR:
+      return PRECEDENCE_SHIFT;
+    case TType::Add:
+    case TType::Sub:
+      return PRECEDENCE_ADDITIVE;
+    case TType::Mul:
+    case TType::Div:
+    case TType::Modulo:
+      return PRECEDENCE_MULTIPLICATIVE;
+    default:
+      return PRECEDENCE_LOWEST;
   }
 }
 ASTType *ASTType::get_void() {

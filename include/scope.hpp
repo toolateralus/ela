@@ -1,12 +1,13 @@
 #pragma once
 
+#include <string>
+#include <unordered_map>
+#include <unordered_set>
+
 #include "arena.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "type.hpp"
-#include <string>
-#include <unordered_map>
-#include <unordered_set>
 
 extern jstl::Arena scope_arena;
 enum SymbolFlags {
@@ -40,9 +41,7 @@ struct Scope {
     return defines;
   };
 
-  bool add_def(const InternedString &define) {
-    return defines().insert(define).second;
-  }
+  bool add_def(const InternedString &define) { return defines().insert(define).second; }
 
   bool has_def(const InternedString &define) const {
     if (defines().contains(define)) {
@@ -51,9 +50,7 @@ struct Scope {
     return false;
   }
 
-  void undef(const InternedString &define) {
-    defines().erase(define);
-  }
+  void undef(const InternedString &define) { defines().erase(define); }
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
@@ -62,14 +59,12 @@ struct Scope {
   inline int fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function() && name != "this")
-        fields++;
+      if (!sym.is_function() && name != "this") fields++;
     }
     return fields;
   }
 
-  void insert(const InternedString &name, int type_id,
-              int flags = SYMBOL_IS_VARIABLE);
+  void insert(const InternedString &name, int type_id, int flags = SYMBOL_IS_VARIABLE);
 
   Symbol *lookup(const InternedString &name);
 
@@ -82,8 +77,7 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  int create_type(TypeKind kind, const InternedString &name,
-                  TypeInfo *info = nullptr, const TypeExt &ext = {}) {
+  int create_type(TypeKind kind, const InternedString &name, TypeInfo *info = nullptr, const TypeExt &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
     types[name] = id;
     return id;
@@ -95,8 +89,7 @@ struct Scope {
     return id;
   }
 
-  int create_enum_type(const InternedString &name,
-                       const std::vector<InternedString> &fields, bool flags) {
+  int create_enum_type(const InternedString &name, const std::vector<InternedString> &fields, bool flags) {
     auto id = global_create_enum_type(name, fields, flags);
     types[name] = id;
     return id;
@@ -108,13 +101,12 @@ struct Scope {
     return id;
   }
 
-  int create_union_type(const InternedString &name, Scope *scope,
-                        UnionFlags kind) {
+  int create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
     auto id = global_create_union_type(name, scope, kind);
     types[name] = id;
     return id;
   }
-  
+
   int find_type_id(const InternedString &name, const TypeExt &ext) {
     if (!types.contains(name)) {
       if (parent) {
@@ -134,7 +126,6 @@ static Scope *create_child(Scope *parent) {
 }
 
 struct Context {
-
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
   // This type_info_strings field should be in the emit visitor.
   // That's the only place it's used anyway.
@@ -150,8 +141,7 @@ struct Context {
   }
   inline Scope *exit_scope() {
     if (scope == root_scope) {
-      throw_error(
-          "Internal Compiler Error: attempted to exit the global scope.", {});
+      throw_error("Internal Compiler Error: attempted to exit the global scope.", {});
     }
     auto old_scope = scope;
     if (scope) {

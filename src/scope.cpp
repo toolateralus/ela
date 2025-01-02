@@ -1,4 +1,5 @@
 #include "scope.hpp"
+
 #include "type.hpp"
 
 Context::Context() {
@@ -42,7 +43,7 @@ Context::Context() {
     range_scope->insert("span", s64_type());
 
     auto func = FunctionTypeInfo{};
-    func.params_len=1;
+    func.params_len = 1;
     func.parameter_types[0] = s64_type();
     func.return_type = bool_type();
     range_scope->insert("contains", global_find_function_type_id(func, {}));
@@ -59,19 +60,14 @@ Context::Context() {
     assert_info.parameter_types[0] = charptr_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
-    scope->insert(
-        "assert",
-        global_find_function_type_id(assert_info, {}),
-        SYMBOL_IS_FUNCTION);
+    scope->insert("assert", global_find_function_type_id(assert_info, {}), SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;
     // no other function will ever use this type. thats why we have a ?, because
     // we have no first class types yet.
-    scope->insert("sizeof",
-                  global_find_function_type_id(sizeof_info, {}),
-                  SYMBOL_IS_FUNCTION);
+    scope->insert("sizeof", global_find_function_type_id(sizeof_info, {}), SYMBOL_IS_FUNCTION);
   }
 
   // define types used for reflection.
@@ -89,17 +85,13 @@ Context::Context() {
     auto element_id = global_create_struct_type("Element", element_scope);
 
     // Type*
-    auto type_ptr =
-        global_find_type_id(type_id, {.extensions = {TYPE_EXT_POINTER}});
-        
+    auto type_ptr = global_find_type_id(type_id, {.extensions = {TYPE_EXT_POINTER}});
+
     // Field*[]
-    auto field_arr = global_find_type_id(
-        field_id, {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY},
-                  .array_sizes = {nullptr}});
+    auto field_arr =
+        global_find_type_id(field_id, {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
     // Element[]
-    auto element_arr = global_find_type_id(
-        element_id, {.extensions = {TYPE_EXT_ARRAY},
-                  .array_sizes = {nullptr}});
+    auto element_arr = global_find_type_id(element_id, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
     // Field*
     auto field_ptr = global_find_type_id(field_id, {.extensions = {TYPE_EXT_POINTER}});
 
@@ -153,52 +145,51 @@ Context::Context() {
 
     auto type_id = global_create_struct_type("string", str_scope);
 
-    // ** DO NOT REMOVE ** 
+    // ** DO NOT REMOVE **
     string_type() = type_id;
 
     auto type = global_get_type(type_id);
 
-    static_cast<StructTypeInfo*>(type->get_info())->implicit_cast_table = {
-      charptr_type(),
-      c_string_type(),
+    static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
+        charptr_type(),
+        c_string_type(),
     };
 
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
-    str_scope->insert("is_view", bool_type()); // is this a borrowing copy?
+    str_scope->insert("is_view", bool_type());  // is this a borrowing copy?
 
     str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
 
     auto func = FunctionTypeInfo{};
     func.parameter_types[0] = char_type();
     func.return_type = void_type();
-    func.params_len=1;
+    func.params_len = 1;
 
     str_scope->insert("push", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[0] = -1;
-    func.params_len=0;
-    func.return_type=char_type();
+    func.params_len = 0;
+    func.return_type = char_type();
     str_scope->insert("pop", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
-
     func.parameter_types[0] = int_type();
-    func.params_len=1;
-    func.return_type=void_type();
+    func.params_len = 1;
+    func.return_type = void_type();
     str_scope->insert("erase_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[0] = int_type();
     func.parameter_types[1] = char_type();
     func.params_len = 2;
-    func.return_type= void_type();
+    func.return_type = void_type();
     str_scope->insert("insert_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[1] = string_type();
     str_scope->insert("insert_substr_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
-    func.params_len=1;
+    func.params_len = 1;
     func.return_type = string_type();
-    func.parameter_types[0]= range_type();
+    func.parameter_types[0] = range_type();
     str_scope->insert("substr", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     auto sym = str_scope->local_lookup("[");
@@ -206,7 +197,6 @@ Context::Context() {
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
     sym->function_overload_types.push_back(global_find_function_type_id(*info, {}));
-
   }
 
   // Env type
@@ -215,9 +205,10 @@ Context::Context() {
     auto type = global_create_struct_type("Env", scope);
 
     auto func = FunctionTypeInfo{};
-    func.params_len=0;
-    auto str_array = global_find_type_id(string_type(), TypeExt{.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
-    func.return_type = str_array; 
+    func.params_len = 0;
+    auto str_array =
+        global_find_type_id(string_type(), TypeExt{.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
+    func.return_type = str_array;
     scope->insert("args", global_find_function_type_id(func, {}));
     scope->parent = root_scope;
     root_scope->types.insert({"Env", type});
@@ -232,15 +223,13 @@ Context::Context() {
   info.return_type = void_type();
   root_scope->insert("move", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
-
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
   for (int i = 0; i < type_table.size(); ++i) {
     // std::cout << "inserting " << type_table[i].get_base().get_str() << "\n";
-    root_scope->types.insert({type_table[i].get_base(),  i});
+    root_scope->types.insert({type_table[i].get_base(), i});
   }
-
 }
 
 void Scope::insert(const InternedString &name, int type_id, int flags) {
@@ -251,8 +240,8 @@ void Scope::insert(const InternedString &name, int type_id, int flags) {
 
 /*
   !BUG !!! SUPER CRITICAL !!!
-  ! Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be resolved STAT
-  ! There is a repro for this, with a possible and likely explanation for why this is happening
+  ! Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be
+  resolved STAT ! There is a repro for this, with a possible and likely explanation for why this is happening
 */
 
 Symbol *Scope::lookup(const InternedString &name) {
