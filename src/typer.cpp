@@ -597,11 +597,10 @@ std::any Typer::visit(ASTFor *node) {
 
   int iter_ty = -1;
 
-  if (range_type_id == ctx.scope->find_type_id("string", {})) {
+  if (range_type_id == string_type()) {
     iter_ty = char_type();
-  } else if (range_type_id == ctx.scope->find_type_id("Range", {})) {
-  } else if (range_type_id == ctx.scope->find_type_id("Range", {})) {
-    iter_ty = int_type();  // ! THIS SHOULD BE S64 BUT IT CAUSES ANNOY BALLS ISSUES.
+  } else if (range_type_id == ::range_type()) {
+    iter_ty = int_type();
     if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
       throw_error(
           "Cannot use pointer value semantic with a range. use Range{<start>, "

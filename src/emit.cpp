@@ -243,7 +243,7 @@ std::any Emitter::visit(ASTBinExpr *node) {
   }
 
   auto op_ty = node->op.type;
-  auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And;
+  auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And || op_ty == TType::Xor || op_ty == TType::Or;
 
   if (needs_parens) (*ss) << "(";
   auto left = node->left->accept(this);
@@ -882,11 +882,7 @@ std::any Emitter::visit(ASTAllocate *node) {
     case ASTAllocate::New: {
       auto ptr_type = global_get_type(node->type.get()->resolved_type);
       (*ss) << "new ";
-      auto ext = ptr_type->get_ext();
-      ext.extensions.pop_back();
-      auto nonptr = global_find_type_id(ptr_type->base_id, ext);
-      auto nonptr_ty = global_get_type(nonptr);
-      auto str = to_cpp_string(nonptr_ty);
+      auto str = to_cpp_string(global_get_type(ptr_type->get_element_type()));
       (*ss) << str;
       if (!node->arguments) {
         (*ss) << "()";
