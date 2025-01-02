@@ -1,8 +1,8 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  204            106           1657
-src/emit.cpp                                 176             62           1411
+src/ast.cpp                                  204            106           1656
+src/emit.cpp                                 168             44           1392
 src/typer.cpp                                181            120           1142
 src/type.cpp                                  86             44            554
 include/ast.hpp                               81             19            515
@@ -11,7 +11,7 @@ include/lex.hpp                               38              4            303
 include/type.hpp                              56             17            246
 src/lex.cpp                                   19              2            225
 include/constexpr.hpp                         31              0            217
-include/visitor.hpp                           29              6            210
+include/visitor.hpp                           30              6            212
 src/main.cpp                                  46             19            202
 include/core.hpp                              22              2            187
 src/scope.cpp                                 42             30            181
@@ -22,5 +22,5 @@ include/string_builder.hpp                     3              2             70
 include/interned_string.hpp                    4              0             50
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1109            468           7924
+SUM:                                        1102            450           7906
 -----------------------------------------------------------------------------------------

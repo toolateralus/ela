@@ -143,6 +143,9 @@ struct Emitter : VisitorBase {
   int indentLevel = 0;
   Context &ctx;
 
+  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
+                               compile_command.compilation_flags.contains("-nostdlib");
+                               
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.

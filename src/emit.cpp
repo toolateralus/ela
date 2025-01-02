@@ -58,11 +58,9 @@ std::any Emitter::visit(ASTElse *node) {
 }
 std::any Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
-
   auto old_scope = ctx.scope;
   ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
-
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
     // Emit old-style for loop for pointer semantics
     (*ss) << "auto* ";
@@ -83,7 +81,6 @@ std::any Emitter::visit(ASTFor *node) {
     (*ss) << " : ";
     node->range->accept(this);
   }
-
   (*ss) << ")";
   node->block->accept(this);
   ctx.set_scope(old_scope);
@@ -121,13 +118,6 @@ std::any Emitter::visit(ASTArguments *node) {
 }
 std::any Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
-
-  if (!type) {
-    throw_error(
-        "Internal compiler error: an ASTType* was null when trying to "
-        "find it's type in the table",
-        node->source_range);
-  }
 
   // For reflection
   if (node->flags == ASTTYPE_EMIT_OBJECT) {
@@ -210,6 +200,7 @@ std::any Emitter::visit(ASTUnaryExpr *node) {
     (*ss) << ".pop()";
     return {};
   }
+
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
@@ -231,9 +222,6 @@ std::any Emitter::visit(ASTBinExpr *node) {
     (*ss) << ");\n";
     return {};
   }
-
-  // CLEANUP(Josh) 10/14/2024, 10:13:23 AM
-  // Get rid of these janky operators and just use generic methods.
   if (node->op.type == TType::Concat) {
     node->left->accept(this);
     (*ss) << ".push(";
@@ -241,25 +229,18 @@ std::any Emitter::visit(ASTBinExpr *node) {
     (*ss) << ");\n";
     return {};
   }
-
   auto op_ty = node->op.type;
-  // auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And || op_ty == TType::Xor || op_ty == TType::Or;
-
-  // if (needs_parens) 
   (*ss) << "(";
   auto left = node->left->accept(this);
   space();
   (*ss) << node->op.value.get_str();
-
   if (node->op.type == TType::Assign) {
     auto type = global_get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer();
     if (isptr) (*ss) << "(" << to_cpp_string(type) << ")";
   }
-
   space();
   auto right = node->right->accept(this);
-  // if (needs_parens) 
   (*ss) << ")";
   return {};
 }
@@ -269,30 +250,13 @@ std::any Emitter::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return {};
 }
+
 std::any Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name.value);
 
-  if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
-    if (node->value.is_not_null()) {
-      (*ss) << " = ";
-      cast_pointers_implicit(node);
-      node->value.get()->accept(this);
-    }
-    return {};
-  }
-
-  const auto is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
-                               compile_command.compilation_flags.contains("-nostdlib");
-
-  if (node->is_bitfield) {
-    node->type->accept(this);
-    space();
-    (*ss) << node->name.value.get_str();
-    space();
-    (*ss) << ": " << node->bitsize.value.get_str();
+  auto handle_initialization = [&]() {
     if (node->value.is_not_null()) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
@@ -300,6 +264,21 @@ std::any Emitter::visit(ASTDeclaration *node) {
     } else if (emit_default_init) {
       (*ss) << "{}";
     }
+  };
+
+  if (type->is_kind(TYPE_FUNCTION)) {
+    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
+    handle_initialization();
+    return {};
+  }
+
+  if (node->is_bitfield) {
+    node->type->accept(this);
+    space();
+    (*ss) << node->name.value.get_str();
+    space();
+    (*ss) << ": " << node->bitsize.value.get_str();
+    handle_initialization();
     return {};
   }
 
@@ -307,26 +286,8 @@ std::any Emitter::visit(ASTDeclaration *node) {
     get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
-    } else if (emit_default_init && !type->get_ext().is_pointer() && !is_freestanding) {
-      bool cancelled = false;
-      std::string init = "{";
-      for (int i = 0; i < type->get_ext().array_sizes[0]; ++i) {
-        auto elem = type->get_element_type();
-        auto ty = global_get_type(elem);
-        // * We never emit initializers for these sub arrays.
-        // TODO: find a way to actually zero initialize all these fixed buffers
-        // without hacky lambdas everywhere.
-        if (ty->get_ext().is_fixed_sized_array()) {
-          cancelled = true;
-          break;
-        }
-        init += " " + to_cpp_string(ty) + "(),";
-      }
-      if (!cancelled) {
-        init.pop_back();
-        init += "}";
-        (*ss) << init;
-      }
+    } else if (emit_default_init) {
+      (*ss) << "{}";
     }
     return {};
   }
@@ -341,16 +302,10 @@ std::any Emitter::visit(ASTDeclaration *node) {
   space();
   (*ss) << node->name.value.get_str();
   space();
-  if (node->value.is_not_null()) {
-    (*ss) << " = ";
-    cast_pointers_implicit(node);
-    node->value.get()->accept(this);
-  } else if (emit_default_init) {
-    (*ss) << "{}";
-  }
-
+  handle_initialization();
   return {};
 }
+
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   if ((node->flags & FUNCTION_IS_METHOD) != 0 || (node->flags & FUNCTION_IS_STATIC) != 0) {
     return;
@@ -403,6 +358,77 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   }
 }
 std::any Emitter::visit(ASTFunctionDeclaration *node) {
+  auto emit_function_signature_and_body = [&](const std::string &name) {
+    node->return_type->accept(this);
+    (*ss) << " " + name;
+    node->params->accept(this);
+    if (node->block.is_not_null()) {
+      node->block.get()->accept(this);
+    }
+  };
+
+  auto emit_destructor = [&]() {
+    auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
+                                       : current_union_decl.get()->type->resolved_type;
+    auto type = global_get_type(type_id);
+    auto name = type->get_base().get_str();
+    (*ss) << '~' << name << "()";
+    if (!node->block) throw_error("Cannot forward declare a constructor", node->source_range);
+    node->block.get()->accept(this);
+  };
+
+  auto emit_constructor = [&]() {
+    auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
+                                       : current_union_decl.get()->type->resolved_type;
+    auto type = global_get_type(type_id);
+    auto name = type->get_base().get_str();
+    (*ss) << name;
+
+    auto is_copy_ctor =
+        node->params->params.size() == 1 && node->params->params[0]->type->resolved_type ==
+                                                (current_struct_decl ? current_struct_decl.get()->type->resolved_type
+                                                                     : current_union_decl.get()->type->resolved_type);
+
+    if (is_copy_ctor) {
+      (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str() << ")";
+      node->block.get()->accept(this);
+      (*ss) << ";\n";
+      (*ss) << name;
+      (*ss) << "(const " << name << " &" << node->params->params[0]->name.get_str() << ")";
+      node->block.get()->accept(this);
+      (*ss) << ";\n";
+    } else {
+      node->params->accept(this);
+      if (!node->block) {
+        throw_error("Cannot forward declare a constructor", node->source_range);
+      }
+      node->block.get()->accept(this);
+    }
+  };
+
+  auto emit_operator = [&]() {
+    auto op = node->name;
+
+    if (op.type == TType::LParen) {
+      op.value = "()";
+    }
+    if (op.type == TType::LBrace) {
+      op.value = "[]";
+    }
+    if (op.type == TType::Dot) {
+      op.value = "->";
+    }
+    node->return_type->accept(this);
+    (*ss) << " operator " << op.value.get_str();
+
+    if (op.type == TType::Increment || op.type == TType::Decrement) {
+      (*ss) << "(int)";
+    } else {
+      node->params->accept(this);
+    }
+    node->block.get()->accept(this);
+  };
+
   auto emit_various_function_declarations = [&] {
     if ((node->flags & FUNCTION_IS_STATIC) != 0) {
       (*ss) << "static ";
@@ -420,72 +446,17 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     }
 
     if ((node->flags & FUNCTION_IS_DTOR) != 0) {
-      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                         : current_union_decl.get()->type->resolved_type;
-      auto type = global_get_type(type_id);
-      auto name = type->get_base().get_str();
-      // TODO: in the typer, we need to assert that a destructor never takes
-      // parameters.
-      (*ss) << '~' << name << "()";
-      if (!node->block) throw_error("Cannot forward declare a constructor", node->source_range);
-      node->block.get()->accept(this);
+      emit_destructor();
       return;
     }
 
     if ((node->flags & FUNCTION_IS_CTOR) != 0) {
-      auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                         : current_union_decl.get()->type->resolved_type;
-      auto type = global_get_type(type_id);
-      auto name = type->get_base().get_str();
-      (*ss) << name;
-
-      auto is_copy_ctor =
-          node->params->params.size() == 1 && node->params->params[0]->type->resolved_type ==
-                                                  (current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                                                       : current_union_decl.get()->type->resolved_type);
-
-      if (is_copy_ctor) {
-        (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str() << ")";
-        node->block.get()->accept(this);
-        (*ss) << ";\n";
-        (*ss) << name;
-        (*ss) << "(const " << name << " &" << node->params->params[0]->name.get_str() << ")";
-        node->block.get()->accept(this);
-        (*ss) << ";\n";
-        return;
-
-      } else {
-        node->params->accept(this);
-      }
-
-      if (!node->block) {
-        throw_error("Cannot forward declare a constructor", node->source_range);
-      }
-      node->block.get()->accept(this);
+      emit_constructor();
       return;
     }
 
     if ((node->flags & FUNCTION_IS_OPERATOR) != 0) {
-      auto op = node->name;
-
-      if (op.type == TType::LParen) {
-        op.value = "()";
-      }
-      if (op.type == TType::LBrace) {
-        op.value = "[]";
-      }
-      if (op.type == TType::Dot) {
-        op.value = "->";
-      }
-      node->return_type->accept(this);
-      (*ss) << " operator " << op.value.get_str();
-
-      if (op.type == TType::Increment || op.type == TType::Decrement) {
-        (*ss) << "(int)";
-      } else {
-        node->params->accept(this);
-      }
-      node->block.get()->accept(this);
+      emit_operator();
       return;
     }
 
@@ -493,33 +464,18 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "extern \"C\" ";
     }
 
-    static auto use_stdlib = !compile_command.compilation_flags.contains("-nostdlib") &&
-                             !compile_command.compilation_flags.contains("-ffreestanding");
-
-    // we override main's return value to allow compilation without explicitly
-    // returning int from main.
-    if (node->name.value == "main" && use_stdlib) {
-      has_user_defined_main = true;
-      node->return_type->accept(this);
-      (*ss) << " __ela_main_()";  // We use Env::args() to get args now.
-      node->block.get()->accept(this);
-      // This is for a main function when we're not using the stdlib, so you
-      // just take a C style main, since you don't have dynamic arrays.
-    } else if (node->name.value == "main") {
-      (*ss) << "int ";
-      node->return_type->accept(this);
-      // emit parameter signature && name.
-      (*ss) << " " + node->name.value.get_str();
-      node->params->accept(this);
-      // the function's block would only be null in a #foreign function
-      if (node->block.is_not_null()) node->block.get()->accept(this);
+    if (node->name.value == "main") {
+      if (!is_freestanding) {
+        has_user_defined_main = true;
+        node->return_type->accept(this);
+        (*ss) << " __ela_main_()";  // We use Env::args() to get args now.
+        node->block.get()->accept(this);
+      } else {
+        (*ss) << "int ";
+        emit_function_signature_and_body(node->name.value.get_str());
+      }
     } else {
-      node->return_type->accept(this);
-      // emit parameter signature && name.
-      (*ss) << " " + node->name.value.get_str();
-      node->params->accept(this);
-      // the function's block would only be null in a #foreign function
-      if (node->block.is_not_null()) node->block.get()->accept(this);
+      emit_function_signature_and_body(node->name.value.get_str());
     }
   };
 
@@ -595,7 +551,6 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   indentLevel--;
   return {};
 }
-
 std::any Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   auto type_name = node->type->base.get_str();
@@ -618,7 +573,6 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
   (*ss) << "};\n";
   return {};
 }
-
 std::any Emitter::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl) {
     (*ss) << "union " << node->name.value.get_str() << ";\n";
@@ -712,6 +666,7 @@ std::any Emitter::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
   for (const auto &statement : node->statements) {
+    emit_line_directive(node);
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
@@ -727,11 +682,9 @@ std::any Emitter::visit(ASTBlock *node) {
 std::any Emitter::visit(ASTProgram *node) {
   emit_line_directive(node);
 
-  const auto testing = compile_command.has_flag("test");
-  const auto use_stdlib = !compile_command.compilation_flags.contains("-nostdlib") &&
-                          !compile_command.compilation_flags.contains("-ffreestanding");
+  static const auto testing = compile_command.has_flag("test");
 
-  if (use_stdlib) {
+  if (!is_freestanding) {
     code << "#define USE_STD_LIB 1\n";
   } else {
     for (int i = 0; i < type_table.size(); ++i) {
@@ -766,7 +719,7 @@ std::any Emitter::visit(ASTProgram *node) {
 
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
 
-  if (use_stdlib) code << "extern Type **_type_info;\n";
+  if (!is_freestanding) code << "extern Type **_type_info;\n";
 
   if (testing) {
     code << "#define TESTING\n";
@@ -790,7 +743,7 @@ std::any Emitter::visit(ASTProgram *node) {
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   } else {
-    if (has_user_defined_main && use_stdlib)
+    if (has_user_defined_main && !is_freestanding)
       code << R"__(
 int main (int argc, char** argv) {
   // Bootstrap the env
@@ -805,7 +758,7 @@ int main (int argc, char** argv) {
 
   // Emit runtime reflection type info for requested types, only when we have
   // actually requested runtime type information.
-  if (!ctx.type_info_strings.empty() && use_stdlib) {
+  if (!ctx.type_info_strings.empty() && !is_freestanding) {
     std::stringstream type_info{};
     for (const auto &str : ctx.type_info_strings) {
       type_info << str.get_str() << ";\n";
@@ -819,7 +772,8 @@ int main (int argc, char** argv) {
         type_table.size(), type_info.str());
   }
 
-  if (!use_stdlib && !ctx.type_info_strings.empty()) {
+  // TODO: if we're freestanding, we should just emit ID's only for #type().
+  if (is_freestanding && !ctx.type_info_strings.empty()) {
     throw_error(
         "You cannot use runtime type reflection in a freestanding or "
         "nostdlib environment, due to a lack of allocators. To compare "
@@ -1080,7 +1034,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
     int i = 0;
     for (const auto &t : info->types) {
       format_str += get_format_str(t, node);
-      if (i != info->types.size()-1) {
+      if (i != info->types.size() - 1) {
         format_str += ", ";
       }
       ++i;
@@ -1522,8 +1476,8 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 std::string Emitter::to_cpp_string(const TypeExt &extensions, const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   StringBuilder ss;
-  
-  // TODO: we need to fix the emitting of 'c_string' as const char*, 
+
+  // TODO: we need to fix the emitting of 'c_string' as const char*,
   // right now it's fricked up.
   ss << base;
 

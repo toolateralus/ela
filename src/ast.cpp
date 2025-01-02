@@ -110,8 +110,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
 }
 
 // clang-format off
-std::vector<DirectiveRoutine> Parser:: directive_routines =
-{
+std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #include
     // Just like C's include, just paste a text file right above where the
     // include is used.
