@@ -556,7 +556,6 @@ struct Typer;
 
 struct Parser {
   Typer *typer;
-  bool allow_function_type_parsing = true;
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
@@ -612,3 +611,5 @@ struct Parser {
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
 };
+
+

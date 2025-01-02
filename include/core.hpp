@@ -165,7 +165,7 @@ struct SourceRange {
     return begin < 0 || end < 0 || begin > end || begin == end || begin > all_tokens.size() || end > all_tokens.size();
   }
   int64_t begin, end;
-  int64_t begin_loc, end_loc;
+  int64_t begin_loc;
   std::vector<Token> get_tokens() const {
     int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
     int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
