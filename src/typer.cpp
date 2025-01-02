@@ -367,11 +367,10 @@ std::any Typer::visit(ASTFunctionDeclaration *node) {
             node->source_range);
       }
 
-      ctx.scope->insert("this", get_pointer_to_type(ty));
+      ctx.scope->insert("this", global_get_type(ty)->take_pointer_to());
     } else if (current_union_decl) {
       ctx.scope->insert("this",
-                        get_pointer_to_type(
-                            current_union_decl.get()->type->resolved_type));
+                        global_get_type(current_union_decl.get()->type->resolved_type)->take_pointer_to());
     }
   }
 
@@ -1141,7 +1140,7 @@ std::any Typer::visit(ASTDotExpr *node) {
       return s32_type();
     }
     if (node->member_name == "data") {
-      return get_pointer_to_type(base_ty->get_element_type());
+      return global_get_type(base_ty->get_element_type())->take_pointer_to();
     }
   }
 

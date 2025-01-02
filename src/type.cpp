@@ -398,7 +398,7 @@ int Type::get_element_type() const {
   if (!extensions.is_pointer() && !extensions.is_array() &&
       !extensions.is_fixed_sized_array() && !extensions.is_map()) {
     throw_error("Internal compiler error: called get_element_type() on a non "
-                "pointer/array/map type.",
+    "pointer/array/map type.",
                 {});
   }
   auto extensions = this->get_ext().without_back();
@@ -612,16 +612,6 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type,
   }
 }
 
-int get_pointer_to_type(int base) {
-  auto type = global_get_type(base);
-  auto extensions = type->get_ext();
-  extensions.extensions.push_back({TYPE_EXT_POINTER});
-  auto id = global_find_type_id(type->id, extensions);
-  if (id == -1) {
-    throw_error("Failed to get pointer to type", {});
-  }
-  return id;
-}
 void init_type_system() {
   // Signed integers
   {
@@ -763,5 +753,5 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
 int Type::take_pointer_to() const {
   auto ext = this->extensions;
   ext.extensions.push_back(TYPE_EXT_POINTER);
-  return global_find_type_id(base_id, ext);
+  return global_find_type_id(id, ext);
 }

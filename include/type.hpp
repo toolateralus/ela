@@ -305,7 +305,6 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range);
-int get_pointer_to_type(int base);
 
 struct Type {
   int id = invalid_id;
