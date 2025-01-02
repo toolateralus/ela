@@ -1525,11 +1525,11 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 std::string Emitter::to_cpp_string(const TypeExt &extensions, const std::string &base) {
   std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
   StringBuilder ss;
-  if (base == "c_string") {
-    ss << "const char *";
-  } else {
-    ss << base;
-  }
+  
+  // TODO: we need to fix the emitting of 'c_string' as const char*, 
+  // right now it's fricked up.
+  ss << base;
+  
 
   for (const auto ext : extensions.extensions) {
     if (ext == TYPE_EXT_ARRAY) {
