@@ -684,7 +684,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       // <1, 2, 3>; is valid
       // <1, 2, 3 > 10>; can work too.
       auto lookahead = lookahead_buf();
-      bool is_gt = peek().type == TType::GT;
+      bool is_gt = peek().type == TType::RParen;
       bool is_not_identifier = lookahead[1].type != TType::Identifier;
       bool is_not_literal = lookahead[1].family != TFamily::Literal;
       bool is_not_operator = (lookahead[1].family != TFamily::Operator || lookahead[1].type != TType::LParen);
@@ -830,19 +830,6 @@ ASTExpr *Parser::parse_primary() {
   auto range = begin_node();
 
   switch (tok.type) {
-    case TType::LT: {
-      eat();  // <
-      auto exprs = std::vector<ASTExpr *>();
-      while (peek().type != TType::GT) {
-        exprs.push_back(parse_expr());
-        if (peek().type == TType::Comma) eat();
-      }
-      expect(TType::GT);  // >
-      auto tuple = ast_alloc<ASTTuple>();
-      tuple->values = exprs;
-      tuple->type = ast_alloc<ASTType>();
-      return tuple;
-    }
     case TType::Switch: {
       expect(TType::Switch);
       auto expr = parse_expr();
@@ -1017,7 +1004,8 @@ ASTExpr *Parser::parse_primary() {
     }
     case TType::LParen: {
       auto range = begin_node();
-      eat();  // consume '('
+      expect(TType::LParen);  // (
+      const auto lookahead = lookahead_buf();
 
       // for (Type)expr;
       if (ctx.scope->find_type_id(peek().value, {}) != -1 || peek().type == TType::LT) {
@@ -1039,9 +1027,28 @@ ASTExpr *Parser::parse_primary() {
 
       auto expr = parse_expr();
 
+      if (peek().type == TType::Comma) {
+        eat();
+        auto exprs = std::vector<ASTExpr *>{
+          expr
+        };
+        while (peek().type != TType::RParen) {
+          exprs.push_back(parse_expr());
+          if (peek().type == TType::Comma) eat();
+        }
+        expect(TType::RParen); 
+        auto tuple = ast_alloc<ASTTuple>();
+        tuple->values = exprs;
+        tuple->type = ast_alloc<ASTType>();
+        return tuple;
+      }
+
       if (peek().type != TType::RParen) {
         throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
       }
+
+
+
       eat();  // consume ')'
       end_node(expr, range);
       return expr;
@@ -1060,14 +1067,14 @@ ASTType *Parser::parse_type() {
 
   // TODO: refactor tuples to use a different set of symbols.
   // ! Nested tuples think that >> closing them is a shift right symbol
-  if (peek().type == TType::LT) {
+  if (peek().type == TType::LParen) {
     eat();
     std::vector<ASTType *> types;
-    while (peek().type != TType::GT) {
+    while (peek().type != TType::RParen) {
       types.push_back(parse_type());
       if (peek().type == TType::Comma) eat();
     }
-    expect(TType::GT);
+    expect(TType::RParen);
     auto node = ast_alloc<ASTType>();
     node->resolved_type = -1;
     node->flags = 0;
@@ -1108,7 +1115,6 @@ ASTType *Parser::parse_type() {
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
-
 
   if (peek().type == TType::Identifier && 
       lookahead_buf()[1].type == TType::DoubleColon &&

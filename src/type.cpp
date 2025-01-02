@@ -357,8 +357,7 @@ int Type::get_element_type() const {
   if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array() &&
       !extensions.is_map()) {
     throw_error(
-        "Internal compiler error: called get_element_type() on a non "
-        "pointer/array/map type.",
+        std::format("Internal compiler error: called get_element_type() on a non pointer/array/map type. {}", to_string()),
         {});
   }
   auto extensions = this->get_ext().without_back();
