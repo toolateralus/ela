@@ -522,12 +522,6 @@ enum DirectiveKind {
   DIRECTIVE_KIND_DONT_CARE,
 };
 
-enum ParserState {
-  PARSER_STATE_NONE,
-  PARSER_STATE_ARGUMENTS,
-  PARSER_STATE_TUPLE,
-};
-
 struct Parser;
 struct DirectiveRoutine {
   ~DirectiveRoutine() = default;
@@ -562,7 +556,6 @@ struct Typer;
 
 struct Parser {
   Typer *typer;
-  ParserState state;
   bool allow_function_type_parsing = true;
   ASTProgram *parse();
   ASTStatement *parse_statement();
