@@ -255,7 +255,7 @@ std::any Emitter::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     auto type = global_get_type(node->resolved_type);
-    auto isptr = type->get_ext().is_pointer(1);
+    auto isptr = type->get_ext().is_pointer();
     if (isptr)
       (*ss) << "(" << to_cpp_string(type) << ")";
   }
@@ -1034,7 +1034,7 @@ std::any Emitter::visit(ASTTupleDeconstruction *node) {
 // I don't mind implicit casting to void*/u8*
 void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
-  if (type->get_ext().is_pointer(1))
+  if (type->get_ext().is_pointer())
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
@@ -1608,7 +1608,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 
   if (id == c_string_type()) {
     name = "const char";
-  } else if (type->get_base() == "u8" && type->get_ext().is_pointer(1)) {
+  } else if (type->get_base() == "u8" && type->get_ext().is_pointer()) {
     name = "char";
   } else {
     return to_cpp_string(type);

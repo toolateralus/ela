@@ -117,16 +117,8 @@ struct TypeExt {
     return false;
   }
 
-  inline bool is_pointer(int depth = -1) const {
-    if (depth == -1) {
-      return std::find(extensions.rbegin(), extensions.rend(),
-                       TYPE_EXT_POINTER) != extensions.rend();
-    }
-    if (depth > extensions.size()) {
-      return false;
-    }
-    return std::all_of(extensions.rbegin(), extensions.rbegin() + depth,
-                       [](TypeExtEnum ext) { return ext == TYPE_EXT_POINTER; });
+  inline bool is_pointer() const {
+    return has_extensions() && extensions.back() == TYPE_EXT_POINTER;
   }
 
   inline bool operator==(const TypeExt &other) const { return equals(other); }

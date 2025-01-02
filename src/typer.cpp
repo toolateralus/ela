@@ -714,10 +714,7 @@ std::any Typer::visit(ASTFor *node) {
   }
 
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    auto type = global_get_type(iter_ty);
-    auto ext = type->get_ext();
-    ext.extensions.push_back(TYPE_EXT_POINTER);
-    iter_ty = ctx.scope->find_type_id(type->get_base(), ext);
+    iter_ty = global_get_type(iter_ty)->take_pointer_to();
   }
 
   ctx.scope->insert(iden->value, iter_ty);

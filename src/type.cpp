@@ -191,7 +191,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to,
 
   // allow pointer arithmetic
   const auto from_is_scalar_ptr =
-      from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer(-1);
+      from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer();
   const auto to_is_non_ptr_number =
       type_is_numerical(to) && to->get_ext().has_no_extensions();
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
@@ -210,7 +210,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to,
   // TODO: probably want to fix this. right now we have C style pointer casting:
   // any two pointers of the same depth can cast implicitly
   const auto implicit_ptr_cast =
-      from->get_ext().is_pointer(1) && to->get_ext().is_pointer(1);
+      from->get_ext().is_pointer() && to->get_ext().is_pointer();
 
   // If we have a fixed array such as
   // char[5] and the argument takes void*
@@ -221,13 +221,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to,
     if (!from->get_ext().is_fixed_sized_array())
       return false;
 
-    if (!to->get_ext().is_pointer(1))
+    if (!to->get_ext().is_pointer())
       return false;
 
-    auto element_ty_base = from->get_element_type();
-    auto element_ptr_type = global_get_type(global_find_type_id(
-        element_ty_base, {.extensions = {TYPE_EXT_POINTER}}));
-    auto rule = type_conversion_rule(element_ptr_type, to, source_range);
+    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to());
+    auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
+
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
 
@@ -398,7 +397,7 @@ int Type::get_element_type() const {
   if (!extensions.is_pointer() && !extensions.is_array() &&
       !extensions.is_fixed_sized_array() && !extensions.is_map()) {
     throw_error("Internal compiler error: called get_element_type() on a non "
-    "pointer/array/map type.",
+                "pointer/array/map type.",
                 {});
   }
   auto extensions = this->get_ext().without_back();
