@@ -114,7 +114,7 @@ int global_find_type_id(std::vector<int> &tuple_types,
     if (!type->is_kind(TYPE_TUPLE))
       continue;
 
-    auto info = static_cast<TupleTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<TupleTypeInfo>());
 
     if (info->types.size() != tuple_types.size())
       continue;
@@ -143,16 +143,16 @@ int global_find_type_id(std::vector<int> &tuple_types,
 // large programs. However per 500 lines of unit tsting which creates a wide
 // variety of types, we only really get like 50-100 types total, so a hash map
 // is not really going to pay off that much probably.
-ConversionRule type_conversion_rule(const Type *from, const Type *to) {
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
   if (!from || !to) {
     throw_error("Internal Compiler Error: type was null when checking type "
                 "conversion rules",
-                {});
+                source_range);
   }
 
   if (from->is_kind(TYPE_TUPLE) && to->is_kind(TYPE_TUPLE)) {
-    auto from_info = static_cast<TupleTypeInfo *>(from->get_info());
-    auto to_info = static_cast<TupleTypeInfo *>(to->get_info());
+    auto from_info = (from->get_info()->as<TupleTypeInfo>());
+    auto to_info = (to->get_info()->as<TupleTypeInfo>());
 
     if (from_info->types.size() != to_info->types.size()) {
       return CONVERT_PROHIBITED;
@@ -163,7 +163,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
       auto from_t = from_info->types[i];
       auto to_t = to_info->types[i];
       rule =
-          type_conversion_rule(global_get_type(from_t), global_get_type(to_t));
+          type_conversion_rule(global_get_type(from_t), global_get_type(to_t), source_range);
       if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
         return rule;
       }
@@ -225,7 +225,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
     auto element_ty_base = from->get_element_type();
     auto element_ptr_type = global_get_type(global_find_type_id(
         element_ty_base, {.extensions = {TYPE_EXT_POINTER}}));
-    auto rule = type_conversion_rule(element_ptr_type, to);
+    auto rule = type_conversion_rule(element_ptr_type, to, source_range);
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
 
@@ -234,8 +234,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   }
 
   if (from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
-    auto enum_info = static_cast<EnumTypeInfo *>(from->get_info());
-    return type_conversion_rule(global_get_type(enum_info->element_type), to);
+    auto enum_info = (from->get_info()->as<EnumTypeInfo>());
+    return type_conversion_rule(global_get_type(enum_info->element_type), to, source_range);
   }
 
   auto info = to->get_info();
@@ -258,7 +258,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
         global_find_type_id(from->base_id, from->get_ext().without_back()));
     auto to_base = global_get_type(
         global_find_type_id(to->base_id, to->get_ext().without_back()));
-    return type_conversion_rule(from_base, to_base);
+    return type_conversion_rule(from_base, to_base, source_range);
   }
 
   return CONVERT_PROHIBITED;
@@ -320,7 +320,7 @@ bool TypeExt::equals(const TypeExt &other) const {
 std::string Type::to_string() const {
   switch (kind) {
   case TYPE_FUNCTION:
-    return static_cast<FunctionTypeInfo *>(get_info())->to_string(extensions) +
+    return (get_info()->as<FunctionTypeInfo>())->to_string(extensions) +
            extensions.to_string();
   case TYPE_STRUCT:
   case TYPE_TUPLE:
@@ -415,7 +415,7 @@ int Type::get_element_type() const {
       extensions.array_sizes.pop_back();
 
       if (is_kind(TYPE_TUPLE)) {
-        auto info = static_cast<TupleTypeInfo *>(get_info());
+        auto info = (get_info()->as<TupleTypeInfo>());
         return global_find_type_id(info->types, extensions);
       } else
         return global_find_type_id(base_id, extensions);
@@ -553,7 +553,7 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   if (!type->is_kind(TYPE_FUNCTION)) {
     return false;
   }
-  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<FunctionTypeInfo>());
   for (int i = 0; i < info->params_len; ++i) {
     out.push_back(info->parameter_types[i]);
   }
@@ -694,8 +694,8 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   if (from->kind != TYPE_SCALAR || to->kind != TYPE_SCALAR)
     return false;
 
-  auto from_info = static_cast<ScalarTypeInfo *>(from->get_info());
-  auto to_info = static_cast<ScalarTypeInfo *>(to->get_info());
+  auto from_info = (from->get_info()->as<ScalarTypeInfo>());
+  auto to_info = (to->get_info()->as<ScalarTypeInfo>());
 
   // do not allow casting of float to integer implicitly
   if (!from_info->is_integral && to_info->is_integral) {

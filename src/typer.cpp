@@ -23,7 +23,7 @@ void assert_types_can_cast_or_equal(
     const std::string &message) {
   auto from_t = global_get_type(from);
   auto to_t = global_get_type(to);
-  auto conv_rule = type_conversion_rule(from_t, to_t);
+  auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
   if (to != from &&
       (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
     throw_error(message + '\n' +
@@ -59,7 +59,7 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
          symbol->function_overload_types | std::ranges::views::enumerate) {
 
       auto ovrld_ty = global_get_type(overload);
-      auto info = static_cast<FunctionTypeInfo *>(ovrld_ty->get_info());
+      auto info = (ovrld_ty->get_info()->as<FunctionTypeInfo>());
 
       bool match = true;
       int required_params = info->params_len - info->default_params;
@@ -76,7 +76,8 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol,
           } else {
             auto conversion_rule = type_conversion_rule(
                 global_get_type(arg_tys[j]),
-                global_get_type(info->parameter_types[j]));
+                global_get_type(info->parameter_types[j]),
+                node->source_range);
             if (conversion_rule == CONVERT_EXPLICIT &&
                 NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
               match = false;
@@ -156,7 +157,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
   if (type->is_kind(TYPE_SCALAR)) {
     // this is just a plain scalar type, such as an int.
   } else if (type->is_kind(TYPE_STRUCT)) {
-    auto info = static_cast<StructTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<StructTypeInfo>());
 
     // TODO: re enable this once we can find constructors
     for (const auto &[name, symbol] : info->scope->symbols) {
@@ -172,7 +173,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       if (!type)
         continue;
 
-      auto info = static_cast<FunctionTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<FunctionTypeInfo>());
       auto &params = info->parameter_types;
 
       if (info->params_len != node->expressions.size()) {
@@ -181,7 +182,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
 
       for (int i = 0; i < info->params_len; ++i) {
         auto type = global_get_type(params[i]);
-        auto rule = type_conversion_rule(type, global_get_type(node->types[i]));
+        auto rule = type_conversion_rule(type, global_get_type(node->types[i]), node->source_range);
         if (rule != CONVERT_NONE_NEEDED && rule != CONVERT_IMPLICIT) {
           continue;
         }
@@ -220,7 +221,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node,
       i++;
     }
   } else if (type->is_kind(TYPE_UNION)) {
-    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<UnionTypeInfo>());
     if (node->types.size() > 1) {
       throw_error("You can only initialize one field of a union with an "
                   "initializer list",
@@ -255,7 +256,7 @@ std::any Typer::visit(ASTStructDeclaration *node) {
   Defer _([&] { current_struct_decl = last_decl; });
 
   auto type = global_get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
     return {};
@@ -344,7 +345,7 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
   node->element_type = elem_type;
 
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->type->base, {}));
-  auto info = static_cast<EnumTypeInfo *>(enum_type->get_info());
+  auto info = (enum_type->get_info()->as<EnumTypeInfo>());
   info->element_type = elem_type;
 
   return {};
@@ -503,8 +504,8 @@ std::any Typer::visit(ASTDeclaration *node) {
     }
 
     if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions()) {
-      auto info = static_cast<ScalarTypeInfo *>(type->get_info());
-      auto rule = type_conversion_rule(type, global_get_type(int_type()));
+      auto info = (type->get_info()->as<ScalarTypeInfo>());
+      auto rule = type_conversion_rule(type, global_get_type(int_type()), node->source_range);
       if (info->is_integral && rule != CONVERT_PROHIBITED &&
           rule != CONVERT_EXPLICIT) {
         // CLEANUP: again, make sure we need to mock this up to this extent. I
@@ -806,7 +807,7 @@ std::any Typer::visit(ASTCall *node) {
     find_function_overload(node, symbol, arg_tys, type);
   }
 
-  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<FunctionTypeInfo>());
 
   if (!info->is_varargs &&
       (arg_tys.size() > info->params_len ||
@@ -932,7 +933,7 @@ std::any Typer::visit(ASTBinExpr *node) {
   {
     if (type && type->is_kind(TYPE_STRUCT) &&
         type->get_ext().has_no_extensions()) {
-      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<StructTypeInfo>());
       if (auto sym = info->scope->lookup(node->op.value)) {
         auto enclosing_scope = ctx.scope;
         ctx.set_scope(info->scope);
@@ -946,7 +947,7 @@ std::any Typer::visit(ASTBinExpr *node) {
             t = sym->function_overload_types[0];
           }
           auto fun_ty = global_get_type(t);
-          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
+          auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
           auto param_0 = fun_info->parameter_types[0];
           assert_types_can_cast_or_equal(right, param_0, node->source_range,
                                          "expected, {}, got {}",
@@ -982,8 +983,8 @@ std::any Typer::visit(ASTBinExpr *node) {
   } else {
     auto left_t = global_get_type(left);
     auto right_t = global_get_type(right);
-    auto conv_rule_0 = type_conversion_rule(left_t, right_t);
-    auto conv_rule_1 = type_conversion_rule(right_t, left_t);
+    auto conv_rule_0 = type_conversion_rule(left_t, right_t, node->left->source_range);
+    auto conv_rule_1 = type_conversion_rule(right_t, left_t, node->right->source_range);
 
     if (((conv_rule_0 == CONVERT_PROHIBITED) &&
          (conv_rule_1 == CONVERT_PROHIBITED)) ||
@@ -1024,7 +1025,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
 
   if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
       left_ty->get_ext().has_no_extensions()) {
-    auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
+    auto info = (left_ty->get_info()->as<StructTypeInfo>());
     if (auto sym = info->scope->lookup(node->op.value)) {
       auto enclosing_scope = ctx.scope;
       ctx.set_scope(info->scope);
@@ -1038,7 +1039,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
           t = sym->function_overload_types[0];
         }
         auto fun_ty = global_get_type(t);
-        auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
+        auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
         return fun_info->return_type;
       }
     } else
@@ -1050,7 +1051,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule = type_conversion_rule(
-        global_get_type(operand_ty), global_get_type(bool_type()));
+        global_get_type(operand_ty), global_get_type(bool_type()), node->operand->source_range);
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED &&
                         conversion_rule != CONVERT_EXPLICIT);
 
@@ -1096,7 +1097,7 @@ std::any Typer::visit(ASTLiteral *node) {
     if (declaring_or_assigning_type != -1) {
       auto type = global_get_type(declaring_or_assigning_type);
       if (type->is_kind(TYPE_SCALAR) && type_is_numerical(type)) {
-        auto info = static_cast<ScalarTypeInfo *>(type->get_info());
+        auto info = (type->get_info()->as<ScalarTypeInfo>());
         if (info->is_integral)
           return type->id;
       }
@@ -1186,7 +1187,7 @@ std::any Typer::visit(ASTScopeResolution *node) {
     for (auto i = 0; i < type_table.size(); ++i) {
       auto type = global_get_type(i);
       if (type && type->is_kind(TYPE_ENUM)) {
-        auto info = static_cast<EnumTypeInfo *>(type->get_info());
+        auto info = (type->get_info()->as<EnumTypeInfo>());
         for (const auto &key : info->keys) {
           if (key == node->member_name) {
             if (found) {
@@ -1219,15 +1220,15 @@ std::any Typer::visit(ASTScopeResolution *node) {
   Scope *scope = nullptr;
   switch (base_ty->kind) {
   case TYPE_STRUCT: {
-    auto info = static_cast<StructTypeInfo *>(base_ty->get_info());
+    auto info = (base_ty->get_info()->as<StructTypeInfo>());
     scope = info->scope;
   } break;
   case TYPE_UNION: {
-    auto info = static_cast<UnionTypeInfo *>(base_ty->get_info());
+    auto info = (base_ty->get_info()->as<UnionTypeInfo>());
     scope = info->scope;
   } break;
   case TYPE_ENUM: {
-    auto info = static_cast<EnumTypeInfo *>(base_ty->get_info());
+    auto info = (base_ty->get_info()->as<EnumTypeInfo>());
     if (std::ranges::find(info->keys, node->member_name) != info->keys.end()) {
       return base_ty->id;
     }
@@ -1281,7 +1282,7 @@ std::any Typer::visit(ASTSubscript *node) {
   {
     if (left_ty && left_ty->is_kind(TYPE_STRUCT) &&
         left_ty->get_ext().has_no_extensions()) {
-      auto info = static_cast<StructTypeInfo *>(left_ty->get_info());
+      auto info = (left_ty->get_info()->as<StructTypeInfo>());
       if (auto sym = info->scope->lookup("[")) {
         auto enclosing_scope = ctx.scope;
         ctx.set_scope(info->scope);
@@ -1295,7 +1296,7 @@ std::any Typer::visit(ASTSubscript *node) {
             t = sym->function_overload_types[0];
           }
           auto fun_ty = global_get_type(t);
-          auto fun_info = static_cast<FunctionTypeInfo *>(fun_ty->get_info());
+          auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
           auto param_0 = fun_info->parameter_types[0];
           assert_types_can_cast_or_equal(
               subscript, fun_info->parameter_types[0], node->source_range,
@@ -1356,7 +1357,8 @@ std::any Typer::visit(ASTInitializerList *node) {
       last_type = type;
     } else if (last_type != type) {
       auto rule = type_conversion_rule(global_get_type(type),
-                                       global_get_type(last_type));
+                                       global_get_type(last_type),
+                                       expr->source_range);
       if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
         node->types_are_homogenous = false;
       }
@@ -1413,8 +1415,8 @@ std::any Typer::visit(ASTRange *node) {
                 node->source_range);
   }
 
-  auto l_info = static_cast<ScalarTypeInfo *>(l_ty->get_info());
-  auto r_info = static_cast<ScalarTypeInfo *>(r_ty->get_info());
+  auto l_info = (l_ty->get_info()->as<ScalarTypeInfo>());
+  auto r_info = (r_ty->get_info()->as<ScalarTypeInfo>());
 
   if (!l_info->is_integral || !r_info->is_integral) {
     throw_error("Cannot use non-scalar or integral types in a range expression",
@@ -1484,7 +1486,7 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
         node->source_range);
   }
 
-  auto info = static_cast<TupleTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<TupleTypeInfo>());
 
   if (node->idens.size() != info->types.size()) {
     throw_error(std::format("Cannot currently partially deconstruct a tuple. "

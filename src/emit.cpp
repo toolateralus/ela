@@ -142,7 +142,7 @@ std::any Emitter::visit(ASTType *node) {
   }
 
   if (type->is_kind(TYPE_ENUM)) {
-    auto enum_info = static_cast<EnumTypeInfo *>(type->get_info());
+    auto enum_info = (type->get_info()->as<EnumTypeInfo>());
     auto elem_ty = global_get_type(enum_info->element_type);
     (*ss) << to_cpp_string(elem_ty);
     return {};
@@ -572,7 +572,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 std::any Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<StructTypeInfo>());
 
   current_struct_decl = node;
 
@@ -1224,10 +1224,10 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       value->accept(this);
       (*ss) << ".data";
     } else if (type->is_kind(TYPE_STRUCT)) {
-      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<StructTypeInfo>());
       interpolate_to_string_struct_union(info->scope);
     } else if (type->is_kind(TYPE_UNION)) {
-      auto info = static_cast<UnionTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<UnionTypeInfo>());
       interpolate_to_string_struct_union(info->scope);
     } else {
       value->accept(this);
@@ -1258,7 +1258,7 @@ void Emitter::emit_function_pointer_type_string(
 
   std::stringstream ss;
 
-  auto info = static_cast<FunctionTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<FunctionTypeInfo>());
   auto return_type = global_get_type(info->return_type);
 
   ss << to_cpp_string(return_type) << "(" << type_prefix;
@@ -1452,7 +1452,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
   std::stringstream fields_ss;
   if (type->kind == TYPE_STRUCT) {
-    auto info = static_cast<StructTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<StructTypeInfo>());
     if (info->scope->symbols.empty()) {
       return get_type_struct(type, id, context, "{}");
     }
@@ -1482,7 +1482,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     }
     fields_ss << "}";
   } else if (type->kind == TYPE_UNION) {
-    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<UnionTypeInfo>());
     if (info->scope->symbols.empty()) {
       return get_type_struct(type, id, context, "{}");
     }
@@ -1512,7 +1512,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     }
     fields_ss << "}";
   } else if (type->kind == TYPE_ENUM) {
-    auto info = static_cast<EnumTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<EnumTypeInfo>());
     if (info->keys.empty()) {
       return get_type_struct(type, id, context, "{}");
     }
@@ -1643,7 +1643,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     output = to_cpp_string(type->get_ext(), type->get_base().get_str());
     break;
   case TYPE_TUPLE: {
-    auto info = static_cast<TupleTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<TupleTypeInfo>());
     output = "_tuple" + get_tuple_type_name(info->types).get_str();
     output = to_cpp_string(type->get_ext(), output);
     break;

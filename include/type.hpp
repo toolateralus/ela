@@ -180,6 +180,13 @@ struct TypeInfo {
   std::vector<int> explicit_cast_table;
   TypeInfo() {}
 
+  // Use this instead of the clunky static casts everywhere.
+  template<class T>
+  requires std::derived_from<T, TypeInfo>
+  inline T* as() {
+    return static_cast<T*>(this);
+  }
+
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
@@ -273,7 +280,7 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExt &ext);
 int global_create_union_type(const InternedString &name, Scope *scope,
                              UnionFlags kind);
 
-ConversionRule type_conversion_rule(const Type *, const Type *);
+ConversionRule type_conversion_rule(const Type *, const Type *, const SourceRange& = {});
 
 // char *
 int charptr_type();

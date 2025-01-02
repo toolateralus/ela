@@ -393,7 +393,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto enum_decl = parser->parse_enum_declaration(name);
        enum_decl->is_flags = true;
        auto type = global_get_type(enum_decl->type->resolved_type);
-       auto info = static_cast<EnumTypeInfo *>(type->get_info());
+       auto info = (type->get_info()->as<EnumTypeInfo>());
        info->is_flags = true;
        return enum_decl;
      }},
@@ -419,7 +419,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
 
          if (type->is_kind(TYPE_FUNCTION)) {
            auto id = global_find_function_type_id(
-               *static_cast<FunctionTypeInfo *>(type->get_info()),
+               *(type->get_info()->as<FunctionTypeInfo>()),
                aliased_type->extension_info);
 
            parser->ctx.scope->types[name.value] = id;
@@ -466,7 +466,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        parser->expect(TType::DoubleColon);
        auto decl = parser->parse_struct_declaration(get_unique_identifier());
        auto t = global_get_type(decl->type->resolved_type);
-       auto info = static_cast<StructTypeInfo *>(t->get_info());
+       auto info = (t->get_info()->as<StructTypeInfo>());
        info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
        return decl;
      }},
@@ -1308,7 +1308,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
-      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 &&
           info->scope != nullptr) {
         throw_error("Redefinition of struct", range);
@@ -1344,13 +1344,12 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     decl->scope = block->scope;
   } else {
     Type *t = global_get_type(type_id);
-    auto info = static_cast<StructTypeInfo *>(t->get_info());
+    auto info = (t->get_info()->as<StructTypeInfo>());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
 
-  auto info =
-      static_cast<StructTypeInfo *>(global_get_type(type_id)->get_info());
+  auto info = global_get_type(type_id)->get_info()->as<StructTypeInfo>();
 
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
@@ -1378,7 +1377,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       end_node(nullptr, range);
       throw_error("cannot redefine already existing type", range);
     }
-    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<UnionTypeInfo>());
 
     if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
       end_node(nullptr, range);
@@ -1394,7 +1393,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto type = global_get_type(type_id);
 
   if (type && type->is_kind(TYPE_UNION)) {
-    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<UnionTypeInfo>());
     if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
       end_node(nullptr, range);
       throw_error("Redefinition of non forward-declared union type.", range);
@@ -1411,7 +1410,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     eat();
     node->is_fwd_decl = true;
     type = global_get_type(type_id);
-    auto info = static_cast<UnionTypeInfo *>(type->get_info());
+    auto info = (type->get_info()->as<UnionTypeInfo>());
     info->flags |= UNION_IS_FORWARD_DECLARED;
     return node;
   }
@@ -1432,7 +1431,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(struct_decl->type->resolved_type);
-      auto info = static_cast<StructTypeInfo *>(type->get_info());
+      auto info = (type->get_info()->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         throw_error(
             "can only use #anon struct declarations within union types.",
@@ -1453,7 +1452,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   node->scope = block->scope;
 
   type = global_get_type(type_id);
-  auto info = static_cast<UnionTypeInfo *>(type->get_info());
+  auto info = (type->get_info()->as<UnionTypeInfo>());
 
   info->scope = scope;
 
