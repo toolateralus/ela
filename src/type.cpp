@@ -1,6 +1,7 @@
 #include "type.hpp"
 
 #include <ostream>
+#include <set>
 #include <sstream>
 
 #include "ast.hpp"
@@ -77,26 +78,28 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExt &ty
   return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
+std::set<InternedString> made_types = {};
 
 int global_find_type_id(const int base, const TypeExt &type_extensions) {
   if (!type_extensions.has_extensions()) {
     return base;
   }
-  for (int i = 0; i < type_table.size(); ++i) {
-    auto type = &type_table[i];
-    if (type->equals(base, type_extensions)) return type->id;
-  }
-
-  // NOTE:below is just for creating types with new extensions. new function
-  // types, struct types, and enum types must be created manually this just
-  // creates pointer and array types of base 'name'
   auto base_t = &type_table[base];
   auto ext = type_extensions;
   while (base_t->base_id != Type::invalid_id) {
     ext = base_t->get_ext().append(ext);
     base_t = &type_table[base_t->base_id];
   }
-  return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), type_extensions, base_t->id);
+  for (int i = 0; i < type_table.size(); ++i) {
+    auto type = &type_table[i];
+    if (type->equals(base_t->id, ext)) return type->id;
+  }
+  // NOTE:below is just for creating types with new extensions. new function
+  // types, struct types, and enum types must be created manually this just
+  // creates pointer and array types of base 'name'
+  auto t = global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
+  made_types.insert(type_table[t].to_string());
+  return t;
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
@@ -262,24 +265,15 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 }
 
 bool Type::equals(const int base, const TypeExt &type_extensions) const {
-  return base_id == base && type_extensions == get_ext();
+  auto isBaseIdEqual = base_id == base;
+  auto isTypeExtensionEqual = type_extensions == get_ext();
+  return isBaseIdEqual && isTypeExtensionEqual;
 }
 
 bool TypeExt::equals(const TypeExt &other) const {
-  if (extensions.size() != other.extensions.size()) return false;
-
-  if (array_sizes.size() != other.array_sizes.size()) return false;
-
-  for (int i = 0; i < extensions.size(); ++i)
-    if (extensions[i] != other.extensions[i]) return false;
-
-  for (int i = 0; i < array_sizes.size(); ++i)
-    if (array_sizes[i] != other.array_sizes[i]) return false;
-
-  if (key_type != other.key_type) {
-    return false;
-  }
-
+  if (extensions != other.extensions) return false;
+  if (array_sizes != other.array_sizes) return false;
+  if (key_type != other.key_type) return false;
   return true;
 }
 

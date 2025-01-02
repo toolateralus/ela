@@ -3,7 +3,7 @@
 #import dlfcn
 #import file
 #import raylib
-// ! #import gl ! Disabled because c_string is not working right now. @Cooper-Pilot.
+#import gl
 #import interned_string
 #import json
 #import memory
@@ -1560,7 +1560,6 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 }
 }
 
-#def increment_test
 #ifdef increment_test {
 // ! Somehow in the cleanup i broke postfix AND prefix increment operators 
 // ! When used with dot expressions. Whut Teh ****?
