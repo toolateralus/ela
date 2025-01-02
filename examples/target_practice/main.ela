@@ -1,7 +1,7 @@
 #import raylib;
 #import core;
 
-#compiler_flags "-g"
+#c_flags "-g"
 
 /*
   * TODO

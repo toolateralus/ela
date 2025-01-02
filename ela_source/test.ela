@@ -3,7 +3,7 @@
 #import dlfcn
 #import file
 #import raylib
-// #import gl
+// ! #import gl ! Disabled because c_string is not working right now. @Cooper-Pilot.
 #import interned_string
 #import json
 #import memory
@@ -11,7 +11,7 @@
 #import pthread
 #import reflection
 
-#compiler_flags "-g -fsanitize=address,leak"
+#c_flags "-fsanitize=address,leak"
 
 XaryuStruct :: struct {
   f: float ;
@@ -1532,33 +1532,58 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 }
 
 
-#region Dysfunctional Tests {
-
+#ifdef fn_pointer_test {
 // ! @Cooper-Pilot
 // ! FUNCTION TYPES CANT CONVERT TO POINTERS?
+#test test_function_pointer_alias :: fn() {
+  #alias FunctionPointer :: fn* (int, int) -> int;
 
-// #test test_function_pointer_alias :: fn() {
-//   #alias FunctionPointer :: fn* (int, int) -> int;
+  ptr := &function_pointer_helper;
+  assert("Function pointer call", ptr(2, 3) == 6);
 
-//   ptr := &function_pointer_helper;
-//   assert("Function pointer call", ptr(2, 3) == 6);
+  array: FunctionPointer[] = {&function_pointer_helper};
+  from_arr : FunctionPointer = &array[0];
+  assert("Array of function pointers", from_arr(2, 3) == 6);
 
-//   array: FunctionPointer[] = {&function_pointer_helper};
-//   from_arr : FunctionPointer = &array[0];
-//   assert("Array of function pointers", from_arr(2, 3) == 6);
+  fixed: FunctionPointer[12];
+  fixed[0] = &function_pointer_helper;
+  from_fixed : FunctionPointer = &fixed[0];
 
-//   fixed: FunctionPointer[12];
-//   fixed[0] = &function_pointer_helper;
-//   from_fixed : FunctionPointer = &fixed[0];
+  assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
 
-//   assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
+  function :: fn() -> FunctionPointer {
+    return &function_pointer_helper;
+  }
 
-//   function :: fn() -> FunctionPointer {
-//     return &function_pointer_helper;
-//   }
+  returned_ptr : FunctionPointer = function();
+  assert("Function returning function pointer", returned_ptr(2, 3) == 6);
+}
+}
 
-//   returned_ptr : FunctionPointer = function();
-//   assert("Function returning function pointer", returned_ptr(2, 3) == 6);
-// }
+#def increment_test
+#ifdef increment_test {
+// ! Somehow in the cleanup i broke postfix AND prefix increment operators 
+// ! When used with dot expressions. Whut Teh ****?
+#test test_inc_decrement :: fn() {
+  Strukt :: struct {
+    v: s32;
+  }
+  
+  s: Strukt;
+  s.v++;
+
+  if true {
+    s.v++;
+  } else {
+    ++s.v;
+  }
+
+  if true {
+    --s.v;
+  } else {
+    s.v--;
+  }
+}
 
 }
+

@@ -4,7 +4,7 @@
 #import directory;
 #import file;
 
-#compiler_flags "-g"
+#c_flags "-g"
 
 
 playing := false;

@@ -7,7 +7,7 @@
 Compile the output source with debug symbols.
 
 > note: to use `gdb` or another debugger, in your code use
-`#compiler_flags "-g"` as well as the --debug flag in the command line.
+`#c_flags "-g"` as well as the --debug flag in the command line.
 This is to be reworked
 
 ## --verbose

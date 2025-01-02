@@ -89,14 +89,14 @@
   #make(MyType, arg1, arg2)
   ```
 
-#### `#compiler_flags`
+#### `#c_flags`
 - **Kind**: `Statement`
 - **Usage**: 
   - Adds compiler flags like linker options, `-g`, etc., from within your program or header.
   - This is only a thing because of us using the C++ compiler stll for a backend.
 - **Example**:
   ```cpp
-  #compiler_flags "-g -O2"
+  #c_flags "-g -O2"
   ```
 
 #### `#flags`

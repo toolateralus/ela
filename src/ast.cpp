@@ -341,9 +341,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return make;
     }},
 
-    // #compiler_flags, for adding stuff like linker options, -g etc from within
+    // #c_flags, for adding stuff like linker options, -g etc from within
     // your program or header.
-    {.identifier = "compiler_flags",
+    {.identifier = "c_flags",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto string = parser->expect(TType::String).value;
@@ -704,21 +704,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   auto range = begin_node();
   ASTExpr *left = parse_unary();
   while (true) {
-    // ! A little hack for tuples.
-    {
-      // <1, 2, 3>; is valid
-      // <1, 2, 3 > 10>; can work too.
-      auto lookahead = lookahead_buf();
-      bool is_gt = peek().type == TType::RParen;
-      bool is_not_identifier = lookahead[1].type != TType::Identifier;
-      bool is_not_literal = lookahead[1].family != TFamily::Literal;
-      bool is_not_operator = (lookahead[1].family != TFamily::Operator || lookahead[1].type != TType::LParen);
-      bool is_semi = lookahead[1].type == TType::Semi;
-      if ((is_gt && is_not_identifier && is_not_literal && is_not_operator) || is_semi) {
-        return left;
-      }
-    }
-
     Precedence token_precedence = get_operator_precedence(peek());
     if (token_precedence <= precedence) break;
     auto op = eat();
@@ -1072,8 +1057,6 @@ ASTExpr *Parser::parse_primary() {
         throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
       }
 
-
-
       eat();  // consume ')'
       end_node(expr, range);
       return expr;
@@ -1140,6 +1123,11 @@ ASTType *Parser::parse_type() {
 ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
+
+  while (tok.type == TType::Semi) {
+    eat();
+    tok = peek();
+  }
 
   if (peek().type == TType::Identifier && 
       lookahead_buf()[1].type == TType::DoubleColon &&
@@ -1322,13 +1310,14 @@ ASTStatement *Parser::parse_statement() {
     throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", range);
   }
 
+
+  // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
   // * Expression statements.
   {
     auto next = lookahead_buf()[1];
     auto next_next = lookahead_buf()[2];
     // Both postfix and prefix (inc/dec)rement
-    const bool is_increment_or_decrement = next.type == TType::Increment || next.type == TType::Decrement ||
-                                           tok.type == TType::Increment || tok.type == TType::Decrement;
+    const bool is_increment_or_decrement = (next.type == TType::Increment || next.type == TType::Decrement && next_next.type != TType::Semi) || tok.type == TType::Increment || tok.type == TType::Decrement;
 
     // subscript assignment or dot assign/ call statement.
     const bool is_identifier_with_lbrace_or_dot =
@@ -1341,13 +1330,10 @@ ASTStatement *Parser::parse_statement() {
 
     const bool is_deref = tok.type == TType::Mul;
 
-    const bool is_constant_declaration = next.type == TType::DoubleColon && next_next.family != TFamily::Keyword;
-
     const bool is_special_case = tok.type == TType::Delete ||  // delete statement
                                  tok.type == TType::LParen ||  // possible parenthesized dereference or something.
                                  tok.type == TType::Erase ||   // ~vector, for popping and ignoring.
-                                 tok.type == TType::Switch ||  // switch statement
-                                 (is_constant_declaration && next_next.family != TFamily::Operator);
+                                 tok.type == TType::Switch;
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
         is_deref || is_special_case) {

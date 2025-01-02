@@ -1,6 +1,6 @@
 #import core;
 
-#compiler_flags "-lGLEW -lGL -lglfw -lm"
+#c_flags "-lGLEW -lGL -lglfw -lm"
 
 GLFWwindow :: struct;
 

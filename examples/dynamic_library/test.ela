@@ -1,6 +1,6 @@
 #include "shared.ela";
 
-#compiler_flags "-fPIC -shared -o test.so"
+#c_flags "-fPIC -shared -o test.so"
 
 position : Vector2;
 

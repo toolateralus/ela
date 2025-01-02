@@ -47,7 +47,7 @@ Append a flag or a set of space seperated flags to the C++ compiler invocation.
 Beware of contradictory flags.
 
 ```cpp
-#compiler_flags "-g"
+#c_flags "-g"
 ```
 
 ### Structs
