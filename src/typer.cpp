@@ -873,9 +873,6 @@ std::any Typer::visit(ASTBinExpr *node) {
     return void_type();
   }
 
-  if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
-  }
-
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
   // their operands type checked, but right now that would involve casting
   // scalars to each other, which makes no  sense.
