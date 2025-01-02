@@ -7,11 +7,12 @@
   str_len: int = strlen(str);
   for i in 0..str_len {
     if str[i] == delimiter {
-      if i > start then result ~= string{str + start, str + i};
+      if i > start 
+        then result ~= string {str + start, str + i};
       start = i + 1;
     }
   }
-  result ~= string{str + start, str + str_len};
+  result ~= string {str + start, str + str_len};
 }
 
 main :: fn() {

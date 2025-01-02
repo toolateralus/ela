@@ -1009,11 +1009,11 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   }
 
   if (node->op.type == TType::And) {
-    return get_pointer_to_type(operand_ty);
+    return global_get_type(operand_ty)->take_pointer_to();
   }
 
   if (node->op.type == TType::Mul) {
-    return remove_one_pointer_ext(operand_ty, node->source_range);
+    return global_get_type(operand_ty)->get_element_type();
   }
 
   // unary operator overload.
@@ -1315,7 +1315,7 @@ std::any Typer::visit(ASTSubscript *node) {
     assert_types_can_cast_or_equal(subscript, ext.key_type, node->source_range,
                                    "expected : {}, got {}",
                                    "Invalid type when subscripting map");
-    return get_map_value_type(left_ty);
+    return left_ty->get_element_type();
   }
 
   if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_pointer()) {
@@ -1331,7 +1331,7 @@ std::any Typer::visit(ASTSubscript *node) {
     auto element_id = left_ty->get_element_type();
     return element_id;
   }
-  return remove_one_pointer_ext(left_ty->id, node->source_range);
+  return left_ty->get_element_type();
 }
 std::any Typer::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));

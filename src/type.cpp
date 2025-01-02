@@ -76,7 +76,8 @@ int global_find_function_type_id(const FunctionTypeInfo &info,
   if (type_extensions.has_extensions()) {
     base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
   }
-  return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
+  return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions,
+                            base);
 }
 
 // PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
@@ -143,7 +144,8 @@ int global_find_type_id(std::vector<int> &tuple_types,
 // large programs. However per 500 lines of unit tsting which creates a wide
 // variety of types, we only really get like 50-100 types total, so a hash map
 // is not really going to pay off that much probably.
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
+ConversionRule type_conversion_rule(const Type *from, const Type *to,
+                                    const SourceRange &source_range) {
   if (!from || !to) {
     throw_error("Internal Compiler Error: type was null when checking type "
                 "conversion rules",
@@ -162,8 +164,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     for (int i = 0; i < from_info->types.size(); ++i) {
       auto from_t = from_info->types[i];
       auto to_t = to_info->types[i];
-      rule =
-          type_conversion_rule(global_get_type(from_t), global_get_type(to_t), source_range);
+      rule = type_conversion_rule(global_get_type(from_t),
+                                  global_get_type(to_t), source_range);
       if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
         return rule;
       }
@@ -235,7 +237,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   if (from->is_kind(TYPE_ENUM) && from->get_ext().has_no_extensions()) {
     auto enum_info = (from->get_info()->as<EnumTypeInfo>());
-    return type_conversion_rule(global_get_type(enum_info->element_type), to, source_range);
+    return type_conversion_rule(global_get_type(enum_info->element_type), to,
+                                source_range);
   }
 
   auto info = to->get_info();
@@ -332,17 +335,6 @@ std::string Type::to_string() const {
   }
 }
 
-int remove_one_pointer_ext(int operand_ty, const SourceRange &source_range) {
-  auto ty = global_get_type(operand_ty);
-  auto ext = ty->get_ext();
-
-  if (ext.extensions.empty() || ext.extensions.back() != TYPE_EXT_POINTER) {
-    throw_error("cannot dereference a non-pointer type.", source_range);
-  }
-
-  ext.extensions.pop_back();
-  return global_find_type_id(ty->base_id, ext);
-}
 int global_create_struct_type(const InternedString &name, Scope *scope) {
   type_table.emplace_back(type_table.size(), TYPE_STRUCT);
   Type *type = &type_table.back();
@@ -403,29 +395,18 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 }
 
 int Type::get_element_type() const {
-  if (!extensions.is_array()) {
-    return -1;
+  if (!extensions.is_pointer() && !extensions.is_array() &&
+      !extensions.is_fixed_sized_array() && !extensions.is_map()) {
+    throw_error("Internal compiler error: called get_element_type() on a non "
+                "pointer/array/map type.",
+                {});
   }
-  auto extensions = this->get_ext();
-  for (auto it = extensions.extensions.rbegin();
-       it != extensions.extensions.rend();) {
-    if (*it == TYPE_EXT_ARRAY) {
-      it = std::vector<TypeExtEnum>::reverse_iterator(
-          extensions.extensions.erase((it + 1).base()));
-      extensions.array_sizes.pop_back();
-
-      if (is_kind(TYPE_TUPLE)) {
-        auto info = (get_info()->as<TupleTypeInfo>());
-        return global_find_type_id(info->types, extensions);
-      } else
-        return global_find_type_id(base_id, extensions);
-
-    } else {
-      ++it;
-    }
-  }
-
-  return id;
+  auto extensions = this->get_ext().without_back();
+  if (is_kind(TYPE_TUPLE)) {
+    auto info = (get_info()->as<TupleTypeInfo>());
+    return global_find_type_id(info->types, extensions);
+  } else
+    return global_find_type_id(base_id, extensions);
 }
 
 // used for anonymous structs etc.
@@ -779,4 +760,8 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ">";
   return ss.str();
 }
-
+int Type::take_pointer_to() const {
+  auto ext = this->extensions;
+  ext.extensions.push_back(TYPE_EXT_POINTER);
+  return global_find_type_id(base_id, ext);
+}

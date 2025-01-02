@@ -294,7 +294,6 @@ int global_find_type_id(const int, const TypeExt &);
 
 struct Token;
 
-int remove_one_pointer_ext(int, const SourceRange &);
 
 void init_type_system();
 
@@ -306,10 +305,7 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 
 void emit_warnings_or_errors_for_operator_overloads(const TType type,
                                                     SourceRange &range);
-
 int get_pointer_to_type(int base);
-
-int get_map_value_type(Type *map_type);
 
 struct Type {
   int id = invalid_id;
@@ -343,6 +339,7 @@ public:
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;
+  int take_pointer_to() const;
 
   constexpr static int invalid_id = -1;
 };
