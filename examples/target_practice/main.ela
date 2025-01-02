@@ -220,8 +220,8 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
 
 // great function name
 get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
-  gray_value : u8 = (u8) clamp(randf() * 255.0, 0, 255);
-  variance :: fn() -> u8 { return (u8)randf() * _variance; };
+  gray_value : u8 = (u8) clamp(Random::next() * 255.0, 0, 255);
+  variance :: fn() -> u8 { return (u8)Random::next() * _variance; };
   r : u8 = (u8) clamp(gray_value + variance(), 0, 255);
   g : u8 = (u8) clamp(gray_value + variance(), 0, 255);
   b : u8 = (u8) clamp(gray_value + variance(), 0, 255);
@@ -230,15 +230,15 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50
 
 random_vector2 :: fn(origin: Vector2, max: float) -> Vector2 {
   result: Vector2;
-  result.x = origin.x + randf() * max;
-  result.y = origin.y + randf() * max;
+  result.x = origin.x + Random::next() * max;
+  result.y = origin.y + Random::next() * max;
   return origin;
 }
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
   result: Vector2;
-  result.x = origin.x + min.x + randf() * (max.x - min.x);
-  result.y = origin.y + min.y + randf() * (max.y - min.y);
+  result.x = origin.x + min.x + Random::next() * (max.x - min.x);
+  result.y = origin.y + min.y + Random::next() * (max.y - min.y);
   return result;
 }
 
@@ -249,7 +249,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     max_vel := 3.0;
     particle.position = random_vector2(position, max_vel);
     particle.velocity = random_vector2(Vector2{0.0, 0.0}, Vector2{-max_vel, -1.0}, Vector2{max_vel, max_vel});
-    burst : int = (int)randf() * smoke_particle_max_burst;
+    burst : int = (int)Random::next() * smoke_particle_max_burst;
     if can_burst && burst > 1 {
       can_burst = false;
       for _ in 0..burst { make_particle(kind, position, tint); }
@@ -259,7 +259,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
     particle.render_info = smoke_particle_render_info;
     particle.lifetime = 1.0;
-    particle.scale = smoke_particle_init_scale * randf() * 6400.0;
+    particle.scale = smoke_particle_init_scale * Random::next() * 6400.0;
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
@@ -309,9 +309,9 @@ update_particle :: fn(particle: Particle*) -> bool {
 enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
   position : Vector2 = {enemy.rect.x, enemy.rect.y};
   if Vector2Distance(position, enemy.target) < 5 || Vector2Equals(zero, enemy.target) {
-    enemy.target = { randf() * screen_width, randf() * screen_height };
+    enemy.target = { Random::next() * screen_width, Random::next() * screen_height };
     enemy.target.y = clamp(enemy.target.y, 0, screen_height / 1.5);
-    enemy.speed = randf() * enemy_max_speed * round_index;
+    enemy.speed = Random::next() * enemy_max_speed * round_index;
   } else {
     direction := Vector2Normalize(Vector2Subtract(enemy.target, position));
     position = Vector2Add(position, Vector2Scale(direction, enemy.speed));
@@ -322,8 +322,8 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 }
 
 make_enemy :: fn() {
-  x := randf() * screen_width;
-  y := randf() * screen_height;
+  x := Random::next() * screen_width;
+  y := Random::next() * screen_height;
   rect : Rectangle = {x, y, enemy_scale, enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);

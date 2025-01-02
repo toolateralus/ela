@@ -12,7 +12,6 @@
     }
   }
   result ~= string{str + start, str + str_len};
-  return result;
 }
 
 main :: fn() {

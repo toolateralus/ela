@@ -121,6 +121,7 @@ static std::string format_source_location(const SourceRange &source_range,
   // Read the source file
   auto first = span.front();
   auto last = span.back();
+  
   std::ifstream src_file(SourceLocation::files()[first.location.file]);
   if (!src_file.is_open()) {
     return "Error: Unable to open source file\n";

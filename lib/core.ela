@@ -55,15 +55,14 @@
 #foreign atoi :: fn(v: c_string) -> int;
 #foreign atof :: fn(v: c_string) -> float64;
 
-
-
-Random :: enum {
-  Max = 2147483647,
-}
 #foreign rand :: fn() -> int;
 #foreign srand :: fn(seed: u32);
-#static randf :: fn() -> float {
-  return (float)rand() / (float)Random::Max;
+
+Random :: struct {
+  Max :: 2147483647;
+  #static next :: fn(max: float32 = 1) -> float {
+    return ((float)rand() / (float)Random::Max) * max;
+  }
 }
 
 // api for string manipulation.
