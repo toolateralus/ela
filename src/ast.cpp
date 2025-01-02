@@ -1109,6 +1109,16 @@ ASTStatement *Parser::parse_statement() {
   auto range = begin_node();
   auto tok = peek();
 
+
+  if (peek().type == TType::Identifier && 
+      lookahead_buf()[1].type == TType::DoubleColon &&
+      lookahead_buf()[2].type == TType::Identifier) {
+    auto expr = ast_alloc<ASTExprStatement>();
+    expr->expression = parse_expr();
+    end_node(expr, range);
+    return expr;
+  }
+
   // * Tuple destructure.
   if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
     return parse_multiple_asssignment();
@@ -1251,6 +1261,7 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
+
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1275,12 +1286,9 @@ ASTStatement *Parser::parse_statement() {
       auto union_decl = parse_union_declaration(tok);
       end_node(union_decl, range);
       return union_decl;
-    } else {
-      throw_error(
-          "invalid :: statement, expected '(' (for a function), "
-          "'struct', or 'enum",
-          range);
     }
+
+    throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", range);
   }
 
   // * Expression statements.
@@ -1522,11 +1530,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto range = begin_node();
   auto function = ast_alloc<ASTFunctionDeclaration>();
   auto last_func_decl = current_func_decl;
-  Defer deferred([&]{
-    current_func_decl = last_func_decl;
-  });
+  Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = function;
-    
+
   if (range.begin > 0) range.begin = range.begin - 1;
   function->params = parse_parameters();
   function->name = name;

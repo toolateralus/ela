@@ -276,6 +276,7 @@ std::any Typer::visit(ASTStructDeclaration *node) {
   ctx.exit_scope();
   return {};
 }
+
 std::any Typer::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl) {
     return {};
@@ -455,6 +456,7 @@ std::any Typer::visit(ASTFunctionDeclaration *node) {
                                  std::format("function: '{}'", node->name.value.get_str()));
   return {};
 }
+
 std::any Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {

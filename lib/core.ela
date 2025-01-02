@@ -371,24 +371,13 @@ lerp :: fn(a: int, b, t: float) -> int {
   return (int)(a * (1.0 - t)) + (b * t) + 0.5;
 }
 
-
-
-#foreign time :: fn(value: void*) -> int;
+  #foreign time :: fn(value: void*) -> int;
 timespec_t :: struct {
   tv_sec: s64;
   tv_nsec: s64;
 }
 
 #foreign clock_gettime :: fn(clock_id: int, tp: timespec_t*) -> int;
-
-
-as_milliseconds :: fn(c: float64) -> int {
-  return (int)(c * 100_000.0);
-}
-as_seconds :: fn(c: float64) -> int {
-  return (int)(c * 1_000_000.0);
-}
-
 
 Timing :: struct {
   // returns the timespec_t for the current time since epoch.
