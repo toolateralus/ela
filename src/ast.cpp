@@ -266,7 +266,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
 
            parser->expect(TType::DoubleColon);
            parser->expect(TType::Fn);
-           
+
            function->params = parser->parse_parameters();
            function->name = name;
            if (parser->peek().type != TType::Arrow) {
@@ -405,6 +405,9 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
        auto name = parser->expect(TType::Identifier);
        parser->expect(TType::DoubleColon);
        auto aliased_type = parser->parse_type();
+       if (parser->ctx.scope->types.contains(name.value)) {
+         throw_error("Redefinition of type. ", aliased_type->source_range);
+       }
 
        if (aliased_type->resolved_type != -1) {
          auto type = global_get_type(aliased_type->resolved_type);
@@ -419,10 +422,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                *static_cast<FunctionTypeInfo *>(type->get_info()),
                aliased_type->extension_info);
 
-          // TODO: declare type alias here.
-          //  parser->ctx.scope->create_type_alias(id, name.value);
-           //  auto alias = ctx.scope->create_type_alias(id, name.value);
-           //  parser->ctx.scope->aliases.push_back(alias);
+           parser->ctx.scope->types[name.value] = id;
            return ast_alloc<ASTNoop>();
          }
        }
@@ -437,13 +437,7 @@ std::vector<DirectiveRoutine> Parser::directive_routines = {
                      aliased_type->source_range);
        }
 
-       if (type->is_kind(TYPE_FUNCTION))
-         throw_error("Temporarily it is illegal to declare aliases to function "
-                     "types, as well as declare function pointers.",
-                     aliased_type->source_range);
-
-      // TODO: declare type alias here.
-      //  parser->ctx.scope->create_type_alias(id, name.value);
+       parser->ctx.scope->types[name.value] = id;
        return ast_alloc<ASTNoop>();
      }},
 
@@ -692,12 +686,10 @@ ASTType *Parser::parse_type() {
   if (allow_function_type_parsing && peek().type == TType::Fn) {
     expect(TType::Fn);
     return parse_function_type();
-  } 
+  }
 
   auto base = eat().value;
   TypeExt extension_info;
-
-
 
   while (true) {
     if (peek().type == TType::LBrace) {
@@ -931,7 +923,8 @@ ASTStatement *Parser::parse_statement() {
       auto statement = parse_statement();
       node->block->statements = {statement};
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
+        throw_warning(WarningInaccessibleDeclaration,
+                      "Inaccesible declared variable", statement->source_range);
       }
       node->block->scope = ctx.exit_scope();
     } else {
@@ -1186,14 +1179,14 @@ ASTParamsDecl *Parser::parse_parameters() {
     if (!type || peek().type == TType::Colon)
       expect(TType::Colon);
 
-    
-
     auto next = peek();
 
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: fn(int a, b, c) {}
-    if (next.type == TType::Directive || !type || ctx.scope->find_type_id(next.value, {}) != -1 || next.type == TType::Fn) {
+    if (next.type == TType::Directive || !type ||
+        ctx.scope->find_type_id(next.value, {}) != -1 ||
+        next.type == TType::Fn) {
       type = parse_type();
     }
 
@@ -2016,21 +2009,24 @@ ASTType *Parser::parse_function_type() {
   append_type_extensions(output_type);
   FunctionTypeInfo info{};
   auto param_types = parse_parameter_types();
-  
+
   if (peek().type == TType::Arrow) {
     eat();
     auto return_type = parse_type();
-    info.return_type = ctx.scope->find_type_id(return_type->base, return_type->extension_info);
+    info.return_type =
+        ctx.scope->find_type_id(return_type->base, return_type->extension_info);
   } else {
     info.return_type = void_type();
   }
 
   for (size_t i = 0; i < param_types.size(); ++i) {
-    info.parameter_types[i] = ctx.scope->find_type_id(param_types[i]->base, param_types[i]->extension_info);
+    info.parameter_types[i] = ctx.scope->find_type_id(
+        param_types[i]->base, param_types[i]->extension_info);
     info.params_len++;
   }
 
-  output_type->resolved_type = global_find_function_type_id(info, output_type->extension_info);
+  output_type->resolved_type =
+      global_find_function_type_id(info, output_type->extension_info);
   auto t = global_get_type(output_type->resolved_type);
   return output_type;
 }

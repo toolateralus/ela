@@ -18,6 +18,18 @@ Context::Context() {
   root_scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
+  {
+    // auto &type = type_table.emplace_back(type_table.size(), TYPE_SCALAR);
+    // ScalarTypeInfo *info = type_info_alloc<ScalarTypeInfo>();
+    // info->scalar_type = TYPE_CHAR;
+    // info->size = 1;
+    // type.set_base("c_string");
+    // type.set_info(info);
+    // type.set_ext({.extensions = {TYPE_EXT_POINTER}});
+    // ** DO NOT REMOVE ***
+    scope->types["c_string"] = c_string_type() = charptr_type();
+    // ** ------------- ***
+  }
   // Range type
   {
     auto range_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
@@ -33,7 +45,7 @@ Context::Context() {
     func.params_len=1;
     func.parameter_types[0] = s64_type();
     func.return_type = bool_type();
-    range_scope->insert("contains", global_create_function_type("fn (s64) -> bool", func));
+    range_scope->insert("contains", global_find_function_type_id(func, {}));
     range_scope->parent = root_scope;
     root_scope->types.insert({"Range", type});
   }
@@ -49,7 +61,7 @@ Context::Context() {
     assert_info.params_len = 2;
     scope->insert(
         "assert",
-        global_create_function_type("fn (char *, bool) -> void", assert_info),
+        global_find_function_type_id(assert_info, {}),
         SYMBOL_IS_FUNCTION);
 
     FunctionTypeInfo sizeof_info{};
@@ -58,7 +70,7 @@ Context::Context() {
     // no other function will ever use this type. thats why we have a ?, because
     // we have no first class types yet.
     scope->insert("sizeof",
-                  global_create_function_type("fn (...) -> s64", sizeof_info),
+                  global_find_function_type_id(sizeof_info, {}),
                   SYMBOL_IS_FUNCTION);
   }
 
@@ -109,7 +121,7 @@ Context::Context() {
     auto get_info = FunctionTypeInfo{};
     get_info.is_varargs = true;
     get_info.return_type = charptr_type();
-    auto _t = global_create_function_type("fn (...) -> s8*", get_info);
+    auto _t = global_find_function_type_id(get_info, {});
     field_scope->insert("get", _t, SYMBOL_IS_FUNCTION);
     auto get_sym = field_scope->local_lookup("get");
     get_sym->function_overload_types.push_back(_t);
@@ -118,7 +130,7 @@ Context::Context() {
     auto set_info = FunctionTypeInfo{};
     set_info.is_varargs = true;
     set_info.return_type = void_type();
-    _t = global_create_function_type("fn (...) -> void", set_info);
+    _t = global_find_function_type_id(set_info, {});
     field_scope->insert("set", _t, SYMBOL_IS_FUNCTION);
     auto set_sym = field_scope->local_lookup("set");
     set_sym->function_overload_types.push_back(_t);
@@ -128,7 +140,7 @@ Context::Context() {
     elements_info.return_type = element_arr;
     elements_info.params_len = 1;
     elements_info.parameter_types[0] = charptr_type();
-    _t = global_create_function_type("fn (char*) -> Element[]", elements_info);
+    _t = global_find_function_type_id(elements_info, {});
     type_scope->insert("elements", _t, SYMBOL_IS_FUNCTION);
     auto elements_sym = type_scope->local_lookup("elements");
     elements_sym->function_overload_types.push_back(_t);
@@ -162,38 +174,38 @@ Context::Context() {
     func.return_type = void_type();
     func.params_len=1;
 
-    str_scope->insert("push", global_create_function_type("fn (char) -> void", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("push", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[0] = -1;
     func.params_len=0;
     func.return_type=char_type();
-    str_scope->insert("pop", global_create_function_type("fn () -> char", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("pop", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
 
     func.parameter_types[0] = int_type();
     func.params_len=1;
     func.return_type=void_type();
-    str_scope->insert("erase_at", global_create_function_type("fn (int) -> void", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("erase_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[0] = int_type();
     func.parameter_types[1] = char_type();
     func.params_len = 2;
     func.return_type= void_type();
-    str_scope->insert("insert_at", global_create_function_type("fn (int, char) -> void", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("insert_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.parameter_types[1] = string_type();
-    str_scope->insert("insert_substr_at", global_create_function_type("fn (int, char) -> void", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("insert_substr_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     func.params_len=1;
     func.return_type = string_type();
     func.parameter_types[0]= range_type();
-    str_scope->insert("substr", global_create_function_type("fn (Range) -> string", func), SYMBOL_IS_FUNCTION);
+    str_scope->insert("substr", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
 
     auto sym = str_scope->local_lookup("[");
     auto info = type_info_alloc<FunctionTypeInfo>();
     info->parameter_types[0] = int_type();
     info->return_type = s8_type();
-    sym->function_overload_types.push_back(global_create_function_type("fn (int) -> s8", *info));
+    sym->function_overload_types.push_back(global_find_function_type_id(*info, {}));
 
   }
 
@@ -206,7 +218,7 @@ Context::Context() {
     func.params_len=0;
     auto str_array = global_find_type_id(string_type(), TypeExt{.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
     func.return_type = str_array; 
-    scope->insert("args", global_create_function_type("fn () -> string[]", func));
+    scope->insert("args", global_find_function_type_id(func, {}));
     scope->parent = root_scope;
     root_scope->types.insert({"Env", type});
   }
@@ -214,18 +226,18 @@ Context::Context() {
   auto info = FunctionTypeInfo{};
   info.is_varargs = true;
   info.return_type = void_type();
-  root_scope->insert("destruct", global_create_function_type("fn (...) -> void", info), SYMBOL_IS_FUNCTION);
+  root_scope->insert("destruct", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
   info.is_varargs = true;
   info.return_type = void_type();
-  root_scope->insert("move", global_create_function_type("fn (...) -> void", info), SYMBOL_IS_FUNCTION);
+  root_scope->insert("move", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
 
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
-  root_scope->insert("get", global_create_function_type("fn (...) -> void", info), SYMBOL_IS_FUNCTION);
-
+  root_scope->insert("get", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
   for (int i = 0; i < type_table.size(); ++i) {
+    // std::cout << "inserting " << type_table[i].get_base().get_str() << "\n";
     root_scope->types.insert({type_table[i].get_base(),  i});
   }
 

@@ -432,10 +432,11 @@ std::any Typer::visit(ASTFunctionDeclaration *node) {
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = global_get_type(overload_type_id);
       auto this_type = global_get_type(type_id);
-      if (type->equals(this_type->base_id, this_type->get_ext()))
+      if (type->equals(this_type->base_id, this_type->get_ext()) && 
+          type->type_info_equals(this_type->get_info(), this_type->kind))
         throw_error(std::format("re-definition of function '{}'",
                                 node->name.value.get_str()),
-                    {});
+                    node->source_range);
     }
     sym->function_overload_types.push_back(type_id);
     sym->type_id = type_id;

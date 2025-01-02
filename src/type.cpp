@@ -69,9 +69,14 @@ int global_find_function_type_id(const FunctionTypeInfo &info,
       return type->id;
     }
   }
+  auto base = -1;
+  auto type_name = info.to_string();
   auto info_ptr =
       new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
-  return global_create_type(TYPE_FUNCTION, info.to_string(), info_ptr, type_extensions);
+  if (type_extensions.has_extensions()) {
+    base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
+  }
+  return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
 // PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
@@ -259,15 +264,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to) {
   return CONVERT_PROHIBITED;
 }
 
-bool Type::operator==(const Type &type) const {
-  for (int i = 0; i < type_table.size(); ++i) {
-    auto tinfo = &type_table[i];
-    if (tinfo->equals(base_id, extensions) &&
-        type_info_equals(type.get_info(), type.kind))
-      return true;
-  }
-  return false;
-}
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   if (this->kind != kind)
     return false;
@@ -383,7 +379,7 @@ int global_create_enum_type(const InternedString &name,
 int global_create_type(TypeKind kind, const InternedString &name,
                        TypeInfo *info, const TypeExt &extensions,
                        const int base_id) {
-  auto type = type_table.emplace_back(type_table.size(), kind);
+  auto &type = type_table.emplace_back(type_table.size(), kind);
   type.base_id = base_id;
   type.set_ext(extensions);
   type.set_base(name);
@@ -531,14 +527,24 @@ int voidptr_type() {
                                                .array_sizes = {}});
   return type;
 }
-int c_string_type() {
+int charptr_type() {
   static int type =
       global_find_type_id(char_type(), {.extensions = {TYPE_EXT_POINTER}});
   return type;
 }
-int charptr_type() {
-  static int type =
-      global_find_type_id(char_type(), {.extensions = {TYPE_EXT_POINTER}});
+
+int &range_type() {
+  static int type;
+  return type;
+}
+
+int &string_type() {
+  static int type;
+  return type;
+}
+
+int &c_string_type() {
+  static int type;
   return type;
 }
 
@@ -629,7 +635,7 @@ int get_pointer_to_type(int base) {
   auto type = global_get_type(base);
   auto extensions = type->get_ext();
   extensions.extensions.push_back({TYPE_EXT_POINTER});
-  auto id = global_find_type_id(type->base_id, extensions);
+  auto id = global_find_type_id(type->id, extensions);
   if (id == -1) {
     throw_error("Failed to get pointer to type", {});
   }
@@ -774,20 +780,3 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   return ss.str();
 }
 
-int global_create_function_type(const InternedString &name,
-                                const FunctionTypeInfo &info) {
-  auto id = global_create_type(TYPE_FUNCTION, name);
-  auto type = global_get_type(id);
-  type->set_info(new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info));
-  return id;
-}
-
-int &range_type() {
-  static int type;
-  return type;
-}
-
-int &string_type() {
-  static int type;
-  return type;
-}

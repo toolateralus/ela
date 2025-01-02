@@ -248,7 +248,7 @@ int u64_type();
 int float64_type();
 int float_type();
 int float32_type();
-int c_string_type();
+int &c_string_type();
 
 // assigned by the Context.
 int &string_type();
@@ -304,9 +304,6 @@ int get_pointer_to_type(int base);
 
 int get_map_value_type(Type *map_type);
 
-int global_create_function_type(const InternedString &name,
-                                const FunctionTypeInfo &info);
-
 struct Type {
   int id = invalid_id;
   int base_id = invalid_id;
@@ -334,7 +331,6 @@ public:
 
   Type() = default;
   Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
-  bool operator==(const Type &type) const;
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
 
