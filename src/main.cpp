@@ -78,6 +78,13 @@ Ela compiler:
     run_on_finished = true;
   }
 
+  if (argc >= 2 && (strcmp(argv[1], "test") == 0 || strcmp(argv[1], "t") == 0)) {
+    compile_command.flags["test"] = true;
+    argv[1] = (char *)"main.ela";
+    argc = 2;
+    run_on_finished = true;
+  }
+
   if (argc >= 2 && (strcmp(argv[1], "init") == 0)) {
     std::ofstream file("main.ela");
     if (argc > 2 && (strcmp(argv[2], "raylib") == 0)) {

@@ -1127,6 +1127,8 @@ std::string get_format_str(int type_id, ASTNode *node) {
 }
 
 void Emitter::interpolate_string(ASTLiteral *node) {
+  emit_line_directive(node);
+  
   if (node->value.get_str().empty()) {
     throw_warning(WarningEmptyStringInterpolation, "Empty interpolated string.", node->source_range);
     (*ss) << "string()";

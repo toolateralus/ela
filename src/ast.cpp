@@ -1414,7 +1414,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       }
     }
 
-
     Precedence token_precedence = get_operator_precedence(peek());
 
     if (token_precedence <= precedence) {
