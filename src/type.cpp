@@ -1,5 +1,6 @@
 #include "type.hpp"
 #include "ast.hpp"
+#include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
@@ -676,18 +677,12 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
 }
 
 bool TypeExt::is_fixed_sized_array() const {
-  for (const auto &ext : array_sizes) {
-    if (ext.is_not_null()) {
-      return true;
-    }
-  }
-  return false;
+  return has_extensions() && extensions.back() == TYPE_EXT_ARRAY && !array_sizes.empty() && array_sizes.back().is_not_null();
 }
 
 std::string TypeExt::to_string() const {
   std::stringstream ss;
   auto array_sizes = this->array_sizes;
-
   for (const auto ext : extensions) {
     switch (ext) {
     case TYPE_EXT_POINTER:
@@ -699,7 +694,9 @@ std::string TypeExt::to_string() const {
       if (size.is_null())
         ss << "[]";
       else {
-        ss << "[" << size << "]";
+        // TODO: we need a way to evaluate constexprs here
+        // to actually acurrately print the array size.
+        ss << "[" << "fixed_size_not_available" << "]";
       }
     } break;
     case TYPE_EXT_MAP: {

@@ -129,7 +129,7 @@ struct TypeExt {
 
   inline bool has_extensions() const { return !has_no_extensions(); }
 
-  TypeExt append(const TypeExt &to_append) const {
+  inline TypeExt append(const TypeExt &to_append) const {
     auto these = *this;
     int sizes_i = 0;
 
@@ -147,7 +147,8 @@ struct TypeExt {
     }
     return these;
   }
-  TypeExt without_back() const {
+  
+  inline TypeExt without_back() const {
     TypeExt these = *this;
     if (these.extensions.back() == TYPE_EXT_ARRAY) {
       these.array_sizes.pop_back();
