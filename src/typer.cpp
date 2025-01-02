@@ -1217,6 +1217,48 @@ std::any Typer::visit(ASTMake *node) {
   return type;
 }
 std::any Typer::visit(ASTInitializerList *node) {
+
+  // * TODO: Make it so we can have this more complex, up front initialization.
+  // * This will allow for better sub-initializer lists.
+  // * Type *type;
+  // * if (declaring_or_assigning_type != -1) {
+  // *   type = global_get_type(declaring_or_assigning_type);
+  //   Scope *scope;
+  //   switch (type->kind) {
+  //     case TYPE_SCALAR: goto regular_init;
+  //     case TYPE_STRUCT: {
+  //       auto info = type->get_info()->as<StructTypeInfo>();
+  //       scope = info->scope;
+  //     } break;
+  //     case TYPE_UNION: {
+  //       auto info = type->get_info()->as<UnionTypeInfo>();
+  //       scope = info->scope;
+  //     } break;
+  //     case TYPE_TUPLE: {
+  //       throw_error("Cannot use an initializer list to initialize a tuple, use <value, value...> syntax.", node->source_range);
+  //     } break;
+  //     case TYPE_FUNCTION: {
+  //       throw_error("Cannot use an initializer list to initialize a function type.", node->source_range);
+  //     } break;
+  //     case TYPE_ENUM: {
+  //       throw_error("Cannot use an initializer list to initialize an enum type, just use the variant.", node->source_range);
+  //     } break;
+  //   }
+  //   int i {};
+  //   for (const auto& iden : scope->ordered_symbols) {
+  //     auto &sym = scope->symbols[iden];
+  //     if (sym.is_function()) continue;
+  //     auto old_decl_ty = declaring_or_assigning_type;
+  //     declaring_or_assigning_type = sym.type_id;
+  //     if (node->expressions.size() <= i) {
+  //       break;
+  //     }
+  //     auto type = int_from_any(node->expressions[i]->accept(this));
+  //     declaring_or_assigning_type = old_decl_ty;
+  //     // TODO: assert type compatiblity
+  //   }
+  // }
+  // regular_init:
   int last_type = -1;
   for (const auto &expr : node->expressions) {
     int type = int_from_any(expr->accept(this));

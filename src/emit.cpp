@@ -242,9 +242,8 @@ std::any Emitter::visit(ASTBinExpr *node) {
     return {};
   }
 
-  auto op_ty =  node->op.type;
-  auto needs_parens = 
-    op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And;
+  auto op_ty = node->op.type;
+  auto needs_parens = op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And;
 
   if (needs_parens) (*ss) << "(";
   auto left = node->left->accept(this);
@@ -1072,6 +1071,63 @@ void Emitter::get_declaration_type_signature_and_identifier(const std::string &n
   (*ss) << tss.str();
 }
 
+std::string get_format_str(int type_id, ASTNode *node) {
+  auto type = global_get_type(type_id);
+  // We just assume that the type-checker has validated that this struct has a
+  // to_string() function
+
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto info = type->get_info()->as<TupleTypeInfo>();
+    std::string format_str = "<";
+    int i = 0;
+    for (const auto &t : info->types) {
+      format_str += get_format_str(t, node);
+      if (i != info->types.size()-1) {
+        format_str += ", ";
+      }
+      ++i;
+    }
+    format_str += ">";
+    return format_str;
+  }
+
+  if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+    return "%s";
+  }
+  if (type->id == charptr_type() || (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
+    return "%s";
+  }
+  if (type->get_ext().is_pointer()) {
+    return "%p";
+  }
+  if (type->id == bool_type()) {
+    return "%s";
+  }
+  if (type->is_kind(TYPE_SCALAR)) {
+    if (type->id == char_type()) {
+      return "%c";
+    } else if (type->id == s8_type() || type->id == s16_type() || type->id == s32_type() || type->id == u8_type() ||
+               type->id == u16_type() || type->id == u32_type() || type->id == int_type()) {
+      return "%d";
+    } else if (type->id == s64_type() || type->id == u64_type()) {
+      return "%ld";
+    } else if (type->id == float_type() || type->id == float32_type()) {
+      return "%f";
+    } else if (type->id == float64_type()) {
+      return "%lf";
+    } else if (type->id == bool_type()) {
+      return "%d";
+    }
+  }
+  if (type->is_kind(TYPE_ENUM)) {
+    return "%d";
+  }
+  throw_error(std::format("Cannot deduce a format specifier for interpolated "
+                          "string. type: {}",
+                          type->to_string()),
+              node->source_range);
+}
+
 void Emitter::interpolate_string(ASTLiteral *node) {
   if (node->value.get_str().empty()) {
     throw_warning(WarningEmptyStringInterpolation, "Empty interpolated string.", node->source_range);
@@ -1080,46 +1136,6 @@ void Emitter::interpolate_string(ASTLiteral *node) {
   }
 
   std::string str;
-  auto get_format_str = [&](int type_id) {
-    auto type = global_get_type(type_id);
-    // We just assume that the type-checker has validated that this struct has a
-    // to_string() function
-    if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
-      return "%s";
-    }
-    if (type->id == charptr_type() || (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
-      return "%s";
-    }
-    if (type->get_ext().is_pointer()) {
-      return "%p";
-    }
-    if (type->id == bool_type()) {
-      return "%s";
-    }
-    if (type->is_kind(TYPE_SCALAR)) {
-      if (type->id == char_type()) {
-        return "%c";
-      } else if (type->id == s8_type() || type->id == s16_type() || type->id == s32_type() || type->id == u8_type() ||
-                 type->id == u16_type() || type->id == u32_type() || type->id == int_type()) {
-        return "%d";
-      } else if (type->id == s64_type() || type->id == u64_type()) {
-        return "%ld";
-      } else if (type->id == float_type() || type->id == float32_type()) {
-        return "%f";
-      } else if (type->id == float64_type()) {
-        return "%lf";
-      } else if (type->id == bool_type()) {
-        return "%d";
-      }
-    }
-    if (type->is_kind(TYPE_ENUM)) {
-      return "%d";
-    }
-    throw_error(std::format("Cannot deduce a format specifier for interpolated "
-                            "string. type: {}",
-                            type->to_string()),
-                node->source_range);
-  };
 
   auto replace_next_brace_pair = [&](std::string &in, const std::string &replacement) {
     auto start = in.find('{');
@@ -1133,7 +1149,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
 
   for (const auto &value : node->interpolated_values) {
     auto type_id = std::any_cast<int>(value->accept(&type_visitor));
-    std::string format_specifier = get_format_str(type_id);
+    std::string format_specifier = get_format_str(type_id, node);
     auto v = node->value.get_str();
     replace_next_brace_pair(v, format_specifier);
     node->value = v;
@@ -1183,6 +1199,16 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     } else if (type->is_kind(TYPE_UNION)) {
       auto info = (type->get_info()->as<UnionTypeInfo>());
       interpolate_to_string_struct_union(info->scope);
+    } else if (type->is_kind(TYPE_TUPLE)) {
+      auto info = type->get_info()->as<TupleTypeInfo>();
+      for (int i = 0; i < info->types.size(); ++i) {
+        (*ss) << "get<" << std::to_string(i) << ">(";
+        value->accept(this);
+        (*ss) << ")";
+        if (i != info->types.size() - 1) {
+          (*ss) << ", ";
+        }
+      }
     } else {
       value->accept(this);
     }

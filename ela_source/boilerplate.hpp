@@ -180,6 +180,7 @@ extern "C" int snprintf(char *str, size_t size, const char *format, ...);
 extern "C" int sprintf(char *str, const char *format, ...);
 extern "C" void *memcpy(void *, void *, size_t);
 extern "C" void *memset(void*, int, size_t);
+extern "C" int strlen(const char*);
 
 #undef RAND_MAX
 #undef assert
