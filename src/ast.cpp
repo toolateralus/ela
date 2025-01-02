@@ -777,13 +777,19 @@ ASTStatement *Parser::parse_statement() {
   auto tok = peek();
 
   if (tok.type == TType::Eof) {
+    // ! Why is this here?
     return ast_alloc<ASTNoop>();
   }
 
+  // * Tuple destructure.
   if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
     return parse_multiple_asssignment();
   }
 
+  // * Variable declarations
+  // * n := 10, n : int = 10;
+  // * const_n :: 10; (remove me from here)
+  // TODO: this condition seems excessively complicated.
   if (tok.type == TType::Identifier &&
       (lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals ||
        (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].type != TType::LParen &&
@@ -791,7 +797,10 @@ ASTStatement *Parser::parse_statement() {
     auto decl = parse_declaration();
     end_node(decl, range);
     return decl;
-  } else if (tok.type == TType::Directive) {
+  }
+
+  // * '#' Directives.
+  if (tok.type == TType::Directive) {
     eat();
     auto statement = dynamic_cast<ASTStatement *>(
         process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value).get());
@@ -800,143 +809,138 @@ ASTStatement *Parser::parse_statement() {
     }
     end_node(statement, range);
     return statement;
-    // Increment/ Decrement statements;
-  } else if (tok.type == TType::Increment || tok.type == TType::Decrement || tok.type == TType::Delete ||
-             tok.type == TType::LParen || tok.type == TType::Erase || tok.type == TType::Switch ||
-             (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword &&
-              lookahead_buf()[2].family != TFamily::Operator)) {
-    auto statement = ast_alloc<ASTExprStatement>();
-    statement->expression = parse_expr();
+  }
 
-    if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
-      _switch->is_statement = true;
+
+  // * Control flow
+  {
+    if (tok.type == TType::LCurly) {
+      auto block = parse_block();
+      end_node(block, range);
+      return block;
     }
 
-    end_node(statement, range);
-    return statement;
-  } else if (tok.type == TType::LCurly) {
-    auto block = parse_block();
-    end_node(block, range);
-    return block;
-  } else if (tok.type == TType::Return) {
-    expect(TType::Return);
-    auto return_node = ast_alloc<ASTReturn>();
-    if (peek().type != TType::Semi) {
-      return_node->expression = parse_expr();
-    }
-    end_node(return_node, range);
-    return return_node;
-  } else if (tok.type == TType::Break) {
-    eat();
-    auto _break = ast_alloc<ASTBreak>();
-    end_node(_break, range);
-    return _break;
-  } else if (tok.type == TType::Continue) {
-    eat();
-    auto _continue = ast_alloc<ASTContinue>();
-    end_node(_continue, range);
-    return _continue;
-  } else if (tok.type == TType::For) {
-    eat();
-    auto node = ast_alloc<ASTFor>();
-
-    node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
-
-    // reference semantic for iterating over list
-    if (peek().type == TType::Mul) {
-      node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
-      eat();
-    }
-
-    if (lookahead_buf()[1].type == TType::In) {
-      node->iden = parse_primary();
-      expect(TType::In);
-      auto expr = parse_expr();
-      node->range = expr;
-    } else {
-      throw_error(
-          "Invalid for syntax. expected 'for i in 0..10 || for elem in "
-          "iterable || for *elem in iterable",
-          range);
-    }
-
-    node->block = parse_block();
-    end_node(node, range);
-    return node;
-  } else if (tok.type == TType::While) {
-    eat();
-    auto node = ast_alloc<ASTWhile>();
-    if (peek().type != TType::LCurly) {
-      node->condition = parse_expr();
-    }
-    node->block = parse_block();
-    end_node(node, range);
-    return node;
-  } else if (tok.type == TType::If) {
-    eat();
-    auto node = ast_alloc<ASTIf>();
-    node->condition = parse_expr();
-
-    if (peek().type == TType::Then) {
-      eat();
-      node->block = ast_alloc<ASTBlock>();
-      ctx.set_scope();
-      auto statement = parse_statement();
-      node->block->statements = {statement};
-      if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
+    if (tok.type == TType::Return) {
+      expect(TType::Return);
+      auto return_node = ast_alloc<ASTReturn>();
+      if (peek().type != TType::Semi) {
+        return_node->expression = parse_expr();
       }
-      node->block->scope = ctx.exit_scope();
-    } else {
-      node->block = parse_block();
+      end_node(return_node, range);
+      return return_node;
     }
 
-    if (peek().type == TType::Else) {
+    if (tok.type == TType::Break) {
       eat();
-      auto node_else = ast_alloc<ASTElse>();
-      if (peek().type == TType::If) {
-        auto inner_if = parse_statement();
-        assert(inner_if->get_node_type() == AST_NODE_IF);
-        node_else->_if = static_cast<ASTIf *>(inner_if);
+      auto _break = ast_alloc<ASTBreak>();
+      end_node(_break, range);
+      return _break;
+    }
+
+    if (tok.type == TType::Continue) {
+      eat();
+      auto _continue = ast_alloc<ASTContinue>();
+      end_node(_continue, range);
+      return _continue;
+    }
+
+    if (tok.type == TType::For) {
+      eat();
+      auto node = ast_alloc<ASTFor>();
+
+      node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+
+      // reference semantic for iterating over list
+      if (peek().type == TType::Mul) {
+        node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
+        eat();
+      }
+
+      if (lookahead_buf()[1].type == TType::In) {
+        node->iden = parse_primary();
+        expect(TType::In);
+        auto expr = parse_expr();
+        node->range = expr;
       } else {
-        node_else->block = parse_block();
+        throw_error(
+            "Invalid for syntax. expected 'for i in 0..10 || for elem in "
+            "iterable || for *elem in iterable",
+            range);
       }
-      node->_else = node_else;
+
+      node->block = parse_block();
+      end_node(node, range);
+      return node;
     }
-    end_node(node, range);
-    return node;
-  } else if (tok.type == TType::Mul) {
-    auto expr = parse_expr();
-    auto statement = ast_alloc<ASTExprStatement>();
-    statement->expression = expr;
-    end_node(statement, range);
-    return statement;
-    // subscript assignment
-  } else if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::LBrace) ||
-             (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Dot) ||
-             lookahead_buf()[1].type == TType::Assign || lookahead_buf()[1].type == TType::ColonEquals ||
-             lookahead_buf()[1].type == TType::Comma || lookahead_buf()[1].type == TType::LParen ||
-             lookahead_buf()[1].is_comp_assign()) {
-    auto statement = ast_alloc<ASTExprStatement>();
-    statement->expression = parse_expr();
-    end_node(statement, range);
-    return statement;
-  } else if (lookahead_buf()[1].type == TType::DoubleColon) {
+
+    if (tok.type == TType::While) {
+      eat();
+      auto node = ast_alloc<ASTWhile>();
+      if (peek().type != TType::LCurly) {
+        node->condition = parse_expr();
+      }
+      node->block = parse_block();
+      end_node(node, range);
+      return node;
+    }
+
+    if (tok.type == TType::If) {
+      eat();
+      auto node = ast_alloc<ASTIf>();
+      node->condition = parse_expr();
+
+      if (peek().type == TType::Then) {
+        eat();
+        node->block = ast_alloc<ASTBlock>();
+        ctx.set_scope();
+        auto statement = parse_statement();
+        node->block->statements = {statement};
+        if (statement->get_node_type() == AST_NODE_DECLARATION) {
+          throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
+        }
+        node->block->scope = ctx.exit_scope();
+      } else {
+        node->block = parse_block();
+      }
+
+      if (peek().type == TType::Else) {
+        eat();
+        auto node_else = ast_alloc<ASTElse>();
+        if (peek().type == TType::If) {
+          auto inner_if = parse_statement();
+          assert(inner_if->get_node_type() == AST_NODE_IF);
+          node_else->_if = static_cast<ASTIf *>(inner_if);
+        } else {
+          node_else->block = parse_block();
+        }
+        node->_else = node_else;
+      }
+      end_node(node, range);
+      return node;
+    }
+  }
+
+  // * Type declarations.
+  // * Todo: handle constant 'CONST :: VALUE' Declarations here.
+  if (lookahead_buf()[1].type == TType::DoubleColon) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
     if (peek().type == TType::Fn) {
       auto node = parse_function_declaration(tok);
       end_node(node, range);
       return node;
-    } else if (peek().type == TType::Struct) {
+    }
+    if (peek().type == TType::Struct) {
       auto struct_decl = parse_struct_declaration(tok);
       end_node(struct_decl, range);
       return struct_decl;
-    } else if (peek().type == TType::Enum) {
+    }
+    if (peek().type == TType::Enum) {
       auto enum_decl = parse_enum_declaration(tok);
       end_node(enum_decl, range);
       return enum_decl;
-    } else if (peek().type == TType::Union) {
+    }
+    if (peek().type == TType::Union) {
       auto union_decl = parse_union_declaration(tok);
       end_node(union_decl, range);
       return union_decl;
@@ -946,44 +950,86 @@ ASTStatement *Parser::parse_statement() {
           "'struct', or 'enum",
           range);
     }
-  } else if (lookahead_buf()[1].type == TType::Increment || lookahead_buf()[1].type == TType::Decrement) {
-    auto statement = ast_alloc<ASTExprStatement>();
-    statement->expression = parse_expr();
-    end_node(statement, range);
-    return statement;
+  }
+
+  // * Expression statements.
+  {
+    if (lookahead_buf()[1].type == TType::Increment || lookahead_buf()[1].type == TType::Decrement) {
+      auto statement = ast_alloc<ASTExprStatement>();
+      statement->expression = parse_expr();
+      end_node(statement, range);
+      return statement;
+    }
+    if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::LBrace) ||
+        (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Dot) ||
+        lookahead_buf()[1].type == TType::Assign || lookahead_buf()[1].type == TType::ColonEquals ||
+        lookahead_buf()[1].type == TType::Comma || lookahead_buf()[1].type == TType::LParen ||
+        lookahead_buf()[1].is_comp_assign()) {
+      auto statement = ast_alloc<ASTExprStatement>();
+      statement->expression = parse_expr();
+      end_node(statement, range);
+      return statement;
+    }
+    if (tok.type == TType::Mul) {
+      auto expr = parse_expr();
+      auto statement = ast_alloc<ASTExprStatement>();
+      statement->expression = expr;
+      end_node(statement, range);
+      return statement;
+      // subscript assignment
+    }
+
+    if (tok.type == TType::Increment || tok.type == TType::Decrement || tok.type == TType::Delete ||
+        tok.type == TType::LParen || tok.type == TType::Erase || tok.type == TType::Switch ||
+        (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword &&
+         lookahead_buf()[2].family != TFamily::Operator)) {
+      auto statement = ast_alloc<ASTExprStatement>();
+      statement->expression = parse_expr();
+
+      if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
+        _switch->is_statement = true;
+      }
+
+      end_node(statement, range);
+      return statement;
+    }
   }
 
   end_node(nullptr, range);
 
-  if (tok.family == TFamily::Operator) {
-    throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), range);
-  }
+  //*  Failure to parse errors
 
-  if (tok.family == TFamily::Literal) {
+  {
+    if (tok.family == TFamily::Operator) {
+      throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), range);
+    }
+
+    if (tok.family == TFamily::Literal) {
+      eat();
+      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), range);
+    }
+
+    if (tok.family == TFamily::Keyword) {
+      eat();
+      throw_error(std::format("Unexpected keyword: {}", tok.value), range);
+    }
+
+    if (ctx.scope->lookup(tok.value)) {
+      eat();
+      throw_error(std::format("Unexpected variable {}", tok.value), range);
+    }
+
+    if (ctx.scope->find_type_id(tok.value, {}) == -1) {
+      eat();
+      throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), range);
+    }
+
     eat();
-    throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), range);
+    throw_error(std::format("Unexpected token when parsing statement: {}.. This "
+                            "is likely an undefined type.",
+                            tok.value),
+                range);
   }
-
-  if (tok.family == TFamily::Keyword) {
-    eat();
-    throw_error(std::format("Unexpected keyword: {}", tok.value), range);
-  }
-
-  if (ctx.scope->lookup(tok.value)) {
-    eat();
-    throw_error(std::format("Unexpected variable {}", tok.value), range);
-  }
-
-  if (ctx.scope->find_type_id(tok.value, {}) == -1) {
-    eat();
-    throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), range);
-  }
-
-  eat();
-  throw_error(std::format("Unexpected token when parsing statement: {}.. This "
-                          "is likely an undefined type.",
-                          tok.value),
-              range);
 }
 
 ASTDeclaration *Parser::parse_declaration() {
