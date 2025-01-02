@@ -1222,6 +1222,15 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
     a, b := func_takes_tuple_arg(tuple);
     assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
   }
+
+  nested := (1, (2, 3));
+
+  {
+    _, tup := nested;
+    a, b := tup;
+    assert("nested tup failed", a == 2 && b == 3 && _ == 1);
+  }
+
 }
 
 #test test_set_field_with_reflection :: fn() {

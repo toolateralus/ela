@@ -1555,7 +1555,14 @@ std::string Emitter::to_cpp_string(Type *type) {
       break;
     case TYPE_TUPLE: {
       auto info = (type->get_info()->as<TupleTypeInfo>());
-      output = "_tuple" + get_tuple_type_name(info->types).get_str();
+      output = "_tuple<";
+      for (int i = 0; i < info->types.size(); ++i) {
+        output += to_cpp_string(global_get_type(info->types[i]));
+        if (i != info->types.size() -1) {
+          output += ", ";
+        }
+      }
+      output += ">";
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
