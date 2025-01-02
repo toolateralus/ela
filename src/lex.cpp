@@ -13,6 +13,7 @@ void Lexer::get_token(State &state) {
   const std::string &input = state.input;
   const size_t len = state.input_len;
   size_t &lines = state.line;
+  size_t &col = state.col;
   std::stringstream token;
 
   while (pos < len) {
@@ -23,33 +24,46 @@ void Lexer::get_token(State &state) {
     if (c == '\n') {
       pos++;
       lines++;
+      col = 1; // Reset column position at the start of a new line
       continue;
     }
 
     if (c == ' ' || c == '\t') {
       pos++;
+      col++;
       continue;
     }
 
     // single comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '/') {
       pos += 2;
+      col += 2;
       size_t newlinePos = input.find('\n', pos);
-      pos = (newlinePos != std::string::npos) ? newlinePos + 1 : len;
-      lines += (newlinePos != std::string::npos);
+      if (newlinePos != std::string::npos) {
+        lines++;
+        col = 1; // Reset column position at the start of a new line
+        pos = newlinePos + 1;
+      } else {
+        pos = len;
+      }
       continue;
     }
 
     // multi line comment
     if (c == '/' && pos + 1 < len && input[pos + 1] == '*') {
       pos += 2;
+      col += 2;
       while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
         if (input[pos] == '\n') {
           lines++;
+          col = 1; // Reset column position at the start of a new line
+        } else {
+          col++;
         }
         pos++;
       }
       pos += 2;
+      col += 2;
       continue;
     }
 
@@ -58,20 +72,24 @@ void Lexer::get_token(State &state) {
     if (c == '\'')  {
       auto start = pos;
       pos++; // move past '
+      col++;
       c = input[pos];
       std::string value;
       if (c == '\\') {
         value += c; // eat escape characters if present
         pos++;
+        col++;
         c = input[pos];
       }
       value += c;
       pos++; // move past character
+      col++;
       c = input[pos];
       if (c != '\'') {
         throw_error("invalid char literal: too many characters", {.begin = (int64_t)start, .end =(int64_t)pos});
       }
       pos++; // move past '
+      col++;
       state.lookahead_buffer.push_back(
           Token(location, value, TType::Char, TFamily::Literal));
       return;
@@ -79,6 +97,7 @@ void Lexer::get_token(State &state) {
 
     if (c == '"') {
       pos++;
+      col++;
       c = input[pos];
       while (pos < len) {
         c = input[pos];
@@ -88,8 +107,10 @@ void Lexer::get_token(State &state) {
           if (pos + 1 < len) {
             token.put(c);
             pos++;
+            col++;
             token.put(input[pos]);
             pos++;
+            col++;
           } else {
             std::cout << location.ToString();
             std::cout << "\nela: incomplete escape sequence at end of input\n";
@@ -98,10 +119,12 @@ void Lexer::get_token(State &state) {
         } else {
           token.put(c);
           pos++;
+          col++;
           c = input[pos];
         }
       }
       pos++;
+      col++;
       state.lookahead_buffer.push_back(
           Token(location, token.str(), TType::String, TFamily::Literal));
       return;
@@ -111,6 +134,7 @@ void Lexer::get_token(State &state) {
       while (pos < len && (std::isalnum(c) || c == '_')) {
         token.put(c);
         pos++;
+        col++;
         c = input[pos];
       }
       string value = token.str();
@@ -142,6 +166,7 @@ void Lexer::get_token(State &state) {
           }
         }
         pos++;
+        col++;
         c = input[pos];
       }
 
@@ -163,10 +188,12 @@ void Lexer::get_token(State &state) {
       if (c == '0' && (input[pos + 1] == 'x' || input[pos + 1] == 'X')) {
         is_hex = true;
         pos += 2; // Skip '0x'
+        col += 2;
         c = input[pos];
       } else if (c == '0' && (input[pos + 1] == 'b' || input[pos + 1] == 'B')) {
         is_bin = true;
         pos += 2; // Skip '0b'
+        col += 2;
         c = input[pos];
       }
 
@@ -175,6 +202,7 @@ void Lexer::get_token(State &state) {
               (is_bin && (c == '0' || c == '1')) || c == '_')) {
         if (c == '_') {
           pos++;
+          col++;
           c = input[pos];
         }
         if (c == '.') {
@@ -182,6 +210,7 @@ void Lexer::get_token(State &state) {
             auto str = token.str();
             str.pop_back();
             pos++;
+            col++;
             state.lookahead_buffer.push_back(
                 Token(location, str, TType::Integer, TFamily::Literal));
 
@@ -193,10 +222,12 @@ void Lexer::get_token(State &state) {
         }
         token.put(c);
         pos++;
+        col++;
         c = input[pos];
 
         if (c == '_') {
           pos++;
+          col++;
           c = input[pos];
         }
 

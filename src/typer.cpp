@@ -1063,8 +1063,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   return operand_ty;
 }
 std::any Typer::visit(ASTIdentifier *node) {
-
-  auto str = node->value;
+  auto str = node->value.get_str();
 
   auto type_id = ctx.scope->find_type_id(node->value, {});
   if (type_id != -1) {
