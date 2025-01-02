@@ -629,7 +629,7 @@ std::string TypeExt::to_string() const {
         else {
           // TODO: we need a way to evaluate constexprs here
           // to actually acurrately print the array size.
-          ss << "[" << "fixed_size_not_available" << "]";
+          ss << "[" << size << "]";
         }
       } break;
       case TYPE_EXT_MAP: {

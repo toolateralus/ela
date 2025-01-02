@@ -73,6 +73,8 @@ struct SerializeVisitor : VisitorBase {
 };
 
 struct Typer : VisitorBase {
+  Nullable<Symbol> get_symbol(ASTNode *);
+
   int declaring_or_assigning_type = -1;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
@@ -239,4 +241,5 @@ struct Emitter : VisitorBase {
     }
     return {};
   };
+
 };

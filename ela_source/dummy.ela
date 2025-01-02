@@ -18,9 +18,10 @@ function_pointer_helper :: fn(a: int, b) -> int {
     &function_pointer_helper
   };
 
-  // * If we explicitly type this as FunctionPointer, 
-  // it says cannot convert fn() to fn*().
+  // ! If we explicitly type this as FunctionPointer, 
+  // ! it says cannot convert fn() to fn*().
   from_arr := array[0];
+  // ! 
 
   if from_arr != null {
     from_arr(2, 3)
@@ -28,9 +29,18 @@ function_pointer_helper :: fn(a: int, b) -> int {
     assert("", false);
   }
 
-  // fixed: FunctionPointer[12];
+  fixed: FunctionPointer[12] =  {
+    &function_pointer_helper
+  };
+
+  
+  // !Same bug here
   // fixed[0] = &function_pointer_helper;
+
+
   // from_fixed : FunctionPointer = &fixed[0];
+  //! Same bug here
+  from_fixed := &fixed[0];
 
   // assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
 

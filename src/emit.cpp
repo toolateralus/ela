@@ -158,7 +158,7 @@ std::any Emitter::visit(ASTCall *node) {
   return {};
 }
 std::any Emitter::visit(ASTLiteral *node) {
-  auto type = global_get_type(std::any_cast<int>(node->accept(&type_visitor)))->to_string();
+  auto type = to_cpp_string(global_get_type(std::any_cast<int>(node->accept(&type_visitor))));
   std::string output;
   switch (node->tag) {
     case ASTLiteral::InterpolatedString: {
@@ -200,7 +200,7 @@ std::any Emitter::visit(ASTIdentifier *node) {
 }
 std::any Emitter::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Sub) {
-    auto type = global_get_type(std::any_cast<int>(node->operand->accept(&type_visitor)))->to_string();
+    auto type = to_cpp_string(global_get_type(std::any_cast<int>(node->operand->accept(&type_visitor))));
     (*ss) << '(' << type << ')';
   }
   auto left_type = std::any_cast<int>(node->operand->accept(&type_visitor));
@@ -1128,7 +1128,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
 
 void Emitter::interpolate_string(ASTLiteral *node) {
   emit_line_directive(node);
-  
+
   if (node->value.get_str().empty()) {
     throw_warning(WarningEmptyStringInterpolation, "Empty interpolated string.", node->source_range);
     (*ss) << "string()";
@@ -1254,13 +1254,6 @@ void Emitter::emit_function_pointer_type_string(Type *type, Nullable<std::string
     }
   }
   ss << ")";
-
-  if (identifier)
-    std::cout << "emitting \"" << ss.str() << "\" for identifier \"" << *identifier.get() << "\"\n";
-  else {
-    std::cout << "emitting \"" << ss.str() << "\" for type \"" << type->to_string() << "\"\n";
-  }
-
   (*this->ss) << ss.str();
 }
 
@@ -1533,7 +1526,6 @@ std::string Emitter::to_cpp_string(const TypeExt &extensions, const std::string 
   // TODO: we need to fix the emitting of 'c_string' as const char*, 
   // right now it's fricked up.
   ss << base;
-  
 
   for (const auto ext : extensions.extensions) {
     if (ext == TYPE_EXT_ARRAY) {

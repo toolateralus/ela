@@ -204,6 +204,48 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
   return declaring_type;
 }
 
+Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_IDENTIFIER:
+      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value);
+    case AST_NODE_DOT_EXPR: {
+      auto dotnode = static_cast<ASTDotExpr *>(node);
+      auto type = global_get_type(int_from_any(dotnode->base->accept(this)));
+
+      // TODO: 
+      // * We can't do this, since there's no symbol that represents these
+      // * compiler intrinsics. So instead, we just roll with it as we wouldve -- this 
+      // * Is only for overloading anyway.
+      if (type->get_ext().is_array())
+        return nullptr;
+      
+      if (type->get_ext().is_map())
+        return nullptr;
+
+      if (!type->is_kind(TYPE_STRUCT) && !type->is_kind(TYPE_UNION))
+        throw_error("cannot use . on a non-struct, non-union type", node->source_range);
+          
+
+      auto scope = type->is_kind(TYPE_STRUCT) ? type->get_info()->as<StructTypeInfo>()->scope
+                                              : type->get_info()->as<UnionTypeInfo>()->scope;
+      return scope->local_lookup(dotnode->member_name);
+    } break;
+    case AST_NODE_SCOPE_RESOLUTION: {
+      auto srnode = static_cast<ASTScopeResolution *>(node);
+      auto type = global_get_type(int_from_any(srnode->base->accept(this)));
+      if (!type->is_kind(TYPE_STRUCT) && !type->is_kind(TYPE_UNION))
+        throw_error("cannot use :: on a non-struct, non-union type", node->source_range);
+
+      auto scope = type->is_kind(TYPE_STRUCT) ? type->get_info()->as<StructTypeInfo>()->scope
+                                              : type->get_info()->as<UnionTypeInfo>()->scope;
+      return scope->local_lookup(srnode->member_name);
+    } break;
+    default:
+      throw_error("Get symbol cannot be used on this node type", node->source_range);
+  }
+  return nullptr;
+}
+
 std::any Typer::visit(ASTProgram *node) {
   for (auto &statement : node->statements) statement->accept(this);
   return {};
@@ -692,27 +734,26 @@ std::any Typer::visit(ASTCall *node) {
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
 
-  if (type) declaring_or_assigning_type = type->id;
+  auto symbol_nullable = get_symbol(node->function);
 
-  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
-
-  // the type may be null for a generic function but the if statement above
-  // should always take care of that if that was the case.
-  if (type == nullptr) {
+  if (!symbol_nullable && !type) {
     throw_error("Use of undeclared function", node->source_range);
-  }
+  } 
 
-  if (!type->is_kind(TYPE_FUNCTION)) {
-    throw_error(std::format("Unable to call function... target did not refer "
-                            "to a function typed variable. Constructors "
-                            "currently use #make(Type, ...) syntax."),
-                node->source_range);
-  }
-
-  if (node->function->get_node_type() == AST_NODE_IDENTIFIER) {
-    auto identifier = static_cast<ASTIdentifier *>(node->function);
-    auto symbol = ctx.scope->lookup(identifier->value);
+  std::vector<int> arg_tys;
+  if(symbol_nullable) {
+    auto symbol = symbol_nullable.get();
+    type = symbol->type_id != -1 ? global_get_type(symbol->type_id) : nullptr;
+    declaring_or_assigning_type = type->id;
+    arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
     find_function_overload(node, symbol, arg_tys, type);
+  } else {
+    declaring_or_assigning_type = type->id;
+    arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
+  }
+
+  if (!type) {
+    throw_error("Unable to locate type for function call", node->source_range);
   }
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
@@ -1216,7 +1257,6 @@ std::any Typer::visit(ASTMake *node) {
   return type;
 }
 std::any Typer::visit(ASTInitializerList *node) {
-
   // * TODO: Make it so we can have this more complex, up front initialization.
   // * This will allow for better sub-initializer lists.
   // * Type *type;
@@ -1234,13 +1274,15 @@ std::any Typer::visit(ASTInitializerList *node) {
   //       scope = info->scope;
   //     } break;
   //     case TYPE_TUPLE: {
-  //       throw_error("Cannot use an initializer list to initialize a tuple, use <value, value...> syntax.", node->source_range);
+  //       throw_error("Cannot use an initializer list to initialize a tuple, use <value, value...> syntax.",
+  //       node->source_range);
   //     } break;
   //     case TYPE_FUNCTION: {
   //       throw_error("Cannot use an initializer list to initialize a function type.", node->source_range);
   //     } break;
   //     case TYPE_ENUM: {
-  //       throw_error("Cannot use an initializer list to initialize an enum type, just use the variant.", node->source_range);
+  //       throw_error("Cannot use an initializer list to initialize an enum type, just use the variant.",
+  //       node->source_range);
   //     } break;
   //   }
   //   int i {};
