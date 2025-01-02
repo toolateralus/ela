@@ -238,12 +238,6 @@ void Scope::insert(const InternedString &name, int type_id, int flags) {
   ordered_symbols.push_back(name);
 }
 
-/*
-  !BUG !!! SUPER CRITICAL !!!
-  ! Sometimes in methods we get a cyclic scope reference. I Don't want to right now but this most certainly needs to be
-  resolved STAT ! There is a repro for this, with a possible and likely explanation for why this is happening
-*/
-
 Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {
     return &symbols[name];

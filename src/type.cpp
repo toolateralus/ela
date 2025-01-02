@@ -77,10 +77,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExt &ty
   return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
-// PERFORMANCE(Josh) 10/5/2024, 9:55:59 AM
-// We might want to upgrade to a hash map at a certain number of types or
-// something. I think the linear search is fine but this is certainly one of the
-// slowest functions in the compiler.
+
 int global_find_type_id(const int base, const TypeExt &type_extensions) {
   if (!type_extensions.has_extensions()) {
     return base;
@@ -128,13 +125,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_exten
   return global_create_tuple_type(tuple_types, type_extensions);
 }
 
-// CLEANUP(Josh) 10/3/2024, 9:25:36 AM
-// This could be significantly improved for readability
-// PERFORMANCE(Josh) 10/3/2024, 9:25:51 AM
-// Doing linear searches over the types a ton of times might get slower for
-// large programs. However per 500 lines of unit tsting which creates a wide
-// variety of types, we only really get like 50-100 types total, so a hash map
-// is not really going to pay off that much probably.
+
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
   if (!from || !to) {
     throw_error(
@@ -520,8 +511,8 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
     case TType::Mul:
     case TType::Div:
     case TType::Modulo:
+    case TType::LogicalNot:
     case TType::Not:
-    case TType::BitwiseNot:
     case TType::Or:
     case TType::And:
     case TType::SHL:

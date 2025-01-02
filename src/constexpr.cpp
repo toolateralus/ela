@@ -28,9 +28,9 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
             throw_error("Modulo by zero in constant expression", node->source_range);
           }
           return left % right;
-        case TType::Not:
+        case TType::LogicalNot:
           return !left;
-        case TType::BitwiseNot:
+        case TType::Not:
           return ~left;
         case TType::Or:
           return left | right;
@@ -69,9 +69,9 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
       switch (unary->op.type) {
         case TType::Sub:
           return -operand;
-        case TType::Not:
+        case TType::LogicalNot:
           return !operand;
-        case TType::BitwiseNot:
+        case TType::Not:
           return ~operand;
         default:
           throw_error("Invalid unary operator in constant expression", node->source_range);

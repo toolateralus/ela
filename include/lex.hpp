@@ -30,7 +30,7 @@ enum struct TType {
   Semi,
 
   Not,
-  BitwiseNot,
+  LogicalNot,
   Or,
   And,
   SHL,
@@ -159,8 +159,8 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Eof);
     TTYPE_CASE(DoubleColon);
     TTYPE_CASE(Dot);
+    TTYPE_CASE(LogicalNot);
     TTYPE_CASE(Not);
-    TTYPE_CASE(BitwiseNot);
 
     TTYPE_CASE(Increment);
     TTYPE_CASE(Decrement);
@@ -278,7 +278,7 @@ static std::unordered_map<std::string, TType> keywords{
 static std::unordered_map<std::string, TType> operators{
     {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
     {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
-    {"!", TType::Not},          {"~", TType::BitwiseNot}, {"::", TType::DoubleColon}, {"->", TType::Arrow},
+    {"!", TType::LogicalNot},          {"~", TType::Not}, {"::", TType::DoubleColon}, {"->", TType::Arrow},
     {"..", TType::Range},       {"+", TType::Add},        {"-", TType::Sub},          {"*", TType::Mul},
     {"/", TType::Div},          {"%", TType::Modulo},     {"=", TType::Assign},       {",", TType::Comma},
     {";", TType::Semi},         {"(", TType::LParen},     {")", TType::RParen},       {"{", TType::LCurly},

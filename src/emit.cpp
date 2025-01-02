@@ -205,7 +205,7 @@ std::any Emitter::visit(ASTUnaryExpr *node) {
   }
   auto left_type = std::any_cast<int>(node->operand->accept(&type_visitor));
   auto type = global_get_type(left_type);
-  if (node->op.type == TType::BitwiseNot && type->get_ext().is_array()) {
+  if (node->op.type == TType::Not && type->get_ext().is_array()) {
     node->operand->accept(this);
     (*ss) << ".pop()";
     return {};
@@ -233,7 +233,7 @@ std::any Emitter::visit(ASTBinExpr *node) {
   }
 
   // CLEANUP(Josh) 10/14/2024, 10:13:23 AM
-  // Get rid of these janky operators and just use methods.
+  // Get rid of these janky operators and just use generic methods.
   if (node->op.type == TType::Concat) {
     node->left->accept(this);
     (*ss) << ".push(";
@@ -242,10 +242,11 @@ std::any Emitter::visit(ASTBinExpr *node) {
     return {};
   }
 
-  // SIMPLIFY(Josh) We probably don't want to always parenthesize every single
-  // expression. We can just have a table of which operators need custom
-  // precedence 9/30/2024, 10:20:00 AM
-  (*ss) << "(";
+  auto op_ty =  node->op.type;
+  auto needs_parens = 
+    op_ty == TType::SHL || op_ty == TType::SHR || op_ty == TType::Not || op_ty == TType::And;
+
+  if (needs_parens) (*ss) << "(";
   auto left = node->left->accept(this);
   space();
   (*ss) << node->op.value.get_str();
@@ -258,7 +259,7 @@ std::any Emitter::visit(ASTBinExpr *node) {
 
   space();
   auto right = node->right->accept(this);
-  (*ss) << ")";
+  if (needs_parens) (*ss) << ")";
   return {};
 }
 std::any Emitter::visit(ASTExprStatement *node) {
@@ -329,8 +330,6 @@ std::any Emitter::visit(ASTDeclaration *node) {
     return {};
   }
 
-  // TODO: in the type checker, we should assert that this isn't a static member
-  // / function.
   if (node->is_static) {
     (*ss) << "static ";
   } else if (node->is_constexpr) {

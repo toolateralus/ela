@@ -366,8 +366,6 @@ struct ASTSubscript : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
 };
 
-// TODO: generalize type declarations so all types can have nested types and
-// static methods. Should be much simpler.
 struct ASTStructDeclaration : ASTStatement {
   ASTType *type;
   Scope *scope;

@@ -135,7 +135,6 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
   } else if (type->is_kind(TYPE_STRUCT)) {
     auto info = (type->get_info()->as<StructTypeInfo>());
 
-    // TODO: re enable this once we can find constructors
     for (const auto &[name, symbol] : info->scope->symbols) {
       if (name == "this") continue;
 
@@ -160,10 +159,6 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
         }
       }
 
-      // TODO: fix this. We need to know if a symbol is a constructor or not,
-      // right now we are just assuming if there's
-      // TODO: a function that matches the type signature of the init list
-      // within the struct, that it's a valid constructor.
       return declaring_type;
     }
 
@@ -755,9 +750,10 @@ std::any Typer::visit(ASTArguments *node) {
 
   std::vector<int> argument_types;
   for (int i = 0; i < node->arguments.size(); ++i) {
+    auto arg = node->arguments[i];
+
     // TODO: make sure this never happens, we should always have the type of
     // the thing. However args are sometime used for non-functions.
-    auto arg = node->arguments[i];
     if (!info) {
       auto arg_ty = int_from_any(arg->accept(this));
       argument_types.push_back(arg_ty);
@@ -844,7 +840,7 @@ std::any Typer::visit(ASTBinExpr *node) {
         ctx.set_scope(info->scope);
         Defer _([&]() { ctx.set_scope(enclosing_scope); });
         if (sym->is_function()) {
-          // TODO: fix this. we have ambiguitty with how we do this
+          // TODO: fix this. we have ambiguity with how we do this
           int t = -1;
           if (sym->function_overload_types[0] == -1) {
             t = sym->type_id;
@@ -901,7 +897,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement || node->op.type == TType::And ||
-      node->op.type == TType::Mul || node->op.type == TType::BitwiseNot) {
+      node->op.type == TType::Mul || node->op.type == TType::Not) {
   }
 
   if (node->op.type == TType::And) {
@@ -915,7 +911,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   // unary operator overload.
   auto left_ty = global_get_type(operand_ty);
 
-  if (left_ty->get_ext().is_array() && node->op.type == TType::BitwiseNot) {
+  if (left_ty->get_ext().is_array() && node->op.type == TType::Not) {
     return left_ty->get_element_type();
   }
 
@@ -947,7 +943,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
         type_conversion_rule(global_get_type(operand_ty), global_get_type(bool_type()), node->operand->source_range);
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
 
-    if (node->op.type == TType::Not && can_convert) {
+    if (node->op.type == TType::LogicalNot && can_convert) {
       return bool_type();
     }
   }
@@ -1137,8 +1133,6 @@ std::any Typer::visit(ASTScopeResolution *node) {
 std::any Typer::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
-  // TODO: adding get true type fixed a bug here. This shouldn't really be
-  // neccesary, The alias system is still crappy.
   auto left_ty = global_get_type(left);
 
   /*
@@ -1166,7 +1160,7 @@ std::any Typer::visit(ASTSubscript *node) {
         ctx.set_scope(info->scope);
         Defer _([&]() { ctx.set_scope(enclosing_scope); });
         if (sym->is_function()) {
-          // TODO: fix this. we have ambiguitty with how we do this
+          // TODO: fix this. we have ambiguity with how we do this
           int t = -1;
           if (sym->function_overload_types[0] == -1) {
             t = sym->type_id;
@@ -1235,10 +1229,8 @@ std::any Typer::visit(ASTInitializerList *node) {
       }
     }
     // !BUG: somehow for 2 expressions, sometimes this will end up with 4
-    // types. I have no idea how atha's happening. I put a hack in somewhere
-    // that checks the length of the expressions instead of the types. paste
-    // this into the terminal and click the link ::  echo
-    // type_visitor.cpp:249:1
+    // ! types. I have no idea how atha's happening. I put a hack in somewhere
+    // ! that checks the length of the expressions instead of the types
     node->types.push_back(type);
   }
 

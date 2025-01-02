@@ -1414,24 +1414,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       }
     }
 
-    // ! Type inferred assignment.
-    // TODO: Put this somewhere within the declaration stuff.
-    // Right now we cant use n := false in structs, which would be nice terse
-    // syntax for declaring members.
-    {
-      if (peek().type == TType::ColonEquals) {
-        if (left->get_node_type() != AST_NODE_IDENTIFIER) {
-          end_node(left, range);
-          throw_error("Cannot use type inference assignment ':=' on non-identifiers.", range);
-        }
-        auto iden = static_cast<ASTIdentifier *>(left);
-        if (ctx.scope->local_lookup(iden->value)) {
-          end_node(nullptr, range);
-          throw_error("redefinition of a variable.", range);
-        }
-        ctx.scope->insert(iden->value, -1);
-      }
-    }
 
     Precedence token_precedence = get_operator_precedence(peek());
 
@@ -1454,9 +1436,9 @@ ASTExpr *Parser::parse_unary() {
 
   // bitwise not isa  unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
-  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::Not ||
-      peek().type == TType::BitwiseNot || peek().type == TType::Increment || peek().type == TType::Decrement ||
-      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::BitwiseNot) {
+  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot ||
+      peek().type == TType::Not || peek().type == TType::Increment || peek().type == TType::Decrement ||
+      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::Not) {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
