@@ -3,13 +3,15 @@
 mkdir -p build
 cd build
 
-if [ "$1" == "Release" ]; then
+if [ "$1" == "Clean" ] || [ ! -f build.ninja ]; then
+  if [ "$2" == "Release" ]; then
     cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Release
-else
+  else
     cmake .. -G "Ninja" -DCMAKE_BUILD_TYPE=Debug
+  fi
+  ninja clean
 fi
 
-ninja clean
 ninja -j12
 
 if [ $? -ne 0 ]; then

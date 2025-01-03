@@ -98,7 +98,9 @@ struct Typer : VisitorBase {
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
+  int get_function_type(ASTFunctionDeclaration *);
   void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
+  std::any visit_function_declaration(ASTFunctionDeclaration* node, bool generic_instantation, std::vector<int> generic_args = {});
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
@@ -185,9 +187,8 @@ struct Emitter : VisitorBase {
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
 
-  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
 
-  void emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
+  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExt &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
@@ -195,11 +196,14 @@ struct Emitter : VisitorBase {
   std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
+
+
   void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition,
                             Nullable<ASTBlock> block);
-  void emit_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
-                                                       Type *type);
-  void get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
+
+  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
+  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name, Type *type);
+  std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;

@@ -248,7 +248,10 @@ struct ASTParamsDecl : ASTStatement {
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
-  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
+  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL; // TODO: get rid of this, and just add it to the flags.
+  
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<int> generic_instantiations;
 
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
@@ -563,8 +566,9 @@ struct Parser {
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
+  std::vector<GenericParameter> parse_generic_parameters();
   ASTUnionDeclaration *parse_union_declaration(Token);
-  ASTParamsDecl *parse_parameters();
+  ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTBlock *parse_block();
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);

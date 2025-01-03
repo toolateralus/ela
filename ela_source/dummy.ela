@@ -1,8 +1,8 @@
 
+function :: fn![Value, Owner] (a: Value, b: Owner) {
+
+}
+
 main :: fn() {
-  Strukt :: struct {
-    v: s32;
-  }
-  s: Strukt;
-  s.v++;
+  function(1, 2);
 }

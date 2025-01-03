@@ -1485,7 +1485,7 @@ ASTBlock *Parser::parse_block() {
   return block;
 }
 
-ASTParamsDecl *Parser::parse_parameters() {
+ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_params) {
   auto range = begin_node();
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
@@ -1511,12 +1511,14 @@ ASTParamsDecl *Parser::parse_parameters() {
     if (!type || peek().type == TType::Colon) expect(TType::Colon);
 
     auto next = peek();
+    auto is_generic_type = std::ranges::find(generic_params, GenericParameter{next.value}) != generic_params.end();
 
     // if the cached type is null, or if the next token isn't
     // a valid type, we parse the type.
     // this should allow us to do things like func :: fn(int a, b, c) {}
+    // also parse generic-typed arguments.
     if (next.type == TType::Directive || !type || ctx.scope->find_type_id(next.value, {}) != -1 ||
-        next.type == TType::Fn) {
+        next.type == TType::Fn || is_generic_type) {
       type = parse_type();
     }
 
@@ -1543,15 +1545,21 @@ ASTParamsDecl *Parser::parse_parameters() {
 }
 
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
-  expect(TType::Fn);
   auto range = begin_node();
+  expect(TType::Fn);
+
   auto function = ast_alloc<ASTFunctionDeclaration>();
+
+  if (peek().type == TType::GenericBrace) {
+    function->generic_parameters = parse_generic_parameters();
+  }
+
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = function;
 
   if (range.begin > 0) range.begin = range.begin - 1;
-  function->params = parse_parameters();
+  function->params = parse_parameters(function->generic_parameters);
   function->name = name;
 
   auto sym = ctx.scope->local_lookup(name.value);
@@ -1628,6 +1636,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
 
+  std::vector<GenericParameter> params;
+  if (peek().type == TType::GenericBrace) {
+    params = parse_generic_parameters();
+  }
+
   auto old = current_struct_decl;
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
@@ -1679,6 +1692,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
+  info->generic_parameters = params;
 
   current_struct_decl = old;
   end_node(decl, range);
@@ -1687,6 +1701,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto range = begin_node();
+
+
   auto node = ast_alloc<ASTUnionDeclaration>();
   current_union_decl = node;
 
@@ -1714,6 +1730,11 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   Defer _([&] { current_union_decl = nullptr; });
 
   expect(TType::Union);
+
+  std::vector<GenericParameter> params;
+  if (peek().type == TType::GenericBrace) {
+    params = parse_generic_parameters();
+  }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
   auto type = global_get_type(type_id);
@@ -1776,7 +1797,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   type = global_get_type(type_id);
   auto info = (type->get_info()->as<UnionTypeInfo>());
-
+  info->generic_parameters = params;
   info->scope = scope;
 
   end_node(node, range);
@@ -1802,6 +1823,18 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
   }
   return nullptr;
 }
+
+std::vector<GenericParameter> Parser::parse_generic_parameters() {
+  expect(TType::GenericBrace);
+  std::vector<GenericParameter> params;
+  while (peek().type != TType::RBrace) {
+    params.emplace_back(expect(TType::Identifier).value);
+    if (peek().type != TType::RBrace) expect(TType::Comma);
+  }
+  expect(TType::RBrace);
+  return params;
+}
+
 
 std::vector<ASTType *> Parser::parse_parameter_types() {
   std::vector<ASTType *> param_types;
