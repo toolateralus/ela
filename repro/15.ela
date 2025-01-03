@@ -1,0 +1,21 @@
+/* 
+  ! Postfix increment/decrement are broken.
+*/
+
+Struct :: struct {
+  a: int;
+}
+
+main :: fn() {
+  a: Struct; //! Error appears here for some reason.
+  a.a++;
+  a.a--;
+  /* 
+    !Error:
+      ! Invalid primary expression. Token: ';'... Type: 'Semi'
+      --------------------------------------------------------------------------------
+      ? /home/josh_arch/source/c++/ela/repro/15.ela:7:12
+      --------------------------------------------------------------------------------
+      ?  a: Struct;
+  */
+}
