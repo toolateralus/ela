@@ -695,6 +695,9 @@ ASTCall *Parser::parse_call(ASTExpr *function) {
   auto range = begin_node();
   ASTCall *call = ast_alloc<ASTCall>();
   call->function = function;
+  if (peek().type == TType::GenericBrace) {
+    call->generic_arguments = parse_generic_arguments();
+  }
   call->arguments = parse_arguments();
   end_node(call, range);
   return call;
@@ -780,8 +783,8 @@ ASTExpr *Parser::parse_postfix() {
   }
   // build dot and subscript expressions
   while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
-         peek().type == TType::LParen) {
-    if (peek().type == TType::LParen) {
+         peek().type == TType::LParen || peek().type == TType::GenericBrace) {
+    if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
       eat();
@@ -1114,6 +1117,11 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   auto node = ast_alloc<ASTType>();
   node->base = base;
+
+  if (peek().type == TType::GenericBrace) {
+    node->generic_arguments = parse_generic_arguments();
+  }
+
   append_type_extensions(node);
 
   end_node(node, range);
@@ -1323,7 +1331,7 @@ ASTStatement *Parser::parse_statement() {
     const bool is_identifier_with_lbrace_or_dot =
         tok.type == TType::Identifier && (next.type == TType::LBrace || next.type == TType::Dot);
 
-    const bool is_call = next.type == TType::LParen;
+    const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
 
     const bool is_assignment_or_compound =
         next.type == TType::Assign || next.type == TType::Comma || next.is_comp_assign();
@@ -1822,6 +1830,17 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
     }
   }
   return nullptr;
+}
+
+std::vector<ASTType*> Parser::parse_generic_arguments() {
+  expect(TType::GenericBrace);
+  std::vector<ASTType*> params;
+  while (peek().type != TType::RBrace) {
+    params.push_back(parse_type());
+    if (peek().type != TType::RBrace) expect(TType::Comma);
+  }
+  expect(TType::RBrace);
+  return params;
 }
 
 std::vector<GenericParameter> Parser::parse_generic_parameters() {

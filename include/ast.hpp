@@ -145,6 +145,8 @@ struct ASTType : ASTExpr {
   // special info for reflection
   Nullable<ASTExpr> pointing_to;
 
+  std::vector<ASTType*> generic_arguments;
+
   // special info for tuple types.
   std::vector<ASTType *> tuple_types;
 
@@ -285,6 +287,7 @@ struct ASTMake : ASTExpr {
 struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
+  std::vector<ASTType*> generic_arguments;
   int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
@@ -567,6 +570,7 @@ struct Parser {
   ASTDeclaration *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
+  std::vector<ASTType*> parse_generic_arguments();
   ASTUnionDeclaration *parse_union_declaration(Token);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);

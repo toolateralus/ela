@@ -1,8 +1,26 @@
 
-function :: fn![Value, Owner] (a: Value, b: Owner) {
+// function :: fn![Value, Owner] (a: Value, b: Owner) {
+
+// }
+
+// main :: fn() {
+//   function![1, 2](1, 2);
+// }
+
+
+Array :: struct![T] {
 
 }
 
+#alias N :: Array![int];
+
+
+push :: fn() {
+
+}
+
+
 main :: fn() {
-  function(1, 2);
+  push![int]();
+  n : N;
 }
