@@ -1,20 +1,25 @@
-
 // declare a module (rest of this file will be inside this)
 #mod std::mem;
 
-Allocator :: #interface {
+// This isn't really a planned feature, just some mock junk.
+// Maybe in the future we'd add interfaces.
+Allocator :: interface {
   #static alloc :: fn![T]() -> T*;
 }
 
-default_allocator: Allocator;
+// again, not a feature we'd likely add.
+// just a compile-time-mutable alias, like a field that just points to a type.
+#fluid_alias default_allocator :: Allocator;
 
-alloc :: fn![T, Alloc = std::default_allocator]() {
-    return Alloc::alloc![T]();
-  }
+// declare a function within std::mem;
+alloc :: fn![T, Alloc = std::mem::default_allocator]() {
+  return Alloc::alloc![T]();
+}
 
 // declare a module (the block's contents will be inside it.)
 #mod std::mem {
-  alloc :: fn![T, Alloc = std::default_allocator]() {
+  // declare a function within std::mem;
+  alloc :: fn![T, Alloc = std::mem::default_allocator]() {
     return Alloc::alloc![T]();
   }
 }
