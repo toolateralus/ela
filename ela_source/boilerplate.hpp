@@ -546,12 +546,13 @@ struct Element {
 };
 
 struct Type {
-  int id;
-  char *name;
-  size_t size;
-  u64 flags; // defined in reflection.ela and emit.cpp, the values of the flags.
-  _array<Field *> fields;
-  _array<Element> (*elements)(char *);
+  int id;                               // the integer ID used to identify this type.
+  char *name;                           // the type's name.
+  size_t size;                          // sizeof(T)
+  u64 flags;                            // defined in reflection.ela and emit.cpp, the values of the flags.
+  _array<Field *> fields;               // get a list of struct fields, enum variants.
+  _array<Element> (*elements)(char *);  // get a list of the Elements, which can be used to reflect on arrays.
+  Type *element_type;                   // the type this type has a pointer to, is an array of, is a map of, etc.
 };
 
 struct Env {
@@ -560,6 +561,7 @@ struct Env {
     return args;
   }
 };
+
 
 
 #ifdef TESTING

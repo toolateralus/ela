@@ -566,7 +566,6 @@ JsonError :: struct {
   }
 }
 
-
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError;
 
 json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
@@ -584,14 +583,24 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
 }
 
 json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
-  // for elem in val.as_array() {
-  //   err := json_deserialize(elem.data, type.);
-  //   if err.has_value {
-  //     return err;
-  //   }
-  // }
-  // return {};
-  return {true, "Json array deserialization is not yet supported"};
+  // TODO: this has memory problems. When the array gets too big, you get stack smashing. It's probably because you need to pass in
+  // TODO: .data, where that's not immediately intuitive.
+  i := 0;
+  // used to store data as we deserialize.
+  ptr: void* = malloc(type.element_type.size);
+  for elem in val.as_array() {
+    memset(ptr, 0, type.element_type.size); // to avoid corruption from short writes. This shouldn't happen, but we'll be safe.
+    err := json_deserialize(elem, ptr, type.element_type);
+    if err.has_value {
+      free(ptr);
+      return err;
+    }
+    charobj := (char*)object;
+    memcpy(charobj + (i * type.element_type.size), ptr, type.element_type.size);
+    ++i;
+  }
+  free(ptr);
+  return {};
 }
 
 json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
@@ -675,7 +684,7 @@ json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError
       return {true, $"Type mismatch: object to {type.name}"};
     }
   } else if val.is_array() {
-    return {true, "Array deserialization not yet suported"};
+    return json_deserialize_array(val, object, type);
   }
   return json_deserialize_scalar(val, object, type);
 }

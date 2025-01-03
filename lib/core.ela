@@ -371,13 +371,27 @@ lerp :: fn(a: int, b, t: float) -> int {
   return (int)(a * (1.0 - t)) + (b * t) + 0.5;
 }
 
-  #foreign time :: fn(value: void*) -> int;
+#foreign time :: fn(value: void*) -> int;
 timespec_t :: struct {
   tv_sec: s64;
   tv_nsec: s64;
 }
 
 #foreign clock_gettime :: fn(clock_id: int, tp: timespec_t*) -> int;
+
+tm_t :: struct {
+  tm_sec: int;
+  tm_min: int;
+  tm_hour: int;
+  tm_mday: int;
+  tm_mon: int;
+  tm_year: int;
+  tm_wday: int;
+  tm_yday: int;
+  tm_isdst: int;
+}
+
+#foreign localtime_r :: fn(timep: s64*, result: tm_t*) -> tm_t*;
 
 Timing :: struct {
   // returns the timespec_t for the current time since epoch.
@@ -421,5 +435,17 @@ Timing :: struct {
   #static days :: fn() -> float64 {
     ts := get_timespec_since_epoch();
     return (float64)ts.tv_sec / 86_400.0 + (float64)ts.tv_nsec / (86_400.0 * 1_000_000_000.0);
+  }
+
+  #static date_time :: fn() -> string {
+    ts := get_timespec_since_epoch();
+    time_t: s64 = ts.tv_sec;
+    tm: tm_t;
+    localtime_r(&time_t, &tm);
+    buffer: char[64];
+    snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d",
+             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+             tm.tm_hour, tm.tm_min, tm.tm_sec);
+    return string{(c_string)buffer, ((c_string) buffer) + strlen(buffer)};
   }
 }

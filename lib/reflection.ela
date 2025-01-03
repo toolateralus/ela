@@ -109,3 +109,5 @@ type_get_field :: fn(type: Type*, name: string) -> Field* {
   }
   return null;
 }
+
+find_type :: fn(name: string) -> Type *;

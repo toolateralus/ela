@@ -1330,6 +1330,37 @@ JsonValueDeleter :: struct {
   assert("object key", val.get("key").as_string() == "value");
 }
 
+#test test_scalar_deserialization :: fn() {
+  n : int = 100;
+  json := json_serialize(&n, #type(int));
+  n = 0;
+  assert("json  serialize  scalar", json.is_number());
+  err := json_deserialize_scalar(json, &n, #type(int));
+  assert("json error", !err.has_value);
+  assert("json deserialize scalar", n == 100);
+}
+
+#test test_struct_deserialization :: fn() {
+  MyJsonStruct :: struct {
+    n: s64;
+    b: float32;
+    to_string ::fn() -> string {
+      return $"MyJsonStruct [n: {n}, b: {b}]";
+    }
+  }
+
+  n : MyJsonStruct = {
+    100,
+    200.0
+  };
+  json := json_serialize(&n, #type(MyJsonStruct));
+  n = {};
+  assert("json  serialize  object", json.is_object());
+  err := json_deserialize(json, &n, #type(MyJsonStruct));
+  assert("json error", !err.has_value);
+  assert("json deserialize object", n.n == 100 && n.b == 200.0);
+}
+
 #test test_json_comprehensive :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;

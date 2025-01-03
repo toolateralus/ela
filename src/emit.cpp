@@ -445,10 +445,13 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "static ";
     }
 
-    if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+    if (node->name.value != "main") {
       emit_forward_declaration(node);
-      return;
     }
+
+    if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      return;
+    } 
 
     // local function
     if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0) {
@@ -547,7 +550,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   // however, we need to make sure we're not overwriting any user defined
   // constructors. This is an annoying neccesity in C++ because having a constructor, even default
   // make a type an aggregate type that can't be initialized with an initializer list. Dumb!
-  
+
   // TODO: implement me!
   // std::vector<int> field_types;
   // for (const auto &field: info->scope->ordered_symbols) {
@@ -557,7 +560,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   //   }
   // }
   // TODO:
-  
+
   for (const auto &decl : node->fields) {
     indented("");
     decl->accept(this);
@@ -569,7 +572,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   bool has_dtor = false;
   for (const auto &method : node->methods) {
     if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
-        has_default_ctor = true;
+      has_default_ctor = true;
     }
     if ((method->flags & FUNCTION_IS_DTOR) != 0) {
       has_dtor = true;
@@ -781,7 +784,9 @@ std::any Emitter::visit(ASTProgram *node) {
 
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
 
-  if (!is_freestanding) code << "extern Type **_type_info;\n";
+  if (!is_freestanding) {
+    code << "extern Type **_type_info;\n";
+  }
 
   if (testing) {
     code << "#define TESTING\n";
@@ -832,6 +837,29 @@ int main (int argc, char** argv) {
         "  return 0;\n"
         "}}();\n",
         type_table.size(), type_info.str());
+
+    code << std::format(R"_(
+Type *find_type(string name) {{
+  for (size_t i = 0; i < {}; ++i) {{
+    Type *type = _type_info[i];
+    const char *type_name = type->name;
+    const char *name_data = name.data;
+    bool match = true;
+    while (*type_name && *name_data) {{
+      if (*type_name != *name_data) {{
+        match = false;
+        break;
+      }}
+      ++type_name;
+      ++name_data;
+    }}
+    if (match && *type_name == '\\0' && *name_data == '\\0') {{
+      return type;
+    }}
+  }}
+  return nullptr; // Return nullptr if the type is not found
+}}
+)_", type_table.size());
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for #type().
@@ -1414,6 +1442,14 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   if (type->get_ext().is_array()) {
     ss << get_elements_function(type) << ",\n";
   }
+
+  if (type->get_ext().is_array() || type->get_ext().is_pointer() || type->get_ext().is_map() ||
+      type->get_ext().is_fixed_sized_array()) {
+    ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
+  } else {
+    ss << ".element_type = nullptr,\n";
+  }
+
   ss << " };";
   context.type_info_strings.push_back(ss.str());
   return std::format("_type_info[{}]", id);

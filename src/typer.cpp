@@ -666,10 +666,7 @@ std::any Typer::visit(ASTParamDecl *node) {
     // for s8[] to s8*
     {
       auto element = type->get_element_type();
-      auto element_t = global_get_type(element);
-      auto extensions = element_t->get_ext();
-      extensions.extensions.push_back(TYPE_EXT_POINTER);
-      node->type->resolved_type = ctx.scope->find_type_id(element_t->get_base(), extensions);
+      node->type->resolved_type = global_get_type(element)->take_pointer_to();
     }
   }
 

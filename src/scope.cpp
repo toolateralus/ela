@@ -100,6 +100,7 @@ Context::Context() {
     type_scope->insert("fields", field_arr);
     type_scope->insert("size", u64_type());
     type_scope->insert("flags", u64_type());
+    type_scope->insert("element_type", type_ptr);
 
     field_scope->insert("name", charptr_type());
     field_scope->insert("type", type_ptr);
