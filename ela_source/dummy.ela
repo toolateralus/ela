@@ -1,26 +1,27 @@
-
-// function :: fn![Value, Owner] (a: Value, b: Owner) {
-
-// }
-
-// main :: fn() {
-//   function![1, 2](1, 2);
-// }
-
+push :: fn![T](t: T) {
+  return;
+}
 
 Array :: struct![T] {
-
+  data: T*;
+  count: s64;
 }
 
-#alias N :: Array![int];
+Vector2 :: union![T] {
+  values: T[2];
+  #anon :: struct {
+    x: T;
+    y: T;
+  }
 
-
-push :: fn() {
-
+  #static zero :: fn() -> Vector2![T] {
+    return {};
+  }
 }
-
 
 main :: fn() {
   push![int]();
-  n : N;
+  push();
+  n : Array![int];
+  vector: Vector2![float];
 }

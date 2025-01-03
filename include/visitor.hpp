@@ -100,7 +100,12 @@ struct Typer : VisitorBase {
   std::any visit(ASTScopeResolution *node) override;
   int get_function_type(ASTFunctionDeclaration *);
   void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
+
+  // For generics.
   std::any visit_function_declaration(ASTFunctionDeclaration* node, bool generic_instantation, std::vector<int> generic_args = {});
+  std::any visit_struct_declaration(ASTStructDeclaration* node, bool generic_instantiation, std::vector<int> generic_args = {});
+  std::any visit_union_declaration(ASTUnionDeclaration* node, bool generic_instantiation, std::vector<int> generic_args = {});
+
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
