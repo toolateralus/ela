@@ -1,0 +1,65 @@
+
+
+AST :: enum union {
+  // All variants share this region.
+  #base {
+    result: AST*; 
+  }
+
+  // you can define methods, operator overloads, etc here.
+
+  add :: fn(left: AST*, right: AST*) -> AST* {
+    return null;
+  }
+
+  Identifier: string;
+  Float: float64;
+  Integer: s64;
+
+  Binary: struct {
+    left: AST*,
+    right: AST*,
+    op: Operator,
+  };
+
+  Unary: struct {
+    operand: AST*,
+    op: Operator,
+  };
+
+  Program: struct {
+    statements: AST[];
+  }
+}
+
+
+main :: fn() {
+
+  // Explicitly type a variable as only a variant type:
+  // No requirement to always be a parent.
+  // You can make this into a generic AST later, 
+  // and it will just construct a tagged union around it.
+  // This would be the same as making the Program struct on its own.
+  program: AST::Program;
+
+  program.statements ~= AST::Binary {
+    left: mem::arena::new(AST::Identifier{"Xaryu"}),
+    right: new mem::arena::new(AST::Integer{25}),
+    op: Operator::Add,
+  };
+
+  node : AST = program.statements.first();
+
+  // Pattern matching with destructure list.
+  if node #is(AST::Binary{left, right, op}) && op == Operator::Add {
+    result := left.add(right);
+    println(result);
+  }
+
+  // Pattern matching without destructure list.
+  if node #is(AST::Binary, binary) && binary.op == Operator::Add {
+    result := binary.left.add(binary.right);
+    println(result);
+  }
+
+}

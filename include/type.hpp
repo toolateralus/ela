@@ -166,9 +166,13 @@ struct TypeExt {
   std::string to_string() const;
 };
 
+using GenericParameter = InternedString;
+
 struct TypeInfo {
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
+  std::vector<GenericParameter> generic_parameters;
+  
   TypeInfo() {}
 
   // Use this instead of the clunky static casts everywhere.

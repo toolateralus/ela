@@ -99,6 +99,7 @@ enum struct TType {
   Switch,
   Fn,
 
+  GenericBrace // '!<' for ![T, T1]
 };
 
 #define TTYPE_CASE(type) \
@@ -108,6 +109,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Char);
+    TTYPE_CASE(GenericBrace);
     TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
     TTYPE_CASE(Switch);
@@ -290,7 +292,7 @@ static std::unordered_map<std::string, TType> operators{
 
     {"+=", TType::CompAdd},     {"-=", TType::CompSub},   {"*=", TType::CompMul},     {"/=", TType::CompDiv},
     {"%=", TType::CompMod},     {"&=", TType::CompAnd},   {"|=", TType::CompOr},      {"^=", TType::CompXor},
-    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR}};
+    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR}, {"![", TType::GenericBrace}};
 
 struct Lexer {
   struct State {

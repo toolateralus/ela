@@ -1,19 +1,21 @@
-#import core;
+/* 
+  ! Postfix increment/decrement are broken.
+*/
 
-
-main :: fn() {
-  a := <1, <2, 3>>;  //! Bug, the >> gets recognized as a SHR token and fails to parse.
-  a := <1, <2, 3> >; // !Bug, see error below.
+Struct :: struct {
+  a: int;
 }
 
-/* 
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:13: error: expected expression
-    5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-      |             ^
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:14: error: unexpected type name 's32': expected expression
-      5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-        |              ^
-  /home/josh_arch/source/c++/ela/ela_source/dummy.ela:5:23: error: expected unqualified-id
-      5 | _tuple<s32, <s32, s32>> a  = _tuple((s32)1, _tuple((s32)2, (s32)3));
-        |                       ^
-*/
+main :: fn() {
+  a: Struct; //! Error appears here for some reason.
+  a.a++;
+  a.a--;
+  /* 
+    !Error:
+      ! Invalid primary expression. Token: ';'... Type: 'Semi'
+      --------------------------------------------------------------------------------
+      ? /home/josh_arch/source/c++/ela/repro/15.ela:7:12
+      --------------------------------------------------------------------------------
+      ?  a: Struct;
+  */
+}

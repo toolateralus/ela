@@ -143,6 +143,16 @@ Color :: struct {
     color.a = (u8)a;
     return color;
   }
+
+  // Scales rgb values, but never wraps around.
+  scaled_rgb :: fn(scalar: float32) -> #self {
+    return {
+      (u8)clamp((int)(this.r * scalar), 0, 255),
+      (u8)clamp((int)(this.g * scalar), 0, 255),
+      (u8)clamp((int)(this.b * scalar), 0, 255),
+      this.a,
+    }
+  }
 }
 
 Texture2D :: struct {
@@ -868,15 +878,23 @@ DropDown :: struct {
   is_open: bool = false;
   on_selected: fn*(int) = null;
   on_open: fn*() = null;
-    draw :: fn() {
+  label: string;
+  show_selected_option := false;
+  draw :: fn() {
       // Draw the dropdown box
       DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
-      // Draw the selected option
-      if selected_index >= 0 && selected_index < options.length {
+
+      if selected_index >= 0 && selected_index < options.length && show_selected_option {
+        // Draw the selected option
         text_x := rect.x + (rect.width - MeasureText(options[selected_index].data, style.font_size)) / 2;
         text_y := rect.y + (rect.height - style.font_size) / 2;
         DrawText(options[selected_index].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+      } else {
+          // Draw the selected option
+        text_x := rect.x + (rect.width - MeasureText(label.data, style.font_size)) / 2;
+        text_y := rect.y + (rect.height - style.font_size) / 2;
+        DrawText(label.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
       }
 
       hit := CheckCollisionPointRec(GetMousePosition(), rect);

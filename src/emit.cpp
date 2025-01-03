@@ -127,7 +127,7 @@ std::any Emitter::visit(ASTType *node) {
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    emit_function_pointer_type_string(type);
+    (*ss) << get_function_pointer_type_string(type);
     return {};
   }
 
@@ -267,7 +267,7 @@ std::any Emitter::visit(ASTDeclaration *node) {
   };
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
     handle_initialization();
     return {};
   }
@@ -283,7 +283,7 @@ std::any Emitter::visit(ASTDeclaration *node) {
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
@@ -430,6 +430,17 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   auto emit_various_function_declarations = [&] {
+    if (!node->generic_parameters.empty()) {
+      (*ss) << "template<";
+      for (int i = 0; i < node->generic_parameters.size(); ++i) {
+        (*ss) << "class " << node->generic_parameters[i].get_str();
+        if (i != node->generic_parameters.size() - 1) {
+          (*ss) << ", ";
+        }
+      }
+      (*ss) << ">\n";
+    }
+
     if ((node->flags & FUNCTION_IS_STATIC) != 0) {
       (*ss) << "static ";
     }
@@ -509,7 +520,6 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
-
   current_struct_decl = node;
 
   Defer _defer([&] { current_struct_decl = nullptr; });
@@ -532,20 +542,54 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   }
   indentLevel++;
 
+  // TODO: we want to implement default constructors for any combination of
+  // fields, as long as they're in order.
+  // however, we need to make sure we're not overwriting any user defined
+  // constructors. This is an annoying neccesity in C++ because having a constructor, even default
+  // make a type an aggregate type that can't be initialized with an initializer list. Dumb!
+  
+  // TODO: implement me!
+  // std::vector<int> field_types;
+  // for (const auto &field: info->scope->ordered_symbols) {
+  //   auto symbol = info->scope->local_lookup(field);
+  //   if (!symbol->is_function()) {
+  //     field_types.push_back(symbol->type_id);
+  //   }
+  // }
+  // TODO:
+  
   for (const auto &decl : node->fields) {
     indented("");
     decl->accept(this);
     semicolon();
     newline();
   }
-  for (const auto &method : node->methods) {
-    indented("");
 
+  bool has_default_ctor = false;
+  bool has_dtor = false;
+  for (const auto &method : node->methods) {
+    if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
+        has_default_ctor = true;
+    }
+    if ((method->flags & FUNCTION_IS_DTOR) != 0) {
+      has_dtor = true;
+    }
+    indented("");
     method->accept(this);
     semicolon();
     newline();
   }
   ctx.exit_scope();
+
+  // TODO: Implement me!
+  // TODO We define these manually here because it gets annoying if not.
+  // if (!has_default_ctor) {
+  //   (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
+  // }
+
+  // if (!has_dtor) {
+  //   (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
+  // }
 
   (*ss) << "};\n";
   indentLevel--;
@@ -588,6 +632,9 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   ctx.set_scope(node->scope);
   emit_default_init = false;
 
+  bool has_default_ctor = false;
+  bool has_dtor = false;
+
   // DOCUMENT THIS:
   // we will always default-initialize the first field in a union type.
   // this may not pan out, but ideally unions would only be used for stuff like
@@ -605,6 +652,12 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   }
 
   for (const auto &method : node->methods) {
+    if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
+      has_default_ctor = true;
+    }
+    if ((method->flags & FUNCTION_IS_DTOR) != 0) {
+      has_dtor = true;
+    }
     method->accept(this);
     (*ss) << ";\n";
   }
@@ -612,6 +665,15 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   for (const auto &_struct : node->structs) {
     _struct->accept(this);
     (*ss) << ";\n";
+  }
+
+  // We define these manually here because it gets annoying if not.
+  if (!has_default_ctor) {
+    (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
+  }
+
+  if (!has_dtor) {
+    (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
   }
 
   emit_default_init = true;
@@ -624,7 +686,7 @@ std::any Emitter::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    get_declaration_type_signature_and_identifier(node->name.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
   } else {
     node->type->accept(this);
     auto sym = ctx.scope->local_lookup(node->name);
@@ -953,42 +1015,51 @@ void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
   if (type->get_ext().is_pointer()) (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-void Emitter::emit_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
-                                                              Type *type) {
+std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::string &type_string,
+                                                                    const std::string &name, Type *type) {
   //? type string will equal something like void(*)();
   //? we need to emit _array<void(*)()>
-  //? or possibley _array<_array<void(*)()>*>
+  //? or possibly _array<_array<void(*)()>*>
+
+// TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
+// It shouldn't be bad finding the real problem
+#define SLIGHTLY_AWFUL_HACK
+#ifdef SLIGHTLY_AWFUL_HACK
+  std::string string = "_array";  // We just can use C++'s type inference on generics to take care of this.
+  // This probably won't work for nested arrays
+#elif defined(TERRIBLE_HACK)
+  // We could just purge off the problematic characters?
+  // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do that.
   auto string = to_cpp_string(type->get_ext(), type_string);
+  size_t pos = 0;
+  while ((pos = string.find(")*>", pos)) != std::string::npos) {
+    string.replace(pos, 3, ")>");
+    pos += 2;
+  }
+#endif
+
   if (!string.contains(' ' + name + ' ')) {
-    (*ss) << string << ' ' << name;
+    return string + ' ' + name;
   } else {
-    (*ss) << string;
+    return string;
   }
 }
 
-void Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   StringBuilder tss;
-
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
+    // Fixed array fn*[10]();
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
+      // Dynamic array. fn*[]();
     } else if (ext.is_array()) {
-      StringBuilder my_ss;
-      auto old = ss;
-      ss = &my_ss;
-      emit_function_pointer_type_string(type, nullptr);
-      ss = old;
-      auto type_string = my_ss.str();
-      emit_function_pointer_dynamic_array_declaration(type_string, name, type);
-      return;
+      auto type_string = get_function_pointer_type_string(type, nullptr);
+      return get_function_pointer_dynamic_array_declaration(type_string, name, type);
     }
-
-    emit_function_pointer_type_string(type, &identifier);
-    return;
+    return get_function_pointer_type_string(type, &identifier);
   }
-
   auto array_sizes = type->get_ext().array_sizes;
   tss << type->get_base().get_str();
   if (!type->get_ext().is_fixed_sized_array()) {
@@ -1020,7 +1091,7 @@ void Emitter::get_declaration_type_signature_and_identifier(const std::string &n
       tss << "*";
     }
   }
-  (*ss) << tss.str();
+  return tss.str();
 }
 
 std::string get_format_str(int type_id, ASTNode *node) {
@@ -1177,7 +1248,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
 
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
-void Emitter::emit_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
+std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
   auto type_prefix = std::string{"*"};
 
   if (!type->is_kind(TYPE_FUNCTION)) {
@@ -1187,7 +1258,7 @@ void Emitter::emit_function_pointer_type_string(Type *type, Nullable<std::string
         {});
   }
 
-  std::stringstream ss;
+  StringBuilder ss;
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
   auto return_type = global_get_type(info->return_type);
@@ -1208,7 +1279,7 @@ void Emitter::emit_function_pointer_type_string(Type *type, Nullable<std::string
     }
   }
   ss << ")";
-  (*this->ss) << ss.str();
+  return ss.str();
 }
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
@@ -1540,12 +1611,7 @@ std::string Emitter::to_cpp_string(Type *type) {
       output = to_cpp_string(type->get_ext(), type->get_base().get_str());
       break;
     case TYPE_FUNCTION: {
-      StringBuilder my_ss;
-      auto old = ss;
-      ss = &my_ss;
-      emit_function_pointer_type_string(type);
-      ss = old;
-      return my_ss.str();
+      return get_function_pointer_type_string(type);
     }
     case TYPE_ENUM:
       output = type->get_base().get_str();
@@ -1558,7 +1624,7 @@ std::string Emitter::to_cpp_string(Type *type) {
       output = "_tuple<";
       for (int i = 0; i < info->types.size(); ++i) {
         output += to_cpp_string(global_get_type(info->types[i]));
-        if (i != info->types.size() -1) {
+        if (i != info->types.size() - 1) {
           output += ", ";
         }
       }
