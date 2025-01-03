@@ -78,8 +78,6 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExt &ty
   return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
-std::set<InternedString> made_types = {};
-
 int global_find_type_id(const int base, const TypeExt &type_extensions) {
   if (!type_extensions.has_extensions()) {
     return base;
@@ -97,9 +95,7 @@ int global_find_type_id(const int base, const TypeExt &type_extensions) {
   // NOTE:below is just for creating types with new extensions. new function
   // types, struct types, and enum types must be created manually this just
   // creates pointer and array types of base 'name'
-  auto t = global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
-  made_types.insert(type_table[t].to_string());
-  return t;
+  return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
