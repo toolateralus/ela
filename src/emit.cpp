@@ -520,7 +520,6 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
-
   current_struct_decl = node;
 
   Defer _defer([&] { current_struct_decl = nullptr; });
@@ -543,20 +542,54 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   }
   indentLevel++;
 
+  // TODO: we want to implement default constructors for any combination of
+  // fields, as long as they're in order.
+  // however, we need to make sure we're not overwriting any user defined
+  // constructors. This is an annoying neccesity in C++ because having a constructor, even default
+  // make a type an aggregate type that can't be initialized with an initializer list. Dumb!
+  
+  // TODO: implement me!
+  // std::vector<int> field_types;
+  // for (const auto &field: info->scope->ordered_symbols) {
+  //   auto symbol = info->scope->local_lookup(field);
+  //   if (!symbol->is_function()) {
+  //     field_types.push_back(symbol->type_id);
+  //   }
+  // }
+  // TODO:
+  
   for (const auto &decl : node->fields) {
     indented("");
     decl->accept(this);
     semicolon();
     newline();
   }
-  for (const auto &method : node->methods) {
-    indented("");
 
+  bool has_default_ctor = false;
+  bool has_dtor = false;
+  for (const auto &method : node->methods) {
+    if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
+        has_default_ctor = true;
+    }
+    if ((method->flags & FUNCTION_IS_DTOR) != 0) {
+      has_dtor = true;
+    }
+    indented("");
     method->accept(this);
     semicolon();
     newline();
   }
   ctx.exit_scope();
+
+  // TODO: Implement me!
+  // TODO We define these manually here because it gets annoying if not.
+  // if (!has_default_ctor) {
+  //   (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
+  // }
+
+  // if (!has_dtor) {
+  //   (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
+  // }
 
   (*ss) << "};\n";
   indentLevel--;
@@ -599,6 +632,9 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   ctx.set_scope(node->scope);
   emit_default_init = false;
 
+  bool has_default_ctor = false;
+  bool has_dtor = false;
+
   // DOCUMENT THIS:
   // we will always default-initialize the first field in a union type.
   // this may not pan out, but ideally unions would only be used for stuff like
@@ -616,6 +652,12 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   }
 
   for (const auto &method : node->methods) {
+    if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
+      has_default_ctor = true;
+    }
+    if ((method->flags & FUNCTION_IS_DTOR) != 0) {
+      has_dtor = true;
+    }
     method->accept(this);
     (*ss) << ";\n";
   }
@@ -623,6 +665,15 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   for (const auto &_struct : node->structs) {
     _struct->accept(this);
     (*ss) << ";\n";
+  }
+
+  // We define these manually here because it gets annoying if not.
+  if (!has_default_ctor) {
+    (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
+  }
+
+  if (!has_dtor) {
+    (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
   }
 
   emit_default_init = true;

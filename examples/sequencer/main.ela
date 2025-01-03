@@ -4,9 +4,6 @@
 #import directory;
 #import file;
 
-#c_flags "-g"
-
-
 playing := false;
 timer: Timer;
 bpm : float = 120;
@@ -112,9 +109,9 @@ get_sequencer_style :: fn(style: Style) -> Style {
   copy := style;
   color_index++;
   index := color_index % All_Colors.length;
-  index_1 := index + 2 % All_Colors.length;
+  index_1 := index + 4 % All_Colors.length;
   copy.foreground = All_Colors[index];
-  copy.background = All_Colors[index_1].with_alpha(75);
+  copy.background = All_Colors[index_1].with_alpha(75).scaled_rgb(0.5);
   copy.highlighted = copy.background.with_alpha(255);
   return copy;
 }
@@ -134,11 +131,9 @@ SequenceChannel :: struct {
     volume_slider = {
       name, // text
       Rectangle{0, 0, 146, 36}, // rectangle
-      style, // style
+      _style, // style
       0,  // min
       100,   // max
-      null,  // value
-      false, // held
     }
   }
   draw :: fn(x: float, y: float) {
@@ -201,7 +196,9 @@ file_dropdown : DropDown = {
   file_dropdown_style,
   -1,
   false,
-  &on_file_selected
+  &on_file_selected,
+  null,
+  "New Channel"
 };
 
 on_file_selected :: fn(index: int) {
@@ -242,12 +239,13 @@ main :: fn() {
   }
 
   while !WindowShouldClose() {
-    ClearBackground(bg_color);
+    ClearBackground(WHITE.scaled_rgb(0.05));
     BeginDrawing();
       if IsKeyPressed(Key::Space) then play_callback();
 
-      seq_y := GetScreenHeight() / 3.0;
-      seq_x := 0.0
+      seq_y := GetScreenHeight() / 2.0;
+      seq_x := 0.0;
+
       for note in 0..total_notes {
         label_x := seq_x + 150.0 + note * 40.0;
         beat := (note * beats) / total_notes + 1;
@@ -255,6 +253,7 @@ main :: fn() {
         str : string = $"{beat}.{subdiv}";
         DrawText(str.data, (int)label_x, (int)(seq_y - 40.0), 12, WHITE);
       }
+
       if playing {
         cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0
         DrawRectangleLines((int)cursor_x, seq_y, 40, (int)channels.length * 40, ORANGE);
