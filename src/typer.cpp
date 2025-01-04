@@ -829,7 +829,6 @@ std::any Typer::visit(ASTCall *node) {
     arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
 
-
     bool found = false;
     if (auto declaring_node = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())) {
       if (!declaring_node->generic_parameters.empty()) {

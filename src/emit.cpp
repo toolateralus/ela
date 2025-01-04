@@ -445,7 +445,9 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "static ";
     }
 
-    if (node->name.value != "main") {
+    auto is_local = !ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
+
+    if (node->name.value != "main" && !is_local) {
       emit_forward_declaration(node);
     }
 
@@ -454,7 +456,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     } 
 
     // local function
-    if (!ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0) {
+    if (is_local) {
       emit_local_function(node);
       return;
     }
