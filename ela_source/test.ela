@@ -1340,14 +1340,16 @@ JsonValueDeleter :: struct {
   assert("json deserialize scalar", n == 100);
 }
 
-#test test_struct_deserialization :: fn() {
-  MyJsonStruct :: struct {
-    n: s64;
-    b: float32;
-    to_string ::fn() -> string {
-      return $"MyJsonStruct [n: {n}, b: {b}]";
-    }
+MyJsonStruct :: struct {
+  n: s64;
+  b: float32;
+  to_string ::fn() -> string {
+    return $"MyJsonStruct [n: {n}, b: {b}]";
   }
+}
+
+#test test_struct_deserialization :: fn() {
+  
 
   n : MyJsonStruct = {
     100,
