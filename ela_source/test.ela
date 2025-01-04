@@ -11,7 +11,7 @@
 #import pthread
 #import reflection
 
-#c_flags "-fsanitize=address,leak"
+#c_flags "-fsanitize=address,leak,undefined"
 
 XaryuStruct :: struct {
   f: float ;
@@ -1333,6 +1333,8 @@ JsonValueDeleter :: struct {
 #test test_scalar_deserialization :: fn() {
   n : int = 100;
   json := json_serialize(&n, #type(int));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
   n = 0;
   assert("json  serialize  scalar", json.is_number());
   err := json_deserialize_scalar(json, &n, #type(int));
@@ -1349,13 +1351,13 @@ MyJsonStruct :: struct {
 }
 
 #test test_struct_deserialization :: fn() {
-  
-
   n : MyJsonStruct = {
     100,
     200.0
   };
   json := json_serialize(&n, #type(MyJsonStruct));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
   n = {};
   assert("json  serialize  object", json.is_object());
   err := json_deserialize(json, &n, #type(MyJsonStruct));
