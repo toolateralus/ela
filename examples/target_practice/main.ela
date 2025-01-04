@@ -410,7 +410,7 @@ BulletRoutine :: struct {
   spawn :: fn() -> bool {
     timer.interval = interval;
     if timer.tick() {
-      count--;
+      count -= 1;
       PlaySound(shot_sound);
       make_bullet(character.rect.x, character.rect.y, character.rotation); 
       if count == 0 {

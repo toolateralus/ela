@@ -445,7 +445,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "static ";
     }
 
-    auto is_local = !ctx.scope->is_struct_or_union_scope && ctx.scope != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
+    auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
 
     if (node->name.value != "main" && !is_local) {
       emit_forward_declaration(node);
@@ -501,16 +501,17 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   current_func_decl = node;
 
   auto test_flag = compile_command.has_flag("test");
-
-  Defer deferred = {[&]() { current_func_decl = last_func_decl; }};
+  ctx.set_scope(node->scope);
+  Defer deferred = {[&]() {
+    current_func_decl = last_func_decl;
+    ctx.exit_scope();
+  }};
 
   // this also happens to emit the test boilerplate that bootstraps it into the
   // test runner, if applicable.
   if (!should_emit_function(this, node, test_flag)) {
     return {};
   }
-
-  auto symbol = ctx.scope->lookup(node->name.value);
 
   if (node->meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
     emit_foreign_function(node);
@@ -695,11 +696,7 @@ std::any Emitter::visit(ASTParamDecl *node) {
   } else {
     node->type->accept(this);
     auto sym = ctx.scope->local_lookup(node->name);
-    if (sym && type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
-      (*ss) << " const& " << node->name.get_str();
-    } else {
-      (*ss) << ' ' << node->name.get_str();
-    }
+    (*ss) << ' ' << node->name.get_str();
   }
 
   if (node->default_value.is_not_null() && emit_default_args) {

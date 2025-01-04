@@ -327,31 +327,19 @@ std::any Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_
 
 std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantation,
                                            std::vector<int> generic_args) {
+  ctx.set_scope(node->scope);
   auto last_decl = current_func_decl;
   current_func_decl = node;
-  Defer _([&] { current_func_decl = last_decl; });
+  Defer _([&] {
+    current_func_decl = last_decl;
+    ctx.exit_scope();
+  });
 
   if (generic_instantation) {
     for (const auto &param : node->generic_parameters) {
       auto arg = generic_args.back();
-      // TODO: check for overwrite?
-      node->block.get()->scope->types[param] = arg;
+      ctx.scope->types[param] = arg;
       generic_args.pop_back();
-    }
-  }
-
-  if (ctx.scope->is_struct_or_union_scope) {
-    
-
-    if (current_struct_decl) {
-      auto ty = current_struct_decl.get()->type->resolved_type;
-      if (ty == -1) {
-        throw_error("Internal compiler error: Failed to get type of 'this' pointer", node->source_range);
-      }
-
-      ctx.scope->insert("this", global_get_type(ty)->take_pointer_to());
-    } else if (current_union_decl) {
-      ctx.scope->insert("this", global_get_type(current_union_decl.get()->type->resolved_type)->take_pointer_to());
     }
   }
 
@@ -378,9 +366,7 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
 
   for (const auto &param : params) {
     if (param->default_value.is_not_null()) info.default_params++;
-
-    if (node->block.is_not_null()) node->block.get()->scope->insert(param->name, param->type->resolved_type);
-
+    ctx.scope->insert(param->name, param->type->resolved_type);
     info.parameter_types[info.params_len] = param->type->resolved_type;
     info.params_len++;
   }
@@ -389,21 +375,21 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
 
   // TODO: we need to support fwd decls of overloaded functions
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-    ctx.scope->insert(node->name.value, type_id);
-    auto sym = ctx.scope->lookup(node->name.value);
-    sym->flags |= SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION;
+    ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
     return {};
   }
 
-  auto sym = ctx.scope->lookup(node->name.value);
+  auto sym = ctx.scope->parent->lookup(node->name.value);
 
   if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
     sym->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
   }
 
+  if (generic_instantation) {
+    node->generic_instantiations.push_back(type_id);
   // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
   // This is ugly. It's for function overloading
-  if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
+  } else if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
     if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
     for (const auto overload_type_id : sym->function_overload_types) {
       auto type = global_get_type(overload_type_id);
@@ -418,8 +404,8 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
     // always insert the first function declarations as the 0th overloaded type,
     // because we can tell when a fucntion has been overloaded when this array's
     // size is > 1
-    ctx.scope->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->lookup(node->name.value);
+    ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
+    auto sym = ctx.scope->parent->lookup(node->name.value);
     sym->function_overload_types.push_back(type_id);
     sym->declaring_node = node;
   }
@@ -834,11 +820,11 @@ std::any Typer::visit(ASTCall *node) {
     if (auto declaring_node = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())) {
       if (!declaring_node->generic_parameters.empty()) {
         // TODO: infer generic args
-        // visit_function_declaration(declaring_node, true, get_generic_arg_types(node->generic_arguments));
-        // auto instantiation = declaring_node->generic_instantiations.back();
-        // type = global_get_type(instantiation);
-        // symbol_nullable = nullptr;
-        // found = true;
+        visit_function_declaration(declaring_node, true, get_generic_arg_types(node->generic_arguments));
+        auto instantiation = declaring_node->generic_instantiations.back();
+        type = global_get_type(instantiation);
+        symbol_nullable = nullptr;
+        found = true;
       }
     }
 

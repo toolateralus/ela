@@ -1596,8 +1596,10 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     return function;
   }
 
+  ctx.set_scope();
   function->block = parse_block();
   end_node(function, range);
+  function->scope = ctx.exit_scope();
   return function;
 }
 

@@ -247,6 +247,7 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
+
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
   // extern, normal etc.
@@ -255,6 +256,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   std::vector<GenericParameter> generic_parameters;
   std::vector<int> generic_instantiations;
 
+  Scope *scope;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
   Token name;  // TODO: make this an InternedString not a token
