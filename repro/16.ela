@@ -1,0 +1,22 @@
+
+
+main :: fn() {
+  n := $"{}\"{}"; // unable to lex operator \
+  // This is because we tokenize the entire interpolated string.
+  // We should be able to just yank out the {...} and then copy paste the rest as plain text.
+  // Either we can kind of parse out those expressions at lex time, or do some string manipulation in the parser
+  // that's a bit smarter than what we're doing right now.
+
+
+  str := string{};
+
+// Heap buffer overflow,
+// our interplator for strings is sprintf'ing into a 1024 char buffer.
+// it was a nice little hack for the time being, but this is a serious problem.
+// We can just write a chunk allocating snprintf of our own, which when it runs out of space,
+// it can just reallocate in some linked list style allocator /string builder,
+// then concatenate on output.
+  for i in 0..1024 {
+    str = $"{str}{str}";
+  }
+}

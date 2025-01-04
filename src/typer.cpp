@@ -35,6 +35,7 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
                                    "Inconsistent return types in block.");
   }
 };
+
 void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type) {
   if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
     bool found_exact_match = false;
@@ -275,7 +276,7 @@ std::any Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generi
 
   ctx.set_scope(info->scope);
 
-  ctx.scope->insert("this", type->id);
+  ctx.scope->insert("this", type->take_pointer_to());
 
   for (auto decl : node->fields) {
     decl->accept(this);
@@ -301,12 +302,11 @@ std::any Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_
   auto type = global_get_type(node->type->resolved_type);
   auto info = (type->get_info()->as<UnionTypeInfo>());
 
-  if (!info->generic_parameters.empty() && !generic_instantiation) {
-    return {};
-  }
+  if (!info->generic_parameters.empty() && !generic_instantiation) return {};
 
   ctx.set_scope(node->scope);
-  ctx.scope->insert("this", type->id);
+  ctx.scope->insert("this", type->take_pointer_to());
+
   for (const auto &_struct : node->structs) {
     for (const auto &field : _struct->fields) {
       field->accept(this);
@@ -494,6 +494,7 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
 }
 
 // For generic types.
+// TODO: this has a lot of duplicated code and can be cleaned up for sure.
 int Typer::get_function_type(ASTFunctionDeclaration *node) {
   node->return_type->accept(this);
   node->params->accept(this);
@@ -798,7 +799,7 @@ std::any Typer::visit(ASTWhile *node) {
   return control_flow;
 }
 
-std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType*> &args) {
+std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
   std::vector<int> generic_args;
   for (const auto &arg : args) {
     generic_args.push_back(int_from_any(arg->accept(this)));
@@ -828,7 +829,6 @@ std::any Typer::visit(ASTCall *node) {
     type = symbol->type_id != -1 ? global_get_type(symbol->type_id) : nullptr;
     if (type) declaring_or_assigning_type = type->id;
     arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
-
 
     bool found = false;
     if (auto declaring_node = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())) {
