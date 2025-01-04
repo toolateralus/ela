@@ -1,27 +1,7 @@
-push :: fn![T](t: T) {
-  return;
+s :: struct {
+  a: int;
 }
-
-Array :: struct![T] {
-  data: T*;
-  count: s64;
-}
-
-Vector2 :: union![T] {
-  values: T[2];
-  #anon :: struct {
-    x: T;
-    y: T;
-  }
-
-  #static zero :: fn() -> Vector2![T] {
-    return {};
-  }
-}
-
-main :: fn() {
-  push![int]();
-  push();
-  n : Array![int];
-  vector: Vector2![float];
+main ::fn() {
+  n: s;
+  n.a++;
 }
