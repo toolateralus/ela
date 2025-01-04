@@ -797,6 +797,14 @@ std::any Typer::visit(ASTWhile *node) {
   return control_flow;
 }
 
+std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType*> &args) {
+  std::vector<int> generic_args;
+  for (const auto &arg : args) {
+    generic_args.push_back(int_from_any(arg->accept(this)));
+  }
+  return generic_args;
+}
+
 // FEATURE(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
 // with this function syntax, using #make(Type, ...) is really clunky
 // and annoying;
@@ -820,11 +828,13 @@ std::any Typer::visit(ASTCall *node) {
     if (type) declaring_or_assigning_type = type->id;
     arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
+
+
     bool found = false;
     if (auto declaring_node = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())) {
       if (!declaring_node->generic_parameters.empty()) {
-        // // This will have add a generic instantiation to the node's list.
-        // visit_function_declaration(declaring_node, true, arg_tys);
+        // TODO: infer generic args
+        // visit_function_declaration(declaring_node, true, get_generic_arg_types(node->generic_arguments));
         // auto instantiation = declaring_node->generic_instantiations.back();
         // type = global_get_type(instantiation);
         // symbol_nullable = nullptr;
