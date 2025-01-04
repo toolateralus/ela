@@ -765,25 +765,10 @@ ASTExpr *Parser::parse_unary() {
 ASTExpr *Parser::parse_postfix() {
   auto range = begin_node();
   auto left = parse_primary();
-  if (peek().type == TType::Range) {
-    eat();
-    auto right = parse_expr();
-    auto node = ast_alloc<ASTRange>();
-    node->left = left;
-    node->right = right;
-    return node;
-  }
-  if (peek().type == TType::Increment || peek().type == TType::Decrement) {
-    auto unary = ast_alloc<ASTUnaryExpr>();
-    unary->operand = left;
-    unary->op = peek();
-    eat();
-    end_node(unary, range);
-    return unary;
-  }
   // build dot and subscript expressions
   while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
-         peek().type == TType::LParen || peek().type == TType::GenericBrace) {
+         peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
+         peek().type == TType::Decrement || peek().type == TType::Range) {
     if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -798,7 +783,14 @@ ASTExpr *Parser::parse_postfix() {
       dot->base = left;
       dot->member_name = expect(TType::Identifier).value;
       left = dot;
-    } else {
+    } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
+      auto unary = ast_alloc<ASTUnaryExpr>();
+      unary->operand = left;
+      unary->op = peek();
+      eat();
+      end_node(unary, range);
+      return unary;
+    } else if (peek().type == TType::LBrace) {
       eat();
       auto index = parse_expr();
       expect(TType::RBrace);
@@ -806,6 +798,13 @@ ASTExpr *Parser::parse_postfix() {
       subscript->left = left;
       subscript->subscript = index;
       left = subscript;
+    } else if (peek().type == TType::Range) {
+      eat();
+      auto right = parse_expr();
+      auto node = ast_alloc<ASTRange>();
+      node->left = left;
+      node->right = right;
+      return node;
     }
   }
 
@@ -1042,14 +1041,12 @@ ASTExpr *Parser::parse_primary() {
 
       if (peek().type == TType::Comma) {
         eat();
-        auto exprs = std::vector<ASTExpr *>{
-          expr
-        };
+        auto exprs = std::vector<ASTExpr *>{expr};
         while (peek().type != TType::RParen) {
           exprs.push_back(parse_expr());
           if (peek().type == TType::Comma) eat();
         }
-        expect(TType::RParen); 
+        expect(TType::RParen);
         auto tuple = ast_alloc<ASTTuple>();
         tuple->values = exprs;
         tuple->type = ast_alloc<ASTType>();
@@ -1137,8 +1134,7 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
-  if (peek().type == TType::Identifier && 
-      lookahead_buf()[1].type == TType::DoubleColon &&
+  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
       lookahead_buf()[2].type == TType::Identifier) {
     auto expr = ast_alloc<ASTExprStatement>();
     expr->expression = parse_expr();
@@ -1288,7 +1284,6 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1318,14 +1313,15 @@ ASTStatement *Parser::parse_statement() {
     throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", range);
   }
 
-
   // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
   // * Expression statements.
   {
     auto next = lookahead_buf()[1];
     auto next_next = lookahead_buf()[2];
     // Both postfix and prefix (inc/dec)rement
-    const bool is_increment_or_decrement = (next.type == TType::Increment || next.type == TType::Decrement && next_next.type != TType::Semi) || tok.type == TType::Increment || tok.type == TType::Decrement;
+    const bool is_increment_or_decrement =
+        (next.type == TType::Increment || next.type == TType::Decrement && next_next.type != TType::Semi) ||
+        tok.type == TType::Increment || tok.type == TType::Decrement;
 
     // subscript assignment or dot assign/ call statement.
     const bool is_identifier_with_lbrace_or_dot =
@@ -1714,7 +1710,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto range = begin_node();
 
-
   auto node = ast_alloc<ASTUnionDeclaration>();
   current_union_decl = node;
 
@@ -1838,9 +1833,9 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
   return nullptr;
 }
 
-std::vector<ASTType*> Parser::parse_generic_arguments() {
+std::vector<ASTType *> Parser::parse_generic_arguments() {
   expect(TType::GenericBrace);
-  std::vector<ASTType*> params;
+  std::vector<ASTType *> params;
   while (peek().type != TType::RBrace) {
     params.push_back(parse_type());
     if (peek().type != TType::RBrace) expect(TType::Comma);
@@ -1859,7 +1854,6 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   expect(TType::RBrace);
   return params;
 }
-
 
 std::vector<ASTType *> Parser::parse_parameter_types() {
   std::vector<ASTType *> param_types;
