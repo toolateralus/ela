@@ -1020,7 +1020,7 @@ ASTExpr *Parser::parse_primary() {
       const auto lookahead = lookahead_buf();
 
       // for (Type)expr;
-      if (ctx.scope->find_type_id(peek().value, {}) != -1 || peek().type == TType::LT) {
+      if (ctx.scope->find_type_id(peek().value, {}) != -1 && (lookahead_buf()[1].type == TType::RParen || lookahead_buf()[1].type == TType::Mul)) {
         // CLEANUP: We probably don't wanna use ASTMake for so many things,
         // but for now it's okay. Actually, we don't want ASTMake at all, it
         // should get eliminated and ASTConstruct and ASTCast should probably be

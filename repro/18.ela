@@ -1,0 +1,16 @@
+
+/* 
+    Error:
+          Unable to create type alias: target type does not exist.
+  --------------------------------------------------------------------------------
+
+  /home/josh_arch/source/ela/rope/main.ela:1:1
+  --------------------------------------------------------------------------------
+  #import core;
+  ^
+*/
+ Result :: (int, string);
+
+main :: fn () {
+
+}

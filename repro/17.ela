@@ -1,0 +1,5 @@
+
+// Returning a tuple from a function pointer segfauls the compiler.
+main :: fn() {
+  next: fn * () -> (int, string);
+}
