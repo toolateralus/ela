@@ -1683,7 +1683,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
         decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
       } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        decl->methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
+        auto function = static_cast<ASTFunctionDeclaration *>(statement);
+        function->flags |= FUNCTION_IS_METHOD;
+        decl->methods.push_back(function);
       } else {
         throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
       }
@@ -1781,7 +1783,9 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       fields.push_back(static_cast<ASTDeclaration *>(statement));
     } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      methods.push_back(static_cast<ASTFunctionDeclaration *>(statement));
+      auto function = static_cast<ASTFunctionDeclaration *>(statement);
+      function->flags |= FUNCTION_IS_METHOD;
+      methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(struct_decl->type->resolved_type);

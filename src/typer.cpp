@@ -341,7 +341,7 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
   }
 
   if (ctx.scope->is_struct_or_union_scope) {
-    node->flags |= FUNCTION_IS_METHOD;
+    
 
     if (current_struct_decl) {
       auto ty = current_struct_decl.get()->type->resolved_type;
