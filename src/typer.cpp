@@ -274,6 +274,9 @@ std::any Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generi
   }
 
   ctx.set_scope(info->scope);
+
+  ctx.scope->insert("this", type->id);
+
   for (auto decl : node->fields) {
     decl->accept(this);
   }
@@ -302,10 +305,8 @@ std::any Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_
     return {};
   }
 
-  // we store this ast just to type check the stuff.
   ctx.set_scope(node->scope);
-
-  // do this first.
+  ctx.scope->insert("this", type->id);
   for (const auto &_struct : node->structs) {
     for (const auto &field : _struct->fields) {
       field->accept(this);
