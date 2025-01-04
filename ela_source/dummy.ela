@@ -1,7 +1,10 @@
-s :: struct {
-  a: int;
+#import core;
+
+add :: fn![T](a: T, b: T) -> T {
+  return a + b;
 }
-main ::fn() {
-  n: s;
-  n.a++;
+
+main :: fn() {
+  printf("%d\n", add![int](5, 6));
+  printf("%f\n", add![float](5.435, 1.234));
 }

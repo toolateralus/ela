@@ -325,21 +325,22 @@ std::any Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_
   return {};
 }
 
-std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantation,
+int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantation,
                                            std::vector<int> generic_args) {
+  auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   auto last_decl = current_func_decl;
   current_func_decl = node;
   Defer _([&] {
     current_func_decl = last_decl;
-    ctx.exit_scope();
+    ctx.set_scope(old_scope);
   });
 
   if (generic_instantation) {
+    auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto arg = generic_args.back();
-      ctx.scope->types[param] = arg;
-      generic_args.pop_back();
+      ctx.scope->types[param] = *generic_arg;
+      generic_arg++;
     }
   }
 
@@ -385,29 +386,29 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
     sym->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
   }
 
-  if (generic_instantation) {
-    node->generic_instantiations.push_back(type_id);
-  // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
-  // This is ugly. It's for function overloading
-  } else if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
-    if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
-    for (const auto overload_type_id : sym->function_overload_types) {
-      auto type = global_get_type(overload_type_id);
-      auto this_type = global_get_type(type_id);
-      if (type->equals(this_type->base_id, this_type->get_ext()) &&
-          type->type_info_equals(this_type->get_info(), this_type->kind))
-        throw_error(std::format("re-definition of function '{}'", node->name.value.get_str()), node->source_range);
+  if (!generic_instantation) {
+    // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
+    // This is ugly. It's for function overloading
+    if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
+      if (sym->function_overload_types.size() >= 1) sym->flags |= SYMBOL_HAS_OVERLOADS;
+      for (const auto overload_type_id : sym->function_overload_types) {
+        auto type = global_get_type(overload_type_id);
+        auto this_type = global_get_type(type_id);
+        if (type->equals(this_type->base_id, this_type->get_ext()) &&
+            type->type_info_equals(this_type->get_info(), this_type->kind))
+          throw_error(std::format("re-definition of function '{}'", node->name.value.get_str()), node->source_range);
+      }
+      sym->function_overload_types.push_back(type_id);
+      sym->type_id = type_id;
+    } else {
+      // always insert the first function declarations as the 0th overloaded type,
+      // because we can tell when a fucntion has been overloaded when this array's
+      // size is > 1
+      ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
+      auto sym = ctx.scope->parent->lookup(node->name.value);
+      sym->function_overload_types.push_back(type_id);
+      sym->declaring_node = node;
     }
-    sym->function_overload_types.push_back(type_id);
-    sym->type_id = type_id;
-  } else {
-    // always insert the first function declarations as the 0th overloaded type,
-    // because we can tell when a fucntion has been overloaded when this array's
-    // size is > 1
-    ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->parent->lookup(node->name.value);
-    sym->function_overload_types.push_back(type_id);
-    sym->declaring_node = node;
   }
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) return {};
 
@@ -427,12 +428,7 @@ std::any Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool ge
   assert_types_can_cast_or_equal(control_flow.type, info.return_type, node->source_range,
                                  "invalid return type.. expected '{}', got '{}'",
                                  std::format("function: '{}'", node->name.value.get_str()));
-
-  if (!node->generic_parameters.empty()) {
-    node->generic_instantiations.push_back(get_function_type(node));
-  }
-
-  return {};
+  return type_id;
 }
 
 std::any Typer::visit(ASTStructDeclaration *node) { return visit_struct_declaration(node, false); }
@@ -496,7 +492,6 @@ int Typer::get_function_type(ASTFunctionDeclaration *node) {
   info.params_len = 0;
   info.default_params = 0;
   info.meta_type = node->meta_type;
-  auto name = node->name.value;
   info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
   auto params = node->params->params;
 
@@ -511,8 +506,10 @@ int Typer::get_function_type(ASTFunctionDeclaration *node) {
 }
 
 std::any Typer::visit(ASTFunctionDeclaration *node) {
-  // ! How in the world have we been getting by, without entering a scope?
   if (!node->generic_parameters.empty()) {
+    ctx.scope->insert(node->name.value, -1, SYMBOL_IS_FUNCTION);
+    auto sym = ctx.scope->lookup(node->name.value);
+    sym->declaring_node = node;
     return {};
   }
   return visit_function_declaration(node, false);
@@ -793,6 +790,15 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args
   return generic_args;
 }
 
+Type *find_generic_function(ASTFunctionDeclaration *declaring_node, const std::vector<int> &gen_args) {
+  for (auto &instantiation : declaring_node->generic_instantiations) {
+    if (instantiation.arguments == gen_args) {
+      return global_get_type(instantiation.type);
+    }
+  }
+  return nullptr;
+}
+
 // FEATURE(Josh) 10/1/2024, 8:46:53 AM We should be able to call constructors
 // with this function syntax, using #make(Type, ...) is really clunky
 // and annoying;
@@ -820,9 +826,18 @@ std::any Typer::visit(ASTCall *node) {
     if (auto declaring_node = dynamic_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())) {
       if (!declaring_node->generic_parameters.empty()) {
         // TODO: infer generic args
-        visit_function_declaration(declaring_node, true, get_generic_arg_types(node->generic_arguments));
-        auto instantiation = declaring_node->generic_instantiations.back();
-        type = global_get_type(instantiation);
+        auto gen_args = get_generic_arg_types(node->generic_arguments);
+        type = find_generic_function(declaring_node, gen_args);
+        if (type == nullptr) {
+          if (declaring_node->generic_parameters.size() != gen_args.size()) {
+            throw_error("Mismatch in generic parameter/ arguments count", node->source_range);
+          }
+          auto copy = static_cast<ASTFunctionDeclaration *>(deep_copy_ast(declaring_node));
+          auto type_id = visit_function_declaration(copy, true, gen_args);
+          copy->generic_parameters.clear();
+          declaring_node->generic_instantiations.push_back({gen_args, copy, type_id});
+          type = global_get_type(type_id);
+        }
         symbol_nullable = nullptr;
         found = true;
       }
@@ -845,8 +860,7 @@ std::any Typer::visit(ASTCall *node) {
 
   if (!info->is_varargs &&
       (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params)) {
-    throw_error(std::format("Function call has incorrect number of arguments. "
-                            "Expected: {}, Found: {}\n type: {}",
+    throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}\n type: {}",
                             info->params_len, arg_tys.size(), type->to_string()),
                 node->source_range);
   }

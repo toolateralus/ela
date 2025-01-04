@@ -247,6 +247,11 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
+struct GenericFunctionInstance {
+  std::vector<int> arguments;
+  ASTFunctionDeclaration *definition;
+  int type;
+};
 
 struct ASTFunctionDeclaration : ASTStatement {
   int flags = 0;
@@ -254,7 +259,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL; // TODO: get rid of this, and just add it to the flags.
   
   std::vector<GenericParameter> generic_parameters;
-  std::vector<int> generic_instantiations;
+  std::vector<GenericFunctionInstance> generic_instantiations;
 
   Scope *scope;
   ASTParamsDecl *params;
