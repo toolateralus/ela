@@ -144,6 +144,18 @@ std::any Emitter::visit(ASTType *node) {
 }
 std::any Emitter::visit(ASTCall *node) {
   node->function->accept(this);
+  if (!node->generic_arguments.empty()) {
+    auto &gen_args = node->generic_arguments;
+    (*ss) << "<";
+    auto last = gen_args.end() - 1;
+    for (auto it = gen_args.begin(); it != gen_args.end(); it++) {
+      (*it)->accept(this);
+      if (it != last) {
+        (*ss) << ", ";
+      }
+    }
+    (*ss) << ">";
+  }
   node->arguments->accept(this);
   return {};
 }

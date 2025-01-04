@@ -20,8 +20,5 @@ Vector2 :: union![T] {
 }
 
 main :: fn() {
-  push![int]();
-  push();
-  n : Array![int];
-  vector: Vector2![float];
+  push![int](5);
 }
