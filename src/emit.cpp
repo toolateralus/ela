@@ -144,18 +144,6 @@ std::any Emitter::visit(ASTType *node) {
 }
 std::any Emitter::visit(ASTCall *node) {
   node->function->accept(this);
-  if (!node->generic_arguments.empty()) {
-    auto &gen_args = node->generic_arguments;
-    (*ss) << "<";
-    auto last = gen_args.end() - 1;
-    for (auto it = gen_args.begin(); it != gen_args.end(); it++) {
-      (*it)->accept(this);
-      if (it != last) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << ">";
-  }
   node->arguments->accept(this);
   return {};
 }
@@ -443,29 +431,28 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
-      (*ss) << "template<";
-      for (int i = 0; i < node->generic_parameters.size(); ++i) {
-        (*ss) << "class " << node->generic_parameters[i].get_str();
-        if (i != node->generic_parameters.size() - 1) {
-          (*ss) << ", ";
-        }
+      for (auto &instantiation : node->generic_instantiations) {
+        instantiation.definition->accept(this);
       }
-      (*ss) << ">\n";
-    }
-
-    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
-      (*ss) << "static ";
+      return;
     }
 
     auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
 
     if (node->name.value != "main" && !is_local) {
+      if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+        (*ss) << "static ";
+      }
       emit_forward_declaration(node);
     }
 
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
       return;
-    } 
+    }
+
+    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+      (*ss) << "static ";
+    }
 
     // local function
     if (is_local) {
@@ -513,10 +500,11 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   current_func_decl = node;
 
   auto test_flag = compile_command.has_flag("test");
+  auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer deferred = {[&]() {
     current_func_decl = last_func_decl;
-    ctx.exit_scope();
+    ctx.set_scope(old_scope);
   }};
 
   // this also happens to emit the test boilerplate that bootstraps it into the

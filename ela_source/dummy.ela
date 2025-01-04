@@ -1,24 +1,10 @@
-push :: fn![T](t: T) {
-  return;
-}
+#import core;
 
-Array :: struct![T] {
-  data: T*;
-  count: s64;
-}
-
-Vector2 :: union![T] {
-  values: T[2];
-  #anon :: struct {
-    x: T;
-    y: T;
-  }
-
-  #static zero :: fn() -> Vector2![T] {
-    return {};
-  }
+add :: fn![T](a: T, b: T) -> T {
+  return a + b;
 }
 
 main :: fn() {
-  push![int](5);
+  printf("%d\n", add![int](5, 6));
+  printf("%f\n", add![float](5.435, 1.234));
 }
