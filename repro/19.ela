@@ -1,7 +1,0 @@
-#import core;
-#import file;
-
-main :: fn() {
-  a := (File::read_all("main.ela"), 0);
-  b := File::read_all("main.ela");
-}

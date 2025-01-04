@@ -1556,7 +1556,6 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   Strings::contains("Hi!", 'H'); // just test that this compiles.
 }
 
-
 #ifdef FUNCTION_POINTER_TEST {
   function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
   //! See emitter 'get_function_pointer_dynamic_array_declaration', this is super bugged.
@@ -1586,13 +1585,13 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   }
 }
 
-
-generic_add :: fn![T](a: T, b: T) -> T {
+add_generic :: fn![T](a: T, b: T) -> T {
   return a + b;
 }
 
 #test test_generic_add :: fn() {
-  result := generic_add![float](100.0, 100.0);
-  assert("generic_add_int failed", result == 200.0);
+  n := add_generic![float](100.0, 100.0);
+  assert("generic_add_int failed", n == 200.0);
+  assert("generic_add_int failed", add_generic![float](100.0, 100.0) == 200.0);
 }
 
