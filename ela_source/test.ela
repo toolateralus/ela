@@ -1586,38 +1586,13 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   }
 }
 
-// #def increment_test;
-#ifdef increment_test {
-  // ! Somehow in the cleanup i broke postfix AND prefix increment operators 
-  // ! When used with dot expressions. Whut Teh ****?
-  #test test_inc_decrement :: fn() {
-    Strukt :: struct {
-      v: s32;
-    }
-    
-    s: Strukt;
-    s.v++;
 
-    if true {
-      s.v++;
-    } else {
-      ++s.v;
-    }
-
-    if true {
-      --s.v;
-    } else {
-      s.v--;
-    }
-  }
-
+generic_add :: fn![T](a: T, b: T) -> T {
+  return a + b;
 }
 
-#def GENERIC_FUNCTION_TEST
-
-#ifdef GENERIC_FUNCTION_TEST {
-  // func :: fn![T]() -> T {
-  //   return {};
-  // }
+#test test_generic_add :: fn() {
+  result := generic_add![float](100.0, 100.0);
+  assert("generic_add_int failed", result == 200.0);
 }
 
