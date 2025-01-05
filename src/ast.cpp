@@ -33,6 +33,10 @@ static void remove_body(Parser *parser) {
       depth++;
     if (parser->peek().type == TType::RCurly)
       depth--;
+    if (parser->peek().type == TType::LCurly)
+      depth++;
+    if (parser->peek().type == TType::RCurly)
+      depth--;
     parser->eat();
   }
 }
@@ -745,7 +749,7 @@ ASTExpr *Parser::parse_postfix() {
   // build dot and subscript expressions
   while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
          peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
-         peek().type == TType::Decrement || peek().type == TType::Range) {
+         peek().type == TType::Decrement || peek().type == TType::Range || peek().type == TType::As) {
     if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -782,6 +786,15 @@ ASTExpr *Parser::parse_postfix() {
       node->left = left;
       node->right = right;
       return node;
+    } else if (peek().type == TType::As) {
+      eat();
+      auto type = parse_type();
+      auto node = ast_alloc<ASTMake>();
+      node->type_arg = type;
+      node->kind = MAKE_CAST;
+      node->arguments = ast_alloc<ASTArguments>();
+      node->arguments->arguments.push_back(left);
+      left = node;
     }
   }
 
@@ -1015,7 +1028,6 @@ ASTExpr *Parser::parse_primary() {
       }
 
       auto expr = parse_expr();
-
       if (peek().type == TType::Comma) {
         eat();
         auto exprs = std::vector<ASTExpr *>{expr};
@@ -1030,7 +1042,6 @@ ASTExpr *Parser::parse_primary() {
         tuple->type = ast_alloc<ASTType>();
         return tuple;
       }
-
       if (peek().type != TType::RParen) {
         throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
       }
@@ -1556,6 +1567,11 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   ctx.set_scope();
+
+  // TODO: find a better solution to this.
+  for (const auto &param : function->generic_parameters) {
+    ctx.scope->types[param] = -2;
+  }
   function->block = parse_block();
   end_node(function, range);
   function->scope = ctx.exit_scope();
@@ -1598,6 +1614,22 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   return node;
 }
 
+void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
+  for (const auto &statement : statements) {
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+      decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
+    } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+        auto function = static_cast<ASTFunctionDeclaration *>(statement);
+        function->flags |= FUNCTION_IS_METHOD;
+        decl->methods.push_back(function);
+    } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
+      visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
+    } else if (statement->get_node_type() != AST_NODE_NOOP) {
+      throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
+    }
+  }
+}
+
 // TODO:
 // We need to clean up the struct & union parsing, make it more consistent.
 // Maybe use a generic function, they're strangely different.
@@ -1636,29 +1668,23 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   decl->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
+  info->scope = decl->scope = create_child(ctx.scope);
+  info->scope->is_struct_or_union_scope = true;
+
+  for (const auto &param : decl->generic_parameters) {
+    info->scope->types[param] = -2;
+  }
 
   if (!semicolon()) {
-    auto block = parse_block();
-    block->scope->is_struct_or_union_scope = true;
-    for (const auto &statement : block->statements) {
-      if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-      } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        auto function = static_cast<ASTFunctionDeclaration *>(statement);
-        function->flags |= FUNCTION_IS_METHOD;
-        decl->methods.push_back(function);
-      } else {
-        throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
-      }
-    }
+    auto block = parse_block(decl->scope);
+    visit_struct_statements(decl, block->statements);
     decl->scope = block->scope;
+    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
+    info->scope = decl->scope;
   } else {
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
-
-  info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-  info->scope = decl->scope;
 
   current_struct_decl = old;
   end_node(decl, range);
@@ -1711,6 +1737,9 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     type_id = decl->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
   }
 
+  type = global_get_type(type_id);
+  auto info = (type->get_info()->as<UnionTypeInfo>());
+
   if (peek().type == TType::Semi) {
     eat();
     decl->is_fwd_decl = true;
@@ -1723,10 +1752,15 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
   std::vector<ASTStructDeclaration *> structs;
-  auto block = parse_block();
-  block->scope->is_struct_or_union_scope = true;
 
-  auto scope = block->scope;
+  info->scope = decl->scope = create_child(ctx.scope);
+  info->scope->is_struct_or_union_scope = true;
+
+  for (const auto &param : decl->generic_parameters) {
+    info->scope->types[param] = -2;
+  }
+
+  auto block = parse_block(info->scope);
 
   for (auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
@@ -1754,11 +1788,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   decl->fields = fields;
   decl->methods = methods;
   decl->structs = structs;
-  decl->scope = block->scope;
-
-  type = global_get_type(type_id);
-  auto info = (type->get_info()->as<UnionTypeInfo>());
-  info->scope = scope;
 
   end_node(decl, range);
   return decl;

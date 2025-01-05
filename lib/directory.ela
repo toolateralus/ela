@@ -24,7 +24,7 @@ Directory :: struct {
     entry: void*;
     while entry = readdir(dir) {
       ent : dirent* = entry;
-      files ~= {(c_string)ent.d_name};
+      files ~= {ent.d_name as c_string};
     }
     closedir(dir);
     return {path, files};

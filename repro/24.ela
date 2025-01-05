@@ -1,0 +1,8 @@
+Yunion :: union![T] {
+  a: T;
+}
+
+main :: fn() {
+  n : Yunion![int];
+}
+

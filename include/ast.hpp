@@ -75,7 +75,7 @@ struct ASTStatement : ASTNode {
 };
 
 struct ASTStatementList : ASTStatement {
-  std::vector<ASTStatement *> statements;
+  std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override;
 };
@@ -627,6 +627,7 @@ struct Parser {
   std::vector<ASTType *> parse_generic_arguments();
   ASTUnionDeclaration *parse_union_declaration(Token);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
+  void visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements);
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTBlock *parse_block(Scope *scope = nullptr);
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);

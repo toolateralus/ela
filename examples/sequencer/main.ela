@@ -139,7 +139,7 @@ SequenceChannel :: struct {
   draw :: fn(x: float, y: float) {
     if total_notes != check_buttons.length {
       while total_notes > check_buttons.length {
-        _x : float = x + 150 + (float)(check_buttons.length * 40) + 2;
+        _x : float = x + 150 + ((check_buttons.length * 40) as float) + 2;
         check_buttons ~= {
           false,
           Rectangle{_x, y, 36, 36},
@@ -168,7 +168,7 @@ SequenceChannel :: struct {
   update :: fn(index: int) {
     if volume != old_volume {
       old_volume = volume;
-      SetSoundVolume(sound, (float)volume / 100.0);
+      SetSoundVolume(sound, (volume as float) / 100.0);
     }
     if check_buttons[index].value {
       PlaySound(sound);
@@ -251,17 +251,17 @@ main :: fn() {
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
         str : string = $"{beat}.{subdiv}";
-        DrawText(str.data, (int)label_x, (int)(seq_y - 40.0), 12, WHITE);
+        DrawText(str.data, label_x as int, (seq_y - 40.0) as int, 12, WHITE);
       }
 
       if playing {
         cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0
-        DrawRectangleLines((int)cursor_x, seq_y, 40, (int)channels.length * 40, ORANGE);
+        DrawRectangleLines(cursor_x as int, seq_y, 40, (channels.length as int) * 40, ORANGE);
       }
 
       sequencer();
       bpm_slider.draw();
-      bpm = (float)(int)bpm;
+      bpm = (bpm as int) as float;
 
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 
@@ -270,7 +270,7 @@ main :: fn() {
       subdivision_slider.draw();
       beats_slider.draw();
 
-      draw_button("reset (no undo)", {(float)GetScreenWidth() - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
+      draw_button("reset (no undo)", {(GetScreenWidth() as float) - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
       draw_button("remove channel", Rectangle{0, 215, 125, 30}, reset_button_style, &on_remove_channel);
 
       for *channel in channels {

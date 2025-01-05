@@ -81,9 +81,9 @@ enum struct TType {
   False,
   Null,
   Varargs,
-  Directive,    // #
-  ColonEquals,  //  :=
-  Dollar,       // $
+  Directive,   // #
+  ColonEquals, //  :=
+  Dollar,      // $
 
   Struct,
   Enum,
@@ -99,11 +99,12 @@ enum struct TType {
   Switch,
   Fn,
 
-  GenericBrace // '!<' for ![T, T1]
+  GenericBrace, // '!<' for ![T, T1]
+  As,           // 'as' for casting
 };
 
-#define TTYPE_CASE(type) \
-  case TType::type:      \
+#define TTYPE_CASE(type)                                                                                               \
+  case TType::type:                                                                                                    \
     return #type
 
 static inline std::string TTypeToString(TType type) {
@@ -189,6 +190,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
     TTYPE_CASE(Dollar);
+    TTYPE_CASE(As);
   }
   return "Unknown";
 }
@@ -275,12 +277,13 @@ static std::unordered_map<std::string, TType> keywords{
     // intrinsic functions
     {"new", TType::New},
     {"delete", TType::Delete},
+    {"as", TType::As},
 };
 
 static std::unordered_map<std::string, TType> operators{
     {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
     {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
-    {"!", TType::LogicalNot},          {"~", TType::Not}, {"::", TType::DoubleColon}, {"->", TType::Arrow},
+    {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},
     {"..", TType::Range},       {"+", TType::Add},        {"-", TType::Sub},          {"*", TType::Mul},
     {"/", TType::Div},          {"%", TType::Modulo},     {"=", TType::Assign},       {",", TType::Comma},
     {";", TType::Semi},         {"(", TType::LParen},     {")", TType::RParen},       {"{", TType::LCurly},
@@ -292,7 +295,7 @@ static std::unordered_map<std::string, TType> operators{
 
     {"+=", TType::CompAdd},     {"-=", TType::CompSub},   {"*=", TType::CompMul},     {"/=", TType::CompDiv},
     {"%=", TType::CompMod},     {"&=", TType::CompAnd},   {"|=", TType::CompOr},      {"^=", TType::CompXor},
-    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR}, {"![", TType::GenericBrace}};
+    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR},  {"![", TType::GenericBrace}};
 
 struct Lexer {
   struct State {
