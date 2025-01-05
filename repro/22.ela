@@ -1,4 +1,4 @@
-
+#import core;
 
 Struct :: struct {
   #static StaticMethod :: fn() -> int {
@@ -10,6 +10,11 @@ CallMeMaybe:: fn![T]() {
   T::StaticMethod();
 }
 
+Strackt :: struct![T] {
+  n := T::StaticMethod();
+}
+
 main :: fn() {
-  CallMeMaybe![Generic_Passed_In_Param_struct_lol]();
+  CallMeMaybe![Struct]();
+  println(to_string(f.n));
 }

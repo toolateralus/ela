@@ -1585,6 +1585,11 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   ctx.set_scope();
+
+  // TODO: find a better solution to this.
+  for (const auto &param: function->generic_parameters) {
+    ctx.scope->types[param] = -2;
+  }
   function->block = parse_block();
   end_node(function, range);
   function->scope = ctx.exit_scope();
@@ -1668,10 +1673,15 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   decl->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
+  info->scope = decl->scope = create_child(ctx.scope);
+  info->scope->is_struct_or_union_scope = true;
+
+  for (const auto &param: decl->generic_parameters) {
+    info->scope->types[param] = -2;
+  }
 
   if (!semicolon()) {
-    auto block = parse_block();
-    block->scope->is_struct_or_union_scope = true;
+    auto block = parse_block(decl->scope);
     for (const auto &statement : block->statements) {
       if (statement->get_node_type() == AST_NODE_DECLARATION) {
         decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
@@ -1684,13 +1694,12 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       }
     }
     decl->scope = block->scope;
+    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
+    info->scope = decl->scope;
   } else {
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
-
-  info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-  info->scope = decl->scope;
 
   current_struct_decl = old;
   end_node(decl, range);
@@ -1743,6 +1752,9 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     type_id = decl->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
   }
 
+  type = global_get_type(type_id);
+  auto info = (type->get_info()->as<UnionTypeInfo>());
+  
   if (peek().type == TType::Semi) {
     eat();
     decl->is_fwd_decl = true;
@@ -1755,10 +1767,17 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
   std::vector<ASTStructDeclaration *> structs;
-  auto block = parse_block();
-  block->scope->is_struct_or_union_scope = true;
 
-  auto scope = block->scope;
+  info->scope = decl->scope = create_child(ctx.scope);
+  info->scope->is_struct_or_union_scope = true;
+
+  for (const auto &param: decl->generic_parameters) {
+    info->scope->types[param] = -2;
+  }
+
+
+  auto block = parse_block(info->scope);
+  
 
   for (auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
@@ -1786,11 +1805,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   decl->fields = fields;
   decl->methods = methods;
   decl->structs = structs;
-  decl->scope = block->scope;
-
-  type = global_get_type(type_id);
-  auto info = (type->get_info()->as<UnionTypeInfo>());
-  info->scope = scope;
 
   end_node(decl, range);
   return decl;
