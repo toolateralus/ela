@@ -1,0 +1,7 @@
+S :: struct![T] {}
+
+#alias SINT :: S![int];
+
+main :: fn() {
+  sint: SINT;
+}

@@ -1,21 +1,16 @@
-#foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
 
-insert_at :: fn(arr: s64[]*, v: s64, idx: s64) {
-  if idx < 0 || idx > arr.length {
-    return;
-  }
+/* 
+    Error:
+          Unable to create type alias: target type does not exist.
+  --------------------------------------------------------------------------------
 
-  (*arr) ~= 0;
+  /home/josh_arch/source/ela/rope/main.ela:1:1
+  --------------------------------------------------------------------------------
+  #import core;
+  ^
+*/
+ Result :: (int, string);
 
-  memmove(
-    arr.data + idx + 1, //! BUG::: The pointer arithmetic here crashes the compiler
-    arr.data + idx,
-    (arr.length - idx - 1) * sizeof(s64)
-  );
-
-  (*arr)[idx] = v;
-}
-
-main :: fn() {
+main :: fn () {
 
 }

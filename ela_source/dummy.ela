@@ -1,7 +1,5 @@
-JsonTokenType :: enum {
-  Comma,
-}
-
 main :: fn() {
-  tokenTypeNames : int[JsonTokenType::Comma + 1];
+  buffer: char[20];
+  index: int = 0;
+  buffer[index] = '0';
 }

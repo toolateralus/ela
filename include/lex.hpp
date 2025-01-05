@@ -1,6 +1,5 @@
 #pragma once
 
-#include "interned_string.hpp"
 #include <deque>
 #include <filesystem>
 #include <fstream>
@@ -8,6 +7,8 @@
 #include <string>
 #include <unordered_map>
 #include <vector>
+
+#include "interned_string.hpp"
 
 enum struct TType {
   Eof = -1,
@@ -29,7 +30,7 @@ enum struct TType {
   Semi,
 
   Not,
-  BitwiseNot,
+  LogicalNot,
   Or,
   And,
   SHL,
@@ -98,15 +99,18 @@ enum struct TType {
   Switch,
   Fn,
 
+  GenericBrace, // '!<' for ![T, T1]
+  As,           // 'as' for casting
 };
 
-#define TTYPE_CASE(type)                                                       \
-  case TType::type:                                                            \
+#define TTYPE_CASE(type)                                                                                               \
+  case TType::type:                                                                                                    \
     return #type
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Char);
+    TTYPE_CASE(GenericBrace);
     TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
     TTYPE_CASE(Switch);
@@ -158,8 +162,8 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Eof);
     TTYPE_CASE(DoubleColon);
     TTYPE_CASE(Dot);
+    TTYPE_CASE(LogicalNot);
     TTYPE_CASE(Not);
-    TTYPE_CASE(BitwiseNot);
 
     TTYPE_CASE(Increment);
     TTYPE_CASE(Decrement);
@@ -186,6 +190,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
     TTYPE_CASE(Dollar);
+    TTYPE_CASE(As);
   }
   return "Unknown";
 }
@@ -199,8 +204,7 @@ enum struct TFamily {
 
 struct SourceLocation {
   SourceLocation() {}
-  SourceLocation(size_t line, size_t column, std::size_t file)
-      : line(line), column(column), file(file) {}
+  SourceLocation(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
   size_t line = 0, column = 0;
   size_t file = 0;
 
@@ -208,50 +212,41 @@ struct SourceLocation {
     static std::vector<std::string> files;
     return files;
   }
-  std::string ToString() const {
-    return files()[file] + ":" + std::to_string(line) + ":" +
-           std::to_string(column);
-  }
+  std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
 };
 
 struct Token {
   inline bool is_relational() const {
     switch (type) {
-    case TType::LT:
-    case TType::GT:
-    case TType::EQ:
-    case TType::NEQ:
-    case TType::LE:
-    case TType::GE:
-    case TType::LogicalOr:
-    case TType::LogicalAnd:
-      return true;
-    default:
-      return false;
+      case TType::LT:
+      case TType::GT:
+      case TType::EQ:
+      case TType::NEQ:
+      case TType::LE:
+      case TType::GE:
+      case TType::LogicalOr:
+      case TType::LogicalAnd:
+        return true;
+      default:
+        return false;
     }
   }
   inline bool is_comp_assign() const {
-    return type == TType::CompAdd || type == TType::CompSub ||
-           type == TType::CompMul || type == TType::CompDiv ||
-           type == TType::CompMod || type == TType::CompAnd ||
-           type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR ||
-           type == TType::Concat || type == TType::Erase;
+    return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
+           type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
+           type == TType::CompSHL || type == TType::CompSHR || type == TType::Concat || type == TType::Erase;
   }
 
   Token() {}
 
-  Token(SourceLocation location, InternedString value, TType type,
-        TFamily family)
-      : value(std::move(value)), type(type), family(family),
-        location(location) {}
+  Token(SourceLocation location, InternedString value, TType type, TFamily family)
+      : value(std::move(value)), type(type), family(family), location(location) {}
   InternedString value;
   TType type;
   TFamily family;
   SourceLocation location;
   static Token &Eof() {
-    static Token eof =
-        Token(SourceLocation(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
+    static Token eof = Token(SourceLocation(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
     return eof;
   }
 
@@ -259,70 +254,54 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
-      // control flow
-      {"in", TType::In},
-      {"fn", TType::Fn},
-      {"switch", TType::Switch},
-      {"then", TType::Then},
-      {"return", TType::Return},
-      {"break", TType::Break},
-      {"continue", TType::Continue},
-      {"for", TType::For},
-      {"while", TType::While},
-      {"if", TType::If},
-      {"else", TType::Else},
-      // type declarations
-      {"struct", TType::Struct},
-      {"union", TType::Union},
-      {"enum", TType::Enum},
-      // literals
-      {"true", TType::True},
-      {"false", TType::False},
-      {"null", TType::Null},
-      // intrinsic functions
-      {"new", TType::New},
-      {"delete", TType::Delete},
-  };
+    // control flow
+    {"in", TType::In},
+    {"fn", TType::Fn},
+    {"switch", TType::Switch},
+    {"then", TType::Then},
+    {"return", TType::Return},
+    {"break", TType::Break},
+    {"continue", TType::Continue},
+    {"for", TType::For},
+    {"while", TType::While},
+    {"if", TType::If},
+    {"else", TType::Else},
+    // type declarations
+    {"struct", TType::Struct},
+    {"union", TType::Union},
+    {"enum", TType::Enum},
+    // literals
+    {"true", TType::True},
+    {"false", TType::False},
+    {"null", TType::Null},
+    // intrinsic functions
+    {"new", TType::New},
+    {"delete", TType::Delete},
+    {"as", TType::As},
+};
 
-  static std::unordered_map<std::string, TType> operators {
-      {":", TType::Colon},        {"~=", TType::Concat},
-      {"~~", TType::Erase},       {"$", TType::Dollar},
-      {":=", TType::ColonEquals}, {"...", TType::Varargs},
-      {"#", TType::Directive},    {".", TType::Dot},
-      {"!", TType::Not},          {"~", TType::BitwiseNot},
-      {"::", TType::DoubleColon}, {"->", TType::Arrow},
-      {"..", TType::Range},       {"+", TType::Add},
-      {"-", TType::Sub},          {"*", TType::Mul},
-      {"/", TType::Div},          {"%", TType::Modulo},
-      {"=", TType::Assign},       {",", TType::Comma},
-      {";", TType::Semi},         {"(", TType::LParen},
-      {")", TType::RParen},       {"{", TType::LCurly},
-      {"}", TType::RCurly},       {"|", TType::Or},
-      {"&", TType::And},          {"||", TType::LogicalOr},
-      {"&&", TType::LogicalAnd},  {"<<", TType::SHL},
-      {">>", TType::SHR},         {"^", TType::Xor},
-      {"<", TType::LT},           {">", TType::GT},
-      {"==", TType::EQ},          {"!=", TType::NEQ},
-      {"<=", TType::LE},          {">=", TType::GE},
-      {"[", TType::LBrace},       {"]", TType::RBrace},
-      {"++", TType::Increment},   {"--", TType::Decrement},
+static std::unordered_map<std::string, TType> operators{
+    {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
+    {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
+    {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},
+    {"..", TType::Range},       {"+", TType::Add},        {"-", TType::Sub},          {"*", TType::Mul},
+    {"/", TType::Div},          {"%", TType::Modulo},     {"=", TType::Assign},       {",", TType::Comma},
+    {";", TType::Semi},         {"(", TType::LParen},     {")", TType::RParen},       {"{", TType::LCurly},
+    {"}", TType::RCurly},       {"|", TType::Or},         {"&", TType::And},          {"||", TType::LogicalOr},
+    {"&&", TType::LogicalAnd},  {"<<", TType::SHL},       {">>", TType::SHR},         {"^", TType::Xor},
+    {"<", TType::LT},           {">", TType::GT},         {"==", TType::EQ},          {"!=", TType::NEQ},
+    {"<=", TType::LE},          {">=", TType::GE},        {"[", TType::LBrace},       {"]", TType::RBrace},
+    {"++", TType::Increment},   {"--", TType::Decrement},
 
-      {"+=", TType::CompAdd},     {"-=", TType::CompSub},
-      {"*=", TType::CompMul},     {"/=", TType::CompDiv},
-      {"%=", TType::CompMod},     {"&=", TType::CompAnd},
-      {"|=", TType::CompOr},      {"^=", TType::CompXor},
-      {"<<=", TType::CompSHL},    {">>=", TType::CompSHR}};
-
+    {"+=", TType::CompAdd},     {"-=", TType::CompSub},   {"*=", TType::CompMul},     {"/=", TType::CompDiv},
+    {"%=", TType::CompMod},     {"&=", TType::CompAnd},   {"|=", TType::CompOr},      {"^=", TType::CompXor},
+    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR},  {"![", TType::GenericBrace}};
 
 struct Lexer {
   struct State {
+    bool operator==(const Lexer::State &other) const { return other.input == input; }
 
-    bool operator==(const Lexer::State &other) const {
-      return other.input == input;
-    }
-
-    State(const std::string &input, size_t file_idx, size_t input_len,
-          const std::filesystem::path &path)
+    State(const std::string &input, size_t file_idx, size_t input_len, const std::filesystem::path &path)
         : input(input), file_idx(file_idx), path(path), input_len(input_len) {}
 
     std::string input{};
@@ -334,9 +313,7 @@ struct Lexer {
     size_t file_idx{};
     size_t input_len{};
 
-    static State from_string(const std::string &input) {
-      return State(input, 0, input.length(), "");
-    }
+    static State from_string(const std::string &input) { return State(input, 0, input.length(), ""); }
 
     static State from_file(const std::string &filename) {
       auto canonical = std::filesystem::canonical(filename);
@@ -344,8 +321,7 @@ struct Lexer {
       std::filesystem::current_path(canonical.parent_path());
 
       if (!std::filesystem::exists(canonical)) {
-        printf("File %s does not exist. Quitting..",
-               canonical.string().c_str());
+        printf("File %s does not exist. Quitting..", canonical.string().c_str());
         exit(1);
       }
 
@@ -370,6 +346,5 @@ struct Lexer {
     }
   };
 
-  
   void get_token(State &state);
 };

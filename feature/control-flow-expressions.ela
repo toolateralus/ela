@@ -22,14 +22,14 @@ main :: fn() {
   index_of := for i in 0..arr.length {
     if arr[i] == value then return i;
   } #or_else {
-    return 0;
+    return -1;
   }
 
   // Same thing for these.
   index_of := while i < arr.length {
     if arr[i] == value then return i;
   } #or_else {
-    return 0;
+    return -1;
   } 
 }
 

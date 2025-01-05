@@ -1,9 +1,11 @@
 #include "visitor.hpp"
+
+#include <any>
+
 #include "ast.hpp"
 #include "core.hpp"
 #include "lex.hpp"
 #include "type.hpp"
-#include <any>
 
 std::any SerializeVisitor::visit(ASTProgram *node) {
   ss << indent() << "Program {\n";
@@ -20,8 +22,7 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
 
   ss << indent() << "flags: " << block_flags_to_string(node->flags) << '\n';
   auto type = global_get_type(node->return_type);
-  if (type)
-    ss << indent() << "type: " << type->to_string() << '\n';
+  if (type) ss << indent() << "type: " << type->to_string() << '\n';
 
   indentLevel++;
   for (auto statement : node->statements) {
@@ -32,17 +33,15 @@ std::any SerializeVisitor::visit(ASTBlock *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
-
-  if ((node->flags & FUNCTION_IS_CTOR) != 0 ||
-      (node->flags & FUNCTION_IS_DTOR) != 0) {
+  if ((node->flags & FUNCTION_IS_CTOR) != 0 || (node->flags & FUNCTION_IS_DTOR) != 0) {
     ss << indent() << "constructor: ";
     node->params->accept(this);
     return {};
   }
 
-  ss << indent() << "Function " << node->name.value.get_str() << " {\n";
+  ss << indent() << "Function " << node->name.get_str() << " {\n";
   indentLevel++;
-  auto sym = context.scope->lookup(node->name.value);
+  auto sym = context.scope->lookup(node->name);
   // ss << indent() << "type: " << global_get_type(sym->type_id)->to_string() <<
   // '\n';
   visit(node->params);
@@ -78,7 +77,7 @@ std::any SerializeVisitor::visit(ASTParamDecl *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTDeclaration *node) {
-  ss << indent() << "Declaration " << node->name.value.get_str() << " : ";
+  ss << indent() << "Declaration " << node->name.get_str() << " : ";
   node->type->accept(this);
   if (node->value.is_not_null()) {
     ss << " = ";
@@ -120,12 +119,9 @@ std::any SerializeVisitor::visit(ASTLiteral *node) {
 std::any SerializeVisitor::visit(ASTType *node) {
   if (node->resolved_type != -1) {
     auto type = global_get_type(node->resolved_type);
-    ss << "type: " << node->resolved_type << ", " << type->get_base().get_str()
-       << " " << type->get_ext().to_string();
+    ss << "type: " << node->resolved_type << ", " << type->get_base().get_str() << " " << type->get_ext().to_string();
     return {};
   }
-  ss << node->base.get_str();
-  ss << node->extension_info.to_string();
   return {};
 }
 std::any SerializeVisitor::visit(ASTArguments *node) {
@@ -133,8 +129,7 @@ std::any SerializeVisitor::visit(ASTArguments *node) {
   indentLevel++;
   bool first = true;
   for (auto arg : node->arguments) {
-    if (!first)
-      ss << ", ";
+    if (!first) ss << ", ";
     first = false;
     arg->accept(this);
   }
@@ -143,26 +138,26 @@ std::any SerializeVisitor::visit(ASTArguments *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTCall *node) {
-  ss << indent() << "Call " << node->function
-     << " type: " << global_get_type(node->type)->to_string() << " {\n";
+  ss << indent() << "Call " << node->function << " type: " << global_get_type(node->type)->to_string() << " {\n";
   indentLevel++;
   visit(node->arguments);
   indentLevel--;
   ss << indent() << "}\n";
   return {};
 }
-std::string SerializeVisitor::indent() {
-  return std::string(indentLevel * 2, ' ');
-}
+std::string SerializeVisitor::indent() { return std::string(indentLevel * 2, ' '); }
 std::any SerializeVisitor::visit(ASTReturn *node) {
   ss << indent() << "Return: ";
-  if (node->expression.is_not_null())
-    node->expression.get()->accept(this);
+  if (node->expression.is_not_null()) node->expression.get()->accept(this);
   ss << indent() << '\n';
   return {};
 }
 std::any SerializeVisitor::visit(ASTContinue *node) {
   ss << indent() << "Continue\n";
+  return {};
+}
+std::any SerializeVisitor::visit(ASTAlias *node) {
+  ss << indent() << "Alias\n";
   return {};
 }
 std::any SerializeVisitor::visit(ASTBreak *node) {
@@ -212,8 +207,7 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   ss << indent() << "While {\n";
   indentLevel++;
   ss << indent() << "condition: ";
-  if (node->condition.is_not_null())
-    node->condition.get()->accept(this);
+  if (node->condition.is_not_null()) node->condition.get()->accept(this);
   ss << '\n';
 
   node->block->accept(this);
@@ -222,13 +216,13 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
-  auto t = global_get_type(node->type->resolved_type);
-  auto info = static_cast<StructTypeInfo *>(t->get_info());
+  auto t = global_get_type(node->resolved_type);
+  auto info = (t->get_info()->as<StructTypeInfo>());
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
 
   if (!is_anonymous) {
     ss << indent() << "Struct ";
-    ss << node->type->base.get_str();
+    ss << node->name.get_str();
     ss << " {\n";
   } else {
     ss << indent() << "anonymous struct" << '\n';
@@ -292,12 +286,11 @@ std::any SerializeVisitor::visit(ASTInitializerList *node) {
 
 std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
   ss << "enum : ";
-  ss << node->type->base.get_str();
+  ss << node->name.get_str();
   for (const auto &[key, value] : node->key_values) {
     ss << "\nkey: " << key.get_str();
     ss << "value: ";
-    if (value.is_not_null())
-      value.get()->accept(this);
+    if (value.is_not_null()) value.get()->accept(this);
   }
   return {};
 }
@@ -345,6 +338,7 @@ std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visi
 std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }
@@ -369,10 +363,8 @@ std::any SerializeVisitor::visit(ASTUnionDeclaration *node) {
 
 std::any SerializeVisitor::visit(ASTAllocate *node) {
   ss << "allocation: ";
-  if (node->type)
-    node->type.get()->accept(this);
-  if (node->arguments)
-    node->arguments.get()->accept(this);
+  if (node->type) node->type.get()->accept(this);
+  if (node->arguments) node->arguments.get()->accept(this);
   return {};
 }
 
@@ -381,13 +373,7 @@ std::any SerializeVisitor::visit(ASTScopeResolution *node) {
   ss << "::" << node->member_name.get_str();
   return {};
 }
-
-
-// TODO: implement me. Im lazy and this takes a while and uses up my hands!
+// TODO: implement me.
 std::any SerializeVisitor::visit(ASTTuple *node) { return {}; }
-std::any ASTStatementList::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-}
-ASTNodeType ASTStatementList::get_node_type() const {
-  return AST_NODE_STATEMENT_LIST;
-}
+std::any ASTStatementList::accept(VisitorBase *visitor) { return visitor->visit(this); }
+ASTNodeType ASTStatementList::get_node_type() const { return AST_NODE_STATEMENT_LIST; }

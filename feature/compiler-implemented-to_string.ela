@@ -3,6 +3,13 @@ Strukt :: struct {
   a: int;
   b: int;
   c: string;
+
+  /*  The compiler would auto implement::
+    to_string :: fn() -> string {
+      return $"\Strukt { a: {a} b: {b} c: {c} \}";
+    } 
+  */
+
 }
 
 main :: fn() {

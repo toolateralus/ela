@@ -1,41 +1,32 @@
 #pragma once
 
-#include "lex.hpp"
 #include <chrono>
+#include <filesystem>
 #include <format>
 #include <fstream>
 #include <functional>
 #include <iostream>
 #include <sstream>
-#include <filesystem>
 #include <unordered_map>
+
+#include "lex.hpp"
 
 #define MB(n) (n * 1024 * 1024)
 #define GB(n) (n * 1024 * 1024 * 1024)
 
 // simple pointer wrapper that expresses intent about whether a pointer is optional or not
 // without a nasty allocating wrapper like std::optional (which is also annoying to type)
-template<class T>
+template <class T>
 struct Nullable {
   ~Nullable() = default;
   Nullable() {}
   Nullable(T *ptr) : ptr(ptr) {}
-  T *ptr {};
-  T *get() const {
-    return ptr;
-  }
-  void set(T *ptr) {
-    this->ptr = ptr;
-  }
-  operator bool() const {
-    return ptr;
-  }
-  bool is_null() const {
-    return ptr == nullptr;
-  }
-  bool is_not_null() const {
-    return ptr != nullptr;
-  }
+  T *ptr{};
+  T *get() const { return ptr; }
+  void set(T *ptr) { this->ptr = ptr; }
+  operator bool() const { return ptr; }
+  bool is_null() const { return ptr == nullptr; }
+  bool is_not_null() const { return ptr != nullptr; }
 };
 
 struct ASTProgram;
@@ -46,48 +37,45 @@ struct CompilationMetric {
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;
   std::chrono::time_point<std::chrono::high_resolution_clock> end_time;
   std::chrono::duration<double> duration;
-  void begin() {
-    start_time = std::chrono::high_resolution_clock::now();
-  }
+  void begin() { start_time = std::chrono::high_resolution_clock::now(); }
   void end(const std::string &note) {
     id = note;
     end_time = std::chrono::high_resolution_clock::now();
     duration = end_time - start_time;
   }
-  
+
   std::string get_time() {
-      auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
-      if (ms >= 1000) {
-          auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
-          return std::to_string(sec) + " s";
-      } else if (ms >= 1) {
-          return std::to_string(ms) + " ms";
-      } else {
-          auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
-          return std::to_string(us) + " µs";
-      }
+    auto ms = std::chrono::duration_cast<std::chrono::milliseconds>(duration).count();
+    if (ms >= 1000) {
+      auto sec = std::chrono::duration_cast<std::chrono::seconds>(duration).count();
+      return std::to_string(sec) + " s";
+    } else if (ms >= 1) {
+      return std::to_string(ms) + " ms";
+    } else {
+      auto us = std::chrono::duration_cast<std::chrono::microseconds>(duration).count();
+      return std::to_string(us) + " µs";
+    }
   }
 };
 
 struct CompileCommand {
-  
-   void print_metrics() {
-      if (has_flag("metrics")) {
-        std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
-        std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
-        std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
-      }
+  void print_metrics() {
+    if (has_flag("metrics")) {
+      std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
+      std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
+      std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
+    }
   }
-  
+
   CompilationMetric parse;
   CompilationMetric lower;
   CompilationMetric cpp;
-  
+
   CompileCommand() = default;
   std::filesystem::path input_path;
   std::filesystem::path output_path;
   std::filesystem::path binary_path;
-  std::filesystem::path original_path; // where the compiler was invoked from
+  std::filesystem::path original_path;  // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
   std::string compilation_flags;
   inline void print() const {
@@ -96,11 +84,10 @@ struct CompileCommand {
     std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;
     std::cout << "\033[1;32mFlags:\033[0m" << std::endl;
     for (const auto &flag : flags) {
-      std::cout << "  \033[1;34m--" << flag.first
-                << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
+      std::cout << "  \033[1;34m--" << flag.first << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
     }
   }
-  inline void add_compilation_flag(const std::string &flags)  {
+  inline void add_compilation_flag(const std::string &flags) {
     this->compilation_flags += flags;
     if (!this->compilation_flags.ends_with(' ')) {
       this->compilation_flags += ' ';
@@ -108,8 +95,9 @@ struct CompileCommand {
   }
   inline CompileCommand(int argc, char *argv[]) {
     if (argc < 2) {
-      printf("\033[31mUsage: <input.ela> (optional)::[-o "
-                                  "<output.cpp>] [--flag]\033[0m\n");
+      printf(
+          "\033[31mUsage: <input.ela> (optional)::[-o "
+          "<output.cpp>] [--flag]\033[0m\n");
     }
 
     for (int i = 1; i < argc; ++i) {
@@ -129,18 +117,16 @@ struct CompileCommand {
     }
 
     std::filesystem::path input_fs_path(input_path);
-    
+
     if (!std::filesystem::exists(input_fs_path)) {
-      printf("%s\n", (std::format(
-          "\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
+      printf("%s\n", (std::format("\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
       exit(1);
     }
 
     std::filesystem::path parent_path = input_fs_path.parent_path();
     if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
-      printf("%s\n", std::format(
-          "\033[31mError: Parent directory '{}' does not exist.\033[0m",
-          parent_path.string()).c_str());
+      printf("%s\n",
+             std::format("\033[31mError: Parent directory '{}' does not exist.\033[0m", parent_path.string()).c_str());
       exit(1);
     }
 
@@ -175,16 +161,11 @@ extern CompileCommand compile_command;
 extern std::vector<Token> all_tokens;
 
 struct SourceRange {
-
   inline bool empty() const {
-    return begin < 0 || end < 0 ||
-           begin > end ||
-           begin == end ||
-           begin > all_tokens.size() ||
-           end > all_tokens.size(); 
+    return begin < 0 || end < 0 || begin > end || begin == end || begin > all_tokens.size() || end > all_tokens.size();
   }
   int64_t begin, end;
-  int64_t begin_loc, end_loc;
+  int64_t begin_loc;
   std::vector<Token> get_tokens() const {
     int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
     int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
@@ -200,7 +181,7 @@ static std::string get_source_filename(const SourceRange &range) {
   auto tokens = range.get_tokens();
   if (tokens.empty()) {
     return "";
-  } 
+  }
   auto token = tokens[0];
   auto location = token.location;
   return location.files()[location.file];
@@ -209,16 +190,12 @@ static std::string get_source_filename(const SourceRange &range) {
 struct Defer {
   const std::function<void()> func;
   Defer(const std::function<void()> &&func) : func(func) {}
-  ~Defer() {
-    func();
-  }
+  ~Defer() { func(); }
 };
 
-
-template <class T> struct std::formatter<std::vector<T>> {
-  constexpr auto parse(std::format_parse_context &context) {
-    return context.begin();
-  }
+template <class T>
+struct std::formatter<std::vector<T>> {
+  constexpr auto parse(std::format_parse_context &context) { return context.begin(); }
   auto format(const std::vector<T> &sVal, std::format_context &context) const {
     auto out = context.out();
     out = std::format_to(out, "[");
@@ -231,4 +208,48 @@ template <class T> struct std::formatter<std::vector<T>> {
     out = std::format_to(out, "]");
     return out;
   }
+};
+
+
+template <class T>
+requires(std::is_enum_v<T>)
+struct Flags {
+  using underlying = std::underlying_type_t<T>;
+  Flags() = default;
+  Flags(T value) : value(static_cast<underlying>(value)) {}
+  Flags(underlying value) : value(value) {}
+
+  inline Flags &operator|=(T other) {
+    value |= static_cast<underlying>(other);
+    return *this;
+  }
+  inline Flags &operator&=(T other) {
+    value &= static_cast<underlying>(other);
+    return *this;
+  }
+  inline Flags operator|(T other) const {
+    return Flags(value | static_cast<underlying>(other));
+  }
+  inline Flags operator&(T other) const {
+    return Flags(value & static_cast<underlying>(other));
+  }
+
+  inline Flags &operator|=(underlying other) {
+    value |= other;
+    return *this;
+  }
+  inline Flags &operator&=(underlying other) {
+    value &= other;
+    return *this;
+  }
+  inline Flags operator|(underlying other) const {
+    return Flags(value | other);
+  }
+  inline Flags operator&(underlying other) const {
+    return Flags(value & other);
+  }
+  inline explicit operator bool() const {
+    return value != 0;
+  }
+  underlying value{};
 };

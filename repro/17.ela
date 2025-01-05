@@ -1,6 +1,5 @@
 
-
+// Returning a tuple from a function pointer segfauls the compiler.
 main :: fn() {
-  str : string;
-  str.contains("") // ! crashes during compilation;
+  next: fn * () -> (int, string);
 }

@@ -1,7 +1,7 @@
 #import raylib;
 #import core;
 
-#compiler_flags "-g"
+#c_flags "-g"
 
 /*
   * TODO
@@ -84,13 +84,13 @@ spark_color : Color = {
   YELLOW.r,
   YELLOW.g,
   YELLOW.b,
-  (u8)25
+  25 as u8
 };
 
 bg_color : Color = BLACK;
 
 target_bg_color : Color = {
-  (u8)75, (u8)75, (u8)75,(u8)255,
+  75 as u8, 75 as u8, 75 as u8, 255 as u8,
 }
 
 ParticleKind :: enum {
@@ -102,8 +102,8 @@ RenderInfo :: struct {
   texture: Texture2D;
   tex_rect : Rectangle;
   #ctor :: fn(tex: Texture2D) {
-    w := (float)tex.width;
-    h := (float)tex.height;
+    w := tex.width as float;
+    h := tex.height as float;
     tex_rect = {
       0, 0,
       w, h
@@ -220,25 +220,25 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
 
 // great function name
 get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
-  gray_value : u8 = (u8) clamp(randf() * 255.0, 0, 255);
-  variance :: fn() -> u8 { return (u8)randf() * _variance; };
-  r : u8 = (u8) clamp(gray_value + variance(), 0, 255);
-  g : u8 = (u8) clamp(gray_value + variance(), 0, 255);
-  b : u8 = (u8) clamp(gray_value + variance(), 0, 255);
-  return #make(Color, {r, g, b, (u8)255});
+  gray_value : u8 = clamp(Random::next(1) * 255.0, 0, 255) as u8;
+  variance :: fn() -> u8 { return (Random::next(1) * _variance) as u8; };
+  r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
+  g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
+  b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
+  return #make(Color, {r, g, b, 255 as u8});
 }
 
 random_vector2 :: fn(origin: Vector2, max: float) -> Vector2 {
   result: Vector2;
-  result.x = origin.x + randf() * max;
-  result.y = origin.y + randf() * max;
+  result.x = origin.x + Random::next(1) * max;
+  result.y = origin.y + Random::next(1) * max;
   return origin;
 }
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
   result: Vector2;
-  result.x = origin.x + min.x + randf() * (max.x - min.x);
-  result.y = origin.y + min.y + randf() * (max.y - min.y);
+  result.x = origin.x + min.x + Random::next(1) * (max.x - min.x);
+  result.y = origin.y + min.y + Random::next(1) * (max.y - min.y);
   return result;
 }
 
@@ -249,7 +249,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     max_vel := 3.0;
     particle.position = random_vector2(position, max_vel);
     particle.velocity = random_vector2(Vector2{0.0, 0.0}, Vector2{-max_vel, -1.0}, Vector2{max_vel, max_vel});
-    burst : int = (int)randf() * smoke_particle_max_burst;
+    burst : int = (Random::next(1) * smoke_particle_max_burst) as int;
     if can_burst && burst > 1 {
       can_burst = false;
       for _ in 0..burst { make_particle(kind, position, tint); }
@@ -259,7 +259,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
     particle.render_info = smoke_particle_render_info;
     particle.lifetime = 1.0;
-    particle.scale = smoke_particle_init_scale * randf() * 6400.0;
+    particle.scale = smoke_particle_init_scale * Random::next(1) * 6400.0;
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
@@ -309,9 +309,9 @@ update_particle :: fn(particle: Particle*) -> bool {
 enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
   position : Vector2 = {enemy.rect.x, enemy.rect.y};
   if Vector2Distance(position, enemy.target) < 5 || Vector2Equals(zero, enemy.target) {
-    enemy.target = { randf() * screen_width, randf() * screen_height };
+    enemy.target = { Random::next(1) * screen_width, Random::next(1) * screen_height };
     enemy.target.y = clamp(enemy.target.y, 0, screen_height / 1.5);
-    enemy.speed = randf() * enemy_max_speed * round_index;
+    enemy.speed = Random::next(1) * enemy_max_speed * round_index;
   } else {
     direction := Vector2Normalize(Vector2Subtract(enemy.target, position));
     position = Vector2Add(position, Vector2Scale(direction, enemy.speed));
@@ -322,8 +322,8 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 }
 
 make_enemy :: fn() {
-  x := randf() * screen_width;
-  y := randf() * screen_height;
+  x := Random::next(1) * screen_width;
+  y := Random::next(1) * screen_height;
   rect : Rectangle = {x, y, enemy_scale, enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);
@@ -349,7 +349,7 @@ make_bullet :: fn(x: float, y, rotation) {
   }
   rect : Rectangle = {x + offset, y - bullet_scale, bullet_scale, bullet_scale};
   radians := (rotation / 360) * 3.14159265 * 2;
-  direction : Vector2 = {-(float)sin(radians), (float)cos(radians)};
+  direction : Vector2 = {-(sin(radians) as float), cos(radians) as float};
   start_velocity := Vector2Scale(direction, bullet_start_velocity);
   bullets ~= new Bullet(rect, bullet_render_info, start_velocity, rotation);
   make_particle(ParticleKind::Smoke, {rect.x, rect.y}, PINK);
@@ -360,10 +360,10 @@ make_bullet :: fn(x: float, y, rotation) {
 draw_background :: fn() {
   bg_color = color_lerp(bg_color, target_bg_color, 0.25);
   DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
-  now : float = (float)GetTime();
+  now : float = GetTime() as float; 
   t := (now - game_start_time) / fade_in_length;
   if scene == Scene::Game && t < fade_in_length {
-    DrawRectangle(0, 0, (int)screen_width, (int)screen_height, color_lerp(BLACK, CLEAR, t));
+    DrawRectangle(0, 0, screen_width as int, screen_height as int, color_lerp(BLACK, CLEAR, t));
   }
 }
 
@@ -388,7 +388,7 @@ draw_game :: fn() {
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);
   }
   for particle in text_particles {
-    DrawText(particle.text.data, (int)particle.position.x, (int)particle.position.y, particle.font_size, particle.color);
+    DrawText(particle.text.data, particle.position.x as int, particle.position.y as int, particle.font_size, particle.color);
   }
 
   DrawTexturePro(character.texture, character.tex_rect, character.rect, character.origin, character.rotation, WHITE);
@@ -410,7 +410,7 @@ BulletRoutine :: struct {
   spawn :: fn() -> bool {
     timer.interval = interval;
     if timer.tick() {
-      count--;
+      count -= 1;
       PlaySound(shot_sound);
       make_bullet(character.rect.x, character.rect.y, character.rotation); 
       if count == 0 {
@@ -462,8 +462,8 @@ update_game :: fn() {
 
   // advance level.
   if targets_destroyed >= round_base_num_enemies_to_advance * round_index {
-    if round_finish_start_time == -1.0 { round_finish_start_time  = (float)GetTime(); }
-    now : float = (float)GetTime();
+    if round_finish_start_time == -1.0 { round_finish_start_time = GetTime(); }
+    now : float = GetTime() as float;
     if now - round_finish_start_time < 2.0 {
       text : string = $"Round: {round_index + 1}...";
       style := jiggly_text_style;
@@ -524,7 +524,7 @@ update_game :: fn() {
   }
 
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
-    for i in 0..(int)fabs(character.horizontal_velocity * smoke_particle_density) {
+    for i in 0..fabs(character.horizontal_velocity * smoke_particle_density) as s64 {
       make_particle(ParticleKind::Smoke, {
         character.rect.x - 10,
         character.rect.y + (character.rect.height / 3),
@@ -556,8 +556,8 @@ update_game :: fn() {
 
   screen_rect : Rectangle = {
     0.0, 0.0,
-    (float)GetScreenWidth(),
-    (float)GetScreenHeight()
+    GetScreenWidth() as float,
+    GetScreenHeight() as float,
   };
 
   // update bullets and perform collision against enemies.
@@ -601,10 +601,10 @@ update_game :: fn() {
         enemy_pos : Vector2 = {enemy.rect.x, enemy.rect.y};
         character_pos : Vector2 = {character.rect.x, character.rect.y};
         distance := Vector2Distance(enemy_pos, character_pos);
-        amount : int = (int)distance * round_index;
+        amount : int = (distance * round_index) as int;
         score += amount
-        ui_text_color.a = (u8)255;
-        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, (float)clamp(0.5, 3.5, (float)distance));
+        ui_text_color.a = 255 as u8;
+        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as float) as float);
         break;
       }
     }
@@ -634,7 +634,7 @@ update_game :: fn() {
   dead_text_particles : TextParticle*[];
   for particle in text_particles {
     particle.position = Vector2Add(particle.position, {0.1, 0.1});
-    now := (float)GetTime();
+    now := GetTime() as float;
     particle.color.a = lerp(particle.color.a, 0, (now - particle.spawn_time) / particle.lifetime);
     if now - particle.spawn_time >= particle.lifetime {
       dead_text_particles ~= particle;
@@ -654,12 +654,12 @@ init :: fn() {
 
   background_texture = LoadTexture("res/background.png");
 
-  screen_width = (float)GetScreenWidth();
-  screen_height = (float)GetScreenHeight();
+  screen_width =  GetScreenWidth() as float;
+  screen_height = GetScreenHeight() as float;
 
   background_rect = {
     0.0, 0.0,
-    (float)background_texture.width, (float)background_texture.height
+    background_texture.width as float, background_texture.height as float
   };
 
   character.texture = LoadTexture("res/character.png");
@@ -669,8 +669,8 @@ init :: fn() {
   player_smoke_color.g /= 2;
   player_smoke_color.b /= 2;
 
-  w := (float)character.texture.width;
-  h := (float)character.texture.height;
+  w := character.texture.width  as float;
+  h := character.texture.height as float;
   character.tex_rect = {
     0, 0,
     w, h

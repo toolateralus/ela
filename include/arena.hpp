@@ -13,40 +13,40 @@
  * std::runtime_error is thrown.
  */
 
-#include <cstddef>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
+#include <cstddef>
+
 namespace jstl {
-  struct Arena final {
-    Arena() = delete;
+struct Arena final {
+  Arena() = delete;
 
-    Arena(const Arena &) = delete;
-    Arena(Arena &&) = delete;
-    Arena &operator=(const Arena &) = delete;
-    Arena &operator=(Arena &&) = delete;
+  Arena(const Arena &) = delete;
+  Arena(Arena &&) = delete;
+  Arena &operator=(const Arena &) = delete;
+  Arena &operator=(Arena &&) = delete;
 
-    inline Arena(size_t capacity)
-        : capacity(capacity), data(new char[capacity]), ptr(0) {}
+  inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
-    inline ~Arena() { delete[] data; }
+  inline ~Arena() { delete[] data; }
 
-    inline char *allocate(size_t size_in_bytes) {
-      size_t alignment = alignof(std::max_align_t);
-      size_t aligned_ptr = (ptr + alignment - 1) & ~(alignment - 1);
-      if (aligned_ptr + size_in_bytes > capacity) {
-        printf("failed to allocate in arena");
-        exit(1);
-      }
-      char *mem = (char *)data + aligned_ptr;
-      ptr = aligned_ptr + size_in_bytes;
-      return mem;
+  inline char *allocate(size_t size_in_bytes) {
+    size_t alignment = alignof(std::max_align_t);
+    size_t aligned_ptr = (ptr + alignment - 1) & ~(alignment - 1);
+    if (aligned_ptr + size_in_bytes > capacity) {
+      printf("failed to allocate in arena");
+      exit(1);
     }
+    char *mem = (char *)data + aligned_ptr;
+    ptr = aligned_ptr + size_in_bytes;
+    return mem;
+  }
 
-  private:
-    const size_t capacity;
-    const char *data;
-    size_t ptr = 0;
-  };
-}
+ private:
+  const size_t capacity;
+  const char *data;
+  size_t ptr = 0;
+};
+}  // namespace jstl

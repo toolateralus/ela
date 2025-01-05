@@ -1,11 +1,12 @@
 #pragma once
-#include "string_builder.hpp"
+#include <any>
+#include <sstream>
+
 #include "ast.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
-#include <any>
-#include <sstream>
+#include "string_builder.hpp"
 
 struct VisitorBase {
   enum VisitorFlags {
@@ -17,7 +18,7 @@ struct VisitorBase {
   DECLARE_VISIT_BASE_METHODS()
 
   virtual std::any visit(ASTStatementList *node) {
-    for (const auto &stmt: node->statements) {
+    for (const auto &stmt : node->statements) {
       stmt->accept(this);
     }
     return {};
@@ -61,24 +62,31 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
+  std::any visit(ASTTuple *node) override;
+  std::any visit(ASTAlias *node) override;
+
   // TODO: implement me.
+
   std::any visit(ASTRange *node) override { return {}; }
   std::any visit(ASTSwitch *node) override { return {}; };
-  std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override { return {}; };
-  
 };
 
 struct Typer : VisitorBase {
+  Nullable<Symbol> get_symbol(ASTNode *);
 
   int declaring_or_assigning_type = -1;
 
+  template <typename T>
+  int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
+                    std::vector<int> args);
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
+  std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTProgram *node) override;
@@ -94,8 +102,17 @@ struct Typer : VisitorBase {
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
-  void find_function_overload(ASTCall *&node, Symbol *&symbol,
-                              std::vector<int> &arg_tys, Type *&type);
+  int get_function_type(ASTFunctionDeclaration *);
+  void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
+  std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
+  // For generics.
+  int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
+                                 std::vector<int> generic_args = {});
+  int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+                               std::vector<int> generic_args = {});
+  int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
+                                   std::vector<int> generic_args = {});
+
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
@@ -116,6 +133,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
+  std::any visit(ASTAlias *node) override;
   InternedString type_name(ASTExpr *node);
 };
 
@@ -123,6 +141,7 @@ struct Emitter : VisitorBase {
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
+  std::vector<int> generic_arguments;
   int num_tests = 0;
 
   std::vector<std::function<void()>> pending_statements;
@@ -139,6 +158,9 @@ struct Emitter : VisitorBase {
 
   int indentLevel = 0;
   Context &ctx;
+
+  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
+                               compile_command.compilation_flags.contains("-nostdlib");
 
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
@@ -159,22 +181,16 @@ struct Emitter : VisitorBase {
         return;
       }
 
-      (*ss) << std::string{"\n#line "} << std::to_string(loc)
-            << std::string{" \""} << filename << std::string{"\"\n"};
+      (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline Emitter(Context &context, Typer &type_visitor)
-      : type_visitor(type_visitor), ctx(context) {
-    ss = &code;
-  }
+  inline Emitter(Context &context, Typer &type_visitor) : type_visitor(type_visitor), ctx(context) { ss = &code; }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
-  inline void indentedln(const std::string &s) {
-    (*ss) << indent() << s + '\n';
-  }
+  inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
   inline void newline() { (*ss) << '\n'; }
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
@@ -185,21 +201,22 @@ struct Emitter : VisitorBase {
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
 
-  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node,
-                            bool test_flag);
-
-  void
-  emit_function_pointer_type_string(Type *type,
-                                    Nullable<std::string> identifier = nullptr);
-  std::string to_cpp_string(const TypeExt &ext, const std::string &base);
+  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
+  std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
 
-  std::string get_type_struct(Type *type, int id, Context &context,
-                              const std::string &fields);
-  std::string get_field_struct(const std::string &name, Type *type,
-                               Type *parent_type, Context &context);
+  std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
+  std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
+
+  void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition,
+                            Nullable<ASTBlock> block);
+
+  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
+  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
+                                                             Type *type);
+  std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
@@ -207,13 +224,6 @@ struct Emitter : VisitorBase {
   std ::any visit(ASTFunctionDeclaration *node) override;
   std ::any visit(ASTParamsDecl *node) override;
   std ::any visit(ASTParamDecl *node) override;
-  void emit_condition_block(ASTNode *node, const std::string &keyword,
-                            Nullable<ASTExpr> condition,
-                            Nullable<ASTBlock> block);
-  void emit_function_pointer_dynamic_array_declaration(
-      const std::string &type_string, const std::string &name, Type *type);
-  void get_declaration_type_signature_and_identifier(const std::string &name,
-                                                     Type *type);
 
   std ::any visit(ASTDeclaration *node) override;
   std ::any visit(ASTExprStatement *node) override;
@@ -243,9 +253,10 @@ struct Emitter : VisitorBase {
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTScopeResolution *node) override;
+  std::any visit(ASTAlias *node) override;
 
   std::any visit(ASTStatementList *node) override {
-    for (const auto &stmt: node->statements) {
+    for (const auto &stmt : node->statements) {
       stmt->accept(this);
       (*ss) << ";";
     }

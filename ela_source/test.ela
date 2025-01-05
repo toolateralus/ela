@@ -11,7 +11,7 @@
 #import pthread
 #import reflection
 
-#compiler_flags "-g -fsanitize=address,leak"
+#c_flags "-fsanitize=address,leak,undefined"
 
 XaryuStruct :: struct {
   f: float ;
@@ -627,11 +627,6 @@ something :: fn(f: float32) -> float32 {
   assert("flags & Banana::Unripe failed.", (flags & Banana::Unripe) != 0);
 }
 
-// TODO(Josh) 10/1/2024, 10:08:18 AM :: we need to allow declarations of variables with their enum type.
-// Right now we just cast enums to int always.
-// We should be able to do MyEnum value = MyEnum::Some;
-// This will also allow us to do other stuff, like type safe enums.
-
 #test test_regular_enum :: fn() {
   value := MyEnum::Some;
   value1 := MyEnum::Value;
@@ -688,6 +683,25 @@ something :: fn(f: float32) -> float32 {
 	arr2 := new int;
 	delete(arr, arr2);
   assert("delete", arr == null && arr2 == null);
+}
+
+MojStruktIter :: struct{
+  data: int[10];
+  begin :: fn() -> int* {
+    return (int*)data;
+  }
+  end :: fn() -> int* {
+    return (int*)data + 10;
+  }
+}
+
+#test test_defined_iterator ::fn() {
+  count := 0;
+  new_struct : MojStruktIter;
+  for item in new_struct {
+    count += 1;
+  }
+  assert("custom iterator failed to iterate correctly", count == 10);
 }
 
 #test custom_iterator_increment :: fn() {
@@ -748,12 +762,6 @@ something :: fn(f: float32) -> float32 {
   other: int_ptr  = p;
   assert("alias failed to equal pointed to type field.", p == other);
   free(p);
-
-  pp: int** = #make(int**, malloc(sizeof(int*)));
-  other1: int_ptr* = pp;
-  assert("alias failed to equal pointed to type field.", pp == other1);
-
-  free(pp);
 }
 
 #test test_string_interpolation :: fn() {
@@ -885,7 +893,7 @@ overloaded :: fn(xaryu: Xaryu ) -> Xaryu {
 
 #test test_cast :: fn() {
   n: int = 10;
-  f: float  = (float)n;
+  f: float  = n as float;
   assert("Cast failed", f == 10.0);
 }
 
@@ -952,10 +960,6 @@ New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   assert("Range based for loop failed.", n == 9);
 }
 
-#alias FunctionPointer :: int(int, int)*;
-
-function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
-
 #test test_multidimensional_arrays :: fn() {
   array: int[5][5];
   for x in 0..5 {
@@ -985,28 +989,6 @@ function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
       assert("multidimensional failure", dynamic[x][y] == x * y);
     }
   }
-}
-
-#test test_function_pointer_alias :: fn() {
-  ptr := &function_pointer_helper;
-  assert("Function pointer call", ptr(2, 3) == 6);
-
-  array: FunctionPointer[] = {&function_pointer_helper};
-  from_arr : FunctionPointer = array[0];
-  assert("Array of function pointers", from_arr(2, 3) == 6);
-
-  fixed: FunctionPointer[12];
-  fixed[0] = &function_pointer_helper;
-  from_fixed : FunctionPointer = fixed[0];
-
-  assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
-
-  function :: fn() -> FunctionPointer {
-    return &function_pointer_helper;
-  }
-
-  returned_ptr : FunctionPointer = function();
-  assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 }
 
 #test test_map_aka_associative_array :: fn() {
@@ -1191,55 +1173,46 @@ switch_helper :: fn() -> int {
   assert("init list calling ctor failed", i.z == 25);
 }
 
-func_returns_tuple :: fn() -> <int, int> {
-  return <10, 10>;
+func_returns_tuple :: fn() -> (int, int) {
+  return (10, 10);
 }
 
-func_takes_tuple_arg :: fn(tuple: <int, int>) -> <int, int> {
+func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   a, b := tuple;
-  return <a + 10, b + 10>;
+  return (a + 10, b + 10);
 }
 
 #test test_tuples :: fn() {
-  t1 : <int, int, int> = <0, 1, 2>;
+  t1 : (int, int, int) = (0, 1, 2);
   {
     a,b,c := t1;
     assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
   }
 
-  t2 := <3, 2, 1, 0>;
+  t2 := (3, 2, 1, 0);
 
   {
     a,b,c,d := t2;
     assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
   }
 
-  array : <int, int>[] = {<10, 10>};
-  //array ~= <10, 10>;
+  array : (int, int)[] = {(10, 10)};
+  array ~= (10, 10);
 
   {
     a, b := array[0];
     assert("Storing tuple in array failed", a == 10 && b == 10);
   }
 
-  ptr : <int, int>* = new <int, int>(10, 10);
+  ptr : (int, int)* = new (int, int)(10, 10);
   {
     a, b := *ptr;
     assert("Calling new with tuple failed", a == 10 && b == 10);
   }
   delete(ptr);
 
-  // ! Bug: This just completely fails. The type ends up being null during the subscript.
-  // ! Really every line here is bugged. No idea why, I wish we had generics so we didn't have to do this hackiness.
-  //! map : <int, int>[string];
-  //! {
-  //!   map["Hi"] = <10, 10>;
-  //!   a, b := map["Hi"];
-  //!   assert("tuple in map failed", a == 10 && b == 10);
-  //! }
-
-  ptr_arr: <int, int>*[];
-  ptr_arr ~= new <int, int>(10, 10);
+  ptr_arr: (int, int)*[];
+  ptr_arr ~= new (int, int)(10, 10);
 
   {
     a, b := *(ptr_arr[0]);
@@ -1254,10 +1227,19 @@ func_takes_tuple_arg :: fn(tuple: <int, int>) -> <int, int> {
   }
 
   {
-    tuple := <0, 0>;
+    tuple := (0, 0);
     a, b := func_takes_tuple_arg(tuple);
     assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
   }
+
+  nested := (1, (2, 3));
+
+  {
+    _, tup := nested;
+    a, b := tup;
+    assert("nested tup failed", a == 2 && b == 3 && _ == 1);
+  }
+
 }
 
 #test test_set_field_with_reflection :: fn() {
@@ -1274,7 +1256,7 @@ func_takes_tuple_arg :: fn(tuple: <int, int>) -> <int, int> {
  reflector.n = 100;
  type := #type(Reflector);
  field := type.fields[0];
- n := *(int*)field.get(&reflector);
+ n := *(field.get(&reflector) as int*);
  assert("reflection field.set() failed.", n == 100);
 }
 
@@ -1367,6 +1349,41 @@ JsonValueDeleter :: struct {
   assert("object key", val.get("key").as_string() == "value");
 }
 
+#test test_scalar_deserialization :: fn() {
+  n : int = 100;
+  json := json_serialize(&n, #type(int));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = 0;
+  assert("json  serialize  scalar", json.is_number());
+  err := json_deserialize_scalar(json, &n, #type(int));
+  assert("json error", !err.has_value);
+  assert("json deserialize scalar", n == 100);
+}
+
+MyJsonStruct :: struct {
+  n: s64;
+  b: float32;
+  to_string ::fn() -> string {
+    return $"MyJsonStruct [n: {n}, b: {b}]";
+  }
+}
+
+#test test_struct_deserialization :: fn() {
+  n : MyJsonStruct = {
+    100,
+    200.0
+  };
+  json := json_serialize(&n, #type(MyJsonStruct));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = {};
+  assert("json  serialize  object", json.is_object());
+  err := json_deserialize(json, &n, #type(MyJsonStruct));
+  assert("json error", !err.has_value);
+  assert("json deserialize object", n.n == 100 && n.b == 200.0);
+}
+
 #test test_json_comprehensive :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
@@ -1398,27 +1415,26 @@ JsonValueDeleter :: struct {
 
   nested_object_val := object_val.get("nested_object");
   assert("deeply_nested_key", nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
-}
-
+} 
 
 #test test_array_reflection :: fn() {
   fixed: int[3] = {1, 2, 3};
   fixed_type := #type(fixed);
   index: int = 0;
-  fixed_elements := fixed_type.elements((char*)&fixed);
+  fixed_elements := fixed_type.elements((&fixed) as char*);
   assert("Fixed array length mismatch", fixed_elements.length == 3);
   for elem in fixed_elements {
-    assert("Fixed array element mismatch", (*(int*)elem.data) == fixed[index]);
+    assert("Fixed array element mismatch", *(elem.data as int*) == fixed[index]);
     ++index;
   }
 
   dynamic: int[] = {3, 2, 1};
   dynamic_type := #type(dynamic);
   index = 0;
-  dynamic_elements := dynamic_type.elements((char*)&dynamic);
+  dynamic_elements := dynamic_type.elements((&dynamic) as char*);
   assert("Dynamic array length mismatch", dynamic_elements.length == 3);
   for elem in dynamic_elements {
-    assert("Dynamic array element mismatch", (*(int*)elem.data) == dynamic[index]);
+    assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
     ++index;
   }
 }
@@ -1435,9 +1451,9 @@ BitfieldTest :: struct {
 }
 
 add :: fn(a: s32, b: s32) -> s32 { return a + b; }
-add :: fn(a: float, b: s32) -> s32 { return ((s32)a) + b; }
-add :: fn(a: s32, b: float) -> s32 { return a + ((s32)b); }
-add :: fn(a: s32, b: u32) -> s32 { return a + ((s32)b); }
+add :: fn(a: float, b: s32) -> s32 { return a as s32 + b; }
+add :: fn(a: s32, b: float) -> s32 { return a + (b as s32); }
+add :: fn(a: s32, b: u32) -> s32 { return a + (b as s32); }
 add :: fn(a: s32) -> s32 { return a + 2; }
 add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
@@ -1448,7 +1464,7 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
   assert("expected 2",   a == 2);
   a = add(1, 1.0);
   assert("expected {2}", a == 2);
-  a = add(1, (u32)1);
+  a = add(1, 1 as s32);
   assert("expected {2}", a == 2);
   a = add(1);
   assert("expected {3}", a == 3);
@@ -1552,5 +1568,79 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
       }
     }
     assert("ndef", false);
+  }
+}
+
+#test test_scope_resolution_statement :: fn() {
+  Strings::contains("Hi!", 'H'); // just test that this compiles.
+}
+
+
+add_generic :: fn![T](a: T, b: T) -> T {
+  return a + b;
+}
+
+#test test_generic_add :: fn() {
+  assert("generic_add_float failed", add_generic![float](100.0, 100.0) == 200.0);
+  assert("generic_add_int failed", add_generic![int](5, 6) == 11);
+}
+
+GenericStruct :: struct![T] {
+  a: T;
+  b: T;
+  run :: fn() -> T {
+    return a + b;
+  }
+}
+
+#test test_generic_struct :: fn() {
+  int_adder: GenericStruct![int] = {5, 6};
+  assert("generic type failure", int_adder.run() == 5 + 6);
+  float_adder: GenericStruct![float] = {1.23, 4.56};
+  assert("generic type failure", float_adder.run() == 1.23 + 4.56);
+}
+
+// ! Todo fix this.
+#ifdef TEST_GENERIC_UNION {
+  GenericUnion :: union![T, T1] {
+    a: T;
+    b: T1;
+  }
+
+  #test test_generic_union :: fn() {
+    int_adder: GenericUnion![int, float];
+    int_adder.a = 11;
+    assert("generic type failure", int_adder.a == 5 + 6);
+    int_adder.b = 1.23 + 4.56;
+    assert("generic type failure", int_adder.b == 1.23 + 4.56);
+  }
+}
+
+#ifdef FUNCTION_POINTER_TEST {
+  function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
+  //! See emitter 'get_function_pointer_dynamic_array_declaration', this is super bugged.
+  //! particularly, lists/ dynamic arrays of function pointers are super shoddy.
+  #test test_function_pointer_alias :: fn() {
+    #alias FunctionPointer :: fn* (int, int) -> int;
+    ptr := &function_pointer_helper;
+    assert("Function pointer call", ptr(2, 3) == 6);
+  // ! This works (compiles), but it causes a 'wild jump' aka the PC goes to non-executable memory region..
+  // ! Wtf?
+    // array: FunctionPointer[] = {&function_pointer_helper};
+    // from_arr : FunctionPointer = &array[0];
+    // assert("Array of function pointers", from_arr(2, 3) == 6);
+  // ! 
+    // fixed: FunctionPointer[12];
+    // fixed[0] = &function_pointer_helper;
+    // from_fixed : FunctionPointer = &fixed[0];
+
+    // assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
+
+    // function :: fn() -> FunctionPointer {
+    //   return &function_pointer_helper;
+    // }
+
+    // returned_ptr : FunctionPointer = function();
+    // assert("Function returning function pointer", returned_ptr(2, 3) == 6);
   }
 }

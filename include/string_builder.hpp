@@ -1,5 +1,4 @@
 
-
 #include <cstddef>
 #include <cstring>
 #include <string>
@@ -17,8 +16,7 @@ struct StringBuilder {
       std::memcpy(data, str, length);
     }
     inline ~Block() {
-      if (next)
-        delete next;
+      if (next) delete next;
     }
   };
   Block *root;

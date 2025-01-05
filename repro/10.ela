@@ -1,9 +1,0 @@
-// this segfaults, the type is null in the delete satement in the emit visitor
-
-main :: fn() {
-	arr := new int;
-	delete((int*)arr);
-  
-  // this is ok 'delete(arr)'
-  // it's the cast that breaks.
-}

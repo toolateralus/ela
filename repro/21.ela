@@ -1,0 +1,26 @@
+// A generic that returns and doesn't take a param of T (or any params)
+// fails to compile because we use c++ overloading instead of using template<T>
+// We have to use some sort of mangling to avoid this.
+generic :: fn![T]() -> T {
+  return {};
+}
+
+main :: fn() {
+  generic![int]();
+  generic![float]();
+
+/* 
+  /home/josh_arch/source/c++/ela/repro/21.ela:4:7: error: functions that differ only in their return type cannot be overloaded
+    4 | float generic ();
+      | ~~~~~ ^
+/home/josh_arch/source/c++/ela/repro/21.ela:8:5: note: previous definition is here
+    8 | int generic() {
+      | ~~~ ^
+/home/josh_arch/source/c++/ela/repro/21.ela:5:7: error: functions that differ only in their return type cannot be overloaded
+    5 | float generic() {
+      | ~~~~~ ^
+/home/josh_arch/source/c++/ela/repro/21.ela:8:5: note: previous definition is here
+    8 | int generic() {
+      | ~~~ ^
+*/
+}

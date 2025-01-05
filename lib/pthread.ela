@@ -2,8 +2,8 @@
 
 pthread_attr_t :: union;
 
-#alias ThreadStartRoutine :: void*(void*)*;
-#alias ThreadFunction :: void()*;
+#alias ThreadFunction :: fn* ();
+#alias ThreadStartRoutine :: fn* (void*)-> void*;
 
 #foreign pthread_create :: fn(thread: pthread_t*, attr: pthread_attr_t*, start_routine: ThreadStartRoutine, arg: void*) -> int;
 #foreign pthread_join :: fn(thread: pthread_t*, retval: void**) -> int;
@@ -23,7 +23,7 @@ Thread :: struct {
   
   #ctor :: fn() {}
   #ctor :: fn(function: ThreadFunction) {
-    start(function, (void*)this);
+    start(function, this);
   }
   
   join :: fn() -> void* {
