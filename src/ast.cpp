@@ -1638,6 +1638,11 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   return node;
 }
 
+// TODO:
+// We need to clean up the struct & union parsing, make it more consistent.
+// Maybe use a generic function, they're strangely different.
+// Also, we need to declare generic parameters types here with like -2 so
+// casting and T:: works and shtuff.
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
