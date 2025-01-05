@@ -5,6 +5,7 @@
 #include <unordered_set>
 
 #include "arena.hpp"
+#include "constexpr.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "type.hpp"
@@ -25,6 +26,7 @@ struct Symbol {
   int flags = SYMBOL_IS_VARIABLE;
   std::vector<int> function_overload_types;
   Nullable<ASTNode> declaring_node;
+  Value value;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
 
@@ -77,7 +79,7 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  int create_type(TypeKind kind, const InternedString &name, TypeInfo *info = nullptr, const TypeExt &ext = {}) {
+  int create_type(TypeKind kind, const InternedString &name, TypeInfo *info = nullptr, const TypeExtensions &ext = {}) {
     auto id = global_create_type(kind, name, info, ext);
     types[name] = id;
     return id;
@@ -95,7 +97,7 @@ struct Scope {
     return id;
   }
 
-  int create_tuple_type(const std::vector<int> &types, const TypeExt &ext) {
+  int create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
     auto id = global_create_tuple_type(types, ext);
     this->types[get_tuple_type_name(types)] = id;
     return id;
@@ -107,7 +109,7 @@ struct Scope {
     return id;
   }
 
-  int find_type_id(const InternedString &name, const TypeExt &ext) {
+  int find_type_id(const InternedString &name, const TypeExtensions &ext) {
     if (!types.contains(name)) {
       if (parent) {
         return parent->find_type_id(name, ext);

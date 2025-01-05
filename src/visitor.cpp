@@ -122,8 +122,6 @@ std::any SerializeVisitor::visit(ASTType *node) {
     ss << "type: " << node->resolved_type << ", " << type->get_base().get_str() << " " << type->get_ext().to_string();
     return {};
   }
-  ss << node->base.get_str();
-  ss << node->extension_info.to_string();
   return {};
 }
 std::any SerializeVisitor::visit(ASTArguments *node) {
@@ -156,6 +154,10 @@ std::any SerializeVisitor::visit(ASTReturn *node) {
 }
 std::any SerializeVisitor::visit(ASTContinue *node) {
   ss << indent() << "Continue\n";
+  return {};
+}
+std::any SerializeVisitor::visit(ASTAlias *node) {
+  ss << indent() << "Alias\n";
   return {};
 }
 std::any SerializeVisitor::visit(ASTBreak *node) {
@@ -284,7 +286,7 @@ std::any SerializeVisitor::visit(ASTInitializerList *node) {
 
 std::any SerializeVisitor::visit(ASTEnumDeclaration *node) {
   ss << "enum : ";
-  ss << node->type->base.get_str();
+  ss << node->name.get_str();
   for (const auto &[key, value] : node->key_values) {
     ss << "\nkey: " << key.get_str();
     ss << "value: ";
@@ -336,6 +338,7 @@ std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visi
 std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }

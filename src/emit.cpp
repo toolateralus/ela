@@ -91,6 +91,7 @@ std::any Emitter::visit(ASTBreak *node) {
   indented("break");
   return {};
 }
+std::any Emitter::visit(ASTAlias *node) { return {}; }
 std::any Emitter::visit(ASTContinue *node) {
   emit_line_directive(node);
   indented("continue");
@@ -120,7 +121,7 @@ std::any Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
 
   // For reflection
-  if (node->flags == ASTTYPE_EMIT_OBJECT) {
+  if (node->kind == ASTType::REFLECTION) {
     int pointed_to_ty = std::any_cast<int>(node->pointing_to.get()->accept(&type_visitor));
     (*ss) << to_type_struct(global_get_type(pointed_to_ty), ctx);
     return {};
@@ -139,7 +140,6 @@ std::any Emitter::visit(ASTType *node) {
   }
 
   auto type_string = to_cpp_string(type);
-
 
   (*ss) << type_string;
   return {};
@@ -239,7 +239,8 @@ std::any Emitter::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign) {
     auto type = global_get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer();
-    if (isptr) (*ss) << "(" << to_cpp_string(type) << ")";
+    if (isptr)
+      (*ss) << "(" << to_cpp_string(type) << ")";
   }
   space();
   auto right = node->right->accept(this);
@@ -370,26 +371,27 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   auto emit_destructor = [&]() {
-    auto type_id = current_struct_decl ? current_struct_decl.get()->resolved_type
-                                       : current_union_decl.get()->resolved_type;
+    auto type_id =
+        current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type;
     auto type = global_get_type(type_id);
     auto name = type->get_base().get_str();
     (*ss) << '~' << name << "()";
-    if (!node->block) throw_error("Cannot forward declare a constructor", node->source_range);
+    if (!node->block)
+      throw_error("Cannot forward declare a constructor", node->source_range);
     node->block.get()->accept(this);
   };
 
   auto emit_constructor = [&]() {
-    auto type_id = current_struct_decl ? current_struct_decl.get()->resolved_type
-                                       : current_union_decl.get()->resolved_type;
+    auto type_id =
+        current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type;
     auto type = global_get_type(type_id);
     auto name = type->get_base().get_str();
     (*ss) << name;
 
     auto is_copy_ctor =
-        node->params->params.size() == 1 && node->params->params[0]->type->resolved_type ==
-                                                (current_struct_decl ? current_struct_decl.get()->resolved_type
-                                                                     : current_union_decl.get()->resolved_type);
+        node->params->params.size() == 1 &&
+        node->params->params[0]->type->resolved_type ==
+            (current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type);
 
     if (is_copy_ctor) {
       (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str() << ")";
@@ -439,7 +441,8 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       return;
     }
 
-    auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
+    auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope &&
+                    (node->flags & FUNCTION_IS_METHOD) == 0;
 
     if (node->name != "main" && !is_local) {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
@@ -485,7 +488,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       if (!is_freestanding) {
         has_user_defined_main = true;
         node->return_type->accept(this);
-        (*ss) << " __ela_main_()";  // We use Env::args() to get args now.
+        (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
         node->block.get()->accept(this);
       } else {
         (*ss) << "int ";
@@ -527,19 +530,18 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
 std::string mangled_type_args(const std::vector<int> &args) {
   std::string s;
-  for (const auto &arg: args) {
+  for (const auto &arg : args) {
     s += "_" + std::to_string(arg);
   }
   return s;
 }
-
 
 std::any Emitter::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.type);
       type->set_base(type->get_base().get_str() + mangled_type_args(instantiation.arguments));
-      static_cast<ASTStructDeclaration*>(instantiation.node)->resolved_type = type->id;
+      static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
       instantiation.node->accept(this);
     }
     return {};
@@ -552,7 +554,8 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   Defer _defer([&] { current_struct_decl = nullptr; });
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
-    if (node->is_extern) *ss << "extern \"C\" ";
+    if (node->is_extern)
+      *ss << "extern \"C\" ";
     *ss << "struct " << type->get_base().get_str() << ";\n";
     return {};
   }
@@ -624,7 +627,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
 }
 std::any Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
-  auto type_name = node->type->base.get_str();
+  auto type_name = node->name.get_str();
   int n = 0;
   (*ss) << "enum " << type_name << " {\n";
   for (const auto &[key, value] : node->key_values) {
@@ -774,11 +777,14 @@ std::any Emitter::visit(ASTProgram *node) {
   } else {
     for (int i = 0; i < type_table.size(); ++i) {
       Type *type = &type_table[i];
-      TypeExt ext = type->get_ext();
+      TypeExtensions ext = type->get_ext();
 
-      if (type->get_base() == "Field") continue;
-      if (type->get_base() == "Element") continue;
-      if (type->get_base() == "Type") continue;
+      if (type->get_base() == "Field")
+        continue;
+      if (type->get_base() == "Element")
+        continue;
+      if (type->get_base() == "Type")
+        continue;
 
       if (ext.is_array() && !ext.is_fixed_sized_array()) {
         throw_error(std::format("You cannot use dynamic arrays in a freestanding or nostdlib "
@@ -795,10 +801,9 @@ std::any Emitter::visit(ASTProgram *node) {
     }
 
     if (compile_command.has_flag("test")) {
-      throw_error(
-          "You cannot use unit tests in a freestanding or nostlib "
-          "environment due to lack of exception handling",
-          {});
+      throw_error("You cannot use unit tests in a freestanding or nostlib "
+                  "environment due to lack of exception handling",
+                  {});
     }
   }
 
@@ -850,13 +855,12 @@ int main (int argc, char** argv) {
     for (const auto &str : ctx.type_info_strings) {
       type_info << str.get_str() << ";\n";
     }
-    code << std::format(
-        "Type **_type_info = new Type*[{}];\n"
-        "auto __ts_init_func_result__ = []{{\n"
-        "  {};\n"
-        "  return 0;\n"
-        "}}();\n",
-        type_table.size(), type_info.str());
+    code << std::format("Type **_type_info = new Type*[{}];\n"
+                        "auto __ts_init_func_result__ = []{{\n"
+                        "  {};\n"
+                        "  return 0;\n"
+                        "}}();\n",
+                        type_table.size(), type_info.str());
 
     code << std::format(R"_(
 Type *find_type(string name) {{
@@ -879,16 +883,16 @@ Type *find_type(string name) {{
   }}
   return nullptr; // Return nullptr if the type is not found
 }}
-)_", type_table.size());
+)_",
+                        type_table.size());
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for #type().
   if (is_freestanding && !ctx.type_info_strings.empty()) {
-    throw_error(
-        "You cannot use runtime type reflection in a freestanding or "
-        "nostdlib environment, due to a lack of allocators. To compare "
-        "types, use #typeid.",
-        {});
+    throw_error("You cannot use runtime type reflection in a freestanding or "
+                "nostdlib environment, due to a lack of allocators. To compare "
+                "types, use #typeid.",
+                {});
   }
 
   return {};
@@ -899,7 +903,7 @@ std::any Emitter::visit(ASTDotExpr *node) {
 
   auto op = ".";
 
-  if (!base_ty->get_ext().extensions.empty() && base_ty->get_ext().extensions.back() == TYPE_EXT_POINTER) {
+  if (base_ty->get_ext().back_type() == TYPE_EXT_POINTER) {
     op = "->";
   }
 
@@ -912,10 +916,9 @@ std::any Emitter::visit(ASTMake *node) {
   auto type = global_get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
     if (node->arguments->arguments.empty()) {
-      throw_error(
-          "cannot create a pointer currently with #make. it only casts "
-          "pointers.",
-          node->source_range);
+      throw_error("cannot create a pointer currently with #make. it only casts "
+                  "pointers.",
+                  node->source_range);
     }
     (*ss) << "(" << to_cpp_string(type) << ")";
     node->arguments->arguments[0]->accept(this);
@@ -1037,7 +1040,8 @@ std::any Emitter::visit(ASTTuple *node) {
   (*ss) << "_tuple(";
   for (const auto &value : node->values) {
     value->accept(this);
-    if (value != node->values.back()) (*ss) << ", ";
+    if (value != node->values.back())
+      (*ss) << ", ";
   }
   (*ss) << ")";
   return {};
@@ -1060,7 +1064,8 @@ std::any Emitter::visit(ASTTupleDeconstruction *node) {
 // I don't mind implicit casting to void*/u8*
 void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
   auto type = global_get_type(node->type->resolved_type);
-  if (type->get_ext().is_pointer()) (*ss) << "(" << to_cpp_string(type) << ")";
+  if (type->get_ext().is_pointer())
+    (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
 std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::string &type_string,
@@ -1073,7 +1078,7 @@ std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::s
 // It shouldn't be bad finding the real problem
 #define SLIGHTLY_AWFUL_HACK
 #ifdef SLIGHTLY_AWFUL_HACK
-  std::string string = "_array";  // We just can use C++'s type inference on generics to take care of this.
+  std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
   // This probably won't work for nested arrays
 #elif defined(TERRIBLE_HACK)
   // We could just purge off the problematic characters?
@@ -1108,35 +1113,24 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
     }
     return get_function_pointer_type_string(type, &identifier);
   }
-  auto array_sizes = type->get_ext().array_sizes;
   tss << type->get_base().get_str();
   if (!type->get_ext().is_fixed_sized_array()) {
     tss << name << ' ';
   }
   bool emitted_iden = false;
   for (const auto ext : type->get_ext().extensions) {
-    if (ext == TYPE_EXT_ARRAY) {
-      auto size = array_sizes.back();
-      array_sizes.pop_back();
-      if (size.is_null()) {
-        std::string current = tss.str();
-        tss.clear();
-        tss << "_array<" << current << ">";
-      } else {
-        auto old = this->ss;
-        this->ss = &tss;
-        if (!emitted_iden) {
-          emitted_iden = true;
-          tss << ' ' << name;
-        }
-        tss << "[";
-        size.get()->accept(this);
-        tss << "]";
-        this->ss = old;
-      }
-    }
-    if (ext == TYPE_EXT_POINTER) {
+    if (ext.type == TYPE_EXT_ARRAY) {
+      std::string current = tss.str();
+      tss.clear();
+      tss << "_array<" << current << ">";
+    } else if (ext.type == TYPE_EXT_POINTER) {
       tss << "*";
+    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+      if (!emitted_iden) {
+        emitted_iden = true;
+        tss << ' ' << name;
+      }
+      tss << "[" << ext.array_size << "]";
     }
   }
   return tss.str();
@@ -1238,10 +1232,9 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       auto sym = scope->lookup("to_string");
 
       if (!sym)
-        throw_error(
-            "Cannot use a struct in an interpolated string without defining a "
-            "`to_string` function that returns either a char* or a string",
-            value->source_range);
+        throw_error("Cannot use a struct in an interpolated string without defining a "
+                    "`to_string` function that returns either a char* or a string",
+                    value->source_range);
 
       auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
 
@@ -1249,7 +1242,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       value->accept(this);
 
       auto &extensions = type->get_ext();
-      if (extensions.has_extensions() && extensions.extensions.back() == TYPE_EXT_POINTER) {
+      if (extensions.back_type() == TYPE_EXT_POINTER) {
         (*ss) << "->to_string()";
       } else {
         (*ss) << ".to_string()";
@@ -1285,10 +1278,12 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     } else {
       value->accept(this);
     }
-    if (value != node->interpolated_values.back()) (*ss) << ", ";
+    if (value != node->interpolated_values.back())
+      (*ss) << ", ";
   };
 
-  for (const auto &value : node->interpolated_values) interpolate_value(value);
+  for (const auto &value : node->interpolated_values)
+    interpolate_value(value);
 
   (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
            "strlen(buf); return str; }()";
@@ -1300,10 +1295,9 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   auto type_prefix = std::string{"*"};
 
   if (!type->is_kind(TYPE_FUNCTION)) {
-    throw_error(
-        "Internal compiler error: tried to get a function pointer from "
-        "a non-function type",
-        {});
+    throw_error("Internal compiler error: tried to get a function pointer from "
+                "a non-function type",
+                {});
   }
 
   StringBuilder ss;
@@ -1347,39 +1341,32 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 std::string Emitter::get_elements_function(Type *type) {
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
-    return std::format(
-        ".elements = +[](char * array) -> _array<Element> {{\n"
-        "  auto arr = (_array<{}>*)(array);\n"
-        "  _array<Element> elements;\n"
-        "  for (int i = 0; i < arr->length; ++i) {{\n"
-        "    elements.push({{\n"
-        "      .data = (char*)&(*arr)[i],\n"
-        "      .type = {},\n"
-        "    }});\n"
-        "  }}\n"
-        "  return elements;\n"
-        "}}\n",
-        to_cpp_string(element_type), to_type_struct(element_type, ctx));
+    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
+                       "  auto arr = (_array<{}>*)(array);\n"
+                       "  _array<Element> elements;\n"
+                       "  for (int i = 0; i < arr->length; ++i) {{\n"
+                       "    elements.push({{\n"
+                       "      .data = (char*)&(*arr)[i],\n"
+                       "      .type = {},\n"
+                       "    }});\n"
+                       "  }}\n"
+                       "  return elements;\n"
+                       "}}\n",
+                       to_cpp_string(element_type), to_type_struct(element_type, ctx));
   } else {
-    auto old = this->ss;
-    auto ss = StringBuilder{};
-    this->ss = &ss;
-    type->get_ext().array_sizes.back().get()->accept(this);
-    auto length = ss.str();
-    this->ss = old;
-    return std::format(
-        ".elements = +[](char * array) -> _array<Element> {{\n"
-        "  auto arr = ({}*)(array);\n"
-        "  _array<Element> elements;\n"
-        "  for (int i = 0; i < {}; ++i) {{\n"
-        "    elements.push({{\n"
-        "      .data = (char*)&arr[i],\n"
-        "      .type = {},\n"
-        "    }});\n"
-        "  }}\n"
-        "  return elements;\n"
-        "}}\n",
-        to_cpp_string(element_type), length, to_type_struct(element_type, ctx));
+    auto size = type->get_ext().extensions.back().array_size;
+    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
+                       "  auto arr = ({}*)(array);\n"
+                       "  _array<Element> elements;\n"
+                       "  for (int i = 0; i < {}; ++i) {{\n"
+                       "    elements.push({{\n"
+                       "      .data = (char*)&arr[i],\n"
+                       "      .type = {},\n"
+                       "    }});\n"
+                       "  }}\n"
+                       "  return elements;\n"
+                       "}}\n",
+                       to_cpp_string(element_type), size, to_type_struct(element_type, ctx));
   }
 }
 
@@ -1427,20 +1414,21 @@ std::string get_type_flags(Type *type) {
       break;
   }
   for (const auto &ext : type->get_ext().extensions) {
-    switch (ext) {
+    switch (ext.type) {
       case TYPE_EXT_POINTER:
         kind_flags |= TYPE_FLAGS_POINTER;
         break;
+      case TYPE_EXT_FIXED_ARRAY:
+        kind_flags |= TYPE_FLAGS_FIXED_ARRAY;
+        break;
       case TYPE_EXT_ARRAY:
-        if (type->get_ext().is_fixed_sized_array()) {
-          kind_flags |= TYPE_FLAGS_FIXED_ARRAY;
-        } else {
-          kind_flags |= TYPE_FLAGS_ARRAY;
-        }
-
+        kind_flags |= TYPE_FLAGS_ARRAY;
         break;
       case TYPE_EXT_MAP:
         kind_flags |= TYPE_FLAGS_MAP;
+        break;
+      case TYPE_EXT_INVALID:
+        throw_error("Internal Compiler Error: Extension type not set.", {});
         break;
     }
   }
@@ -1455,7 +1443,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << "_type_info[" << id << "] = new Type {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
 
-  if (!type->is_kind(TYPE_ENUM)) ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+  if (!type->is_kind(TYPE_ENUM))
+    ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
 
   ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
@@ -1506,17 +1495,18 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
 
-      if (name == "this") continue;
+      if (name == "this")
+        continue;
 
       auto t = global_get_type(sym.type_id);
       // TODO: handle methods separately
-      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION)) continue;
+      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+        continue;
 
       if (!t)
-        throw_error(
-            "Internal Compiler Error: Type was null in reflection "
-            "'to_type_struct()'",
-            {});
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << get_field_struct(name.get_str(), t, type, context);
       ++it;
       if (it < count) {
@@ -1535,17 +1525,18 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     for (const auto &tuple : info->scope->symbols) {
       auto &[name, sym] = tuple;
 
-      if (name == "this") continue;
+      if (name == "this")
+        continue;
 
       auto t = global_get_type(sym.type_id);
       // TODO: handle methods separately
-      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION)) continue;
+      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+        continue;
 
       if (!t)
-        throw_error(
-            "Internal Compiler Error: Type was null in reflection "
-            "'to_type_struct()'",
-            {});
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << get_field_struct(name.get_str(), t, type, context);
       ++it;
       if (it < count) {
@@ -1564,10 +1555,9 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     for (const auto &name : info->keys) {
       auto t = global_get_type(s32_type());
       if (!t)
-        throw_error(
-            "Internal Compiler Error: Type was null in reflection "
-            "'to_type_struct()'",
-            {});
+        throw_error("Internal Compiler Error: Type was null in reflection "
+                    "'to_type_struct()'",
+                    {});
       fields_ss << get_field_struct(name.get_str(), t, type, context);
       ++it;
       if (it < count) {
@@ -1589,8 +1579,8 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   }
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.get_str() << "\", "
-                            << node->name.get_str() << "),";
+    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.get_str() << "\", " << node->name.get_str()
+                            << "),";
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
@@ -1600,8 +1590,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   return true;
 }
 
-std::string Emitter::to_cpp_string(const TypeExt &extensions, const std::string &base) {
-  std::vector<Nullable<ASTExpr>> array_sizes = extensions.array_sizes;
+std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
   StringBuilder ss;
 
   // TODO: we need to fix the emitting of 'c_string' as const char*,
@@ -1609,29 +1598,18 @@ std::string Emitter::to_cpp_string(const TypeExt &extensions, const std::string 
   ss << base;
 
   for (const auto ext : extensions.extensions) {
-    if (ext == TYPE_EXT_ARRAY) {
-      auto size = array_sizes.back();
-      array_sizes.pop_back();
-      if (size.is_null()) {
-        std::string current = ss.str();
-        ss.str("");
-        ss.clear();
-        ss << "_array<" << current << ">";
-      } else {
-        auto old = this->ss;
-        this->ss = &ss;
-        ss << "[";
-        size.get()->accept(this);
-        ss << "]";
-        this->ss = old;
-      }
-    }
-    if (ext == TYPE_EXT_POINTER) {
-      ss << "*";
-    }
-    if (ext == TYPE_EXT_MAP) {
+    if (ext.type == TYPE_EXT_ARRAY) {
       std::string current = ss.str();
-      auto key_string = to_cpp_string(global_get_type(extensions.key_type));
+      ss.str("");
+      ss.clear();
+      ss << "_array<" << current << ">";
+    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+      ss << "[" << ext.array_size << "]";
+    } else if (ext.type == TYPE_EXT_POINTER) {
+      ss << "*";
+    } else if (ext.type == TYPE_EXT_MAP) {
+      std::string current = ss.str();
+      auto key_string = to_cpp_string(global_get_type(ext.key_type));
       ss.str("");
       ss.clear();
       ss << "_map<" << key_string << ", " << current << ">";

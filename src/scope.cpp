@@ -85,15 +85,15 @@ Context::Context() {
     auto element_id = global_create_struct_type("Element", element_scope);
 
     // Type*
-    auto type_ptr = global_find_type_id(type_id, {.extensions = {TYPE_EXT_POINTER}});
+    auto type_ptr = global_find_type_id(type_id, {.extensions = {{TYPE_EXT_POINTER}}});
 
     // Field*[]
     auto field_arr =
-        global_find_type_id(field_id, {.extensions = {TYPE_EXT_POINTER, TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
+        global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
     // Element[]
-    auto element_arr = global_find_type_id(element_id, {.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
+    auto element_arr = global_find_type_id(element_id, {.extensions = {{TYPE_EXT_ARRAY}}});
     // Field*
-    auto field_ptr = global_find_type_id(field_id, {.extensions = {TYPE_EXT_POINTER}});
+    auto field_ptr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}}});
 
     type_scope->insert("id", s32_type());
     type_scope->insert("name", charptr_type());
@@ -208,7 +208,7 @@ Context::Context() {
     auto func = FunctionTypeInfo{};
     func.params_len = 0;
     auto str_array =
-        global_find_type_id(string_type(), TypeExt{.extensions = {TYPE_EXT_ARRAY}, .array_sizes = {nullptr}});
+        global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}});
     func.return_type = str_array;
     scope->insert("args", global_find_function_type_id(func, {}));
     scope->parent = root_scope;

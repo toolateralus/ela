@@ -63,6 +63,7 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTUnionDeclaration *node) override;
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTTuple *node) override;
+  std::any visit(ASTAlias *node) override;
 
   // TODO: implement me.
 
@@ -85,6 +86,7 @@ struct Typer : VisitorBase {
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
+  std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
   std::any visit(ASTProgram *node) override;
@@ -131,6 +133,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
+  std::any visit(ASTAlias *node) override;
   InternedString type_name(ASTExpr *node);
 };
 
@@ -199,7 +202,7 @@ struct Emitter : VisitorBase {
   void cast_pointers_implicit(ASTDeclaration *&node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
-  std::string to_cpp_string(const TypeExt &ext, const std::string &base);
+  std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
 
@@ -250,6 +253,7 @@ struct Emitter : VisitorBase {
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTScopeResolution *node) override;
+  std::any visit(ASTAlias *node) override;
 
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {

@@ -14,13 +14,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-enum {
-  ASTTYPE_NORMAL,
-  ASTTYPE_FROM_SCOPE_RES,
-  ASTTYPE_EMIT_OBJECT,
-  ASTTYPE_IS_TUPLE,
-};
-
 extern jstl::Arena ast_arena;
 
 template <class T> T *ast_alloc(size_t n = 1) { return new (ast_arena.allocate(sizeof(T) * n)) T(); }
@@ -63,6 +56,7 @@ enum ASTNodeType {
   AST_NODE_UNION_DECLARATION,
   AST_NODE_ALLOCATE,
   AST_NODE_NOOP,
+  AST_NODE_ALIAS,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
@@ -130,27 +124,59 @@ struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
 };
 
+struct ASTTypeExtension {
+  TypeExtEnum type;
+  ASTExpr *expression;
+};
+
 struct ASTType : ASTExpr {
-  int flags = -1;
-  // base name,
-  InternedString base;
+  enum Kind {
+    NORMAL,
+    REFLECTION,
+    TUPLE,
+    FUNCTION,
+  } kind;
+  union {
+    struct {
+      InternedString base;
+      std::vector<ASTType *> generic_arguments;
+    } normal;
+    struct {
+      std::vector<ASTType *> parameter_types;
+      Nullable<ASTType> return_type;
+    } function;
+    // special info for tuple types.
+    std::vector<ASTType *> tuple_types;
+  };
+  ASTType() {}
+  ASTType(const ASTType &other) {
+    extensions = other.extensions;
+    kind = other.kind;
+    pointing_to = other.pointing_to;
+    switch (kind) {
+      case NORMAL:
+      case REFLECTION:
+        normal = decltype(normal)(other.normal);
+        break;
+      case TUPLE:
+        tuple_types = decltype(tuple_types)(other.tuple_types);
+        break;
+      case FUNCTION:
+        function = decltype(function)(other.function);
+        break;
+    }
+  }
+  ~ASTType() {}
   // [], *, [string] etc.
-  TypeExt extension_info{};
+  std::vector<ASTTypeExtension> extensions;
+  // special info for reflection
+  Nullable<ASTExpr> pointing_to;
 
   // the actual type this got resolved to in the type checker.
   int resolved_type = Type::invalid_id;
 
-  // special info for reflection
-  Nullable<ASTExpr> pointing_to;
-
-  std::vector<ASTType *> generic_arguments;
-
-  // special info for tuple types.
-  std::vector<ASTType *> tuple_types;
-
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void();
-
   std::any accept(VisitorBase *visitor) override;
 };
 struct ASTExprStatement : ASTStatement {
@@ -412,7 +438,7 @@ struct ASTInitializerList : ASTExpr {
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
   int element_type;
-  ASTType *type;
+  InternedString name;
   std::vector<std::pair<InternedString, Nullable<ASTExpr>>> key_values;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
@@ -467,6 +493,13 @@ struct ASTNoop : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTAlias : ASTStatement {
+  InternedString name;
+  ASTType *type;
+  ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
+  std::any accept(VisitorBase *visitor) override;
+};
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
@@ -502,6 +535,7 @@ struct ASTNoop : ASTStatement {
   std::any visit(ASTRange *node) override {};                                                                          \
   std::any visit(ASTSwitch *node) override {};                                                                         \
   std::any visit(ASTTuple *node) override {};                                                                          \
+  std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
@@ -539,6 +573,7 @@ struct ASTNoop : ASTStatement {
   virtual std::any visit(ASTRange *node) = 0;                                                                          \
   virtual std::any visit(ASTSwitch *node) = 0;                                                                         \
   virtual std::any visit(ASTTuple *node) = 0;                                                                          \
+  virtual std::any visit(ASTAlias *node) = 0;                                                                          \
   virtual std::any visit(ASTTupleDeconstruction *node) = 0;
 
 enum DirectiveKind {

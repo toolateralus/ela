@@ -686,13 +686,22 @@ something :: fn(f: float32) -> float32 {
 }
 
 MojStruktIter :: struct{
-  begin :: fn() {
-    // TODO: implement this/
+  data: int[10];
+  begin :: fn() -> int* {
+    return (int*)data;
+  }
+  end :: fn() -> int* {
+    return (int*)data + 10;
   }
 }
 
 #test test_defined_iterator ::fn() {
-  // TODO: add this test.
+  count := 0;
+  new_struct : MojStruktIter;
+  for item in new_struct {
+    count += 1;
+  }
+  assert("custom iterator failed to iterate correctly", count == 10);
 }
 
 #test custom_iterator_increment :: fn() {

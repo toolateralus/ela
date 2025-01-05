@@ -1,7 +1,7 @@
 #include "type.hpp"
 
+#include <cstddef>
 #include <ostream>
-#include <set>
 #include <sstream>
 
 #include "ast.hpp"
@@ -11,7 +11,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 
-std::string FunctionTypeInfo::to_string(const TypeExt &ext) const {
+std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   std::stringstream ss;
   ss << "fn ";
   ss << ext.to_string() << ' ';
@@ -61,7 +61,7 @@ Type *global_get_type(const int id) {
   return &type_table[id];
 }
 
-int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExt &type_extensions) {
+int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].kind != TYPE_FUNCTION) continue;
     const Type *type = &type_table[i];
@@ -78,7 +78,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExt &ty
   return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
-int global_find_type_id(const int base, const TypeExt &type_extensions) {
+int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   if (!type_extensions.has_extensions()) {
     return base;
   }
@@ -98,7 +98,7 @@ int global_find_type_id(const int base, const TypeExt &type_extensions) {
   return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
 }
 
-int global_find_type_id(std::vector<int> &tuple_types, const TypeExt &type_extensions) {
+int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
     auto type = &type_table[i];
 
@@ -260,16 +260,14 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
   return false;
 }
 
-bool Type::equals(const int base, const TypeExt &type_extensions) const {
+bool Type::equals(const int base, const TypeExtensions &type_extensions) const {
   auto isBaseIdEqual = base_id == base;
   auto isTypeExtensionEqual = type_extensions == get_ext();
   return isBaseIdEqual && isTypeExtensionEqual;
 }
 
-bool TypeExt::equals(const TypeExt &other) const {
+bool TypeExtensions::equals(const TypeExtensions &other) const {
   if (extensions != other.extensions) return false;
-  if (array_sizes != other.array_sizes) return false;
-  if (key_type != other.key_type) return false;
   return true;
 }
 
@@ -318,7 +316,7 @@ int global_create_enum_type(const InternedString &name, const std::vector<Intern
   type->set_info(info);
   return type->id;
 }
-int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExt &extensions,
+int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
   auto &type = type_table.emplace_back(type_table.size(), kind);
   type.base_id = base_id;
@@ -435,11 +433,11 @@ int float_type() {
   return type;
 }
 int voidptr_type() {
-  static int type = global_find_type_id(void_type(), TypeExt{.extensions = {TYPE_EXT_POINTER}, .array_sizes = {}});
+  static int type = global_find_type_id(void_type(), {.extensions = {{TYPE_EXT_POINTER}}});
   return type;
 }
 int charptr_type() {
-  static int type = global_find_type_id(char_type(), {.extensions = {TYPE_EXT_POINTER}});
+  static int type = global_find_type_id(char_type(), {.extensions = {{TYPE_EXT_POINTER}}});
   return type;
 }
 
@@ -597,33 +595,25 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
   return from_info->size <= to_info->size;
 }
 
-bool TypeExt::is_fixed_sized_array() const {
-  return has_extensions() && extensions.back() == TYPE_EXT_ARRAY && !array_sizes.empty() &&
-         array_sizes.back().is_not_null();
-}
-
-std::string TypeExt::to_string() const {
+std::string TypeExtensions::to_string() const {
   std::stringstream ss;
-  auto array_sizes = this->array_sizes;
   for (const auto ext : extensions) {
-    switch (ext) {
+    switch (ext.type) {
       case TYPE_EXT_POINTER:
         ss << "*";
         break;
       case TYPE_EXT_ARRAY: {
-        auto size = array_sizes.back();
-        array_sizes.pop_back();
-        if (size.is_null())
-          ss << "[]";
-        else {
-          // TODO: we need a way to evaluate constexprs here
-          // to actually acurrately print the array size.
-          ss << "[" << size << "]";
-        }
+        ss << "[]";
       } break;
       case TYPE_EXT_MAP: {
-        ss << "[" << global_get_type(key_type)->to_string() << "]";
+        ss << "[" << global_get_type(ext.key_type)->to_string() << "]";
       } break;
+      case TYPE_EXT_FIXED_ARRAY:
+        ss << "[" << ext.array_size << "]";
+        break;
+      case TYPE_EXT_INVALID:
+        throw_error("Internal compiler error: extension type invalid", {});
+        break;
     }
   }
   return ss.str();
@@ -634,7 +624,7 @@ int get_map_value_type(Type *map_type) {
   return id;
 }
 
-int global_create_tuple_type(const std::vector<int> &types, const TypeExt &ext) {
+int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
   type_table.emplace_back(type_table.size(), TYPE_TUPLE);
   Type *type = &type_table.back();
 
@@ -668,6 +658,6 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
 }
 int Type::take_pointer_to() const {
   auto ext = this->extensions;
-  ext.extensions.push_back(TYPE_EXT_POINTER);
+  ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
 }
