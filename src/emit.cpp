@@ -139,6 +139,8 @@ std::any Emitter::visit(ASTType *node) {
   }
 
   auto type_string = to_cpp_string(type);
+
+
   (*ss) << type_string;
   return {};
 }
@@ -522,9 +524,22 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
   return {};
 }
+
+std::string mangled_type_args(const std::vector<int> &args) {
+  std::string s;
+  for (const auto &arg: args) {
+    s += "_" + std::to_string(arg);
+  }
+  return s;
+}
+
+
 std::any Emitter::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
+      auto type = global_get_type(instantiation.type);
+      type->set_base(type->get_base().get_str() + mangled_type_args(instantiation.arguments));
+      static_cast<ASTStructDeclaration*>(instantiation.node)->type->resolved_type = type->id;
       instantiation.node->accept(this);
     }
     return {};

@@ -138,6 +138,7 @@ struct Emitter : VisitorBase {
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
+  std::vector<int> generic_arguments;
   int num_tests = 0;
 
   std::vector<std::function<void()>> pending_statements;
