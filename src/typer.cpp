@@ -1298,7 +1298,8 @@ std::any Typer::visit(ASTScopeResolution *node) {
       throw_error(std::format("Unable to find enum variant {}", node->member_name), node->source_range);
   }
 
-  auto base_ty = global_get_type(int_from_any(node->base->accept(this)));
+  auto id = int_from_any(node->base->accept(this));
+  auto base_ty = global_get_type(id);
 
   Scope *scope = nullptr;
   switch (base_ty->kind) {

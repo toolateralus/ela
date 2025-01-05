@@ -59,7 +59,7 @@ ASTParamDecl* ASTCopier::copy_param_decl(ASTParamDecl* node) {
 }
 ASTDeclaration* ASTCopier::copy_declaration(ASTDeclaration* node) {
   auto new_node = new (ast_alloc<ASTDeclaration>()) ASTDeclaration(*node);
-  new_node->type = static_cast<ASTType*>(copy_node(node->type));
+  if (node->type) new_node->type = static_cast<ASTType*>(copy_node(node->type));
   if (node->value) new_node->value = static_cast<ASTExpr*>(copy_node(node->value.get()));
   return new_node;
 }

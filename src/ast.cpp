@@ -1469,11 +1469,11 @@ ASTDeclaration *Parser::parse_declaration() {
   return decl;
 }
 
-ASTBlock *Parser::parse_block() {
+ASTBlock *Parser::parse_block(Scope *scope) {
   auto range = begin_node();
   expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
-  ctx.set_scope();
+  ctx.set_scope(scope);
   while (peek().type != TType::RCurly) {
     if (peek().type == TType::Eof) {
       end_node(nullptr, range);
