@@ -156,7 +156,6 @@ ASTWhile* ASTCopier::copy_while(ASTWhile* node) {
 }
 ASTStructDeclaration* ASTCopier::copy_struct_declaration(ASTStructDeclaration* node) {
   auto new_node = new (ast_alloc<ASTStructDeclaration>()) ASTStructDeclaration(*node);
-  new_node->type = static_cast<ASTType*>(copy_node(node->type));
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
@@ -211,7 +210,6 @@ ASTUnionDeclaration* ASTCopier::copy_union_declaration(ASTUnionDeclaration* node
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  new_node->type = static_cast<ASTType*>(copy_node(node->type));
   new_node->fields.clear();
   for (auto field : node->fields) {
     new_node->fields.push_back(static_cast<ASTDeclaration*>(copy_node(field)));

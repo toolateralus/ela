@@ -413,11 +413,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        ASTType *type;
+        ASTType *type = ast_alloc<ASTType>();
         if (parser->current_union_decl) {
-          type = parser->current_union_decl.get()->type;
+          type->base = parser->current_union_decl.get()->name;
         } else if (parser->current_struct_decl) {
-          type = parser->current_struct_decl.get()->type;
+          type->base = parser->current_struct_decl.get()->name;
         } else {
           throw_error(
               "can only use #self in unions and structs to get the "
@@ -434,7 +434,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->expect(TType::DoubleColon);
         auto decl = parser->parse_struct_declaration(get_unique_identifier());
-        auto t = global_get_type(decl->type->resolved_type);
+        auto t = global_get_type(decl->resolved_type);
         auto info = (t->get_info()->as<StructTypeInfo>());
         info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
         return decl;
@@ -1672,10 +1672,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     type_id = ctx.scope->create_struct_type(name.value, {});
   }
 
-  decl->type = ast_alloc<ASTType>();
-  decl->type->base = name.value;
-  decl->type->extension_info = {};
-  decl->type->resolved_type = type_id;
+  decl->name = name.value;
+  decl->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
 
@@ -1709,16 +1707,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   auto range = begin_node();
-
-  auto node = ast_alloc<ASTUnionDeclaration>();
-  current_union_decl = node;
-
-  node->name = name;
-  node->type = ast_alloc<ASTType>();
-  node->type->base = name.value;
-
+  auto decl = ast_alloc<ASTUnionDeclaration>();
+  current_union_decl = decl;
+  decl->name = name.value;
   auto id = ctx.scope->find_type_id(name.value, {});
-
+  decl->resolved_type = id;
   if (id != -1) {
     auto type = global_get_type(id);
 
@@ -1739,7 +1732,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   expect(TType::Union);
 
   if (peek().type == TType::GenericBrace) {
-    node->generic_parameters = parse_generic_parameters();
+    decl->generic_parameters = parse_generic_parameters();
   }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
@@ -1755,16 +1748,16 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   } else {
     // if we didn't find a foward declaration, instantiate a new empty union
     // type, and resolve the node type, cause might as well.
-    type_id = node->type->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
+    type_id = decl->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
   }
 
   if (peek().type == TType::Semi) {
     eat();
-    node->is_fwd_decl = true;
+    decl->is_fwd_decl = true;
     type = global_get_type(type_id);
     auto info = (type->get_info()->as<UnionTypeInfo>());
     info->flags |= UNION_IS_FORWARD_DECLARED;
-    return node;
+    return decl;
   }
 
   std::vector<ASTDeclaration *> fields;
@@ -1784,10 +1777,10 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
-      auto type = global_get_type(struct_decl->type->resolved_type);
+      auto type = global_get_type(struct_decl->resolved_type);
       auto info = (type->get_info()->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        throw_error("can only use #anon struct declarations within union types.", node->source_range);
+        throw_error("can only use #anon struct declarations within union types.", decl->source_range);
       }
       structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
@@ -1798,17 +1791,17 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     }
   }
 
-  node->fields = fields;
-  node->methods = methods;
-  node->structs = structs;
-  node->scope = block->scope;
+  decl->fields = fields;
+  decl->methods = methods;
+  decl->structs = structs;
+  decl->scope = block->scope;
 
   type = global_get_type(type_id);
   auto info = (type->get_info()->as<UnionTypeInfo>());
   info->scope = scope;
 
-  end_node(node, range);
-  return node;
+  end_node(decl, range);
+  return decl;
 }
 
 Nullable<ASTExpr> Parser::try_parse_directive_expr() {

@@ -214,13 +214,13 @@ std::any SerializeVisitor::visit(ASTWhile *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
-  auto t = global_get_type(node->type->resolved_type);
+  auto t = global_get_type(node->resolved_type);
   auto info = (t->get_info()->as<StructTypeInfo>());
   const auto is_anonymous = (info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0;
 
   if (!is_anonymous) {
     ss << indent() << "Struct ";
-    ss << node->type->base.get_str();
+    ss << node->name.get_str();
     ss << " {\n";
   } else {
     ss << indent() << "anonymous struct" << '\n';

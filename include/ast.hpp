@@ -379,9 +379,9 @@ struct ASTSubscript : ASTExpr {
 };
 
 struct ASTStructDeclaration : ASTStatement {
-  ASTType *type;
   Scope *scope;
-
+  InternedString name;
+  int resolved_type;
   bool is_fwd_decl = false;
   bool is_extern = false;
 
@@ -415,8 +415,9 @@ struct ASTEnumDeclaration : ASTStatement {
 
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
-  Token name; // TODO: make not a token
-  ASTType *type;
+  InternedString name;
+  int resolved_type;
+
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;
 

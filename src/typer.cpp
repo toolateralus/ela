@@ -265,7 +265,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
   current_struct_decl = node;
   Defer _([&] { current_struct_decl = last_decl; });
 
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
@@ -281,7 +281,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
       ctx.scope->types[param] = *generic_arg;
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type(node->type->base, node->scope));
+    type = global_get_type(global_create_struct_type(node->name, node->scope));
   }
 
   ctx.scope->insert("this", type->take_pointer_to());
@@ -308,7 +308,7 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
   current_union_decl = node;
   Defer _([&] { current_union_decl = last_decl; });
 
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = global_get_type(node->resolved_type);
 
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
@@ -319,7 +319,7 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
       ctx.scope->types[param] = *generic_arg;
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type(node->type->base, node->scope));
+    type = global_get_type(global_create_struct_type(node->name, node->scope));
   }
 
   ctx.scope->insert("this", type->take_pointer_to());
@@ -453,8 +453,8 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
 
 std::any Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->insert(node->type->base, -1, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->lookup(node->type->base);
+    ctx.scope->insert(node->name, -1);
+    auto sym = ctx.scope->lookup(node->name);
     sym->declaring_node = node;
     return {};
   }
@@ -463,8 +463,8 @@ std::any Typer::visit(ASTStructDeclaration *node) {
 
 std::any Typer::visit(ASTUnionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->insert(node->name.value, -1, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->lookup(node->name.value);
+    ctx.scope->insert(node->name, -1);
+    auto sym = ctx.scope->lookup(node->name);
     sym->declaring_node = node;
     return {};
   }
@@ -1413,11 +1413,9 @@ std::any Typer::visit(ASTSubscript *node) {
 }
 std::any Typer::visit(ASTMake *node) {
   auto type = int_from_any(node->type_arg->accept(this));
-
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
   declaring_or_assigning_type = type;
-
   if (!node->arguments->arguments.empty()) {
     node->arguments->accept(this);
   }

@@ -209,3 +209,47 @@ struct std::formatter<std::vector<T>> {
     return out;
   }
 };
+
+
+template <class T>
+requires(std::is_enum_v<T>)
+struct Flags {
+  using underlying = std::underlying_type_t<T>;
+  Flags() = default;
+  Flags(T value) : value(static_cast<underlying>(value)) {}
+  Flags(underlying value) : value(value) {}
+
+  inline Flags &operator|=(T other) {
+    value |= static_cast<underlying>(other);
+    return *this;
+  }
+  inline Flags &operator&=(T other) {
+    value &= static_cast<underlying>(other);
+    return *this;
+  }
+  inline Flags operator|(T other) const {
+    return Flags(value | static_cast<underlying>(other));
+  }
+  inline Flags operator&(T other) const {
+    return Flags(value & static_cast<underlying>(other));
+  }
+
+  inline Flags &operator|=(underlying other) {
+    value |= other;
+    return *this;
+  }
+  inline Flags &operator&=(underlying other) {
+    value &= other;
+    return *this;
+  }
+  inline Flags operator|(underlying other) const {
+    return Flags(value | other);
+  }
+  inline Flags operator&(underlying other) const {
+    return Flags(value & other);
+  }
+  inline explicit operator bool() const {
+    return value != 0;
+  }
+  underlying value{};
+};

@@ -370,8 +370,8 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   auto emit_destructor = [&]() {
-    auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                       : current_union_decl.get()->type->resolved_type;
+    auto type_id = current_struct_decl ? current_struct_decl.get()->resolved_type
+                                       : current_union_decl.get()->resolved_type;
     auto type = global_get_type(type_id);
     auto name = type->get_base().get_str();
     (*ss) << '~' << name << "()";
@@ -380,16 +380,16 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   auto emit_constructor = [&]() {
-    auto type_id = current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                       : current_union_decl.get()->type->resolved_type;
+    auto type_id = current_struct_decl ? current_struct_decl.get()->resolved_type
+                                       : current_union_decl.get()->resolved_type;
     auto type = global_get_type(type_id);
     auto name = type->get_base().get_str();
     (*ss) << name;
 
     auto is_copy_ctor =
         node->params->params.size() == 1 && node->params->params[0]->type->resolved_type ==
-                                                (current_struct_decl ? current_struct_decl.get()->type->resolved_type
-                                                                     : current_union_decl.get()->type->resolved_type);
+                                                (current_struct_decl ? current_struct_decl.get()->resolved_type
+                                                                     : current_union_decl.get()->resolved_type);
 
     if (is_copy_ctor) {
       (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str() << ")";
@@ -539,13 +539,13 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.type);
       type->set_base(type->get_base().get_str() + mangled_type_args(instantiation.arguments));
-      static_cast<ASTStructDeclaration*>(instantiation.node)->type->resolved_type = type->id;
+      static_cast<ASTStructDeclaration*>(instantiation.node)->resolved_type = type->id;
       instantiation.node->accept(this);
     }
     return {};
   }
   emit_line_directive(node);
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
   current_struct_decl = node;
 
@@ -646,14 +646,14 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
 }
 std::any Emitter::visit(ASTUnionDeclaration *node) {
   if (node->is_fwd_decl) {
-    (*ss) << "union " << node->name.value.get_str() << ";\n";
+    (*ss) << "union " << node->name.get_str() << ";\n";
     return {};
   }
 
   Defer _([&] { current_union_decl = nullptr; });
   current_union_decl = node;
 
-  (*ss) << "union " << node->name.value.get_str() << "{\n";
+  (*ss) << "union " << node->name.get_str() << "{\n";
 
   indentLevel++;
   ctx.set_scope(node->scope);
@@ -696,11 +696,11 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
 
   // We define these manually here because it gets annoying if not.
   if (!has_default_ctor) {
-    (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
+    (*ss) << "\n" << node->name.get_str() << "() {}\n";
   }
 
   if (!has_dtor) {
-    (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
+    (*ss) << "\n~" << node->name.get_str() << "() {}\n";
   }
 
   emit_default_init = true;
