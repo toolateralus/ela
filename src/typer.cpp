@@ -749,8 +749,13 @@ std::any Typer::visit(ASTFor *node) {
     auto info = dynamic_cast<StructTypeInfo *>(range_type->get_info());
     Symbol *begin = info->scope->lookup("begin");
     Symbol *end = info->scope->lookup("end");
+    auto begin_ty = global_get_type(begin->type_id);
+    // TODO: assert begin&endty are functions && return the same type.
     if (begin && end && begin->type_id == end->type_id) {
-      iter_ty = begin->type_id;
+      iter_ty = begin_ty->get_info()->as<FunctionTypeInfo>()->return_type;
+      if (node->value_semantic != VALUE_SEMANTIC_POINTER) {
+        iter_ty = global_get_type(iter_ty)->get_element_type();
+      }
     } else {
       throw_error(std::format("Can only iterate over structs you define 'begin' and "
                               "'end' on. They must both be defined, and must both "

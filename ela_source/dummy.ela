@@ -1,16 +1,44 @@
 #import core;
 
-Adder :: struct![T] {
-  a: T;
-  b: T;
-  run :: fn() -> T {
-    return a + b;
+List :: struct![T] {
+  data: T*;
+  length: u64;
+  capacity: u64;
+
+  #operator([]) :: fn(index: u64) -> T* {
+    return &data[index];
+  }
+  push :: fn(item: T) {
+    if (length >= capacity) {
+      if (capacity == 0) {
+        capacity = 8;
+      } else {
+        capacity *= 2;
+      }
+      data = realloc(data, #type(T).size * capacity);
+    }
+    data[length] = item;
+    length += 1;
+  }
+  begin :: fn() -> T* {
+    return data;
+  }
+  end :: fn() -> T* {
+    return data + length;
+  }
+  pop :: fn() -> T {
+    length -= 1;
+    return data[length + 1];
   }
 }
 
-main :: fn() {
-  int_adder: Adder![int];
-  int_adder.a = 5;
-  int_adder.b = 6;
-  printf("%d\n", int_adder.run());
+main ::fn() {
+  list : List![int];
+  for i in 0..100 {
+    list.push(i);
+  }
+
+  for item in list {
+    println($"{item}");
+  }
 }
