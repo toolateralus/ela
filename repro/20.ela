@@ -1,0 +1,13 @@
+overloaded :: fn(n : int) {
+
+}
+
+// This overwrites the previous overload.
+// This could just be a compiler error?
+overloaded :: fn![T](n : T) {
+
+}
+
+main :: fn() {
+  overloaded(100);  
+}
