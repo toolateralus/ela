@@ -1,10 +1,16 @@
 #import core;
 
-add :: fn![T](a: T, b: T) -> T {
-  return a + b;
+Adder :: struct![T] {
+  a: T;
+  b: T;
+  run :: fn() -> T {
+    return a + b;
+  }
 }
 
 main :: fn() {
-  printf("%d\n", add![int](5, 6));
-  printf("%f\n", add![float](5.435, 1.234));
+  int_adder: Adder![int];
+  int_adder.a = 5;
+  int_adder.b = 6;
+  printf("%d\n", int_adder.run());
 }

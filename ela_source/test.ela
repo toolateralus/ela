@@ -1591,8 +1591,30 @@ generic_add :: fn![T](a: T, b: T) -> T {
   return a + b;
 }
 
-#test test_generic_add :: fn() {
-  result := generic_add![float](100.0, 100.0);
-  assert("generic_add_int failed", result == 200.0);
+#test test_generic_func :: fn() {
+  float_res := generic_add![float](100.0, 100.0);
+  assert("generic_add_float failed", float_res == 200.0);
+  int_res := generic_add![int](5, 6);
+  assert("generic_add_int failed", result == 11);
 }
 
+GnericStruct :: struct![T] {
+  a: T;
+  b: T;
+  run :: fn() -> T {
+    return a + b;
+  }
+}
+
+#test test_generic_type :: fn() {
+  int_adder: GnericStruct![int];
+  int_adder.a = 5;
+  int_adder.b = 6;
+  res := int_adder.run();
+  assert("generic type failure", res == 5 + 6);
+  float_adder: GnericStruct![float];
+  float_adder.a = 1.23;
+  float_adder.b = 4.56;
+  res = float_adder.run();
+  assert("generic type failure", res == 1.23 + 4.56);
+}

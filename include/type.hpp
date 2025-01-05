@@ -171,7 +171,6 @@ using GenericParameter = InternedString;
 struct TypeInfo {
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
-  std::vector<GenericParameter> generic_parameters;
   
   TypeInfo() {}
 

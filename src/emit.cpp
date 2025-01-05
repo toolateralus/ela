@@ -432,7 +432,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
       for (auto &instantiation : node->generic_instantiations) {
-        instantiation.definition->accept(this);
+        instantiation.node->accept(this);
       }
       return;
     }
@@ -523,6 +523,12 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   return {};
 }
 std::any Emitter::visit(ASTStructDeclaration *node) {
+  if (!node->generic_parameters.empty()) {
+    for (auto &instantiation : node->generic_instantiations) {
+      instantiation.node->accept(this);
+    }
+    return {};
+  }
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());

@@ -1642,14 +1642,13 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto range = begin_node();
   expect(TType::Struct);
 
-  std::vector<GenericParameter> params;
-  if (peek().type == TType::GenericBrace) {
-    params = parse_generic_parameters();
-  }
-
   auto old = current_struct_decl;
   auto decl = ast_alloc<ASTStructDeclaration>();
   current_struct_decl = decl;
+
+  if (peek().type == TType::GenericBrace) {
+    decl->generic_parameters = parse_generic_parameters();
+  }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
 
@@ -1669,10 +1668,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   }
 
   decl->type = ast_alloc<ASTType>();
-  ;
   decl->type->base = name.value;
   decl->type->extension_info = {};
   decl->type->resolved_type = type_id;
+  auto type = global_get_type(type_id);
+  auto info = type->get_info()->as<StructTypeInfo>();
 
   if (!semicolon()) {
     auto block = parse_block();
@@ -1690,17 +1690,12 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     }
     decl->scope = block->scope;
   } else {
-    Type *t = global_get_type(type_id);
-    auto info = (t->get_info()->as<StructTypeInfo>());
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     decl->is_fwd_decl = true;
   }
 
-  auto info = global_get_type(type_id)->get_info()->as<StructTypeInfo>();
-
   info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   info->scope = decl->scope;
-  info->generic_parameters = params;
 
   current_struct_decl = old;
   end_node(decl, range);
@@ -1738,9 +1733,8 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   expect(TType::Union);
 
-  std::vector<GenericParameter> params;
   if (peek().type == TType::GenericBrace) {
-    params = parse_generic_parameters();
+    node->generic_parameters = parse_generic_parameters();
   }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
@@ -1806,7 +1800,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   type = global_get_type(type_id);
   auto info = (type->get_info()->as<UnionTypeInfo>());
-  info->generic_parameters = params;
   info->scope = scope;
 
   end_node(node, range);
