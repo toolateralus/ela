@@ -29,8 +29,10 @@ static void remove_body(Parser *parser) {
   parser->expect(TType::LCurly);
   int depth = 1;
   while (depth > 0) {
-    if (parser->peek().type == TType::LCurly) depth++;
-    if (parser->peek().type == TType::RCurly) depth--;
+    if (parser->peek().type == TType::LCurly)
+      depth++;
+    if (parser->peek().type == TType::RCurly)
+      depth--;
     parser->eat();
   }
 }
@@ -55,28 +57,28 @@ static void remove_preproc(Parser *parser) {
 static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list, PreprocKind kind) {
   bool executed = false;
 
-  if (kind == PREPROC_IFDEF) {  // Handling #ifdef
+  if (kind == PREPROC_IFDEF) { // Handling #ifdef
     auto symbol = parser->expect(TType::Identifier).value;
     executed = parser->ctx.scope->has_def(symbol);
-  } else if (kind == PREPROC_IFNDEF) {  // Handling #ifndef
+  } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
     auto symbol = parser->expect(TType::Identifier).value;
     executed = !parser->ctx.scope->has_def(symbol);
-  } else if (kind == PREPROC_IF) {  // Handling #if
+  } else if (kind == PREPROC_IF) { // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
     executed = value.is_truthy();
   } else {
-    throw_error(
-        "INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
-        "unrecognized kind.",
-        {});
+    throw_error("INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
+                "unrecognized kind.",
+                {});
   }
 
   if (executed) {
     parser->expect(TType::LCurly);
     while (parser->peek().type != TType::RCurly) {
       list->statements.push_back(parser->parse_statement());
-      while (parser->peek().type == TType::Semi) parser->eat();
+      while (parser->peek().type == TType::Semi)
+        parser->eat();
     }
     parser->expect(TType::RCurly);
   } else {
@@ -99,7 +101,8 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
         parser->expect(TType::LCurly);
         while (parser->peek().type != TType::RCurly) {
           list->statements.push_back(parser->parse_statement());
-          while (parser->peek().type == TType::Semi) parser->eat();
+          while (parser->peek().type == TType::Semi)
+            parser->eat();
         }
         parser->expect(TType::RCurly);
       }
@@ -648,7 +651,8 @@ ASTProgram *Parser::parse() {
       }
     }
 
-    while (semicolon()) eat();
+    while (semicolon())
+      eat();
 
     if (peek().type == TType::Eof && states.empty()) {
       break;
@@ -664,13 +668,15 @@ ASTProgram *Parser::parse() {
           program->statements.push_back(statement);
         }
       }
-      if (semicolon()) eat();
+      if (semicolon())
+        eat();
       continue;
     }
 
     program->statements.push_back(parse_statement());
 
-    while (semicolon()) eat();
+    while (semicolon())
+      eat();
   }
   end_node(program, range);
   return program;
@@ -708,7 +714,8 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
     Precedence token_precedence = get_operator_precedence(peek());
-    if (token_precedence <= precedence) break;
+    if (token_precedence <= precedence)
+      break;
     auto op = eat();
     auto right = parse_expr(token_precedence);
     auto binexpr = ast_alloc<ASTBinExpr>();
@@ -732,7 +739,8 @@ ASTExpr *Parser::parse_unary() {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
-    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
+    auto is_rvalue =
+        expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
     // don't need to do this if we already got one of the previous ones.
     auto ctor = is_rvalue || [&] {
       if (expr->get_node_type() != AST_NODE_MAKE) {
@@ -746,12 +754,11 @@ ASTExpr *Parser::parse_unary() {
     }();
     if ((is_rvalue || ctor) && (op.type == TType::And || op.type == TType::Mul)) {
       end_node(nullptr, range);
-      throw_error(
-          "Cannot take the address of, or dereference a literal or "
-          "'rvalue'\nlike a function result or constructor result. It "
-          "is a temporary value\nand would be invalid once this "
-          "statement completed executing",
-          range);
+      throw_error("Cannot take the address of, or dereference a literal or "
+                  "'rvalue'\nlike a function result or constructor result. It "
+                  "is a temporary value\nand would be invalid once this "
+                  "statement completed executing",
+                  range);
     }
     unaryexpr->op = op;
     unaryexpr->operand = expr;
@@ -768,7 +775,7 @@ ASTExpr *Parser::parse_postfix() {
   // build dot and subscript expressions
   while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
          peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
-         peek().type == TType::Decrement || peek().type == TType::Range) {
+         peek().type == TType::Decrement || peek().type == TType::Range || peek().type == TType::As) {
     if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -805,6 +812,15 @@ ASTExpr *Parser::parse_postfix() {
       node->left = left;
       node->right = right;
       return node;
+    } else if (peek().type == TType::As) {
+      eat();
+      auto type = parse_type();
+      auto node = ast_alloc<ASTMake>();
+      node->type_arg = type;
+      node->kind = MAKE_CAST;
+      node->arguments = ast_alloc<ASTArguments>();
+      node->arguments->arguments.push_back(left);
+      left = node;
     }
   }
 
@@ -873,10 +889,9 @@ ASTExpr *Parser::parse_primary() {
       eat();
       if (peek().type != TType::Identifier) {
         end_node(nullptr, range);
-        throw_error(
-            "::Something syntax is only for using enum variants that are "
-            "in your current scope.",
-            range);
+        throw_error("::Something syntax is only for using enum variants that are "
+                    "in your current scope.",
+                    range);
       }
       auto scope_res = ast_alloc<ASTScopeResolution>();
       scope_res->base = nullptr;
@@ -1016,35 +1031,16 @@ ASTExpr *Parser::parse_primary() {
     }
     case TType::LParen: {
       auto range = begin_node();
-      expect(TType::LParen);  // (
+      expect(TType::LParen); // (
       const auto lookahead = lookahead_buf();
-
-      // for (Type)expr;
-      if (ctx.scope->find_type_id(peek().value, {}) != -1 && (lookahead_buf()[1].type == TType::RParen || lookahead_buf()[1].type == TType::Mul)) {
-        // CLEANUP: We probably don't wanna use ASTMake for so many things,
-        // but for now it's okay. Actually, we don't want ASTMake at all, it
-        // should get eliminated and ASTConstruct and ASTCast should probably be
-        // added to replace it. This would help us have a more consistent and
-        // clear syntax.
-
-        auto type = parse_type();
-        auto node = ast_alloc<ASTMake>();
-        expect(TType::RParen);
-        node->type_arg = type;
-        node->kind = MAKE_CAST;
-        node->arguments = ast_alloc<ASTArguments>();
-        node->arguments->arguments.push_back(parse_unary());
-        return node;
-      }
-
       auto expr = parse_expr();
-
       if (peek().type == TType::Comma) {
         eat();
         auto exprs = std::vector<ASTExpr *>{expr};
         while (peek().type != TType::RParen) {
           exprs.push_back(parse_expr());
-          if (peek().type == TType::Comma) eat();
+          if (peek().type == TType::Comma)
+            eat();
         }
         expect(TType::RParen);
         auto tuple = ast_alloc<ASTTuple>();
@@ -1052,12 +1048,10 @@ ASTExpr *Parser::parse_primary() {
         tuple->type = ast_alloc<ASTType>();
         return tuple;
       }
-
       if (peek().type != TType::RParen) {
         throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
       }
-
-      eat();  // consume ')'
+      eat(); // consume ')'
       end_node(expr, range);
       return expr;
     }
@@ -1080,7 +1074,8 @@ ASTType *Parser::parse_type() {
     std::vector<ASTType *> types;
     while (peek().type != TType::RParen) {
       types.push_back(parse_type());
-      if (peek().type == TType::Comma) eat();
+      if (peek().type == TType::Comma)
+        eat();
     }
     expect(TType::RParen);
     auto node = ast_alloc<ASTType>();
@@ -1097,10 +1092,9 @@ ASTType *Parser::parse_type() {
   if (peek().type == TType::Directive) {
     auto expr = try_parse_directive_expr().get();
     if (expr->get_node_type() != AST_NODE_TYPE) {
-      throw_error(
-          "unable to get type from directive expression where a type "
-          "was expected.",
-          range);
+      throw_error("unable to get type from directive expression where a type "
+                  "was expected.",
+                  range);
     }
     auto type = static_cast<ASTType *>(expr);
     return type;
@@ -1226,10 +1220,9 @@ ASTStatement *Parser::parse_statement() {
         auto expr = parse_expr();
         node->range = expr;
       } else {
-        throw_error(
-            "Invalid for syntax. expected 'for i in 0..10 || for elem in "
-            "iterable || for *elem in iterable",
-            range);
+        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in "
+                    "iterable || for *elem in iterable",
+                    range);
       }
 
       node->block = parse_block();
@@ -1334,9 +1327,9 @@ ASTStatement *Parser::parse_statement() {
 
     const bool is_deref = tok.type == TType::Mul;
 
-    const bool is_special_case = tok.type == TType::Delete ||  // delete statement
-                                 tok.type == TType::LParen ||  // possible parenthesized dereference or something.
-                                 tok.type == TType::Erase ||   // ~vector, for popping and ignoring.
+    const bool is_special_case = tok.type == TType::Delete || // delete statement
+                                 tok.type == TType::LParen || // possible parenthesized dereference or something.
+                                 tok.type == TType::Erase ||  // ~vector, for popping and ignoring.
                                  tok.type == TType::Switch;
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
@@ -1402,10 +1395,9 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
       node->idens.push_back(iden);
     } else {
       end_node(nullptr, range);
-      throw_error(
-          "Can only have identifiers on the left hand side of a tuple "
-          "deconstruction expressions",
-          range);
+      throw_error("Can only have identifiers on the left hand side of a tuple "
+                  "deconstruction expressions",
+                  range);
     }
   }
   if (peek().type == TType::ColonEquals) {
@@ -1414,10 +1406,9 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   } else {
     // TODO: allow typed tuple deconstructions.
     end_node(nullptr, range);
-    throw_error(
-        "Currently, you cannot have an explicitly typed tuple "
-        "deconstruction. Use a, b, c := ....",
-        range);
+    throw_error("Currently, you cannot have an explicitly typed tuple "
+                "deconstruction. Use a, b, c := ....",
+                range);
   }
   return node;
 }
@@ -1438,10 +1429,9 @@ ASTDeclaration *Parser::parse_declaration() {
   if (ctx.scope->find_type_id(iden.value, {}) != -1 || keywords.contains(iden.value.get_str()) ||
       reserved.contains(iden.value.get_str())) {
     end_node(nullptr, range);
-    throw_error(
-        "Invalid variable declaration: a type or keyword exists with "
-        "that name,",
-        range);
+    throw_error("Invalid variable declaration: a type or keyword exists with "
+                "that name,",
+                range);
   }
 
   if (peek().type == TType::Colon) {
@@ -1481,7 +1471,8 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     }
     auto statement = parse_statement();
     block->statements.push_back(statement);
-    while (semicolon()) eat();
+    while (semicolon())
+      eat();
   }
   expect(TType::RCurly);
   block->scope = ctx.exit_scope();
@@ -1502,17 +1493,17 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
-        throw_error(
-            "Cannot use varargs outside of a function declaration. "
-            "Only use this for #foreign functions.",
-            range);
+        throw_error("Cannot use varargs outside of a function declaration. "
+                    "Only use this for #foreign functions.",
+                    range);
       }
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
       continue;
     }
 
     auto name = expect(TType::Identifier).value;
-    if (!type || peek().type == TType::Colon) expect(TType::Colon);
+    if (!type || peek().type == TType::Colon)
+      expect(TType::Colon);
 
     auto next = peek();
     auto is_generic_type = std::ranges::find(generic_params, GenericParameter{next.value}) != generic_params.end();
@@ -1562,7 +1553,8 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = function;
 
-  if (range.begin > 0) range.begin = range.begin - 1;
+  if (range.begin > 0)
+    range.begin = range.begin - 1;
   function->params = parse_parameters(function->generic_parameters);
   function->name = name.value;
 
@@ -1814,11 +1806,10 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
     if (expr.is_not_null()) {
       return expr;
     } else {
-      throw_error(
-          "Invalid directive in expression: directives in "
-          "expressions must return a value.",
+      throw_error("Invalid directive in expression: directives in "
+                  "expressions must return a value.",
 
-          {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
+                  {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
     }
   }
   return nullptr;
@@ -1829,7 +1820,8 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
   std::vector<ASTType *> params;
   while (peek().type != TType::RBrace) {
     params.push_back(parse_type());
-    if (peek().type != TType::RBrace) expect(TType::Comma);
+    if (peek().type != TType::RBrace)
+      expect(TType::Comma);
   }
   expect(TType::RBrace);
   return params;
@@ -1840,7 +1832,8 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   std::vector<GenericParameter> params;
   while (peek().type != TType::RBrace) {
     params.emplace_back(expect(TType::Identifier).value);
-    if (peek().type != TType::RBrace) expect(TType::Comma);
+    if (peek().type != TType::RBrace)
+      expect(TType::Comma);
   }
   expect(TType::RBrace);
   return params;
@@ -1925,8 +1918,8 @@ static Precedence get_operator_precedence(Token token) {
   switch (type) {
     case TType::Assign:
     case TType::ColonEquals:
-    case TType::Concat:  // this is for appending to arrays
-    case TType::Erase:   // this is for erase elements for arrays
+    case TType::Concat: // this is for appending to arrays
+    case TType::Erase:  // this is for erase elements for arrays
       return PRECEDENCE_ASSIGNMENT;
     case TType::LogicalOr:
       return PRECEDENCE_LOGICALOR;
@@ -2007,7 +2000,8 @@ SourceRange Parser::begin_node() { return SourceRange{.begin = token_idx, .begin
 
 void Parser::end_node(ASTNode *node, SourceRange &range) {
   range.end = token_idx;
-  if (node) node->source_range = range;
+  if (node)
+    node->source_range = range;
 }
 
 Token Parser::peek() const {

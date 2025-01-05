@@ -123,37 +123,37 @@ JsonLexer :: struct {
         position++;
         c = input[position];
       }
-      token.value = #make(string, &input[start], &input[start] + len);
+      token.value = string{&input[start], &input[start] + len};
       token.type = JsonTokenType::Number;
       return token;
       // operators
     } else if c == ':' {
-      token.value = #make(string, ":");
+      token.value = ":";
       token.type = JsonTokenType::Colon;
       position++;
       return token;
     } else if c == '{' {
-      token.value = #make(string, "{");
+      token.value = "{";
       token.type = JsonTokenType::LCurly;
       position++;
       return token;
     } else if c == '}' {
-      token.value = #make(string, "}");
+      token.value = "}";
       token.type = JsonTokenType::RCurly;
       position++;
       return token;
     } else if c == '[' {
-      token.value = #make(string, "[");
+      token.value = "[";
       token.type = JsonTokenType::LBracket;
       position++;
       return token;
     } else if c == ']' {
-      token.value = #make(string, "]");
+      token.value = "]";
       token.type = JsonTokenType::RBracket;
       position++;
       return token;
     } else if c == ',' {
-      token.value = #make(string, ",");
+      token.value = ",";
       token.type = JsonTokenType::Comma;
       position++;
       return token;
@@ -172,21 +172,21 @@ JsonLexer :: struct {
         c = input[position];
       }
       position++;
-      token.value = #make(string, &input[start], &input[start] + len);
+      token.value = string{&input[start], &input[start] + len}
       token.type = JsonTokenType::String;
       return token;
     } else if position + 4 <= length && strncmp(&input[position], "true", 4) == 0 {
-      token.value = #make(string, "true");
+      token.value = "true";
       token.type = JsonTokenType::True;
       position += 4;
       return token;
     } else if position + 5 <= length && strncmp(&input[position], "false", 5) == 0 {
-      token.value = #make(string, "false");
+      token.value = "false";
       token.type = JsonTokenType::False;
       position += 5;
       return token;
     } else if position + 4 <= length && strncmp(&input[position], "null", 4) == 0 {
-      token.value = #make(string, "null");
+      token.value = "null";
       token.type = JsonTokenType::Null;
       position += 4;
       return token;
@@ -208,14 +208,14 @@ JsonLexer :: struct {
     for type in types {
       if token.type == type then return token;
       if i == 0 {
-        types_string = #make(string, tokenTypeNames[type]);
+        types_string = tokenTypeNames[type];
         i++;
       } else {
         types_string = $"{types_string} | {tokenTypeNames[type]}"
       }
     }
     err(token, $"Expected {types_string}, got {tokenTypeNames[token.type]} :: {token.value}");
-    return {#make(string, ""), JsonTokenType::Invalid};
+    return {"", JsonTokenType::Invalid};
   }
 
   expect_type :: fn(type: s32) -> JsonToken {
@@ -277,21 +277,21 @@ JsonValue :: struct {
       obj := data.object;
       len := obj.length;
       rBrack := "}";
-      str := #make(string, "{");
+      str := "{";
 
       for i in 0..len {
         kvp := obj[i];
         if i == 0 {
-          str = $"{str}{(char)34}{kvp.key}{(char)34}: {kvp.value}";
+          str = $"{str}{32 as char}{kvp.key}{32 as char}: {kvp.value}";
         } else {
-          str = $"{str}, {(char)34}{kvp.key}{(char)34}: {kvp.value}";
+          str = $"{str}, {32 as char}{kvp.key}{32 as char}: {kvp.value}";
         }
       }
       return $"{str}{rBrack}";
     } else if type == JsonValueType::Array {
       arr := data.array;
       len := arr.length;
-      str := #make(string, "[");
+      str := "[";
 
       for i in 0..len {
         val := arr[i];
@@ -305,12 +305,12 @@ JsonValue :: struct {
     } else if type == JsonValueType::Number {
       return $"{data.number}";
     } else if type == JsonValueType::String {
-      return $"{(char)34}{data._string}{(char)34}";
+      return $"{32 as char}{data._string}{32 as char}";
     } else if type == JsonValueType::Boolean {
       if data.boolean == true {
-        return #make(string, "true");
+        return string{"true"};
       } else {
-        return #make(string, "false");
+        return string{"false"};
       }
     } else if type == JsonValueType::Null {
       return #make(string, "null");
@@ -451,65 +451,63 @@ json_parse_string :: fn(str: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, "string", str);
   return json_parse(&lexer);
 }
-
 json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   if type_is_float(type) {
     val.type = JsonValueType::Number;
     if type.id == #typeid(float) {
-      val.data.number = *(float*)object;
+      val.data.number = *(object as float*);
       return val;
     } else if type.id == #typeid(float64) {
-      val.data.number = *(float64*)object;
+      val.data.number = *(object as float64*);
       return val;
     } else if type.id == #typeid(float32) {
-      val.data.number = *(float32*)object;
+      val.data.number = *(object as float32*);
       return val;
     }
   } else if type_is_integral(type) {
     val.type = JsonValueType::Number;
     if type_is_signed(type) {
       if type.id == #typeid(char) {
-        val.data.number = *(c_string)object;
+        val.data.number = *(object as c_string);
         return val;
       } else if type.id == #typeid(s8) {
-        val.data.number = *(s8*)object;
+        val.data.number = *(object as s8*);
         return val;
       } else if type.id == #typeid(s16) {
-        val.data.number = *(s16*)object;
+        val.data.number = *(object as s16*);
         return val;
       } else if type.id == #typeid(s32) {
-        val.data.number = *(s32*)object;
+        val.data.number = *(object as s32*);
         return val;
       } else if type.id == #typeid(s64) {
-        val.data.number = *(s64*)object;
+        val.data.number = *(object as s64*);
         return val;
       } else if type.id == #typeid(int) {
-        val.data.number = *(int*)object;
+        val.data.number = *(object as int*);
         return val;
       }
     } else {
       if type.id == #typeid(u8) {
-        val.data.number = *(u8*)object;
+        val.data.number = *(object as u8*);
         return val;
       } else if type.id == #typeid(u16) {
-        val.data.number = *(u16*)object;
+        val.data.number = *(object as u16*);
         return val;
       } else if type.id == #typeid(u32) {
-        val.data.number = *(u32*)object;
+        val.data.number = *(object as u32*);
         return val;
       } else if type.id == #typeid(u64) {
-        val.data.number = *(u64*)object;
+        val.data.number = *(object as u64*);
         return val;
       }
     }
   } else if type_is_bool(type) {
     val.type = JsonValueType::Boolean;
-    val.data.boolean = *(bool*)object;
+    val.data.boolean = *(object as bool*);
   }
   return null;
 }
-
 json_serialize :: fn(object: void*, type: Type*) -> JsonValue*;
 
 json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
@@ -519,7 +517,7 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
   for field in type.fields {
     field_kvp: JsonKeyValuePair;
     field_kvp.key = field.name;
-    field_kvp.value = json_serialize((void*)field.get(object), field.type);
+    field_kvp.value = json_serialize(object as u8* + field.offset, field.type);
     val.data.object ~= field_kvp;
   }
   return val;
@@ -529,7 +527,7 @@ json_serialize_array :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   val.type = JsonValueType::Array;
   val.data.array = JsonValue*[]{};
-  for elem in type.elements((c_string)object) {
+  for elem in type.elements(object as c_string) {
     val.data.array ~= json_serialize(elem.data, elem.type);
   }
   return val;
@@ -540,7 +538,7 @@ json_serialize :: fn(object: void*, type: Type*) -> JsonValue* {
     if type.id == #typeid(string) {
       val := new JsonValue{};
       val.type = JsonValueType::String;
-      val.data._string = *(string*)object;
+      val.data._string = *(object as string*);
       return val;
     } else if type_is_scalar(type) {
       return json_serialize_scalar(object, type);
@@ -574,7 +572,7 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
     if !struct_field {
       return {true, $"Could not find field {json_field.key} in type {type.name}"};
     }
-    err := json_deserialize(json_field.value, (void*)struct_field.get(object), struct_field.type);
+    err := json_deserialize(json_field.value, object as u8* + struct_field.offset, struct_field.type);
     if err.has_value {
       return err;
     }
@@ -583,20 +581,16 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
 }
 
 json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
-  // TODO: this has memory problems. When the array gets too big, you get stack smashing. It's probably because you need to pass in
-  // TODO: .data, where that's not immediately intuitive.
   i := 0;
-  // used to store data as we deserialize.
   ptr: void* = malloc(type.element_type.size);
+  
   for elem in val.as_array() {
-    memset(ptr, 0, type.element_type.size); // to avoid corruption from short writes. This shouldn't happen, but we'll be safe.
+    memset(ptr, 0, type.element_type.size);
     err := json_deserialize(elem, ptr, type.element_type);
     if err.has_value {
-      free(ptr);
       return err;
     }
-    charobj := (char*)object;
-    memcpy(charobj + (i * type.element_type.size), ptr, type.element_type.size);
+    memcpy(object as char* + (i * type.element_type.size), ptr, type.element_type.size);
     ++i;
   }
   free(ptr);
@@ -608,61 +602,47 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
     return {true, "Unable to deserialize into pointer type with 'json_deserialize_scalar'"};
   }
   if type_is_bool(type) {
-    v := (bool*)object;
-    *v = val.as_boolean();
+    *(object as bool*) = val.as_boolean();
   } else if (type_is_float(type)) {
     if (type.size == 8) {
-      v := (float64*)object;
-      *v = val.as_number();
+      *(object as float64*) = val.as_number();
     } else {
-      v := (float32*)object;
-      *v = (float32)val.as_number();
+      *(object as float32*) = val.as_number() as float32;
     }
   } else if (type_is_integral(type)) {
     is_signed := type_is_signed(type);
     switch type.size {
         8: {
           if is_signed {
-            v := (s64*)object;
-            *v = val.as_number();
+            *(object as s64*) = val.as_number();
           } else {
-            v := (u64*)object;
-            *v = (u64)val.as_number();
+            *(object as u64*) = val.as_number() as u64;
           }
         }
         4: {
           if is_signed {
-            v := (s32*)object;
-            *v = (s32)val.as_number();
+            *(object as s32*) = val.as_number() as s32;
           } else {
-            v := (u32*)object;
-            *v = (u32)val.as_number();
+            *(object as u32*) = val.as_number() as u32;
           }
         }
         2: {
           if is_signed {
-            v := (s16*)object;
-            *v = (s16)val.as_number();
+            *(object as s16*) = val.as_number() as s16;
           } else {
-            v := (u16*)object;
-            *v = (u16)val.as_number();
+            *(object as u16*) = val.as_number() as u16;
           }
         }
         1: {
           if is_signed {
-            v := (s8*)object;
-            *v = (s8)val.as_number();
+            *(object as s8*) = val.as_number() as s8;
           } else {
-            v := (u8*)object;
-            *v = (u8)val.as_number();
+            *(object as u8*) = val.as_number() as u8;
           }
         }
     }
   } else if (type_is_string(type)) {
-    // our outdated reflection module doesn't support strings in the way we'd want.
-    // type_is_string is for char* i think.
-    str := (string*)object;
-    *str = val.as_string();
+    *(object as string*) = val.as_string();
   } else {
     return {true, $"Unable to deserialize into type {type.name}"};
   }
@@ -672,7 +652,7 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   if val.is_string() {
     if type.id == #typeid(string) {
-      *(string*)object = val.as_string();
+      *(object as string*) = val.as_string();
       return {};
     } else {
       return {true, $"Type mismatch: string to {type.name}"};

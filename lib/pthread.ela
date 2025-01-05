@@ -23,7 +23,7 @@ Thread :: struct {
   
   #ctor :: fn() {}
   #ctor :: fn(function: ThreadFunction) {
-    start(function, (void*)this);
+    start(function, this);
   }
   
   join :: fn() -> void* {

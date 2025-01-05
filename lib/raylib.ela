@@ -140,16 +140,16 @@ Color :: struct {
 
   with_alpha :: fn(a: int) -> #self {
     color := *this;
-    color.a = (u8)a;
+    color.a = a as u8;
     return color;
   }
 
   // Scales rgb values, but never wraps around.
   scaled_rgb :: fn(scalar: float32) -> #self {
     return {
-      (u8)clamp((int)(this.r * scalar), 0, 255),
-      (u8)clamp((int)(this.g * scalar), 0, 255),
-      (u8)clamp((int)(this.b * scalar), 0, 255),
+      clamp((this.r * scalar) as int, 0, 255) as u8,
+      clamp((this.g * scalar) as int, 0, 255) as u8,
+      clamp((this.b * scalar) as int, 0, 255) as u8,
       this.a,
     }
   }
@@ -361,44 +361,43 @@ ConfigFlags :: enum {
   BorderlessWindowedMode = 0x00008000, // 1 << 15
   InterlacedHint        = 0x00010000  // 1 << 16
 }
-
 color_lerp :: fn(a: Color, b: Color, t: float) -> Color {
-  return #make(Color, {
-    (u8)clamp(a.r + (b.r - a.r) * t, 0, 255),
-    (u8)clamp(a.g + (b.g - a.g) * t, 0, 255),
-    (u8)clamp(a.b + (b.b - a.b) * t, 0, 255),
-    (u8)clamp(a.a + (b.a - a.a) * t, 0, 255)
-  });
+  return {
+    clamp(a.r + (b.r - a.r) * t, 0, 255) as u8,
+    clamp(a.g + (b.g - a.g) * t, 0, 255) as u8,
+    clamp(a.b + (b.b - a.b) * t, 0, 255) as u8,
+    clamp(a.a + (b.a - a.a) * t, 0, 255) as u8
+  };
 }
 
 CLEAR: Color;
-WHITE: Color = { (u8)255, (u8)255, (u8)255, (u8)255 };
-BLACK: Color = { (u8)0, (u8)0, (u8)0, (u8)255 };
-RED: Color = { (u8)255, (u8)0, (u8)0, (u8)255 };
-GREEN: Color = { (u8)0, (u8)255, (u8)0, (u8)255 };
-BLUE: Color = { (u8)0, (u8)0, (u8)255, (u8)255 };
-YELLOW: Color = { (u8)255, (u8)255, (u8)0, (u8)255 };
-PURPLE: Color = { (u8)255, (u8)0, (u8)255, (u8)255 };
-ORANGE: Color = { (u8)255, (u8)165, (u8)0, (u8)255 };
-GRAY: Color = { (u8)128, (u8)128, (u8)128, (u8)255 };
-DARKGRAY: Color = { (u8)80, (u8)80, (u8)80, (u8)255 };
-LIGHTGRAY: Color = { (u8)200, (u8)200, (u8)200, (u8)255 };
-BROWN: Color = { (u8)165, (u8)42, (u8)42, (u8)255 };
-PINK: Color = { (u8)255, (u8)192, (u8)203, (u8)255 };
-LIME: Color = { (u8)0, (u8)255, (u8)0, (u8)255 };
-DARKGREEN: Color = { (u8)0, (u8)100, (u8)0, (u8)255 };
-SKYBLUE: Color = { (u8)135, (u8)206, (u8)235, (u8)255 };
-VIOLET: Color = { (u8)238, (u8)130, (u8)238, (u8)255 };
-GOLD: Color = { (u8)255, (u8)215, (u8)0, (u8)255 };
-BEIGE: Color = { (u8)245, (u8)245, (u8)220, (u8)255 };
-MAGENTA: Color = { (u8)255, (u8)0, (u8)255, (u8)255 };
-MAROON: Color = { (u8)128, (u8)0, (u8)0, (u8)255 };
-DARKBLUE: Color = { (u8)0, (u8)0, (u8)139, (u8)255 };
-DARKPURPLE: Color = { (u8)139, (u8)0, (u8)139, (u8)255 };
-DARKBROWN: Color = { (u8)101, (u8)67, (u8)33, (u8)255 };
-CYAN: Color = { (u8)0, (u8)255, (u8)255, (u8)255 };
-DARKCYAN: Color = { (u8)0, (u8)139, (u8)139, (u8)255 };
-LIGHTCYAN: Color = { (u8)224, (u8)255, (u8)255, (u8)255 };
+WHITE: Color = { 255 as u8, 255 as u8, 255 as u8, 255 as u8 };
+BLACK: Color = { 0 as u8, 0 as u8, 0 as u8, 255 as u8 };
+RED: Color = { 255 as u8, 0 as u8, 0 as u8, 255 as u8 };
+GREEN: Color = { 0 as u8, 255 as u8, 0 as u8, 255 as u8 };
+BLUE: Color = { 0 as u8, 0 as u8, 255 as u8, 255 as u8 };
+YELLOW: Color = { 255 as u8, 255 as u8, 0 as u8, 255 as u8 };
+PURPLE: Color = { 255 as u8, 0 as u8, 255 as u8, 255 as u8 };
+ORANGE: Color = { 255 as u8, 165 as u8, 0 as u8, 255 as u8 };
+GRAY: Color = { 128 as u8, 128 as u8, 128 as u8, 255 as u8 };
+DARKGRAY: Color = { 80 as u8, 80 as u8, 80 as u8, 255 as u8 };
+LIGHTGRAY: Color = { 200 as u8, 200 as u8, 200 as u8, 255 as u8 };
+BROWN: Color = { 165 as u8, 42 as u8, 42 as u8, 255 as u8 };
+PINK: Color = { 255 as u8, 192 as u8, 203 as u8, 255 as u8 };
+LIME: Color = { 0 as u8, 255 as u8, 0 as u8, 255 as u8 };
+DARKGREEN: Color = { 0 as u8, 100 as u8, 0 as u8, 255 as u8 };
+SKYBLUE: Color = { 135 as u8, 206 as u8, 235 as u8, 255 as u8 };
+VIOLET: Color = { 238 as u8, 130 as u8, 238 as u8, 255 as u8 };
+GOLD: Color = { 255 as u8, 215 as u8, 0 as u8, 255 as u8 };
+BEIGE: Color = { 245 as u8, 245 as u8, 220 as u8, 255 as u8 };
+MAGENTA: Color = { 255 as u8, 0 as u8, 255 as u8, 255 as u8 };
+MAROON: Color = { 128 as u8, 0 as u8, 0 as u8, 255 as u8 };
+DARKBLUE: Color = { 0 as u8, 0 as u8, 139 as u8, 255 as u8 };
+DARKPURPLE: Color = { 139 as u8, 0 as u8, 139 as u8, 255 as u8 };
+DARKBROWN: Color = { 101 as u8, 67 as u8, 33 as u8, 255 as u8 };
+CYAN: Color = { 0 as u8, 255 as u8, 255 as u8, 255 as u8 };
+DARKCYAN: Color = { 0 as u8, 139 as u8, 139 as u8, 255 as u8 };
+LIGHTCYAN: Color = { 224 as u8, 255 as u8, 255 as u8, 255 as u8 };
 
 // Exclude black and white.
 All_Colors : Color[] = {
@@ -599,17 +598,17 @@ measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
 
 // * Draw wavy jiggly text.
 jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
-  time: float = (float)GetTime();
+  time: float = GetTime() as float;
   length: int = strlen(text);
 
   intensity := style.jiggle_intensity;
   rate := style.jiggle_rate;
 
   for i in 0..length {
-    char_x := rect.x + (float)i * style.font_size;
-    char_y := rect.y + intensity * sin(rate * time + (float)i);
+    char_x := rect.x + i * style.font_size as float;
+    char_y := rect.y + intensity * sin(rate * time + (i as float));
     temp : char[2] = { text[i], '\0' };
-    DrawText((c_string)temp, (int)char_x, (int)char_y, style.font_size, style.foreground);
+    DrawText(temp as c_string, char_x as int, char_y as int, style.font_size, style.foreground);
   }
 }
 
@@ -650,7 +649,7 @@ draw_button :: fn(text: c_string, rect: Rectangle, style: Style, callback: Butto
   }
 
   if !style.use_jiggly_text {
-    DrawText(text, (int)text_x, (int)text_y, style.font_size, style.foreground);
+    DrawText(text, text_x as int, text_y as int, style.font_size, style.foreground);
   } else {
     jiggly_text(text, {text_x, text_y, new_rect.width, new_rect.height}, style);
   }
@@ -672,8 +671,8 @@ Timer :: struct {
       return true;
     }
     if now > (last_tick_time + interval) {
-      its := (int)((now - last_tick_time) / interval);
-      last_tick_time += (float)its * interval;
+      its := ((now - last_tick_time) / interval) as int;
+      last_tick_time += its * interval as int;
       return true;
     }
     return false;
@@ -704,20 +703,20 @@ SliderF :: struct {
     // Draw the slider foreground
     DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
 
-    DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, style.highlighted);
+    DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, style.highlighted);
 
 
     // Draw the text
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
     text_y := rect.y + (rect.height - style.font_size) / 2;
-    DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
+    DrawText(text.data, text_x as int, text_y as int, style.font_size, style.highlighted);
 
     // Draw the slider value
 
     value_text := $"{*this.value}";
     value_text.data[digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
+    DrawText(value_text.data, value_text_x as int, text_y as int, style.font_size, style.highlighted);
 
 
     adjust_slider_value :: fn() {
@@ -766,9 +765,9 @@ SliderI :: struct {
   draw :: fn() {
     DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
 
-    v_f := (float)*this.value;
-    min_f := (float)min_value;
-    max_f := (float)max_value;
+    v_f := (*this.value) as float;
+    min_f := min_value as float;
+    max_f := max_value as float;
 
     slider_width : float = rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
 
@@ -781,16 +780,16 @@ SliderI :: struct {
 
     DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
 
-    DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, style.highlighted);
+    DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, style.highlighted);
 
     text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
     text_y := rect.y + (rect.height - style.font_size) / 2;
-    DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.highlighted);
+    DrawText(text.data, text_x as int, text_y as int, style.font_size, style.highlighted);
 
     value_text := $"{*this.value}";
     value_text.data[digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, (int)value_text_x, (int)text_y, style.font_size, style.highlighted);
+    DrawText(value_text.data, value_text_x as int, text_y as int, style.font_size, style.highlighted);
 
 
     adjust_slider_value :: fn() {
@@ -843,13 +842,13 @@ CheckButton :: struct {
     if text.data {
       text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
       text_y := rect.y + (rect.height - style.font_size) / 2;
-      DrawText(text.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+      DrawText(text.data, text_x as int, text_y as int, style.font_size, style.foreground);
     }
 
     hit := CheckCollisionPointRec(GetMousePosition(), rect);
 
     if hit {
-      DrawRectangleLines((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height, ORANGE);
+      DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, ORANGE);
     }
 
 
@@ -889,12 +888,12 @@ DropDown :: struct {
         // Draw the selected option
         text_x := rect.x + (rect.width - MeasureText(options[selected_index].data, style.font_size)) / 2;
         text_y := rect.y + (rect.height - style.font_size) / 2;
-        DrawText(options[selected_index].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+        DrawText(options[selected_index].data, text_x as int, text_y as int, style.font_size, style.foreground);
       } else {
           // Draw the selected option
         text_x := rect.x + (rect.width - MeasureText(label.data, style.font_size)) / 2;
         text_y := rect.y + (rect.height - style.font_size) / 2;
-        DrawText(label.data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+        DrawText(label.data, text_x as int, text_y as int, style.font_size, style.foreground);
       }
 
       hit := CheckCollisionPointRec(GetMousePosition(), rect);
@@ -918,7 +917,7 @@ DropDown :: struct {
           DrawRectangleV(Vector2{option_rect.x, option_rect.y}, Vector2{option_rect.width, option_rect.height}, option_color);
           text_x := option_rect.x + (option_rect.width - MeasureText(options[i].data, style.font_size)) / 2;
           text_y := option_rect.y + (option_rect.height - style.font_size) / 2;
-          DrawText(options[i].data, (int)text_x, (int)text_y, style.font_size, style.foreground);
+          DrawText(options[i].data, text_x as int, text_y as int, style.font_size, style.foreground);
 
           if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton::Left) {
             selected_index = i;
