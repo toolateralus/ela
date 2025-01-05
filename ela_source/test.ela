@@ -685,6 +685,16 @@ something :: fn(f: float32) -> float32 {
   assert("delete", arr == null && arr2 == null);
 }
 
+MojStruktIter :: struct{
+  begin :: fn() {
+    // TODO: implement this/
+  }
+}
+
+#test test_defined_iterator ::fn() {
+  // TODO: add this test.
+}
+
 #test custom_iterator_increment :: fn() {
   for i in #make(Range, 0, 10, 2) {
     assert("iter increment failed to be divisible by 2", i % 2 == 0);
