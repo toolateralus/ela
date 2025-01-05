@@ -1,28 +1,28 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  211            113           1716
-src/emit.cpp                                 182             75           1475
-src/typer.cpp                                198            120           1294
-src/type.cpp                                  79             44            550
-include/ast.hpp                               87             22            531
-src/ast_copier.cpp                             1              0            349
-src/visitor.cpp                               25             17            334
+src/ast.cpp                                  199            113           1698
+src/emit.cpp                                 179             75           1456
+src/typer.cpp                                201            118           1345
+include/ast.hpp                               84             21            571
+src/type.cpp                                  78             42            543
+src/ast_copier.cpp                             1              0            375
+src/visitor.cpp                               25             17            337
 include/lex.hpp                               38              4            308
-include/type.hpp                              58             17            247
+include/type.hpp                              54             13            248
+include/visitor.hpp                           30              7            228
 include/core.hpp                              26              2            227
 src/lex.cpp                                   19              2            225
-include/visitor.hpp                           30              7            224
 include/constexpr.hpp                         31              0            217
 src/main.cpp                                  46             19            202
 src/scope.cpp                                 42             30            182
 include/error.hpp                             30              2            171
-include/scope.hpp                             25              4            123
+include/scope.hpp                             25              4            125
 src/constexpr.cpp                              2              0             95
 include/string_builder.hpp                     3              2             70
 include/interned_string.hpp                    4              0             50
 include/ast_copier.hpp                         3              0             43
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1149            492           8664
+SUM:                                        1129            483           8747
 -----------------------------------------------------------------------------------------
