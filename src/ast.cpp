@@ -732,7 +732,7 @@ ASTExpr *Parser::parse_unary() {
     auto op = eat();
     auto expr = parse_unary();
     auto unaryexpr = ast_alloc<ASTUnaryExpr>();
-    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || expr->get_node_type() == AST_NODE_CALL;
+    auto is_rvalue = expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
     // don't need to do this if we already got one of the previous ones.
     auto ctor = is_rvalue || [&] {
       if (expr->get_node_type() != AST_NODE_MAKE) {
