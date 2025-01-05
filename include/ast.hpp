@@ -166,7 +166,7 @@ struct ASTExprStatement : ASTStatement {
 struct ASTDeclaration : ASTStatement {
   Token name;  // TODO: make these an interned string. No need to hold on to a token.
   Token bitsize;
-  ASTType *type = nullptr;
+  ASTType *type = nullptr; // TODO: make me nullable.
   Nullable<ASTExpr> value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
@@ -581,7 +581,7 @@ struct Parser {
   ASTUnionDeclaration *parse_union_declaration(Token);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);
-  ASTBlock *parse_block();
+  ASTBlock *parse_block(Scope *scope = nullptr);
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
