@@ -162,10 +162,15 @@ struct ASTExprStatement : ASTStatement {
 // All of our declarations could inherit from a base declaration. I am not sure
 // if that would be useful.
 struct ASTDeclaration : ASTStatement {
-  Token name; // TODO: make these an interned string. No need to hold on to a token.
-  Token bitsize;
-  ASTType *type = nullptr; // TODO: make me nullable.
+  InternedString name;
+  InternedString bitsize;
+
+  // This isn't nullable, even though it can be null for part of compilation.
+  // That's because if it ever was null, when it's done typing it will have been created.
+  // It creates too much friction later on down the line if it's not.
+  ASTType* type = nullptr;
   Nullable<ASTExpr> value;
+
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
 
@@ -263,7 +268,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   Scope *scope;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
-  Token name; // TODO: make this an InternedString not a token
+  InternedString name;
   ASTType *return_type;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_FUNCTION_DECLARATION; }

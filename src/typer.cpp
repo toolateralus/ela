@@ -327,7 +327,7 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
   for (const auto &_struct : node->structs) {
     for (const auto &field : _struct->fields) {
       field->accept(this);
-      node->scope->insert(field->name.value, field->type->resolved_type);
+      node->scope->insert(field->name, field->type->resolved_type);
     }
   }
 
@@ -375,7 +375,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   info.default_params = 0;
   info.meta_type = node->meta_type;
 
-  auto name = node->name.value;
+  auto name = node->name;
 
   info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
 
@@ -393,11 +393,11 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
 
   // TODO: we need to support fwd decls of overloaded functions
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-    ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
+    ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
     return {};
   }
 
-  auto sym = ctx.scope->parent->lookup(node->name.value);
+  auto sym = ctx.scope->parent->lookup(node->name);
 
   if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
     sym->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
@@ -414,7 +414,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
         auto this_type = global_get_type(type_id);
         if (type->equals(this_type->base_id, this_type->get_ext()) &&
             type->type_info_equals(this_type->get_info(), this_type->kind))
-          throw_error(std::format("re-definition of function '{}'", node->name.value.get_str()), node->source_range);
+          throw_error(std::format("re-definition of function '{}'", node->name.get_str()), node->source_range);
       }
       sym->function_overload_types.push_back(type_id);
       sym->type_id = type_id;
@@ -422,8 +422,8 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
       // always insert the first function declarations as the 0th overloaded type,
       // because we can tell when a fucntion has been overloaded when this array's
       // size is > 1
-      ctx.scope->parent->insert(node->name.value, type_id, SYMBOL_IS_FUNCTION);
-      auto sym = ctx.scope->parent->lookup(node->name.value);
+      ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FUNCTION);
+      auto sym = ctx.scope->parent->lookup(node->name);
       sym->function_overload_types.push_back(type_id);
       sym->declaring_node = node;
     }
@@ -447,7 +447,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
     throw_error("Not all code paths return a value.", node->source_range);
   assert_types_can_cast_or_equal(control_flow.type, info.return_type, node->source_range,
                                  "invalid return type.. expected '{}', got '{}'",
-                                 std::format("function: '{}'", node->name.value.get_str()));
+                                 std::format("function: '{}'", node->name.get_str()));
   return type_id;
 }
 
@@ -545,8 +545,8 @@ int Typer::get_function_type(ASTFunctionDeclaration *node) {
 
 std::any Typer::visit(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->insert(node->name.value, -1, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->lookup(node->name.value);
+    ctx.scope->insert(node->name, -1, SYMBOL_IS_FUNCTION);
+    auto sym = ctx.scope->lookup(node->name);
     sym->declaring_node = node;
     return {};
   }
@@ -610,14 +610,14 @@ std::any Typer::visit(ASTDeclaration *node) {
     auto expr_type = int_from_any(node->value.get()->accept(this));
     assert_types_can_cast_or_equal(expr_type, node->type->resolved_type, node->source_range,
                                    "invalid declaration types. expected: {}, got {}",
-                                   std::format("declaration: {}", node->name.value.get_str()));
+                                   std::format("declaration: {}", node->name.get_str()));
   }
 
-  auto symbol = ctx.scope->lookup(node->name.value);
+  auto symbol = ctx.scope->lookup(node->name);
   symbol->type_id = node->type->resolved_type;
 
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
-    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.value.get_str()),
+    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()),
                 node->source_range);
   }
 

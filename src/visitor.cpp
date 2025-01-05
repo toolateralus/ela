@@ -39,9 +39,9 @@ std::any SerializeVisitor::visit(ASTFunctionDeclaration *node) {
     return {};
   }
 
-  ss << indent() << "Function " << node->name.value.get_str() << " {\n";
+  ss << indent() << "Function " << node->name.get_str() << " {\n";
   indentLevel++;
-  auto sym = context.scope->lookup(node->name.value);
+  auto sym = context.scope->lookup(node->name);
   // ss << indent() << "type: " << global_get_type(sym->type_id)->to_string() <<
   // '\n';
   visit(node->params);
@@ -77,7 +77,7 @@ std::any SerializeVisitor::visit(ASTParamDecl *node) {
   return {};
 }
 std::any SerializeVisitor::visit(ASTDeclaration *node) {
-  ss << indent() << "Declaration " << node->name.value.get_str() << " : ";
+  ss << indent() << "Declaration " << node->name.get_str() << " : ";
   node->type->accept(this);
   if (node->value.is_not_null()) {
     ss << " = ";

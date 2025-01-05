@@ -256,7 +256,7 @@ std::any Emitter::visit(ASTExprStatement *node) {
 std::any Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->type->resolved_type);
-  auto symbol = ctx.scope->local_lookup(node->name.value);
+  auto symbol = ctx.scope->local_lookup(node->name);
 
   auto handle_initialization = [&]() {
     if (node->value.is_not_null()) {
@@ -269,7 +269,7 @@ std::any Emitter::visit(ASTDeclaration *node) {
   };
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    (*ss) << get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     handle_initialization();
     return {};
   }
@@ -277,15 +277,15 @@ std::any Emitter::visit(ASTDeclaration *node) {
   if (node->is_bitfield) {
     node->type->accept(this);
     space();
-    (*ss) << node->name.value.get_str();
+    (*ss) << node->name.get_str();
     space();
-    (*ss) << ": " << node->bitsize.value.get_str();
+    (*ss) << ": " << node->bitsize.get_str();
     handle_initialization();
     return {};
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    (*ss) << get_declaration_type_signature_and_identifier(node->name.value.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     if (node->value.is_not_null()) {
       node->value.get()->accept(this);
     } else if (emit_default_init) {
@@ -302,7 +302,7 @@ std::any Emitter::visit(ASTDeclaration *node) {
 
   node->type->accept(this);
   space();
-  (*ss) << node->name.value.get_str();
+  (*ss) << node->name.get_str();
   space();
   handle_initialization();
   return {};
@@ -320,7 +320,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   }
 
   node->return_type->accept(this);
-  (*ss) << ' ' << node->name.value.get_str() << ' ';
+  (*ss) << ' ' << node->name.get_str() << ' ';
   node->params->accept(this);
   (*ss) << ";\n";
   emit_default_args = false;
@@ -328,7 +328,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
 void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
   // Right now we just always do a closure on local lambda functions.
   // This probably isn't desirable for simple in-out functions
-  (*ss) << indent() << "auto " << node->name.value.get_str() << " = [&]";
+  (*ss) << indent() << "auto " << node->name.get_str() << " = [&]";
   node->params->accept(this);
   (*ss) << " -> ";
   node->return_type->accept(this);
@@ -338,14 +338,14 @@ void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
   node->block.get()->accept(this);
 }
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
-  if (node->name.value == "main") {
+  if (node->name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
   (*ss) << "extern \"C\" ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
-  (*ss) << node->name.value.get_str() << '(';
+  (*ss) << node->name.get_str() << '(';
   for (const auto &param : node->params->params) {
     (*ss) << get_cpp_scalar_type(param->type->resolved_type);
     if (param != node->params->params.back()) {
@@ -411,19 +411,19 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_operator = [&]() {
     auto op = node->name;
 
-    if (op.type == TType::LParen) {
-      op.value = "()";
+    if (op == "(") {
+      op = "()";
     }
-    if (op.type == TType::LBrace) {
-      op.value = "[]";
+    if (op == "[") {
+      op = "[]";
     }
-    if (op.type == TType::Dot) {
-      op.value = "->";
+    if (op == ".") {
+      op = "->";
     }
     node->return_type->accept(this);
-    (*ss) << " operator " << op.value.get_str();
+    (*ss) << " operator " << op.get_str();
 
-    if (op.type == TType::Increment || op.type == TType::Decrement) {
+    if (op == "++" || op == "--") {
       (*ss) << "(int)";
     } else {
       node->params->accept(this);
@@ -441,7 +441,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
     auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope && (node->flags & FUNCTION_IS_METHOD) == 0;
 
-    if (node->name.value != "main" && !is_local) {
+    if (node->name != "main" && !is_local) {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
@@ -481,7 +481,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "extern \"C\" ";
     }
 
-    if (node->name.value == "main") {
+    if (node->name == "main") {
       if (!is_freestanding) {
         has_user_defined_main = true;
         node->return_type->accept(this);
@@ -489,10 +489,10 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
         node->block.get()->accept(this);
       } else {
         (*ss) << "int ";
-        emit_function_signature_and_body(node->name.value.get_str());
+        emit_function_signature_and_body(node->name.get_str());
       }
     } else {
-      emit_function_signature_and_body(node->name.value.get_str());
+      emit_function_signature_and_body(node->name.get_str());
     }
   };
 
@@ -1589,12 +1589,12 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   }
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.value.get_str() << "\", "
-                            << node->name.value.get_str() << "),";
+    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.get_str() << "\", "
+                            << node->name.get_str() << "),";
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
-  if (test_flag && node->name.value == "main") {
+  if (test_flag && node->name == "main") {
     return false;
   }
   return true;

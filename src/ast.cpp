@@ -246,7 +246,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::Fn);
 
         function->params = parser->parse_parameters();
-        function->name = name;
+        function->name = name.value;
         if (parser->peek().type != TType::Arrow) {
           function->return_type = ASTType::get_void();
         } else {
@@ -476,7 +476,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
 
-        func_decl->name = op;
+        func_decl->name = op.value;
 
         emit_warnings_or_errors_for_operator_overloads(op.type, func_decl->source_range);
 
@@ -534,7 +534,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::RParen);
         ASTDeclaration *decl = parser->parse_declaration();
         decl->is_bitfield = true;
-        decl->bitsize = size;
+        decl->bitsize = size.value;
         return decl;
     }}, 
 
@@ -1426,7 +1426,7 @@ ASTDeclaration *Parser::parse_declaration() {
   auto range = begin_node();
   ASTDeclaration *decl = ast_alloc<ASTDeclaration>();
   auto iden = eat();
-  decl->name = iden;
+  decl->name = iden.value;
 
   static std::set<std::string> reserved = {
       "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
@@ -1564,7 +1564,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   if (range.begin > 0) range.begin = range.begin - 1;
   function->params = parse_parameters(function->generic_parameters);
-  function->name = name;
+  function->name = name.value;
 
   auto sym = ctx.scope->local_lookup(name.value);
 
@@ -1784,7 +1784,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       }
       structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
-        block->scope->insert(field->name.value, field->type->resolved_type);
+        block->scope->insert(field->name, field->type->resolved_type);
       }
     } else {
       throw_error("Non method/field declarations not allowed in union", range);
