@@ -64,9 +64,8 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTTuple *node) override;
 
-
   // TODO: implement me.
-  
+
   std::any visit(ASTRange *node) override { return {}; }
   std::any visit(ASTSwitch *node) override { return {}; };
   std::any visit(ASTTupleDeconstruction *node) override { return {}; };
@@ -77,6 +76,9 @@ struct Typer : VisitorBase {
 
   int declaring_or_assigning_type = -1;
 
+  template <typename T>
+  int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
+                    std::vector<int> args);
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
@@ -100,11 +102,14 @@ struct Typer : VisitorBase {
   std::any visit(ASTScopeResolution *node) override;
   int get_function_type(ASTFunctionDeclaration *);
   void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
-  std::vector<int> get_generic_arg_types(const std::vector<ASTType*> &args);
+  std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
-  int visit_function_declaration(ASTFunctionDeclaration* node, bool generic_instantation, std::vector<int> generic_args = {});
-  std::any visit_struct_declaration(ASTStructDeclaration* node, bool generic_instantiation, std::vector<int> generic_args = {});
-  std::any visit_union_declaration(ASTUnionDeclaration* node, bool generic_instantiation, std::vector<int> generic_args = {});
+  int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
+                                 std::vector<int> generic_args = {});
+  int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+                               std::vector<int> generic_args = {});
+  int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
+                                   std::vector<int> generic_args = {});
 
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
@@ -152,7 +157,7 @@ struct Emitter : VisitorBase {
 
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
                                compile_command.compilation_flags.contains("-nostdlib");
-                               
+
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.
@@ -192,7 +197,6 @@ struct Emitter : VisitorBase {
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
 
-
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExt &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
@@ -202,12 +206,12 @@ struct Emitter : VisitorBase {
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 
-
   void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition,
                             Nullable<ASTBlock> block);
 
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
-  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name, Type *type);
+  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
+                                                             Type *type);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   std::any visit(ASTStructDeclaration *node) override;
@@ -253,5 +257,4 @@ struct Emitter : VisitorBase {
     }
     return {};
   };
-
 };
