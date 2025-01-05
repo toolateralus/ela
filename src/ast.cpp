@@ -1587,7 +1587,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   ctx.set_scope();
 
   // TODO: find a better solution to this.
-  for (const auto &param: function->generic_parameters) {
+  for (const auto &param : function->generic_parameters) {
     ctx.scope->types[param] = -2;
   }
   function->block = parse_block();
@@ -1635,6 +1635,22 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   return node;
 }
 
+void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
+  for (const auto &statement : statements) {
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+      decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
+    } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+        auto function = static_cast<ASTFunctionDeclaration *>(statement);
+        function->flags |= FUNCTION_IS_METHOD;
+        decl->methods.push_back(function);
+    } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
+      visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
+    } else if (statement->get_node_type() != AST_NODE_NOOP) {
+      throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
+    }
+  }
+}
+
 // TODO:
 // We need to clean up the struct & union parsing, make it more consistent.
 // Maybe use a generic function, they're strangely different.
@@ -1676,23 +1692,13 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   info->scope = decl->scope = create_child(ctx.scope);
   info->scope->is_struct_or_union_scope = true;
 
-  for (const auto &param: decl->generic_parameters) {
+  for (const auto &param : decl->generic_parameters) {
     info->scope->types[param] = -2;
   }
 
   if (!semicolon()) {
     auto block = parse_block(decl->scope);
-    for (const auto &statement : block->statements) {
-      if (statement->get_node_type() == AST_NODE_DECLARATION) {
-        decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-      } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        auto function = static_cast<ASTFunctionDeclaration *>(statement);
-        function->flags |= FUNCTION_IS_METHOD;
-        decl->methods.push_back(function);
-      } else {
-        throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
-      }
-    }
+    visit_struct_statements(decl, block->statements);
     decl->scope = block->scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
     info->scope = decl->scope;
@@ -1754,7 +1760,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   type = global_get_type(type_id);
   auto info = (type->get_info()->as<UnionTypeInfo>());
-  
+
   if (peek().type == TType::Semi) {
     eat();
     decl->is_fwd_decl = true;
@@ -1771,13 +1777,11 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   info->scope = decl->scope = create_child(ctx.scope);
   info->scope->is_struct_or_union_scope = true;
 
-  for (const auto &param: decl->generic_parameters) {
+  for (const auto &param : decl->generic_parameters) {
     info->scope->types[param] = -2;
   }
 
-
   auto block = parse_block(info->scope);
-  
 
   for (auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
