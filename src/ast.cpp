@@ -287,6 +287,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto type = parser->parse_expr();
         parser->expect(TType::RParen);
         auto outer = ast_alloc<ASTType>();
+        
         outer->kind = ASTType::REFLECTION;
         outer->normal.base = "Type";
         outer->extensions.push_back({TYPE_EXT_POINTER});
@@ -1050,8 +1051,6 @@ ASTExpr *Parser::parse_primary() {
 ASTType *Parser::parse_type() {
   auto range = begin_node();
 
-  // TODO: refactor tuples to use a different set of symbols.
-  // ! Nested tuples think that >> closing them is a shift right symbol
   if (peek().type == TType::LParen) {
     eat();
     std::vector<ASTType *> types;
@@ -1836,14 +1835,14 @@ void Parser::append_type_extensions(ASTType *node) {
           expect(TType::RBrace);
           continue;
         }
-        node->extensions.push_back({TYPE_EXT_ARRAY, expression});
+        node->extensions.push_back({TYPE_EXT_FIXED_ARRAY, expression});
       } else {
-        node->extensions.push_back({TYPE_EXT_ARRAY, nullptr});
+        node->extensions.push_back({TYPE_EXT_ARRAY});
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {
       expect(TType::Mul);
-      node->extensions.push_back({TYPE_EXT_POINTER, nullptr});
+      node->extensions.push_back({TYPE_EXT_POINTER});
     } else {
       break;
     }
@@ -1852,6 +1851,7 @@ void Parser::append_type_extensions(ASTType *node) {
 
 ASTType *Parser::parse_function_type() {
   auto output_type = ast_alloc<ASTType>();
+  output_type->kind = ASTType::FUNCTION;
   append_type_extensions(output_type);
   FunctionTypeInfo info{};
   output_type->function.parameter_types = parse_parameter_types();

@@ -1,1 +1,5 @@
-#foreign system :: fn(cmd: c_string) -> int;
+main :: fn() {
+  buffer: char[20];
+  index: int = 0;
+  buffer[index] = '0';
+}

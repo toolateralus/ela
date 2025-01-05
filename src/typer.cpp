@@ -3,7 +3,6 @@
 #include <format>
 #include <ranges>
 #include <string>
-#include <type_traits>
 #include <vector>
 
 #include "ast.hpp"
@@ -476,7 +475,9 @@ std::any Typer::visit(ASTUnionDeclaration *node) {
 std::any Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = -1;
 
+  std::vector<InternedString> fields;
   for (const auto &[key, value] : node->key_values) {
+    fields.push_back(key);
     if (value.is_null())
       continue;
 
@@ -505,10 +506,10 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
     elem_type = s32_type();
   }
 
-  node->element_type = elem_type;
-
+  ctx.scope->create_enum_type(node->name, fields, node->is_flags);
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
   auto info = (enum_type->get_info()->as<EnumTypeInfo>());
+  node->element_type = elem_type;
   info->element_type = elem_type;
 
   return {};
@@ -560,7 +561,7 @@ std::any Typer::visit(ASTDeclaration *node) {
   if (node->type == nullptr) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
       auto type = static_cast<ASTType *>(node->value.get());
-      if (type->kind == ASTType::REFLECTION) {
+      if (type->kind != ASTType::REFLECTION) {
         throw_error("Cannot use a type as a value.", node->value.get()->source_range);
       }
     }
@@ -592,7 +593,7 @@ std::any Typer::visit(ASTDeclaration *node) {
   if (node->value.is_not_null()) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
       auto type = static_cast<ASTType *>(node->value.get());
-      if (type->kind == ASTType::REFLECTION) {
+      if (type->kind != ASTType::REFLECTION) {
         throw_error("Cannot use a type as a value.", node->value.get()->source_range);
       }
     }
@@ -1016,6 +1017,22 @@ std::any Typer::visit(ASTType *node) {
   } else if (node->kind == ASTType::REFLECTION) {
     node->pointing_to.get()->accept(this);
     node->resolved_type = ctx.scope->find_type_id(node->normal.base, extensions);
+  } else if (node->kind == ASTType::FUNCTION) {
+    auto &func = node->function; 
+    FunctionTypeInfo info;
+    if (func.return_type.is_not_null()) {
+      info.return_type = int_from_any(func.return_type.get()->accept(this));
+    } else {
+      info.return_type = void_type();
+    }
+    for (auto &param_ty : func.parameter_types) {
+      param_ty->accept(this);
+      info.parameter_types[info.params_len] = param_ty->resolved_type;
+      info.params_len++;
+    }
+    node->resolved_type = global_find_function_type_id(info, extensions);
+  } else {
+    throw_error("Internal Compiler Error: Invalid type kind", node->source_range);
   }
   return node->resolved_type;
 }
@@ -1405,12 +1422,12 @@ std::any Typer::visit(ASTSubscript *node) {
   auto ext = left_ty->get_ext();
 
   if (ext.is_map()) {
-    assert_types_can_cast_or_equal(subscript, ext.back_type(), node->source_range, "expected : {}, got {}",
+    assert_types_can_cast_or_equal(subscript, ext.extensions.back().key_type, node->source_range, "expected : {}, got {}",
                                    "Invalid type when subscripting map");
     return left_ty->get_element_type();
   }
 
-  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_pointer()) {
+  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() && !left_ty->get_ext().is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), node->source_range);
   }
 
@@ -1515,8 +1532,15 @@ std::any Typer::visit(ASTAllocate *node) {
   if (type == -1) {
     throw_error("Use of undeclared type", node->source_range);
   }
-  if (node->arguments)
+  if (node->arguments) {
+    auto declaring_type = global_get_type(declaring_or_assigning_type);
+    // Make sure that an initializer list won't try to construct a pointer which is prohibited.
+    if (declaring_type->get_ext().is_pointer()) {
+      declaring_or_assigning_type = global_find_type_id(declaring_type->base_id, declaring_type->get_ext().without_back());
+    }
+
     node->arguments.get()->accept(this);
+  }
 
   auto t = global_get_type(type);
   return node->type.get()->resolved_type = t->id;
@@ -1599,12 +1623,11 @@ std::any Typer::visit(ASTAlias *node) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
   }
 
-  auto symbol = ctx.scope->lookup(node->name);
-  symbol->type_id = node->type->resolved_type;
-
-  if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
-    throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
+  if (ctx.scope->types.contains(node->name)) {
+    throw_error("Redeclaration of type", node->source_range);
   }
+  ctx.scope->types[node->name] = node->type->resolved_type;
+
   return {};
 }
 

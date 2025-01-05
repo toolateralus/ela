@@ -1130,7 +1130,7 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
         emitted_iden = true;
         tss << ' ' << name;
       }
-      tss << "[" << ext.array_size << "]";
+      tss << "[" << std::to_string(ext.array_size) << "]";
     }
   }
   return tss.str();
@@ -1448,7 +1448,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
-  if (type->get_ext().is_array()) {
+  if (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array()) {
     ss << get_elements_function(type) << ",\n";
   }
 
@@ -1604,7 +1604,7 @@ std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::
       ss.clear();
       ss << "_array<" << current << ">";
     } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
-      ss << "[" << ext.array_size << "]";
+      ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER) {
       ss << "*";
     } else if (ext.type == TYPE_EXT_MAP) {

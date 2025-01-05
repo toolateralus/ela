@@ -26,7 +26,7 @@ JsonToken :: struct {
 }
 
 JsonLexer :: struct {
-  tokenTypeNames : string[JsonTokenType::Comma + 1] = {
+  tokenTypeNames : string[] = {
     "Invalid",
     "True",
     "False",

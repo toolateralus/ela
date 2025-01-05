@@ -1417,27 +1417,29 @@ MyJsonStruct :: struct {
   assert("deeply_nested_key", nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
 } 
 
-#test test_array_reflection :: fn() {
-  fixed: int[3] = {1, 2, 3};
-  fixed_type := #type(fixed);
-  index: int = 0;
-  fixed_elements := fixed_type.elements((char*)&fixed);
-  assert("Fixed array length mismatch", fixed_elements.length == 3);
-  for elem in fixed_elements {
-    assert("Fixed array element mismatch", (*(int*)elem.data) == fixed[index]);
-    ++index;
-  }
+  #test test_array_reflection :: fn() {
+    index: int = 0;
 
-  dynamic: int[] = {3, 2, 1};
-  dynamic_type := #type(dynamic);
-  index = 0;
-  dynamic_elements := dynamic_type.elements((char*)&dynamic);
-  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
-  for elem in dynamic_elements {
-    assert("Dynamic array element mismatch", (*(int*)elem.data) == dynamic[index]);
-    ++index;
+    fixed: int[3] = {1, 2, 3};
+    fixed_type := #type(fixed);
+    fixed_elements := fixed_type.elements((char*)&fixed);
+    assert("Fixed array length mismatch", fixed_elements.length == 3);
+    for elem in fixed_elements {
+      assert("Fixed array element mismatch", (*(int*)elem.data) == fixed[index]);
+      ++index;
+    }
+
+
+    dynamic: int[] = {3, 2, 1};
+    dynamic_type := #type(dynamic);
+    index = 0;
+    dynamic_elements := dynamic_type.elements((char*)&dynamic);
+    assert("Dynamic array length mismatch", dynamic_elements.length == 3);
+    for elem in dynamic_elements {
+      assert("Dynamic array element mismatch", (*(int*)elem.data) == dynamic[index]);
+      ++index;
+    }
   }
-}
 
 BitfieldTest :: struct {
   #bitfield(1) i : u32 = 0;
