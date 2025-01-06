@@ -9,6 +9,10 @@ InternedString :: struct {
     id = 0;
   }
 
+  #operator(()) :: fn() -> s64 {
+    return id;
+  }
+
   #ctor :: fn(value: string) {
     #static cache: s64[string];
     #static next_id: s64 = 1;
