@@ -1,5 +1,7 @@
+overloaded :: fn![T](n : T) {
+
+}
+
 main :: fn() {
-  buffer: char[20];
-  index: int = 0;
-  buffer[index] = '0';
+  overloaded(100 as s32);  
 }

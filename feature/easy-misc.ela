@@ -1,0 +1,9 @@
+
+  
+// implement defer.
+// this should be really easy to transpile to a c++ RAII struct with a lambda.
+defer {
+  ...
+}
+
+defer STMT;

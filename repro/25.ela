@@ -1,0 +1,6 @@
+#import memory;
+
+main :: fn() {
+  a: ArenaOf![int];
+}
+

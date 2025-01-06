@@ -1,7 +1,10 @@
 //  * Manually call destructor on one or many objects. useful for unions that
 //  own non-trivial objects.
+#include <utility>
 template <class... T> void destruct(T &...t) { (t.~T(), ...); }
-
+template <class T, class... Args> T* construct(void* memory, Args&&... args) {
+  return new (memory) T(std::forward<Args>(args)...);
+}
 #if USE_STD_LIB
 struct string;
 #endif

@@ -12,18 +12,14 @@
 #foreign printf :: fn(format: c_string, ...) -> int;
 #foreign exit :: fn(code: int);
 
-#static print :: fn(str: string) {
-  printf("%s", str.data);
+#static print :: fn![t](str: T) {
+  printf("%s", $"{str}".data);
 }
-#static print :: fn(str: char *) {
-  printf("%s", str);
+
+#static println :: fn![T](str: T) {
+  printf("%s\n", $"{str}".data);
 }
-#static println :: fn(str: string) {
-  printf("%s\n", str.data);
-}
-#static println :: fn(str: c_string) {
-  printf("%s\n", str);
-}
+
 #static panic :: fn(msg: string) {
   println(msg);
   exit(1);

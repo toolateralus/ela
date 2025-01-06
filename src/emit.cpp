@@ -256,6 +256,12 @@ std::any Emitter::visit(ASTExprStatement *node) {
 
 std::any Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
+
+  if (node->type->resolved_type == -1) {
+    throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
+  }
+
+
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name);
 

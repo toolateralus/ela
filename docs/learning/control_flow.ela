@@ -1,46 +1,39 @@
 /* If statements */
 
-if true {
-  ...
+// Your typical if else stuff.
+if true {  
 } else {
-  ...
 }
 
 if false {
-  ...
 } else if true {
-  ...
 } else {
-  ...
 }
 
 
-/* 
-  A single-line-bodied if statement that only has one statement as a body and no else can be shorthanded as 
-*/
+ 
+//* A single-line-bodied if statement that only has one statement as a body and no else can be shorthanded as 
 if true then println("Hi!");
 
 
 /* While loop */
-
 while true {
   if 0 then break;
   if 1 then continue;
 }
-
 
 /* For loops:  */
 
 // C equivalent:  for (int i = 0; i < 100; ++i) {}
 for i in 0..100 {}
 
-// you can use any expression on the left or right of the range.
+// you can use any expression on the left or right of the range, as long as it's an s64 type.
 for i in 0..get_max() {}
-
-// another example.
 for _ in get_min()..get_max() + 100 {}
 
 // C equivalent: for (int i = 100; i >= 0; --i) {}
+// If the first (left) of the range is greater than the last (right)
+// it will implicitly iterate in reverse.
 for i in 100..0 {}
 
 // To control the increment in a range, you can use Range's initializer list.
@@ -51,7 +44,6 @@ for i in Range{0, 100, 2} {}
 // C equivalent: for (int i = 100; i >= 0; i -= 4) {}
 for i in Range{100, 0, 4} {}
 
-
 /* To iterate over a collection, such as an array, you can use: */
 array : #make(s32[], 100); // make a 100 long, zero initialized array.
 
@@ -60,8 +52,77 @@ for v in array {
   println($"{v}");
 }
 
-/* To avoid copies, or to mutate elements, you can use this syntax to take a pointer to the element you're getting from the iterator */
+/* 
+  To avoid copies, or to mutate elements, you can use this syntax to take a pointer to the element you're getting from the iterator
+  You cannot use this on Ranges (0..100) currently.
+*/
 for *v in array {
   println($"{*v}");
 }
+
+/* 
+  custom iterators
+*/
+
+MyIterable :: struct {
+  n: char* = malloc(1024);
+
+  // much like C++, defining a begin() and end() will allow the for loops to iterate over you own types.
+  begin :: fn() -> char* {
+    return n;
+  }
+  end ::   fn() -> char* {
+    return n + 1024;
+  }
+
+
+}
+
+// You can return a struct that has a (++), *(deref), and (!=) for more controller iteration.
+// at the time of writing this, this is busted. but it will be fixed soon.
+CustomIterator :: struct {
+  n:        char*;
+  size:     s32;
+  position: s32;
+
+  #ctor :: (n: char*, size: s32, position: s32 = 0) {
+    this.n = n;
+    this.size = size;
+    this.position = position;
+  }
+
+  #operator(++) :: fn() -> #self {
+    this.position++;
+    return *this;
+  }
+
+  #operator(*) :: fn () -> char {
+    return n[position];
+  }
+
+  #operator(!=) :: fn(other: #self) -> bool {
+    return n != other.n || size != other.size || position != other.position;
+  }
+}
+
+Iterable2 :: struct {
+  n: char * = malloc(1024);
+
+  begin :: fn() -> CustomIterator {
+    return {n, 1024, 0};
+  }
+  end ::   fn() -> CustomIterator {
+    return {null, 1024, 1024};
+  }
+}
+
+main :: fn() {
+  it: Iterable2;
+  // just print the junk data malloc'd.
+  for ch in it {
+    print(ch);
+  }
+}
+
+
 

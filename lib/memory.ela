@@ -48,3 +48,33 @@ Arena :: struct {
     return result;
   }
 }
+
+
+// Super basic arena allocator, with a constructor that allocates a big block,
+// an allocate method that returns u8*, and a destructor that frees the block.
+ArenaOf :: struct![T] {
+  count: u64;
+  size: u64;
+  memory: T*;
+
+  // size is max items.
+  #ctor :: fn(size: u64) {
+    this.size = size;
+    memory = (malloc(sizeof(T) * size) as T*);
+  }
+
+  #dtor :: fn() {
+    free(memory as T*);
+    memory = null;
+  }
+  
+  allocate :: fn() -> T* {
+    oom := count > size;
+    if oom {
+      return null as T*;
+    }
+    count++;
+    // TODO: add some kind of placement new like mechanism
+    return memory[count] as T*;
+  }
+}

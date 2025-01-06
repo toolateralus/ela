@@ -227,6 +227,7 @@ Context::Context() {
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
 
+
   for (int i = 0; i < type_table.size(); ++i) {
     // std::cout << "inserting " << type_table[i].get_base().get_str() << "\n";
     root_scope->types.insert({type_table[i].get_base(), i});

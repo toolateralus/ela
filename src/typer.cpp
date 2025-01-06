@@ -320,7 +320,7 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
       ctx.scope->types[param] = *generic_arg;
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type(node->name, node->scope));
+    type = global_get_type(global_create_union_type(node->name, node->scope, UNION_IS_NORMAL));
   }
 
   ctx.scope->insert("this", type->take_pointer_to());
@@ -858,15 +858,31 @@ std::any Typer::visit(ASTCall *node) {
     }
     arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
-    if (!node->generic_arguments.empty()) {
-      auto gen_args = get_generic_arg_types(node->generic_arguments);
-      auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
-                                                           symbol->declaring_node.get(), gen_args);
-      if (type_id == -2) {
-        throw_error("Template instantiation argument count mismatch", node->source_range);
+    if (!node->generic_arguments.empty() ||
+        (symbol->declaring_node.is_not_null() &&
+         symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION &&
+         static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())->generic_parameters.size() != 0)) {
+      // TODO: make the generic argument inference actually make sense. This is just kind of a hack so we can omit it on some basic calls
+      // like println etc.
+      if (node->generic_arguments.empty()) {
+        auto gen_args = std::any_cast<std::vector<int>>(node->arguments->accept(this));
+        auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
+                                                            symbol->declaring_node.get(), gen_args);
+        if (type_id == -2) {
+          throw_error("Template instantiation argument count mismatch", node->source_range);
+        }
+        type = global_get_type(type_id);
+        symbol_nullable = nullptr;
+      } else {
+        auto gen_args = get_generic_arg_types(node->generic_arguments);
+        auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
+                                                            symbol->declaring_node.get(), gen_args);
+        if (type_id == -2) {
+          throw_error("Template instantiation argument count mismatch", node->source_range);
+        }
+        type = global_get_type(type_id);
+        symbol_nullable = nullptr;
       }
-      type = global_get_type(type_id);
-      symbol_nullable = nullptr;
     } else {
       find_function_overload(node, symbol, arg_tys, type);
     }
@@ -1018,7 +1034,7 @@ std::any Typer::visit(ASTType *node) {
     node->pointing_to.get()->accept(this);
     node->resolved_type = ctx.scope->find_type_id(node->normal.base, extensions);
   } else if (node->kind == ASTType::FUNCTION) {
-    auto &func = node->function; 
+    auto &func = node->function;
     FunctionTypeInfo info;
     if (func.return_type.is_not_null()) {
       info.return_type = int_from_any(func.return_type.get()->accept(this));
@@ -1422,12 +1438,13 @@ std::any Typer::visit(ASTSubscript *node) {
   auto ext = left_ty->get_ext();
 
   if (ext.is_map()) {
-    assert_types_can_cast_or_equal(subscript, ext.extensions.back().key_type, node->source_range, "expected : {}, got {}",
-                                   "Invalid type when subscripting map");
+    assert_types_can_cast_or_equal(subscript, ext.extensions.back().key_type, node->source_range,
+                                   "expected : {}, got {}", "Invalid type when subscripting map");
     return left_ty->get_element_type();
   }
 
-  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() && !left_ty->get_ext().is_pointer()) {
+  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() &&
+      !left_ty->get_ext().is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), node->source_range);
   }
 
@@ -1536,7 +1553,8 @@ std::any Typer::visit(ASTAllocate *node) {
     auto declaring_type = global_get_type(declaring_or_assigning_type);
     // Make sure that an initializer list won't try to construct a pointer which is prohibited.
     if (declaring_type->get_ext().is_pointer()) {
-      declaring_or_assigning_type = global_find_type_id(declaring_type->base_id, declaring_type->get_ext().without_back());
+      declaring_or_assigning_type =
+          global_find_type_id(declaring_type->base_id, declaring_type->get_ext().without_back());
     }
 
     node->arguments.get()->accept(this);

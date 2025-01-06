@@ -1,5 +1,10 @@
+// string :: struct;
 
-_Range_Iterator :: struct {
+// TODO: we need to have a more complex inference algoritm for 
+// custom iterators on structs. What we need to do is look at the dereference operator on the
+// iterator struct, not just the return type of begin()/end();
+
+_MRange_Iterator :: struct {
   current:   u64;
   end_value: u64;
   increment: u64;
@@ -14,7 +19,7 @@ _Range_Iterator :: struct {
 
   #operator(*) :: fn() -> u64 { return current; }
 
-  #operator(++) :: fn() -> _Range_Iterator  {
+  #operator(++) :: fn() -> _MRange_Iterator  {
     if (is_reverse) {
       current -= increment;
     } else {
@@ -23,7 +28,7 @@ _Range_Iterator :: struct {
     return *this;
   }
 
-  #operator(!=) :: fn(other: _Range_Iterator) -> bool  {
+  #operator(!=) :: fn(other: _MRange_Iterator) -> bool  {
     if (is_reverse) {
       return current > other.end_value;
     } else {
@@ -32,38 +37,41 @@ _Range_Iterator :: struct {
   }
 }
 
-Range :: struct {
-  #alias u64 :: u64;
+// * We need to be able to take some form of initializer list.
+MRange :: struct {
   #ctor :: fn() {}
-  #ctor :: (first: u64, last: u64, increment: u64 = 1) {
-    : first(first), last(last), span(last - first), is_reverse(first > last),
-        increment(increment)
-
+  #ctor :: fn(first: u64, last: u64, increment: u64 = 1) {
+    this.is_reverse = first > last;
     this.first = first;
     this.last = last;
     this.increment = increment;
     if (is_reverse) {
-      first--;
+      // TODO: decrement first by 1?
       span = first - last;
     }
   }
-  Range(const Range &other) {
+
+  #ctor :: fn(other: MRange) {
     first = other.first;
     last = other.last;
     span = other.span;
     is_reverse = other.is_reverse;
     increment = other.increment;
   }
-  u64 first = 0, last = 0, span = 0, increment = 1;
-  bool is_reverse = false;
 
+  first:      u64;
+  last:       u64;
+  span:       u64;
+  increment:  u64 = 1;
+  is_reverse: bool;
 
-  _Range_Iterator begin() const {
-    return _Range_Iterator(first, last, is_reverse, increment);
+  begin :: fn() -> _MRange_Iterator {
+    return _MRange_Iterator{first, last, is_reverse, increment};
   }
-  _Range_Iterator end() const { return _Range_Iterator(first, last, is_reverse, increment); }
-  _Range_Iterator begin() { return _Range_Iterator(first, last, is_reverse, increment); }
-  _Range_Iterator end() { return _Range_Iterator(first, last, is_reverse, increment); }
+
+  end :: fn() -> _MRange_Iterator {
+    return _MRange_Iterator{first, last, is_reverse, increment};
+  }
 
   #operator(==) :: fn(number: u64) -> bool {
     return number >= first && number <= last;
@@ -73,5 +81,6 @@ Range :: struct {
     return number >= first && number <= last;
   }
 
-  string to_string() {}
+  // TODO: implement me. it depends on string which wouldn't have been defined yet.
+  // string to_string() { return $"{first}..{last}"; }
 };
