@@ -16,23 +16,10 @@ To search for all info comments in the source just use vscodes regex search with
 - we should add `defer`.
 - we need to instantiate templates for generics where most appropriate, not just when theyre declared.
   example:
-
-```cpp
-generic :: fn![T]() {
-  ...
-}
-
-my_struct :: struct {
-
-}
-
-// error here, because my_struct is defined after generic, and generic emits all it's instantiations at
-// the root declaration, so cpp cant find my_struct
-generic![my_struct]();
-
-
-```
-
+  
+- generic functions, and really all functions, need to be mangled inthe emitter. This will allow us to do our own overloads,
+  imporve generics, and better prepare us for lowering to C instead of C++.
+  
 - we should make it so `boilerplate.hpp` doesn't exist, and use our own language, where applicable.
 - if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions.
 

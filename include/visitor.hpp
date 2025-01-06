@@ -141,10 +141,7 @@ struct Emitter : VisitorBase {
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
-  std::vector<int> generic_arguments;
   int num_tests = 0;
-
-  std::vector<std::function<void()>> pending_statements;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
@@ -152,9 +149,16 @@ struct Emitter : VisitorBase {
 
   Typer &type_visitor;
 
-  StringBuilder code{};
-  StringBuilder *ss{};
   StringBuilder test_functions{};
+
+  StringBuilder code{}; // general 
+  StringBuilder *ss = &code;
+  
+  StringBuilder type_declaration{};
+  StringBuilder type_definition{};
+  
+  StringBuilder function_declaration{};
+  StringBuilder function_definition{};
 
   int indentLevel = 0;
   Context &ctx;
@@ -174,20 +178,18 @@ struct Emitter : VisitorBase {
     auto loc = node->source_range.begin_loc;
     if (loc != last_loc) {
       auto filename = get_source_filename(node->source_range);
-
       // !BUG: figure out why this is sometimes empty.
       if (filename.empty()) {
         // printf("Empty filename for line directive.\n");
         return;
       }
-
       (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline Emitter(Context &context, Typer &type_visitor) : type_visitor(type_visitor), ctx(context) { ss = &code; }
+  inline Emitter(Context &context, Typer &type_visitor) : type_visitor(type_visitor), ctx(context) { }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }

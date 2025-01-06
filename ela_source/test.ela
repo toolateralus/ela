@@ -1569,6 +1569,7 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
     }
     assert("ndef", false);
   }
+
 }
 
 #test test_scope_resolution_statement :: fn() {

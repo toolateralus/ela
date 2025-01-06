@@ -11,10 +11,12 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
+#define DEFER(block) Defer _defer([&]()block);
+
 /*
   TODO:
    This entire visitor needs a huge cleanup. there's some absolutely terrible
-  code in here and it's super messy. ? However it works xD
+  *ss in here and it's super messy. ? However it works xD
 */
 
 constexpr auto TYPE_FLAGS_INTEGER = 2;
@@ -440,6 +442,10 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   auto emit_various_function_declarations = [&] {
+    DEFER({
+      ss = &code;
+    })
+
     if (!node->generic_parameters.empty()) {
       for (auto &instantiation : node->generic_instantiations) {
         instantiation.node->accept(this);
@@ -460,6 +466,8 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
       return;
     }
+
+    ss = &function_definition;
 
     if ((node->flags & FUNCTION_IS_STATIC) != 0) {
       (*ss) << "static ";
@@ -513,10 +521,15 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto test_flag = compile_command.has_flag("test");
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
-  Defer deferred = {[&]() {
+
+  DEFER({
     current_func_decl = last_func_decl;
     ctx.set_scope(old_scope);
-  }};
+  });
+
+  ss = &function_declaration;
+  emit_forward_declaration(node);
+  ss = &code;
 
   // this also happens to emit the test boilerplate that bootstraps it into the
   // test runner, if applicable.
@@ -543,6 +556,8 @@ std::string mangled_type_args(const std::vector<int> &args) {
 }
 
 std::any Emitter::visit(ASTStructDeclaration *node) {
+  ss = &type_declaration;
+
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.type);
@@ -557,14 +572,21 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   auto info = (type->get_info()->as<StructTypeInfo>());
   current_struct_decl = node;
 
-  Defer _defer([&] { current_struct_decl = nullptr; });
+  Defer _defer([&] { 
+    current_struct_decl = nullptr; 
+    ss = &code;
+  });
 
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
-    if (node->is_extern)
+  if (node->is_extern)
       *ss << "extern \"C\" ";
     *ss << "struct " << type->get_base().get_str() << ";\n";
+
+  
+  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) { 
     return {};
   }
+
+  ss = &type_definition;
 
   ctx.set_scope(node->scope);
 
@@ -613,6 +635,12 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   return {};
 }
 std::any Emitter::visit(ASTEnumDeclaration *node) {
+  ss = &type_definition;
+  Defer defer{
+    [&]() {
+      ss = &code;
+    }
+  };
   emit_line_directive(node);
   auto type_name = node->name.get_str();
   int n = 0;
@@ -635,14 +663,23 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
   return {};
 }
 std::any Emitter::visit(ASTUnionDeclaration *node) {
+  ss = &type_declaration;
+
+  DEFER({
+    ss = &code;
+    current_union_decl = nullptr;
+  });
+
   auto type = global_get_type(node->resolved_type);
   auto info = type->get_info()->as<UnionTypeInfo>();
+  (*ss) << "union " << node->name.get_str() << ";\n";
+
   if (node->is_fwd_decl) {
-    (*ss) << "union " << node->name.get_str() << ";\n";
     return {};
   }
 
-  Defer _([&] { current_union_decl = nullptr; });
+  ss = &type_definition;
+
   current_union_decl = node;
 
   if ((info->flags & UNION_IS_ANONYMOUS) != 0) {
@@ -696,6 +733,7 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   (*ss) << "};\n";
   return {};
 }
+
 std::any Emitter::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->type->resolved_type);
 
@@ -757,7 +795,7 @@ std::any Emitter::visit(ASTProgram *node) {
   static const auto testing = compile_command.has_flag("test");
 
   if (!is_freestanding) {
-    code << "#define USE_STD_LIB 1\n";
+    *ss << "#define USE_STD_LIB 1\n";
   } else {
     for (int i = 0; i < type_table.size(); ++i) {
       Type *type = &type_table[i];
@@ -791,14 +829,14 @@ std::any Emitter::visit(ASTProgram *node) {
     }
   }
 
-  code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  *ss << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
 
   if (!is_freestanding) {
-    code << "extern Type **_type_info;\n";
+    *ss << "extern Type **_type_info;\n";
   }
 
   if (testing) {
-    code << "#define TESTING\n";
+    *ss << "#define TESTING\n";
   }
 
   for (const auto &statement : node->statements) {
@@ -814,13 +852,13 @@ std::any Emitter::visit(ASTProgram *node) {
     }
 
     // deploy the array of test struct wrappers.
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
+    *ss << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
 
     // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
+    *ss << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding)
-      code << R"__(
+      *ss << R"__(
 int main (int argc, char** argv) {
   // Bootstrap the env
   for (int i = 0; i < argc; ++i) {
@@ -839,14 +877,14 @@ int main (int argc, char** argv) {
     for (const auto &str : ctx.type_info_strings) {
       type_info << str.get_str() << ";\n";
     }
-    code << std::format("Type **_type_info = new Type*[{}];\n"
+    *ss << std::format("Type **_type_info = new Type*[{}];\n"
                         "auto __ts_init_func_result__ = []{{\n"
                         "  {};\n"
                         "  return 0;\n"
                         "}}();\n",
                         type_table.size(), type_info.str());
 
-    code << std::format(R"_(
+    *ss << std::format(R"_(
 Type *find_type(string name) {{
   for (size_t i = 0; i < {}; ++i) {{
     Type *type = _type_info[i];
@@ -1066,7 +1104,7 @@ std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::s
   // This probably won't work for nested arrays
 #elif defined(TERRIBLE_HACK)
   // We could just purge off the problematic characters?
-  // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do that.
+  // Much better solution would be fix the *ssgen where this is happening, But I have no freaking idea how to do that.
   auto string = to_cpp_string(type->get_ext(), type_string);
   size_t pos = 0;
   while ((pos = string.find(")*>", pos)) != std::string::npos) {
