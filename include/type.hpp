@@ -95,6 +95,7 @@ enum UnionFlags {
   UNION_IS_NORMAL = 1 << 0,
   UNION_IS_SUM_TYPE = 1 << 1,
   UNION_IS_FORWARD_DECLARED = 1 << 2,
+  UNION_IS_ANONYMOUS = 1 << 3,
 };
 
 struct ASTExpr;

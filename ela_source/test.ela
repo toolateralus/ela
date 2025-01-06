@@ -1644,3 +1644,16 @@ GenericStruct :: struct![T] {
     // assert("Function returning function pointer", returned_ptr(2, 3) == 6);
   }
 }
+
+
+AnonSubUnion :: struct {
+  #anon :: union {
+    a: int;
+  }
+}
+
+#test test_anon_union_in_struct :: fn() {
+  anon: AnonSubUnion;
+  anon.a = 100;
+  assert("Anon sub union failed", anon.a == 100);
+}

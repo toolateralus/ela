@@ -409,6 +409,8 @@ struct ASTSubscript : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
 };
 
+struct ASTUnionDeclaration;
+
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
@@ -418,6 +420,7 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTFunctionDeclaration *> methods;
+  std::vector<ASTUnionDeclaration*> unions;
 
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;

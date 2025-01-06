@@ -287,12 +287,19 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
 
   ctx.scope->insert("this", type->take_pointer_to());
 
+  for (auto subunion: node->unions) {
+    for (const auto &field : subunion->fields) {
+      field->accept(this);
+      node->scope->insert(field->name, field->type->resolved_type);
+    }
+  }
   for (auto decl : node->fields) {
     decl->accept(this);
   }
   for (auto method : node->methods) {
     method->accept(this);
   }
+  
 
   ctx.set_scope(old_scope);
   return type->id;
@@ -1263,7 +1270,6 @@ std::any Typer::visit(ASTLiteral *node) {
       break;
   }
 }
-
 std::any Typer::visit(ASTDotExpr *node) {
   auto base_ty_id = int_from_any(node->base->accept(this));
   auto base_ty = global_get_type(base_ty_id);
@@ -1314,7 +1320,6 @@ std::any Typer::visit(ASTDotExpr *node) {
                 node->source_range);
   }
 }
-
 std::any Typer::visit(ASTScopeResolution *node) {
   // .EnumVariant fix ups.
   if (node->base == nullptr) {
@@ -1384,7 +1389,6 @@ std::any Typer::visit(ASTScopeResolution *node) {
                 node->source_range);
   }
 }
-
 std::any Typer::visit(ASTSubscript *node) {
   auto left = int_from_any(node->left->accept(this));
   auto subscript = int_from_any(node->subscript->accept(this));
@@ -1623,7 +1627,6 @@ std::any Typer::visit(ASTSwitch *node) {
     return return_type;
   }
 }
-
 std::any Typer::visit(ASTTuple *node) {
   std::vector<int> types;
   for (const auto &v : node->values) {
@@ -1633,7 +1636,6 @@ std::any Typer::visit(ASTTuple *node) {
   extensions.extensions = accept_extensions(node->type->extensions);
   return node->type->resolved_type = global_find_type_id(types, extensions);
 }
-
 std::any Typer::visit(ASTAlias *node) {
   node->type->accept(this);
 
@@ -1648,7 +1650,6 @@ std::any Typer::visit(ASTAlias *node) {
 
   return {};
 }
-
 std::any Typer::visit(ASTTupleDeconstruction *node) {
   auto type = global_get_type(int_from_any(node->right->accept(this)));
 

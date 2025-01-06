@@ -578,21 +578,12 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   }
   indentLevel++;
 
-  // TODO: we want to implement default constructors for any combination of
-  // fields, as long as they're in order.
-  // however, we need to make sure we're not overwriting any user defined
-  // constructors. This is an annoying neccesity in C++ because having a constructor, even default
-  // make a type an aggregate type that can't be initialized with an initializer list. Dumb!
-
-  // TODO: implement me!
-  // std::vector<int> field_types;
-  // for (const auto &field: info->scope->ordered_symbols) {
-  //   auto symbol = info->scope->local_lookup(field);
-  //   if (!symbol->is_function()) {
-  //     field_types.push_back(symbol->type_id);
-  //   }
-  // }
-  // TODO:
+  for (const auto &_union: node->unions) {
+    indented("");
+    _union->accept(this);
+    semicolon();
+    newline();
+  }
 
   for (const auto &decl : node->fields) {
     indented("");
@@ -615,18 +606,8 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
     semicolon();
     newline();
   }
+  
   ctx.exit_scope();
-
-  // TODO: Implement me!
-  // TODO We define these manually here because it gets annoying if not.
-  // if (!has_default_ctor) {
-  //   (*ss) << "\n" << node->type->base.get_str() << "() {}\n";
-  // }
-
-  // if (!has_dtor) {
-  //   (*ss) << "\n~" << node->type->base.get_str() << "() {}\n";
-  // }
-
   (*ss) << "};\n";
   indentLevel--;
   return {};
@@ -654,6 +635,8 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
   return {};
 }
 std::any Emitter::visit(ASTUnionDeclaration *node) {
+  auto type = global_get_type(node->resolved_type);
+  auto info = type->get_info()->as<UnionTypeInfo>();
   if (node->is_fwd_decl) {
     (*ss) << "union " << node->name.get_str() << ";\n";
     return {};
@@ -662,7 +645,11 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   Defer _([&] { current_union_decl = nullptr; });
   current_union_decl = node;
 
-  (*ss) << "union " << node->name.get_str() << "{\n";
+  if ((info->flags & UNION_IS_ANONYMOUS) != 0) {
+    (*ss) << "union " << "{\n";
+  } else {
+    (*ss) << "union " << node->name.get_str() << "{\n";
+  }
 
   indentLevel++;
   ctx.set_scope(node->scope);
@@ -701,15 +688,6 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   for (const auto &_struct : node->structs) {
     _struct->accept(this);
     (*ss) << ";\n";
-  }
-
-  // We define these manually here because it gets annoying if not.
-  if (!has_default_ctor) {
-    (*ss) << "\n" << node->name.get_str() << "() {}\n";
-  }
-
-  if (!has_dtor) {
-    (*ss) << "\n~" << node->name.get_str() << "() {}\n";
   }
 
   emit_default_init = true;

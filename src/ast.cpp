@@ -405,16 +405,26 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return type;
     }},
 
-    // #anon, for declaring anonymous sub-structs in unions primarily.
+    // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->expect(TType::DoubleColon);
-        auto decl = parser->parse_struct_declaration(get_unique_identifier());
-        auto t = global_get_type(decl->resolved_type);
-        auto info = (t->get_info()->as<StructTypeInfo>());
-        info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
-        return decl;
+        auto tok = parser->expect(TType::DoubleColon);
+        if (parser->peek().type == TType::Struct) {
+          auto decl = parser->parse_struct_declaration(get_unique_identifier());
+          auto t = global_get_type(decl->resolved_type);
+          auto info = (t->get_info()->as<StructTypeInfo>());
+          info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+          return decl;
+        } else if (parser->peek().type == TType::Union){
+          auto decl = parser->parse_union_declaration(get_unique_identifier());
+          auto t = global_get_type(decl->resolved_type);
+          auto info = (t->get_info()->as<UnionTypeInfo>());
+          info->flags |= UNION_IS_ANONYMOUS;
+          return decl;
+        } else {
+          throw_error("Expected struct or union after #anon ::...", SourceRange{(int64_t)tok.location.line});
+        }
     }},
 
     // #operator, for operator overloads.
@@ -1616,13 +1626,27 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 
 void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
   for (const auto &statement : statements) {
+    
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
     } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         auto function = static_cast<ASTFunctionDeclaration *>(statement);
         function->flags |= FUNCTION_IS_METHOD;
         decl->methods.push_back(function);
-    } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
+    } else if (statement->get_node_type() == AST_NODE_UNION_DECLARATION)  {
+      auto union_decl = static_cast<ASTUnionDeclaration *>(statement);
+      auto type = global_get_type(union_decl->resolved_type);
+      auto info = (type->get_info()->as<UnionTypeInfo>());
+      if ((info->flags & UNION_IS_ANONYMOUS) == 0) {
+        throw_error("can only use #anon union declarations within struct types.", decl->source_range);
+      }
+      decl->unions.push_back(union_decl);
+      for (const auto &field : union_decl->fields) {
+        decl->scope->insert(field->name, field->type->resolved_type);
+      }
+    } 
+
+    else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
       visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
     } else if (statement->get_node_type() != AST_NODE_NOOP) {
       throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
@@ -1749,10 +1773,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
     return decl;
   }
 
-  std::vector<ASTDeclaration *> fields;
-  std::vector<ASTFunctionDeclaration *> methods;
-  std::vector<ASTStructDeclaration *> structs;
-
   info->scope = decl->scope = create_child(ctx.scope);
   info->scope->is_struct_or_union_scope = true;
 
@@ -1764,11 +1784,11 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   for (auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
-      fields.push_back(static_cast<ASTDeclaration *>(statement));
+      decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
     } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       function->flags |= FUNCTION_IS_METHOD;
-      methods.push_back(function);
+      decl->methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(struct_decl->resolved_type);
@@ -1776,7 +1796,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
         throw_error("can only use #anon struct declarations within union types.", decl->source_range);
       }
-      structs.push_back(struct_decl);
+      decl->structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
         block->scope->insert(field->name, field->type->resolved_type);
       }
@@ -1784,10 +1804,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       throw_error("Non method/field declarations not allowed in union", range);
     }
   }
-
-  decl->fields = fields;
-  decl->methods = methods;
-  decl->structs = structs;
 
   end_node(decl, range);
   return decl;

@@ -75,6 +75,6 @@ ArenaOf :: struct![T] {
     }
     count++;
     // TODO: add some kind of placement new like mechanism
-    return memory[count] as T*;
+    return (&memory[count]) as T*;
   }
 }
