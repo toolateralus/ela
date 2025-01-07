@@ -191,7 +191,8 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
       info.parameter_types[info.params_len] = param->type->resolved_type;
       info.params_len++;
     }
-    type_id = global_find_function_type_id(info, {});
+    if (info.return_type != -2) 
+      type_id = global_find_function_type_id(info, {});
   }
 
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
