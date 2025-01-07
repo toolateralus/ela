@@ -10,12 +10,17 @@ impl thing {
     return a + b;
   }
   mut_me :: fn(self*) {
-    printf("Hi\n");
+    printf("Hi from a '%s'\n", $"{#type(self).name}".data);
+    self.a = 100;
+    self.b = 200;
   }
 }
 
 main :: fn() {
-  t: thing;
+  t: thing = {
+    0, 0
+  };
   n := t.static_method(5, 2);
   t.mut_me();
+  printf("%d, %d\n", t.a, t.b);
 }

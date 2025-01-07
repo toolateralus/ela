@@ -200,7 +200,7 @@ std::any Emitter::visit(ASTCall *node) {
       (*ss) << "(";
 
       if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
-        if (!base_type->get_ext().is_pointer()) {
+        if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
           (*ss) << "&";
         }
         left->accept(this);

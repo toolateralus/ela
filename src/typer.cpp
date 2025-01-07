@@ -907,6 +907,12 @@ std::any Typer::visit(ASTCall *node) {
                 node->source_range);
   }
 
+  if (has_self_param) {
+    auto param_0 = global_get_type(info->parameter_types[0]);
+    // !BUG : we have to assert that the self type is actually correct here, and that 
+    // !the function we're calling is a method.
+  }
+
   for (int i = 0; i < info->params_len; ++i) {
     // !BUG: default parameters evade type checking
     if (arg_tys.size() <= i) {
