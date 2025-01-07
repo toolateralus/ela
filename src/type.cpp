@@ -539,6 +539,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 
 void init_type_system() {
   // Signed integers
+  
   {
     s64_type();
     s32_type();
