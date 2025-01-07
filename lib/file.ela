@@ -33,13 +33,34 @@ SeekPosition :: enum {
 }
 
 File :: struct {
-  #static length :: fn(file: FILE*) -> u32 {
+  fd: FILE*;
+ 
+  
+
+
+}
+
+impl File {
+  #dtor :: fn(self*) {
+    if fd then close();
+  }
+
+  flush :: fn(self*) {
+    fflush(self.fd);
+  }
+  close :: fn(self*) -> void {
+    fflush(self.fd);
+    fclose(self.fd);
+    self.fd = null;
+  }
+
+  length :: fn(file: FILE*) -> u32 {
     fseek(file, 0, SeekPosition::End);
     len := ftell(file);
     fseek(file, 0, SeekPosition::Begin);
     return #make(u32, len);
   }
-  #static read_all :: fn(file: FILE*, len: u32*) -> string {
+  read_all :: fn(file: FILE*, len: u32*) -> string {
     *len = File::length(file);
     c: char;
     str: string;
@@ -48,7 +69,7 @@ File :: struct {
     }
     return str;
   }
-  #static read_all :: fn(filename: char*) -> string {
+  read_all :: fn(filename: char*) -> string {
     file := fopen(filename, "r");
     str: string;
     c: char;
@@ -58,7 +79,7 @@ File :: struct {
     fclose(file);
     return str;
   }
-  #static read_all :: fn(filename: string) -> string {
+  read_all :: fn(filename: string) -> string {
     file := fopen(filename.data, "r");
     str: string;
     c: char;
@@ -68,23 +89,23 @@ File :: struct {
     fclose(file);
     return str;
   }
-  #static write_all :: fn(filename: string, data: string) -> void {
+  write_all :: fn(filename: string, data: string) -> void {
     file := fopen(filename.data, "w");
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);
   }
-  #static write_all :: fn(filename: string, data: char*, nbytes: u64) -> void {
+  write_all :: fn(filename: string, data: char*, nbytes: u64) -> void {
     file := fopen(filename.data, "w");
     fwrite(data, sizeof(char), nbytes, file);
     fclose(file);
   }
-  #static write_all :: fn(filename: char*, data: char*, nbytes: u64) -> void {
+  write_all :: fn(filename: char*, data: char*, nbytes: u64) -> void {
     file := fopen(filename, "w");
     fwrite(data, sizeof(char), nbytes, file);
     fclose(file);
   }
   // Used to convert our flag enum to a string for fopen/fclose etc.
-  #static flags_to_string :: fn(flags: int) -> string {
+  flags_to_string :: fn(flags: int) -> string {
     s : string;
     if (flags & FileOpenFlags::Read != 0) 
       then s = "r";
@@ -92,35 +113,13 @@ File :: struct {
       then s = $"{s}w";
     return s;
   }
-  #static open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
+  open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
     return {fopen(filename.data, flags_to_string(flags).data)};
   }
-
-  /* INSTANCE DATA & METHODS */
-
-  fd: FILE*;
-
-
-  read :: fn(buffer: u8*, size: u64) -> u64 {
-    return fread(buffer, 1, size, fd);
+  read :: fn(self*, buffer: u8*, size: u64) -> u64 {
+    return fread(buffer, 1, size, self.fd);
   }
-
-  write :: fn(buffer: u8*, size: u64) -> u64 {
-    return fwrite(buffer, 1, size, fd);
+  write :: fn(self*, buffer: u8*, size: u64) -> u64 {
+    return fwrite(buffer, 1, size, self.fd);
   }
-
-  flush :: fn() {
-    fflush(fd);
-  }
-
-  close :: fn() -> void {
-    fflush(fd);
-    fclose(fd);
-    fd = null;
-  }
-  
-  #dtor :: fn() {
-    if fd then close();
-  }
-
 }

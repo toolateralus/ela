@@ -395,11 +395,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           type->normal.base = parser->current_union_decl.get()->name;
         } else if (parser->current_struct_decl) {
           type->normal.base = parser->current_struct_decl.get()->name;
+        } else if (parser->current_impl) {
+          // TODO: fix leak here.
+          type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl.get()->target));
         } else {
-          throw_error(
-              "can only use #self in unions and structs to get the "
-              "type name of the current declaring type",
-              {});
+          throw_error("#self is only valid in unions, structs, and impl's.",{});
         }
         parser->append_type_extensions(type);
         return type;
@@ -1516,6 +1516,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       param->type = type;
       param->name = name;
       params->params.push_back(param);
+      if (peek().type == TType::Comma) eat();
       continue;
     }
 

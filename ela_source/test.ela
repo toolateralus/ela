@@ -1473,13 +1473,15 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 
 }
 
-#test test_call_statics :: fn() {
-  Static :: struct {
-    #static counter :: fn() -> s32 {
-      #static i: s32 = 0;
-      return i++;
-    }
+Static :: struct;
+impl Static {
+  counter :: fn() -> s32 {
+    #static i: s32 = 0;
+    return i++;
   }
+}
+
+#test test_call_statics :: fn() {
   for i in 0..10 {
     assert("Static member method with static local failed", Static::counter() == i);
   }
@@ -1572,7 +1574,7 @@ add :: fn(a: s32, b: s32, c: s32) -> s32 { return a + b + c; }
 }
 
 #test test_scope_resolution_statement :: fn() {
-  Strings::contains("Hi!", 'H'); // just test that this compiles.
+  string::contains("Hi!", 'H'); // just test that this compiles.
 }
 
 

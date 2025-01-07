@@ -211,58 +211,59 @@ Vector2 :: struct {
     return $"x: {x}, y: {y}"
   }
 }
-
 Vector3 :: struct {
   x: float;
   y: float;
   z: float;
+}
 
-  #operator(+) :: fn(other: Vector3) -> Vector3 {
-    return #make(#self, {x + other.x, y + other.y, z + other.z });
+impl Vector3 {
+  #operator(+) :: fn(self, other: Vector3) -> Vector3 {
+    return #make(#self, {self.x + other.x, self.y + other.y, self.z + other.z });
   }
 
-  #operator(-) :: fn(other: Vector3) -> Vector3 {
-    return #make(#self, {x - other.x, y - other.y, z - other.z });
+  #operator(-) :: fn(self, other: Vector3) -> Vector3 {
+    return #make(#self, {self.x - other.x, self.y - other.y, self.z - other.z });
   }
 
-  #operator(*) :: fn(scalar: float) -> Vector3 {
-    return #make(#self, {x * scalar, y * scalar, z * scalar });
+  #operator(*) :: fn(self, scalar: float) -> Vector3 {
+    return #make(#self, {self.x * scalar, self.y * scalar, self.z * scalar });
   }
 
-  #operator(/) :: fn(scalar: float) -> Vector3 {
-    return #make(#self, {x / scalar, y / scalar, z / scalar });
+  #operator(/) :: fn(self, scalar: float) -> Vector3 {
+    return #make(#self, {self.x / scalar, self.y / scalar, self.z / scalar });
   }
 
-  #operator(+=) :: fn(other: Vector3) -> Vector3 {
-    x += other.x;
-    y += other.y;
-    z += other.z;
-    return *this;
+  #operator(+=) :: fn(self, other: Vector3) -> Vector3 {
+    self.x += other.x;
+    self.y += other.y;
+    self.z += other.z;
+    return self;
   }
 
-  #operator(-=) :: fn(other: Vector3) -> Vector3 {
-    x -= other.x;
-    y -= other.y;
-    z -= other.z;
-    return *this;
+  #operator(-=) :: fn(self, other: Vector3) -> Vector3 {
+    self.x -= other.x;
+    self.y -= other.y;
+    self.z -= other.z;
+    return self;
   }
 
-  #operator(*=) :: fn(scalar: float) -> Vector3 {
-    x *= scalar;
-    y *= scalar;
-    z *= scalar;
-    return *this;
+  #operator(*=) :: fn(self, scalar: float) -> Vector3 {
+    self.x *= scalar;
+    self.y *= scalar;
+    self.z *= scalar;
+    return self;
   }
 
-  #operator(/=) :: fn(scalar: float) -> Vector3 {
-    x /= scalar;
-    y /= scalar;
-    z /= scalar;
-    return *this;
+  #operator(/=) :: fn(self, scalar: float) -> Vector3 {
+    self.x /= scalar;
+    self.y /= scalar;
+    self.z /= scalar;
+    return self;
   }
 
-  to_string :: fn() -> string {
-    return $"x: {x}, y: {y}, z: {z}"
+  to_string :: fn(self) -> string {
+    return $"x: {self.x}, y: {self.y}, z: {self.z}"
   }
 }
 

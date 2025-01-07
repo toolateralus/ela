@@ -908,9 +908,7 @@ std::any Typer::visit(ASTCall *node) {
   }
 
   if (has_self_param) {
-    auto param_0 = global_get_type(info->parameter_types[0]);
-    // !BUG : we have to assert that the self type is actually correct here, and that 
-    // !the function we're calling is a method.
+    arg_tys.insert(arg_tys.begin(), info->parameter_types[0]);
   }
 
   for (int i = 0; i < info->params_len; ++i) {

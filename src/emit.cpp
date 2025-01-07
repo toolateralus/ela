@@ -204,7 +204,7 @@ std::any Emitter::visit(ASTCall *node) {
           (*ss) << "&";
         }
         left->accept(this);
-        if (node->arguments->arguments.size() > 1) {
+        if (node->arguments->arguments.size() > 0) {
           (*ss) << ", ";
         }
       }

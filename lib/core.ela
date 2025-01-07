@@ -56,92 +56,94 @@
 
 Random :: struct {
   Max :: 2147483647;
-  #static next :: fn(max: float32) -> float {
-    return (rand() as float) / (Random::Max as float) * max;
-  }
 }
+
+// impl Random {
+//   next :: fn(max: float32) -> float {
+//     return (rand() as float) / (Random::Max as float) * max;
+//   }
+// }
 
 // api for string manipulation.
 // when dot expressions are fixed we should be able to implement 'string' in language,
 // and we won't need an extra struct to do this.
-Strings :: struct {
-  #static starts_with :: fn(str: c_string, substr: c_string) -> bool {
-    if str == null || substr == null
-      then return false;
+Strings :: struct;
 
-    str_len: int = strlen(str);
-    substr_len: int = strlen(substr);
+impl string {
+  insert :: fn(self*, pos: s64, ch: char) {
+    if pos < 0 || pos > self.length then return;
+    
+    new_data: c_string = malloc(self.length + 2);
+    memcpy(new_data, self.data, pos);
+    new_data[pos] = ch;
+    memcpy(new_data + pos + 1, self.data + pos, self.length - pos);
+    new_data[self.length + 1] = 0;
 
-    if str_len < substr_len
-      then return false;
-
-    if str_len == substr_len && strcmp(str, substr) == 0
-      then return true;
-
-    return strncmp(str, substr, substr_len) == 0;
+    self.data = new_data;
+    self.length += 1;
   }
-  #static ends_with :: fn(str: c_string, pattern: c_string) -> bool {
-    if !str || !pattern
-      then return false;
+  insert :: fn(self*, pos: s64, substr: string) {
+    if pos < 0 || pos > self.length {
+      return;
+    }
+    new_data: c_string = malloc(self.length + substr.length + 1);
+    memcpy(new_data, self.data, pos);
+    memcpy(new_data + pos, substr.data, substr.length);
+    memcpy(new_data + pos + substr.length, self.data + pos, self.length - pos);
+    new_data[self.length + substr.length] = 0;
 
-    len: int = strlen(str);
-    patlen: int = strlen(pattern);
-
-    if len < patlen
-      then return false;
-
-    return strncmp(str + (len - patlen), pattern, patlen) == 0;
+    self.data = new_data;
+    self.length += substr.length;
   }
-  #static starts_with :: fn(str: string, substr: string) -> bool {
-    if str.data == null || substr.data == null
+  starts_with :: fn(self*, substr: string) -> bool {
+    if self.data == null || substr.data == null
       then return false;
 
-    str_len: int = str.length;
+    str_len: int = self.length;
     substr_len: int = substr.length;
 
     if str_len < substr_len
       then return false;
 
-    if str_len == substr_len && strcmp(str.data, substr.data) == 0
+    if str_len == substr_len && strcmp(self.data, substr.data) == 0
       then return true;
 
-    return strncmp(str.data, substr.data, substr_len) == 0;
+    return strncmp(self.data, substr.data, substr_len) == 0;
   }
-  #static ends_with :: fn(str: string, pattern: string) -> bool {
-    if !str.data || !pattern.data
+  ends_with :: fn(self*, pattern: string) -> bool {
+    if !self.data || !pattern.data
       then return false;
-
-    len: int = str.length;
+    len: int = self.length;
     patlen: int = pattern.length;
-
     if len < patlen
       then return false;
-
-    return strncmp(str.data + (len - patlen), pattern.data, patlen) == 0;
+    return strncmp(self.data + (len - patlen), pattern.data, patlen) == 0;
   }
-  #static replace :: fn(str: string, pattern: string, replacement: string) -> string {
-    if !str.data || !pattern.data || !replacement.data
-      then return str;
+  // TODO: fix me, something is super messed up. with type checking the implicit self/self* argument,
+  // TODO: we basicaly just assume if it's missing one argument it has self.
+  // replace :: fn(self*, pattern: string, replacement: string) -> string {
+  //   if !self.data || !pattern.data || !replacement.data
+  //     then return *self;
 
-    result: string;
-    str_len := str.length;
-    pattern_len := pattern.length;
-    replacement_len := replacement.length;
+  //   result: string;
+  //   str_len := self.length;
+  //   pattern_len := pattern.length;
+  //   replacement_len := replacement.length;
 
-    i: int;
-    while i < str_len {
-      if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
-        result.insert_substr_at(result.length, replacement);
-        i += pattern_len;
-      } else {
-        result.insert_substr_at(result.length, string{str.data + i, str.data + i + 1});
-        i += 1;
-      }
-    }
+  //   i: int;
+  //   while i < str_len {
+  //     if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
+  //       result.insert(result.length, replacement);
+  //       i += pattern_len;
+  //     } else {
+  //       result.insert(result.length, string{self.data + i, self.data + i + 1});
+  //       i += 1;
+  //     }
+  //   }
 
-    return result;
-  }
-  #static substr :: fn(src: c_string, start: int, end: int) -> string {
+  //   return result;
+  // }
+  substr :: fn(src: c_string, start: int, end: int) -> string {
     if !src
       then return {};
 
@@ -159,10 +161,11 @@ Strings :: struct {
     free(dest);
     return v;
   }
-  #static equals :: fn(a: c_string, b) -> bool {
+  equals :: fn(a: c_string, b) -> bool {
     return strcmp(a, b) == 0;
   }
-  #static split :: fn(str: c_string, delimiter: char) -> string[] {
+  
+  split :: fn(str: c_string, delimiter: char) -> string[] {
     if !str then return {};
     result: string[];
     start: int = 0;
@@ -176,71 +179,48 @@ Strings :: struct {
     result ~= string{str + start, str + str_len};
     return result;
   }
-  #static split :: fn(str: string, delimiter: char) -> string[] {
-    if !str.data then return {};
+  split :: fn(self*, delimiter: char) -> string[] {
+    if !self.data then return {};
     result: string[];
     start: int = 0;
-    str_len: int = str.length;
+    str_len: int = self.length;
     for i in 0..str_len {
-      if str.data[i] == delimiter {
-        if i > start then result ~= string{str.data + start, str.data + i};
+      if self.data[i] == delimiter {
+        if i > start then result ~= string{self.data + start, self.data + i};
         start = i + 1;
       }
     }
-    result ~= string{str.data + start, str.data + str_len};
+    result ~= string{self.data + start, self.data + str_len};
     return result;
   }
-  #static contains :: fn(str: string, ch: char) -> bool {
-    for _ch in str {
+
+  contains :: fn(self*, ch: char) -> bool {
+    for _ch in *self {
       if _ch == ch {
         return true;
       }
     }
     return false;
   }
-  #static contains :: fn(str: c_string, ch: char) -> bool {
-    for _ch in string{str} {
-      if _ch == ch {
-        return true;
-      }
-    }
-    return false;
-  }
-  #static contains :: fn(str: string, pattern: string) -> bool {
-    if str.data == null || pattern.data == null
+  contains :: fn(self*, pattern: string) -> bool {
+    if self.data == null || pattern.data == null
       then return false;
 
-    str_len: int = str.length;
+    str_len: int = self.length;
     pattern_len: int = pattern.length;
 
     if str_len < pattern_len
       then return false;
 
     for i in 0..(str_len - pattern_len + 1) {
-      if strncmp(str.data + i, pattern.data, pattern_len) == 0 {
-        return true;
-      }
-    }
-    return false;
-  }
-  #static contains :: fn(str: c_string, pattern: c_string) -> bool {
-    if str == null || pattern == null
-      then return false;
-
-    str_len: int = strlen(str);
-    pattern_len: int = strlen(pattern);
-
-    if str_len < pattern_len
-      then return false;
-
-    for i in 0..(str_len - pattern_len + 1) {
-      if strncmp(str + i, pattern, pattern_len) == 0 {
+      if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
         return true;
       }
     }
     return false;
   }
 }
+
 
 to_string :: fn(num: s64) -> string {
   switch num {
@@ -389,52 +369,54 @@ tm_t :: struct {
 
 #foreign localtime_r :: fn(timep: s64*, result: tm_t*) -> tm_t*;
 
-Timing :: struct {
+Timing :: struct;
+
+impl Timing {
   // returns the timespec_t for the current time since epoch.
-  #static get_timespec_since_epoch :: fn() -> timespec_t {
+  get_timespec_since_epoch :: fn() -> timespec_t {
     ts: timespec_t;
     clock_gettime(0, &ts);
     return ts;
   }
   
   // returns a seconds value representing time since epoch
-  #static seconds :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  seconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) + (ts.tv_nsec as float64) / (1_000_000_000.0 as float64);
   }
 
   // returns a milliseconds value representing time since epoch
-  #static milliseconds :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  milliseconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) * 1_000.0 + (ts.tv_nsec as float64) / 1_000_000.0 as float64;
   }
 
   // returns a microseconds value representing time since epoch
-  #static microseconds :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  microseconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) * 1_000_000.0 + (ts.tv_nsec as float64) / 1_000.0;
   }
 
   // returns a minutes value representing time since epoch
-  #static minutes :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  minutes :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) / 60.0 + (ts.tv_nsec as float64) / (60.0 * 1_000_000_000.0);
   }
 
   // returns an hours value representing time since epoch
-  #static hours :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  hours :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) / 3_600.0 + (ts.tv_nsec as float64) / ((3_600.0 * 1_000_000_000.0) as float64);
   }
 
   // returns a days value representing time since epoch
-  #static days :: fn() -> float64 {
-    ts := get_timespec_since_epoch();
+  days :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
     return (ts.tv_sec as float64) / 86_400.0 + (ts.tv_nsec as float64) / ((86_400.0 * 1_000_000_000.0) as float64)
   }
 
-  #static date_time :: fn() -> string {
-    ts := get_timespec_since_epoch();
+  date_time :: fn() -> string {
+    ts := #self::get_timespec_since_epoch();
     time_t: s64 = ts.tv_sec;
     tm: tm_t;
     localtime_r(&time_t, &tm);

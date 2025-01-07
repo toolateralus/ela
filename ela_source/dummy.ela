@@ -1,26 +1,60 @@
-thing :: struct {
+#import core;
+
+Thing :: struct {
   a: s32;
   b: s32;
 }
 
-#foreign printf :: fn(c: c_string, ...) -> int;
+impl Thing {
+  create :: fn() -> #self {
+    println("дравствуйте, из создать!");
+    v: #self;
+    return v;
+  }
 
-impl thing {
+  #ctor :: fn() {
+    // We should probably just ditch constructors and use special functions for them.
+    // Initialier lists will only be for complete, ordered initialization.
+    // These aren't getting called, they just have an anonymous, generated name.
+  }
+
+  // This just emits as a function called +. Operator overloads need a COMPLETE rework, no longer can we rely on C++'s operator overloading.
+  // #operator(+) :: fn(self, other: #self) -> #self {
+  //   return self;
+  // }
+
   static_method :: fn(a: s32, b: s32) -> s32 {
     return a + b;
   }
-  mut_me :: fn(self*) {
-    printf("Hi from a '%s'\n", $"{#type(self).name}".data);
-    self.a = 100;
+
+  mut_me :: fn(self*, a:s32) {
+    println($"Hello from a {#type(self).name}");
+    self.a = a;
     self.b = 200;
   }
 }
 
 main :: fn() {
-  t: thing = {
-    0, 0
-  };
-  n := t.static_method(5, 2);
-  t.mut_me();
+  t:= Thing::create();
+  n := Thing::static_method(5, 2);
+  t.mut_me(100);
   printf("%d, %d\n", t.a, t.b);
 }
+
+// SMALLER TODOS:
+  // functions called via :: need to assert that they're static functions and don't take a "self/self*"
+
+// MASSIVE REWORKS -- TODO:
+
+// Easy(ish)
+  // 'mut' keyword needs to be added, and we need to check that on compilation to assert const params and variables aren't being modified.
+     // 'const' (not a keyword) would just be default behaviour
+
+  // All objects need to have a zero initialization scheme. this will just compile to "= {0}" when in C, but maybe we want to do it ourselves;
+  // Implicit passing of "self/self*" is really shoddy in the type checker, we basically assume a bunch of stuff.
+  // Implement operator overloads called by function.
+  // Implement named initializer lists, no more constructors.
+
+// Hard
+  // Implement destructors called by function.
+  // Implement defer, for those who don't want constructors, or just specialized cleanup/scope exit routines without implementing boilerplate classes and macros just to do it.
