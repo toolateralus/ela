@@ -64,6 +64,10 @@ struct SerializeVisitor : VisitorBase {
   std::any visit(ASTAllocate *node) override;
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTAlias *node) override;
+  std::any visit(ASTImpl *node) override {
+    // todo:
+    return {};
+  }
 
   // TODO: implement me.
 
@@ -102,6 +106,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTLiteral *node) override;
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
+
   int get_function_type(ASTFunctionDeclaration *);
   void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
@@ -111,7 +116,7 @@ struct Typer : VisitorBase {
   int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                std::vector<int> generic_args = {});
   int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
-                                   std::vector<int> generic_args = {});
+                              std::vector<int> generic_args = {});
 
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;
@@ -134,6 +139,8 @@ struct Typer : VisitorBase {
   std::any visit(ASTTuple *node) override;
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTAlias *node) override;
+  std::any visit(ASTImpl *node) override;
+
   InternedString type_name(ASTExpr *node);
 };
 
@@ -149,8 +156,9 @@ struct Emitter : VisitorBase {
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  Nullable<ASTImpl> current_impl = nullptr;
 
-  Typer &type_visitor;
+  Typer &typer;
 
   StringBuilder code{};
   StringBuilder *ss{};
@@ -187,7 +195,7 @@ struct Emitter : VisitorBase {
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline Emitter(Context &context, Typer &type_visitor) : type_visitor(type_visitor), ctx(context) { ss = &code; }
+  inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
@@ -254,7 +262,7 @@ struct Emitter : VisitorBase {
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTScopeResolution *node) override;
   std::any visit(ASTAlias *node) override;
-
+  std::any visit(ASTImpl *node) override;
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);

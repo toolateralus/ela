@@ -210,7 +210,6 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
   return declaring_type;
 }
 
-
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_IDENTIFIER:
@@ -289,7 +288,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
 
   ctx.scope->insert("this", type->take_pointer_to());
 
-  for (auto subunion: node->unions) {
+  for (auto subunion : node->unions) {
     for (const auto &field : subunion->fields) {
       field->accept(this);
       node->scope->insert(field->name, field->type->resolved_type);
@@ -297,11 +296,6 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
   }
   for (auto decl : node->fields) {
     decl->accept(this);
-  }
-  for (auto method : node->methods) {
-    method->accept(this);
-    auto symbol = ctx.scope->local_lookup(method->name);
-    symbol->flags |= SYMBOL_IS_METHOD;
   }
 
   ctx.set_scope(old_scope);
@@ -344,9 +338,6 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
 
   for (const auto &field : node->fields) {
     field->accept(this);
-  }
-  for (const auto &method : node->methods) {
-    method->accept(this);
   }
 
   ctx.set_scope(old_scope);
@@ -872,12 +863,12 @@ std::any Typer::visit(ASTCall *node) {
         (symbol->declaring_node.is_not_null() &&
          symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION &&
          static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())->generic_parameters.size() != 0)) {
-      // TODO: make the generic argument inference actually make sense. This is just kind of a hack so we can omit it on some basic calls
-      // like println etc.
+      // TODO: make the generic argument inference actually make sense. This is just kind of a hack so we can omit it on
+      // some basic calls like println etc.
       if (node->generic_arguments.empty()) {
         auto gen_args = std::any_cast<std::vector<int>>(node->arguments->accept(this));
         auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
-                                                            symbol->declaring_node.get(), gen_args);
+                                                             symbol->declaring_node.get(), gen_args);
         if (type_id == -2) {
           throw_error("Template instantiation argument count mismatch", node->source_range);
         }
@@ -886,7 +877,7 @@ std::any Typer::visit(ASTCall *node) {
       } else {
         auto gen_args = get_generic_arg_types(node->generic_arguments);
         auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
-                                                            symbol->declaring_node.get(), gen_args);
+                                                             symbol->declaring_node.get(), gen_args);
         if (type_id == -2) {
           throw_error("Template instantiation argument count mismatch", node->source_range);
         }
@@ -1653,3 +1644,29 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
   return {};
 };
+
+std::any Typer::visit(ASTImpl *node) {
+  auto type = global_get_type(int_from_any(node->target->accept(this)));
+
+  if (!type) {
+    throw_error("Impl used on a non-existent type.", node->source_range);
+  }
+
+  Scope *scope;
+  if (type->is_kind(TYPE_STRUCT)) {
+    scope = type->get_info()->as<StructTypeInfo>()->scope;
+  } else if (type->is_kind(TYPE_ENUM)) {
+    scope = type->get_info()->as<UnionTypeInfo>()->scope;
+  } else {
+    throw_error("Couldn't find scope for impl target. Is it a union or struct?", node->source_range);
+  }
+
+  auto previous = ctx.scope;
+  ctx.set_scope(scope);
+  for (const auto &method: node->methods) {
+    method->accept(this);
+  }
+  ctx.set_scope(previous);
+  
+  return {};
+}

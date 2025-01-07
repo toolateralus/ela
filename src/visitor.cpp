@@ -234,9 +234,6 @@ std::any SerializeVisitor::visit(ASTStructDeclaration *node) {
   for (auto decl : node->fields) {
     decl->accept(this);
   }
-  for (auto method : node->methods) {
-    method->accept(this);
-  }
 
   context.exit_scope();
 
@@ -339,6 +336,7 @@ std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this)
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTImpl::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }
@@ -353,9 +351,6 @@ std::any SerializeVisitor::visit(ASTUnionDeclaration *node) {
   context.set_scope(node->scope);
   for (const auto &field : node->fields) {
     field->accept(this);
-  }
-  for (const auto &method : node->methods) {
-    method->accept(this);
   }
   context.exit_scope();
   return {};

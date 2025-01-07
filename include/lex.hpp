@@ -101,6 +101,7 @@ enum struct TType {
 
   GenericBrace, // '!<' for ![T, T1]
   As,           // 'as' for casting
+  Impl,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -191,6 +192,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHR);
     TTYPE_CASE(Dollar);
     TTYPE_CASE(As);
+    TTYPE_CASE(Impl);
   }
   return "Unknown";
 }
@@ -278,6 +280,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"new", TType::New},
     {"delete", TType::Delete},
     {"as", TType::As},
+    {"impl", TType::Impl},
 };
 
 static std::unordered_map<std::string, TType> operators{

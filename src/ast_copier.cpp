@@ -188,10 +188,6 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   for (auto field : node->fields) {
     new_node->fields.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
   }
-  new_node->methods.clear();
-  for (auto method : node->methods) {
-    new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
-  }
   current_scope = old_scope;
   return new_node;
 }
@@ -237,10 +233,6 @@ ASTUnionDeclaration *ASTCopier::copy_union_declaration(ASTUnionDeclaration *node
   new_node->fields.clear();
   for (auto field : node->fields) {
     new_node->fields.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
-  }
-  new_node->methods.clear();
-  for (auto method : node->methods) {
-    new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
   }
   new_node->structs.clear();
   for (auto strct : node->structs) {
@@ -298,6 +290,8 @@ ASTScopeResolution *ASTCopier::copy_scope_resolution(ASTScopeResolution *node) {
 }
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   switch (node->get_node_type()) {
+    case AST_NODE_IMPL:
+      return copy_node(static_cast<ASTImpl*>(node));
     case AST_NODE_PROGRAM:
       return copy_program(static_cast<ASTProgram *>(node));
     case AST_NODE_BLOCK:

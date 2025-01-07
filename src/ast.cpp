@@ -9,7 +9,8 @@
 #include <set>
 #include <string>
 #include <unordered_set>
-
+#include "visitor.hpp"
+#include "ast_copier.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -17,7 +18,6 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-#include "visitor.hpp"
 
 enum PreprocKind {
   PREPROC_IF,
@@ -1130,6 +1130,10 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+  if (peek().type == TType::Impl) {
+    return parse_impl();
+  }
+
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
       lookahead_buf()[2].type == TType::Identifier) {
     auto expr = ast_alloc<ASTExprStatement>();
@@ -1278,6 +1282,7 @@ ASTStatement *Parser::parse_statement() {
       return node;
     }
   }
+
 
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
@@ -1503,6 +1508,17 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     auto name = expect(TType::Identifier).value;
 
+    // Self param for impls.
+    if (name == "self") {
+      auto type = static_cast<ASTType*>(deep_copy_ast(current_impl.get()->target));
+      append_type_extensions(type);
+      auto param = ast_alloc<ASTParamDecl>();
+      param->type = type;
+      param->name = name;
+      params->params.push_back(param);
+      continue;
+    }
+
     if (peek().type == TType::Colon) {
       expect(TType::Colon);
       type = parse_type();
@@ -1623,15 +1639,47 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   return node;
 }
 
+ASTImpl *Parser::parse_impl() {
+  auto range = begin_node();
+  expect(TType::Impl);
+  Defer _([&]{
+    current_impl = nullptr;
+  });
+  auto impl = ast_alloc<ASTImpl>();
+  current_impl = impl;
+  impl->target = parse_type();
+
+  // TODO: remove this!
+  auto type = global_get_type(std::any_cast<int>(impl->target->accept(typer)));
+  Scope *scope;
+  if (type->is_kind(TYPE_STRUCT)) {
+    scope = type->get_info()->as<StructTypeInfo>()->scope;
+  } else if (type->is_kind(TYPE_ENUM)) {
+    scope = type->get_info()->as<UnionTypeInfo>()->scope;
+  } else {
+    end_node(impl, range);
+    throw_error("Couldn't find scope for impl target. Is it a union or struct?", impl->source_range);
+  }
+
+  auto block = parse_block(scope);
+  end_node(impl, range);
+
+  for (const auto &statement: block->statements) {
+    if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      auto function = static_cast<ASTFunctionDeclaration *>(statement);
+      function->flags |= FUNCTION_IS_METHOD;
+      impl->methods.push_back(function);
+    } else {
+      throw_error("invalid statement: only methods are allowed in 'impl's", statement->source_range);
+    }
+  }
+  return impl;
+}
+
 void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
   for (const auto &statement : statements) {
-    
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        auto function = static_cast<ASTFunctionDeclaration *>(statement);
-        function->flags |= FUNCTION_IS_METHOD;
-        decl->methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_UNION_DECLARATION)  {
       auto union_decl = static_cast<ASTUnionDeclaration *>(statement);
       auto type = global_get_type(union_decl->resolved_type);
@@ -1643,12 +1691,10 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
       for (const auto &field : union_decl->fields) {
         decl->scope->insert(field->name, field->type->resolved_type);
       }
-    } 
-
-    else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
+    } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
       visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
     } else if (statement->get_node_type() != AST_NODE_NOOP) {
-      throw_error("Non-field or non-method declaration not allowed in struct.", statement->source_range);
+      throw_error("Non-field declaration not allowed in struct.", statement->source_range);
     }
   }
 }
@@ -1784,10 +1830,6 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
   for (auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      auto function = static_cast<ASTFunctionDeclaration *>(statement);
-      function->flags |= FUNCTION_IS_METHOD;
-      decl->methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(struct_decl->resolved_type);
@@ -1800,7 +1842,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
         block->scope->insert(field->name, field->type->resolved_type);
       }
     } else {
-      throw_error("Non method/field declarations not allowed in union", range);
+      throw_error("Non field declarations not allowed in union", range);
     }
   }
 
