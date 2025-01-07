@@ -427,7 +427,6 @@ std::any Typer::visit(ASTDeclaration *node) {
         throw_error("Cannot use a type as a value.", node->value.get()->source_range);
       }
     }
-
     auto value_ty = int_from_any(node->value.get()->accept(this));
     if (value_ty == void_type()) {
       throw_error("Cannot assign a variable of type 'void'", node->source_range);

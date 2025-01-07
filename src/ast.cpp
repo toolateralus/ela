@@ -1640,20 +1640,25 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   one->value = "1";
 
   ASTExpr *last_value = zero;
+  bool was_zero = true;
+  Token add_token(tok.location, "+", TType::Add, TFamily::Operator);
 
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
+
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
     } else {
-      if (last_value->get_node_type() == AST_NODE_LITERAL && static_cast<ASTLiteral *>(last_value)->value == "0") {
+      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL && static_cast<ASTLiteral *>(last_value)->value == "0") {
         value = zero;
+        was_zero = false;
       } else {
         auto bin = ast_alloc<ASTBinExpr>();
         bin->left = last_value;
         bin->right = one;
+        bin->op = add_token;      
         last_value = bin;
         value = bin;
       }
@@ -1662,6 +1667,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       eat();
     }
     node->key_values.push_back({iden, value});
+    last_value = value;
   }
   end_node(node, range);
   std::vector<InternedString> keys;
