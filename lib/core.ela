@@ -200,15 +200,6 @@ impl string {
     return result;
   }
 
-  contains :: fn(self*, ch: char) -> bool {
-    for _ch in *self {
-      if _ch == ch {
-        return true;
-      }
-    }
-    return false;
-  }
-
   contains :: fn(self*, pattern: string) -> bool {
     if self.data == null || pattern.data == null
       then return false;
@@ -285,28 +276,8 @@ to_string :: fn(num: s64) -> string {
 #foreign cos :: fn(f: float64) -> float64;
 #foreign sin :: fn(f: float64) -> float64;
 
-abs :: fn(v: s64) -> s64 {
-  if v < 0 {
-    return -v;
-  }
-  return v;
-}
 
-abs :: fn(v: float64) -> float64 {
-  if v < 0.0 {
-    return -v;
-  }
-  return v;
-}
-
-abs :: fn(v: float) -> float {
-  if v < 0.0 {
-    return -v;
-  }
-  return v;
-}
-
-abs :: fn(v: int) -> int {
+abs :: fn![T](v: T) -> T {
   if v < 0 {
     return -v;
   }
@@ -314,26 +285,15 @@ abs :: fn(v: int) -> int {
 }
 
 
-min :: fn(a: int, b: int) -> int {
+min :: fn![T](a: T, b: T) -> T {
   if a > b then return b;
   return a;
 }
 
-max :: fn(a: int, b: int) -> int {
+max :: fn![T](a: T, b: T) -> T {
   if a > b then return a;
   return b;
 }
-
-min :: fn(a: float, b: float) -> float {
-  if a > b then return b;
-  return a;
-}
-
-max :: fn(a: float, b: float) -> float {
-  if a > b then return a;
-  return b;
-}
-
 
 clamp :: fn(v: float64, min, max) -> float64 {
   if v < min then return min;
@@ -341,17 +301,8 @@ clamp :: fn(v: float64, min, max) -> float64 {
   return v;
 }
 
-clamped :: fn(v: float*, min: float, max) {
-  if *v < min then *v = min;
-  if *v > max then *v = max;
-}
-
 lerp :: fn(a: float, b, t) -> float {
   return (a * (1.0 - t)) + (b * t);
-}
-
-lerp :: fn(a: int, b, t: float) -> int {
-  return (a * (1.0 - t)) + (b * t) + 0.5 as int;
 }
 
 #foreign time :: fn(value: void*) -> int;

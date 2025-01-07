@@ -117,7 +117,7 @@ Context::Context() {
     auto _t = global_find_function_type_id(get_info, {});
     field_scope->insert("get", _t, SYMBOL_IS_FUNCTION);
     auto get_sym = field_scope->local_lookup("get");
-    get_sym->function_overload_types.push_back(_t);
+    get_sym->type_id = _t;
 
     // field.set()
     auto set_info = FunctionTypeInfo{};
@@ -126,7 +126,7 @@ Context::Context() {
     _t = global_find_function_type_id(set_info, {});
     field_scope->insert("set", _t, SYMBOL_IS_FUNCTION);
     auto set_sym = field_scope->local_lookup("set");
-    set_sym->function_overload_types.push_back(_t);
+    set_sym->type_id = _t;
 
     // type.elements()
     auto elements_info = FunctionTypeInfo{};
@@ -136,7 +136,7 @@ Context::Context() {
     _t = global_find_function_type_id(elements_info, {});
     type_scope->insert("elements", _t, SYMBOL_IS_FUNCTION);
     auto elements_sym = type_scope->local_lookup("elements");
-    elements_sym->function_overload_types.push_back(_t);
+    elements_sym->type_id = _t;
   }
 
   // string struct, stores length info.
@@ -145,12 +145,11 @@ Context::Context() {
     str_scope->parent = root_scope;
 
     auto type_id = global_create_struct_type("string", str_scope);
-
     // ** DO NOT REMOVE **
     string_type() = type_id;
+    // ** ------------- **
 
     auto type = global_get_type(type_id);
-
     static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
         charptr_type(),
         c_string_type(),
@@ -158,46 +157,11 @@ Context::Context() {
 
     str_scope->insert("data", charptr_type());
     str_scope->insert("length", s32_type());
-    str_scope->insert("is_view", bool_type());  // is this a borrowing copy?
-
-    str_scope->insert("[", s8_type(), SYMBOL_IS_FUNCTION);
-
+    str_scope->insert("is_view", bool_type());
     auto func = FunctionTypeInfo{};
     func.parameter_types[0] = char_type();
     func.return_type = void_type();
     func.params_len = 1;
-
-    str_scope->insert("push", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    func.parameter_types[0] = -1;
-    func.params_len = 0;
-    func.return_type = char_type();
-    str_scope->insert("pop", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    func.parameter_types[0] = int_type();
-    func.params_len = 1;
-    func.return_type = void_type();
-    str_scope->insert("erase_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    func.parameter_types[0] = int_type();
-    func.parameter_types[1] = char_type();
-    func.params_len = 2;
-    func.return_type = void_type();
-    str_scope->insert("insert_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    func.parameter_types[1] = string_type();
-    str_scope->insert("insert_substr_at", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    func.params_len = 1;
-    func.return_type = string_type();
-    func.parameter_types[0] = range_type();
-    str_scope->insert("substr", global_find_function_type_id(func, {}), SYMBOL_IS_FUNCTION);
-
-    auto sym = str_scope->local_lookup("[");
-    auto info = type_info_alloc<FunctionTypeInfo>();
-    info->parameter_types[0] = int_type();
-    info->return_type = s8_type();
-    sym->function_overload_types.push_back(global_find_function_type_id(*info, {}));
   }
 
   // Env type

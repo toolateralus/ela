@@ -8,14 +8,8 @@
 #include "string_builder.hpp"
 
 struct VisitorBase {
-  enum VisitorFlags {
-    FLAG_NO_STATE = 0,
-    FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
-  };
-  int visitor_flags = FLAG_NO_STATE;
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
-
   virtual std::any visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -23,7 +17,6 @@ struct VisitorBase {
     return {};
   };
 };
-
 
 struct Typer : VisitorBase {
   Nullable<Symbol> get_symbol(ASTNode *);
@@ -56,8 +49,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
 
-  int get_function_type(ASTFunctionDeclaration *);
-  void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
+  
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
   int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,

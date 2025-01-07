@@ -1582,17 +1582,18 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->params = parse_parameters(function->generic_parameters);
   function->name = name.value;
 
-  auto sym = ctx.scope->local_lookup(name.value);
-
-  if (sym) {
-    sym->flags |= SYMBOL_HAS_OVERLOADS;
-  } else {
-    // to allow for recursion
-    ctx.scope->insert(name.value, -1);
-    auto sym = ctx.scope->lookup(name.value);
-    sym->flags |= SYMBOL_IS_FUNCTION;
-    sym->declaring_node = function;
+  // check for definition.
+  {
+    auto sym = ctx.scope->local_lookup(name.value);
+    if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
+      end_node(nullptr, range);
+      throw_error(std::format("Redefinition of function {}", name.value), range);
+    };
   }
+
+  ctx.scope->insert(name.value, -1, SYMBOL_IS_FUNCTION);
+  auto sym = ctx.scope->lookup(name.value);
+  sym->declaring_node = function;
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();

@@ -182,7 +182,6 @@ std::any Emitter::visit(ASTCall *node) {
     auto base_sym_ptr = base_symbol.get();
     auto arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(&typer));
     Type *function_type = global_get_type(base_sym_ptr->type_id);
-    typer.find_function_overload(node, base_sym_ptr, arg_tys, function_type);
     auto info = function_type->get_info()->as<FunctionTypeInfo>();
     auto param_0_ty = global_get_type(info->parameter_types[0]);
 

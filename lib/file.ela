@@ -57,31 +57,12 @@ impl File {
     fseek(file, 0, SeekPosition::Begin);
     return #make(u32, len);
   }
-  read_all :: fn(file: FILE*, len: u32*) -> string {
-    *len = File::length(file);
-    c: char;
-    str: string;
-    while ((c = fgetc(file)) != EOF) {
-      str.push(c);
-    }
-    return str;
-  }
-  read_all :: fn(filename: char*) -> string {
-    file := fopen(filename, "r");
-    str: string;
-    c: char;
-    while ((c = fgetc(file)) != EOF) {
-      str.push(c);
-    }
-    fclose(file);
-    return str;
-  }
   read_all :: fn(filename: string) -> string {
     file := fopen(filename.data, "r");
     str: string;
     c: char;
     while ((c = fgetc(file)) != EOF) {
-      str.push(c);
+      str = $"{str}{c}";
     }
     fclose(file);
     return str;
@@ -91,16 +72,7 @@ impl File {
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);
   }
-  write_all :: fn(filename: string, data: char*, nbytes: u64) -> void {
-    file := fopen(filename.data, "w");
-    fwrite(data, sizeof(char), nbytes, file);
-    fclose(file);
-  }
-  write_all :: fn(filename: char*, data: char*, nbytes: u64) -> void {
-    file := fopen(filename, "w");
-    fwrite(data, sizeof(char), nbytes, file);
-    fclose(file);
-  }
+
   // Used to convert our flag enum to a string for fopen/fclose etc.
   flags_to_string :: fn(flags: int) -> string {
     s : string;

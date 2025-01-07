@@ -229,7 +229,7 @@ impl JsonLexer {
   }
 
   expect_type :: fn(self*, type: s32) -> JsonToken {
-    return self.expect_types(self, {type});
+    return self.expect_types({type: type});
   }
 }
 
@@ -270,22 +270,7 @@ JsonValue :: struct {
 }
 
 impl JsonValue {
-  #dtor :: fn() {
-    if type == JsonValueType::Object {
-      for kvp in data.object {
-        delete(kvp.value);
-      }
-      destruct(data.object);
-    } else if type == JsonValueType::Array {
-      for val in data.array {
-        delete(val);
-      }
-      destruct(data.array);
-    } else if type == JsonValueType::String {
-      destruct(data._string);
-    }
-  }
-  to_string :: fn(self*) -> string {
+    to_string :: fn(self*) -> string {
     if self.type == JsonValueType::Object {
       obj := self.data.object;
       len := obj.length;
@@ -331,6 +316,22 @@ impl JsonValue {
       return string::empty();
     }
   }
+  #dtor :: fn() {
+    if type == JsonValueType::Object {
+      for kvp in data.object {
+        delete(kvp.value);
+      }
+      destruct(data.object);
+    } else if type == JsonValueType::Array {
+      for val in data.array {
+        delete(val);
+      }
+      destruct(data.array);
+    } else if type == JsonValueType::String {
+      destruct(data._string);
+    }
+  }
+
   get :: fn(self*, key: string) -> JsonValue* {
     if self.type != JsonValueType::Object {
       return null;
@@ -342,7 +343,8 @@ impl JsonValue {
     }
     return null;
   }
-  get :: fn(self*, index: int) -> JsonValue* {
+
+  at :: fn(self*, index: int) -> JsonValue* {
     if self.type != JsonValueType::Array {
       return null;
     }
@@ -352,6 +354,7 @@ impl JsonValue {
     }
     return arr[index];
   }
+
   is_number :: fn(self*) -> bool {
     return self.type == JsonValueType::Number;
   }
@@ -404,7 +407,7 @@ impl JsonValue {
 
 json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
   value := new JsonValue;
-  token := lexer.expect_types(lexer, {
+  token := lexer.expect_types({
     JsonTokenType::LBracket,
     JsonTokenType::LCurly,
     JsonTokenType::Number,
@@ -422,7 +425,7 @@ json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
     }
     while token.type != JsonTokenType::RBracket {
       value.data.array ~= json_parse(lexer);
-      token = lexer.expect_types(lexer, {JsonTokenType::RBracket, JsonTokenType::Comma});
+      token = lexer.expect_types({JsonTokenType::RBracket, JsonTokenType::Comma});
     }
   } else if token.type == JsonTokenType::LCurly {
     value.type = JsonValueType::Object;
@@ -435,7 +438,7 @@ json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
       key := lexer.expect_type(JsonTokenType::String);
       _ := lexer.expect_type(JsonTokenType::Colon);
       value.data.object ~= {key: key.value, value: json_parse(lexer)};
-      token = lexer.expect_types(lexer, {JsonTokenType::RCurly, JsonTokenType::Comma});
+      token = lexer.expect_types({JsonTokenType::RCurly, JsonTokenType::Comma});
     }
   } else if token.type == JsonTokenType::Number {
     value.type = JsonValueType::Number;

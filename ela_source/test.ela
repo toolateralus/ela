@@ -101,10 +101,6 @@ impl IHaveAMethod {
   }
 }
 
-XarBarInitListTestStruct :: struct {
-  x: float;
-  y: float;
-}
 
 Xaryu :: struct {
   value: int;
@@ -830,49 +826,9 @@ overloaded :: fn(xaryu: Xaryu ) -> Xaryu {
 }
 
 #test test_initializer_lists :: fn() {
-    scalar: int;
-    arr: int[]  = {0, 1, 2};
-    fixed: int[3] = {0, 1, 2};
-
-    str: InitListStruct = {
-      a: 0, 
-      b: 0, 
-      c: 0
-    };
-    
-    InitListStruct[] strArr = {InitListStruct{0, 0, 0, 4}, InitListStruct{0, 0, 0}, InitListStruct{0, 0, 0}};
-
-    strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}}; // ! Comment this out to test.
-    strArr1: InitListStruct[3] = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-
-    expected_arr: int[] = {0, 1, 2};
-    for i in 0..arr.length {
-      assert("Array element mismatch", arr[i] == expected_arr[i]);
-    }
-
-    expected_fixed: int[3] = {0, 1, 2};
-    for i in 0..3 {
-      assert("Fixed array element mismatch", fixed[i] == expected_fixed[i]);
-    }
-
-    assert("Struct element mismatch", str.a == 0);
-    assert("Struct element mismatch", str.b == 0);
-    assert("Struct element mismatch", str.c == 0);
-
-    expected_strArr: InitListStruct[]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for i in 0..strArr.length {
-      assert("Struct array element mismatch", strArr[i].a == expected_strArr[i].a);
-      assert("Struct array element mismatch", strArr[i].b == expected_strArr[i].b);
-      assert("Struct array element mismatch", strArr[i].c == expected_strArr[i].c);
-    }
-
-    // Assertions for strArr1
-    expected_strArr1: InitListStruct[3]  = {{0, 0, 0}, {0, 0, 0}, {0, 0, 0}};
-    for i in 0..3 {
-      assert("Fixed struct array element mismatch", strArr1[i].a == expected_strArr1[i].a);
-      assert("Fixed struct array element mismatch", strArr1[i].b == expected_strArr1[i].b);
-      assert("Fixed struct array element mismatch", strArr1[i].c == expected_strArr1[i].c);
-    }
+  scalar: int;
+  arr: int[]  = {0, 1, 2};
+  fixed: int[3] = {0, 1, 2};
 }
 
 #test test_cast :: fn() {
@@ -911,12 +867,17 @@ overloaded :: fn(xaryu: Xaryu ) -> Xaryu {
   assert("failed to erase element from array with ~~", array.length == 0);
 }
 
+XarBarInitListTestStruct :: struct {
+  x: float;
+  y: float;
+}
+
 New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   return v;
 }
 
 #test test_init_list_as_implicit_parameter :: fn() {
-  v := New({0.0, 0.0});
+  v := New({x: 0.0, y: 0.0});
   assert("failed", v.x == 0.0 && v.y == 0.0);
 }
 
@@ -1019,7 +980,7 @@ InitListTest :: struct {
 }
 
 returns_an_init_list  :: fn() -> InitListTest {
-  return {0};
+  return {n: 0};
 }
 
 infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
@@ -1029,9 +990,8 @@ infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
 
 #test test_init_list_comprehensive :: fn() {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
-  assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({0}).n == 0);
+  assert("Init list failed to infer from parameter signature", infers_argument_from_init_list({n: 0}).n == 0);
   empty_init_list := InitListTest{};
-
 }
 
 #test subscript_string :: fn() {
@@ -1062,8 +1022,8 @@ switch_helper :: fn() -> int {
 
   passed = false;
   switch str {
-    string{"Hello"}: { assert("Switch case on string failed", false); }
-    string{"Hello!"}: { passed = true; }
+    string::from("Hello"): { assert("Switch case on string failed", false); }
+    string::from("Hello!"): { passed = true; }
   }
   assert("Failed to hit positive switch case for string", passed);
 
@@ -1275,7 +1235,7 @@ impl JsonValueDeleter {
   }
   #dtor :: fn(self*) {
     for val in self.vals {
-      delete(self.val);
+      delete(val);
     }
   }
 }

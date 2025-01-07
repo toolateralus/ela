@@ -14,7 +14,6 @@ extern jstl::Arena scope_arena;
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_HAS_OVERLOADS = 1 << 3,
   SYMBOL_IS_METHOD = 1 << 4,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
 };
@@ -25,7 +24,6 @@ struct Symbol {
   InternedString name;
   int type_id;
   int flags = SYMBOL_IS_VARIABLE;
-  std::vector<int> function_overload_types;
   Nullable<ASTNode> declaring_node;
   Value value;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }

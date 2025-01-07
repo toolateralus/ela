@@ -37,80 +37,6 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
   }
 };
 
-void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type) {
-  if ((symbol->flags & SYMBOL_HAS_OVERLOADS) != 0) {
-    bool found_exact_match = false;
-    int exact_match_idx = -1;
-
-    bool found_implicit_match = false;
-    int implicit_match_idx = -1;
-
-// Define the helper macro
-#define NON_VARARGS_NO_DEFAULT_PARAMS(info) (!info->is_varargs && info->default_params == 0)
-
-    for (const auto &[i, overload] : symbol->function_overload_types | std::ranges::views::enumerate) {
-      auto ovrld_ty = global_get_type(overload);
-      auto info = (ovrld_ty->get_info()->as<FunctionTypeInfo>());
-
-      bool match = true;
-      int required_params = info->params_len - info->default_params;
-      if (arg_tys.size() < required_params || (!info->is_varargs && arg_tys.size() > info->params_len)) {
-        match = false;
-      } else {
-        for (int j = 0; j < arg_tys.size(); ++j) {
-          if (j >= info->params_len) {
-            if (!info->is_varargs) {
-              match = false;
-              break;
-            }
-          } else {
-            auto conversion_rule = type_conversion_rule(global_get_type(arg_tys[j]),
-                                                        global_get_type(info->parameter_types[j]), node->source_range);
-            if (conversion_rule == CONVERT_EXPLICIT && NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
-              match = false;
-              break;
-            }
-            if (conversion_rule == CONVERT_IMPLICIT && NON_VARARGS_NO_DEFAULT_PARAMS(info)) {
-              found_implicit_match = true;
-              implicit_match_idx = i;
-            } else if (conversion_rule != CONVERT_NONE_NEEDED) {
-              match = false;
-              break;
-            }
-          }
-        }
-      }
-
-      if (match) {
-        found_exact_match = true;
-        exact_match_idx = i;
-        break;
-      }
-    }
-
-    if (!found_exact_match && !found_implicit_match) {
-      std::vector<std::string> names;
-      for (auto n : arg_tys) {
-        names.push_back(global_get_type(n)->to_string());
-      }
-      throw_error(std::format("No function overload for provided argument "
-                              "signature found.. got : {}",
-                              names),
-                  node->source_range);
-    }
-
-    if (found_exact_match) {
-      type = global_get_type(symbol->function_overload_types[exact_match_idx]);
-      assert(type != nullptr);
-    } else {
-      type = global_get_type(symbol->function_overload_types[implicit_match_idx]);
-      assert(type != nullptr);
-    }
-
-#undef NON_VARARGS_NO_DEFAULT_PARAMS
-  }
-}
-
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_IDENTIFIER:
@@ -227,14 +153,18 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
 
 int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
                                       std::vector<int> generic_args) {
+
+  // Setup context.
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   auto last_decl = current_func_decl;
   current_func_decl = node;
+
   Defer _([&] {
     current_func_decl = last_decl;
     ctx.set_scope(old_scope);
   });
+  
 
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -247,70 +177,34 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   node->return_type->accept(this);
   node->params->accept(this);
 
+  int type_id = -1;
   FunctionTypeInfo info;
-  info.return_type = node->return_type->resolved_type;
-
-  if (info.return_type == -1) {
-    throw_error("Use of undeclared type", node->return_type->source_range);
+  // Get function type id from header.
+  {
+    info.return_type = node->return_type->resolved_type;
+    info.meta_type = node->meta_type;
+    info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
+    for (const auto &param : node->params->params) {
+      if (param->default_value.is_not_null())
+        info.default_params++;
+      ctx.scope->insert(param->name, param->type->resolved_type);
+      info.parameter_types[info.params_len] = param->type->resolved_type;
+      info.params_len++;
+    }
+    type_id = global_find_function_type_id(info, {});
   }
 
-  info.params_len = 0;
-  info.default_params = 0;
-  info.meta_type = node->meta_type;
-
-  auto name = node->name;
-
-  info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
-
-  auto params = node->params->params;
-
-  for (const auto &param : params) {
-    if (param->default_value.is_not_null())
-      info.default_params++;
-    ctx.scope->insert(param->name, param->type->resolved_type);
-    info.parameter_types[info.params_len] = param->type->resolved_type;
-    info.params_len++;
-  }
-
-  auto type_id = global_find_function_type_id(info, {});
-
-  // TODO: we need to support fwd decls of overloaded functions
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
     ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
     return {};
   }
 
-  auto sym = ctx.scope->parent->lookup(node->name);
-
-  if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
-    sym->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
-  }
-
   if (!generic_instantiation) {
-    // CLEANUP(Josh) 10/7/2024, 8:07:00 AM
-    // This is ugly. It's for function overloading
-    if (sym && ((node->flags & FUNCTION_IS_CTOR) == 0) && (node->flags & FUNCTION_IS_DTOR) == 0) {
-      if (sym->function_overload_types.size() >= 1)
-        sym->flags |= SYMBOL_HAS_OVERLOADS;
-      for (const auto overload_type_id : sym->function_overload_types) {
-        auto type = global_get_type(overload_type_id);
-        auto this_type = global_get_type(type_id);
-        if (type->equals(this_type->base_id, this_type->get_ext()) &&
-            type->type_info_equals(this_type->get_info(), this_type->kind))
-          throw_error(std::format("re-definition of function '{}'", node->name.get_str()), node->source_range);
-      }
-      sym->function_overload_types.push_back(type_id);
-      sym->type_id = type_id;
-    } else {
-      // always insert the first function declarations as the 0th overloaded type,
-      // because we can tell when a fucntion has been overloaded when this array's
-      // size is > 1
-      ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FUNCTION);
-      auto sym = ctx.scope->parent->lookup(node->name);
-      sym->function_overload_types.push_back(type_id);
-      sym->declaring_node = node;
-    }
+    ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FUNCTION);
+    auto sym = ctx.scope->lookup(node->name);
+    sym->declaring_node = node;
   }
+
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN)
     return {};
 
@@ -377,36 +271,6 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
   return {};
 }
 
-// For generic types.
-// TODO: this has a lot of duplicated code and can be cleaned up for sure.
-int Typer::get_function_type(ASTFunctionDeclaration *node) {
-  node->return_type->accept(this);
-  node->params->accept(this);
-
-  FunctionTypeInfo info;
-  info.return_type = node->return_type->resolved_type;
-
-  if (info.return_type == -1) {
-    throw_error("Use of undeclared type", node->return_type->source_range);
-  }
-
-  info.params_len = 0;
-  info.default_params = 0;
-  info.meta_type = node->meta_type;
-  info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
-  auto params = node->params->params;
-
-  for (const auto &param : params) {
-    if (param->default_value.is_not_null())
-      info.default_params++;
-    if (node->block.is_not_null())
-      node->block.get()->scope->insert(param->name, param->type->resolved_type);
-    info.parameter_types[info.params_len] = param->type->resolved_type;
-    info.params_len++;
-  }
-
-  return global_find_function_type_id(info, {});
-}
 
 std::any Typer::visit(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
@@ -709,20 +573,22 @@ std::any Typer::visit(ASTCall *node) {
     throw_error("Use of undeclared function", node->source_range);
   }
 
-  std::vector<int> arg_tys;
+  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
+  if (type) {
+    declaring_or_assigning_type = type->id;
+  }
+
   if (symbol_nullable) {
     auto symbol = symbol_nullable.get();
 
-    type = symbol->type_id != -1 ? global_get_type(symbol->type_id) : nullptr;
-    if (type) {
-      declaring_or_assigning_type = type->id;
-    }
-    arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
+    type = global_get_type(symbol->type_id);
+
 
     if (!node->generic_arguments.empty() ||
         (symbol->declaring_node.is_not_null() &&
          symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION &&
          static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())->generic_parameters.size() != 0)) {
+      // * Inferred generic argumetns based on only function arguments.
       // TODO: make the generic argument inference actually make sense. This is just kind of a hack so we can omit it on
       // some basic calls like println etc.
       if (node->generic_arguments.empty()) {
@@ -735,6 +601,7 @@ std::any Typer::visit(ASTCall *node) {
         type = global_get_type(type_id);
         symbol_nullable = nullptr;
       } else {
+        // * Generic arguments ![T]
         auto gen_args = get_generic_arg_types(node->generic_arguments);
         auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
                                                              symbol->declaring_node.get(), gen_args);
@@ -744,13 +611,8 @@ std::any Typer::visit(ASTCall *node) {
         type = global_get_type(type_id);
         symbol_nullable = nullptr;
       }
-    } else {
-      find_function_overload(node, symbol, arg_tys, type);
     }
-  } else {
-    declaring_or_assigning_type = type->id;
-    arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
-  }
+  } 
 
   if (!type) {
     throw_error("Unable to locate type for function call", node->source_range);
@@ -950,34 +812,8 @@ std::any Typer::visit(ASTBinExpr *node) {
     return element_ty;
   }
 
-  // CLEANUP(Josh) 10/4/2024, 2:00:49 PM
-  // We copy pasted this code like in 5 places, and a lot of the stuff is just
-  // identical.
-  {
-    if (type && type->is_kind(TYPE_STRUCT) && type->get_ext().has_no_extensions()) {
-      auto info = (type->get_info()->as<StructTypeInfo>());
-      if (auto sym = info->scope->lookup(node->op.value)) {
-        auto enclosing_scope = ctx.scope;
-        ctx.set_scope(info->scope);
-        Defer _([&]() { ctx.set_scope(enclosing_scope); });
-        if (sym->is_function()) {
-          // TODO: fix this. we have ambiguity with how we do this
-          int t = -1;
-          if (sym->function_overload_types[0] == -1) {
-            t = sym->type_id;
-          } else {
-            t = sym->function_overload_types[0];
-          }
-          auto fun_ty = global_get_type(t);
-          auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
-          auto param_0 = fun_info->parameter_types[0];
-          assert_types_can_cast_or_equal(right, param_0, node->source_range, "expected, {}, got {}",
-                                         "invalid call to operator overload");
-          return fun_info->return_type;
-        }
-      }
-    }
-  }
+  // * There was operator overloading here. Instead, now we're going to wait until we have traits and a more sensible, non C++ way to do this.
+  // * For now, it's being removed
 
   // TODO: clean up this hacky mess.
   if (node->op.type == TType::Concat) {
@@ -1035,27 +871,8 @@ std::any Typer::visit(ASTUnaryExpr *node) {
     return left_ty->get_element_type();
   }
 
-  if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions()) {
-    auto info = (left_ty->get_info()->as<StructTypeInfo>());
-    if (auto sym = info->scope->lookup(node->op.value)) {
-      auto enclosing_scope = ctx.scope;
-      ctx.set_scope(info->scope);
-      Defer _([&]() { ctx.set_scope(enclosing_scope); });
-      if (sym->is_function()) {
-        // TODO: fix this. we have ambiguitty with how we do this
-        int t = -1;
-        if (sym->function_overload_types[0] == -1) {
-          t = sym->type_id;
-        } else {
-          t = sym->function_overload_types[0];
-        }
-        auto fun_ty = global_get_type(t);
-        auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
-        return fun_info->return_type;
-      }
-    } else
-      throw_error(std::format("couldn't find {} overload for struct type", node->op.value), node->source_range);
-  }
+  // * Again, operator overloading once was here.
+  // * We need to wait until we have interfaces to do it properly.
 
   // Convert to boolean if implicitly possible, for ! expressions
   {
@@ -1209,40 +1026,8 @@ std::any Typer::visit(ASTSubscript *node) {
     return element_id;
   }
 
-  /// ? CLEANUP(Josh) 10/4/2024, 2:18:42 PM  Remove unwanted operator
-  /// overloads.
-  // delete the subscript operator, call operator, and various other operators
-  // we may not want in the languaeg. We want to keep it simple, and having
-  // 100-200 lines of code dedicated to things that are never used is not
-  // conducive to that prospect.
-  {
-    if (left_ty && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions()) {
-      auto info = (left_ty->get_info()->as<StructTypeInfo>());
-      if (auto sym = info->scope->lookup("[")) {
-        auto enclosing_scope = ctx.scope;
-        ctx.set_scope(info->scope);
-        Defer _([&]() { ctx.set_scope(enclosing_scope); });
-        if (sym->is_function()) {
-          // TODO: fix this. we have ambiguity with how we do this
-          int t = -1;
-          if (sym->function_overload_types[0] == -1) {
-            t = sym->type_id;
-          } else {
-            t = sym->function_overload_types[0];
-          }
-          auto fun_ty = global_get_type(t);
-          auto fun_info = (fun_ty->get_info()->as<FunctionTypeInfo>());
-          auto param_0 = fun_info->parameter_types[0];
-          assert_types_can_cast_or_equal(subscript, fun_info->parameter_types[0], node->source_range,
-                                         "expected: {}, got: {}",
-                                         "invalid parameter type in subscript operator overload");
-          return fun_info->return_type;
-        }
-      } else {
-        throw_error("couldn't find [] overload for struct type", node->source_range);
-      }
-    }
-  }
+  // * Todo: reimplement operator overloads with interfaces.
+
   auto ext = left_ty->get_ext();
 
   if (ext.is_map()) {
@@ -1286,7 +1071,9 @@ std::any Typer::visit(ASTInitializerList *node) {
 
   if (target_type->get_ext().is_pointer() ||
       target_type->is_kind(TYPE_SCALAR) && target_type->get_ext().has_no_extensions()) {
-    throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's not an array\n\tgot {}", target_type->to_string()),
+    throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
+                            "not an array\n\tgot {}",
+                            target_type->to_string()),
                 node->source_range);
   }
 
@@ -1307,7 +1094,8 @@ std::any Typer::visit(ASTInitializerList *node) {
 
       for (const auto &[id, value] : node->key_values) {
         auto symbol = scope->local_lookup(id);
-        if (!symbol) throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
+        if (!symbol)
+          throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
 
         if (symbol->is_function()) {
           throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
@@ -1332,16 +1120,14 @@ std::any Typer::visit(ASTInitializerList *node) {
       if (values.empty()) {
         return declaring_or_assigning_type;
       }
-    
+
       auto target_element_type = target_type->get_element_type();
       auto element_type = int_from_any(values[0]->accept(this));
       for (int i = 1; i < values.size(); ++i) {
         int type = -1;
         if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
           auto old = declaring_or_assigning_type;
-          Defer _([&]{
-            declaring_or_assigning_type = old;
-          });
+          Defer _([&] { declaring_or_assigning_type = old; });
           declaring_or_assigning_type = target_element_type;
           type = int_from_any(values[i]->accept(this));
         } else {
