@@ -145,6 +145,25 @@ std::any Emitter::visit(ASTType *node) {
   return {};
 }
 std::any Emitter::visit(ASTCall *node) {
+  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+    auto dot = (ASTDotExpr*)node->function;
+    auto base_ty = global_get_type(dot->base->resolved_type);
+    auto base_scope = ((StructTypeInfo*)base_ty->get_info())->scope;
+    if (base_scope->local_lookup(dot->member_name)) {
+      (*ss) << to_cpp_string(base_ty) << "_" << dot->member_name.get_str();
+      (*ss) << "(";
+      if (!base_ty->get_ext().is_pointer()) {
+        (*ss) << "&";
+      }
+      dot->base->accept(this);
+      for (auto &arg : node->arguments->arguments) {
+        (*ss) << ",";
+        arg->accept(this);
+      }
+      (*ss) << ")";
+      return {};
+    }
+  }
   node->function->accept(this);
   node->arguments->accept(this);
   return {};
@@ -591,6 +610,9 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
     semicolon();
     newline();
   }
+  
+  (*ss) << "};\n";
+  indentLevel--;
 
   bool has_default_ctor = false;
   bool has_dtor = false;
@@ -608,8 +630,6 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   }
   
   ctx.exit_scope();
-  (*ss) << "};\n";
-  indentLevel--;
   return {};
 }
 std::any Emitter::visit(ASTEnumDeclaration *node) {

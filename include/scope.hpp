@@ -15,6 +15,7 @@ enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_HAS_OVERLOADS = 1 << 3,
+  SYMBOL_IS_METHOD = 1 << 4,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
 };
 

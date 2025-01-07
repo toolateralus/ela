@@ -298,8 +298,9 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
   }
   for (auto method : node->methods) {
     method->accept(this);
+    auto symbol = ctx.scope->local_lookup(method->name);
+    symbol->flags |= SYMBOL_IS_METHOD;
   }
-  
 
   ctx.set_scope(old_scope);
   return type->id;
@@ -1212,13 +1213,14 @@ std::any Typer::visit(ASTUnaryExpr *node) {
 std::any Typer::visit(ASTIdentifier *node) {
   auto str = node->value.get_str();
 
-  auto type_id = ctx.scope->find_type_id(node->value, {});
-  if (type_id != -1) {
-    return type_id;
+  node->resolved_type = ctx.scope->find_type_id(node->value, {});
+  if (node->resolved_type != -1) {
+    return node->resolved_type;
   }
 
   auto symbol = ctx.scope->lookup(node->value);
   if (symbol) {
+    node->resolved_type = symbol->type_id;
     return symbol->type_id;
   } else {
     throw_error(std::format("Use of undeclared identifier '{}'", node->value), node->source_range);
@@ -1312,8 +1314,8 @@ std::any Typer::visit(ASTDotExpr *node) {
     throw_error("Dot expressions can only be used on structs, unions, and enums.", node->source_range);
   }
 
-  auto member = base_scope->lookup(node->member_name);
-  if (auto member = base_scope->lookup(node->member_name)) {
+  if (auto member = base_scope->local_lookup(node->member_name)) {
+    node->resolved_type = member->type_id;
     return member->type_id;
   } else {
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
@@ -1321,38 +1323,6 @@ std::any Typer::visit(ASTDotExpr *node) {
   }
 }
 std::any Typer::visit(ASTScopeResolution *node) {
-  // .EnumVariant fix ups.
-  if (node->base == nullptr) {
-    bool found = false;
-    for (auto i = 0; i < type_table.size(); ++i) {
-      auto type = global_get_type(i);
-      if (type && type->is_kind(TYPE_ENUM)) {
-        auto info = (type->get_info()->as<EnumTypeInfo>());
-        for (const auto &key : info->keys) {
-          if (key == node->member_name) {
-            if (found) {
-              throw_warning(WarningAmbigousVariants,
-                            std::format("Found multiple enum types with variant '{}'.. "
-                                        "using the `.{}` syntax will choose the first "
-                                        "defined one. (Note: ignored candidate `{}`)",
-                                        key.get_str(), key.get_str(), type->get_base().get_str()),
-                            node->source_range);
-            } else {
-              auto ast_type = ast_alloc<ASTType>();
-              ast_type->kind = ASTType::NORMAL;
-              ast_type->normal.base = type->get_base();
-              node->base = ast_type;
-              found = true;
-            }
-          }
-        }
-      }
-    }
-
-    if (!found)
-      throw_error(std::format("Unable to find enum variant {}", node->member_name), node->source_range);
-  }
-
   auto id = int_from_any(node->base->accept(this));
   auto base_ty = global_get_type(id);
 
@@ -1381,8 +1351,8 @@ std::any Typer::visit(ASTScopeResolution *node) {
     throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
   }
 
-  auto member = scope->lookup(node->member_name);
-  if (auto member = scope->lookup(node->member_name)) {
+  if (auto member = scope->local_lookup(node->member_name)) {
+    node->resolved_type = member->type_id;
     return member->type_id;
   } else {
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),

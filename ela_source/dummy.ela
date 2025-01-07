@@ -1,7 +1,10 @@
-overloaded :: fn![T](n : T) {
-
+thing :: struct {
+  method :: fn(a: int, b: int) -> int {
+    return a + b;
+  }
 }
 
 main :: fn() {
-  overloaded(100 as s32);  
+  t: thing;
+  a := t.method(5, 6);
 }

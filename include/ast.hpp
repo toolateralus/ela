@@ -65,6 +65,7 @@ enum ASTNodeType {
 
 struct ASTNode {
   SourceRange source_range{};
+  int resolved_type = Type::invalid_id;
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
@@ -171,9 +172,6 @@ struct ASTType : ASTExpr {
   std::vector<ASTTypeExtension> extensions;
   // special info for reflection
   Nullable<ASTExpr> pointing_to;
-
-  // the actual type this got resolved to in the type checker.
-  int resolved_type = Type::invalid_id;
 
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void();
