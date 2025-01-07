@@ -323,6 +323,9 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   type.set_ext(extensions);
   type.set_base(name);
   type.set_info(info);
+  if (!info->scope) {
+    info->scope = create_child(root_scope);
+  }
   return type.id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {

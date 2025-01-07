@@ -1,44 +1,55 @@
 #import core;
 
-Thing :: struct {
-  a: s32;
-  b: s32;
-}
+// Thing :: struct {
+//   a: s32;
+//   b: s32;
+// }
 
-impl Thing {
-  create :: fn() -> #self {
-    println("дравствуйте, из создать!");
-    v: #self;
-    return v;
+// impl Thing {
+//   create :: fn() -> #self {
+//     println("дравствуйте, из создать!");
+//     v: #self;
+//     return v;
+//   }
+
+//   #ctor :: fn() {
+//     // We should probably just ditch constructors and use special functions for them.
+//     // Initialier lists will only be for complete, ordered initialization.
+//     // These aren't getting called, they just have an anonymous, generated name.
+//   }
+
+//   // This just emits as a function called +. Operator overloads need a COMPLETE rework, no longer can we rely on C++'s operator overloading.
+//   // #operator(+) :: fn(self, other: #self) -> #self {
+//   //   return self;
+//   // }
+
+//   static_method :: fn(a: s32, b: s32) -> s32 {
+//     return a + b;
+//   }
+
+//   mut_me :: fn(self*, a:s32) {
+//     println($"Hello from a {#type(self).name}");
+//     self.a = a;
+//     self.b = 200;
+//   }
+// }
+
+impl int {
+  from :: fn(b: bool) -> #self {
+    return b as #self;
   }
-
-  #ctor :: fn() {
-    // We should probably just ditch constructors and use special functions for them.
-    // Initialier lists will only be for complete, ordered initialization.
-    // These aren't getting called, they just have an anonymous, generated name.
-  }
-
-  // This just emits as a function called +. Operator overloads need a COMPLETE rework, no longer can we rely on C++'s operator overloading.
-  // #operator(+) :: fn(self, other: #self) -> #self {
-  //   return self;
-  // }
-
-  static_method :: fn(a: s32, b: s32) -> s32 {
-    return a + b;
-  }
-
-  mut_me :: fn(self*, a:s32) {
-    println($"Hello from a {#type(self).name}");
-    self.a = a;
-    self.b = 200;
+  add :: fn(self, n: #self) -> #self {
+    return self + n;
   }
 }
 
 main :: fn() {
-  t:= Thing::create();
-  n := Thing::static_method(5, 2);
-  t.mut_me(100);
-  printf("%d, %d\n", t.a, t.b);
+  println((10 as int).add(10));
+
+  // t:= Thing::create();
+  // n := Thing::static_method(5, 2);
+  // t.mut_me(100);
+  // printf("%d, %d\n", t.a, t.b);
 }
 
 // SMALLER TODOS:

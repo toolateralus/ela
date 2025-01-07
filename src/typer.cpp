@@ -217,33 +217,13 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       auto type = global_get_type(int_from_any(dotnode->base->accept(this)));
-
-      // TODO:
-      // * We can't do this, since there's no symbol that represents these
-      // * compiler intrinsics. So instead, we just roll with it as we wouldve -- this
-      // * Is only for overloading anyway.
-      if (type->get_ext().is_array())
-        return nullptr;
-
-      if (type->get_ext().is_map())
-        return nullptr;
-
-      if (!type->is_kind(TYPE_STRUCT) && !type->is_kind(TYPE_UNION))
-        throw_error("cannot use . on a non-struct, non-union type", node->source_range);
-
-      auto scope = type->is_kind(TYPE_STRUCT) ? type->get_info()->as<StructTypeInfo>()->scope
-                                              : type->get_info()->as<UnionTypeInfo>()->scope;
-
+      auto scope = type->get_info()->scope;
       return scope->local_lookup(dotnode->member_name);
     } break;
     case AST_NODE_SCOPE_RESOLUTION: {
       auto srnode = static_cast<ASTScopeResolution *>(node);
       auto type = global_get_type(int_from_any(srnode->base->accept(this)));
-      if (!type->is_kind(TYPE_STRUCT) && !type->is_kind(TYPE_UNION))
-        throw_error("cannot use :: on a non-struct, non-union type", node->source_range);
-
-      auto scope = type->is_kind(TYPE_STRUCT) ? type->get_info()->as<StructTypeInfo>()->scope
-                                              : type->get_info()->as<UnionTypeInfo>()->scope;
+      auto scope = type->get_info()->scope;
       return scope->local_lookup(srnode->member_name);
     } break;
     case AST_NODE_SUBSCRIPT: {
@@ -1304,14 +1284,8 @@ std::any Typer::visit(ASTDotExpr *node) {
     }
   }
 
-  Scope *base_scope = nullptr;
-  if (auto info = dynamic_cast<StructTypeInfo *>(base_ty->get_info())) {
-    base_scope = info->scope;
-  } else if (auto info = dynamic_cast<UnionTypeInfo *>(base_ty->get_info())) {
-    base_scope = info->scope;
-  } else {
-    throw_error("Dot expressions can only be used on structs, unions, and enums.", node->source_range);
-  }
+  Scope *base_scope = base_ty->get_info()->scope;
+  
 
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
@@ -1325,26 +1299,7 @@ std::any Typer::visit(ASTScopeResolution *node) {
   auto id = int_from_any(node->base->accept(this));
   auto base_ty = global_get_type(id);
 
-  Scope *scope = nullptr;
-  switch (base_ty->kind) {
-    case TYPE_STRUCT: {
-      auto info = (base_ty->get_info()->as<StructTypeInfo>());
-      scope = info->scope;
-    } break;
-    case TYPE_UNION: {
-      auto info = (base_ty->get_info()->as<UnionTypeInfo>());
-      scope = info->scope;
-    } break;
-    case TYPE_ENUM: {
-      auto info = (base_ty->get_info()->as<EnumTypeInfo>());
-      if (std::ranges::find(info->keys, node->member_name) != info->keys.end()) {
-        return base_ty->id;
-      }
-      throw_error("failed to find key in enum type.", node->source_range);
-    } break;
-    default:
-      throw_error("Unsupported type for scope resolution (:: operator)", node->source_range);
-  }
+  Scope *scope = base_ty->get_info()->scope;
 
   if (!scope) {
     throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
@@ -1444,49 +1399,6 @@ std::any Typer::visit(ASTMake *node) {
   return type;
 }
 std::any Typer::visit(ASTInitializerList *node) {
-  // * TODO: Make it so we can have this more complex, up front initialization.
-  // * This will allow for better sub-initializer lists.
-  // * Type *type;
-  // * if (declaring_or_assigning_type != -1) {
-  // *   type = global_get_type(declaring_or_assigning_type);
-  //   Scope *scope;
-  //   switch (type->kind) {
-  //     case TYPE_SCALAR: goto regular_init;
-  //     case TYPE_STRUCT: {
-  //       auto info = type->get_info()->as<StructTypeInfo>();
-  //       scope = info->scope;
-  //     } break;
-  //     case TYPE_UNION: {
-  //       auto info = type->get_info()->as<UnionTypeInfo>();
-  //       scope = info->scope;
-  //     } break;
-  //     case TYPE_TUPLE: {
-  //       throw_error("Cannot use an initializer list to initialize a tuple, use <value, value...> syntax.",
-  //       node->source_range);
-  //     } break;
-  //     case TYPE_FUNCTION: {
-  //       throw_error("Cannot use an initializer list to initialize a function type.", node->source_range);
-  //     } break;
-  //     case TYPE_ENUM: {
-  //       throw_error("Cannot use an initializer list to initialize an enum type, just use the variant.",
-  //       node->source_range);
-  //     } break;
-  //   }
-  //   int i {};
-  //   for (const auto& iden : scope->ordered_symbols) {
-  //     auto &sym = scope->symbols[iden];
-  //     if (sym.is_function()) continue;
-  //     auto old_decl_ty = declaring_or_assigning_type;
-  //     declaring_or_assigning_type = sym.type_id;
-  //     if (node->expressions.size() <= i) {
-  //       break;
-  //     }
-  //     auto type = int_from_any(node->expressions[i]->accept(this));
-  //     declaring_or_assigning_type = old_decl_ty;
-  //     // TODO: assert type compatiblity
-  //   }
-  // }
-  // regular_init:
   int last_type = -1;
   for (const auto &expr : node->expressions) {
     int type = int_from_any(expr->accept(this));
@@ -1503,7 +1415,6 @@ std::any Typer::visit(ASTInitializerList *node) {
     // ! that checks the length of the expressions instead of the types
     node->types.push_back(type);
   }
-
   return assert_type_can_be_assigned_from_init_list(node, declaring_or_assigning_type);
 }
 std::any Typer::visit(ASTAllocate *node) {
@@ -1653,19 +1564,10 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
 std::any Typer::visit(ASTImpl *node) {
   auto type = global_get_type(int_from_any(node->target->accept(this)));
-
   if (!type) {
     throw_error("Impl used on a non-existent type.", node->source_range);
   }
-
-  Scope *scope;
-  if (type->is_kind(TYPE_STRUCT)) {
-    scope = type->get_info()->as<StructTypeInfo>()->scope;
-  } else if (type->is_kind(TYPE_ENUM)) {
-    scope = type->get_info()->as<UnionTypeInfo>()->scope;
-  } else {
-    throw_error("Couldn't find scope for impl target. Is it a union or struct?", node->source_range);
-  }
+  Scope *scope = type->get_info()->scope;
 
   auto previous = ctx.scope;
   ctx.set_scope(scope);

@@ -184,21 +184,13 @@ std::any Emitter::visit(ASTCall *node) {
     Type *function_type = global_get_type(base_sym_ptr->type_id);
     typer.find_function_overload(node, base_sym_ptr, arg_tys, function_type);
     auto info = function_type->get_info()->as<FunctionTypeInfo>();
-
     auto param_0_ty = global_get_type(info->parameter_types[0]);
 
-    Scope *base_scope;
+    // TODO: this needs a lot of work I think. Maybe it will work just fine, but this seems super hacky.
     if (base_type) {
-      if (base_type->is_kind(TYPE_STRUCT)) {
-        base_scope = base_type->get_info()->as<StructTypeInfo>()->scope;
-      } else if (base_type->is_kind(TYPE_UNION)) {
-        base_scope = base_type->get_info()->as<UnionTypeInfo>()->scope;
-      } else {
-        throw_error("Internal compiler error: couldn't get type for method call", node->source_range);
-      }
+      Scope *base_scope = base_type->get_info()->scope;
       (*ss) << to_cpp_string(base_type) << "_" << base_symbol.get()->name.get_str();
       (*ss) << "(";
-
       if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
         if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
           (*ss) << "&";
@@ -208,7 +200,6 @@ std::any Emitter::visit(ASTCall *node) {
           (*ss) << ", ";
         }
       }
-
       for (auto &arg : node->arguments->arguments) {
         arg->accept(this);
         if (arg != node->arguments->arguments.back()) {

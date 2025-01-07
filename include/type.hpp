@@ -165,11 +165,11 @@ struct TypeExtensions {
 using GenericParameter = InternedString;
 
 struct TypeInfo {
+  // Now that we have impl & our own free-func methods, any object can have a method.
+  Scope *scope;
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
-
   TypeInfo() {}
-
   // Use this instead of the clunky static casts everywhere.
   template <class T>
     requires std::derived_from<T, TypeInfo>
@@ -211,16 +211,12 @@ struct EnumTypeInfo : TypeInfo {
 
 struct UnionTypeInfo : TypeInfo {
   int flags;
-  Scope *scope;
   UnionTypeInfo() {}
 };
 
 struct StructTypeInfo : TypeInfo {
   int flags;
-  Scope *scope;
-
   virtual std::string to_string() const override { return ""; }
-
   StructTypeInfo() {}
 };
 

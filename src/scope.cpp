@@ -229,7 +229,7 @@ Context::Context() {
 
 
   for (int i = 0; i < type_table.size(); ++i) {
-    // std::cout << "inserting " << type_table[i].get_base().get_str() << "\n";
+    type_table[i].get_info()->scope->parent = root_scope;
     root_scope->types.insert({type_table[i].get_base(), i});
   }
 }

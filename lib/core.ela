@@ -58,11 +58,11 @@ Random :: struct {
   Max :: 2147483647;
 }
 
-// impl Random {
-//   next :: fn(max: float32) -> float {
-//     return (rand() as float) / (Random::Max as float) * max;
-//   }
-// }
+impl Random {
+  next :: fn(max: float32) -> float {
+    return (rand() as float) / (Random::Max as float) * max;
+  }
+}
 
 // api for string manipulation.
 // when dot expressions are fixed we should be able to implement 'string' in language,
@@ -70,18 +70,6 @@ Random :: struct {
 Strings :: struct;
 
 impl string {
-  insert :: fn(self*, pos: s64, ch: char) {
-    if pos < 0 || pos > self.length then return;
-    
-    new_data: c_string = malloc(self.length + 2);
-    memcpy(new_data, self.data, pos);
-    new_data[pos] = ch;
-    memcpy(new_data + pos + 1, self.data + pos, self.length - pos);
-    new_data[self.length + 1] = 0;
-
-    self.data = new_data;
-    self.length += 1;
-  }
   insert :: fn(self*, pos: s64, substr: string) {
     if pos < 0 || pos > self.length {
       return;
@@ -95,6 +83,7 @@ impl string {
     self.data = new_data;
     self.length += substr.length;
   }
+
   starts_with :: fn(self*, substr: string) -> bool {
     if self.data == null || substr.data == null
       then return false;
@@ -110,6 +99,7 @@ impl string {
 
     return strncmp(self.data, substr.data, substr_len) == 0;
   }
+
   ends_with :: fn(self*, pattern: string) -> bool {
     if !self.data || !pattern.data
       then return false;
@@ -119,66 +109,51 @@ impl string {
       then return false;
     return strncmp(self.data + (len - patlen), pattern.data, patlen) == 0;
   }
+
   // TODO: fix me, something is super messed up. with type checking the implicit self/self* argument,
   // TODO: we basicaly just assume if it's missing one argument it has self.
-  // replace :: fn(self*, pattern: string, replacement: string) -> string {
-  //   if !self.data || !pattern.data || !replacement.data
-  //     then return *self;
+  replace :: fn(self*, pattern: string, replacement: string) -> string {
+    if !self.data || !pattern.data || !replacement.data
+      then return *self;
 
-  //   result: string;
-  //   str_len := self.length;
-  //   pattern_len := pattern.length;
-  //   replacement_len := replacement.length;
+    result: string;
+    str_len := self.length;
+    pattern_len := pattern.length;
+    replacement_len := replacement.length;
 
-  //   i: int;
-  //   while i < str_len {
-  //     if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
-  //       result.insert(result.length, replacement);
-  //       i += pattern_len;
-  //     } else {
-  //       result.insert(result.length, string{self.data + i, self.data + i + 1});
-  //       i += 1;
-  //     }
-  //   }
+    i: int;
+    while i < str_len {
+      if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
+        result.insert(result.length, replacement);
+        i += pattern_len;
+      } else {
+        result.insert(result.length, string{self.data + i, self.data + i + 1});
+        i += 1;
+      }
+    }
 
-  //   return result;
-  // }
-  substr :: fn(src: c_string, start: int, end: int) -> string {
-    if !src
+    return result;
+  }
+
+  substr :: fn(self*, start: int, end: int) -> string {
+    if self.length == 0
       then return {};
 
-    len: int = strlen(src);
-    if (start > end)
+    len: int = self.length;
+
+    if start > end
       then return {};
-    if (len < end - start)
+
+    if len < end - start
       then return {};
 
     dest: c_string = malloc(sizeof(char) * (end - start) + 1);
-    memcpy(dest, src + start, end - start);
-    dest[(end - start)] = 0;
+    memcpy(dest, self.data + start, end - start);
+    dest[end - start] = 0;
 
-    v: string = dest;
-    free(dest);
-    return v;
+    return string{dest, dest + (end - start)};
   }
-  equals :: fn(a: c_string, b) -> bool {
-    return strcmp(a, b) == 0;
-  }
-  
-  split :: fn(str: c_string, delimiter: char) -> string[] {
-    if !str then return {};
-    result: string[];
-    start: int = 0;
-    str_len: int = strlen(str);
-    for i in 0..str_len {
-      if str[i] == delimiter {
-        if i > start then result ~= string{str + start, str + i};
-        start = i + 1;
-      }
-    }
-    result ~= string{str + start, str + str_len};
-    return result;
-  }
+
   split :: fn(self*, delimiter: char) -> string[] {
     if !self.data then return {};
     result: string[];
@@ -202,6 +177,7 @@ impl string {
     }
     return false;
   }
+
   contains :: fn(self*, pattern: string) -> bool {
     if self.data == null || pattern.data == null
       then return false;

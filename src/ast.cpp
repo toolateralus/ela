@@ -1650,17 +1650,8 @@ ASTImpl *Parser::parse_impl() {
   current_impl = impl;
   impl->target = parse_type();
 
-  // TODO: remove this!
   auto type = global_get_type(std::any_cast<int>(impl->target->accept(typer)));
-  Scope *scope;
-  if (type->is_kind(TYPE_STRUCT)) {
-    scope = type->get_info()->as<StructTypeInfo>()->scope;
-  } else if (type->is_kind(TYPE_ENUM)) {
-    scope = type->get_info()->as<UnionTypeInfo>()->scope;
-  } else {
-    end_node(impl, range);
-    throw_error("Couldn't find scope for impl target. Is it a union or struct?", impl->source_range);
-  }
+  Scope *scope = type->get_info()->scope;
 
   auto block = parse_block(scope);
   end_node(impl, range);
