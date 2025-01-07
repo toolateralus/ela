@@ -1,15 +1,15 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  204            113           1742
-src/emit.cpp                                 183             53           1523
-src/typer.cpp                                192             72           1316
-include/ast.hpp                               90             23            578
+src/ast.cpp                                  208            113           1770
+src/emit.cpp                                 187             55           1523
+src/typer.cpp                                181             59           1277
+include/ast.hpp                               93             24            585
 src/type.cpp                                  79             42            546
 src/ast_copier.cpp                             1              0            369
 src/visitor.cpp                               25             17            332
 include/lex.hpp                               38              4            311
-include/type.hpp                              50             14            248
+include/type.hpp                              50             14            247
 include/visitor.hpp                           30              8            235
 include/core.hpp                              26              2            227
 src/lex.cpp                                   19              2            225
@@ -24,5 +24,5 @@ include/interned_string.hpp                    4              0             50
 include/ast_copier.hpp                         3              0             43
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1133            418           8840
+SUM:                                        1133            408           8835
 -----------------------------------------------------------------------------------------

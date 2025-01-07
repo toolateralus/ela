@@ -428,9 +428,35 @@ struct ASTStructDeclaration : ASTStatement {
 };
 
 struct ASTInitializerList : ASTExpr {
-  bool types_are_homogenous = true;
-  std::vector<int> types;
-  std::vector<ASTExpr *> expressions;
+  ASTInitializerList() {}
+  ~ASTInitializerList() {}
+
+  ASTInitializerList(const ASTInitializerList &other) {
+    tag = other.tag;
+    switch (tag) {
+      case INIT_LIST_NAMED:
+        new (&key_values) std::vector<std::pair<InternedString, ASTExpr *>>(other.key_values);
+        break;
+      case INIT_LIST_COLLECTION:
+        new (&values) std::vector<ASTExpr *>(other.values);
+        break;
+      case INIT_LIST_EMPTY:
+        break;
+    }
+  }
+  
+  // Key values.
+  union {
+    std::vector<std::pair<InternedString, ASTExpr *>> key_values;
+    std::vector<ASTExpr*> values;
+  };
+
+  enum {
+    INIT_LIST_EMPTY,
+    INIT_LIST_NAMED,
+    INIT_LIST_COLLECTION,
+  } tag;
+
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };

@@ -1,4 +1,5 @@
 #include "ast_copier.hpp"
+#include "ast.hpp"
 
 Scope *ASTCopier::copy_scope(Scope *old) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope(*old);
@@ -210,9 +211,15 @@ ASTMake *ASTCopier::copy_make(ASTMake *node) {
 }
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
   auto new_node = new (ast_alloc<ASTInitializerList>()) ASTInitializerList(*node);
-  new_node->expressions.clear();
-  for (auto expr : node->expressions) {
-    new_node->expressions.push_back(static_cast<ASTExpr *>(copy_node(expr)));
+  new_node->key_values.clear();
+  if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
+    for (auto expr : node->values) {
+      new_node->values.push_back(static_cast<ASTExpr *>(copy_node(expr)));
+    }
+  } else {
+    for (auto [id, expr] : node->key_values) {
+      new_node->key_values.push_back({id, static_cast<ASTExpr *>(copy_node(expr))});
+    }
   }
   return new_node;
 }

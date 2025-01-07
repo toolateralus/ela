@@ -1,5 +1,6 @@
-#c_flags "-lraylib -lm"
 #import core;
+
+#c_flags "-lraylib -lm"
 
 Key :: enum {
   Null            = 0,
@@ -129,28 +130,25 @@ Color :: struct {
   g: u8;
   b: u8;
   a: u8;
+}
 
-  to_string :: fn() -> string {
-    return $"r: {r}, g: {g}, b: {b}, a: {a}";
+impl Color {
+  to_string :: fn(self*) -> string {
+    return $"r: {self.r}, g: {self.g}, b: {self.b}, a: {self.a}";
   }
 
-  #operator(==) :: fn(other: #self) -> bool {
-    return other.a == a && other.r == r && other.g == g && other.b == b;
-  }
-
-  with_alpha :: fn(a: int) -> #self {
-    color := *this;
-    color.a = a as u8;
-    return color;
+  with_alpha :: fn(self, a: int) -> #self {
+    self.a = a as u8;
+    return self;
   }
 
   // Scales rgb values, but never wraps around.
-  scaled_rgb :: fn(scalar: float32) -> #self {
+  scaled_rgb :: fn(self, scalar: float32) -> #self {
     return {
-      clamp((this.r * scalar) as int, 0, 255) as u8,
-      clamp((this.g * scalar) as int, 0, 255) as u8,
-      clamp((this.b * scalar) as int, 0, 255) as u8,
-      this.a,
+      clamp((self.r * scalar) as int, 0, 255) as u8,
+      clamp((self.g * scalar) as int, 0, 255) as u8,
+      clamp((self.b * scalar) as int, 0, 255) as u8,
+      self.a,
     }
   }
 }
@@ -167,50 +165,51 @@ Vector2 :: struct {
   x: float;
   y: float;
 
-  #operator(+) :: fn(other: #self) -> #self {
-    return #make(#self, { x + other.x, y + other.y });
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   return #make(#self, { x + other.x, y + other.y });
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    return #make(#self, {x - other.x, y - other.y });
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   return #make(#self, {x - other.x, y - other.y });
+  // }
 
-  #operator(*) :: fn(scalar: float) -> #self {
-    return #make(#self, {x * scalar, y * scalar });
-  }
+  // #operator(*) :: fn(scalar: float) -> #self {
+  //   return #make(#self, {x * scalar, y * scalar });
+  // }
 
-  #operator(/) :: fn(scalar: float) -> #self {
-    return #make(#self, {x / scalar, y / scalar });
-  }
+  // #operator(/) :: fn(scalar: float) -> #self {
+  //   return #make(#self, {x / scalar, y / scalar });
+  // }
 
-  #operator(+=) :: fn(other: #self) -> #self {
-    x += other.x;
-    y += other.y;
-    return *this;
-  }
+  // #operator(+=) :: fn(other: #self) -> #self {
+  //   x += other.x;
+  //   y += other.y;
+  //   return *this;
+  // }
 
-  #operator(-=) :: fn(other: #self) -> #self {
-    x -= other.x;
-    y -= other.y;
-    return *this;
-  }
+  // #operator(-=) :: fn(other: #self) -> #self {
+  //   x -= other.x;
+  //   y -= other.y;
+  //   return *this;
+  // }
 
-  #operator(*=) :: fn(scalar: float) -> #self {
-    x *= scalar;
-    y *= scalar;
-    return *this;
-  }
+  // #operator(*=) :: fn(scalar: float) -> #self {
+  //   x *= scalar;
+  //   y *= scalar;
+  //   return *this;
+  // }
 
-  #operator(/=) :: fn(scalar: float) -> #self {
-    x /= scalar;
-    y /= scalar;
-    return *this;
-  }
+  // #operator(/=) :: fn(scalar: float) -> #self {
+  //   x /= scalar;
+  //   y /= scalar;
+  //   return *this;
+  // }
 
-  to_string :: fn() -> string {
-    return $"x: {x}, y: {y}"
-  }
+  // to_string :: fn() -> string {
+  //   return $"x: {x}, y: {y}"
+  // }
 }
+
 Vector3 :: struct {
   x: float;
   y: float;

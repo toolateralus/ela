@@ -305,14 +305,14 @@ int global_create_union_type(const InternedString &name, Scope *scope, UnionFlag
   type->set_info(info);
   return type->id;
 }
-int global_create_enum_type(const InternedString &name, const std::vector<InternedString> &keys, bool is_flags,
+int global_create_enum_type(const InternedString &name, Scope* scope, bool is_flags,
                             size_t element_type) {
   type_table.emplace_back(type_table.size(), TYPE_ENUM);
   Type *type = &type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
-  info->keys = keys;
+  info->scope = scope;
   type->set_info(info);
   return type->id;
 }

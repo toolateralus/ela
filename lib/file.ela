@@ -34,16 +34,13 @@ SeekPosition :: enum {
 
 File :: struct {
   fd: FILE*;
- 
-  
-
-
 }
 
 impl File {
-  #dtor :: fn(self*) {
-    if fd then close();
-  }
+  // TODO: fix me
+  // #dtor :: fn(self*) {
+  //   if fd then close();
+  // }
 
   flush :: fn(self*) {
     fflush(self.fd);
@@ -114,7 +111,9 @@ impl File {
     return s;
   }
   open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
-    return {fopen(filename.data, flags_to_string(flags).data)};
+    return File{
+      fd: fopen(filename.data, flags_to_string(flags).data)
+    };
   }
   read :: fn(self*, buffer: u8*, size: u64) -> u64 {
     return fread(buffer, 1, size, self.fd);

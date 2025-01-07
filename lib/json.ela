@@ -19,10 +19,17 @@ JsonTokenType :: enum {
 }
 
 JsonToken :: struct {
-  value : string;
   type : int = JsonTokenType::Invalid;
+  value : string;
   line: int;
   column: int;
+}
+
+impl JsonToken {
+  Invalid :: fn() -> #self {
+    v: #self;
+    return v;
+  }
 }
 
 JsonLexer :: struct {
@@ -49,177 +56,180 @@ JsonLexer :: struct {
   length : int;
   input : string;
   lookahead_buffer : JsonToken[];
-
-  err :: fn(token: JsonToken ,msg: string) {
-    println($"[{file}:{token.line}:{token.column}] {msg}");
+}
+impl JsonLexer {
+  err :: fn(self*, token: JsonToken, msg: string) {
+    println($"[{self.file}:{token.line}:{token.column}] {msg}");
     exit(1);
   }
 
-  #ctor :: fn(_file: c_string, _input: string) {
-    file = _file;
-    input = _input;
-    length = input.length;
+  create :: fn(_file: c_string, _input: string) -> #self {
+    self: #self;
+    self.file = _file;
+    self.input = _input;
+    self.length = self.input.length;
+    return self;
   }
 
-  get_token :: fn() -> JsonToken {
-    if lookahead_buffer.length != 0 {
-      return ~lookahead_buffer;
+  get_token :: fn(self*) -> JsonToken {
+    if self.lookahead_buffer.length != 0 {
+      return ~self.lookahead_buffer;
     }
     token : JsonToken;
-    token.column = position - line_start;
-    token.line = cur_line + 1;
-    if position >= length || input[position] == 0 {
+    token.column = self.position - self.line_start;
+    token.line = self.cur_line + 1;
+    if self.position >= self.length || self.input[self.position] == 0 {
       token.type = JsonTokenType::Eof;
       return token;
     }
-    c : char = input[position];
+    c : char = self.input[self.position];
 
     // whitespace
-    while position < length {
+    while self.position < self.length {
       if c == '\n' || c == '\r' {
-        line_start = position;
-        cur_line++;
+        self.line_start = self.position;
+        self.cur_line++;
       } else if !isspace(c) {
         break;
       }
-      position++;
-      c = input[position];
+      self.position++;
+      c = self.input[self.position];
     }
-    token.column = position - line_start;
-    token.line = cur_line + 1;
+    token.column = self.position - self.line_start;
+    token.line = self.cur_line + 1;
 
-    if position >= length || input[position] == 0 {
+    if self.position >= self.length || self.input[self.position] == 0 {
       token.type = JsonTokenType::Eof;
       return token;
     }
 
     // comments
     if c == '/' {
-      position++;
-      if position >= length {
-        err(token, "Unexpected character: {c}");
+      self.position++;
+      if self.position >= self.length {
+        self.err(token, "Unexpected character: {c}");
       }
-      c = input[position];
+      c = self.input[self.position];
       if c != '/' {
-        err(token, "Unexpected character: {c}");
+        self.err(token, "Unexpected character: {c}");
       }
       while c != '\n' && c != '\r' {
-        position++;
-        if position >= length || input[position] == 0 {
+        self.position++;
+        if self.position >= self.length || self.input[self.position] == 0 {
           token.type = JsonTokenType::Eof;
           return token;
         }
-        c = input[position];
+        c = self.input[self.position];
       }
-      return get_token();
+      return self.get_token();
     }
 
     if isdigit(c) {
       // numbers
       len : int;
-      start : int = position;
-      while (isdigit(c) || c == '.') && position < length {
+      start : int = self.position;
+      while (isdigit(c) || c == '.') && self.position < self.length {
         len++;
-        position++;
-        c = input[position];
+        self.position++;
+        c = self.input[self.position];
       }
-      token.value = string{&input[start], &input[start] + len};
+      token.value = string::from_ptr(&self.input[start], &self.input[start] + len);
       token.type = JsonTokenType::Number;
       return token;
       // operators
     } else if c == ':' {
       token.value = ":";
       token.type = JsonTokenType::Colon;
-      position++;
+      self.position++;
       return token;
     } else if c == '{' {
       token.value = "{";
       token.type = JsonTokenType::LCurly;
-      position++;
+      self.position++;
       return token;
     } else if c == '}' {
       token.value = "}";
       token.type = JsonTokenType::RCurly;
-      position++;
+      self.position++;
       return token;
     } else if c == '[' {
       token.value = "[";
       token.type = JsonTokenType::LBracket;
-      position++;
+      self.position++;
       return token;
     } else if c == ']' {
       token.value = "]";
       token.type = JsonTokenType::RBracket;
-      position++;
+      self.position++;
       return token;
     } else if c == ',' {
       token.value = ",";
       token.type = JsonTokenType::Comma;
-      position++;
+      self.position++;
       return token;
     } else if c == '\"' {
-      position++;
-      c = input[position];
+      self.position++;
+      c = self.input[self.position];
       len : int;
-      start : int = position;
-      while c != '\"' && position < length {
+      start : int = self.position;
+      while c != '\"' && self.position < self.length {
         if c == '\n' || c == '\r' {
-          line_start = position;
-          cur_line++;
+          self.line_start = self.position;
+          self.cur_line++;
         }
         len++;
-        position++;
-        c = input[position];
+        self.position++;
+        c = self.input[self.position];
       }
-      position++;
-      token.value = string{&input[start], &input[start] + len}
+      self.position++;
+      token.value = string::from_ptr(&self.input[start], &self.input[start] + len);
       token.type = JsonTokenType::String;
       return token;
-    } else if position + 4 <= length && strncmp(&input[position], "true", 4) == 0 {
+    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "true", 4) == 0 {
       token.value = "true";
       token.type = JsonTokenType::True;
-      position += 4;
+      self.position += 4;
       return token;
-    } else if position + 5 <= length && strncmp(&input[position], "false", 5) == 0 {
+    } else if self.position + 5 <= self.length && strncmp(&self.input[self.position], "false", 5) == 0 {
       token.value = "false";
       token.type = JsonTokenType::False;
-      position += 5;
+      self.position += 5;
       return token;
-    } else if position + 4 <= length && strncmp(&input[position], "null", 4) == 0 {
+    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "null", 4) == 0 {
       token.value = "null";
       token.type = JsonTokenType::Null;
-      position += 4;
+      self.position += 4;
       return token;
     } else {
       return token;
     }
   }
 
-  peek_token :: fn() -> JsonToken {
-    token : JsonToken = get_token();
-    lookahead_buffer ~= token;
+  peek_token :: fn(self*) -> JsonToken {
+    token : JsonToken = self.get_token();
+    self.lookahead_buffer ~= token;
     return token;
   }
 
-  expect_types :: fn(types: s32[]) -> JsonToken {
-    token := this.get_token();
+  expect_types :: fn(self*, types: s32[]) -> JsonToken {
+    token := self.get_token();
     types_string: string;
     i : int;
     for type in types {
       if token.type == type then return token;
       if i == 0 {
-        types_string = tokenTypeNames[type];
+        types_string = self.tokenTypeNames[type];
         i++;
       } else {
-        types_string = $"{types_string} | {tokenTypeNames[type]}"
+        types_string = $"{types_string} | {self.tokenTypeNames[type]}";
       }
     }
-    err(token, $"Expected {types_string}, got {tokenTypeNames[token.type]} :: {token.value}");
-    return {"", JsonTokenType::Invalid};
+    self.err(token, $"Expected {types_string}, got {self.tokenTypeNames[token.type]} :: {token.value}");
+    return JsonToken::Invalid();
   }
 
-  expect_type :: fn(type: s32) -> JsonToken {
-    return this.expect_types({type});
+  expect_type :: fn(self*, type: s32) -> JsonToken {
+    return self.expect_types(self, {type});
   }
 }
 
@@ -251,12 +261,15 @@ JsonValueUnion :: union {
   _string: string;
   object: JsonKeyValuePair[];
   array: JsonValue*[];
-  #dtor :: fn() {}
 }
 
 JsonValue :: struct {
   data: JsonValueUnion;
   type : int = JsonValueType::Invalid;
+
+}
+
+impl JsonValue {
   #dtor :: fn() {
     if type == JsonValueType::Object {
       for kvp in data.object {
@@ -272,9 +285,9 @@ JsonValue :: struct {
       destruct(data._string);
     }
   }
-  to_string :: fn() -> string {
-    if type == JsonValueType::Object {
-      obj := data.object;
+  to_string :: fn(self*) -> string {
+    if self.type == JsonValueType::Object {
+      obj := self.data.object;
       len := obj.length;
       rBrack := "}";
       str := "{";
@@ -288,8 +301,8 @@ JsonValue :: struct {
         }
       }
       return $"{str}{rBrack}";
-    } else if type == JsonValueType::Array {
-      arr := data.array;
+    } else if self.type == JsonValueType::Array {
+      arr := self.data.array;
       len := arr.length;
       str := "[";
 
@@ -302,88 +315,88 @@ JsonValue :: struct {
         }
       }
       return $"{str}]";
-    } else if type == JsonValueType::Number {
+    } else if self.type == JsonValueType::Number {
       return $"{data.number}";
-    } else if type == JsonValueType::String {
+    } else if self.type == JsonValueType::String {
       return $"{32 as char}{data._string}{32 as char}";
-    } else if type == JsonValueType::Boolean {
-      if data.boolean == true {
-        return string{"true"};
+    } else if self.type == JsonValueType::Boolean {
+      if self.data.boolean == true {
+        return string::from("true");
       } else {
-        return string{"false"};
+        return string::from("false");
       }
-    } else if type == JsonValueType::Null {
-      return #make(string, "null");
+    } else if self.type == JsonValueType::Null {
+      return string::from("null");
     } else {
-      return #make(string);
+      return string::empty();
     }
   }
-  get :: fn(key: string) -> JsonValue* {
-    if type != JsonValueType::Object {
+  get :: fn(self*, key: string) -> JsonValue* {
+    if self.type != JsonValueType::Object {
       return null;
     }
-    for kvp in data.object {
+    for kvp in self.data.object {
       if kvp.key == key {
         return kvp.value;
       }
     }
     return null;
   }
-  get :: fn(index: int) -> JsonValue* {
-    if type != JsonValueType::Array {
+  get :: fn(self*, index: int) -> JsonValue* {
+    if self.type != JsonValueType::Array {
       return null;
     }
-    arr := data.array;
+    arr := self.data.array;
     if index < 0 || index >= arr.length {
       return null;
     }
     return arr[index];
   }
-  is_number :: fn() -> bool {
-    return type == JsonValueType::Number;
+  is_number :: fn(self*) -> bool {
+    return self.type == JsonValueType::Number;
   }
-  is_string :: fn() -> bool {
-    return type == JsonValueType::String;
+  is_string :: fn(self*) -> bool {
+    return self.type == JsonValueType::String;
   }
-  is_object :: fn() -> bool {
-    return type == JsonValueType::Object;
+  is_object :: fn(self*) -> bool {
+    return self.type == JsonValueType::Object;
   }
-  is_array :: fn() -> bool {
-    return type == JsonValueType::Array;
+  is_array :: fn(self*) -> bool {
+    return self.type == JsonValueType::Array;
   }
-  is_boolean :: fn() -> bool {
-    return type == JsonValueType::Boolean;
+  is_boolean :: fn(self*) -> bool {
+    return self.type == JsonValueType::Boolean;
   }
-  is_null :: fn() -> bool {
-    return type == JsonValueType::Null;
+  is_null :: fn(self*) -> bool {
+    return self.type == JsonValueType::Null;
   }
-  as_number :: fn() -> float64 {
-    if type == JsonValueType::Number {
-      return data.number;
+  as_number :: fn(self*) -> float64 {
+    if self.type == JsonValueType::Number {
+      return self.data.number;
     }
     return 0.0; // or handle error
   }
-  as_string :: fn() -> string {
-    if type == JsonValueType::String {
-      return data._string;
+  as_string :: fn(self*) -> string {
+    if self.type == JsonValueType::String {
+      return self.data._string;
     }
     return ""; // or handle error
   }
-  as_object :: fn() -> JsonKeyValuePair[] {
-    if type == JsonValueType::Object {
-      return data.object;
+  as_object :: fn(self*) -> JsonKeyValuePair[] {
+    if self.type == JsonValueType::Object {
+      return self.data.object;
     }
     return {}; // or handle error
   }
-  as_array :: fn() -> JsonValue*[] {
-    if type == JsonValueType::Array {
-      return data.array;
+  as_array :: fn(self*) -> JsonValue*[] {
+    if self.type == JsonValueType::Array {
+      return self.data.array;
     }
     return {}; // or handle error
   }
-  as_boolean :: fn() -> bool {
-    if type == JsonValueType::Boolean {
-      return data.boolean;
+  as_boolean :: fn(self*) -> bool {
+    if self.type == JsonValueType::Boolean {
+      return self.data.boolean;
     }
     return false; // or handle error
   }
@@ -391,7 +404,7 @@ JsonValue :: struct {
 
 json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
   value := new JsonValue;
-  token := lexer.expect_types({
+  token := lexer.expect_types(lexer, {
     JsonTokenType::LBracket,
     JsonTokenType::LCurly,
     JsonTokenType::Number,
@@ -409,7 +422,7 @@ json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
     }
     while token.type != JsonTokenType::RBracket {
       value.data.array ~= json_parse(lexer);
-      token = lexer.expect_types({JsonTokenType::RBracket, JsonTokenType::Comma});
+      token = lexer.expect_types(lexer, {JsonTokenType::RBracket, JsonTokenType::Comma});
     }
   } else if token.type == JsonTokenType::LCurly {
     value.type = JsonValueType::Object;
@@ -421,8 +434,8 @@ json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
     while token.type != JsonTokenType::RCurly {
       key := lexer.expect_type(JsonTokenType::String);
       _ := lexer.expect_type(JsonTokenType::Colon);
-      value.data.object ~= JsonKeyValuePair{key.value, json_parse(lexer)};
-      token = lexer.expect_types({JsonTokenType::RCurly, JsonTokenType::Comma});
+      value.data.object ~= {key: key.value, value: json_parse(lexer)};
+      token = lexer.expect_types(lexer, {JsonTokenType::RCurly, JsonTokenType::Comma});
     }
   } else if token.type == JsonTokenType::Number {
     value.type = JsonValueType::Number;
@@ -451,6 +464,7 @@ json_parse_string :: fn(str: c_string) -> JsonValue* {
   lexer := #make(JsonLexer, "string", str);
   return json_parse(&lexer);
 }
+
 json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
   val := new JsonValue{};
   if type_is_float(type) {
@@ -508,6 +522,7 @@ json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
   }
   return null;
 }
+
 json_serialize :: fn(object: void*, type: Type*) -> JsonValue*;
 
 json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
@@ -552,12 +567,19 @@ json_serialize :: fn(object: void*, type: Type*) -> JsonValue* {
 }
 
 JsonError :: struct {
-  has_value : bool = false;
   message: string;
-
-  to_string :: fn() -> string {
-    if(has_value) {
-      return $"Json Error: {message}";
+  has_value : bool = false;
+}
+impl JsonError {
+  Error :: fn(msg: string) -> JsonError {
+    return { has_value: true , message: msg };
+  }
+  Ok :: fn() -> JsonError {
+    return { has_value: false, message: string::empty()};
+  }
+  to_string :: fn(self*) -> string {
+    if self.has_value {
+      return $"Json Error: {self.message}";
     } else {
       return "Ok";
     }
@@ -570,7 +592,7 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
   for json_field in val.data.object {
     struct_field := type_get_field(type, json_field.key);
     if !struct_field {
-      return {true, $"Could not find field {json_field.key} in type {type.name}"};
+      return JsonError::Error($"Could not find field {json_field.key} in type {type.name}");
     }
     err := json_deserialize(json_field.value, object as u8* + struct_field.offset, struct_field.type);
     if err.has_value {
@@ -599,7 +621,7 @@ json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> Jso
 
 json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   if (!type_has_no_extension(type)) {
-    return {true, "Unable to deserialize into pointer type with 'json_deserialize_scalar'"};
+    return JsonError::Error("Unable to deserialize into pointer type with 'json_deserialize_scalar'");
   }
   if type_is_bool(type) {
     *(object as bool*) = val.as_boolean();
@@ -644,7 +666,7 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
   } else if (type_is_string(type)) {
     *(object as string*) = val.as_string();
   } else {
-    return {true, $"Unable to deserialize into type {type.name}"};
+    return JsonError::Error($"Unable to deserialize into type {type.name}");
   }
   return {};
 }
@@ -655,13 +677,13 @@ json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError
       *(object as string*) = val.as_string();
       return {};
     } else {
-      return {true, $"Type mismatch: string to {type.name}"};
+      return JsonError::Error($"Type mismatch: string to {type.name}");
     }
   } else if val.is_object() {
     if type_is_struct(type) {
       return json_deserialize_struct(val, object, type);
     } else {
-      return {true, $"Type mismatch: object to {type.name}"};
+      return JsonError::Error($"Type mismatch: object to {type.name}");
     }
   } else if val.is_array() {
     return json_deserialize_array(val, object, type);

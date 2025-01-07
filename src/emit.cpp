@@ -193,10 +193,13 @@ std::any Emitter::visit(ASTCall *node) {
       (*ss) << "(";
       if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
         if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-          // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary expression with only literals
+          // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary
+          // expression with only literals
           // TODO: it could be a cast of a literal, it could be a bunch a function call's result.
           if (node->function->get_node_type() == AST_NODE_LITERAL) {
-            throw_error("Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which is temporary memory.", node->source_range);
+            throw_error("Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which "
+                        "is temporary memory.",
+                        node->source_range);
           }
           (*ss) << "&";
         }
@@ -962,12 +965,33 @@ std::any Emitter::visit(ASTSubscript *node) {
 }
 std::any Emitter::visit(ASTInitializerList *node) {
   (*ss) << "{";
-  for (const auto &expr : node->expressions) {
-    expr->accept(this);
-    if (expr != node->expressions.back()) {
-      (*ss) << ", ";
+  switch (node->tag) {
+    case ASTInitializerList::INIT_LIST_EMPTY: {
+      (*ss) << "}";
+      return {};
     }
+    case ASTInitializerList::INIT_LIST_NAMED: {
+    const auto size = node->key_values.size();
+    for (int i = 0; i < node->key_values.size(); ++i) {
+      const auto &[key, value] = node->key_values[i];
+      (*ss) << '.' << key.get_str() << " = ";
+      value->accept(this); 
+      if (i != size - 1) {
+        (*ss) << ",\n";
+      }
+    }
+    } break;
+    case ASTInitializerList::INIT_LIST_COLLECTION: {
+
+    for (const auto &expr : node->values) {
+      expr->accept(this);
+      if (expr != node->values.back()) {
+        (*ss) << ", ";
+      }
+    }
+    } break;
   }
+
   (*ss) << "}";
   return {};
 }
@@ -1572,25 +1596,28 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
     }
     fields_ss << "}";
   } else if (type->kind == TYPE_ENUM) {
-    auto info = (type->get_info()->as<EnumTypeInfo>());
-    if (info->keys.empty()) {
+    // TODO: we have to fix this!.
+    auto info = type->get_info();
+    if (info->scope->ordered_symbols.empty()) {
       return get_type_struct(type, id, context, "{}");
     }
     fields_ss << "{";
-    int count = info->keys.size();
-    int it = 0;
-    for (const auto &name : info->keys) {
+    for (const auto &field : info->scope->ordered_symbols) {
       auto t = global_get_type(s32_type());
-      if (!t)
+
+      if (!t) {
         throw_error("Internal Compiler Error: Type was null in reflection "
                     "'to_type_struct()'",
                     {});
-      fields_ss << get_field_struct(name.get_str(), t, type, context);
-      ++it;
-      if (it < count) {
-        fields_ss << ", ";
+      }
+
+      fields_ss << get_field_struct(field.get_str(), t, type, context);
+
+      if (field != info->scope->ordered_symbols.back()) {
+        fields_ss << ",\n";
       }
     }
+
     fields_ss << "}";
   } else {
     return get_type_struct(type, id, context, "{}");

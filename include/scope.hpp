@@ -92,8 +92,8 @@ struct Scope {
     return id;
   }
 
-  int create_enum_type(const InternedString &name, const std::vector<InternedString> &fields, bool flags) {
-    auto id = global_create_enum_type(name, fields, flags);
+  int create_enum_type(const InternedString &name, Scope *scope, bool flags) {
+    auto id = global_create_enum_type(name, scope, flags);
     types[name] = id;
     return id;
   }

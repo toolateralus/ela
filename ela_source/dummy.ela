@@ -36,6 +36,12 @@ impl Thing {
   }
 }
 
+Enoom :: enum {
+  A = 10,
+  B,
+  C
+}
+
 impl int {
   from :: fn(b: bool) -> #self {
     return b as #self;
@@ -51,6 +57,7 @@ main :: fn() {
   n := Thing::static_method(5, 2);
   t.mut_me(100);
   printf("[%d, %d]\n", t.a, t.b);
+  println(Enoom::A as s32)
 }
 
 // SMALLER TODOS:

@@ -32,6 +32,16 @@
 #foreign usleep :: fn(c: int);
 
 
+#foreign strdup :: fn(str: c_string) -> c_string;
+#foreign strndup :: fn(str: c_string, n: u64) -> c_string;
+#foreign strerror :: fn(errnum: int) -> c_string;
+#foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
+#foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
+#foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
+#foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
+#foreign strchr :: fn(str: c_string, c: int) -> c_string;
+#foreign strrchr :: fn(str: c_string, c: int) -> c_string;
+#foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
 #foreign strlen :: fn(str: c_string) -> int;
 #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
 #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
@@ -70,6 +80,27 @@ impl Random {
 Strings :: struct;
 
 impl string {
+  empty :: fn() -> #self {
+    return {};
+  }
+
+  from :: fn(data: c_string) -> #self{
+    len := strlen(data);
+    str: string;
+    str.data = strdup(data);
+    str.length = len;
+    return str;
+  }
+
+  from_ptr :: fn(begin: c_string, end: c_string) -> string {
+    str: string;
+    str.length = end - begin;
+    str.data = malloc(str.length + 1);
+    memcpy(str.data, begin, str.length);
+    str.data[str.length] = 0;
+    return str;
+  }
+
   insert :: fn(self*, pos: s64, substr: string) {
     if pos < 0 || pos > self.length {
       return;
@@ -127,7 +158,7 @@ impl string {
         result.insert(result.length, replacement);
         i += pattern_len;
       } else {
-        result.insert(result.length, string{self.data + i, self.data + i + 1});
+        result.insert(result.length, string::from_ptr(self.data + i, self.data + i + 1));
         i += 1;
       }
     }
@@ -151,7 +182,7 @@ impl string {
     memcpy(dest, self.data + start, end - start);
     dest[end - start] = 0;
 
-    return string{dest, dest + (end - start)};
+    return string::from_ptr(dest, dest + (end - start));
   }
 
   split :: fn(self*, delimiter: char) -> string[] {
@@ -161,11 +192,11 @@ impl string {
     str_len: int = self.length;
     for i in 0..str_len {
       if self.data[i] == delimiter {
-        if i > start then result ~= string{self.data + start, self.data + i};
+        if i > start then result ~= string::from_ptr(self.data + start, self.data + i);
         start = i + 1;
       }
     }
-    result ~= string{self.data + start, self.data + str_len};
+    result ~= string::from_ptr(self.data + start, self.data + str_len);
     return result;
   }
 
@@ -200,16 +231,16 @@ impl string {
 
 to_string :: fn(num: s64) -> string {
   switch num {
-    0: { return string{"0"}; }
-    1: { return string{"1"}; }
-    2: { return string{"2"}; }
-    3: { return string{"3"}; }
-    4: { return string{"4"}; }
-    5: { return string{"5"}; }
-    6: { return string{"6"}; }
-    7: { return string{"7"}; }
-    8: { return string{"8"}; }
-    9: { return string{"9"}; }
+    0: { return string::from("0"); }
+    1: { return string::from("1"); }
+    2: { return string::from("2"); }
+    3: { return string::from("3"); }
+    4: { return string::from("4"); }
+    5: { return string::from("5"); }
+    6: { return string::from("6"); }
+    7: { return string::from("7"); }
+    8: { return string::from("8"); }
+    9: { return string::from("9"); }
   }
 
   negative := false;
@@ -239,7 +270,7 @@ to_string :: fn(num: s64) -> string {
     buffer[index - i - 1] = temp;
   }
 
-  return string{buffer as c_string, (buffer as c_string) + index};
+  return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
 
 
 }
@@ -400,6 +431,6 @@ impl Timing {
     snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d",
              tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec);
-    return string{buffer as c_string, buffer as c_string + strlen(buffer)};
+    return string::from_ptr(buffer as c_string, buffer as c_string + strlen(buffer));
   }
 }

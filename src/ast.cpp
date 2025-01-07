@@ -927,10 +927,26 @@ ASTExpr *Parser::parse_primary() {
       auto range = begin_node();
       eat();
       auto init_list = ast_alloc<ASTInitializerList>();
-      while (peek().type != TType::RCurly) {
-        init_list->expressions.push_back(parse_expr());
-        if (peek().type == TType::Comma) {
-          eat();
+
+      if (peek().type == TType::RCurly) {
+        init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
+      } else if (lookahead_buf()[1].type != TType::Colon) {
+        init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+        while (peek().type != TType::RCurly) {
+          init_list->values.push_back(parse_expr());
+          if (peek().type == TType::Comma) {
+            eat();
+          }
+        }
+      } else {
+        init_list->tag = ASTInitializerList::INIT_LIST_NAMED;
+        while (peek().type != TType::RCurly) {
+          auto identifier = expect(TType::Identifier).value;
+          expect(TType::Colon);
+          init_list->key_values.push_back({identifier, parse_expr()});
+          if (peek().type == TType::Comma) {
+            eat();
+          }
         }
       }
       expect(TType::RCurly);
@@ -1283,7 +1299,6 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1510,13 +1525,14 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     // Self param for impls.
     if (name == "self") {
-      auto type = static_cast<ASTType*>(deep_copy_ast(current_impl.get()->target));
+      auto type = static_cast<ASTType *>(deep_copy_ast(current_impl.get()->target));
       append_type_extensions(type);
       auto param = ast_alloc<ASTParamDecl>();
       param->type = type;
       param->name = name;
       params->params.push_back(param);
-      if (peek().type == TType::Comma) eat();
+      if (peek().type == TType::Comma)
+        eat();
       continue;
     }
 
@@ -1614,12 +1630,33 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
+
+  auto zero = ast_alloc<ASTLiteral>();
+  zero->tag = ASTLiteral::Integer;
+  zero->value = "0";
+
+  auto one = ast_alloc<ASTLiteral>();
+  one->tag = ASTLiteral::Integer;
+  one->value = "1";
+
+  ASTExpr *last_value = zero;
+
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
+    } else {
+      if (last_value->get_node_type() == AST_NODE_LITERAL && static_cast<ASTLiteral *>(last_value)->value == "0") {
+        value = zero;
+      } else {
+        auto bin = ast_alloc<ASTBinExpr>();
+        bin->left = last_value;
+        bin->right = one;
+        last_value = bin;
+        value = bin;
+      }
     }
     if (peek().type == TType::Comma) {
       eat();
@@ -1643,9 +1680,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 ASTImpl *Parser::parse_impl() {
   auto range = begin_node();
   expect(TType::Impl);
-  Defer _([&]{
-    current_impl = nullptr;
-  });
+  Defer _([&] { current_impl = nullptr; });
   auto impl = ast_alloc<ASTImpl>();
   current_impl = impl;
   impl->target = parse_type();
@@ -1656,7 +1691,7 @@ ASTImpl *Parser::parse_impl() {
   auto block = parse_block(scope);
   end_node(impl, range);
 
-  for (const auto &statement: block->statements) {
+  for (const auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       function->flags |= FUNCTION_IS_METHOD;
@@ -1672,7 +1707,7 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
   for (const auto &statement : statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_UNION_DECLARATION)  {
+    } else if (statement->get_node_type() == AST_NODE_UNION_DECLARATION) {
       auto union_decl = static_cast<ASTUnionDeclaration *>(statement);
       auto type = global_get_type(union_decl->resolved_type);
       auto info = (type->get_info()->as<UnionTypeInfo>());

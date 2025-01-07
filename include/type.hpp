@@ -205,7 +205,6 @@ struct ScalarTypeInfo : TypeInfo {
 struct EnumTypeInfo : TypeInfo {
   int element_type = 0;
   bool is_flags = false;
-  std::vector<InternedString> keys;
   EnumTypeInfo() {};
 };
 
@@ -252,7 +251,7 @@ InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
 int global_create_struct_type(const InternedString &, Scope *);
-int global_create_enum_type(const InternedString &, const std::vector<InternedString> &, bool = false,
+int global_create_enum_type(const InternedString &, Scope *, bool = false,
                             size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
 int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);

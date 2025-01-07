@@ -111,105 +111,6 @@ void Typer::find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<
   }
 }
 
-// CLEANUP(Josh) 10/4/2024, 1:39:21 PM Wow this is an eyesore. There has to be a
-// way to clean this dang thing up either returns the correct type that this
-// init list will get casted to, or throws an error. node->types_are_homogenous
-// is pretty loose: it states that these types are either the same, or
-// implicitly convertible to each other. that may not be enough to satisfy the
-// C++ type system when it's strangely strict in some places more than others
-int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int declaring_type) {
-  auto type = global_get_type(declaring_type);
-  //! BUG This fails to accurately type check sub initializers. Also, we may
-  //! want to implement sub initializers for struct types
-  // and check those too
-  if (node->types_are_homogenous && (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array())) {
-    for (const auto [i, expr] : node->expressions | std::ranges::views::enumerate) {
-      if (expr->get_node_type() == AST_NODE_INITIALIZER_LIST) {
-        assert_type_can_be_assigned_from_init_list(static_cast<ASTInitializerList *>(expr), node->types[i]);
-      }
-    }
-    return declaring_type;
-  }
-  if (type->get_ext().has_extensions()) {
-    throw_error("Unable to construct type from initializer list", node->source_range);
-  }
-  if (type->is_kind(TYPE_SCALAR)) {
-    // this is just a plain scalar type, such as an int.
-  } else if (type->is_kind(TYPE_STRUCT)) {
-    auto info = (type->get_info()->as<StructTypeInfo>());
-
-    for (const auto &[name, symbol] : info->scope->symbols) {
-      if (name == "this")
-        continue;
-
-      // constructors use anonymous symbol names.
-      if ((symbol.flags & SYMBOL_IS_FUNCTION) == 0 || !name.get_str().contains("__anon_D"))
-        continue;
-      auto type = global_get_type(symbol.type_id);
-
-      if (!type)
-        continue;
-
-      auto info = (type->get_info()->as<FunctionTypeInfo>());
-      auto &params = info->parameter_types;
-
-      if (info->params_len != node->expressions.size()) {
-        continue;
-      }
-
-      for (int i = 0; i < info->params_len; ++i) {
-        auto type = global_get_type(params[i]);
-        auto rule = type_conversion_rule(type, global_get_type(node->types[i]), node->source_range);
-        if (rule != CONVERT_NONE_NEEDED && rule != CONVERT_IMPLICIT) {
-          continue;
-        }
-      }
-
-      return declaring_type;
-    }
-
-    // !HACK i used node->expressions.size() to bypass a bug with the types of
-    // initlist exceeding the number of expressions.
-    // * REMOVE ME *
-    if (info->scope->fields_count() < node->expressions.size()) {
-      throw_error("excess elements provided in initializer list.", node->source_range);
-    }
-    // search for fields within the range of the types provided.
-    int i = 0;
-    for (const auto &name : info->scope->ordered_symbols) {
-      if (name == "this")
-        continue;
-      auto sym = info->scope->symbols[name];
-      if (i >= node->types.size()) {
-        break;
-      }
-      if (!sym.is_function() && !global_get_type(sym.type_id)->is_kind(TYPE_FUNCTION)) {
-        assert_types_can_cast_or_equal(node->types[i], sym.type_id, node->source_range, "expected: {}, got: {}",
-                                       "Invalid types in initializer list for struct");
-      }
-      i++;
-    }
-  } else if (type->is_kind(TYPE_UNION)) {
-    auto info = (type->get_info()->as<UnionTypeInfo>());
-    if (node->types.size() > 1) {
-      throw_error("You can only initialize one field of a union with an "
-                  "initializer list",
-                  node->source_range);
-    }
-    // search for the first field member and type check against it.
-    for (const auto &[name, sym] : info->scope->symbols) {
-      if (!sym.is_function() && !global_get_type(sym.type_id)->is_kind(TYPE_FUNCTION)) {
-        assert_types_can_cast_or_equal(node->types[0], sym.type_id, node->source_range, "{}, {}",
-                                       "Invalid types in initializer list for union");
-        break;
-      }
-    }
-  } else {
-    throw_error("Unable to construct type from initializer list", node->source_range);
-  }
-  return declaring_type;
-}
-
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_IDENTIFIER:
@@ -455,44 +356,24 @@ std::any Typer::visit(ASTUnionDeclaration *node) {
 
 std::any Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = -1;
-
-  std::vector<InternedString> fields;
-  for (const auto &[key, value] : node->key_values) {
-    fields.push_back(key);
-    if (value.is_null())
-      continue;
-
-    if (node->is_flags) {
-      throw_error("You shouldn't use a #flags enum to generate auto "
-                  "flags, and also use non-default values.",
-                  node->source_range);
-    }
-
-    auto expr = value.get();
-    auto id = int_from_any(value.get()->accept(this));
-    auto type = global_get_type(id);
-
-    if (elem_type == -1) {
-      elem_type = id;
-    }
-
-    assert_types_can_cast_or_equal(id, elem_type, node->source_range, "expected: {}, got : {}",
-                                   "Inconsistent types in enum declaration.");
-  }
-
-  if (elem_type == void_type())
-    throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
-
-  if (elem_type == -1) {
-    elem_type = s32_type();
-  }
-
-  ctx.scope->create_enum_type(node->name, fields, node->is_flags);
+  ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags);
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
-  auto info = (enum_type->get_info()->as<EnumTypeInfo>());
+  auto info = enum_type->get_info()->as<EnumTypeInfo>();
+  for (const auto &[key, value] : node->key_values) {
+    auto node_ty = int_from_any(value.get()->accept(this));
+    info->scope->insert(key, node_ty);
+    if (elem_type == -1) {
+      elem_type = node_ty;
+    } else {
+      assert_types_can_cast_or_equal(node_ty, elem_type, node->source_range, "expected: {}, got : {}",
+                                     "Inconsistent types in enum declaration.");
+    }
+  }
+  if (elem_type == void_type()) {
+    throw_error("Invalid enum declaration.. got null or no type.", node->source_range);
+  }
   node->element_type = elem_type;
   info->element_type = elem_type;
-
   return {};
 }
 
@@ -878,10 +759,11 @@ std::any Typer::visit(ASTCall *node) {
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
 
-  auto wrong_num_params = (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params);
-  auto has_self_param = arg_tys.size() == info->params_len -1; // This is far too guess-based, but i'm just hacking it in
-  if (!info->is_varargs &&
-      wrong_num_params && !has_self_param) {
+  auto wrong_num_params =
+      (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params);
+  auto has_self_param =
+      arg_tys.size() == info->params_len - 1; // This is far too guess-based, but i'm just hacking it in
+  if (!info->is_varargs && wrong_num_params && !has_self_param) {
     throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}\n type: {}",
                             info->params_len, arg_tys.size(), type->to_string()),
                 node->source_range);
@@ -1285,7 +1167,6 @@ std::any Typer::visit(ASTDotExpr *node) {
   }
 
   Scope *base_scope = base_ty->get_info()->scope;
-  
 
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
@@ -1399,23 +1280,105 @@ std::any Typer::visit(ASTMake *node) {
   return type;
 }
 std::any Typer::visit(ASTInitializerList *node) {
-  int last_type = -1;
-  for (const auto &expr : node->expressions) {
-    int type = int_from_any(expr->accept(this));
-    if (last_type == -1) {
-      last_type = type;
-    } else if (last_type != type) {
-      auto rule = type_conversion_rule(global_get_type(type), global_get_type(last_type), expr->source_range);
-      if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
-        node->types_are_homogenous = false;
-      }
-    }
-    // !BUG: somehow for 2 expressions, sometimes this will end up with 4
-    // ! types. I have no idea how atha's happening. I put a hack in somewhere
-    // ! that checks the length of the expressions instead of the types
-    node->types.push_back(type);
+  auto target_type = global_get_type(declaring_or_assigning_type);
+  if (!target_type) {
+    throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
-  return assert_type_can_be_assigned_from_init_list(node, declaring_or_assigning_type);
+
+  if (target_type->get_ext().is_pointer() ||
+      target_type->is_kind(TYPE_SCALAR) && target_type->get_ext().has_no_extensions()) {
+    throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's not an array\n\tgot {}", target_type->to_string()),
+                node->source_range);
+  }
+
+  auto scope = target_type->get_info()->scope;
+
+  switch (node->tag) {
+    case ASTInitializerList::INIT_LIST_NAMED: {
+      if (!target_type->is_kind(TYPE_STRUCT) && !target_type->is_kind(TYPE_UNION)) {
+        throw_error(std::format("named initializer lists can only be used for structs & unions, got type {}\nNote, for "
+                                "unions, you can only provide one value.",
+                                target_type->to_string()),
+                    node->source_range);
+      }
+
+      if (node->key_values.empty()) {
+        return declaring_or_assigning_type;
+      }
+
+      for (const auto &[id, value] : node->key_values) {
+        auto symbol = scope->local_lookup(id);
+        if (!symbol) throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
+
+        if (symbol->is_function()) {
+          throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
+                      value->source_range);
+        }
+        auto value_ty = int_from_any(value->accept(this));
+        assert_types_can_cast_or_equal(value_ty, symbol->type_id, value->source_range, "from {}, to {}",
+                                       "Unable to cast type to target field for named initializer list");
+      }
+    } break;
+    case ASTInitializerList::INIT_LIST_COLLECTION: {
+      if (!target_type->get_ext().is_array() && !target_type->get_ext().is_fixed_sized_array() &&
+          !target_type->get_ext().is_map()) {
+        throw_error(std::format("Collection-style initializer lists like '{{0, 1, 2, ..}} or {{{{key, value}}, {{key, "
+                                "value}}}}' can only be used with "
+                                "arrays, fixed arrays, and maps. Got {}",
+                                target_type->to_string()),
+                    node->source_range);
+      }
+      auto &values = node->values;
+
+      if (values.empty()) {
+        return declaring_or_assigning_type;
+      }
+    
+      auto target_element_type = target_type->get_element_type();
+      auto element_type = int_from_any(values[0]->accept(this));
+      for (int i = 1; i < values.size(); ++i) {
+        int type = -1;
+        if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+          auto old = declaring_or_assigning_type;
+          Defer _([&]{
+            declaring_or_assigning_type = old;
+          });
+          declaring_or_assigning_type = target_element_type;
+          type = int_from_any(values[i]->accept(this));
+        } else {
+          type = int_from_any(values[i]->accept(this));
+        }
+
+        assert_types_can_cast_or_equal(
+            type, element_type, values[i]->source_range, "to {} from {}",
+            "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
+      }
+
+      auto element_ty_ptr = global_get_type(element_type);
+      auto target_element_ty_ptr = global_get_type(target_element_type);
+
+      if (element_ty_ptr->is_kind(TYPE_SCALAR) && element_ty_ptr->get_ext().has_no_extensions() &&
+          target_element_ty_ptr->is_kind(TYPE_SCALAR) && target_element_ty_ptr->get_ext().has_no_extensions()) {
+        auto target_info = target_element_ty_ptr->get_info()->as<ScalarTypeInfo>();
+        auto elem_info = element_ty_ptr->get_info()->as<ScalarTypeInfo>();
+
+        // We allow implicit downcasting/ sign casting, just to prevent annoyances.
+        if (target_info->is_integral && elem_info->is_integral) {
+          return declaring_or_assigning_type;
+        }
+      }
+
+      assert_types_can_cast_or_equal(
+          element_type, target_element_type, node->source_range, "to {} from {}",
+          "Failed to assign element type from value passed into collection-style initializer list");
+
+      return declaring_or_assigning_type;
+    } break;
+    case ASTInitializerList::INIT_LIST_EMPTY:
+      return declaring_or_assigning_type;
+  }
+
+  return declaring_or_assigning_type;
 }
 std::any Typer::visit(ASTAllocate *node) {
   if (node->kind == ASTAllocate::Delete) {
@@ -1571,7 +1534,7 @@ std::any Typer::visit(ASTImpl *node) {
 
   auto previous = ctx.scope;
   ctx.set_scope(scope);
-  for (const auto &method: node->methods) {
+  for (const auto &method : node->methods) {
     method->accept(this);
   }
   ctx.set_scope(previous);

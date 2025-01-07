@@ -205,16 +205,6 @@ int CompileCommand::compile() {
   Typer type_visitor{context};
   type_visitor.visit(root);
 
-  if (has_flag("verbose")) {
-    SerializeVisitor serializer(context);
-    auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
-    printf("%s\n", serialized_view.c_str());
-    std::ofstream ast(binary_path.string() + ".coffee");
-    ast << serialized_view;
-    ast.flush();
-    ast.close();
-  }
-
   Emitter emit(context, type_visitor);
   emit.visit(root);
 

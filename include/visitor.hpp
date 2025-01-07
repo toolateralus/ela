@@ -1,6 +1,5 @@
 #pragma once
 #include <any>
-#include <sstream>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -25,56 +24,6 @@ struct VisitorBase {
   };
 };
 
-struct SerializeVisitor : VisitorBase {
-  SerializeVisitor(Context &context) : context(context) {}
-  std::stringstream ss{};
-  int indentLevel = 0;
-  Context &context;
-  std::string indent();
-
-  std::any visit(ASTProgram *node) override;
-  std::any visit(ASTFunctionDeclaration *node) override;
-  std::any visit(ASTBlock *node) override;
-  std::any visit(ASTParamsDecl *node) override;
-  std::any visit(ASTParamDecl *node) override;
-  std::any visit(ASTDeclaration *node) override;
-  std::any visit(ASTExprStatement *node) override;
-  std::any visit(ASTBinExpr *node) override;
-  std::any visit(ASTUnaryExpr *node) override;
-  std::any visit(ASTIdentifier *node) override;
-  std::any visit(ASTLiteral *node) override;
-  std::any visit(ASTType *node) override;
-  std::any visit(ASTCall *node) override;
-  std::any visit(ASTArguments *node) override;
-  std::any visit(ASTReturn *node) override;
-  std::any visit(ASTContinue *node) override;
-  std::any visit(ASTBreak *node) override;
-  std::any visit(ASTFor *node) override;
-  std::any visit(ASTIf *node) override;
-  std::any visit(ASTElse *node) override;
-  std::any visit(ASTWhile *node) override;
-  std::any visit(ASTStructDeclaration *node) override;
-  std::any visit(ASTDotExpr *node) override;
-  std::any visit(ASTScopeResolution *node) override;
-  std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
-  std::any visit(ASTInitializerList *node) override;
-  std::any visit(ASTEnumDeclaration *node) override;
-  std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
-  std::any visit(ASTTuple *node) override;
-  std::any visit(ASTAlias *node) override;
-  std::any visit(ASTImpl *node) override {
-    // todo:
-    return {};
-  }
-
-  // TODO: implement me.
-
-  std::any visit(ASTRange *node) override { return {}; }
-  std::any visit(ASTSwitch *node) override { return {}; };
-  std::any visit(ASTTupleDeconstruction *node) override { return {}; };
-};
 
 struct Typer : VisitorBase {
   Nullable<Symbol> get_symbol(ASTNode *);
