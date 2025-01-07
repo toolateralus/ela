@@ -144,24 +144,63 @@ std::any Emitter::visit(ASTType *node) {
   (*ss) << type_string;
   return {};
 }
+
+int Emitter::get_dot_left_type(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_IDENTIFIER:
+      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
+    case AST_NODE_DOT_EXPR: {
+      auto dotnode = static_cast<ASTDotExpr *>(node);
+      return std::any_cast<int>(dotnode->base->accept(&type_visitor));
+    } break;
+    case AST_NODE_SCOPE_RESOLUTION: {
+      auto srnode = static_cast<ASTScopeResolution *>(node);
+      return std::any_cast<int>(srnode->base->accept(&type_visitor));
+    } break;
+    default:
+      throw_error(std::format("Internal Compiler Error: 'get_dot_left_type' encountered an unexpected node, kind {}",
+                              (int)node->get_node_type()),
+                  node->source_range);
+  }
+  return -1;
+}
+
 std::any Emitter::visit(ASTCall *node) {
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-    auto dot = (ASTDotExpr*)node->function;
-    auto base_ty = global_get_type(dot->base->resolved_type);
-    auto base_scope = ((StructTypeInfo*)base_ty->get_info())->scope;
-    if (base_scope->local_lookup(dot->member_name)) {
-      (*ss) << to_cpp_string(base_ty) << "_" << dot->member_name.get_str();
+  if (node->function->get_node_type() == AST_NODE_DOT_EXPR ||
+      node->function->get_node_type() == AST_NODE_SCOPE_RESOLUTION) {
+    auto type = global_get_type(get_dot_left_type(node->function));
+    auto symbol = type_visitor.get_symbol(node->function);
+    auto left = node->function->get_node_type() == AST_NODE_DOT_EXPR ? 
+      static_cast<ASTDotExpr*>(node->function)->base :
+      static_cast<ASTScopeResolution*>(node->function)->base;
+
+    if (!symbol) {
+      throw_error("Internal compiler error: failed to get symbol for method call", node->source_range);
+    }
+
+    Scope *base_scope;
+    if (type) {
+      if (type->is_kind(TYPE_STRUCT)) {
+        base_scope = type->get_info()->as<StructTypeInfo>()->scope;
+      } else if (type->is_kind(TYPE_UNION)) {
+        base_scope = type->get_info()->as<UnionTypeInfo>()->scope;
+      } else {
+        throw_error("Internal compiler error: couldn't get type for method call", node->source_range);
+      }
+      (*ss) << to_cpp_string(type) << "_" << symbol.get()->name.get_str();
       (*ss) << "(";
-      if (!base_ty->get_ext().is_pointer()) {
+      if (!type->get_ext().is_pointer()) {
         (*ss) << "&";
       }
-      dot->base->accept(this);
+      left->accept(this);
       for (auto &arg : node->arguments->arguments) {
         (*ss) << ",";
         arg->accept(this);
       }
       (*ss) << ")";
       return {};
+    } else {
+      throw_error("Internal compiler error: unable to find method call", node->source_range);
     }
   }
   node->function->accept(this);
@@ -280,7 +319,6 @@ std::any Emitter::visit(ASTDeclaration *node) {
     throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
-
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name);
 
@@ -335,9 +373,6 @@ std::any Emitter::visit(ASTDeclaration *node) {
 }
 
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  if ((node->flags & FUNCTION_IS_METHOD) != 0 || (node->flags & FUNCTION_IS_STATIC) != 0) {
-    return;
-  }
 
   emit_default_args = true;
 
@@ -385,6 +420,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
     (*ss) << ");";
   }
 }
+
 std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
     node->return_type->accept(this);
@@ -458,6 +494,32 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     node->block.get()->accept(this);
   };
 
+  auto emit_method_header = [&]() {
+    auto parent_ty_id = current_struct_decl.is_not_null() ? 
+                    current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type;
+      auto parent_ty = global_get_type(parent_ty_id);
+
+      node->return_type->accept(this);
+      (*ss) << ' ' << parent_ty->get_base().get_str() << '_' << node->name.get_str(); 
+      
+      (*ss) << "(";
+      int i = 0;
+      (*ss) << to_cpp_string(global_get_type(parent_ty->take_pointer_to())) << " self";
+      if (!node->params->params.empty()) {
+        (*ss) << ", ";
+      }
+      for (const auto &param : node->params->params) {
+        param->accept(this);
+        if (i != node->params->params.size() - 1) {
+          (*ss) << ", ";
+        }
+        ++i;
+      }
+
+      (*ss) << ")";
+
+  };
+
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
       for (auto &instantiation : node->generic_instantiations) {
@@ -473,7 +535,12 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
-      emit_forward_declaration(node);
+      if ((node->flags & FUNCTION_IS_METHOD) != 0) {
+        emit_method_header(); 
+        (*ss) << ";\n";
+      } else{
+        emit_forward_declaration(node);
+      }
     }
 
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
@@ -507,6 +574,12 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
       (*ss) << "extern \"C\" ";
+    }
+
+    if ((node->flags & FUNCTION_IS_METHOD) != 0) {
+      emit_method_header();
+      node->block.get()->accept(this);
+      return;
     }
 
     if (node->name == "main") {
@@ -552,7 +625,6 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
 
   return {};
 }
-
 std::string mangled_type_args(const std::vector<int> &args) {
   std::string s;
   for (const auto &arg : args) {
@@ -597,7 +669,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
   }
   indentLevel++;
 
-  for (const auto &_union: node->unions) {
+  for (const auto &_union : node->unions) {
     indented("");
     _union->accept(this);
     semicolon();
@@ -610,12 +682,13 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
     semicolon();
     newline();
   }
-  
+
   (*ss) << "};\n";
   indentLevel--;
 
   bool has_default_ctor = false;
   bool has_dtor = false;
+
   for (const auto &method : node->methods) {
     if ((method->flags & FUNCTION_IS_CTOR) != 0 && method->params->params.size() == 0) {
       has_default_ctor = true;
@@ -628,7 +701,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
     semicolon();
     newline();
   }
-  
+
   ctx.exit_scope();
   return {};
 }

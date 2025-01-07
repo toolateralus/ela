@@ -1487,8 +1487,6 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
   ASTParamsDecl *params = ast_alloc<ASTParamsDecl>();
   expect(TType::LParen);
   ASTType *type = nullptr;
-  // TODO: simplify me.
-  // TODO: Make it so repeat type params are post-iden, such as '(a, b, c: s32)' instead of '(a: s32, b, c)'
   while (peek().type != TType::RParen) {
     auto subrange = begin_node();
 
@@ -1504,6 +1502,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     }
 
     auto name = expect(TType::Identifier).value;
+
     if (peek().type == TType::Colon) {
       expect(TType::Colon);
       type = parse_type();

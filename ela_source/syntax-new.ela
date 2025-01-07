@@ -1,0 +1,31 @@
+type Vector2 :: struct {
+  x: s32;
+  y: s32;
+}
+
+impl Vector2 {
+  // Method, takes self as a value.
+  add :: fn(self, other: #self) -> #self {
+    // named init list.
+    return { 
+      x: self.x + other.x,
+      y: self.y + other.y,
+    };
+  }
+  // Method, takes a mutable pointer to self.
+  normalize :: fn(mut self*) {
+    length := sqrt(self.x * self.x + self.y * self.y);
+    if length != 0 {
+      self.x /= length;
+      self.y /= length;
+    }
+  }
+  // Static method.
+  zero :: fn() -> #self {
+    return {};
+  }
+}
+
+
+
+

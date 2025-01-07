@@ -1,10 +1,10 @@
 thing :: struct {
-  method :: fn(a: int, b: int) -> int {
+  method :: fn(a: s32, b) -> s32 {
     return a + b;
   }
 }
 
 main :: fn() {
   t: thing;
-  a := t.method(5, 6);
+  n := t.method(5, 2);
 }

@@ -207,7 +207,7 @@ struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   Token op;
-  int resolved_type;
+  
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
@@ -412,7 +412,7 @@ struct ASTUnionDeclaration;
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
-  int resolved_type;
+  
   bool is_fwd_decl = false;
   bool is_extern = false;
 
@@ -448,7 +448,7 @@ struct ASTEnumDeclaration : ASTStatement {
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
-  int resolved_type;
+  
 
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;

@@ -210,6 +210,7 @@ int assert_type_can_be_assigned_from_init_list(ASTInitializerList *node, int dec
   return declaring_type;
 }
 
+
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_IDENTIFIER:
@@ -233,6 +234,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
 
       auto scope = type->is_kind(TYPE_STRUCT) ? type->get_info()->as<StructTypeInfo>()->scope
                                               : type->get_info()->as<UnionTypeInfo>()->scope;
+
       return scope->local_lookup(dotnode->member_name);
     } break;
     case AST_NODE_SCOPE_RESOLUTION: {
