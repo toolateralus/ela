@@ -898,8 +898,10 @@ std::any Typer::visit(ASTCall *node) {
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
 
+  auto wrong_num_params = (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params);
+  auto has_self_param = arg_tys.size() == info->params_len -1; // This is far too guess-based, but i'm just hacking it in
   if (!info->is_varargs &&
-      (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params)) {
+      wrong_num_params && !has_self_param) {
     throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}\n type: {}",
                             info->params_len, arg_tys.size(), type->to_string()),
                 node->source_range);
@@ -1667,6 +1669,6 @@ std::any Typer::visit(ASTImpl *node) {
     method->accept(this);
   }
   ctx.set_scope(previous);
-  
+
   return {};
 }

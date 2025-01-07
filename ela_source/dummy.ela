@@ -3,13 +3,19 @@ thing :: struct {
   b: s32;
 }
 
+#foreign printf :: fn(c: c_string, ...) -> int;
+
 impl thing {
-  method :: fn(a: s32, b: s32) -> s32 {
+  static_method :: fn(a: s32, b: s32) -> s32 {
     return a + b;
+  }
+  mut_me :: fn(self*) {
+    printf("Hi\n");
   }
 }
 
 main :: fn() {
   t: thing;
-  n := t.method(5, 2);
+  n := t.static_method(5, 2);
+  t.mut_me();
 }
