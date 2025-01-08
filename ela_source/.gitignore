@@ -1,7 +1,3 @@
 *
-.*toml
 !*.ela
-!*.json
 !boilerplate.hpp
-!.gitignore
-/tests

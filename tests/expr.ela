@@ -1,0 +1,188 @@
+#import core;
+
+#test test_comp_assign :: fn() {
+  deref: s32 = 1;
+  deref += deref;
+  assert("+=", deref == 2);
+  deref -= deref;
+  assert("-=", deref == 0);
+  deref *= deref;
+  assert("*=)", deref == 0);
+  deref = 2;
+  deref /= deref;
+  assert("/=", deref == 1);
+  deref = 2;
+  deref %= deref;
+  assert("%=", deref == 0);
+  deref &= deref;
+  assert("&=", deref == 0);
+  deref |= deref;
+  assert("|=", deref == 0);
+  deref ^= deref;
+  assert("^=", deref == 0);
+  deref <<= deref;
+  assert("<<=", deref == 0);
+  deref >>= deref;
+  assert(">>=", deref == 0);
+}
+
+#test test_operators :: fn() {
+  left: s32 = 1;
+  right: s32 = 1;
+  result: s32;
+  result_bool: bool;
+  result_bool = left == right;
+  assert("left should equal right", result_bool == true);
+  result_bool = left != right;
+  assert("left should not equal right", result_bool == false);
+  result_bool = left < right;
+  assert("left should not be less than right", result_bool == false);
+  result_bool = left > right;
+  assert("left should not be greater than right", result_bool == false);
+  result_bool = left <= right;
+  assert("left should be less than or equal to right", result_bool == true);
+  result_bool = left >= right;
+  assert("left should be greater than or equal to right", result_bool == true);
+  result_bool = left && right;
+  assert("left and right should be true", result_bool == true);
+  result_bool = left || right;
+  assert("left or right should be true", result_bool == true);
+
+  result = left + right;
+  assert("left + right should be 2", result == 2);
+  result = left - right;
+  assert("left - right should be 0", result == 0);
+  result = left * right;
+  assert("left * right should be 1", result == 1);
+  result = left / right;
+  assert("left / right should be 1", result == 1);
+  result = left % right;
+  assert("left % right should be 0", result == 0);
+  result = left & right;
+  assert("left & right should be 1", result == 1);
+  result = left | right;
+  assert("left | right should be 1", result == 1);
+  result = left ^ right;
+  assert("left ^ right should be 0", result == 0);
+  result = left << right;
+  assert("left << right should be 2", result == 2);
+  result = left >> right;
+  assert("left >> right should be 0", result == 0);
+}
+
+#test test_relational_results :: fn() {
+  test1: bool = (1 == 1 + 2) || 1 == 2;
+  test2: bool = (3 > 2) && (2 < 4);
+  test3: bool = !(5 <= 5) || (6 >= 6);
+  test4: bool = (7 != 8) && (9 == 9);
+  assert("test1 should be false", test1 == false);
+  assert("test2 should be true", test2 == true);
+  assert("test3 should be true", test3 == true);
+  assert("test4 should be true", test4 == true);
+}
+
+#test test_address_of :: fn() {
+  v: s32 = 0;
+  addr_of_v: s32* = &v;
+  assert("address of grabbed a non-null ptr", addr_of_v != null);
+  v = *addr_of_v;
+  assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
+}
+
+#test test_implicit_numerical_casting :: fn() {
+  u1: u8;
+  u2: u16 = u1;
+  u3: u32 = u2;
+  u4: u64 = u3;
+  assert("unable to upcast successfully", u4 == u1);
+
+  s1: s8;
+  s2: s16 = s1;
+  s3: s32 = s2;
+  s4: s64 = s3;
+  assert("unable to upcast successfully", s1 == s4);
+
+  f: float;
+  f1: float64 = f;
+  assert("unable to upcast successfully", f == f1);
+}
+
+#test test_two_way_implicit_conversion_bin_ops :: fn() {
+  v: s32;
+  v1: s8;
+  f: float32;
+  assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
+}
+
+Node :: struct {
+  next: Node*;
+}
+
+Array :: struct {
+  ptr: Node[10];
+}
+
+#test test_chained_dot_subscript :: fn() {
+  a: Array;
+  a.ptr[0].next = null;
+  assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
+
+  n: Node ;
+  a.ptr[0].next = &n;
+  assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
+}
+
+#test test_subscript :: fn() {
+  arr: s32[100];
+  arr[50] = 0;
+  assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
+  n: int;
+  ++n;
+}
+
+#test test_referencing_pointer :: fn() {
+  node: Node;
+  node.next = malloc(sizeof(Node));
+  other: Node;
+  node.next.next = &other;
+  assert("mallocing 'next' of 'Node' failed.", node.next != null);
+  assert("dereferencing other into node.next failed.", node.next.next != null);
+  free(node.next);
+}
+
+
+// This whole directive, #make() needs to be removed.
+// it's noisy and unneccesary.
+#test test_make_cast :: fn() {
+  big: u16 = #make(u16, 65365);
+  small: u8 = #make(u8, big);
+  assert("failed to down cast", small == (big % 255));
+}
+
+XaryuStruct :: struct {
+  f: float ;
+}
+
+#test test_comp_assign_non_iden :: fn() {
+  arr: float32[12];
+  arr[0] = 10;
+  arr[0] += 10;
+  assert("comp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
+
+  xarbars:  XaryuStruct[1];
+  xarbars[0].f = 10.0;
+  xarbars[0].f += 10.0;
+  assert("comp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
+}
+
+
+#test test_cast :: fn() {
+  n: int = 10;
+  f: float  = n as float;
+  assert("Cast failed", f == 10.0);
+}
+
+#test test_underscores_in_number_literals :: fn() {
+  n: int = 1_000_000;
+  assert("number literal with underscores failed to equal expected value", n == 1000000)
+}

@@ -1,0 +1,18 @@
+// this is a comment
+{
+	// nested comment
+	"string": "Hello, World!",
+	"number": 42,
+	"boolean": true,
+	"null_value": null,
+	"array": [1, "two", false, null],
+	"object": {
+		"nested_string": "Nested Hello",
+		"nested_number": 3.14,
+		"nested_boolean": false,
+		"nested_array": ["a", "b", "c"],
+		"nested_object": {
+			"deeply_nested_key": "Deep Value"
+		}
+	}
+}

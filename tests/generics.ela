@@ -1,0 +1,10 @@
+#import core;
+
+add_generic :: fn![T](a: T, b: T) -> T {
+  return a + b;
+}
+
+#test test_generic_add :: fn() {
+  assert("generic_add_float failed", add_generic![float](100.0, 100.0) == 200.0);
+  assert("generic_add_int failed", add_generic![int](5, 6) == 11);
+}

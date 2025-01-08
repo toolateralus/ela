@@ -1,0 +1,32 @@
+
+
+GenericStruct :: struct![T] {
+  a: T;
+  b: T;
+}
+
+impl GenericStruct {
+  run :: fn(self*) -> T {
+    return self.a + self.b;
+  }
+}
+
+#test test_generic_struct :: fn() {
+  int_adder: GenericStruct![int] = {5, 6};
+  assert("generic type failure", int_adder.run() == 5 + 6);
+  float_adder: GenericStruct![float] = {1.23, 4.56};
+  assert("generic type failure", float_adder.run() == 1.23 + 4.56);
+}
+
+GenericUnion :: union![T, T1] {
+  a: T;
+  b: T1;
+}
+
+#test test_generic_union :: fn() {
+  int_adder: GenericUnion![int, float];
+  int_adder.a = 11;
+  assert("generic type failure", int_adder.a == 5 + 6);
+  int_adder.b = 1.23 + 4.56;
+  assert("generic type failure", int_adder.b == 1.23 + 4.56);
+}

@@ -1,0 +1,70 @@
+#import core;
+
+func_returns_tuple :: fn() -> (int, int) {
+  return (10, 10);
+}
+
+func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
+  a, b := tuple;
+  return (a + 10, b + 10);
+}
+
+#test test_tuple_ptr :: fn () {
+  ptr : (int, int)* = malloc(32) as (int, int)*;
+  *ptr = (10, 10);
+  {
+    a, b := *ptr;
+    assert("mallocing with tuple failed", a == 10 && b == 10);
+  }
+
+  ptr_arr: (int, int)*[];
+  ptr_arr ~= ptr;
+
+  {
+    a, b := *(ptr_arr[0]);
+    assert("mallocing into tuple array failed", a == 10 && b == 10);
+  }
+
+  free(ptr);
+}
+
+#test test_tuple_array :: fn() {
+  array : (int, int)[] = {(10, 10)};
+  array ~= (10, 10);
+  a, b := array[0];
+  assert("Storing tuple in array failed", a == 10 && b == 10);
+}
+
+#test test_tuple_fn_interactions :: fn() {
+  {
+    a, b := func_returns_tuple();
+    assert("returning tuple from function failed", a == 10 && b == 10);
+  }
+
+  tuple := (0, 0);
+  a, b := func_takes_tuple_arg(tuple);
+  assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
+}
+
+#test test_nested_tuple :: fn() {
+  nested := (1, (2, 3));
+  {
+    _, tup := nested;
+    a, b := tup;
+    assert("nested tup failed", a == 2 && b == 3 && _ == 1);
+  }
+}
+
+#test test_tuples :: fn() {
+  t1 : (int, int, int) = (0, 1, 2);
+  {
+    a,b,c := t1;
+    assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
+  }
+
+  t2 := (3, 2, 1, 0);
+  {
+    a,b,c,d := t2;
+    assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
+  }
+}

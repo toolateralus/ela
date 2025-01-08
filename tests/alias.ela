@@ -1,0 +1,15 @@
+#import core; 
+
+#test test_type_alias :: fn() {
+  #alias XaryuBarSchnar :: int;
+  i: XaryuBarSchnar = 0;
+  assert("type alias failed", i == 0);
+}
+
+#test test_ptr_alias :: fn() {
+  #alias int_ptr :: int*;
+  p: int* = malloc(sizeof(int));
+  other: int_ptr  = p;
+  assert("alias failed to equal pointed to type field.", p == other);
+  free(p);
+}

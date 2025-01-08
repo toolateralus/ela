@@ -1,0 +1,59 @@
+#import core;
+
+Union :: union {
+  a: int = -1;
+  b: int;
+  c: int;
+}
+
+impl Union {
+  method :: fn(self*, n: int) {
+    assert("union equality check in method failed", n == self.a && n == self.b && n == self.c);
+  }
+}
+
+_Vec2 :: union {
+  #anon :: struct {
+    x: int;
+    y: int;
+    z: int;
+  };
+  values: int[3];
+}
+
+impl _Vec2 {
+  method :: fn(self*, n: int) {
+    assert("union equality check in method failed", n == self.x && n == self.y && n == self.z);
+    assert("union equality check in method failed", n == self.values[0] && n == self.values[1] && n == self.values[2]);
+  }
+  something :: fn() -> #self {
+    return {};
+  }
+}
+
+#test test_union_type_anonymous_sub_struct :: fn() {
+  vec: _Vec2;
+  vec.method(0); // this does the assertions
+}
+
+
+
+#test test_union_type :: fn() {
+  test_union: Union;
+  test_union.a = 10;
+  assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
+  test_union.method(10);
+}
+
+
+AnonSubUnion :: struct {
+  #anon :: union {
+    a: int;
+  }
+}
+
+#test test_anon_union_in_struct :: fn() {
+  anon: AnonSubUnion;
+  anon.a = 100;
+  assert("Anon sub union failed", anon.a == 100);
+}

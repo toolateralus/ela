@@ -1,0 +1,21 @@
+
+/* 
+  We just do a test pass on all the installed libs to make sure they're compiling.
+  Also, if these libraries implement tests, we run them here.
+*/
+
+#import core
+#import directory
+#import dlfcn
+#import file
+#import net
+#import reflection
+#import pthread
+#import interned_string
+
+// These will be relatively hard to refactor.
+// #import memory // * this uses generics.
+// #import json   // * some bugs with self/self* type prevents this from compiling
+// #import raylib // * big rewrite, almost everything. This is our biggest library, so that sucks.
+// #import gl     // * big rewrite, not nearly as bad as raylib.
+

@@ -1,0 +1,47 @@
+#import core;
+#import reflection;
+
+Reflector :: struct {
+  n: int;
+}
+
+
+#test test_set_field_with_reflection :: fn() {
+reflector: Reflector;
+type := #type(Reflector);
+field := type.fields[0];
+integer: int = 100;
+field.set(&reflector, integer);
+assert("reflection field.set() failed.", reflector.n == 100);
+}
+
+#test test_get_field_with_reflection :: fn() {
+reflector: Reflector;
+reflector.n = 100;
+type := #type(Reflector);
+field := type.fields[0];
+n := *(field.get(&reflector) as int*);
+assert("reflection field.set() failed.", n == 100);
+}
+
+#test test_array_reflection :: fn() {
+  fixed: int[3] = {1, 2, 3};
+  fixed_type := #type(fixed);
+  index: int = 0;
+  fixed_elements := fixed_type.elements((&fixed) as char*);
+  assert("Fixed array length mismatch", fixed_elements.length == 3);
+  for elem in fixed_elements {
+    assert("Fixed array element mismatch", *(elem.data as int*) == fixed[index]);
+    ++index;
+  }
+
+  dynamic: int[] = {3, 2, 1};
+  dynamic_type := #type(dynamic);
+  index = 0;
+  dynamic_elements := dynamic_type.elements((&dynamic) as char*);
+  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
+  for elem in dynamic_elements {
+    assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
+    ++index;
+  }
+}

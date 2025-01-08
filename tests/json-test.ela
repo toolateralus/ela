@@ -1,0 +1,144 @@
+#import core;
+#import json;
+
+JsonValueDeleter :: struct {
+  vals: JsonValue*[];
+}
+
+impl JsonValueDeleter {
+  add :: fn(self*, val: JsonValue*) {
+    self.vals ~= val;
+  }
+  #dtor :: fn(self*) {
+    for val in self.vals {
+      free(val);
+    }
+  }
+}
+
+#test test_json_types :: fn() {
+  deleter: JsonValueDeleter;
+  val : JsonValue*;
+
+  val = json_parse_string("true");
+  deleter.add(val);
+  assert("bool", val.is_boolean());
+
+  val = json_parse_string("32.1");
+  deleter.add(val);
+  assert("number", val.is_number());
+
+  val = json_parse_string("\"hello\"");
+  deleter.add(val);
+  assert("string", val.is_string());
+
+  val = json_parse_string("[1, 2, 3]");
+  deleter.add(val);
+  assert("array", val.is_array());
+
+  val = json_parse_string("{\"key\": \"value\"}");
+  deleter.add(val);
+  assert("object", val.is_object());
+
+  val = json_parse_string("null");
+  deleter.add(val);
+  assert("null", val.is_null());
+}
+
+#test test_json_values :: fn() {
+  deleter: JsonValueDeleter;
+  val : JsonValue*;
+
+  val = json_parse_string("true");
+  deleter.add(val);
+  assert("bool", val.as_boolean() == true);
+
+  val = json_parse_string("32.1");
+  deleter.add(val);
+  assert("number", val.as_number() == atof("32.1"));
+
+  val = json_parse_string("\"hello\"");
+  deleter.add(val);
+  assert("string", val.as_string() == "hello");
+
+  val = json_parse_string("[1, 2, 3]");
+  deleter.add(val);
+  assert("array length", val.as_array().length == 3);
+  assert("array element 0", val.get(0).as_number() == 1);
+  assert("array element 1", val.get(1).as_number() == 2);
+  assert("array element 2", val.get(2).as_number() == 3);
+
+  val = json_parse_string("{\"key\": \"value\"}");
+  deleter.add(val);
+  assert("object key", val.get("key").as_string() == "value");
+}
+
+#test test_scalar_deserialization :: fn() {
+  n : int = 100;
+  json := json_serialize(&n, #type(int));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = 0;
+  assert("json  serialize  scalar", json.is_number());
+  err := json_deserialize_scalar(json, &n, #type(int));
+  assert("json error", !err.has_value);
+  assert("json deserialize scalar", n == 100);
+}
+
+MyJsonStruct :: struct {
+  n: s64;
+  b: float32;
+}
+impl MyJsonStruct {
+  to_string ::fn(self*) -> string {
+    return $"MyJsonStruct [n: {self.n}, b: {self.b}]";
+  }
+}
+
+#test test_struct_deserialization :: fn() {
+  n : MyJsonStruct = {
+    100,
+    200.0
+  };
+  json := json_serialize(&n, #type(MyJsonStruct));
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = {};
+  assert("json  serialize  object", json.is_object());
+  err := json_deserialize(json, &n, #type(MyJsonStruct));
+  assert("json error", !err.has_value);
+  assert("json deserialize object", n.n == 100 && n.b == 200.0);
+}
+
+#test test_json_comprehensive :: fn() {
+  deleter: JsonValueDeleter;
+  val : JsonValue*;
+
+  val = json_parse_file("test.json");
+  deleter.add(val);
+  assert("string", val.get("string").as_string() == "Hello, World!");
+  assert("number", val.get("number").as_number() == 42);
+  assert("boolean", val.get("boolean").as_boolean() == true);
+  assert("null_value", val.get("null_value").is_null());
+
+  array_val := val.get("array");
+  assert("array length", array_val.as_array().length == 4);
+  assert("array element 0", array_val.get(0).as_number() == 1);
+  assert("array element 1", array_val.get(1).as_string() == "two");
+  assert("array element 2", array_val.get(2).as_boolean() == false);
+  assert("array element 3", array_val.get(3).is_null());
+
+  object_val := val.get("object");
+  assert("nested_string", object_val.get("nested_string").as_string() == "Nested Hello");
+  assert("nested_number", object_val.get("nested_number").as_number() == atof("3.14"));
+  assert("nested_boolean", object_val.get("nested_boolean").as_boolean() == false);
+
+  nested_array_val := object_val.get("nested_array");
+  assert("nested_array length", nested_array_val.as_array().length == 3);
+  assert("nested_array element 0", nested_array_val.get(0).as_string() == "a");
+  assert("nested_array element 1", nested_array_val.get(1).as_string() == "b");
+  assert("nested_array element 2", nested_array_val.get(2).as_string() == "c");
+
+  nested_object_val := object_val.get("nested_object");
+  assert("deeply_nested_key", nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
+} 
