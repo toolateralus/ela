@@ -1,3 +1,4 @@
+/ela_source
 /.cache
 /bin
 /compile_commands.json
@@ -7,4 +8,3 @@
 /x64
 /.vs
 /out
-/ela_source
