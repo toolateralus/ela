@@ -271,7 +271,9 @@ Rectangle :: struct {
   y: float;
   width: float;
   height: float;
+}
 
+impl Rectangle {
   to_string :: fn() -> string {
     return $"x: {x}, y: {y}, width: {width}, height: {height}";
   }
@@ -361,6 +363,7 @@ ConfigFlags :: enum {
   BorderlessWindowedMode = 0x00008000, // 1 << 15
   InterlacedHint        = 0x00010000  // 1 << 16
 }
+
 color_lerp :: fn(a: Color, b: Color, t: float) -> Color {
   return {
     clamp(a.r + (b.r - a.r) * t, 0, 255) as u8,
@@ -664,15 +667,18 @@ Timer :: struct {
   interval : float = 0.5;
   // Returns true if the timer has exceeded the interval time relative to the last tick time.
   last_tick_time: float;
-  tick :: fn() -> bool {
+}
+
+impl Timer {
+  tick :: fn(self*) -> bool {
     now := GetTime();
-    if last_tick_time == 0 {
-      last_tick_time = now;
+    if self.last_tick_time == 0 {
+      self.last_tick_time = now;
       return true;
     }
-    if now > (last_tick_time + interval) {
-      its := ((now - last_tick_time) / interval) as int;
-      last_tick_time += its * interval as int;
+    if now > (self.last_tick_time + self.interval) {
+      its := ((now - self.last_tick_time) / self.interval) as int;
+      self.last_tick_time += its * self.interval as int;
       return true;
     }
     return false;
@@ -688,66 +694,67 @@ SliderF :: struct {
   value: float*;
   held : bool;
   digits_to_show: int = 5;
-  draw :: fn() {
-    // Draw the slider background
-    DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+}
 
-    slider_width : float = rect.width * clamp((abs(*this.value - min_value) / abs(max_value - min_value)), 0.0, 1.0);
+impl SliderF {
+  draw :: fn(self) {
+    // Draw the slider background
+    DrawRectangleV(Vector2{self.rect.x, self.rect.y}, Vector2{self.rect.width, self.rect.height}, self.style.background);
+
+    slider_width : float = self.rect.width * clamp((abs(*self.value - self.min_value) / abs(self.max_value - self.min_value)), 0.0, 1.0);
     slider_rect : Rectangle = {
-      rect.x,
-      rect.y,
+      self.rect.x,
+      self.rect.y,
       slider_width,
-      rect.height
+      self.rect.height
     };
 
     // Draw the slider foreground
-    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, self.style.foreground);
 
-    DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, style.highlighted);
-
+    DrawRectangleLines(self.rect.x as int, self.rect.y as int, self.rect.width as int, self.rect.height as int, self.style.highlighted);
 
     // Draw the text
-    text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
-    text_y := rect.y + (rect.height - style.font_size) / 2;
-    DrawText(text.data, text_x as int, text_y as int, style.font_size, style.highlighted);
+    text_x := self.rect.x + (self.rect.width - MeasureText(self.text.data, self.style.font_size)) / 2;
+    text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
+    DrawText(self.text.data, text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
     // Draw the slider value
+    value_text := $"{*self.value}";
+    value_text.data[self.digits_to_show] = '\0';
+    value_text_x := text_x + MeasureText(self.text.data, self.style.font_size) + 10; // 10 pixels padding
+    DrawText(value_text.data, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
-    value_text := $"{*this.value}";
-    value_text.data[digits_to_show] = '\0';
-    value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, value_text_x as int, text_y as int, style.font_size, style.highlighted);
+    self.adjust_slider_value();
+  }
 
-
-    adjust_slider_value :: fn() {
-      increment: float;
-      if IsKeyDown(Key::LeftShift) {
-        increment = (max_value - min_value) / 100;
-      } else {
-        increment = (max_value - min_value) / 50;
-      }
-      if IsKeyPressed(Key::Right) {
-        *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
-      } else if IsKeyPressed(Key::Left) {
-        *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
-      }
-    };
-
-    // Handle mouse input and call the local function for keyboard input
-    mouse_pos := GetMousePosition();
-    if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonDown(MouseButton::Left) {
-        this.held = true;
-      }
-      adjust_slider_value();
+  adjust_slider_value :: fn(self) {
+    increment: float;
+    if IsKeyDown(Key::LeftShift) {
+      increment = (self.max_value - self.min_value) / 100;
+    } else {
+      increment = (self.max_value - self.min_value) / 50;
+    }
+    if IsKeyPressed(Key::Right) {
+      *self.value = clamp(*self.value + increment, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
+    } else if IsKeyPressed(Key::Left) {
+      *self.value = clamp(*self.value - increment, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
     }
 
-    if this.held {
+    // Handle mouse input
+    mouse_pos := GetMousePosition();
+    if CheckCollisionPointRec(mouse_pos, self.rect) {
+      if IsMouseButtonDown(MouseButton::Left) {
+        self.held = true;
+      }
+    }
+
+    if self.held {
       if !IsMouseButtonDown(MouseButton::Left) {
-        this.held = false;
+        self.held = false;
       } else {
-        new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
-        *this.value = clamp(new_value, min(min_value, max_value), max(min_value, max_value));
+        new_value := self.min_value + ((mouse_pos.x - self.rect.x) / self.rect.width) * (self.max_value - self.min_value);
+        *self.value = clamp(new_value, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
       }
     }
   }
@@ -762,64 +769,68 @@ SliderI :: struct {
   value: int*;
   held : bool;
   digits_to_show: int = 3;
-  draw :: fn() {
-    DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+}
 
-    v_f := (*this.value) as float;
-    min_f := min_value as float;
-    max_f := max_value as float;
+impl SliderI {
+  draw :: fn(self) {
+    DrawRectangleV(Vector2{self.rect.x, self.rect.y}, Vector2{self.rect.width, self.rect.height}, self.style.background);
 
-    slider_width : float = rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
+    v_f := (*self.value) as float;
+    min_f := self.min_value as float;
+    max_f := self.max_value as float;
+
+    slider_width : float = self.rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
 
     slider_rect : Rectangle = {
-      rect.x,
-      rect.y,
+      self.rect.x,
+      self.rect.y,
       slider_width,
-      rect.height
+      self.rect.height
     };
 
-    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, style.foreground);
+    DrawRectangleV(Vector2{slider_rect.x, slider_rect.y}, Vector2{slider_rect.width, slider_rect.height}, self.style.foreground);
 
-    DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, style.highlighted);
+    DrawRectangleLines(self.rect.x as int, self.rect.y as int, self.rect.width as int, self.rect.height as int, self.style.highlighted);
 
-    text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
-    text_y := rect.y + (rect.height - style.font_size) / 2;
-    DrawText(text.data, text_x as int, text_y as int, style.font_size, style.highlighted);
+    text_x := self.rect.x + (self.rect.width - MeasureText(self.text.data, self.style.font_size)) / 2;
+    text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
+    DrawText(self.text.data, text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
-    value_text := $"{*this.value}";
-    value_text.data[digits_to_show] = '\0';
-    value_text_x := text_x + MeasureText(text.data, style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, value_text_x as int, text_y as int, style.font_size, style.highlighted);
+    value_text := $"{*self.value}";
+    value_text.data[self.digits_to_show] = '\0';
+    value_text_x := text_x + MeasureText(self.text.data, self.style.font_size) + 10; // 10 pixels padding
+    DrawText(value_text.data, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
+    self.adjust_slider_value();
+  }
 
-    adjust_slider_value :: fn() {
-      increment: float;
-      if IsKeyDown(Key::LeftShift) {
-        increment = (max_value - min_value) / 100;
-      } else {
-        increment = (max_value - min_value) / 50;
-      }
-      if IsKeyPressed(Key::Right) {
-        *this.value = clamp(*this.value + increment, min(min_value, max_value), max(min_value, max_value));
-      } else if IsKeyPressed(Key::Left) {
-        *this.value = clamp(*this.value - increment, min(min_value, max_value), max(min_value, max_value));
-      }
-    };
-
-    mouse_pos := GetMousePosition();
-    if CheckCollisionPointRec(mouse_pos, rect) {
-      if IsMouseButtonDown(MouseButton::Left) {
-        this.held = true;
-      }
-      adjust_slider_value();
+  adjust_slider_value :: fn(self) {
+    increment: float;
+    if IsKeyDown(Key::LeftShift) {
+      increment = (self.max_value - self.min_value) / 100;
+    } else {
+      increment = (self.max_value - self.min_value) / 50;
+    }
+    if IsKeyPressed(Key::Right) {
+      *self.value = clamp(*self.value + increment, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
+    } else if IsKeyPressed(Key::Left) {
+      *self.value = clamp(*self.value - increment, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
     }
 
-    if this.held {
+    // Handle mouse input
+    mouse_pos := GetMousePosition();
+    if CheckCollisionPointRec(mouse_pos, self.rect) {
+      if IsMouseButtonDown(MouseButton::Left) {
+        self.held = true;
+      }
+    }
+
+    if self.held {
       if !IsMouseButtonDown(MouseButton::Left) {
-        this.held = false;
+        self.held = false;
       } else {
-        new_value := min_value + ((mouse_pos.x - rect.x) / rect.width) * (max_value - min_value);
-        *this.value = clamp(new_value, min(min_value, max_value), max(min_value, max_value));
+        new_value := self.min_value + ((mouse_pos.x - self.rect.x) / self.rect.width) * (self.max_value - self.min_value);
+        *self.value = clamp(new_value, min(self.min_value, self.max_value), max(self.min_value, self.max_value));
       }
     }
   }
@@ -831,40 +842,41 @@ CheckButton :: struct {
   style: Style;
   text: string;
   allow_hold : bool;
+}
 
-  draw :: fn() {
-    if value {
-      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.highlighted);
+impl CheckButton {
+  draw :: fn(self*) {
+    if self.value {
+      DrawRectangleV(Vector2{self.rect.x, self.rect.y}, Vector2{self.rect.width, self.rect.height}, self.style.highlighted);
     } else {
-      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+      DrawRectangleV(Vector2{self.rect.x, self.rect.y}, Vector2{self.rect.width, self.rect.height}, self.style.background);
     }
 
-    if text.data {
-      text_x := rect.x + (rect.width - MeasureText(text.data, style.font_size)) / 2;
-      text_y := rect.y + (rect.height - style.font_size) / 2;
-      DrawText(text.data, text_x as int, text_y as int, style.font_size, style.foreground);
+    if self.text.data {
+      text_x := self.rect.x + (self.rect.width - MeasureText(self.text.data, self.style.font_size)) / 2;
+      text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
+      DrawText(self.text.data, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
     }
 
-    hit := CheckCollisionPointRec(GetMousePosition(), rect);
+    hit := CheckCollisionPointRec(GetMousePosition(), self.rect);
 
     if hit {
-      DrawRectangleLines(rect.x as int, rect.y as int, rect.width as int, rect.height as int, ORANGE);
+      DrawRectangleLines(self.rect.x as int, self.rect.y as int, self.rect.width as int, self.rect.height as int, ORANGE);
     }
-
 
     left := false;
     right := false;
 
-    if allow_hold {
-      left = IsMouseButtonDown(MouseButton::Left)
+    if self.allow_hold {
+      left = IsMouseButtonDown(MouseButton::Left);
       right = IsMouseButtonDown(MouseButton::Right);
       if hit && left {
-        value = true;
+        self.value = true;
       } else if hit && right {
-        value = false;
+        self.value = false;
       }
     } else if hit && IsMouseButtonPressed(MouseButton::Left) {
-      value = !value;
+      self.value = !self.value;
     }
   }
 }
@@ -879,59 +891,61 @@ DropDown :: struct {
   on_open: fn*() = null;
   label: string;
   show_selected_option := false;
-  draw :: fn() {
-      // Draw the dropdown box
-      DrawRectangleV(Vector2{rect.x, rect.y}, Vector2{rect.width, rect.height}, style.background);
+}
 
+impl DropDown {
+  draw :: fn(self*) {
+    // Draw the dropdown box
+    DrawRectangleV(Vector2{self.rect.x, self.rect.y}, Vector2{self.rect.width, self.rect.height}, self.style.background);
 
-      if selected_index >= 0 && selected_index < options.length && show_selected_option {
-        // Draw the selected option
-        text_x := rect.x + (rect.width - MeasureText(options[selected_index].data, style.font_size)) / 2;
-        text_y := rect.y + (rect.height - style.font_size) / 2;
-        DrawText(options[selected_index].data, text_x as int, text_y as int, style.font_size, style.foreground);
-      } else {
-          // Draw the selected option
-        text_x := rect.x + (rect.width - MeasureText(label.data, style.font_size)) / 2;
-        text_y := rect.y + (rect.height - style.font_size) / 2;
-        DrawText(label.data, text_x as int, text_y as int, style.font_size, style.foreground);
+    if self.selected_index >= 0 && self.selected_index < self.options.length && self.show_selected_option {
+      // Draw the selected option
+      text_x := self.rect.x + (self.rect.width - MeasureText(self.options[self.selected_index].data, self.style.font_size)) / 2;
+      text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
+      DrawText(self.options[self.selected_index].data, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+    } else {
+      // Draw the label
+      text_x := self.rect.x + (self.rect.width - MeasureText(self.label.data, self.style.font_size)) / 2;
+      text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
+      DrawText(self.label.data, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+    }
+
+    hit := CheckCollisionPointRec(GetMousePosition(), self.rect);
+    if hit && IsMouseButtonPressed(MouseButton::Left) {
+      self.is_open = !self.is_open;
+      if self.is_open && self.on_open {
+        self.on_open();
       }
+    }
 
-      hit := CheckCollisionPointRec(GetMousePosition(), rect);
-      if hit && IsMouseButtonPressed(MouseButton::Left) {
-        is_open = !is_open;
-        if is_open && on_open {
-          on_open();
+    hit_option := false;
+    if self.is_open {
+      option_rect := self.rect;
+      option_rect.y += self.rect.height;
+      for i in 0..self.options.length {
+        option_color := self.style.background;
+        if CheckCollisionPointRec(GetMousePosition(), option_rect) {
+          option_color = self.style.highlighted;
+          hit_option = true;
         }
-      }
+        DrawRectangleV(Vector2{option_rect.x, option_rect.y}, Vector2{option_rect.width, option_rect.height}, option_color);
+        text_x := option_rect.x + (option_rect.width - MeasureText(self.options[i].data, self.style.font_size)) / 2;
+        text_y := option_rect.y + (option_rect.height - self.style.font_size) / 2;
+        DrawText(self.options[i].data, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
 
-      hit_option := false;
-      if is_open {
-        option_rect := rect;
-        option_rect.y += rect.height;
-        for i in 0..options.length {
-          option_color := style.background;
-          if CheckCollisionPointRec(GetMousePosition(), option_rect) {
-            option_color = style.highlighted;
-            hit_option = true;
+        if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton::Left) {
+          self.selected_index = i;
+          self.is_open = false;
+          if self.on_selected {
+            self.on_selected(i);
           }
-          DrawRectangleV(Vector2{option_rect.x, option_rect.y}, Vector2{option_rect.width, option_rect.height}, option_color);
-          text_x := option_rect.x + (option_rect.width - MeasureText(options[i].data, style.font_size)) / 2;
-          text_y := option_rect.y + (option_rect.height - style.font_size) / 2;
-          DrawText(options[i].data, text_x as int, text_y as int, style.font_size, style.foreground);
-
-          if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton::Left) {
-            selected_index = i;
-            is_open = false;
-            if on_selected {
-              on_selected(i);
-            }
-          }
-          option_rect.y += option_rect.height;
         }
+        option_rect.y += option_rect.height;
       }
+    }
 
-      if !hit && !hit_option {
-        is_open = false;
-      }
+    if !hit && !hit_option {
+      self.is_open = false;
+    }
   }
 }

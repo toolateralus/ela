@@ -812,41 +812,41 @@ Vec4 :: union {
     w: float;
   }
 
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    output.z += z;
-    output.w += w;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   output.z += z;
+  //   output.w += w;
+  //   return output;
+  // }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    output.z *= z;
-    output.w *= w;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   output.z *= z;
+  //   output.w *= w;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    output.z /= z;
-    output.w /= w;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   output.z /= z;
+  //   output.w /= w;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other
-    output.x -= x;
-    output.y -= y;
-    output.z -= z;
-    output.w -= w;
-    return output;
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other
+  //   output.x -= x;
+  //   output.y -= y;
+  //   output.z -= z;
+  //   output.w -= w;
+  //   return output;
+  // }
 }
 
 impl Vec4 {
@@ -869,37 +869,37 @@ Vec3 :: union {
     z: float;
   }
 
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    output.z += z;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   output.z += z;
+  //   return output;
+  // }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    output.z *= z;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   output.z *= z;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    output.z /= z;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   output.z /= z;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other;
-    output.x -= x;
-    output.y -= y;
-    output.z -= z;
-    return output;
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x -= x;
+  //   output.y -= y;
+  //   output.z -= z;
+  //   return output;
+  // }
 
   
 }
@@ -923,33 +923,33 @@ Vec2 :: union {
     y: float;
   }
 
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   return output;
+  // }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other;
-    output.x -= x;
-    output.y -= y;
-    return output;
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x -= x;
+  //   output.y -= y;
+  //   return output;
+  // }
 }
 
 impl Vec2 {
@@ -984,29 +984,29 @@ Mat4 :: union {
     M32: float;
     M33: float;
   };
-  #operator(*) :: fn(self, other: #self) -> #self {
-    matrix: #self;
-    matrix.M00 = self.M00 * other.M00 + self.M01 * other.M10 + self.M02 * other.M20 + self.M03 * other.M30;
-    matrix.M01 = self.M00 * other.M01 + self.M01 * other.M11 + self.M02 * other.M21 + self.M03 * other.M31;
-    matrix.M02 = self.M00 * other.M02 + self.M01 * other.M12 + self.M02 * other.M22 + self.M03 * other.M32;
-    matrix.M03 = self.M00 * other.M03 + self.M01 * other.M13 + self.M02 * other.M23 + self.M03 * other.M33;
+  // #operator(*) :: fn(self, other: #self) -> #self {
+  //   matrix: #self;
+  //   matrix.M00 = self.M00 * other.M00 + self.M01 * other.M10 + self.M02 * other.M20 + self.M03 * other.M30;
+  //   matrix.M01 = self.M00 * other.M01 + self.M01 * other.M11 + self.M02 * other.M21 + self.M03 * other.M31;
+  //   matrix.M02 = self.M00 * other.M02 + self.M01 * other.M12 + self.M02 * other.M22 + self.M03 * other.M32;
+  //   matrix.M03 = self.M00 * other.M03 + self.M01 * other.M13 + self.M02 * other.M23 + self.M03 * other.M33;
     
-    matrix.M10 = self.M10 * other.M00 + self.M11 * other.M10 + self.M12 * other.M20 + self.M13 * other.M30;
-    matrix.M11 = self.M10 * other.M01 + self.M11 * other.M11 + self.M12 * other.M21 + self.M13 * other.M31;
-    matrix.M12 = self.M10 * other.M02 + self.M11 * other.M12 + self.M12 * other.M22 + self.M13 * other.M32;
-    matrix.M13 = self.M10 * other.M03 + self.M11 * other.M13 + self.M12 * other.M23 + self.M13 * other.M33;
+  //   matrix.M10 = self.M10 * other.M00 + self.M11 * other.M10 + self.M12 * other.M20 + self.M13 * other.M30;
+  //   matrix.M11 = self.M10 * other.M01 + self.M11 * other.M11 + self.M12 * other.M21 + self.M13 * other.M31;
+  //   matrix.M12 = self.M10 * other.M02 + self.M11 * other.M12 + self.M12 * other.M22 + self.M13 * other.M32;
+  //   matrix.M13 = self.M10 * other.M03 + self.M11 * other.M13 + self.M12 * other.M23 + self.M13 * other.M33;
     
-    matrix.M20 = self.M20 * other.M00 + self.M21 * other.M10 + self.M22 * other.M20 + self.M23 * other.M30;
-    matrix.M21 = self.M20 * other.M01 + self.M21 * other.M11 + self.M22 * other.M21 + self.M23 * other.M31;
-    matrix.M22 = self.M20 * other.M02 + self.M21 * other.M12 + self.M22 * other.M22 + self.M23 * other.M32;
-    matrix.M23 = self.M20 * other.M03 + self.M21 * other.M13 + self.M22 * other.M23 + self.M23 * other.M33;
+  //   matrix.M20 = self.M20 * other.M00 + self.M21 * other.M10 + self.M22 * other.M20 + self.M23 * other.M30;
+  //   matrix.M21 = self.M20 * other.M01 + self.M21 * other.M11 + self.M22 * other.M21 + self.M23 * other.M31;
+  //   matrix.M22 = self.M20 * other.M02 + self.M21 * other.M12 + self.M22 * other.M22 + self.M23 * other.M32;
+  //   matrix.M23 = self.M20 * other.M03 + self.M21 * other.M13 + self.M22 * other.M23 + self.M23 * other.M33;
     
-    matrix.M30 = self.M30 * other.M00 + self.M31 * other.M10 + self.M32 * other.M20 + self.M33 * other.M30;
-    matrix.M31 = self.M30 * other.M01 + self.M31 * other.M11 + self.M32 * other.M21 + self.M33 * other.M31;
-    matrix.M32 = self.M30 * other.M02 + self.M31 * other.M12 + self.M32 * other.M22 + self.M33 * other.M32;
-    matrix.M33 = self.M30 * other.M03 + self.M31 * other.M13 + self.M32 * other.M23 + self.M33 * other.M33;
-    return matrix;
-  }
+  //   matrix.M30 = self.M30 * other.M00 + self.M31 * other.M10 + self.M32 * other.M20 + self.M33 * other.M30;
+  //   matrix.M31 = self.M30 * other.M01 + self.M31 * other.M11 + self.M32 * other.M21 + self.M33 * other.M31;
+  //   matrix.M32 = self.M30 * other.M02 + self.M31 * other.M12 + self.M32 * other.M22 + self.M33 * other.M32;
+  //   matrix.M33 = self.M30 * other.M03 + self.M31 * other.M13 + self.M32 * other.M23 + self.M33 * other.M33;
+  //   return matrix;
+  // }
 }
 
 impl Mat4 {

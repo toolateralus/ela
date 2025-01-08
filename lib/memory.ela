@@ -2,8 +2,8 @@
 
 #flags ArenaFlags :: enum {
   None,        // default.
-  AlignAllocations,   // if this flag is set, the allocator will fix alignment automatically when a misaligned allocation is found. Else it will naively allocate regardless of size.
-  OutOfMemory, // if this flag is set, the program will exit and print a message on out of memory. Otherwise it will silently return null.
+  AlignAllocations,   // if self flag is set, the allocator will fix alignment automatically when a misaligned allocation is found. Else it will naively allocate regardless of size.
+  OutOfMemory, // if self flag is set, the program will exit and print a message on out of memory. Otherwise it will silently return null.
 }
 
 // Super basic arena allocator, with a constructor that allocates a big block,
@@ -12,15 +12,17 @@ Arena :: struct {
   ptr: u64;
   size: u64;
   memory: u8*;
-  flags: ArenaFlags = ArenaFlags::None;
+  flags: ArenaFlags = ArenaFlags::None as ArenaFlags;
   alignment : int = 8;
 }
 
 impl Arena {
-  create :: fn(size: u64, flags: ArenaFlags) {
-    this.size = size;
-    this.flags = flags;
-    memory = malloc(sizeof(u8) * size);
+  create :: fn(size: u64, flags: ArenaFlags) -> #self {
+    self: #self;
+    self.size = size;
+    self.flags = flags;
+    self.memory = malloc(sizeof(u8) * size);
+    return self;
   }
 
   deinit :: fn(self*) {
@@ -62,9 +64,11 @@ ArenaOf :: struct![T] {
 }
 
 impl ArenaOf![T] {
-  create :: fn(size: u64) {
-    this.size = size;
-    memory = (malloc(sizeof(T) * size) as T*);
+  create :: fn(size: u64) -> #self {
+    self: #self;
+    self.size = size;
+    self.memory = (malloc(sizeof(T) * size) as T*);
+    return self;
   }
 
   dealloc :: fn(self*) {
