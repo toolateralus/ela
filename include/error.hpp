@@ -165,7 +165,7 @@ static std::string format_source_location(const SourceRange &source_range, Error
     size_t caret_line_start = error_line_start - context_start;
     std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
     caret_indicator = std::string(first.location.column - 1, ' ');
-    caret_indicator += std::string(first.value.get_str().length(), '^');
+    caret_indicator += std::string(std::max((size_t)3, first.value.get_str().length()), '^');
 
     if (terminal_supports_color) ss << "\033[34m";
 

@@ -99,6 +99,7 @@ enum struct TType {
   GenericBrace, // '!<' for ![T, T1]
   As,           // 'as' for casting
   Impl,
+  ExpressionBody,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -108,6 +109,7 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Char);
+    TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
     TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
@@ -279,6 +281,7 @@ static std::unordered_map<std::string, TType> keywords{
 };
 
 static std::unordered_map<std::string, TType> operators{
+    {"=>", TType::ExpressionBody },
     {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
     {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
     {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},

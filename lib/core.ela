@@ -12,7 +12,7 @@
 #foreign printf :: fn(format: c_string, ...) -> int;
 #foreign exit :: fn(code: int);
 
-#static print :: fn![t](str: T) {
+#static print :: fn![T](str: T) {
   printf("%s", $"{str}".data);
 }
 

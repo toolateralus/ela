@@ -534,12 +534,10 @@ struct Type {
   Type *element_type;                  // the type this type has a pointer to, is an array of, is a map of, etc.
 };
 
-struct Env {
-  static _array<string> &args() {
-    static _array<string> args;
-    return args;
-  }
-};
+static _array<string> &Env_args() {
+  static _array<string> args;
+  return args;
+}
 
 #ifdef TESTING
 

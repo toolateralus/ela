@@ -835,6 +835,9 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::Colon);
         _case.block = parse_block();
         cases.push_back(_case);
+        if (peek().type == TType::Comma){
+          eat();
+        }
       }
       expect(TType::RCurly);
       auto node = ast_alloc<ASTSwitch>();
@@ -1464,9 +1467,21 @@ ASTDeclaration *Parser::parse_declaration() {
 
 ASTBlock *Parser::parse_block(Scope *scope) {
   auto range = begin_node();
-  expect(TType::LCurly);
   ASTBlock *block = ast_alloc<ASTBlock>();
   ctx.set_scope(scope);
+
+  if (peek().type == TType::ExpressionBody) {
+    expect(TType::ExpressionBody);
+    auto $return = ast_alloc<ASTReturn>();
+    $return->expression = parse_expr();
+    block->statements = {$return};
+    block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
+                                     // anyway when entering it.
+    return block;
+  }
+
+  expect(TType::LCurly);
+
   while (peek().type != TType::RCurly) {
     if (peek().type == TType::Eof) {
       end_node(nullptr, range);

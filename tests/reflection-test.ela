@@ -7,21 +7,21 @@ Reflector :: struct {
 
 
 #test test_set_field_with_reflection :: fn() {
-reflector: Reflector;
-type := #type(Reflector);
-field := type.fields[0];
-integer: int = 100;
-field.set(&reflector, integer);
-assert("reflection field.set() failed.", reflector.n == 100);
+  reflector: Reflector;
+  type := #type(Reflector);
+  field := type.fields[0];
+  integer: int = 100;
+  field.set(&reflector, integer);
+  assert("reflection field.set() failed.", reflector.n == 100);
 }
 
 #test test_get_field_with_reflection :: fn() {
-reflector: Reflector;
-reflector.n = 100;
-type := #type(Reflector);
-field := type.fields[0];
-n := *(field.get(&reflector) as int*);
-assert("reflection field.set() failed.", n == 100);
+  reflector: Reflector;
+  reflector.n = 100;
+  type := #type(Reflector);
+  field := type.fields[0];
+  n := *(field.get(&reflector) as int*);
+  assert("reflection field.set() failed.", n == 100);
 }
 
 #test test_array_reflection :: fn() {
