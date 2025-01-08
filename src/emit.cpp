@@ -797,6 +797,8 @@ std::any Emitter::visit(ASTBlock *node) {
 std::any Emitter::visit(ASTProgram *node) {
   emit_line_directive(node);
 
+
+
   static const auto testing = compile_command.has_flag("test");
 
   if (!is_freestanding) {
@@ -856,6 +858,9 @@ std::any Emitter::visit(ASTProgram *node) {
       test_init.pop_back();
     }
 
+    if (compile_command.has_flag("test-verbose")) {
+      // code <<  "#define TEST_VERBOSE;\n";
+    }
     // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
 

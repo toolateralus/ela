@@ -1,5 +1,6 @@
 #include "scope.hpp"
 
+#include "core.hpp"
 #include "type.hpp"
 
 Context::Context() {
@@ -19,14 +20,11 @@ Context::Context() {
   root_scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
+  if (compile_command.has_flag("test")) {
+    root_scope->add_def("TESTING");
+  }
+
   {
-    // auto &type = type_table.emplace_back(type_table.size(), TYPE_SCALAR);
-    // ScalarTypeInfo *info = type_info_alloc<ScalarTypeInfo>();
-    // info->scalar_type = TYPE_CHAR;
-    // info->size = 1;
-    // type.set_base("c_string");
-    // type.set_info(info);
-    // type.set_ext({.extensions = {TYPE_EXT_POINTER}});
     // ** DO NOT REMOVE ***
     scope->types["c_string"] = c_string_type() = charptr_type();
     // ** ------------- ***

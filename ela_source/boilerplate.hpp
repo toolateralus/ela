@@ -2,7 +2,7 @@
 //  own non-trivial objects.
 #include <utility>
 template <class... T> void destruct(T &...t) { (t.~T(), ...); }
-template <class T, class... Args> T* construct(void* memory, Args&&... args) {
+template <class T, class... Args> T *construct(void *memory, Args &&...args) {
   return new (memory) T(std::forward<Args>(args)...);
 }
 #if USE_STD_LIB
@@ -13,8 +13,7 @@ struct Range {
   using value_type = signed long long;
   Range() {}
   Range(value_type first, value_type last, value_type increment = 1)
-      : first(first), last(last), span(last - first), is_reverse(first > last),
-        increment(increment) {
+      : first(first), last(last), span(last - first), is_reverse(first > last), increment(increment) {
     if (is_reverse) {
       first--;
       span = first - last;
@@ -33,10 +32,8 @@ struct Range {
   struct iterator {
     value_type current, end_value, increment;
     bool is_reverse;
-    iterator(value_type start, value_type end_value, bool is_reverse,
-             value_type increment)
-        : current(start), end_value(end_value), is_reverse(is_reverse),
-          increment(increment) {}
+    iterator(value_type start, value_type end_value, bool is_reverse, value_type increment)
+        : current(start), end_value(end_value), is_reverse(is_reverse), increment(increment) {}
     value_type operator*() const { return current; }
 
     iterator &operator++() {
@@ -57,20 +54,14 @@ struct Range {
     }
   };
 
-  iterator begin() const {
-    return iterator(first, last, is_reverse, increment);
-  }
+  iterator begin() const { return iterator(first, last, is_reverse, increment); }
   iterator end() const { return iterator(first, last, is_reverse, increment); }
   iterator begin() { return iterator(first, last, is_reverse, increment); }
   iterator end() { return iterator(first, last, is_reverse, increment); }
 
-  bool operator==(const value_type number) const {
-    return number >= first && number <= last;
-  }
+  bool operator==(const value_type number) const { return number >= first && number <= last; }
 
-  bool contains(const value_type number) {
-    return number >= first && number <= last;
-  }
+  bool contains(const value_type number) { return number >= first && number <= last; }
 
 #if USE_STD_LIB
   string to_string() const;
@@ -106,25 +97,21 @@ template <typename... Args> _tuple(Args...) -> _tuple<Args...>;
 template <typename T> struct tuple_size;
 
 template <typename... Args>
-struct tuple_size<_tuple<Args...>>
-    : std::integral_constant<std::size_t, sizeof...(Args)> {};
+struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
 
 // Helper to get the type of the element at a specific index
 template <std::size_t I, typename T> struct tuple_element;
 
-template <typename Head, typename... Tail>
-struct tuple_element<0, _tuple<Head, Tail...>> {
+template <typename Head, typename... Tail> struct tuple_element<0, _tuple<Head, Tail...>> {
   using type = Head;
 };
 
-template <std::size_t I, typename Head, typename... Tail>
-struct tuple_element<I, _tuple<Head, Tail...>> {
+template <std::size_t I, typename Head, typename... Tail> struct tuple_element<I, _tuple<Head, Tail...>> {
   using type = typename tuple_element<I - 1, _tuple<Tail...>>::type;
 };
 
 // Original get function for lvalue references
-template <std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(_tuple<Head, Tail...> &t) {
+template <std::size_t I, typename Head, typename... Tail> decltype(auto) get(_tuple<Head, Tail...> &t) {
   if constexpr (I == 0) {
     return t.head;
   } else {
@@ -133,8 +120,7 @@ decltype(auto) get(_tuple<Head, Tail...> &t) {
 }
 
 // Overload for const lvalue references
-template <std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(const _tuple<Head, Tail...> &t) {
+template <std::size_t I, typename Head, typename... Tail> decltype(auto) get(const _tuple<Head, Tail...> &t) {
   if constexpr (I == 0) {
     return t.head;
   } else {
@@ -143,8 +129,7 @@ decltype(auto) get(const _tuple<Head, Tail...> &t) {
 }
 
 // Overload for rvalue references
-template <std::size_t I, typename Head, typename... Tail>
-decltype(auto) get(_tuple<Head, Tail...> &&t) {
+template <std::size_t I, typename Head, typename... Tail> decltype(auto) get(_tuple<Head, Tail...> &&t) {
   if constexpr (I == 0) {
     return std::move(t.head);
   } else {
@@ -154,10 +139,8 @@ decltype(auto) get(_tuple<Head, Tail...> &&t) {
 
 namespace std {
 template <typename... Args>
-struct tuple_size<_tuple<Args...>>
-    : std::integral_constant<std::size_t, sizeof...(Args)> {};
-template <std::size_t I, typename... Args>
-struct tuple_element<I, _tuple<Args...>> {
+struct tuple_size<_tuple<Args...>> : std::integral_constant<std::size_t, sizeof...(Args)> {};
+template <std::size_t I, typename... Args> struct tuple_element<I, _tuple<Args...>> {
   using type = typename ::tuple_element<I, _tuple<Args...>>::type;
 };
 } // namespace std
@@ -182,8 +165,8 @@ extern "C" int printf(const char *format, ...);
 extern "C" int snprintf(char *str, size_t size, const char *format, ...);
 extern "C" int sprintf(char *str, const char *format, ...);
 extern "C" void *memcpy(void *, void *, size_t);
-extern "C" void *memset(void*, int, size_t);
-extern "C" int strlen(const char*);
+extern "C" void *memset(void *, int, size_t);
+extern "C" int strlen(const char *);
 
 #undef RAND_MAX
 #undef assert
@@ -203,11 +186,9 @@ template <class T> struct _array {
 
   _array() : data(nullptr), length(0), capacity(0), is_view(false) {}
 
-  _array(int length)
-      : data(new T[length]), length(length), capacity(length), is_view(false) {}
+  _array(int length) : data(new T[length]), length(length), capacity(length), is_view(false) {}
 
-  _array(T *array, int len)
-      : data(new T[len]), length(len), capacity(len), is_view(false) {
+  _array(T *array, int len) : data(new T[len]), length(len), capacity(len), is_view(false) {
     std::copy(array, array + len, data);
   }
 
@@ -219,14 +200,12 @@ template <class T> struct _array {
   }
 
   _array(const _array &other)
-      : data(new T[other.length]), length(other.length),
-        capacity(other.capacity), is_view(other.is_view) {
+      : data(new T[other.length]), length(other.length), capacity(other.capacity), is_view(other.is_view) {
     std::copy(other.data, other.data + other.length, data);
   }
 
   _array(_array &&other) noexcept
-      : data(other.data), length(other.length), capacity(other.capacity),
-        is_view(other.is_view) {
+      : data(other.data), length(other.length), capacity(other.capacity), is_view(other.is_view) {
     other.data = nullptr;
     other.length = 0;
     other.capacity = 0;
@@ -264,8 +243,7 @@ template <class T> struct _array {
     return *this;
   }
 
-  _array(std::initializer_list<T> list)
-      : length(list.size()), capacity(list.size()), is_view(false) {
+  _array(std::initializer_list<T> list) : length(list.size()), capacity(list.size()), is_view(false) {
     if (list.size() != 0) {
       data = new T[list.size()];
       std::copy(list.begin(), list.end(), data);
@@ -326,8 +304,7 @@ template <class T> struct _array {
   }
 
   bool operator==(const _array &other) const {
-    return length == other.length &&
-           std::equal(data, data + length, other.data);
+    return length == other.length && std::equal(data, data + length, other.data);
   }
 
   bool operator!=(const _array &other) const { return !(*this == other); }
@@ -534,8 +511,7 @@ struct Field {
   size_t offset;
 
   template <class T, class T1> inline void set(T *target, T1 data) const {
-    memcpy(reinterpret_cast<char *>(target) + offset, (char *)&data,
-           sizeof(T1));
+    memcpy(reinterpret_cast<char *>(target) + offset, (char *)&data, sizeof(T1));
   }
 
   template <class T> inline s8 *get(T *source) const {
@@ -549,13 +525,13 @@ struct Element {
 };
 
 struct Type {
-  int id;                               // the integer ID used to identify this type.
-  char *name;                           // the type's name.
-  size_t size;                          // sizeof(T)
-  u64 flags;                            // defined in reflection.ela and emit.cpp, the values of the flags.
-  _array<Field *> fields;               // get a list of struct fields, enum variants.
-  _array<Element> (*elements)(char *);  // get a list of the Elements, which can be used to reflect on arrays.
-  Type *element_type;                   // the type this type has a pointer to, is an array of, is a map of, etc.
+  int id;                              // the integer ID used to identify this type.
+  char *name;                          // the type's name.
+  size_t size;                         // sizeof(T)
+  u64 flags;                           // defined in reflection.ela and emit.cpp, the values of the flags.
+  _array<Field *> fields;              // get a list of struct fields, enum variants.
+  _array<Element> (*elements)(char *); // get a list of the Elements, which can be used to reflect on arrays.
+  Type *element_type;                  // the type this type has a pointer to, is an array of, is a map of, etc.
 };
 
 struct Env {
@@ -565,14 +541,11 @@ struct Env {
   }
 };
 
-
-
 #ifdef TESTING
 
-#define assert(message, condition)                                             \
-  if (!(condition))                                                            \
-    throw __test_exception("\033[31mAssertion failed: %s, message: %s\033[0m\n",   \
-                           #condition, #message);
+#define assert(message, condition)                                                                                     \
+  if (!(condition))                                                                                                    \
+    throw __test_exception("\033[31mAssertion failed: %s, message: %s\033[0m\n", #condition, #message);
 
 extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
 extern "C" int strcpy(const char *, char *);
@@ -580,8 +553,7 @@ extern "C" int strlen(const char *);
 struct __test_exception {
   const char *m_what;
 
-  template <typename... Args>
-  __test_exception(const char *fmt, Args &&...args) {
+  template <typename... Args> __test_exception(const char *fmt, Args &&...args) {
     char buf[1024];
     snprintf(buf, sizeof(buf), fmt, args...);
     m_what = new char[strlen(buf) + 1];
@@ -594,12 +566,11 @@ struct __test_exception {
 };
 struct __COMPILER_GENERATED_TEST {
   __COMPILER_GENERATED_TEST() {}
-  __COMPILER_GENERATED_TEST(const char *name, void (*function)())
-      : name(name), function(function) {}
+  __COMPILER_GENERATED_TEST(const char *name, void (*function)()) : name(name), function(function) {}
   const char *name;
   void (*function)();
   bool run() const {
-
+#ifdef TEST_VERBOSE
     printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
     try {
       function();
@@ -610,28 +581,46 @@ struct __COMPILER_GENERATED_TEST {
       printf("%s", e.what());
       return false;
     }
+#else
+    try {
+      function();
+      return true;
+    } catch (__test_exception &e) {
+      return false;
+    }
+#endif
   }
 };
 
-#define __TEST_RUNNER_MAIN                                                     \
-  int main() {                                                                 \
-    int failed = 0;                                                            \
-    int passed = 0;                                                            \
-    for (const auto &test : tests) {                                           \
-      if (test.run())                                                          \
-        passed++;                                                              \
-      else                                                                     \
-        failed++;                                                              \
-    }                                                                          \
-    printf("Test run complete!\n\033[1;31mfailed: %d, \033[1;32mpassed: "      \
-           "%d\033[0m\n",                                                      \
-           failed, passed);                                                    \
+#define __TEST_RUNNER_MAIN                                                                                             \
+  int main() {                                                                                                         \
+    int failed = 0;                                                                                                    \
+    int passed = 0;                                                                                                    \
+    const char *failed_tests[sizeof(tests) / sizeof(tests[0])];                                                        \
+    int failed_index = 0;                                                                                              \
+    for (const auto &test : tests) {                                                                                   \
+      if (test.run()) {                                                                                                \
+        passed++;                                                                                                      \
+      } else {                                                                                                         \
+        failed_tests[failed_index++] = test.name;                                                                      \
+        failed++;                                                                                                      \
+      }                                                                                                                \
+    }                                                                                                                  \
+    printf("\033[1;31mfailed: %d, \033[1;32mpassed: "                                              \
+           "%d\033[0m\n",                                                                                              \
+           failed, passed);                                                                                            \
+    if (failed > 0) {                                                                                                  \
+      for (int i = 0; i < failed_index; ++i) {                                                                         \
+        printf("\033[1;31mfailed \033[0m::(\033[1;35m%s\033[0m)\n", failed_tests[i]);                                                                             \
+      }                                                                                                                \
+    }                                                                                                                  \
   }
+
 #else
-#define assert(message, condition)                                             \
-  if (!(condition)) {                                                          \
-    printf("assertion failed: %s\n "#condition"\n", message);                                 \
-    exit(1);                                                                   \
+#define assert(message, condition)                                                                                     \
+  if (!(condition)) {                                                                                                  \
+    printf("assertion failed: %s\n " #condition "\n", message);                                                        \
+    exit(1);                                                                                                           \
   }
 
 #endif
