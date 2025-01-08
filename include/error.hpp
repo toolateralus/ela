@@ -73,96 +73,117 @@ static std::string format_message(const std::string &message) {
   return formatted.str();
 }
 static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity) {
-  const char *color = "";
-  const char *code_color = "";
+    const char *color = "";
+    const char *code_color = "";
 
-  auto span = source_range.get_tokens();
+    auto span = source_range.get_tokens();
 
-  if (terminal_supports_color) {
-    switch (severity) {
-      case ERROR_INFO:
-        color = "\033[36m";         // Cyan
-        code_color = "\033[1;36m";  // Bold Cyan
-        break;
-      case ERROR_WARNING:
-        color = "\033[33m";         // Yellow
-        code_color = "\033[1;33m";  // Bold Yellow
-        break;
-      case ERROR_FAILURE:
-        color = "\033[31m";         // Red
-        code_color = "\033[1;31m";  // Bold Red
-        break;
+    if (terminal_supports_color) {
+        switch (severity) {
+            case ERROR_INFO:
+                color = "\033[36m";         // Cyan
+                code_color = "\033[1;36m";  // Bold Cyan
+                break;
+            case ERROR_WARNING:
+                color = "\033[33m";         // Yellow
+                code_color = "\033[1;33m";  // Bold Yellow
+                break;
+            case ERROR_FAILURE:
+                color = "\033[31m";         // Red
+                code_color = "\033[1;31m";  // Bold Red
+                break;
+        }
     }
-  }
 
-  // nocheckin
-  if (span.empty()) {
-    return "Error: No tokens in source range\n";
-  }
-
-  std::stringstream ss;
-  if (terminal_supports_color) ss << "\033[90m";
-  ss << std::string(80, '-');
-  if (terminal_supports_color) ss << "\033[0m\n";
-  ss << '\n';
-  ss << color << span.front().location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
-  if (terminal_supports_color) ss << "\033[90m";
-  ss << std::string(80, '-');
-  if (terminal_supports_color) ss << "\033[0m";
-  ss << '\n';
-
-  // Read the source file
-  auto first = span.front();
-  auto last = span.back();
-
-  std::ifstream src_file(SourceLocation::files()[first.location.file]);
-  if (!src_file.is_open()) {
-    return "Error: Unable to open source file\n";
-  }
-
-  std::string file_content((std::istreambuf_iterator<char>(src_file)), std::istreambuf_iterator<char>());
-  src_file.close();
-
-  std::stringstream source_code;
-  std::string caret_indicator;
-
-  size_t line_start = 0;
-  size_t line_end = 0;
-  size_t current_line = 1;
-
-  for (size_t i = 0; i < file_content.size(); ++i) {
-    if (file_content[i] == '\n') {
-      current_line++;
-      if (current_line == first.location.line) {
-        line_start = i + 1;
-      } else if (current_line == first.location.line + 1) {
-        line_end = i;
-        break;
-      }
+    if (span.empty()) {
+        return "Error: No tokens in source range\n";
     }
-  }
 
-  if (line_end == 0) {
-    line_end = file_content.size();
-  }
+    std::stringstream ss;
+    if (terminal_supports_color) ss << "\033[90m";
+    ss << std::string(80, '-');
+    if (terminal_supports_color) ss << "\033[0m\n";
+    ss << '\n';
+    ss << color << span.front().location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
+    if (terminal_supports_color) ss << "\033[90m";
+    ss << std::string(80, '-');
+    if (terminal_supports_color) ss << "\033[0m";
+    ss << '\n';
 
-  std::string line = file_content.substr(line_start, line_end - line_start);
-  source_code << line << '\n';
+    // Read the source file
+    auto first = span.front();
+    auto last = span.back();
 
-  caret_indicator = std::string(first.location.column - 1, ' ');
-  caret_indicator += std::string(first.value.get_str().length(), '^');
+    std::ifstream src_file(SourceLocation::files()[first.location.file]);
+    if (!src_file.is_open()) {
+        return "Error: Unable to open source file\n";
+    }
 
-  if (terminal_supports_color) ss << "\033[34m";
+    std::string file_content((std::istreambuf_iterator<char>(src_file)), std::istreambuf_iterator<char>());
+    src_file.close();
 
-  ss << source_code.str();
+    std::stringstream source_code;
+    std::string caret_indicator;
 
-  if (terminal_supports_color) ss << "\033[32m";
+    size_t line_start = 0;
+    size_t line_end = 0;
+    size_t current_line = 1;
 
-  ss << caret_indicator << '\n';
+    // Find the start and end positions for the lines around the error
+    size_t error_line_start = 0;
+    size_t error_line_end = 0;
+    size_t context_start = 0;
+    size_t context_end = 0;
 
-  if (terminal_supports_color) ss << "\033[0m";
+    for (size_t i = 0; i < file_content.size(); ++i) {
+        if (file_content[i] == '\n') {
+            current_line++;
+            if (current_line == first.location.line - 2) {
+                context_start = i + 1;
+            }
+            if (current_line == first.location.line) {
+                error_line_start = i + 1;
+            }
+            if (current_line == first.location.line + 1) {
+                error_line_end = i;
+            }
+            if (current_line == first.location.line + 3) {
+                context_end = i;
+                break;
+            }
+        }
+    }
 
-  return ss.str();
+    if (context_end == 0) {
+        context_end = file_content.size();
+    }
+
+    std::string context = file_content.substr(context_start, context_end - context_start);
+    source_code << context << '\n';
+
+    // Generate the caret indicator
+    size_t caret_line_start = error_line_start - context_start;
+    std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
+    caret_indicator = std::string(first.location.column - 1, ' ');
+    caret_indicator += std::string(first.value.get_str().length(), '^');
+
+    if (terminal_supports_color) ss << "\033[34m";
+
+    // Insert the context lines
+    std::istringstream context_stream(context);
+    std::string line;
+    size_t line_count = 0;
+    while (std::getline(context_stream, line)) {
+        ss << line << '\n';
+        line_count++;
+        if (line_count == 3) { // Insert caret indicator after the error line
+            ss << caret_indicator << '\n';
+        }
+    }
+
+    if (terminal_supports_color) ss << "\033[0m";
+
+    return ss.str();
 }
 enum WarningFlags {
   WarningNone = 0,
