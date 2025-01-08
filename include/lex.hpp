@@ -89,9 +89,6 @@ enum struct TType {
   Enum,
   Union,
 
-  New,
-  Delete,
-
   Then,
   Colon,
   In,
@@ -183,8 +180,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompMul);
     TTYPE_CASE(CompDiv);
     TTYPE_CASE(CompMod);
-    TTYPE_CASE(New);
-    TTYPE_CASE(Delete);
     TTYPE_CASE(CompAnd);
     TTYPE_CASE(CompOr);
     TTYPE_CASE(CompXor);
@@ -276,11 +271,11 @@ static std::unordered_map<std::string, TType> keywords{
     {"true", TType::True},
     {"false", TType::False},
     {"null", TType::Null},
-    // intrinsic functions
-    {"new", TType::New},
-    {"delete", TType::Delete},
+
+    // miscellaneous
     {"as", TType::As},
     {"impl", TType::Impl},
+    
 };
 
 static std::unordered_map<std::string, TType> operators{

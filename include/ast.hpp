@@ -54,7 +54,6 @@ enum ASTNodeType {
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_ENUM_DECLARATION,
   AST_NODE_UNION_DECLARATION,
-  AST_NODE_ALLOCATE,
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
@@ -488,18 +487,6 @@ struct ASTUnionDeclaration : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
 };
 
-struct ASTAllocate : ASTExpr {
-  Nullable<ASTType> type;
-  Nullable<ASTArguments> arguments;
-
-  enum Kind {
-    New,
-    Delete,
-  } kind;
-  std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_ALLOCATE; }
-};
-
 struct SwitchCase {
   ASTExpr *expression;
   ASTBlock *block;
@@ -569,7 +556,6 @@ struct ASTImpl : ASTStatement {
   std::any visit(ASTInitializerList *node) override {}                                                                 \
   std::any visit(ASTEnumDeclaration *node) override {}                                                                 \
   std::any visit(ASTUnionDeclaration *node) override {}                                                                \
-  std::any visit(ASTAllocate *node) override {};                                                                       \
   std::any visit(ASTRange *node) override {};                                                                          \
   std::any visit(ASTSwitch *node) override {};                                                                         \
   std::any visit(ASTTuple *node) override {};                                                                          \
@@ -607,7 +593,6 @@ struct ASTImpl : ASTStatement {
   virtual std::any visit(ASTInitializerList *node) = 0;                                                                \
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                                                                \
   virtual std::any visit(ASTUnionDeclaration *node) = 0;                                                               \
-  virtual std::any visit(ASTAllocate *node) = 0;                                                                       \
   virtual std::any visit(ASTRange *node) = 0;                                                                          \
   virtual std::any visit(ASTSwitch *node) = 0;                                                                         \
   virtual std::any visit(ASTTuple *node) = 0;                                                                          \

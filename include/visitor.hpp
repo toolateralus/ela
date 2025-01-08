@@ -74,7 +74,6 @@ struct Typer : VisitorBase {
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;
@@ -196,7 +195,6 @@ struct Emitter : VisitorBase {
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
   std::any visit(ASTRange *node) override;
   std::any visit(ASTSwitch *node) override;
   std::any visit(ASTTuple *node) override;

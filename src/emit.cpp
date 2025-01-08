@@ -993,46 +993,7 @@ std::any Emitter::visit(ASTInitializerList *node) {
   (*ss) << "}";
   return {};
 }
-std::any Emitter::visit(ASTAllocate *node) {
-  switch (node->kind) {
-    case ASTAllocate::New: {
-      auto ptr_type = global_get_type(node->type.get()->resolved_type);
-      (*ss) << "new ";
-      auto str = to_cpp_string(global_get_type(ptr_type->get_element_type()));
-      (*ss) << str;
-      if (!node->arguments) {
-        (*ss) << "()";
-      } else {
-        node->arguments.get()->accept(this);
-      }
-    } break;
-    case ASTAllocate::Delete:
-      auto args = node->arguments.get()->arguments;
-      for (const auto &arg : args) {
-        (*ss) << "delete ";
-        arg->accept(this);
-        (*ss) << ";\n" << indent();
-        switch (arg->get_node_type()) {
-          case AST_NODE_IDENTIFIER:
-          case AST_NODE_DOT_EXPR:
-          case AST_NODE_SCOPE_RESOLUTION:
-          case AST_NODE_SUBSCRIPT: {
-            arg->accept(this);
-            (*ss) << " = nullptr";
-            (*ss) << ";\n" << indent();
-          } break;
-          default: {
-            throw_warning(WarningNonNullDeletedPointer,
-                          "Cannot set deleted pointer to null. Delete as a "
-                          "variable to silence this.",
-                          arg->source_range);
-          }
-        }
-      }
-      break;
-  }
-  return {};
-}
+
 std::any Emitter::visit(ASTRange *node) {
   (*ss) << "Range(";
   node->left->accept(this);

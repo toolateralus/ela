@@ -22,14 +22,18 @@ Directory :: struct {
 impl Directory {
   open :: fn(path: string) -> Directory {
     dir := opendir(path.data);
-    if !dir then return {path, string[]{}};
+    if !dir then return { 
+      path: path,
+      files : {}
+    };
+
     files: string[];
     entry: void*;
     while entry = readdir(dir) {
       ent : dirent* = entry;
-      files ~= {ent.d_name as c_string};
+      files ~= string::from(ent.d_name as c_string);
     }
     closedir(dir);
-    return {path, files};
+    return {path: path, files: files};
   }
 }

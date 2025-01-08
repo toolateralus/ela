@@ -319,12 +319,12 @@ impl JsonValue {
   #dtor :: fn() {
     if type == JsonValueType::Object {
       for kvp in data.object {
-        delete(kvp.value);
+        free(kvp.value);
       }
       destruct(data.object);
     } else if type == JsonValueType::Array {
       for val in data.array {
-        delete(val);
+        free(val);
       }
       destruct(data.array);
     } else if type == JsonValueType::String {
@@ -406,7 +406,7 @@ impl JsonValue {
 }
 
 json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
-  value := new JsonValue;
+  value : JsonValue* = malloc(sizeof(JsonValue));
   token := lexer.expect_types({
     JsonTokenType::LBracket,
     JsonTokenType::LCurly,
@@ -469,7 +469,7 @@ json_parse_string :: fn(str: c_string) -> JsonValue* {
 }
 
 json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
-  val := new JsonValue{};
+  val : JsonValue* = malloc(sizeof(JsonValue));
   if type_is_float(type) {
     val.type = JsonValueType::Number;
     if type.id == #typeid(float) {
@@ -529,7 +529,7 @@ json_serialize_scalar :: fn(object: void*, type: Type*) -> JsonValue* {
 json_serialize :: fn(object: void*, type: Type*) -> JsonValue*;
 
 json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
-  val := new JsonValue{};
+  val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Object;
   val.data.object = JsonKeyValuePair[]{};
   for field in type.fields {
@@ -542,7 +542,7 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> JsonValue* {
 }
 
 json_serialize_array :: fn(object: void*, type: Type*) -> JsonValue* {
-  val := new JsonValue{};
+  val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Array;
   val.data.array = JsonValue*[]{};
   for elem in type.elements(object as c_string) {
@@ -554,7 +554,7 @@ json_serialize_array :: fn(object: void*, type: Type*) -> JsonValue* {
 json_serialize :: fn(object: void*, type: Type*) -> JsonValue* {
   if type_has_no_extension(type) {
     if type.id == #typeid(string) {
-      val := new JsonValue{};
+      val : JsonValue* = malloc(sizeof(JsonValue));
       val.type = JsonValueType::String;
       val.data._string = *(object as string*);
       return val;

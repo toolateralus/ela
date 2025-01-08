@@ -84,7 +84,7 @@ impl File {
   }
   open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
     return File{
-      fd: fopen(filename.data, flags_to_string(flags).data)
+      fd: fopen(filename.data, File::flags_to_string(flags).data)
     };
   }
   read :: fn(self*, buffer: u8*, size: u64) -> u64 {

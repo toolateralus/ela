@@ -453,6 +453,8 @@ std::any Typer::visit(ASTFor *node) {
 
   int iter_ty = -1;
 
+  // TODO: implement some kind of interface system that we can use for iterators, 
+  // no longer can we rely on C++'s crappy 'begin()/end()' since we compile our own free methods.
   if (range_type_id == string_type()) {
     iter_ty = char_type();
   } else if (range_type_id == ::range_type()) {
@@ -464,24 +466,6 @@ std::any Typer::visit(ASTFor *node) {
     }
   } else if (range_type->get_ext().is_array() || range_type->get_ext().is_fixed_sized_array()) {
     iter_ty = range_type->get_element_type();
-  } else if (range_type->is_kind(TYPE_STRUCT)) {
-    auto info = dynamic_cast<StructTypeInfo *>(range_type->get_info());
-    Symbol *begin = info->scope->lookup("begin");
-    Symbol *end = info->scope->lookup("end");
-    auto begin_ty = global_get_type(begin->type_id);
-    // TODO: assert begin&endty are functions && return the same type.
-    if (begin && end && begin->type_id == end->type_id) {
-      iter_ty = begin_ty->get_info()->as<FunctionTypeInfo>()->return_type;
-      if (node->value_semantic != VALUE_SEMANTIC_POINTER) {
-        iter_ty = global_get_type(iter_ty)->get_element_type();
-      }
-    } else {
-      throw_error(std::format("Can only iterate over structs you define 'begin' and "
-                              "'end' on. They must both be defined, and must both "
-                              "return the same type. type in question {}",
-                              range_type->to_string()),
-                  node->source_range);
-    }
   } else {
     throw_error("Cannot iterate with a range-based for loop over a "
                 "non-collection type.",
@@ -1085,11 +1069,19 @@ std::any Typer::visit(ASTInitializerList *node) {
                     node->source_range);
       }
 
+
+      // @Cleanup this is useful for returning a default value.
+      // we would probably prefer a type::default(),
+      // but for now we'll leave it.
       if (node->key_values.empty()) {
         return declaring_or_assigning_type;
       }
 
       for (const auto &[id, value] : node->key_values) {
+        auto old = declaring_or_assigning_type;
+        Defer _([&]{
+          declaring_or_assigning_type = old;
+        }); 
         auto symbol = scope->local_lookup(id);
         if (!symbol)
           throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
@@ -1098,6 +1090,8 @@ std::any Typer::visit(ASTInitializerList *node) {
           throw_error(std::format("Cannot initialize a function :: ({}) with an initializer list.", id),
                       value->source_range);
         }
+        declaring_or_assigning_type = symbol->type_id;
+
         auto value_ty = int_from_any(value->accept(this));
         assert_types_can_cast_or_equal(value_ty, symbol->type_id, value->source_range, "from {}, to {}",
                                        "Unable to cast type to target field for named initializer list");
@@ -1161,36 +1155,6 @@ std::any Typer::visit(ASTInitializerList *node) {
   }
 
   return declaring_or_assigning_type;
-}
-std::any Typer::visit(ASTAllocate *node) {
-  if (node->kind == ASTAllocate::Delete) {
-    if (node->arguments.is_null() || node->arguments.get()->arguments.size() < 1)
-      throw_error("invalid delete statement: you need at least one argument", node->source_range);
-    for (auto &arg : node->arguments.get()->arguments) {
-      arg->accept(this);
-    }
-    return void_type();
-  }
-  // just type check them, no need to return
-  // we should probably type check parameters for a constructor
-  // but we need a seperate system for that
-  auto type = int_from_any(node->type.get()->accept(this));
-  if (type == -1) {
-    throw_error("Use of undeclared type", node->source_range);
-  }
-  if (node->arguments) {
-    auto declaring_type = global_get_type(declaring_or_assigning_type);
-    // Make sure that an initializer list won't try to construct a pointer which is prohibited.
-    if (declaring_type->get_ext().is_pointer()) {
-      declaring_or_assigning_type =
-          global_find_type_id(declaring_type->base_id, declaring_type->get_ext().without_back());
-    }
-
-    node->arguments.get()->accept(this);
-  }
-
-  auto t = global_get_type(type);
-  return node->type.get()->resolved_type = t->id;
 }
 std::any Typer::visit(ASTRange *node) {
   auto left = int_from_any(node->left->accept(this));

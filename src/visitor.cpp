@@ -46,7 +46,6 @@ std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this
 std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTAllocate::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }

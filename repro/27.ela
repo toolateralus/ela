@@ -1,0 +1,11 @@
+#alias Alias :: s64;
+
+// Impl on an alias crashes.
+// probably a null scope.
+impl Alias {
+  from :: fn(n: s32) -> #self {
+    return n as #self;
+  }
+}
+
+main :: fn() {}

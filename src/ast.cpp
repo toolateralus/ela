@@ -818,26 +818,6 @@ ASTExpr *Parser::parse_primary() {
   if (auto directive_expr = try_parse_directive_expr()) {
     return directive_expr.get();
   }
-
-  // special unary for allocation, new delete.
-  if (tok.type == TType::New || tok.type == TType::Delete) {
-    eat();
-    ASTAllocate::Kind kind = tok.type == TType::New ? ASTAllocate::Kind::New : ASTAllocate::Kind::Delete;
-    auto node = ast_alloc<ASTAllocate>();
-    if (kind == ASTAllocate::New) {
-      auto type = parse_type();
-      type->extensions.push_back({TYPE_EXT_POINTER});
-      node->type = type;
-    }
-    Nullable<ASTArguments> args = nullptr;
-    if (peek().type == TType::LParen) {
-      args = parse_arguments();
-    }
-    node->arguments = args;
-    node->kind = kind;
-    return node;
-  }
-
   auto range = begin_node();
 
   switch (tok.type) {
@@ -1348,8 +1328,7 @@ ASTStatement *Parser::parse_statement() {
 
     const bool is_deref = tok.type == TType::Mul;
 
-    const bool is_special_case = tok.type == TType::Delete || // delete statement
-                                 tok.type == TType::LParen || // possible parenthesized dereference or something.
+    const bool is_special_case = tok.type == TType::LParen || // possible parenthesized dereference or something.
                                  tok.type == TType::Erase ||  // ~vector, for popping and ignoring.
                                  tok.type == TType::Switch;
 

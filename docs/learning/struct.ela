@@ -27,7 +27,7 @@ MyStruct :: struct {
   #ctor :: fn() {
     field = 100.0;
     field1 = 200.0;
-    field2 = new #self{}; // this would obviously infinitely recurse, but just an example.
+    field2 = malloc(sizeof(#self)) as self*; // this would obviously infinitely recurse, but just an example.
   }
   
   //? Parameterized constructor
@@ -39,7 +39,7 @@ MyStruct :: struct {
   //? destructors
   #dtor :: fn() {
     if field2 then
-      delete(field2);
+      free(field2);
   }
   
   

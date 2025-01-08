@@ -15,24 +15,19 @@ start_thread :: fn(arg: void*) -> void*;
 Thread :: struct {
   handle: pthread_t;
   start_function: ThreadFunction;
-  
-  start :: fn(function: ThreadFunction, arg: void*) {
-    this.start_function = function;
-    pthread_create(&this.handle, null, &start_thread, arg);  
+}
+
+impl Thread {
+  start :: fn(function: ThreadFunction, arg: void*) -> #self {
+    self: #self;
+    self.start_function = function;
+    pthread_create(&self.handle, null, &start_thread, arg);
+    return self;
   }
-  
-  #ctor :: fn() {}
-  #ctor :: fn(function: ThreadFunction) {
-    start(function, this);
-  }
-  
-  join :: fn() -> void* {
-    n : void* = null;
-    pthread_join(&this.handle, &n);
+  join :: fn(self*) -> void* {
+    #static n : void* = null; // this is discarded.
+    pthread_join(&self.handle, &n);
     return n;
-  }
-  #dtor :: fn() {
-    join();
   }
 }
 
@@ -40,7 +35,9 @@ Thread :: struct {
 start_thread :: fn(arg: void*) -> void* {
   thread : Thread* = arg;
   if (thread.start_function != null) {
-    thread.start_function();
+    // @Cleanup remove this hack.
+    fun := thread.start_function;
+    fun();
   }
   return null;
 }
@@ -54,17 +51,22 @@ start_thread :: fn(arg: void*) -> void* {
 /* Simple mutex */
 Mutex :: struct {
   handle: pthread_mutex_t;
-  #ctor :: fn() {
-    pthread_mutex_init(&this.handle, null);
+}
+
+impl Mutex {
+  create :: fn() -> #self {
+    self: #self;
+    pthread_mutex_init(&self.handle, null);
+    return self;
   }
-  lock :: fn() {
-    pthread_mutex_lock(&this.handle);
+  lock :: fn(self*) {
+    pthread_mutex_lock(&self.handle);
   }
-  unlock :: fn() {
-    pthread_mutex_unlock(&this.handle);
+  unlock :: fn(self*) {
+    pthread_mutex_unlock(&self.handle);
   }
-  #dtor :: fn() {
-    pthread_mutex_destroy(&this.handle);
+  #dtor :: fn(self*) {
+    pthread_mutex_destroy(&self.handle);
   }
 }
 

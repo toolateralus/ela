@@ -248,14 +248,6 @@ ASTUnionDeclaration *ASTCopier::copy_union_declaration(ASTUnionDeclaration *node
   current_scope = old_scope;
   return new_node;
 }
-ASTAllocate *ASTCopier::copy_allocate(ASTAllocate *node) {
-  auto new_node = new (ast_alloc<ASTAllocate>()) ASTAllocate(*node);
-  if (node->type)
-    new_node->type = static_cast<ASTType *>(copy_node(node->type.get()));
-  if (node->arguments)
-    new_node->arguments = static_cast<ASTArguments *>(copy_node(node->arguments.get()));
-  return new_node;
-}
 ASTRange *ASTCopier::copy_range(ASTRange *node) {
   auto new_node = new (ast_alloc<ASTRange>()) ASTRange(*node);
   new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
@@ -370,8 +362,6 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
     case AST_NODE_UNION_DECLARATION:
       return copy_union_declaration(static_cast<ASTUnionDeclaration *>(node));
-    case AST_NODE_ALLOCATE:
-      return copy_allocate(static_cast<ASTAllocate *>(node));
     case AST_NODE_RANGE:
       return copy_range(static_cast<ASTRange *>(node));
     case AST_NODE_SWITCH:

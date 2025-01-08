@@ -484,8 +484,6 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
     case TType::Varargs:
     case TType::Directive:
     case TType::ColonEquals:
-    case TType::New:
-    case TType::Delete:
     case TType::Dollar:
     case TType::RParen:
     case TType::RBrace:

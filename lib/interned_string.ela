@@ -4,32 +4,26 @@
 
 InternedString :: struct {
   id: s64;
+};
 
-  #ctor :: fn() {
-    id = 0;
-  }
-
-  #operator(()) :: fn() -> s64 {
-    return id;
-  }
-
-  #ctor :: fn(value: string) {
+impl InternedString {
+  from :: fn(value: string) -> #self {
     #static cache: s64[string];
     #static next_id: s64 = 1;
-    _id := cache[value];
-    if _id == 0 {
-      id = next_id++;
+    self: #self;
+    id := cache[value];
+    if id == 0 {
+      self.id = next_id++;
       cache[value] = id;
       __interned_string_storage_cache[id] = value;
     }
-    else { id = _id; }
+    else { 
+      self.id = id; 
+    }
+    return self;
   }
-
-  value :: fn() -> string {
-    return __interned_string_storage_cache[id];
-  }
-
-  #operator(==) :: fn(other: InternedString) -> bool {
-    return other.id == id;
+  value :: fn(self*) -> string {
+    return __interned_string_storage_cache[self.id];
   }
 }
+

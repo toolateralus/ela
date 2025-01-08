@@ -4,4 +4,4 @@
 !*.json
 !boilerplate.hpp
 !.gitignore
-!run_test.sh
+/tests
