@@ -639,6 +639,8 @@ ASTProgram *Parser::parse() {
 
     if (peek().type == TType::Eof && states.empty()) {
       break;
+    } else if (peek().type == TType::Eof) {
+      eat();
     }
 
     if (peek().type == TType::Directive) {
@@ -653,6 +655,7 @@ ASTProgram *Parser::parse() {
       }
       if (semicolon())
         eat();
+
       continue;
     }
 
@@ -1647,14 +1650,15 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       expect(TType::Assign);
       value = parse_expr();
     } else {
-      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL && static_cast<ASTLiteral *>(last_value)->value == "0") {
+      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
+          static_cast<ASTLiteral *>(last_value)->value == "0") {
         value = zero;
         was_zero = false;
       } else {
         auto bin = ast_alloc<ASTBinExpr>();
         bin->left = last_value;
         bin->right = one;
-        bin->op = add_token;      
+        bin->op = add_token;
         last_value = bin;
         value = bin;
       }

@@ -559,7 +559,6 @@ std::any Typer::visit(ASTCall *node) {
     throw_error("Use of undeclared function", node->source_range);
   }
 
-  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
   if (type) {
     declaring_or_assigning_type = type->id;
   }
@@ -607,6 +606,9 @@ std::any Typer::visit(ASTCall *node) {
   }
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
+  
+  // we do this super late cuz the argument types have to be inferred for initializer lists.
+  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
   auto args_ct = arg_tys.size();
   auto params_ct = info->params_len - (method_call ? 1 : 0);
@@ -641,16 +643,16 @@ std::any Typer::visit(ASTArguments *node) {
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
 
-    // TODO: make sure this never happens, we should always have the type of
-    // the thing. However args are sometime used for non-functions.
     if (!info) {
       auto arg_ty = int_from_any(arg->accept(this));
       argument_types.push_back(arg_ty);
       continue;
     }
+
     auto old_ty = declaring_or_assigning_type;
     declaring_or_assigning_type = info->parameter_types[i];
     Defer _defer([&] { declaring_or_assigning_type = old_ty; });
+
     argument_types.push_back(int_from_any(arg->accept(this)));
   }
   return argument_types;

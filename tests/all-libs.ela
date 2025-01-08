@@ -4,14 +4,17 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-#import core
-#import directory
-#import dlfcn
-#import file
-#import net
-#import reflection
-#import pthread
-#import interned_string
+#import core;
+#import directory;
+#import dlfcn;
+#import file;
+#import net;
+#import reflection;
+#import pthread;
+#import interned_string;
+
+main :: fn() {}
+
 
 // These will be relatively hard to refactor.
 // #import memory // * this uses generics.
