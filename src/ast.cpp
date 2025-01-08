@@ -396,7 +396,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         } else if (parser->current_struct_decl) {
           type->normal.base = parser->current_struct_decl.get()->name;
         } else if (parser->current_impl) {
-          // TODO: fix leak here.
           type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl.get()->target));
         } else {
           throw_error("#self is only valid in unions, structs, and impl's.",{});
@@ -1125,8 +1124,8 @@ ASTType *Parser::parse_type() {
 
   auto base = eat().value;
   auto node = ast_alloc<ASTType>();
+  node->kind = ASTType::NORMAL;
   node->normal.base = base;
-
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
   }

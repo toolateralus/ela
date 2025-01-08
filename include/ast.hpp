@@ -137,7 +137,7 @@ struct ASTType : ASTExpr {
     REFLECTION,
     TUPLE,
     FUNCTION,
-  } kind;
+  } kind = NORMAL;
   union {
     struct {
       InternedString base;

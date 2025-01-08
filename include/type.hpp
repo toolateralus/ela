@@ -166,7 +166,7 @@ using GenericParameter = InternedString;
 
 struct TypeInfo {
   // Now that we have impl & our own free-func methods, any object can have a method.
-  Scope *scope;
+  Scope *scope = nullptr;
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
   TypeInfo() {}

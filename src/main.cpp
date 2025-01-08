@@ -4,6 +4,7 @@
 #include <ostream>
 #include <unordered_map>
 
+#include "arena.hpp"
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -170,6 +171,10 @@ main :: fn() {
 
   init_type_system();
   auto result = compile_command.compile();
+  using arena = jstl::Arena;
+  // scope_arena.~arena();
+  // type_info_arena.~arena();
+  // ast_arena.~arena();
 
   if (run_on_finished) {
     if (result == 0) {

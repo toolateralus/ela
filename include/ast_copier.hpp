@@ -5,6 +5,7 @@
 
 struct ASTCopier {
   Scope *current_scope = nullptr;
+  ASTImpl *copy_impl(ASTImpl* node);
   Scope *copy_scope(Scope *old);
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);
