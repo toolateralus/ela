@@ -188,7 +188,7 @@ std::any Emitter::visit(ASTCall *node) {
     // TODO: this needs a lot of work I think. Maybe it will work just fine, but this seems super hacky.
     if (base_type) {
       Scope *base_scope = base_type->get_info()->scope;
-      (*ss) << to_cpp_string(base_type) << "_" << base_symbol.get()->name.get_str();
+      (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
       (*ss) << "(";
       if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
         if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
