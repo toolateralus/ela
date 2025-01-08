@@ -79,22 +79,28 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 }
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
+  if (base < 0) {
+    throw_error("global_find_type_id() got a negative base index", {});
+  }
+
   if (!type_extensions.has_extensions()) {
     return base;
   }
-  auto base_t = &type_table[base];
+  auto base_t = global_get_type(base);
   auto ext = type_extensions;
-  while (base_t->base_id != Type::invalid_id) {
+  while (base_t && base_t->base_id != Type::invalid_id) {
     ext = base_t->get_ext().append(ext);
-    base_t = &type_table[base_t->base_id];
+    base_t = global_get_type(base_t->base_id);
   }
+
+  if (!base_t) {
+    throw_error("INTERNAL_COMPILER_ERROR: global_find_type_id() reduced a type to nullptr when removing extensions", {});
+  }
+
   for (int i = 0; i < type_table.size(); ++i) {
-    auto type = &type_table[i];
+    auto type = global_get_type(i);
     if (type->equals(base_t->id, ext)) return type->id;
   }
-  // NOTE:below is just for creating types with new extensions. new function
-  // types, struct types, and enum types must be created manually this just
-  // creates pointer and array types of base 'name'
   return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
 }
 

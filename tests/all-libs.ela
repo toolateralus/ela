@@ -14,6 +14,12 @@
 #import interned_string;
 
 // These will be relatively hard to refactor.
+
+// * This def is for 'memory' where we have ArenaOf![T] 
+// * since generics are broken and it's shown in another test
+// ! REMOVE 'GENERICS_ENABLED' in 'lib/memory.ela'
+// #def GENERICS_ENABLED
+
 #import memory;// * this uses generics.
 #import json;   // * some bugs with self/self* type prevents this from compiling
 #import raylib; // * big rewrite, almost everything. This is our biggest library, so that sucks.
