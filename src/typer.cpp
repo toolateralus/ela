@@ -197,13 +197,13 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
 
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
     ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
+    ctx.scope->parent->lookup(node->name)->declaring_node = node;
     return {};
   }
 
   if (!generic_instantiation) {
     ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FUNCTION);
-    auto sym = ctx.scope->lookup(node->name);
-    sym->declaring_node = node;
+    ctx.scope->parent->lookup(node->name)->declaring_node = node;
   }
 
   if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN)
@@ -569,6 +569,7 @@ std::any Typer::visit(ASTCall *node) {
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
 
   auto symbol_nullable = get_symbol(node->function);
+  bool method_call = false;
 
   if (!symbol_nullable && !type) {
     throw_error("Use of undeclared function", node->source_range);
@@ -581,14 +582,16 @@ std::any Typer::visit(ASTCall *node) {
 
   if (symbol_nullable) {
     auto symbol = symbol_nullable.get();
-
     type = global_get_type(symbol->type_id);
+    ASTFunctionDeclaration *func = nullptr;
 
+    if (symbol->declaring_node.is_not_null() &&
+        symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+      method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
+    }
 
-    if (!node->generic_arguments.empty() ||
-        (symbol->declaring_node.is_not_null() &&
-         symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION &&
-         static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get())->generic_parameters.size() != 0)) {
+    if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
       // * Inferred generic argumetns based on only function arguments.
       // TODO: make the generic argument inference actually make sense. This is just kind of a hack so we can omit it on
       // some basic calls like println etc.
@@ -621,29 +624,22 @@ std::any Typer::visit(ASTCall *node) {
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
 
-  auto wrong_num_params =
-      (arg_tys.size() > info->params_len || arg_tys.size() < info->params_len - info->default_params);
-  auto has_self_param =
-      arg_tys.size() == info->params_len - 1; // This is far too guess-based, but i'm just hacking it in
-  if (!info->is_varargs && wrong_num_params && !has_self_param) {
+  auto args_ct = arg_tys.size();
+  auto params_ct = info->params_len - (method_call ? 1 : 0);
+  if ((args_ct > params_ct && !info->is_varargs) || args_ct < params_ct) {
     throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}\n type: {}",
-                            info->params_len, arg_tys.size(), type->to_string()),
+                            params_ct, args_ct, type->to_string()),
                 node->source_range);
   }
-
-  if (has_self_param) {
-    arg_tys.insert(arg_tys.begin(), info->parameter_types[0]);
-  }
-
-  for (int i = 0; i < info->params_len; ++i) {
-    // !BUG: default parameters evade type checking
-    if (arg_tys.size() <= i) {
-      continue;
-    }
-
-    assert_types_can_cast_or_equal(arg_tys[i], info->parameter_types[i], node->source_range,
+  int param_index = 0;
+  for (int arg_index = 0; arg_index < arg_tys.size(); ++arg_index) {
+    // skip self param for method calls
+    if (method_call && arg_index == 0) param_index++;
+    // early end for var args
+    if (arg_index <= params_ct) break;
+    assert_types_can_cast_or_equal(arg_tys[arg_index], info->parameter_types[arg_index], node->source_range,
                                    "invalid argument types. expected: {}, got: {}",
-                                   std::format("parameter: {} of function", i));
+                                   std::format("parameter: {} of function", arg_index));
   }
 
   node->type = info->return_type;

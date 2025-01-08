@@ -1525,6 +1525,15 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     // Self param for impls.
     if (name == "self") {
+      if (!params->params.empty()) {
+        end_node(nullptr, range);
+        throw_error("\"self\" must appear first in method parameters.", range);
+      }
+      if (!current_impl) {
+        end_node(nullptr, range);
+        throw_error("\"self\" can only appear in method parameters.", range);
+      }
+      params->has_self = true;
       auto type = static_cast<ASTType *>(deep_copy_ast(current_impl.get()->target));
       append_type_extensions(type);
       auto param = ast_alloc<ASTParamDecl>();
@@ -1610,6 +1619,14 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   ctx.set_scope();
+
+  if (current_impl) {
+    if (function->params->has_self) {
+      function->flags |= FUNCTION_IS_METHOD;
+    } else {
+      function->flags |= FUNCTION_IS_STATIC;
+    }
+  }
 
   // TODO: find a better solution to this.
   for (const auto &param : function->generic_parameters) {
@@ -1701,7 +1718,6 @@ ASTImpl *Parser::parse_impl() {
   for (const auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
-      function->flags |= FUNCTION_IS_METHOD;
       impl->methods.push_back(function);
     } else {
       throw_error("invalid statement: only methods are allowed in 'impl's", statement->source_range);
