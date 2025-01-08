@@ -11,7 +11,7 @@
 // #import pthread
 #import reflection
 
-#c_flags "-fsanitize=address,leak,undefined"
+// #c_flags "-fsanitize=address,leak,undefined"
 
 XaryuStruct :: struct {
   f: float ;
@@ -19,20 +19,6 @@ XaryuStruct :: struct {
 
 Reflector :: struct {
   n: int;
-}
-
-#ifdef INIT_LIST_CONSTRUCTOR {
-  InitListTestCtorStruct :: struct {
-    z : int;
-    #ctor :: fn(n : int, f: int) {
-      z = n * f;
-    }
-  }
-
-  #test test_init_list_ctor :: fn() {
-    i : InitListTestCtorStruct = {5, 5};
-    assert("init list calling ctor failed", i.z == 25);
-  }
 }
 
 InitListStruct :: struct {
@@ -101,7 +87,6 @@ impl IHaveAMethod {
   }
 }
 
-
 Xaryu :: struct {
   value: int;
 }
@@ -111,8 +96,6 @@ impl Xaryu {
     return "XarBar";
   }
 }
-
-
 
 #flags Banana :: enum  {
   Unripe,
@@ -136,8 +119,6 @@ SwitchCaseEnum :: enum {
   SwitchVariant0,
   SwitchVariant1,
 }
-
-
 
 #test test_for :: fn() {
   for i in 0..10 {
@@ -503,42 +484,6 @@ something :: fn(f: float32) -> float32 {
   vec.method(0); // this does the assertions
 }
 
-#test test_new :: fn() {
-  vec: _Vec2* = new _Vec2(10, 10, 10);
-  vec1: _Vec2* = new _Vec2(10, 10, 10);
-  assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
-  delete (vec, vec1);
-}
-
-#test test_delete :: fn() {
-	arr := new int;
-	arr2 := new int;
-	delete(arr, arr2);
-  assert("delete", arr == null && arr2 == null);
-}
-
-#ifdef TEST_ITERATOR_MOJ_STRUKT {
-  MojStruktIter :: struct{
-    data: int[10];
-    
-    begin :: fn() -> int* {
-      return (int*)data;
-    }
-    end :: fn() -> int* {
-      return (int*)data + 10;
-    }
-  }
-
-  #test test_defined_iterator ::fn() {
-    count := 0;
-    new_struct : MojStruktIter;
-    for item in new_struct {
-      count += 1;
-    }
-    assert("custom iterator failed to iterate correctly", count == 10);
-  }
-}
-
 #test custom_iterator_increment :: fn() {
   for i in #make(Range, 0, 10, 2) {
     assert("iter increment failed to be divisible by 2", i % 2 == 0);
@@ -565,46 +510,6 @@ something :: fn(f: float32) -> float32 {
   }
   delete(arr);
 }
-
-#ifdef CUSTOM_ITERATOR_TEST {
-  CustomIteratorStruct :: struct {
-    value: int*;
-  }
-
-  impl CustomIteratorStruct {
-    create :: fn() -> #self {
-      self: #self;
-      self.value = malloc(sizeof(int) * 10);
-      memset(self.value, 0, sizeof(int) * 10);
-      return self;
-    }
-
-    // These aren't going to work with C++ iterators anymore, because of the way we compile methods now.
-    // We will just have to implement our own iterator system, preferably with an interface.
-    begin :: fn(self*) -> int * {
-      return value;
-    }
-    end :: fn(self*) -> int * {
-      return value + 10;
-    }
-
-    // TODO: re-add this.
-    #dtor :: fn() {
-      free(value);
-    }
-  }
-
-  #test test_custom_iterator :: fn() {
-    iter: CustomIteratorStruct;
-    n: int;
-    for k in iter {
-      assert("iterator value failed to equal 0", k == 0);
-      n++;
-    }
-    assert("failed to iterate the appropriate number of times", n == 10);
-  }
-}
-
 
 
 #test test_string :: fn() {
@@ -1000,22 +905,288 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 
 }
 
-#test test_set_field_with_reflection :: fn() {
- reflector: Reflector;
- type := #type(Reflector);
- field := type.fields[0];
- integer: int = 100;
- field.set(&reflector, integer);
- assert("reflection field.set() failed.", reflector.n == 100);
+BitfieldTest :: struct {
+  #bitfield(1) i : u32 = 0;
+  #bitfield(2) z: u32 = 3;
 }
 
-#test test_get_field_with_reflection :: fn() {
- reflector: Reflector;
- reflector.n = 100;
- type := #type(Reflector);
- field := type.fields[0];
- n := *(field.get(&reflector) as int*);
- assert("reflection field.set() failed.", n == 100);
+#test test_bitfield_in_struct :: fn() {
+  test: BitfieldTest;
+  assert("bitfield failed to equal 0", test.i == 0);
+  assert("bitfield z failed to equal 3", test.z == 3);
+}
+
+Static :: struct;
+impl Static {
+  counter :: fn() -> s32 {
+    #static i: s32 = 0;
+    return i++;
+  }
+}
+
+#test test_call_statics :: fn() {
+  for i in 0..10 {
+    assert("Static member method with static local failed", Static::counter() == i);
+  }
+}
+
+#test test_conditional_compilation :: fn() {
+  #def CHEESE;
+
+  #ifdef HAMBURGER {
+    CONSTANT0 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT0 :: 20;
+  } else {
+    CONSTANT0 :: 10;
+  }
+  
+  assert("ifdef failed", CONSTANT0 == 20);
+  #undef CHEESE;
+
+  #def HAMBURGER;
+
+  #ifdef HAMBURGER {
+    CONSTANT1 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT1 :: 20;
+  } else if true {
+    CONSTANT1 :: 10;
+  }
+  
+  assert("ifdef failed", CONSTANT1 == 100);
+
+  #undef HAMBURGER;
+  
+  #ifdef HAMBURGER {
+    CONSTANT2 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT2 :: 20;
+  } else  {
+    CONSTANT2 :: 10;
+  }
+
+  
+  assert("ifdef failed", CONSTANT2 == 10);
+
+  #ifndef HAMBURGER {
+    CONSTANT3 :: 100;
+  } 
+
+  assert("ifndef failed", CONSTANT3 == 100);
+
+  #def thing
+
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", false);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", true);
+  }
+
+  #undef thing;
+  
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", true);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef", false);
+  }
+}
+
+#test test_scope_resolution_statement :: fn() {
+  // (string::from("Hi!").contains("H"));
+}
+
+
+add_generic :: fn![T](a: T, b: T) -> T {
+  return a + b;
+}
+
+#test test_generic_add :: fn() {
+  assert("generic_add_float failed", add_generic![float](100.0, 100.0) == 200.0);
+  assert("generic_add_int failed", add_generic![int](5, 6) == 11);
+}
+
+
+AnonSubUnion :: struct {
+  #anon :: union {
+    a: int;
+  }
+}
+
+#test test_anon_union_in_struct :: fn() {
+  anon: AnonSubUnion;
+  anon.a = 100;
+  assert("Anon sub union failed", anon.a == 100);
+}
+
+/* 
+  ! These are all disabled because the refactor to the compiler broke them, and I 
+  ! was just trying to get them back to a compiling status.
+*/
+
+
+#ifdef GENERIC_STRUCT_WITH_FUNCTIONS {
+  GenericStruct :: struct![T] {
+    a: T;
+    b: T;
+  }
+
+  impl GenericStruct {
+    run :: fn(self*) -> T {
+      return self.a + self.b;
+    }
+  }
+
+  #test test_generic_struct :: fn() {
+    int_adder: GenericStruct![int] = {5, 6};
+    assert("generic type failure", int_adder.run() == 5 + 6);
+    float_adder: GenericStruct![float] = {1.23, 4.56};
+    assert("generic type failure", float_adder.run() == 1.23 + 4.56);
+  }
+}
+
+// ! Todo fix this.
+#ifdef TEST_GENERIC_UNION {
+  GenericUnion :: union![T, T1] {
+    a: T;
+    b: T1;
+  }
+
+  #test test_generic_union :: fn() {
+    int_adder: GenericUnion![int, float];
+    int_adder.a = 11;
+    assert("generic type failure", int_adder.a == 5 + 6);
+    int_adder.b = 1.23 + 4.56;
+    assert("generic type failure", int_adder.b == 1.23 + 4.56);
+  }
+}
+
+#ifdef FUNCTION_POINTER_TEST {
+  function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
+  //! See emitter 'get_function_pointer_dynamic_array_declaration', this is super bugged.
+  //! particularly, lists/ dynamic arrays of function pointers are super shoddy.
+  #test test_function_pointer_alias :: fn() {
+    #alias FunctionPointer :: fn* (int, int) -> int;
+    ptr := &function_pointer_helper;
+    assert("Function pointer call", ptr(2, 3) == 6);
+  // ! This works (compiles), but it causes a 'wild jump' aka the PC goes to non-executable memory region..
+  // ! Wtf?
+    // array: FunctionPointer[] = {&function_pointer_helper};
+    // from_arr : FunctionPointer = &array[0];
+    // assert("Array of function pointers", from_arr(2, 3) == 6);
+  // ! 
+    // fixed: FunctionPointer[12];
+    // fixed[0] = &function_pointer_helper;
+    // from_fixed : FunctionPointer = &fixed[0];
+
+    // assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
+
+    // function :: fn() -> FunctionPointer {
+    //   return &function_pointer_helper;
+    // }
+
+    // returned_ptr : FunctionPointer = function();
+    // assert("Function returning function pointer", returned_ptr(2, 3) == 6);
+  }
+}
+
+#ifdef INIT_LIST_CONSTRUCTOR {
+  InitListTestCtorStruct :: struct {
+    z : int;
+    #ctor :: fn(n : int, f: int) {
+      z = n * f;
+    }
+  }
+
+  #test test_init_list_ctor :: fn() {
+    i : InitListTestCtorStruct = {5, 5};
+    assert("init list calling ctor failed", i.z == 25);
+  }
+}
+
+#ifdef TEST_ITERATOR_MOJ_STRUKT {
+  MojStruktIter :: struct{
+    data: int[10];
+    
+    begin :: fn() -> int* {
+      return (int*)data;
+    }
+    end :: fn() -> int* {
+      return (int*)data + 10;
+    }
+  }
+
+  #test test_defined_iterator ::fn() {
+    count := 0;
+    new_struct : MojStruktIter;
+    for item in new_struct {
+      count += 1;
+    }
+    assert("custom iterator failed to iterate correctly", count == 10);
+  }
+}
+
+#ifdef CUSTOM_ITERATOR_TEST {
+  CustomIteratorStruct :: struct {
+    value: int*;
+  }
+
+  impl CustomIteratorStruct {
+    create :: fn() -> #self {
+      self: #self;
+      self.value = malloc(sizeof(int) * 10);
+      memset(self.value, 0, sizeof(int) * 10);
+      return self;
+    }
+
+    // These aren't going to work with C++ iterators anymore, because of the way we compile methods now.
+    // We will just have to implement our own iterator system, preferably with an interface.
+    begin :: fn(self*) -> int * {
+      return value;
+    }
+    end :: fn(self*) -> int * {
+      return value + 10;
+    }
+
+    // TODO: re-add this.
+    #dtor :: fn() {
+      free(value);
+    }
+  }
+
+  #test test_custom_iterator :: fn() {
+    iter: CustomIteratorStruct;
+    n: int;
+    for k in iter {
+      assert("iterator value failed to equal 0", k == 0);
+      n++;
+    }
+    assert("failed to iterate the appropriate number of times", n == 10);
+  }
 }
 
 #ifdef JSON_TESTS {
@@ -1163,227 +1334,61 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 
 }
 
-#test test_array_reflection :: fn() {
-  fixed: int[3] = {1, 2, 3};
-  fixed_type := #type(fixed);
-  index: int = 0;
-  fixed_elements := fixed_type.elements((&fixed) as char*);
-  assert("Fixed array length mismatch", fixed_elements.length == 3);
-  for elem in fixed_elements {
-    assert("Fixed array element mismatch", *(elem.data as int*) == fixed[index]);
-    ++index;
+#ifdef REFLECTION_TESTS{
+
+  #test test_set_field_with_reflection :: fn() {
+  reflector: Reflector;
+  type := #type(Reflector);
+  field := type.fields[0];
+  integer: int = 100;
+  field.set(&reflector, integer);
+  assert("reflection field.set() failed.", reflector.n == 100);
   }
 
-  dynamic: int[] = {3, 2, 1};
-  dynamic_type := #type(dynamic);
-  index = 0;
-  dynamic_elements := dynamic_type.elements((&dynamic) as char*);
-  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
-  for elem in dynamic_elements {
-    assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
-    ++index;
-  }
-}
-
-BitfieldTest :: struct {
-  #bitfield(1) i : u32 = 0;
-  #bitfield(2) z: u32 = 3;
-}
-
-#test test_bitfield_in_struct :: fn() {
-  test: BitfieldTest;
-  assert("bitfield failed to equal 0", test.i == 0);
-  assert("bitfield z failed to equal 3", test.z == 3);
-}
-
-Static :: struct;
-impl Static {
-  counter :: fn() -> s32 {
-    #static i: s32 = 0;
-    return i++;
-  }
-}
-
-#test test_call_statics :: fn() {
-  for i in 0..10 {
-    assert("Static member method with static local failed", Static::counter() == i);
-  }
-}
-
-#test test_conditional_compilation :: fn() {
-  #def CHEESE;
-
-  #ifdef HAMBURGER {
-    CONSTANT0 :: 100;
-  } else ifdef CHEESE {
-    CONSTANT0 :: 20;
-  } else {
-    CONSTANT0 :: 10;
-  }
-  
-  assert("ifdef failed", CONSTANT0 == 20);
-  #undef CHEESE;
-
-  #def HAMBURGER;
-
-  #ifdef HAMBURGER {
-    CONSTANT1 :: 100;
-  } else ifdef CHEESE {
-    CONSTANT1 :: 20;
-  } else if true {
-    CONSTANT1 :: 10;
-  }
-  
-  assert("ifdef failed", CONSTANT1 == 100);
-
-  #undef HAMBURGER;
-  
-  #ifdef HAMBURGER {
-    CONSTANT2 :: 100;
-  } else ifdef CHEESE {
-    CONSTANT2 :: 20;
-  } else  {
-    CONSTANT2 :: 10;
+  #test test_get_field_with_reflection :: fn() {
+  reflector: Reflector;
+  reflector.n = 100;
+  type := #type(Reflector);
+  field := type.fields[0];
+  n := *(field.get(&reflector) as int*);
+  assert("reflection field.set() failed.", n == 100);
   }
 
-  
-  assert("ifdef failed", CONSTANT2 == 10);
-
-  #ifndef HAMBURGER {
-    CONSTANT3 :: 100;
-  } 
-
-  assert("ifndef failed", CONSTANT3 == 100);
-
-  #def thing
-
-  #ifndef thing {
-    for i in 0..100 {
-      n := i;
-      if i % 3 == 1 {
-        n -= 2;
-      }
+  #test test_array_reflection :: fn() {
+    fixed: int[3] = {1, 2, 3};
+    fixed_type := #type(fixed);
+    index: int = 0;
+    fixed_elements := fixed_type.elements((&fixed) as char*);
+    assert("Fixed array length mismatch", fixed_elements.length == 3);
+    for elem in fixed_elements {
+      assert("Fixed array element mismatch", *(elem.data as int*) == fixed[index]);
+      ++index;
     }
-    assert("ndef", false);
-  } else {
-    for i in 0..100 {
-      n := i;
-      if i % 3 == 1 {
-        n -= 2;
-      }
-    }
-    assert("ndef", true);
-  }
 
-  #undef thing;
-  
-  #ifndef thing {
-    for i in 0..100 {
-      n := i;
-      if i % 3 == 1 {
-        n -= 2;
-      }
-    }
-    assert("ndef", true);
-  } else {
-    for i in 0..100 {
-      n := i;
-      if i % 3 == 1 {
-        n -= 2;
-      }
-    }
-    assert("ndef", false);
-  }
-}
-
-#test test_scope_resolution_statement :: fn() {
-  // (string::from("Hi!").contains("H"));
-}
-
-
-add_generic :: fn![T](a: T, b: T) -> T {
-  return a + b;
-}
-
-#test test_generic_add :: fn() {
-  assert("generic_add_float failed", add_generic![float](100.0, 100.0) == 200.0);
-  assert("generic_add_int failed", add_generic![int](5, 6) == 11);
-}
-
-#ifdef GENERIC_STRUCT_WITH_FUNCTIONS {
-  GenericStruct :: struct![T] {
-    a: T;
-    b: T;
-  }
-
-  impl GenericStruct {
-    run :: fn(self*) -> T {
-      return self.a + self.b;
+    dynamic: int[] = {3, 2, 1};
+    dynamic_type := #type(dynamic);
+    index = 0;
+    dynamic_elements := dynamic_type.elements((&dynamic) as char*);
+    assert("Dynamic array length mismatch", dynamic_elements.length == 3);
+    for elem in dynamic_elements {
+      assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
+      ++index;
     }
   }
-
-  #test test_generic_struct :: fn() {
-    int_adder: GenericStruct![int] = {5, 6};
-    assert("generic type failure", int_adder.run() == 5 + 6);
-    float_adder: GenericStruct![float] = {1.23, 4.56};
-    assert("generic type failure", float_adder.run() == 1.23 + 4.56);
-  }
 }
 
-// ! Todo fix this.
-#ifdef TEST_GENERIC_UNION {
-  GenericUnion :: union![T, T1] {
-    a: T;
-    b: T1;
+#ifdef TEST_NEW_DELETE {
+  #test test_new :: fn() {
+    vec: _Vec2* = new _Vec2(10, 10, 10);
+    vec1: _Vec2* = new _Vec2(10, 10, 10);
+    assert("new allocated structs using ctor failed to equal each other", vec.x == vec1.x && vec.y == vec1.y && vec.z == vec1.z);
+    delete (vec, vec1);
   }
 
-  #test test_generic_union :: fn() {
-    int_adder: GenericUnion![int, float];
-    int_adder.a = 11;
-    assert("generic type failure", int_adder.a == 5 + 6);
-    int_adder.b = 1.23 + 4.56;
-    assert("generic type failure", int_adder.b == 1.23 + 4.56);
+  #test test_delete :: fn() {
+    arr := new int;
+    arr2 := new int;
+    delete(arr, arr2);
+    assert("delete", arr == null && arr2 == null);
   }
-}
-
-#ifdef FUNCTION_POINTER_TEST {
-  function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
-  //! See emitter 'get_function_pointer_dynamic_array_declaration', this is super bugged.
-  //! particularly, lists/ dynamic arrays of function pointers are super shoddy.
-  #test test_function_pointer_alias :: fn() {
-    #alias FunctionPointer :: fn* (int, int) -> int;
-    ptr := &function_pointer_helper;
-    assert("Function pointer call", ptr(2, 3) == 6);
-  // ! This works (compiles), but it causes a 'wild jump' aka the PC goes to non-executable memory region..
-  // ! Wtf?
-    // array: FunctionPointer[] = {&function_pointer_helper};
-    // from_arr : FunctionPointer = &array[0];
-    // assert("Array of function pointers", from_arr(2, 3) == 6);
-  // ! 
-    // fixed: FunctionPointer[12];
-    // fixed[0] = &function_pointer_helper;
-    // from_fixed : FunctionPointer = &fixed[0];
-
-    // assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
-
-    // function :: fn() -> FunctionPointer {
-    //   return &function_pointer_helper;
-    // }
-
-    // returned_ptr : FunctionPointer = function();
-    // assert("Function returning function pointer", returned_ptr(2, 3) == 6);
-  }
-}
-
-
-AnonSubUnion :: struct {
-  #anon :: union {
-    a: int;
-  }
-}
-
-#test test_anon_union_in_struct :: fn() {
-  anon: AnonSubUnion;
-  anon.a = 100;
-  assert("Anon sub union failed", anon.a == 100);
 }

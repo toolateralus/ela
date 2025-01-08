@@ -970,24 +970,23 @@ std::any Emitter::visit(ASTInitializerList *node) {
       return {};
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
-    const auto size = node->key_values.size();
-    for (int i = 0; i < node->key_values.size(); ++i) {
-      const auto &[key, value] = node->key_values[i];
-      (*ss) << '.' << key.get_str() << " = ";
-      value->accept(this); 
-      if (i != size - 1) {
-        (*ss) << ",\n";
+      const auto size = node->key_values.size();
+      for (int i = 0; i < node->key_values.size(); ++i) {
+        const auto &[key, value] = node->key_values[i];
+        (*ss) << '.' << key.get_str() << " = ";
+        value->accept(this);
+        if (i != size - 1) {
+          (*ss) << ",\n";
+        }
       }
-    }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-
-    for (const auto &expr : node->values) {
-      expr->accept(this);
-      if (expr != node->values.back()) {
-        (*ss) << ", ";
+      for (const auto &expr : node->values) {
+        expr->accept(this);
+        if (expr != node->values.back()) {
+          (*ss) << ", ";
+        }
       }
-    }
     } break;
   }
 
@@ -1289,13 +1288,25 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
 
       auto return_ty = global_get_type(sym_ty->return_type);
-      value->accept(this);
-
+      auto param_0 = global_get_type(sym_ty->parameter_types[0]);
+      auto takes_pointer = param_0->get_ext().is_pointer();
       auto &extensions = type->get_ext();
+      auto name = type->get_base();
+      // TODO: we need to check against the method type more appropriately
       if (extensions.back_type() == TYPE_EXT_POINTER) {
-        (*ss) << "->to_string()";
+        (*ss) << name.get_str() << "_to_string(";
+        if (!takes_pointer) {
+          (*ss) << "*";
+        }
+        value->accept(this);
+        (*ss) << ")";
       } else {
-        (*ss) << ".to_string()";
+        (*ss) << name.get_str() << "_to_string(";
+        if (takes_pointer) {
+          (*ss) << "&";
+        }
+        value->accept(this);
+        (*ss) << ")";
       }
 
       if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
