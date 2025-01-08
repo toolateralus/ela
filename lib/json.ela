@@ -229,7 +229,7 @@ impl JsonLexer {
   }
 
   expect_type :: fn(self*, type: s32) -> JsonToken {
-    return self.expect_types({type: type});
+    return self.expect_types({type}); // !BUG :: We should not have to pass self here!
   }
 }
 

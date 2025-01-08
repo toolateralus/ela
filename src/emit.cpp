@@ -677,13 +677,14 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
   (*ss) << "enum " << type_name << " {\n";
   for (const auto &[key, value] : node->key_values) {
     (*ss) << type_name << "_" << key.get_str();
-    if (value.is_not_null()) {
-      (*ss) << " = ";
-      value.get()->accept(this);
-    } else if (node->is_flags) {
+    if (node->is_flags) {
       (*ss) << " = ";
       (*ss) << std::to_string(1 << n);
     }
+    else if (value.is_not_null()) {
+      (*ss) << " = ";
+      value.get()->accept(this);
+    } 
     if (n != node->key_values.size() - 1) {
       (*ss) << ",\n";
     }

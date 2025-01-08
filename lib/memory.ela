@@ -14,37 +14,40 @@ Arena :: struct {
   memory: u8*;
   flags: ArenaFlags = ArenaFlags::None;
   alignment : int = 8;
-  
-  #ctor :: fn(size: u64, flags: ArenaFlags) {
+}
+
+impl Arena {
+  create :: fn(size: u64, flags: ArenaFlags) {
     this.size = size;
     this.flags = flags;
     memory = malloc(sizeof(u8) * size);
   }
-  #dtor :: fn() {
-    free(memory);
-    memory = null;
+
+  deinit :: fn(self*) {
+    free(self.memory);
+    self.memory = null;
   }
   
-  allocate :: fn(size: u64) -> u8* {
+  allocate :: fn(self*, size: u64) -> u8* {
     if size == 0 {
       return null;
     }
     
-    aligned_ptr := this.ptr;
-    if this.flags & ArenaFlags::AlignAllocations != 0 {
-      aligned_ptr = (this.ptr + alignment - 1) & ~(alignment - 1);
+    aligned_ptr := self.ptr;
+    if self.flags & ArenaFlags::AlignAllocations != 0 {
+      aligned_ptr = (self.ptr + alignment - 1) & ~(alignment - 1);
     }
     
-    oom := aligned_ptr + size > this.size;
+    oom := aligned_ptr + size > self.size;
     
-    if oom && this.flags & ArenaFlags::OutOfMemory != 0 {
+    if oom && self.flags & ArenaFlags::OutOfMemory != 0 {
       panic("Arena Allocator: Ran out of memory\n");
     } else if oom {
       return null;
     }
     
-    result := this.memory + aligned_ptr;
-    this.ptr = aligned_ptr + size;
+    result := self.memory + aligned_ptr;
+    self.ptr = aligned_ptr + size;
     return result;
   }
 }
@@ -56,25 +59,25 @@ ArenaOf :: struct![T] {
   count: u64;
   size: u64;
   memory: T*;
+}
 
-  // size is max items.
-  #ctor :: fn(size: u64) {
+impl ArenaOf![T] {
+  create :: fn(size: u64) {
     this.size = size;
     memory = (malloc(sizeof(T) * size) as T*);
   }
 
-  #dtor :: fn() {
-    free(memory as T*);
-    memory = null;
+  dealloc :: fn(self*) {
+    free(self.memory as T*);
+    self. memory = null;
   }
   
-  allocate :: fn() -> T* {
-    oom := count > size;
+  allocate :: fn(self*) -> T* {
+    oom := self.count > self.size;
     if oom {
       return null as T*;
     }
-    count++;
-    // TODO: add some kind of placement new like mechanism
-    return (&memory[count]) as T*;
+    self.count++;
+    return (&self.memory[self.count]) as T*;
   }
 }

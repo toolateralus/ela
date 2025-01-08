@@ -17,8 +17,8 @@ main :: fn() {}
 
 
 // These will be relatively hard to refactor.
-// #import memory // * this uses generics.
-// #import json   // * some bugs with self/self* type prevents this from compiling
-// #import raylib // * big rewrite, almost everything. This is our biggest library, so that sucks.
-// #import gl     // * big rewrite, not nearly as bad as raylib.
+#import memory // * this uses generics.
+#import json   // * some bugs with self/self* type prevents this from compiling
+#import raylib // * big rewrite, almost everything. This is our biggest library, so that sucks.
+#import gl     // * big rewrite, not nearly as bad as raylib.
 

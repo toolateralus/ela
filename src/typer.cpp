@@ -631,6 +631,7 @@ std::any Typer::visit(ASTCall *node) {
   node->type = info->return_type;
   return info->return_type;
 }
+
 std::any Typer::visit(ASTArguments *node) {
   auto type = global_get_type(declaring_or_assigning_type);
 
@@ -1046,6 +1047,9 @@ std::any Typer::visit(ASTMake *node) {
   }
   return type;
 }
+
+// ! BUG :: Initializer lists passed to functions that take a self parameter try to construct self/self* from the init list,
+// ! instead of skipping that argument. Hmm.
 std::any Typer::visit(ASTInitializerList *node) {
   auto target_type = global_get_type(declaring_or_assigning_type);
   if (!target_type) {
@@ -1158,6 +1162,7 @@ std::any Typer::visit(ASTInitializerList *node) {
 
   return declaring_or_assigning_type;
 }
+
 std::any Typer::visit(ASTRange *node) {
   auto left = int_from_any(node->left->accept(this));
   auto right = int_from_any(node->right->accept(this));

@@ -473,14 +473,10 @@ struct ASTEnumDeclaration : ASTStatement {
 struct ASTUnionDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
-  
-
   int kind = UNION_IS_NORMAL;
   bool is_fwd_decl = false;
-
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
-
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTStructDeclaration *> structs;
   std::any accept(VisitorBase *visitor) override;
@@ -662,7 +658,6 @@ struct Parser {
   ASTImpl *parse_impl();
 
   // ASTType* parsing routines
-
   ASTType *parse_type();
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *type);
