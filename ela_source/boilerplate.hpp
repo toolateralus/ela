@@ -586,6 +586,7 @@ struct __COMPILER_GENERATED_TEST {
       function();
       return true;
     } catch (__test_exception &e) {
+      printf("%s", e.what());
       return false;
     }
 #endif

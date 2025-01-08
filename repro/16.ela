@@ -7,8 +7,7 @@ main :: fn() {
   // Either we can kind of parse out those expressions at lex time, or do some string manipulation in the parser
   // that's a bit smarter than what we're doing right now.
 
-
-  str := string{};
+  str: string;
 
 // Heap buffer overflow,
 // our interplator for strings is sprintf'ing into a 1024 char buffer.
