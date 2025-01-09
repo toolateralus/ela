@@ -1710,7 +1710,6 @@ std::any Emitter::visit(ASTDefer *node) {
   std::stringstream defer_ss;
   ss = &defer_ss;
   node->statement->accept(this);
-  (*ss) << ";\n";
   defer_blocks.push_back(std::move(defer_ss));
   return {};
 }
@@ -1721,35 +1720,25 @@ std::any Emitter::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
 
-  if (emitting_block_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-    if (node->return_type != void_type()) {
-      auto type = global_get_type(node->return_type);
-      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << ";\n";
-    }
-  }
+  auto has_return = false;
 
   for (const auto &statement : node->statements) {
     emit_line_directive(node);
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
+
+    if (statement->get_node_type()==AST_NODE_RETURN) {
+      has_return = true;
+    }
     statement->accept(this);
     semicolon();
     newline();
   }
 
-  if (node->parent != nullptr && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-    auto fn = static_cast<ASTFunctionDeclaration*>(node->parent);
-    if (fn->has_defer) {
-      while (!defer_blocks.empty()) {
-        (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
-        (*ss) << defer_blocks.back().str();
-        defer_blocks.pop_back();
-      }
-
-      if (fn->return_type->resolved_type != void_type() && fn->return_type->resolved_type != -1) {
-        (*ss) << "return " << defer_return_value_key << ";\n";
-      }
+  if (node->has_defer && !has_return) {
+    for (int i = defer_blocks.size() - 1; i >= 0; --i) {
+      (*ss) << defer_blocks[i].str();
     }
   }
 
@@ -1763,12 +1752,15 @@ std::any Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
 
   if (emitting_block_with_defer) {
+    for (int i = defer_blocks.size() - 1; i >= 0; --i) {
+      (*ss) << defer_blocks[i].str();
+    }
+    indented("return");
     if (node->expression.is_not_null()) {
-      (*ss) << defer_return_value_key << " = ";
+      space();
       node->expression.get()->accept(this);
     }
     (*ss) << ";\n";
-    (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
   } else {
     indented("return");
     if (node->expression.is_not_null()) {

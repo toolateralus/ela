@@ -1,0 +1,14 @@
+#import core;
+
+get_null_after_malloc :: fn() -> void* {
+  n := malloc(16);
+  defer {
+    free(n);
+    n = null;
+  } 
+  return n;
+}
+
+#test test_defer :: fn() {
+  assert("defer failed", get_null_after_malloc() == null);
+}
