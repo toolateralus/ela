@@ -7,3 +7,18 @@ defer {
 }
 
 defer STMT;
+
+defer allocator.free(ptr);
+
+// maybe ish like this?
+#ifdef DEBUG {
+  @on_return(fn (v) {
+    assert(v == 100);
+  });
+}
+
+defer {
+  
+  
+  println("scope exited");
+}

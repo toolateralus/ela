@@ -192,8 +192,7 @@ std::any Emitter::visit(ASTCall *node) {
       (*ss) << "(";
       if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
         if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-          // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary
-          // expression with only literals
+          // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary expression with only literals
           // TODO: it could be a cast of a literal, it could be a bunch a function call's result.
           if (node->function->get_node_type() == AST_NODE_LITERAL) {
             throw_error("Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which "

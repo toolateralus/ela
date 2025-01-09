@@ -67,6 +67,18 @@ impl File {
     fclose(file);
     return str;
   }
+
+  read_bytes :: fn(filename: string) -> u8[] {
+    file := fopen(filename.data, "r");
+    result: u8[];
+    c: char;
+    while ((c = fgetc(file)) != EOF) {
+      result ~= c as u8;
+    }
+    fclose(file);
+    return result;
+  }
+
   write_all :: fn(filename: string, data: string) -> void {
     file := fopen(filename.data, "w");
     fwrite(data.data, sizeof(char), data.length, file);

@@ -1,0 +1,115 @@
+
+// dumb struct just to show
+Struct :: struct {
+  x: s32;
+  y: s32;
+}
+
+#ifdef ABSTRACT_INTERFACE {
+  // abstract interface.
+  // each method has to be implemented or compiler errors.
+  Format :: interface![T] {
+    to_string :: fn(self*) -> string;
+    parse     :: fn(input: string) -> #self;
+  }
+
+  // impl generic Format interface for Struct.
+  impl Format![Struct] for Struct {
+    to_string :: fn(self*)         -> string {
+      return $"Struct {{x: {self.x}, y: {self.y}}}";
+    }
+    parse     :: fn(input: string) -> #self {
+      // omitted for simplicity.
+      self: #self;
+      return self;
+    }
+  }
+
+} else if AUTO_INTERFACE {
+  // non-abstract interface, can be partially or completely automatically implemented.
+  Format :: interface![T] {
+    to_string :: fn(self*) -> string {
+      return $"{*self}";              // omitted for simplicity.
+    }
+    parse     :: fn(self*) -> #self {
+      return std::parse![T](self);    // again, omitted for simplicity.
+    }
+  }
+
+  // block of auto impls;
+  impl(auto) { 
+    Format![Struct] for Struct,
+    OtherInterface![Struct] for Struct,
+    AnotherInterface![Struct] for Struct,
+  };
+
+  // can use a regular auto impl
+  impl(auto) Format![Struct] for Struct;
+} 
+
+
+// #### ################################# ###
+// #### Example usage / Disallowed usages ###
+// #### ################################# ###
+
+Speak :: interface {
+  greet :: fn(self*);
+}
+
+Dog :: struct {}
+Cat :: struct {}
+
+impl Speak for Dog {
+  greet :: fn(self*) {
+    println("woof");
+  }
+}
+
+impl Speak for Cat {
+  greet :: fn(self*) {
+    println("meow");
+  }
+}
+
+// A type like this:
+  interface(Speak)
+
+// is similar to rust's 'dyn Trait'
+// where it is a dynamic dispatch object.
+// this is a huge benny for things like a GUI library, 
+// where you have Element and you want to call draw,
+// but the type of that field can change at runtime,
+// and we don't want to implement a ton of hacks to get that done.
+
+make_speak :: fn(speaker: interface(Speak)) {
+  speaker.speak();
+}
+
+main :: fn () {
+  dog: Dog;
+  cat: Cat;
+  
+  dog.speak();                     // print "woof";
+  cat.speak();                     // print "meow";
+
+  speaker: interface(Speak);
+  speaker = dog;                   //! invalid, interfaces can only be taken by pointer.
+  speaker = &dog;                  // valid.
+
+  speaker.speak();                 // print "woof";
+
+  make_speak(dog);                 // !invalid, again, interfaces can only be taken by pointer.
+  make_speak(speaker);             // valid. print "woof"
+  make_speak(&cat);                // valid. print "meow"
+
+  switch speaker {
+    is(Dog): {
+
+    },
+    is(Cat): {
+
+    }
+  }
+
+}
+
