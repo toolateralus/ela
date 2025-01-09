@@ -178,7 +178,7 @@ struct Emitter : VisitorBase {
   std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
                                                              Type *type);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
-  int get_dot_left_type(ASTNode *node);
+  int get_expr_left_type_sr_dot(ASTNode *node);
   std::any visit(ASTStructDeclaration *node) override;
   std ::any visit(ASTProgram *node) override;
   std ::any visit(ASTBlock *node) override;

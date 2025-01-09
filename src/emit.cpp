@@ -138,8 +138,11 @@ std::any Emitter::visit(ASTType *node) {
   return {};
 }
 
-int Emitter::get_dot_left_type(ASTNode *node) {
+int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   switch (node->get_node_type()) {
+    case AST_NODE_TYPE: {
+      return std::any_cast<int>(node->accept(&typer));
+    }
     case AST_NODE_IDENTIFIER:
       return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
     case AST_NODE_DOT_EXPR: {
@@ -159,10 +162,9 @@ int Emitter::get_dot_left_type(ASTNode *node) {
 }
 
 std::any Emitter::visit(ASTCall *node) {
-  auto base_symbol = typer.get_symbol(node->function);
   auto node_type = node->function->get_node_type();
-
-  if (base_symbol && (node_type == AST_NODE_DOT_EXPR || node_type == AST_NODE_SCOPE_RESOLUTION)) {
+  auto base_symbol = typer.get_symbol(node->function);
+  if ((base_symbol && (node_type == AST_NODE_DOT_EXPR || node_type == AST_NODE_SCOPE_RESOLUTION || node_type == AST_NODE_TYPE))) {
     auto symbol = base_symbol.get();
     if (symbol->declaring_node.is_not_null() &&
         symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -177,6 +179,15 @@ std::any Emitter::visit(ASTCall *node) {
             throw_error("cannot call a static method from an instance", node->source_range);
           }
           base = static_cast<ASTDotExpr *>(node->function)->base;
+        } else if (node_type == AST_NODE_TYPE) {
+          if (method_call) {
+            throw_error("must call method with instance", node->source_range);
+          }
+          node->function = base = static_cast<ASTType*>(node->function)->normal.base;
+          // TODO: how are we gonna handle super chained dot & scope res calls?
+          while (base->get_node_type() == AST_NODE_SCOPE_RESOLUTION) {
+            base = static_cast<ASTScopeResolution *>(base)->base;  
+          }
         } else {
           if (method_call) {
             throw_error("must call method with instance", node->source_range);
@@ -188,7 +199,7 @@ std::any Emitter::visit(ASTCall *node) {
         Type *function_type = global_get_type(base_sym_ptr->type_id);
         auto info = function_type->get_info()->as<FunctionTypeInfo>();
         auto param_0_ty = global_get_type(info->parameter_types[0]);
-        auto base_type = global_get_type(get_dot_left_type(node->function));
+        auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
 
         if (!base_type) {
           throw_error("Internal compiler error: unable to find method call", node->source_range);
@@ -225,7 +236,7 @@ std::any Emitter::visit(ASTCall *node) {
         return {};
       }
     }
-  }
+  } 
   node->function->accept(this);
   node->arguments->accept(this);
   return {};

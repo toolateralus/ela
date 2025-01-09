@@ -1112,8 +1112,17 @@ ASTType *Parser::parse_type() {
   auto node = ast_alloc<ASTType>();
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
+
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
+  }
+
+  while (peek().type == TType::DoubleColon) {
+    eat();
+    auto scope_res_node = ast_alloc<ASTScopeResolution>();
+    scope_res_node->base = node->normal.base;
+    scope_res_node->member_name = expect(TType::Identifier).value;
+    node->normal.base = scope_res_node;
   }
 
   append_type_extensions(node);

@@ -40,6 +40,16 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
 
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
+    case AST_NODE_SUBSCRIPT: return nullptr;
+    case AST_NODE_TYPE: {
+      auto type_node = static_cast<ASTType*>(node);
+
+      if (type_node->kind != ASTType::NORMAL) {
+        return nullptr;
+      }
+
+      return get_symbol(type_node->normal.base);
+    }
     case AST_NODE_IDENTIFIER:
       return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value);
     case AST_NODE_DOT_EXPR: {
@@ -54,9 +64,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
       auto scope = type->get_info()->scope;
       return scope->local_lookup(srnode->member_name);
     } break;
-    case AST_NODE_SUBSCRIPT: {
-      return nullptr;
-    }
+    
     default:
       throw_error("Get symbol cannot be used on this node type", node->source_range);
   }

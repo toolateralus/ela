@@ -65,19 +65,14 @@
 #foreign srand :: fn(seed: u32);
 
 Random :: struct {
-  Max :: 2147483647;
+  Max :: 2147483647; // !BUG: can't use constants for structs. Emitting it is just empty
 }
 
 impl Random {
   next :: fn(max: float32) -> float {
-    return (rand() as float) / (Random::Max as float) * max;
+    return (rand() as float) / (2147483647 as float) * max;
   }
 }
-
-// api for string manipulation.
-// when dot expressions are fixed we should be able to implement 'string' in language,
-// and we won't need an extra struct to do this.
-Strings :: struct;
 
 impl string {
   empty :: fn() -> #self {
