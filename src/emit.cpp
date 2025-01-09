@@ -97,15 +97,7 @@ std::any Emitter::visit(ASTContinue *node) {
   indented("continue");
   return {};
 }
-std::any Emitter::visit(ASTReturn *node) {
-  emit_line_directive(node);
-  indented("return");
-  if (node->expression.is_not_null()) {
-    space();
-    node->expression.get()->accept(this);
-  }
-  return {};
-}
+
 std::any Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
@@ -450,172 +442,6 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   }
 }
 
-std::any Emitter::visit(ASTFunctionDeclaration *node) {
-  auto emit_function_signature_and_body = [&](const std::string &name) {
-    node->return_type->accept(this);
-    (*ss) << " " + name;
-    node->params->accept(this);
-    if (node->block.is_not_null()) {
-      node->block.get()->accept(this);
-    }
-  };
-
-  auto emit_destructor = [&]() {
-    auto type_id =
-        current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type;
-    auto type = global_get_type(type_id);
-    auto name = type->get_base().get_str();
-    (*ss) << '~' << name << "()";
-    if (!node->block)
-      throw_error("Cannot forward declare a constructor", node->source_range);
-    node->block.get()->accept(this);
-  };
-
-  auto emit_constructor = [&]() {
-    auto type_id =
-        current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type;
-    auto type = global_get_type(type_id);
-    auto name = type->get_base().get_str();
-    (*ss) << name;
-
-    auto is_copy_ctor =
-        node->params->params.size() == 1 &&
-        node->params->params[0]->type->resolved_type ==
-            (current_struct_decl ? current_struct_decl.get()->resolved_type : current_union_decl.get()->resolved_type);
-
-    if (is_copy_ctor) {
-      (*ss) << "(" << name << " &" << node->params->params[0]->name.get_str() << ")";
-      node->block.get()->accept(this);
-      (*ss) << ";\n";
-      (*ss) << name;
-      (*ss) << "(const " << name << " &" << node->params->params[0]->name.get_str() << ")";
-      node->block.get()->accept(this);
-      (*ss) << ";\n";
-    } else {
-      node->params->accept(this);
-      if (!node->block) {
-        throw_error("Cannot forward declare a constructor", node->source_range);
-      }
-      node->block.get()->accept(this);
-    }
-  };
-
-  auto emit_operator = [&]() {
-    auto op = node->name;
-
-    if (op == "(") {
-      op = "()";
-    }
-    if (op == "[") {
-      op = "[]";
-    }
-    if (op == ".") {
-      op = "->";
-    }
-    node->return_type->accept(this);
-    (*ss) << " operator " << op.get_str();
-
-    if (op == "++" || op == "--") {
-      (*ss) << "(int)";
-    } else {
-      node->params->accept(this);
-    }
-    node->block.get()->accept(this);
-  };
-
-  auto emit_various_function_declarations = [&] {
-    if (!node->generic_parameters.empty()) {
-      for (auto &instantiation : node->generic_instantiations) {
-        instantiation.node->accept(this);
-      }
-      return;
-    }
-
-    auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
-
-    if (node->name != "main" && !is_local) {
-      if ((node->flags & FUNCTION_IS_STATIC) != 0) {
-        (*ss) << "static ";
-      }
-      if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-        emit_forward_declaration(node);
-        return;
-      }
-    }
-
-
-    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
-      (*ss) << "static ";
-    }
-
-    // local function
-    if (is_local) {
-      emit_local_function(node);
-      return;
-    }
-
-    if ((node->flags & FUNCTION_IS_DTOR) != 0) {
-      emit_destructor();
-      return;
-    }
-
-    if ((node->flags & FUNCTION_IS_CTOR) != 0) {
-      emit_constructor();
-      return;
-    }
-
-    if ((node->flags & FUNCTION_IS_OPERATOR) != 0) {
-      emit_operator();
-      return;
-    }
-
-    if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-      (*ss) << "extern \"C\" ";
-    }
-
-    if (node->name == "main") {
-      if (!is_freestanding) {
-        has_user_defined_main = true;
-        node->return_type->accept(this);
-        (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
-        node->block.get()->accept(this);
-      } else {
-        (*ss) << "int ";
-        emit_function_signature_and_body(node->name.get_str());
-      }
-    } else {
-      emit_function_signature_and_body(node->name.get_str());
-    }
-  };
-
-  emit_line_directive(node);
-
-  auto last_func_decl = current_func_decl;
-  current_func_decl = node;
-
-  auto test_flag = compile_command.has_flag("test");
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  Defer deferred = {[&]() {
-    current_func_decl = last_func_decl;
-    ctx.set_scope(old_scope);
-  }};
-
-  // this also happens to emit the test boilerplate that bootstraps it into the
-  // test runner, if applicable.
-  if (!should_emit_function(this, node, test_flag)) {
-    return {};
-  }
-
-  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
-    emit_foreign_function(node);
-    return {};
-  }
-
-  emit_various_function_declarations();
-
-  return {};
-}
 std::string mangled_type_args(const std::vector<int> &args) {
   std::string s;
   for (const auto &arg : args) {
@@ -645,7 +471,7 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
-     (*ss) << "extern \"C\" ";
+      (*ss) << "extern \"C\" ";
     }
     (*ss) << "struct " << type->get_base().get_str() << ";\n";
     return {};
@@ -791,25 +617,7 @@ std::any Emitter::visit(ASTParamsDecl *node) {
   (*ss) << ")";
   return {};
 }
-std::any Emitter::visit(ASTBlock *node) {
-  emit_line_directive(node);
-  (*ss) << (" {\n");
-  indentLevel++;
-  ctx.set_scope(node->scope);
-  for (const auto &statement : node->statements) {
-    emit_line_directive(node);
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
-      indented("");
-    }
-    statement->accept(this);
-    semicolon();
-    newline();
-  }
-  indentLevel--;
-  indented("}");
-  ctx.exit_scope();
-  return {};
-}
+
 std::any Emitter::visit(ASTProgram *node) {
   emit_line_directive(node);
 
@@ -1749,6 +1557,225 @@ std::any Emitter::visit(ASTImpl *node) {
     if (method->block) {
       method->block.get()->accept(this);
     }
+  }
+
+  return {};
+}
+
+// TODO:
+/*
+  To accomplish defer, we will have to look at the parent block this is used from, until we get to a function
+  declaration's block, then for all the blocks in the code path, or really the whole thing, we turn all the returns
+  into a variable assignment, and then when we would've returned, we use a goto to the defer block header, if it's
+  applicable, then we return the assigned variable once we've executed defer.
+
+  so, for
+
+  getter :: fn() -> int {
+    handle := get_handle();
+    defer handle.destroy();
+
+    if handle.is_good() {
+      defer handle.drop_consumer();
+      if handle.has_consumer {
+        return handle.id;
+      }
+    }
+
+    return get_invalid_handle_id();
+  }
+
+  we would compile
+  getter :: fn() -> int {
+    handle := get_handle();
+
+    __defer_retval : int;
+
+    if handle.is_good() {
+      defer handle.drop_consumer();
+      if handle.has_consumer {
+        __defer_retval = handle.id;
+        goto DEFER_1;
+      }
+      goto DEFER_1;
+    }
+    __defer_retval = get_invalid_handle_id();
+
+    DEFER_1:
+      handle.drop_consumer();
+    DEFER_0:
+      handle.destroy();
+  }
+
+*/
+std::any Emitter::visit(ASTFunctionDeclaration *node) {
+  auto emit_function_signature_and_body = [&](const std::string &name) {
+    node->return_type->accept(this);
+    (*ss) << " " + name;
+    node->params->accept(this);
+    if (node->block.is_not_null()) {
+      auto last_defer_blocks = std::move(defer_blocks);
+      defer_blocks.clear();
+      bool was_emitting_block_with_defer = emitting_block_with_defer;
+      emitting_block_with_defer = node->has_defer;
+      node->block.get()->accept(this);
+      defer_blocks = std::move(last_defer_blocks);
+      emitting_block_with_defer = was_emitting_block_with_defer;
+    }
+  };
+
+  auto emit_various_function_declarations = [&] {
+    if (!node->generic_parameters.empty()) {
+      for (auto &instantiation : node->generic_instantiations) {
+        instantiation.node->accept(this);
+      }
+      return;
+    }
+
+    auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
+
+    if (node->name != "main" && !is_local) {
+      if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+        (*ss) << "static ";
+      }
+      if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+        emit_forward_declaration(node);
+        return;
+      }
+    }
+
+    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+      (*ss) << "static ";
+    }
+
+    // local function
+    if (is_local) {
+      emit_local_function(node);
+      return;
+    }
+
+    if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
+      (*ss) << "extern \"C\" ";
+    }
+
+    if (node->name == "main") {
+      if (!is_freestanding) {
+        has_user_defined_main = true;
+        node->return_type->accept(this);
+        (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
+        node->block.get()->accept(this);
+      } else {
+        (*ss) << "int ";
+        emit_function_signature_and_body(node->name.get_str());
+      }
+    } else {
+      emit_function_signature_and_body(node->name.get_str());
+    }
+  };
+
+  emit_line_directive(node);
+
+  auto last_func_decl = current_func_decl;
+  current_func_decl = node;
+
+  auto test_flag = compile_command.has_flag("test");
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer deferred = {[&]() {
+    current_func_decl = last_func_decl;
+    ctx.set_scope(old_scope);
+  }};
+
+  // this also happens to emit the test boilerplate that bootstraps it into the
+  // test runner, if applicable.
+  if (!should_emit_function(this, node, test_flag)) {
+    return {};
+  }
+
+  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
+    emit_foreign_function(node);
+    return {};
+  }
+
+  emit_various_function_declarations();
+
+  return {};
+}
+
+std::any Emitter::visit(ASTDefer *node) {
+  auto old = ss;
+  Defer _([&] {
+    ss = old;
+  });
+  std::stringstream defer_ss;
+  ss = &defer_ss;
+  node->statement->accept(this);
+  (*ss) << ";\n";
+  defer_blocks.push_back(std::move(defer_ss));
+  return {};
+}
+
+std::any Emitter::visit(ASTBlock *node) {
+  emit_line_directive(node);
+  (*ss) << (" {\n");
+  indentLevel++;
+  ctx.set_scope(node->scope);
+
+  if (emitting_block_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    if (node->return_type != void_type()) {
+      auto type = global_get_type(node->return_type);
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << ";\n";
+    }
+  }
+
+  for (const auto &statement : node->statements) {
+    emit_line_directive(node);
+    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+      indented("");
+    }
+    statement->accept(this);
+    semicolon();
+    newline();
+  }
+
+  if (node->parent != nullptr && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    auto fn = static_cast<ASTFunctionDeclaration*>(node->parent);
+    if (fn->has_defer) {
+      while (!defer_blocks.empty()) {
+        (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
+        (*ss) << defer_blocks.back().str();
+        defer_blocks.pop_back();
+      }
+
+      if (fn->return_type->resolved_type != void_type() && fn->return_type->resolved_type != -1) {
+        (*ss) << "return " << defer_return_value_key << ";\n";
+      }
+    }
+  }
+
+  indentLevel--;
+  indented("}");
+  ctx.exit_scope();
+  return {};
+}
+
+std::any Emitter::visit(ASTReturn *node) {
+  emit_line_directive(node);
+
+  if (emitting_block_with_defer) {
+    if (node->expression.is_not_null()) {
+      (*ss) << defer_return_value_key << " = ";
+      node->expression.get()->accept(this);
+    }
+    (*ss) << ";\n";
+    (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
+  } else {
+    indented("return");
+    if (node->expression.is_not_null()) {
+      space();
+      node->expression.get()->accept(this);
+    }
+    (*ss) << ";\n";
   }
 
   return {};

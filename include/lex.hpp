@@ -96,10 +96,11 @@ enum struct TType {
   Switch,
   Fn,
 
-  GenericBrace, // '!<' for ![T, T1]
-  As,           // 'as' for casting
+  GenericBrace,   // '!<' for ![T, T1]
+  As,             // 'as' for casting
   Impl,
-  ExpressionBody,
+  ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
+  Defer,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -108,6 +109,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Defer);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
@@ -255,6 +257,7 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
     // control flow
     {"in", TType::In},
+    
     {"fn", TType::Fn},
     {"switch", TType::Switch},
     {"then", TType::Then},
@@ -277,7 +280,7 @@ static std::unordered_map<std::string, TType> keywords{
     // miscellaneous
     {"as", TType::As},
     {"impl", TType::Impl},
-    
+    {"defer", TType::Defer},
 };
 
 static std::unordered_map<std::string, TType> operators{

@@ -1131,6 +1131,10 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+  if (peek().type == TType::Defer) {
+    return parse_defer();
+  }
+
   if (peek().type == TType::Impl) {
     return parse_impl();
   }
@@ -1488,6 +1492,12 @@ ASTBlock *Parser::parse_block(Scope *scope) {
       throw_error("Imbalanced '{' and '}'", range);
     }
     auto statement = parse_statement();
+
+    if (statement->get_node_type() == AST_NODE_DEFER && current_func_decl.get()) {
+      current_func_decl.get()->has_defer = true;
+      block->has_defer = true;
+    }
+
     block->statements.push_back(statement);
     while (semicolon())
       eat();
@@ -1630,6 +1640,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   function->block = parse_block();
+  function->block.get()->parent = function;
 
   for (const auto &stmt: function->block.get()->statements) {
     if (stmt->get_node_type()==AST_NODE_FUNCTION_DECLARATION) {
@@ -1729,6 +1740,15 @@ ASTImpl *Parser::parse_impl() {
     }
   }
   return impl;
+}
+
+ASTDefer *Parser::parse_defer() {
+  auto range = begin_node();
+  expect(TType::Defer);
+  auto node = ast_alloc<ASTDefer>();
+  node->statement = parse_statement();
+  end_node(node, range);
+  return node;
 }
 
 void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {

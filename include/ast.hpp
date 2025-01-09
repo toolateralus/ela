@@ -57,6 +57,7 @@ enum ASTNodeType {
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
+  AST_NODE_DEFER,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
@@ -78,7 +79,7 @@ struct ASTStatement : ASTNode {
 struct ASTStatementList : ASTStatement {
   std::vector<ASTNode *> statements;
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override;
+  ASTNodeType get_node_type() const override { return AST_NODE_STATEMENT_LIST; }
 };
 
 enum BlockFlags {
@@ -107,7 +108,9 @@ inline static std::string block_flags_to_string(int flags) {
 }
 
 struct ASTBlock : ASTStatement {
+  ASTNode *parent;
   int flags = BLOCK_FLAGS_FALL_THROUGH;
+  bool has_defer = false;
   int return_type = Type::invalid_id;
   Scope *scope;
   std::vector<ASTNode *> statements;
@@ -192,7 +195,7 @@ struct ASTDeclaration : ASTStatement {
   // This isn't nullable, even though it can be null for part of compilation.
   // That's because if it ever was null, when it's done typing it will have been created.
   // It creates too much friction later on down the line if it's not.
-  ASTType* type = nullptr;
+  ASTType *type = nullptr;
   Nullable<ASTExpr> value;
 
   std::any accept(VisitorBase *visitor) override;
@@ -207,7 +210,7 @@ struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
   Token op;
-  
+
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
@@ -283,7 +286,7 @@ struct GenericInstance {
 
 struct ASTFunctionDeclaration : ASTStatement {
   size_t flags = 0;
-  
+  bool has_defer = false;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
 
@@ -410,12 +413,12 @@ struct ASTUnionDeclaration;
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
-  
+
   bool is_fwd_decl = false;
   bool is_extern = false;
 
   std::vector<ASTDeclaration *> fields;
-  std::vector<ASTUnionDeclaration*> unions;
+  std::vector<ASTUnionDeclaration *> unions;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
 
@@ -441,11 +444,11 @@ struct ASTInitializerList : ASTExpr {
         break;
     }
   }
-  
+
   // Key values.
   union {
     std::vector<std::pair<InternedString, ASTExpr *>> key_values;
-    std::vector<ASTExpr*> values;
+    std::vector<ASTExpr *> values;
   };
 
   enum {
@@ -509,12 +512,16 @@ struct ASTAlias : ASTStatement {
 // TODO: add interface field, once we have interfaces lol.
 struct ASTImpl : ASTStatement {
   // impl 'target' or impl *interface for 'target'
-  ASTType *target; 
-
+  ASTType *target;
   // methods / static methods this is implementing for the type.
-  std::vector<ASTFunctionDeclaration*> methods;
-
+  std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
+  std::any accept(VisitorBase *visitor) override;
+};
+
+struct ASTDefer : ASTStatement {
+  ASTNode *statement;
+  ASTNodeType get_node_type() const override { return AST_NODE_DEFER; }
   std::any accept(VisitorBase *visitor) override;
 };
 
@@ -553,7 +560,8 @@ struct ASTImpl : ASTStatement {
   std::any visit(ASTSwitch *node) override {};                                                                         \
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
-  std::any visit(ASTTupleDeconstruction *node) override {};
+  std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
+  std::any visit(ASTDefer *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   std::any visit(ASTNoop *noop) { return {}; }                                                                         \
@@ -590,8 +598,9 @@ struct ASTImpl : ASTStatement {
   virtual std::any visit(ASTSwitch *node) = 0;                                                                         \
   virtual std::any visit(ASTTuple *node) = 0;                                                                          \
   virtual std::any visit(ASTAlias *node) = 0;                                                                          \
-  virtual std::any visit(ASTImpl *node) = 0;                                                                          \
-  virtual std::any visit(ASTTupleDeconstruction *node) = 0;
+  virtual std::any visit(ASTImpl *node) = 0;                                                                           \
+  virtual std::any visit(ASTTupleDeconstruction *node) = 0;                                                            \
+  virtual std::any visit(ASTDefer *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -660,6 +669,8 @@ struct Parser {
   void append_type_extensions(ASTType *type);
 
   ASTType *parse_function_type();
+
+  ASTDefer *parse_defer();
 
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<ASTExpr> try_parse_directive_expr();

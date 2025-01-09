@@ -32,7 +32,7 @@ returns :: fn() -> s32  {
 
 #test test_local_function :: fn() {
   local_function :: fn() -> s32 {
-      return 0;
+    return 0;
   }
   assert("failed to get 0 from local function call", local_function() == 0);
 }

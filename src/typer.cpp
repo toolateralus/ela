@@ -371,7 +371,7 @@ std::any Typer::visit(ASTBlock *node) {
   }
 
   node->flags = block_cf.flags;
-  node->return_type = block_cf.type;
+  node->return_type = block_cf.type == -1 ? void_type() : block_cf.type;
   ctx.exit_scope();
   return block_cf;
 }
@@ -1292,5 +1292,10 @@ std::any Typer::visit(ASTImpl *node) {
   }
   ctx.set_scope(previous);
 
+  return {};
+}
+
+std::any Typer::visit(ASTDefer *node) {
+  node->statement->accept(this);
   return {};
 }

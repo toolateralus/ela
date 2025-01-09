@@ -1,5 +1,6 @@
 #pragma once
 #include <any>
+#include <deque>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -80,11 +81,13 @@ struct Typer : VisitorBase {
   std::any visit(ASTTupleDeconstruction *node) override;
   std::any visit(ASTAlias *node) override;
   std::any visit(ASTImpl *node) override;
+  std::any visit(ASTDefer *node) override;
 
   InternedString type_name(ASTExpr *node);
 };
 
 struct Emitter : VisitorBase {
+  static constexpr const char * defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
@@ -100,9 +103,17 @@ struct Emitter : VisitorBase {
 
   Typer &typer;
 
-  StringBuilder code{};
-  StringBuilder *ss{};
-  StringBuilder test_functions{};
+  // used to cache up defers.
+  bool emitting_block_with_defer = false;
+
+  // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
+  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
+  std::deque<std::stringstream> defer_blocks {};
+
+
+  std::stringstream code{};
+  std::stringstream *ss{};
+  std::stringstream test_functions{};
 
   int indentLevel = 0;
   Context &ctx;
@@ -202,6 +213,8 @@ struct Emitter : VisitorBase {
   std::any visit(ASTScopeResolution *node) override;
   std::any visit(ASTAlias *node) override;
   std::any visit(ASTImpl *node) override;
+  std::any visit(ASTDefer *node) override;
+
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);

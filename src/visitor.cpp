@@ -50,6 +50,10 @@ std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTImpl::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTDefer::accept(VisitorBase *visitor) {
+  return visitor->visit(this);
+}
+std::any ASTStatementList::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }
@@ -59,5 +63,3 @@ std::any ASTImpl::accept(VisitorBase *visitor) { return visitor->visit(this); }
   ###########################################
 */
 
-std::any ASTStatementList::accept(VisitorBase *visitor) { return visitor->visit(this); }
-ASTNodeType ASTStatementList::get_node_type() const { return AST_NODE_STATEMENT_LIST; }
