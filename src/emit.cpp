@@ -1737,10 +1737,14 @@ std::any Emitter::visit(ASTBlock *node) {
   }
 
   if (node->has_defer && !has_return) {
-    for (int i = defer_blocks.size() - 1; i >= 0; --i) {
-      (*ss) << defer_blocks[i].str();
+    for (int i = 0; i < node->defer_count; ++i) {
+      (*ss) << defer_blocks.back().str();
+      defer_blocks.pop_back();
     }
   }
+
+
+
 
   indentLevel--;
   indented("}");

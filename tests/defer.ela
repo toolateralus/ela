@@ -12,3 +12,53 @@ get_null_after_malloc :: fn() -> void* {
 #test test_defer :: fn() {
   assert("defer failed", get_null_after_malloc() == null);
 }
+
+nested_defer_test :: fn() -> int {
+  x := 0;
+  defer {
+    x += 1;
+  }
+  if (true) {
+    defer {
+      x += 2;
+    }
+  }
+  return x;
+}
+
+#test test_nested_defer :: fn() {
+  println(nested_defer_test());
+  assert("nested defer failed", nested_defer_test() == 3);
+}
+
+loop_defer_test :: fn() -> int {
+  x := 0;
+  for i in 0..3 {
+    defer {
+      x += i;
+    }
+  }
+  return x;
+}
+
+#test test_loop_defer :: fn() {
+  assert("loop defer failed", loop_defer_test() == 3);
+}
+
+early_return_defer_test :: fn() -> int {
+  x := 0;
+  defer {
+    x += 1;
+  }
+  if (true) {
+    defer {
+      x += 2;
+    }
+    return x;
+  }
+  return x;
+}
+
+#test test_early_return_defer :: fn() {
+  assert("early return defer failed", early_return_defer_test() == 3);
+}

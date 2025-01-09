@@ -1493,9 +1493,14 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     }
     auto statement = parse_statement();
 
-    if (statement->get_node_type() == AST_NODE_DEFER && current_func_decl.get()) {
-      current_func_decl.get()->has_defer = true;
+    if (statement->get_node_type() == AST_NODE_DEFER) {
+      if (current_func_decl.get()) {
+        current_func_decl.get()->has_defer = true;
+      } else {
+        throw_error("You can only use defer within a function scope", statement->source_range);
+      }
       block->has_defer = true;
+      block->defer_count++;
     }
 
     block->statements.push_back(statement);

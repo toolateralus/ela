@@ -111,6 +111,7 @@ struct ASTBlock : ASTStatement {
   ASTNode *parent;
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
+  int defer_count = 0;
   int return_type = Type::invalid_id;
   Scope *scope;
   std::vector<ASTNode *> statements;
