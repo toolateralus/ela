@@ -854,10 +854,10 @@ impl Vec4 {
     return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
   }
   one :: fn() -> #self {
-    return {1.0, 1.0, 1.0, 1.0};
+    return { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
   }
   zero :: fn() -> #self {
-    return {0.0, 0.0, 0.0, 0.0};
+    return { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
   }
 }
 
@@ -909,10 +909,10 @@ impl Vec3 {
     return self.x * self.x + self.y * self.y + self.z * self.z;
   }
   one :: fn() -> #self {
-    return {1.0, 1.0, 1.0};
+    return { x: 1.0, y: 1.0, z: 1.0 };
   }
   zero :: fn() -> Vec3 {
-    return {0.0, 0.0, 0.0};
+    return { x: 0.0, y: 0.0, z: 0.0 };
   }
 }
 
@@ -957,10 +957,10 @@ impl Vec2 {
     return self.x * self.x + self.y * self.y;
   }
   one :: fn() -> #self {
-    return {1.0, 1.0, 1.0};
+    return { x: 1.0, y: 1.0 };
   }
   zero  :: fn() -> #self {
-    return {0.0, 0.0, 0.0};
+    return { x: 0.0, y: 0.0 };
   }
 }
 
@@ -1066,13 +1066,13 @@ Shader :: struct {
 }
 
 impl Shader {
-  #dtor :: fn() {
+  #dtor :: fn(self*) {
     glDeleteProgram(self.handle);
   }
   use :: fn(self*) {
     glUseProgram(self.handle);
   }
-  create :: fn(vertexSource: c_string, fragSource: c_string) {
+  create :: fn(vertexSource: c_string, fragSource: c_string) -> #self {
     v: #self;
     v.handle = create_program(vertexSource, fragSource);
     return v;
@@ -1124,23 +1124,25 @@ Window :: struct {
 }
 
 impl Window {
-  #ctor :: fn(width: int, height: int, title: c_string) {
+  create :: fn(width: int, height: int, title: c_string) -> #self {
+    self: #self;
     if !glfwInit() {
       printf("Failed to initialize glfw\n");
-      return;
+      return self;
     }
-    handle = glfwCreateWindow(width, height, title, null, null);
-    if handle == null {
+    self.handle = glfwCreateWindow(width, height, title, null, null);
+    if self.handle == null {
       printf("Failed to create window\n");
       glfwTerminate();
-      return;
+      return self;
     }
     glfwMakeContextCurrent(self.handle);
     if glewInit() != 0 {
       printf("Failed to initialize glew\n");
       glfwTerminate();
-      return;
+      return self;
     }
+    return self;
   }
   should_close :: fn(self*) -> bool {
     return glfwWindowShouldClose(self.handle);
@@ -1149,7 +1151,7 @@ impl Window {
     glfwSwapBuffers(self.handle);
     glfwPollEvents();
   }
-  clear :: fn(flags: GL = GL::COLOR_BUFFER_BIT  | GL::DEPTH_BUFFER_BIT) {
+  clear :: fn(flags: GL = (GL::COLOR_BUFFER_BIT  | GL::DEPTH_BUFFER_BIT) as GL) {
     glClear(flags);
   }
 }

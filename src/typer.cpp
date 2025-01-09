@@ -153,7 +153,6 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
 
 int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
                                       std::vector<int> generic_args) {
-
   // Setup context.
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
@@ -164,7 +163,6 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
     current_func_decl = last_decl;
     ctx.set_scope(old_scope);
   });
-  
 
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -191,7 +189,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
       info.parameter_types[info.params_len] = param->type->resolved_type;
       info.params_len++;
     }
-    if (info.return_type != -2) 
+    if (info.return_type != -2)
       type_id = global_find_function_type_id(info, {});
   }
 
@@ -271,7 +269,6 @@ std::any Typer::visit(ASTEnumDeclaration *node) {
   info->element_type = elem_type;
   return {};
 }
-
 
 std::any Typer::visit(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
@@ -453,7 +450,7 @@ std::any Typer::visit(ASTFor *node) {
 
   int iter_ty = -1;
 
-  // TODO: implement some kind of interface system that we can use for iterators, 
+  // TODO: implement some kind of interface system that we can use for iterators,
   // no longer can we rely on C++'s crappy 'begin()/end()' since we compile our own free methods.
   if (range_type_id == string_type()) {
     iter_ty = char_type();
@@ -599,33 +596,39 @@ std::any Typer::visit(ASTCall *node) {
         symbol_nullable = nullptr;
       }
     }
-  } 
+  }
 
   if (!type) {
     throw_error("Unable to locate type for function call", node->source_range);
   }
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
-  
-  // we do this super late cuz the argument types have to be inferred for initializer lists.
-  std::vector<int> arg_tys = std::any_cast<std::vector<int>>(node->arguments->accept(this));
 
-  auto args_ct = arg_tys.size();
+  auto args = node->arguments->arguments;
+  auto args_ct = args.size();
   auto params_ct = info->params_len - (method_call ? 1 : 0);
-  if ((args_ct > params_ct && !info->is_varargs) || args_ct < params_ct) {
+  if ((args_ct > params_ct && !info->is_varargs) || args_ct < params_ct - info->default_params) {
     throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}\n type: {}",
                             params_ct, args_ct, type->to_string()),
                 node->source_range);
   }
+
   int param_index = 0;
-  for (int arg_index = 0; arg_index < arg_tys.size(); ++arg_index) {
+  for (int arg_index = 0; arg_index < args_ct; ++arg_index) {
     // skip self param for method calls
-    if (method_call && arg_index == 0) param_index++;
-    // early end for var args
-    if (arg_index <= params_ct) break;
-    assert_types_can_cast_or_equal(arg_tys[arg_index], info->parameter_types[arg_index], node->source_range,
-                                   "invalid argument types. expected: {}, got: {}",
-                                   std::format("parameter: {} of function", arg_index));
+    if (method_call && arg_index == 0) {
+      param_index++;
+    }
+    auto arg = args[arg_index];
+    declaring_or_assigning_type = info->parameter_types[param_index];
+    auto arg_ty = int_from_any(arg->accept(this));
+    // no type checking for var args
+    if (arg_index < params_ct) {
+      assert_types_can_cast_or_equal(arg_ty, info->parameter_types[param_index], node->source_range,
+                                     "invalid argument types. expected: {}, got: {}",
+                                     std::format("parameter: {} of function", arg_index));
+    }
+    param_index++;
   }
 
   node->type = info->return_type;
@@ -796,7 +799,8 @@ std::any Typer::visit(ASTBinExpr *node) {
     return element_ty;
   }
 
-  // * There was operator overloading here. Instead, now we're going to wait until we have traits and a more sensible, non C++ way to do this.
+  // * There was operator overloading here. Instead, now we're going to wait until we have traits and a more sensible,
+  // non C++ way to do this.
   // * For now, it's being removed
 
   // TODO: clean up this hacky mess.
@@ -1048,8 +1052,8 @@ std::any Typer::visit(ASTMake *node) {
   return type;
 }
 
-// ! BUG :: Initializer lists passed to functions that take a self parameter try to construct self/self* from the init list,
-// ! instead of skipping that argument. Hmm.
+// ! BUG :: Initializer lists passed to functions that take a self parameter try to construct self/self* from the init
+// list, ! instead of skipping that argument. Hmm.
 std::any Typer::visit(ASTInitializerList *node) {
   auto target_type = global_get_type(declaring_or_assigning_type);
   if (!target_type) {
@@ -1075,7 +1079,6 @@ std::any Typer::visit(ASTInitializerList *node) {
                     node->source_range);
       }
 
-
       // @Cleanup this is useful for returning a default value.
       // we would probably prefer a type::default(),
       // but for now we'll leave it.
@@ -1085,9 +1088,7 @@ std::any Typer::visit(ASTInitializerList *node) {
 
       for (const auto &[id, value] : node->key_values) {
         auto old = declaring_or_assigning_type;
-        Defer _([&]{
-          declaring_or_assigning_type = old;
-        }); 
+        Defer _([&] { declaring_or_assigning_type = old; });
         auto symbol = scope->local_lookup(id);
         if (!symbol)
           throw_error(std::format("Invalid named initializer list: couldn't find {}", id), node->source_range);
