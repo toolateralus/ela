@@ -16,7 +16,7 @@
 
 extern jstl::Arena ast_arena;
 
-template <class T> T *ast_alloc(size_t n = 1) { return new (ast_arena.allocate(sizeof(T) * n)) T(); }
+
 
 struct VisitorBase;
 
@@ -64,7 +64,9 @@ enum ASTNodeType {
   AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
 
+struct ASTBlock;
 struct ASTNode {
+  Nullable<ASTBlock> declaring_block;
   SourceRange source_range{};
   int resolved_type = Type::invalid_id;
   virtual ~ASTNode() = default;
@@ -107,8 +109,21 @@ inline static std::string block_flags_to_string(int flags) {
   return result;
 }
 
+struct DestructorCall {
+  InternedString variable_name;
+  InternedString destructor_fn_name;
+  int type_id;
+  int statement_idx;
+};
+
 struct ASTBlock : ASTStatement {
   ASTNode *parent;
+  // List of identifiers to call destructors on.
+  // types associate with them too, so we don't have to look it up later.
+  // also, we have the statement idx, so we know how many destructors to acll in an early return
+  // where there maybe more decarations after it.
+  std::vector<DestructorCall> identifiers_to_destruct_on_block_exit;
+
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
   int defer_count = 0;
@@ -225,12 +240,6 @@ struct ASTIdentifier : ASTExpr {
   InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
-
-  static ASTIdentifier *make(InternedString str) {
-    auto node = ast_alloc<ASTIdentifier>();
-    node->value = str;
-    return node;
-  }
 };
 struct ASTLiteral : ASTExpr {
   enum Tag {
@@ -643,6 +652,7 @@ struct Typer;
 
 struct Parser {
   Typer *typer;
+  static Nullable<ASTBlock> current_block;
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
@@ -705,3 +715,10 @@ struct Parser {
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
 };
+
+template  <class T> 
+static inline T *ast_alloc(size_t n = 1) { 
+  auto node = new (ast_arena.allocate(sizeof(T) * n)) T(); 
+  node->declaring_block = Parser::current_block;
+  return node;
+}

@@ -22,8 +22,9 @@ struct VisitorBase {
 struct Typer : VisitorBase {
   Nullable<Symbol> get_symbol(ASTNode *);
 
+  int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
-
+  
   template <typename T>
   int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
                     std::vector<int> args);

@@ -332,6 +332,25 @@ std::any Typer::visit(ASTDeclaration *node) {
   auto symbol = ctx.scope->lookup(node->name);
   symbol->type_id = node->type->resolved_type;
 
+  auto type = global_get_type(node->type->resolved_type);
+
+  // Build a list of destructors to call at emit time when we leave this scope.
+  if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+    auto scope = type->get_info()->scope;
+    for (const auto& [name, sym]: scope->symbols) {
+      if (!sym.is_function()) {
+        continue;
+      }
+      if (sym.declaring_node.is_not_null()) {
+        auto declaring_node = static_cast<ASTFunctionDeclaration*>(sym.declaring_node.get());
+        if ((declaring_node->flags & FUNCTION_IS_DTOR) != 0 && Parser::current_block.is_not_null()) {
+          Parser::current_block.get()->identifiers_to_destruct_on_block_exit.push_back({name, node->name, sym.type_id, current_block_statement_idx});
+          break;
+        }
+      }
+    }
+  }
+
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
   }
@@ -353,7 +372,14 @@ std::any Typer::visit(ASTBlock *node) {
   ctx.set_scope(node->scope);
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
+  int last_statement_idx = current_block_statement_idx;
+  Defer _([&]{
+    current_block_statement_idx = last_statement_idx;
+  });
+
+  int statement_idx = 0;
   for (auto &statement : node->statements) {
+    current_block_statement_idx = statement_idx;
     auto result = statement->accept(this);
     ASTNodeType node_type = statement->get_node_type();
     if (node_type == AST_NODE_BLOCK || node_type == AST_NODE_IF || node_type == AST_NODE_FOR ||
@@ -368,7 +394,9 @@ std::any Typer::visit(ASTBlock *node) {
         block_cf.flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       }
     }
+    statement_idx++;
   }
+  
 
   node->flags = block_cf.flags;
   node->return_type = block_cf.type == -1 ? void_type() : block_cf.type;

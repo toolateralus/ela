@@ -1736,14 +1736,24 @@ std::any Emitter::visit(ASTBlock *node) {
     newline();
   }
 
+  if (!has_return) {
+    for (int i = node->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
+      auto [dtor_name, name, type_id, idx] = node->identifiers_to_destruct_on_block_exit[i]; 
+      (*ss) << dtor_name.get_str() << '(';
+      if (!global_get_type(type_id)->get_ext().is_pointer()) {
+        (*ss) << "&";
+      }
+      (*ss) << name.get_str() << ");\n";
+    }
+  }
+
   if (node->has_defer && !has_return) {
+   
     for (int i = 0; i < node->defer_count; ++i) {
       (*ss) << defer_blocks.back().str();
       defer_blocks.pop_back();
     }
   }
-
-
 
 
   indentLevel--;
@@ -1754,6 +1764,20 @@ std::any Emitter::visit(ASTBlock *node) {
 
 std::any Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
+
+  if (node->declaring_block.is_not_null()) {
+    auto block = node->declaring_block.get();
+
+    for (int i = block->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
+      auto [dtor_name, name, type_id, idx] = block->identifiers_to_destruct_on_block_exit[i]; 
+      if (i > idx) break; // break for not-yet-constructed objects in this block
+      (*ss) << dtor_name.get_str() << '(';
+      if (!global_get_type(type_id)->get_ext().is_pointer()) {
+        (*ss) << "&";
+      }
+      (*ss) << name.get_str() << ");\n";
+    }
+  }
 
   if (emitting_block_with_defer) {
     for (int i = defer_blocks.size() - 1; i >= 0; --i) {

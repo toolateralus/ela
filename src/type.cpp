@@ -374,7 +374,7 @@ Token get_unique_identifier() {
 }
 
 ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
-  auto info = ast_alloc<ScalarTypeInfo>();
+  auto info = type_info_alloc<ScalarTypeInfo>();
   info->scalar_type = type;
   info->size = size;
   info->is_integral = is_integral;

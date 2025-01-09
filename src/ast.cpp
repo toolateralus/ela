@@ -1472,6 +1472,13 @@ ASTDeclaration *Parser::parse_declaration() {
 ASTBlock *Parser::parse_block(Scope *scope) {
   auto range = begin_node();
   ASTBlock *block = ast_alloc<ASTBlock>();
+
+  auto last_block = current_block;
+  current_block = block;
+  Defer _([&]{
+    current_block = last_block;
+  });
+
   ctx.set_scope(scope);
 
   if (peek().type == TType::ExpressionBody) {
@@ -2145,3 +2152,5 @@ Parser::Parser(const std::string &filename, Context &context)
 }
 
 Parser::~Parser() { delete typer; }
+
+Nullable<ASTBlock> Parser::current_block = nullptr;

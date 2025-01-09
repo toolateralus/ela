@@ -1,0 +1,20 @@
+
+#foreign malloc :: fn(n: u64) -> void*;
+#foreign free :: fn(p: void*);
+Structy :: struct {
+  handle := malloc(8);
+}
+
+
+impl Structy {
+  #dtor :: fn(self*) {
+    free(self.handle);
+    self.handle = null;
+  }
+}
+
+
+#test test_destructor :: fn() {
+  s: Structy;
+  assert("failed to destroy", s.handle == null);
+}
