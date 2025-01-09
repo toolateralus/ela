@@ -343,8 +343,8 @@ std::any Typer::visit(ASTDeclaration *node) {
       }
       if (sym.declaring_node.is_not_null()) {
         auto declaring_node = static_cast<ASTFunctionDeclaration*>(sym.declaring_node.get());
-        if ((declaring_node->flags & FUNCTION_IS_DTOR) != 0 && Parser::current_block.is_not_null()) {
-          Parser::current_block.get()->identifiers_to_destruct_on_block_exit.push_back({name, node->name, sym.type_id, current_block_statement_idx});
+        if ((declaring_node->flags & FUNCTION_IS_DTOR) != 0 && node->declaring_block.is_not_null()) {
+          node->declaring_block.get()->identifiers_to_destruct_on_block_exit.push_back({name, node->name, symbol->type_id, current_block_statement_idx});
           break;
         }
       }

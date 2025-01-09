@@ -1739,7 +1739,9 @@ std::any Emitter::visit(ASTBlock *node) {
   if (!has_return) {
     for (int i = node->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
       auto [dtor_name, name, type_id, idx] = node->identifiers_to_destruct_on_block_exit[i]; 
-      (*ss) << dtor_name.get_str() << '(';
+      
+      auto type = global_get_type(type_id);
+      (*ss) << type->get_base().get_str() << '_' << dtor_name.get_str() << '(';
       if (!global_get_type(type_id)->get_ext().is_pointer()) {
         (*ss) << "&";
       }
@@ -1771,7 +1773,8 @@ std::any Emitter::visit(ASTReturn *node) {
     for (int i = block->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
       auto [dtor_name, name, type_id, idx] = block->identifiers_to_destruct_on_block_exit[i]; 
       if (i > idx) break; // break for not-yet-constructed objects in this block
-      (*ss) << dtor_name.get_str() << '(';
+      auto type = global_get_type(type_id);
+      (*ss) << type->get_base().get_str() << '_' << dtor_name.get_str() << '(';
       if (!global_get_type(type_id)->get_ext().is_pointer()) {
         (*ss) << "&";
       }

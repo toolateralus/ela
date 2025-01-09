@@ -1,10 +1,9 @@
-
 #foreign malloc :: fn(n: u64) -> void*;
 #foreign free :: fn(p: void*);
+
 Structy :: struct {
   handle := malloc(8);
 }
-
 
 impl Structy {
   #dtor :: fn(self*) {
@@ -13,8 +12,49 @@ impl Structy {
   }
 }
 
+runDestructor_returnValueStill :: fn() -> Structy {
+  s: Structy;
+  return s;
+}
 
 #test test_destructor :: fn() {
-  s: Structy;
+  s := runDestructor_returnValueStill();
   assert("failed to destroy", s.handle == null);
+}
+
+earlyReturnDestructorTest :: fn() -> Structy {
+  s: Structy;
+  if (true) {
+    return s;
+  }
+  return s; // This line should never be reached
+}
+
+#test test_early_return_destructor :: fn() {
+  s := earlyReturnDestructorTest();
+  assert("early return failed to destroy", s.handle == null);
+}
+
+nestedDestructorTest :: fn() -> Structy {
+  outer: Structy;
+  inner: Structy;
+  return outer;
+}
+
+#test test_nested_destructor :: fn() {
+  s := nestedDestructorTest();
+  assert("nested destructor failed to destroy", s.handle == null);
+}
+
+loopDestructorTest :: fn() -> Structy {
+  s: Structy;
+  for i in 0..3 {
+    temp: Structy;
+  }
+  return s;
+}
+
+#test test_loop_destructor :: fn() {
+  s := loopDestructorTest();
+  assert("loop destructor failed to destroy", s.handle == null);
 }
