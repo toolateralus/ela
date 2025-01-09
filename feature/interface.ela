@@ -89,10 +89,15 @@ main :: fn () {
   dog: Dog;
   cat: Cat;
   
-  dog.speak();                     // print "woof";
+  //             No dynamic dispatch needed for these 2 calls: just call the function.
+  dog.speak();                     // print "woof";  
   cat.speak();                     // print "meow";
 
-  speaker: interface(Speak);
+
+  // dynamic dispatch & storing variables:
+  speaker: dyn(Speak);
+  speaker.speak();                 //! runtime error. dynamic call to speak had no target, null reference exception kinda.
+
   speaker = dog;                   //! invalid, interfaces can only be taken by pointer.
   speaker = &dog;                  // valid.
 
@@ -103,11 +108,11 @@ main :: fn () {
   make_speak(&cat);                // valid. print "meow"
 
   switch speaker {
-    is(Dog): {
-
+    Dog: {
+      println("собака");
     },
-    is(Cat): {
-
+    Cat: {
+      println("кошка");
     }
   }
 
