@@ -117,12 +117,6 @@ struct DestructorCall {
 
 struct ASTBlock : ASTStatement {
   ASTNode *parent;
-  // List of identifiers to call destructors on.
-  // types associate with them too, so we don't have to look it up later.
-  // also, we have the statement idx, so we know how many destructors to acll in an early return
-  // where there maybe more decarations after it.
-  std::vector<DestructorCall> identifiers_to_destruct_on_block_exit;
-
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
   int defer_count = 0;
@@ -551,6 +545,7 @@ struct ASTDefer : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_DEFER; }
   std::any accept(VisitorBase *visitor) override;
 };
+
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.

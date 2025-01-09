@@ -1589,6 +1589,39 @@ std::any Emitter::visit(ASTImpl *node) {
   return {};
 }
 
+std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
+
+  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
+
+  for (const auto &member: node->members) {
+    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      auto struct_node = static_cast<ASTStructDeclaration*>(member);
+      (*ss) << "struct {\n";
+        for (const auto &field: struct_node->fields) {
+          field->accept(this);
+          (*ss) << ";\n";
+        }
+        for (const auto &$union: struct_node->unions) {
+          $union->accept(this);
+        }
+      (*ss) << "} " << struct_node->name.get_str() << ";\n";
+    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
+      auto declaration_node = static_cast<ASTDeclaration*>(member);
+      // TODO: put this error in the typer.
+      auto old = emit_default_init;
+      emit_default_init = false;
+      if (declaration_node->value.is_not_null()) {
+        throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
+      }
+      declaration_node->accept(this);
+      emit_default_init = old;
+      (*ss) << ";\n";
+    }
+  }
+  (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
+  return {};
+}
+
 // TODO:
 /*
   To accomplish defer, we will have to look at the parent block this is used from, until we get to a function
@@ -1737,6 +1770,7 @@ std::any Emitter::visit(ASTDefer *node) {
   std::stringstream defer_ss;
   ss = &defer_ss;
   node->statement->accept(this);
+  (*ss) << ";\n";
   defer_blocks.push_back(std::move(defer_ss));
   return {};
 }
@@ -1747,43 +1781,37 @@ std::any Emitter::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
 
-  auto has_return = false;
+  if (emitting_block_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    if (node->return_type != void_type()) {
+      auto type = global_get_type(node->return_type);
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << ";\n";
+    }
+  }
 
   for (const auto &statement : node->statements) {
     emit_line_directive(node);
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
-
-    if (statement->get_node_type()==AST_NODE_RETURN) {
-      has_return = true;
-    }
     statement->accept(this);
     semicolon();
     newline();
   }
 
-  if (!has_return) {
-    for (int i = node->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
-      auto [dtor_name, name, type_id, idx] = node->identifiers_to_destruct_on_block_exit[i]; 
-      
-      auto type = global_get_type(type_id);
-      (*ss) << type->get_base().get_str() << '_' << dtor_name.get_str() << '(';
-      if (!global_get_type(type_id)->get_ext().is_pointer()) {
-        (*ss) << "&";
+  if (node->parent != nullptr && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    auto fn = static_cast<ASTFunctionDeclaration*>(node->parent);
+    if (fn->has_defer) {
+      while (!defer_blocks.empty()) {
+        (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
+        (*ss) << defer_blocks.back().str();
+        defer_blocks.pop_back();
       }
-      (*ss) << name.get_str() << ");\n";
+
+      if (fn->return_type->resolved_type != void_type() && fn->return_type->resolved_type != -1) {
+        (*ss) << "return " << defer_return_value_key << ";\n";
+      }
     }
   }
-
-  if (node->has_defer && !has_return) {
-   
-    for (int i = 0; i < node->defer_count; ++i) {
-      (*ss) << defer_blocks.back().str();
-      defer_blocks.pop_back();
-    }
-  }
-
 
   indentLevel--;
   indented("}");
@@ -1794,31 +1822,13 @@ std::any Emitter::visit(ASTBlock *node) {
 std::any Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
 
-  if (node->declaring_block.is_not_null()) {
-    auto block = node->declaring_block.get();
-
-    for (int i = block->identifiers_to_destruct_on_block_exit.size() - 1; i >= 0; --i) {
-      auto [dtor_name, name, type_id, idx] = block->identifiers_to_destruct_on_block_exit[i]; 
-      if (i > idx) break; // break for not-yet-constructed objects in this block
-      auto type = global_get_type(type_id);
-      (*ss) << type->get_base().get_str() << '_' << dtor_name.get_str() << '(';
-      if (!global_get_type(type_id)->get_ext().is_pointer()) {
-        (*ss) << "&";
-      }
-      (*ss) << name.get_str() << ");\n";
-    }
-  }
-
   if (emitting_block_with_defer) {
-    for (int i = defer_blocks.size() - 1; i >= 0; --i) {
-      (*ss) << defer_blocks[i].str();
-    }
-    indented("return");
     if (node->expression.is_not_null()) {
-      space();
+      (*ss) << defer_return_value_key << " = ";
       node->expression.get()->accept(this);
     }
     (*ss) << ";\n";
+    (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
   } else {
     indented("return");
     if (node->expression.is_not_null()) {
@@ -1828,38 +1838,5 @@ std::any Emitter::visit(ASTReturn *node) {
     (*ss) << ";\n";
   }
 
-  return {};
-}
-
-std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
-
-  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
-
-  for (const auto &member: node->members) {
-    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration*>(member);
-      (*ss) << "struct {\n";
-        for (const auto &field: struct_node->fields) {
-          field->accept(this);
-          (*ss) << ";\n";
-        }
-        for (const auto &$union: struct_node->unions) {
-          $union->accept(this);
-        }
-      (*ss) << "} " << struct_node->name.get_str() << ";\n";
-    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration*>(member);
-      // TODO: put this error in the typer.
-      auto old = emit_default_init;
-      emit_default_init = false;
-      if (declaration_node->value.is_not_null()) {
-        throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
-      }
-      declaration_node->accept(this);
-      emit_default_init = old;
-      (*ss) << ";\n";
-    }
-  }
-  (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
   return {};
 }
