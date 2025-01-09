@@ -13,3 +13,13 @@
   assert("alias failed to equal pointed to type field.", p == other);
   free(p);
 }
+
+Funky :: fn() -> int {
+  return 102;
+}
+
+#test test_fn_alias :: fn() {
+  #alias func :: fn* () -> int;
+  f: func = &Funky;
+  assert("function pointer failed", f() == 102);
+}

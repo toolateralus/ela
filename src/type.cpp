@@ -288,6 +288,9 @@ std::string Type::to_string() const {
     case TYPE_ENUM:
     case TYPE_UNION:
       return base.get_str();
+    case TYPE_TAGGED_UNION:
+      return base.get_str();
+      break;
   }
 }
 

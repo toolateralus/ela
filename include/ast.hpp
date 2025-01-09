@@ -158,7 +158,7 @@ struct ASTType : ASTExpr {
   
   union {
     struct {
-      InternedString base;
+      ASTExpr* base;
       std::vector<ASTType *> generic_arguments;
     } normal;
     struct {
@@ -240,6 +240,8 @@ struct ASTUnaryExpr : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
 struct ASTIdentifier : ASTExpr {
+  ASTIdentifier() {}
+  ASTIdentifier(const InternedString& value): value(value) {}
   InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }

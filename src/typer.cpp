@@ -765,7 +765,8 @@ std::any Typer::visit(ASTType *node) {
 
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
-    auto symbol = ctx.scope->lookup(normal_ty.base);
+    auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
+    auto symbol = ctx.scope->lookup(base_ty->get_base());
     if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
       auto declaring_node = symbol->declaring_node.get();
       std::vector<int> generic_args;
@@ -788,7 +789,7 @@ std::any Typer::visit(ASTType *node) {
       }
       node->resolved_type = global_find_type_id(type_id, extensions);
     } else {
-      node->resolved_type = ctx.scope->find_type_id(node->normal.base, extensions);
+      node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }
   } else if (node->kind == ASTType::TUPLE) {
     std::vector<int> types;
@@ -797,8 +798,10 @@ std::any Typer::visit(ASTType *node) {
     }
     node->resolved_type = global_find_type_id(types, extensions);
   } else if (node->kind == ASTType::REFLECTION) {
+    auto &normal_ty = node->normal;
+    auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
     node->pointing_to.get()->accept(this);
-    node->resolved_type = ctx.scope->find_type_id(node->normal.base, extensions);
+    node->resolved_type = global_find_type_id(base_ty->id, extensions);
   } else if (node->kind == ASTType::FUNCTION) {
     auto &func = node->function;
     FunctionTypeInfo info;
@@ -1042,6 +1045,8 @@ std::any Typer::visit(ASTScopeResolution *node) {
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     return member->type_id;
+  } else if (auto type = scope->find_type_id(node->member_name, {}); type != -1) {
+    return type;
   } else {
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
                 node->source_range);

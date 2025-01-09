@@ -293,7 +293,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto outer = ast_alloc<ASTType>();
         
         outer->kind = ASTType::REFLECTION;
-        outer->normal.base = "Type";
+        outer->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("Type");
         outer->extensions.push_back({TYPE_EXT_POINTER});
         outer->pointing_to = type;
         return outer;
@@ -392,9 +392,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         ASTType *type = ast_alloc<ASTType>();
         if (parser->current_union_decl) {
-          type->normal.base = parser->current_union_decl.get()->name;
+          type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_union_decl.get()->name);
         } else if (parser->current_struct_decl) {
-          type->normal.base = parser->current_struct_decl.get()->name;
+          type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_struct_decl.get()->name);
         } else if (parser->current_impl) {
           type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl.get()->target));
         } else {
@@ -1111,7 +1111,7 @@ ASTType *Parser::parse_type() {
   auto base = eat().value;
   auto node = ast_alloc<ASTType>();
   node->kind = ASTType::NORMAL;
-  node->normal.base = base;
+  node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
   }
@@ -2116,7 +2116,7 @@ ASTType *ASTType::get_void() {
   static ASTType *type = [] {
     ASTType *type = ast_alloc<ASTType>();
     type->kind = ASTType::NORMAL;
-    type->normal.base = "void";
+    type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("void");
     type->resolved_type = void_type();
     return type;
   }();
