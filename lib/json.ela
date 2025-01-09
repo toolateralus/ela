@@ -301,9 +301,9 @@ impl JsonValue {
       }
       return $"{str}]";
     } else if self.type == JsonValueType::Number {
-      return $"{data.number}";
+      return $"{self.data.number}";
     } else if self.type == JsonValueType::String {
-      return $"{32 as char}{data._string}{32 as char}";
+      return $"{32 as char}{self.data._string}{32 as char}";
     } else if self.type == JsonValueType::Boolean {
       if self.data.boolean == true {
         return string::from("true");
@@ -316,19 +316,19 @@ impl JsonValue {
       return string::empty();
     }
   }
-  #dtor :: fn() {
-    if type == JsonValueType::Object {
-      for kvp in data.object {
+  destroy :: fn(self*) {
+    if self.type == JsonValueType::Object {
+      for kvp in self.data.object {
         free(kvp.value);
       }
-      destruct(data.object);
-    } else if type == JsonValueType::Array {
-      for val in data.array {
+      destruct(self.data.object);
+    } else if self.type == JsonValueType::Array {
+      for val in self.data.array {
         free(val);
       }
-      destruct(data.array);
-    } else if type == JsonValueType::String {
-      destruct(data._string);
+      destruct(self.data.array);
+    } else if self.type == JsonValueType::String {
+      destruct(self.data._string);
     }
   }
 

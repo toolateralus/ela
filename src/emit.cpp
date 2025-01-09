@@ -166,55 +166,71 @@ int Emitter::get_dot_left_type(ASTNode *node) {
 }
 
 std::any Emitter::visit(ASTCall *node) {
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR ||
-      node->function->get_node_type() == AST_NODE_SCOPE_RESOLUTION) {
-    auto base_type = global_get_type(get_dot_left_type(node->function));
-    auto base_symbol = typer.get_symbol(node->function);
+  auto base_symbol = typer.get_symbol(node->function);
+  auto node_type = node->function->get_node_type();
 
-    auto left = node->function->get_node_type() == AST_NODE_DOT_EXPR
-                    ? static_cast<ASTDotExpr *>(node->function)->base
-                    : static_cast<ASTScopeResolution *>(node->function)->base;
+  if (base_symbol && (node_type == AST_NODE_DOT_EXPR || node_type == AST_NODE_SCOPE_RESOLUTION)) {
+    auto symbol = base_symbol.get();
+    if (symbol->declaring_node.is_not_null() &&
+        symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+      auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
+      auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
+      if (static_method || method_call) {
+        ASTExpr *base = nullptr;
 
-    if (!base_symbol) {
-      throw_error("Internal compiler error: failed to get symbol for method call", node->source_range);
-    }
-
-    auto base_sym_ptr = base_symbol.get();
-    Type *function_type = global_get_type(base_sym_ptr->type_id);
-    auto info = function_type->get_info()->as<FunctionTypeInfo>();
-    auto param_0_ty = global_get_type(info->parameter_types[0]);
-
-    // TODO: this needs a lot of work I think. Maybe it will work just fine, but this seems super hacky.
-    if (base_type) {
-      Scope *base_scope = base_type->get_info()->scope;
-      (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
-      (*ss) << "(";
-      if (param_0_ty == base_type || param_0_ty == global_get_type(base_type->take_pointer_to())) {
-        if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-          // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary expression with only literals
-          // TODO: it could be a cast of a literal, it could be a bunch a function call's result.
-          if (node->function->get_node_type() == AST_NODE_LITERAL) {
-            throw_error("Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which "
-                        "is temporary memory.",
-                        node->source_range);
+        if (node_type == AST_NODE_DOT_EXPR) {
+          if (static_method) {
+            throw_error("cannot call a static method from an instance", node->source_range);
           }
-          (*ss) << "&";
+          base = static_cast<ASTDotExpr *>(node->function)->base;
+        } else {
+          if (method_call) {
+            throw_error("must call method with instance", node->source_range);
+          }
+          base = static_cast<ASTScopeResolution *>(node->function)->base;
         }
-        left->accept(this);
-        if (node->arguments->arguments.size() > 0) {
-          (*ss) << ", ";
+
+        auto base_sym_ptr = base_symbol.get();
+        Type *function_type = global_get_type(base_sym_ptr->type_id);
+        auto info = function_type->get_info()->as<FunctionTypeInfo>();
+        auto param_0_ty = global_get_type(info->parameter_types[0]);
+        auto base_type = global_get_type(get_dot_left_type(node->function));
+
+        if (!base_type) {
+          throw_error("Internal compiler error: unable to find method call", node->source_range);
         }
+        // TODO: this needs a lot of work I think. Maybe it will work just fine, but this seems super hacky.
+        Scope *base_scope = base_type->get_info()->scope;
+        (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
+        (*ss) << "(";
+        if (method_call) {
+          if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
+            // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary
+            // expression with only literals
+            // TODO: it could be a cast of a literal, it could be a bunch a function call's result.
+            if (node_type == AST_NODE_LITERAL) {
+              throw_error(
+                  "Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which "
+                  "is temporary memory.",
+                  node->source_range);
+            }
+            (*ss) << "&";
+          }
+          base->accept(this);
+          if (node->arguments->arguments.size() > 0) {
+            (*ss) << ", ";
+          }
+        }
+        for (auto &arg : node->arguments->arguments) {
+          arg->accept(this);
+          if (arg != node->arguments->arguments.back()) {
+            (*ss) << ", ";
+          }
+        }
+        (*ss) << ")";
+        return {};
       }
-      for (auto &arg : node->arguments->arguments) {
-        arg->accept(this);
-        if (arg != node->arguments->arguments.back()) {
-          (*ss) << ",";
-        }
-      }
-      (*ss) << ")";
-      return {};
-    } else {
-      throw_error("Internal compiler error: unable to find method call", node->source_range);
     }
   }
   node->function->accept(this);
@@ -678,11 +694,10 @@ std::any Emitter::visit(ASTEnumDeclaration *node) {
     if (node->is_flags) {
       (*ss) << " = ";
       (*ss) << std::to_string(1 << n);
-    }
-    else if (value.is_not_null()) {
+    } else if (value.is_not_null()) {
       (*ss) << " = ";
       value.get()->accept(this);
-    } 
+    }
     if (n != node->key_values.size() - 1) {
       (*ss) << ",\n";
     }
@@ -1538,7 +1553,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
       }
     }
     fields_ss << "}";
-  }  else if (type->kind == TYPE_ENUM) {
+  } else if (type->kind == TYPE_ENUM) {
     // TODO: we have to fix this!.
     auto info = type->get_info();
     if (info->scope->ordered_symbols.empty()) {

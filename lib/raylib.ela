@@ -230,8 +230,8 @@ Rectangle :: struct {
 }
 
 impl Rectangle {
-  to_string :: fn() -> string {
-    return $"x: {x}, y: {y}, width: {width}, height: {height}";
+  to_string :: fn(self*) -> string {
+    return $"x: {self.x}, y: {self.y}, width: {self.width}, height: {self.height}";
   }
 }
 
