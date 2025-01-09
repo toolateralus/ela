@@ -46,3 +46,13 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
 endif()
 
 target_compile_definitions(ela PRIVATE MAX_NUM_TYPES=10000)
+
+# Use bear on Linux
+if (UNIX AND NOT APPLE)
+    add_custom_target(bear_build
+        COMMAND bear -- make -j${CMAKE_BUILD_PARALLEL_LEVEL}
+        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
+        COMMENT "Running bear to generate compilation database"
+    )
+    add_dependencies(bear_build ela)
+endif()

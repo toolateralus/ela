@@ -538,6 +538,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
+      std::cout << "emitting fwd decl for " << node->name.get_str() << '\n';
       emit_forward_declaration(node);
     }
 
@@ -642,10 +643,13 @@ std::any Emitter::visit(ASTStructDeclaration *node) {
 
   Defer _defer([&] { current_struct_decl = nullptr; });
 
+  // TODO: fix forward declarations not emitting?
+
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
-    if (node->is_extern)
-      *ss << "extern \"C\" ";
-    *ss << "struct " << type->get_base().get_str() << ";\n";
+    if (node->is_extern) {
+     (*ss) << "extern \"C\" ";
+    }
+    (*ss) << "struct " << type->get_base().get_str() << ";\n";
     return {};
   }
 
