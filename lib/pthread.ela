@@ -65,8 +65,10 @@ impl Mutex {
   unlock :: fn(self*) {
     pthread_mutex_unlock(&self.handle);
   }
-  #dtor :: fn(self*) {
+  free :: fn(self*) {
     pthread_mutex_destroy(&self.handle);
   }
+  // #dtor :: fn(self*) {
+  // }
 }
 
