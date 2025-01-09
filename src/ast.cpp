@@ -1113,8 +1113,14 @@ ASTType *Parser::parse_type() {
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
 
+
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
+  }
+
+  if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::LParen) {
+    // this is a function call to a static, single depth function.
+    return node;
   }
 
   while (peek().type == TType::DoubleColon) {
@@ -1429,8 +1435,8 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                   range);
     }
   }
-  if (peek().type == TType::ColonEquals) {
-    eat();
+  if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
+    node->op = eat().type;
     node->right = parse_expr();
   } else {
     // TODO: allow typed tuple deconstructions.
@@ -1439,6 +1445,7 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                 "deconstruction. Use a, b, c := ....",
                 range);
   }
+  end_node(node, range);
   return node;
 }
 

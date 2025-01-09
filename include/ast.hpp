@@ -266,7 +266,7 @@ struct ASTLiteral : ASTExpr {
 struct ASTTupleDeconstruction : ASTStatement {
   std::vector<ASTIdentifier *> idens;
   ASTExpr *right;
-
+  TType op;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_TUPLE_DECONSTRUCTION; }
 };

@@ -1328,9 +1328,9 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-    if (ctx.scope->local_lookup(iden->value)) {
-      throw_error(std::format("Redefinition of a variable is not allowed in a tuple "
-                              "deconstruction yet.\nOffending variable {}",
+    if (ctx.scope->local_lookup(iden->value) && node->op != TType::Assign) {
+      throw_error(std::format("Redefinition of a variable is not allowed in a tuple with :="
+                              "deconstruction yet.\nOffending variable {}\n use `var, var1 := ...`, if both `var` and var1` exist already.",
                               iden->value),
                   node->source_range);
     }

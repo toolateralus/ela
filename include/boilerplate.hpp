@@ -6,6 +6,7 @@ template <class T, class... Args> T *construct(void *memory, Args &&...args) {
   return new (memory) T(std::forward<Args>(args)...);
 }
 #if USE_STD_LIB
+#include <tuple>
 struct string;
 #endif
 
@@ -543,7 +544,7 @@ static _array<string> &Env_args() {
 
 #define assert(message, condition)                                                                                     \
   if (!(condition))                                                                                                    \
-    throw __test_exception("\033[31mAssertion failed: %s, message: %s\033[0m\n", #condition, #message);
+    throw __test_exception("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), \n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n", #condition, message);
 
 extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
 extern "C" int strcpy(const char *, char *);

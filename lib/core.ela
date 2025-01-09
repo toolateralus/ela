@@ -70,7 +70,7 @@ Random :: struct {
 
 impl Random {
   next :: fn(max: float32) -> float {
-    return (rand() as float) / (2147483647 as float) * max;
+    return (rand() as float) / (2147483647 as float) * max; // ! HACK:: replace this magic number with Random::Max when we fix that problen.
   }
 }
 

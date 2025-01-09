@@ -14,6 +14,14 @@
       "args": ["${file}"]
     },
     {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug current file compilation (tests)",
+      "program": "${workspaceFolder}/bin/ela",
+      "cwd": "${fileDirname}",
+      "args": ["${file}", "--test"]
+    },
+    {
       "preLaunchTask": "compile_current",
       "type": "lldb",
       "request": "launch",

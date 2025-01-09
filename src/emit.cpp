@@ -670,6 +670,11 @@ std::any Emitter::visit(ASTProgram *node) {
     }
   }
 
+  if (compile_command.has_flag("test-verbose")) {
+    code <<  "#define TEST_VERBOSE;\n";
+    std :: cout << "adding TEST_VERBOSE\n";
+  }
+
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
 
   if (!is_freestanding) {
@@ -692,9 +697,6 @@ std::any Emitter::visit(ASTProgram *node) {
       test_init.pop_back();
     }
 
-    if (compile_command.has_flag("test-verbose")) {
-      // code <<  "#define TEST_VERBOSE;\n";
-    }
     // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
 
@@ -884,7 +886,7 @@ std::any Emitter::visit(ASTSwitch *node) {
   return {};
 }
 std::any Emitter::visit(ASTTuple *node) {
-  (*ss) << "_tuple(";
+  (*ss) << "std::tuple(";
   for (const auto &value : node->values) {
     value->accept(this);
     if (value != node->values.back())
@@ -894,16 +896,29 @@ std::any Emitter::visit(ASTTuple *node) {
   return {};
 }
 std::any Emitter::visit(ASTTupleDeconstruction *node) {
-  (*ss) << "auto [";
-  for (auto &iden : node->idens) {
-    (*ss) << iden->value.get_str();
-    if (iden != node->idens.back()) {
-      (*ss) << ", ";
+  if (node->op == TType::ColonEquals) {
+    (*ss) << "auto [";
+    for (auto &iden : node->idens) {
+      (*ss) << iden->value.get_str();
+      if (iden != node->idens.back()) {
+        (*ss) << ", ";
+      }
     }
+    (*ss) << "] = ";
+    node->right->accept(this);
+    (*ss) << ";\n";
+  } else {
+    (*ss) << "std::tie(";
+    for (auto &iden : node->idens) {
+      (*ss) << iden->value.get_str();
+      if (iden != node->idens.back()) {
+        (*ss) << ", ";
+      }
+    }
+    (*ss) << ") = ";
+    node->right->accept(this);
+    (*ss) << ";\n";
   }
-  (*ss) << "] = ";
-  node->right->accept(this);
-  (*ss) << ";\n";
   return {};
 };
 
@@ -1489,7 +1504,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     }
     case TYPE_TUPLE: {
       auto info = (type->get_info()->as<TupleTypeInfo>());
-      output = "_tuple<";
+      output = "std::tuple<";
       for (int i = 0; i < info->types.size(); ++i) {
         output += to_cpp_string(global_get_type(info->types[i]));
         if (i != info->types.size() - 1) {

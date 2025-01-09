@@ -19,28 +19,50 @@ impl JsonValueDeleter {
 #test test_json_types :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
+  err : JsonError;
 
-  val = json_parse_string("true");
+  err, val = json_parse_string("true");
+
+  if err.has_value {
+    assert($"{err.message} failed to parse bool".data, false);
+  }
+
   deleter.add(val);
   assert("bool", val.is_boolean());
 
-  val = json_parse_string("32.1");
+  err, val = json_parse_string("32.1");
+  if err.has_value {
+    assert($"{err.message} failed to parse number".data, false);
+  }
+
   deleter.add(val);
   assert("number", val.is_number());
 
-  val = json_parse_string("\"hello\"");
+  err, val = json_parse_string("\"hello\"");
+  if err.has_value {
+    assert($"{err.message} failed to parse string".data, false);
+  }
   deleter.add(val);
   assert("string", val.is_string());
 
-  val = json_parse_string("[1, 2, 3]");
+  err, val = json_parse_string("[1, 2, 3]");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("array", val.is_array());
 
-  val = json_parse_string("{\"key\": \"value\"}");
+  err, val = json_parse_string("{\"key\": \"value\"}");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("object", val.is_object());
 
-  val = json_parse_string("null");
+  err, val = json_parse_string("null");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("null", val.is_null());
 }
@@ -48,39 +70,58 @@ impl JsonValueDeleter {
 #test test_json_values :: fn() {
   deleter: JsonValueDeleter;
   val : JsonValue*;
+  err : JsonError;
 
-  val = json_parse_string("true");
+  err, val = json_parse_string("true");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("bool", val.as_boolean() == true);
 
-  val = json_parse_string("32.1");
+  err, val = json_parse_string("32.1");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("number", val.as_number() == atof("32.1"));
 
-  val = json_parse_string("\"hello\"");
+  err, val = json_parse_string("\"hello\"");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("string", val.as_string() == "hello");
 
-  val = json_parse_string("[1, 2, 3]");
+  err, val = json_parse_string("[1, 2, 3]");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("array length", val.as_array().length == 3);
   assert("array element 0", val.at(0).as_number() == 1);
   assert("array element 1", val.at(1).as_number() == 2);
   assert("array element 2", val.at(2).as_number() == 3);
 
-  val = json_parse_string("{\"key\": \"value\"}");
+  err, val = json_parse_string("{\"key\": \"value\"}");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter.add(val);
   assert("object key", val.get("key").as_string() == "value");
 }
 
 #test test_scalar_deserialization :: fn() {
   n : int = 100;
-  json := json_serialize(&n, #type(int));
+  err, json := json_serialize(&n, #type(int));
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
   deleter: JsonValueDeleter;
   deleter.add(json);
   n = 0;
   assert("json  serialize  scalar", json.is_number());
-  err := json_deserialize_scalar(json, &n, #type(int));
+  err = json_deserialize_scalar(json, &n, #type(int));
   assert("json error", !err.has_value);
   assert("json deserialize scalar", n == 100);
 }
@@ -100,21 +141,29 @@ impl MyJsonStruct {
     n: 100,
     b: 200.0
   };
-  json := json_serialize(&n, #type(MyJsonStruct));
+  err, json := json_serialize(&n, #type(MyJsonStruct));
+  if err.has_value {
+    assert($"{err.message} test_struct_deserialization".data, false);
+  }
   deleter: JsonValueDeleter;
   deleter.add(json);
   n = {};
   assert("json  serialize  object", json.is_object());
-  err := json_deserialize(json, &n, #type(MyJsonStruct));
+  err = json_deserialize(json, &n, #type(MyJsonStruct));
   assert("json error", !err.has_value);
   assert("json deserialize object", n.n == 100 && n.b == 200.0);
 }
 
 #test test_json_comprehensive :: fn() {
   deleter: JsonValueDeleter;
-  val : JsonValue*;
+  val : JsonValue*; err: JsonError;
 
-  val = json_parse_file("test.json");
+  err, val = json_parse_file("test.json");
+
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+
   deleter.add(val);
   assert("string", val.get("string").as_string() == "Hello, World!");
   assert("number", val.get("number").as_number() == 42);
