@@ -180,7 +180,6 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   // Get function type id from header.
   {
     info.return_type = node->return_type->resolved_type;
-    info.meta_type = node->meta_type;
     info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
     for (const auto &param : node->params->params) {
       if (param->default_value.is_not_null())
@@ -204,7 +203,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
     ctx.scope->parent->lookup(node->name)->declaring_node = node;
   }
 
-  if (info.meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN)
+  if ((node->flags & FUNCTION_IS_FOREIGN) != 0)
     return {};
 
   auto old_ty = declaring_or_assigning_type;

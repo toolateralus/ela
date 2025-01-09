@@ -531,21 +531,18 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
       return;
     }
 
-    auto is_local = !ctx.scope->parent->is_struct_or_union_scope && ctx.scope->parent != root_scope &&
-                    (node->flags & FUNCTION_IS_METHOD) == 0;
+    auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
 
     if (node->name != "main" && !is_local) {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
-      std::cout << "emitting fwd decl for " << node->name.get_str() << '\n';
-      emit_forward_declaration(node);
+      if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+        emit_forward_declaration(node);
+        return;
+      }
     }
 
-    if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-      std::cout << node->name.get_str() << " was explicitly forward declared\n";
-      return;
-    }
 
     if ((node->flags & FUNCTION_IS_STATIC) != 0) {
       (*ss) << "static ";
@@ -610,7 +607,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     return {};
   }
 
-  if (node->meta_type == FunctionMetaType::FUNCTION_TYPE_FOREIGN) {
+  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
     emit_foreign_function(node);
     return {};
   }

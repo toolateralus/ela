@@ -71,7 +71,7 @@ enum TypeExtEnum {
   TYPE_EXT_MAP,
 };
 
-enum FunctionInstanceFlags {
+enum FunctionInstanceFlags: size_t {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
@@ -80,15 +80,13 @@ enum FunctionInstanceFlags {
   FUNCTION_IS_VARARGS = 1 << 5,
   FUNCTION_IS_OPERATOR = 1 << 6,
   FUNCTION_IS_EXPORTED = 1 << 7,
-  FUNCTION_IS_MUTATING = 1 << 9,
-  FUNCTION_IS_FORWARD_DECLARED = 1 << 10,
-  FUNCTION_IS_STATIC = 1 << 11,
+  FUNCTION_IS_MUTATING = 1 << 8,
+  FUNCTION_IS_FORWARD_DECLARED = 1 << 9,
+  FUNCTION_IS_STATIC = 1 << 10,
+  FUNCTION_IS_LOCAL = 1 << 11,
+  FUNCTION_IS_FOREIGN = 1 << 12,
 };
 
-enum struct FunctionMetaType {
-  FUNCTION_TYPE_NORMAL,
-  FUNCTION_TYPE_FOREIGN,
-};
 
 enum UnionFlags {
   // this and UNION_IS_SUM_TYPE should never be present at the same itme.
@@ -183,7 +181,6 @@ struct TypeInfo {
 
 struct FunctionTypeInfo : TypeInfo {
   FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
-  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;

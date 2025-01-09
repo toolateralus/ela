@@ -459,12 +459,12 @@ json_parse :: fn(lexer: JsonLexer*) -> JsonValue* {
 }
 
 json_parse_file :: fn(file: c_string) -> JsonValue* {
-  lexer := #make(JsonLexer, file, File::read_all(file));
+  lexer := JsonLexer{file: file, input: File::read_all(file)};
   return json_parse(&lexer);
 }
 
 json_parse_string :: fn(str: c_string) -> JsonValue* {
-  lexer := #make(JsonLexer, "string", str);
+  lexer := JsonLexer { file: "string", input: str };
   return json_parse(&lexer);
 }
 

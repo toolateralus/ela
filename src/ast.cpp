@@ -260,7 +260,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           parser->expect(TType::Arrow);
           function->return_type = parser->parse_type();
         }
-        function->meta_type = FunctionMetaType::FUNCTION_TYPE_FOREIGN;
+        function->flags |= FUNCTION_IS_FOREIGN;
 
         parser->expect(TType::Semi);
 
@@ -1628,7 +1628,15 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   for (const auto &param : function->generic_parameters) {
     ctx.scope->types[param] = -2;
   }
+
   function->block = parse_block();
+
+  for (const auto &stmt: function->block.get()->statements) {
+    if (stmt->get_node_type()==AST_NODE_FUNCTION_DECLARATION) {
+      static_cast<ASTFunctionDeclaration*>(stmt)->flags |= FUNCTION_IS_LOCAL;
+    }
+  }
+
   end_node(function, range);
   function->scope = ctx.exit_scope();
   return function;

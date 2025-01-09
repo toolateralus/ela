@@ -282,11 +282,8 @@ struct GenericInstance {
 };
 
 struct ASTFunctionDeclaration : ASTStatement {
-  int flags = 0;
-  // extern, normal etc.
-  FunctionMetaType meta_type =
-      FunctionMetaType::FUNCTION_TYPE_NORMAL; // TODO: get rid of this, and just add it to the flags.
-
+  size_t flags = 0;
+  
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
 
