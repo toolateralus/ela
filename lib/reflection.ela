@@ -1,6 +1,5 @@
 #import core;
 
-// todo: use #flags
 #flags TypeFlags :: enum {
   // Scalars.
   INTEGER,
@@ -24,6 +23,8 @@
   // Integer sign.
   SIGNED,
   UNSIGNED,
+  
+  TAGGED_UNION,
 }
 
 impl Type  {

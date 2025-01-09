@@ -835,7 +835,7 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::Colon);
         _case.block = parse_block();
         cases.push_back(_case);
-        if (peek().type == TType::Comma){
+        if (peek().type == TType::Comma) {
           eat();
         }
       }
@@ -1304,6 +1304,16 @@ ASTStatement *Parser::parse_statement() {
       return struct_decl;
     }
     if (peek().type == TType::Enum) {
+      if (lookahead_buf()[1].type == TType::LParen && lookahead_buf()[2].type == TType::Union &&
+          lookahead_buf()[3].type == TType::RParen) {
+        expect(TType::Enum);
+        expect(TType::LParen);
+        expect(TType::Union);
+        expect(TType::RParen);
+        auto tagged_union = parse_tagged_union_declaration(tok);
+        end_node(tagged_union, range);
+        return tagged_union;
+      }
       auto enum_decl = parse_enum_declaration(tok);
       end_node(enum_decl, range);
       return enum_decl;
@@ -1475,9 +1485,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 
   auto last_block = current_block;
   current_block = block;
-  Defer _([&]{
-    current_block = last_block;
-  });
+  Defer _([&] { current_block = last_block; });
 
   ctx.set_scope(scope);
 
@@ -1654,9 +1662,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->block = parse_block();
   function->block.get()->parent = function;
 
-  for (const auto &stmt: function->block.get()->statements) {
-    if (stmt->get_node_type()==AST_NODE_FUNCTION_DECLARATION) {
-      static_cast<ASTFunctionDeclaration*>(stmt)->flags |= FUNCTION_IS_LOCAL;
+  for (const auto &stmt : function->block.get()->statements) {
+    if (stmt->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      static_cast<ASTFunctionDeclaration *>(stmt)->flags |= FUNCTION_IS_LOCAL;
     }
   }
 
@@ -1935,6 +1943,29 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
 
   end_node(decl, range);
   return decl;
+}
+
+ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+  auto node = ast_alloc<ASTTaggedUnionDeclaration>();
+  if (peek().type == TType::GenericBrace) {
+    node->generic_parameters = parse_generic_parameters();
+  }
+  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr));
+  auto scope = create_child(ctx.scope);
+  auto block = parse_block(scope);
+  for (const auto &stmt : block->statements) {
+    if (stmt->get_node_type() == AST_NODE_STRUCT_DECLARATION || stmt->get_node_type() == AST_NODE_DECLARATION) {
+      node->members.push_back(stmt);
+    } else {
+      throw_error("invalid node type in tagged union: only struct-like and field-like variants allowed.",
+                  stmt->source_range);
+    }
+  }
+  node->name = name.value;
+  node->scope = scope;
+  type->get_info()->scope = scope;
+  node->resolved_type = type->id;
+  return node;
 }
 
 Nullable<ASTExpr> Parser::try_parse_directive_expr() {

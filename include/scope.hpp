@@ -84,6 +84,12 @@ struct Scope {
     return id;
   }
 
+  int create_tagged_union(const InternedString &name, Scope *scope) {
+    auto id = global_create_tagged_union_type(name, scope);
+    types[name] = id;
+    return id;
+  }
+
   int create_struct_type(const InternedString &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
     types[name] = id;

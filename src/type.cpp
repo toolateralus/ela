@@ -300,6 +300,17 @@ int global_create_struct_type(const InternedString &name, Scope *scope) {
   type->set_info(info);
   return type->id;
 }
+
+int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
+  type_table.emplace_back(type_table.size(), TYPE_TAGGED_UNION);
+  Type *type = &type_table.back();
+  type->set_base(name);
+  TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
+  info->scope = scope;
+  type->set_info(info);
+  return type->id;
+}
+
 int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
   type_table.emplace_back(type_table.size(), TYPE_UNION);
   Type *type = &type_table.back();
@@ -669,3 +680,5 @@ int Type::take_pointer_to() const {
   ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
 }
+
+

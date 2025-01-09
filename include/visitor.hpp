@@ -24,7 +24,7 @@ struct Typer : VisitorBase {
 
   int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
-  
+
   template <typename T>
   int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
                     std::vector<int> args);
@@ -83,6 +83,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTAlias *node) override;
   std::any visit(ASTImpl *node) override;
   std::any visit(ASTDefer *node) override;
+  std::any visit(ASTTaggedUnionDeclaration *node) override;
 
   InternedString type_name(ASTExpr *node);
 };
@@ -215,7 +216,7 @@ struct Emitter : VisitorBase {
   std::any visit(ASTAlias *node) override;
   std::any visit(ASTImpl *node) override;
   std::any visit(ASTDefer *node) override;
-
+  std::any visit(ASTTaggedUnionDeclaration *node) override;
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);

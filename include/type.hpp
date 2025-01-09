@@ -61,6 +61,7 @@ enum TypeKind {
   TYPE_ENUM,
   TYPE_UNION,
   TYPE_TUPLE,
+  TYPE_TAGGED_UNION,
 };
 
 enum TypeExtEnum {
@@ -87,11 +88,9 @@ enum FunctionInstanceFlags: size_t {
   FUNCTION_IS_FOREIGN = 1 << 12,
 };
 
-
 enum UnionFlags {
   // this and UNION_IS_SUM_TYPE should never be present at the same itme.
   UNION_IS_NORMAL = 1 << 0,
-  UNION_IS_SUM_TYPE = 1 << 1,
   UNION_IS_FORWARD_DECLARED = 1 << 2,
   UNION_IS_ANONYMOUS = 1 << 3,
 };
@@ -116,6 +115,7 @@ struct TypeExtension {
     return true;
   }
 };
+
 struct TypeExtensions {
   // this stores things like * and [], [20] etc.
   // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
@@ -177,6 +177,16 @@ struct TypeInfo {
 
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
+};
+
+
+struct TaggedUnionVariant {
+  InternedString name;
+  int type;
+};
+
+struct TaggedUnionTypeInfo: TypeInfo {
+  std::vector<TaggedUnionVariant> variants;
 };
 
 struct FunctionTypeInfo : TypeInfo {
@@ -248,6 +258,7 @@ InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
 int global_create_struct_type(const InternedString &, Scope *);
+int global_create_tagged_union_type(const InternedString &, Scope *);
 int global_create_enum_type(const InternedString &, Scope *, bool = false,
                             size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);

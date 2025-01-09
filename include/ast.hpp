@@ -16,8 +16,6 @@
 
 extern jstl::Arena ast_arena;
 
-
-
 struct VisitorBase;
 
 // used to prevent double includes.
@@ -54,6 +52,7 @@ enum ASTNodeType {
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_ENUM_DECLARATION,
   AST_NODE_UNION_DECLARATION,
+  AST_NODE_TAGGED_UNION_DECLARATION,
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
@@ -156,6 +155,7 @@ struct ASTType : ASTExpr {
     TUPLE,
     FUNCTION,
   } kind = NORMAL;
+  
   union {
     struct {
       InternedString base;
@@ -168,7 +168,9 @@ struct ASTType : ASTExpr {
     // special info for tuple types.
     std::vector<ASTType *> tuple_types;
   };
+
   ASTType() {}
+
   ASTType(const ASTType &other) {
     extensions = other.extensions;
     kind = other.kind;
@@ -186,6 +188,7 @@ struct ASTType : ASTExpr {
         break;
     }
   }
+
   ~ASTType() {}
   // [], *, [string] etc.
   std::vector<ASTTypeExtension> extensions;
@@ -493,6 +496,16 @@ struct ASTUnionDeclaration : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
 };
 
+struct ASTTaggedUnionDeclaration : ASTStatement {
+  InternedString name;
+  Scope *scope;
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTNode *> members;
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
+};
+
 struct SwitchCase {
   ASTExpr *expression;
   ASTBlock *block;
@@ -571,7 +584,8 @@ struct ASTDefer : ASTStatement {
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
-  std::any visit(ASTDefer *node) override {};
+  std::any visit(ASTDefer *node) override {};\
+  std::any visit(ASTTaggedUnionDeclaration *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   std::any visit(ASTNoop *noop) { return {}; }                                                                         \
@@ -610,7 +624,8 @@ struct ASTDefer : ASTStatement {
   virtual std::any visit(ASTAlias *node) = 0;                                                                          \
   virtual std::any visit(ASTImpl *node) = 0;                                                                           \
   virtual std::any visit(ASTTupleDeconstruction *node) = 0;                                                            \
-  virtual std::any visit(ASTDefer *node) = 0;
+  virtual std::any visit(ASTDefer *node) = 0;                                                                          \
+  virtual std::any visit(ASTTaggedUnionDeclaration *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -663,6 +678,7 @@ struct Parser {
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTType *> parse_generic_arguments();
   ASTUnionDeclaration *parse_union_declaration(Token);
+  ASTTaggedUnionDeclaration *parse_tagged_union_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   void visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements);
   ASTEnumDeclaration *parse_enum_declaration(Token);
@@ -716,9 +732,8 @@ struct Parser {
   int64_t token_idx{};
 };
 
-template  <class T> 
-static inline T *ast_alloc(size_t n = 1) { 
-  auto node = new (ast_arena.allocate(sizeof(T) * n)) T(); 
+template <class T> static inline T *ast_alloc(size_t n = 1) {
+  auto node = new (ast_arena.allocate(sizeof(T) * n)) T();
   node->declaring_block = Parser::current_block;
   return node;
 }

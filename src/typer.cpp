@@ -10,6 +10,7 @@
 #include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
@@ -226,6 +227,27 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   return type_id;
 }
 
+std::any Typer::visit(ASTTaggedUnionDeclaration *node) {
+  auto type = global_get_type(node->resolved_type);
+  auto info = type->get_info()->as<TaggedUnionTypeInfo>();
+  ctx.set_scope(node->scope);
+  for (const auto &member: node->members) {
+    auto type = int_from_any(member->accept(this));
+    InternedString name;
+    if (member->get_node_type() == AST_NODE_DECLARATION) {
+      name = static_cast<ASTDeclaration*>(member)->name;
+    } else if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      name = static_cast<ASTStructDeclaration*>(member)->name;
+    }
+    info->variants.push_back(TaggedUnionVariant{
+      name,
+      type
+    });
+  } 
+  ctx.exit_scope();
+  return node->resolved_type;
+}
+
 std::any Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     ctx.scope->insert(node->name, -1);
@@ -365,7 +387,7 @@ std::any Typer::visit(ASTDeclaration *node) {
     }
   }
 
-  return {};
+  return node->resolved_type;
 }
 
 std::any Typer::visit(ASTBlock *node) {

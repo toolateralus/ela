@@ -17,23 +17,24 @@
   code in here and it's super messy. ? However it works xD
 */
 
-constexpr auto TYPE_FLAGS_INTEGER = 2;
-constexpr auto TYPE_FLAGS_FLOAT = 4;
-constexpr auto TYPE_FLAGS_BOOL = 8;
-constexpr auto TYPE_FLAGS_STRING = 16;
-constexpr auto TYPE_FLAGS_STRUCT = 32;
-constexpr auto TYPE_FLAGS_UNION = 64;
-constexpr auto TYPE_FLAGS_ENUM = 128;
-constexpr auto TYPE_FLAGS_TUPLE = 256;
+constexpr auto TYPE_FLAGS_INTEGER = 1 << 0;
+constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
+constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
+constexpr auto TYPE_FLAGS_STRING = 1 << 3;
+constexpr auto TYPE_FLAGS_STRUCT = 1 << 5;
+constexpr auto TYPE_FLAGS_UNION = 1 << 6;
+constexpr auto TYPE_FLAGS_ENUM = 1 << 7;
+constexpr auto TYPE_FLAGS_TUPLE = 1 << 8;
 
-constexpr auto TYPE_FLAGS_ARRAY = 512;
-constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1024;
-constexpr auto TYPE_FLAGS_MAP = 2048;
-constexpr auto TYPE_FLAGS_FUNCTION = 4096;
-constexpr auto TYPE_FLAGS_POINTER = 8192;
+constexpr auto TYPE_FLAGS_ARRAY = 1 << 9;
+constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 10;
+constexpr auto TYPE_FLAGS_MAP = 1 << 11;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 12;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 13;
 
-constexpr auto TYPE_FLAGS_SIGNED = 16384;
-constexpr auto TYPE_FLAGS_UNSIGNED = 32768;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 14;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 15;
+constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 16;
 
 std::any Emitter::visit(ASTWhile *node) {
   emit_condition_block(node, "while", node->condition, node->block);
@@ -1261,6 +1262,9 @@ std::string get_type_flags(Type *type) {
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;
+    case TYPE_TAGGED_UNION:
+      kind_flags = TYPE_FLAGS_TAGGED_UNION;
+      break;
   }
   for (const auto &ext : type->get_ext().extensions) {
     switch (ext.type) {
@@ -1462,19 +1466,16 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 std::string Emitter::to_cpp_string(Type *type) {
   auto output = std::string{};
   switch (type->kind) {
-    case TYPE_SCALAR:
-    case TYPE_STRUCT:
-      output = to_cpp_string(type->get_ext(), type->get_base().get_str());
-      break;
-    case TYPE_FUNCTION: {
+    case TYPE_FUNCTION: 
       return get_function_pointer_type_string(type);
-    }
+    case TYPE_SCALAR:
     case TYPE_ENUM:
-      output = type->get_base().get_str();
-      break;
     case TYPE_UNION:
+    case TYPE_STRUCT:
+    case TYPE_TAGGED_UNION: {
       output = to_cpp_string(type->get_ext(), type->get_base().get_str());
       break;
+    }
     case TYPE_TUPLE: {
       auto info = (type->get_info()->as<TupleTypeInfo>());
       output = "_tuple<";
@@ -1801,5 +1802,38 @@ std::any Emitter::visit(ASTReturn *node) {
     (*ss) << ";\n";
   }
 
+  return {};
+}
+
+std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
+
+  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
+
+  for (const auto &member: node->members) {
+    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      auto struct_node = static_cast<ASTStructDeclaration*>(member);
+      (*ss) << "struct {\n";
+        for (const auto &field: struct_node->fields) {
+          field->accept(this);
+          (*ss) << ";\n";
+        }
+        for (const auto &$union: struct_node->unions) {
+          $union->accept(this);
+        }
+      (*ss) << "} " << struct_node->name.get_str() << ";\n";
+    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
+      auto declaration_node = static_cast<ASTDeclaration*>(member);
+      // TODO: put this error in the typer.
+      auto old = emit_default_init;
+      emit_default_init = false;
+      if (declaration_node->value.is_not_null()) {
+        throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
+      }
+      declaration_node->accept(this);
+      emit_default_init = old;
+      (*ss) << ";\n";
+    }
+  }
+  (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
   return {};
 }
