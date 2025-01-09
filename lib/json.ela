@@ -593,7 +593,7 @@ json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError
 
 json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   for json_field in val.data.object {
-    struct_field := type_get_field(type, json_field.key);
+    struct_field := Type::get_field(type, json_field.key);
     if !struct_field {
       return JsonError::Error($"Could not find field {json_field.key} in type {type.name}");
     }

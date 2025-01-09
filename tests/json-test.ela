@@ -64,9 +64,9 @@ impl JsonValueDeleter {
   val = json_parse_string("[1, 2, 3]");
   deleter.add(val);
   assert("array length", val.as_array().length == 3);
-  assert("array element 0", val.get(0).as_number() == 1);
-  assert("array element 1", val.get(1).as_number() == 2);
-  assert("array element 2", val.get(2).as_number() == 3);
+  assert("array element 0", val.at(0).as_number() == 1);
+  assert("array element 1", val.at(1).as_number() == 2);
+  assert("array element 2", val.at(2).as_number() == 3);
 
   val = json_parse_string("{\"key\": \"value\"}");
   deleter.add(val);
@@ -97,8 +97,8 @@ impl MyJsonStruct {
 
 #test test_struct_deserialization :: fn() {
   n : MyJsonStruct = {
-    100,
-    200.0
+    n: 100,
+    b: 200.0
   };
   json := json_serialize(&n, #type(MyJsonStruct));
   deleter: JsonValueDeleter;
@@ -123,10 +123,10 @@ impl MyJsonStruct {
 
   array_val := val.get("array");
   assert("array length", array_val.as_array().length == 4);
-  assert("array element 0", array_val.get(0).as_number() == 1);
-  assert("array element 1", array_val.get(1).as_string() == "two");
-  assert("array element 2", array_val.get(2).as_boolean() == false);
-  assert("array element 3", array_val.get(3).is_null());
+  assert("array element 0", array_val.at(0).as_number() == 1);
+  assert("array element 1", array_val.at(1).as_string() == "two");
+  assert("array element 2", array_val.at(2).as_boolean() == false);
+  assert("array element 3", array_val.at(3).is_null());
 
   object_val := val.get("object");
   assert("nested_string", object_val.get("nested_string").as_string() == "Nested Hello");
@@ -135,9 +135,9 @@ impl MyJsonStruct {
 
   nested_array_val := object_val.get("nested_array");
   assert("nested_array length", nested_array_val.as_array().length == 3);
-  assert("nested_array element 0", nested_array_val.get(0).as_string() == "a");
-  assert("nested_array element 1", nested_array_val.get(1).as_string() == "b");
-  assert("nested_array element 2", nested_array_val.get(2).as_string() == "c");
+  assert("nested_array element 0", nested_array_val.at(0).as_string() == "a");
+  assert("nested_array element 1", nested_array_val.at(1).as_string() == "b");
+  assert("nested_array element 2", nested_array_val.at(2).as_string() == "c");
 
   nested_object_val := object_val.get("nested_object");
   assert("deeply_nested_key", nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
