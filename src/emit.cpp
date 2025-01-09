@@ -543,6 +543,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
     }
 
     if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      std::cout << node->name.get_str() << " was explicitly forward declared\n";
       return;
     }
 
