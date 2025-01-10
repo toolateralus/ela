@@ -222,12 +222,11 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
   if (control_flow.type == -1)
     control_flow.type = void_type();
-  const auto is_ctor = (node->flags & FUNCTION_IS_CTOR) != 0, is_dtor = (node->flags & FUNCTION_IS_DTOR) != 0;
   if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0)
     throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
   if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0)
     throw_error("Keyword \"break\" must be in a loop.", node->source_range);
-  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && info.return_type != void_type() && !(is_ctor || is_dtor))
+  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && info.return_type != void_type())
     throw_error("Not all code paths return a value.", node->source_range);
   assert_types_can_cast_or_equal(control_flow.type, info.return_type, node->source_range,
                                  "invalid return type.. expected '{}', got '{}'",

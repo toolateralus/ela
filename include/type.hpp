@@ -32,10 +32,7 @@ enum ConversionRule {
 
 Token get_unique_identifier();
 
-enum StructTypeFlags {
-  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
-  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
-};
+
 
 enum ScalarType {
   TYPE_VOID,
@@ -76,23 +73,23 @@ enum FunctionInstanceFlags: size_t {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
-  FUNCTION_IS_CTOR = 1 << 3,
-  FUNCTION_IS_DTOR = 1 << 4,
-  FUNCTION_IS_VARARGS = 1 << 5,
-  FUNCTION_IS_OPERATOR = 1 << 6,
-  FUNCTION_IS_EXPORTED = 1 << 7,
-  FUNCTION_IS_MUTATING = 1 << 8,
-  FUNCTION_IS_FORWARD_DECLARED = 1 << 9,
-  FUNCTION_IS_STATIC = 1 << 10,
-  FUNCTION_IS_LOCAL = 1 << 11,
-  FUNCTION_IS_FOREIGN = 1 << 12,
+  FUNCTION_IS_VARARGS = 1 << 3,
+  FUNCTION_IS_EXPORTED = 1 << 4,
+  FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
+  FUNCTION_IS_STATIC = 1 << 6,
+  FUNCTION_IS_LOCAL = 1 << 7,
+  FUNCTION_IS_FOREIGN = 1 << 8,
 };
 
 enum UnionFlags {
-  // this and UNION_IS_SUM_TYPE should never be present at the same itme.
   UNION_IS_NORMAL = 1 << 0,
   UNION_IS_FORWARD_DECLARED = 1 << 2,
   UNION_IS_ANONYMOUS = 1 << 3,
+};
+
+enum StructTypeFlags {
+  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
+  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
 };
 
 struct ASTExpr;

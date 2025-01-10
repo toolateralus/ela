@@ -108,13 +108,6 @@ inline static std::string block_flags_to_string(int flags) {
   return result;
 }
 
-struct DestructorCall {
-  InternedString variable_name;
-  InternedString destructor_fn_name;
-  int type_id;
-  int statement_idx;
-};
-
 struct ASTBlock : ASTStatement {
   ASTNode *parent;
   int flags = BLOCK_FLAGS_FALL_THROUGH;
@@ -193,14 +186,13 @@ struct ASTType : ASTExpr {
   static ASTType *get_void();
   std::any accept(VisitorBase *visitor) override;
 };
+
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_EXPR_STATEMENT; }
 };
 
-// All of our declarations could inherit from a base declaration. I am not sure
-// if that would be useful.
 struct ASTDeclaration : ASTStatement {
   InternedString name;
   InternedString bitsize;
