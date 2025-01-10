@@ -538,6 +538,8 @@ struct ASTAlias : ASTStatement {
 struct ASTImpl : ASTStatement {
   // impl 'target' or impl *interface for 'target'
   ASTType *target;
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }

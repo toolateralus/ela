@@ -6,11 +6,11 @@ To search for all info comments in the source just use vscodes regex search with
 ### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
 
 # features(in order)
+  - tagged unions.
   - modules.
   - we need mut/const semantics for variables and parameters etc.
   - quick lambdas.
   - interfaces.
-  - tagged unions.
   - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
 
 ## out-of-language features

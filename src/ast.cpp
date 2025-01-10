@@ -1756,8 +1756,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 ASTImpl *Parser::parse_impl() {
   auto range = begin_node();
   expect(TType::Impl);
-  Defer _([&] { current_impl = nullptr; });
   auto impl = ast_alloc<ASTImpl>();
+  
+  if (peek().type == TType::GenericBrace) {
+    impl->generic_parameters = parse_generic_parameters();
+  }
+
+  Defer _([&] { current_impl = nullptr; });
   current_impl = impl;
   impl->target = parse_type();
 
@@ -2201,3 +2206,4 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
