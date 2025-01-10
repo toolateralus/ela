@@ -165,81 +165,54 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 std::any Emitter::visit(ASTCall *node) {
   auto node_type = node->function->get_node_type();
   auto base_symbol = typer.get_symbol(node->function);
-  if ((base_symbol && (node_type == AST_NODE_DOT_EXPR || node_type == AST_NODE_SCOPE_RESOLUTION || node_type == AST_NODE_TYPE))) {
-    auto symbol = base_symbol.get();
-    if (symbol->declaring_node.is_not_null() &&
-        symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
-      auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
-      auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
-      if (static_method || method_call) {
-        ASTExpr *base = nullptr;
 
-        if (node_type == AST_NODE_DOT_EXPR) {
-          if (static_method) {
-            throw_error("cannot call a static method from an instance", node->source_range);
-          }
-          base = static_cast<ASTDotExpr *>(node->function)->base;
-        } else if (node_type == AST_NODE_TYPE) {
-          if (method_call) {
-            throw_error("must call method with instance", node->source_range);
-          }
-          node->function = base = static_cast<ASTType*>(node->function)->normal.base;
-          // TODO: how are we gonna handle super chained dot & scope res calls?
-          while (base->get_node_type() == AST_NODE_SCOPE_RESOLUTION) {
-            base = static_cast<ASTScopeResolution *>(base)->base;  
-          }
-        } else {
-          if (method_call) {
-            throw_error("must call method with instance", node->source_range);
-          }
-          base = static_cast<ASTScopeResolution *>(node->function)->base;
-        }
+  
 
-        auto base_sym_ptr = base_symbol.get();
-        Type *function_type = global_get_type(base_sym_ptr->type_id);
-        auto info = function_type->get_info()->as<FunctionTypeInfo>();
-        auto param_0_ty = global_get_type(info->parameter_types[0]);
-        auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
+  auto symbol = base_symbol.get();
+  if (base_symbol && node_type == AST_NODE_DOT_EXPR && symbol->declaring_node.is_not_null() &&
+      symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+    auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
+    auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
 
-        if (!base_type) {
-          throw_error("Internal compiler error: unable to find method call", node->source_range);
-        }
-        // TODO: this needs a lot of work I think. Maybe it will work just fine, but this seems super hacky.
-        Scope *base_scope = base_type->get_info()->scope;
-        (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
-        (*ss) << "(";
-        if (method_call) {
-          if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-            // TODO: this needs to be more exhaustive, it could be a parenthesized literal, it could be a binary
-            // expression with only literals
-            // TODO: it could be a cast of a literal, it could be a bunch a function call's result.
-            if (node_type == AST_NODE_LITERAL) {
-              throw_error(
-                  "Can't call a 'self*' method with a literal, as you'd be taking a pointer to a literal, which "
-                  "is temporary memory.",
-                  node->source_range);
-            }
-            (*ss) << "&";
-          }
-          base->accept(this);
-          if (node->arguments->arguments.size() > 0) {
-            (*ss) << ", ";
-          }
-        }
-        for (auto &arg : node->arguments->arguments) {
-          arg->accept(this);
-          if (arg != node->arguments->arguments.back()) {
-            (*ss) << ", ";
-          }
-        }
-        (*ss) << ")";
-        return {};
+    if (!method_call || static_method) {
+      throw_error("cannot call a static method from an instance", node->source_range);
+    }
+
+    ASTExpr *base = nullptr;
+    base = static_cast<ASTDotExpr *>(node->function)->base;
+    Type *function_type = global_get_type(base_symbol.get()->type_id);
+    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
+    auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
+    if (!base_type) {
+      throw_error("Internal compiler error: unable to find method call", node->source_range);
+    }
+    (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
+    (*ss) << "(";
+
+    if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
+      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
+      (*ss) << "&";
+    }
+    base->accept(this);
+    if (node->arguments->arguments.size() > 0) {
+      (*ss) << ", ";
+    }
+
+    for (auto &arg : node->arguments->arguments) {
+      arg->accept(this);
+      if (arg != node->arguments->arguments.back()) {
+        (*ss) << ", ";
       }
     }
-  } 
-  node->function->accept(this);
-  node->arguments->accept(this);
+    (*ss) << ")";
+    return {};
+  } else {
+    // normal function call, or a static method.
+    node->function->accept(this);
+    node->arguments->accept(this);
+  }
+
   return {};
 }
 std::any Emitter::visit(ASTLiteral *node) {
@@ -672,8 +645,8 @@ std::any Emitter::visit(ASTProgram *node) {
   }
 
   if (compile_command.has_flag("test-verbose")) {
-    code <<  "#define TEST_VERBOSE;\n";
-    std :: cout << "adding TEST_VERBOSE\n";
+    code << "#define TEST_VERBOSE;\n";
+    std ::cout << "adding TEST_VERBOSE\n";
   }
 
   code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
@@ -1493,7 +1466,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 std::string Emitter::to_cpp_string(Type *type) {
   auto output = std::string{};
   switch (type->kind) {
-    case TYPE_FUNCTION: 
+    case TYPE_FUNCTION:
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
     case TYPE_ENUM:
@@ -1536,7 +1509,6 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 
 std::any Emitter::visit(ASTScopeResolution *node) {
   bool emitted = false;
-
   if (node->base->get_node_type() == AST_NODE_TYPE) {
     auto t = static_cast<ASTType *>(node->base);
     auto type = global_get_type(t->resolved_type);
@@ -1545,16 +1517,11 @@ std::any Emitter::visit(ASTScopeResolution *node) {
       emitted = true;
     }
   }
-
   if (!emitted) {
     node->base->accept(this);
   }
-
-  auto op = "::";
-  auto type_id = std::any_cast<int>(node->base->accept(&typer));
-  if (global_get_type(type_id)->is_kind(TYPE_ENUM)) {
-    op = "_";
-  }
+  auto op = "_"; // ! this may cause issues, but this is going to be a permanent change. we obviously can't lower to C,
+                 // when we use C++ features like `::`
   (*ss) << op << node->member_name.get_str();
   return {};
 }
@@ -1591,23 +1558,22 @@ std::any Emitter::visit(ASTImpl *node) {
 }
 
 std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
-
   (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
 
-  for (const auto &member: node->members) {
+  for (const auto &member : node->members) {
     if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration*>(member);
+      auto struct_node = static_cast<ASTStructDeclaration *>(member);
       (*ss) << "struct {\n";
-        for (const auto &field: struct_node->fields) {
-          field->accept(this);
-          (*ss) << ";\n";
-        }
-        for (const auto &$union: struct_node->unions) {
-          $union->accept(this);
-        }
+      for (const auto &field : struct_node->fields) {
+        field->accept(this);
+        (*ss) << ";\n";
+      }
+      for (const auto &$union : struct_node->unions) {
+        $union->accept(this);
+      }
       (*ss) << "} " << struct_node->name.get_str() << ";\n";
     } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration*>(member);
+      auto declaration_node = static_cast<ASTDeclaration *>(member);
       // TODO: put this error in the typer.
       auto old = emit_default_init;
       emit_default_init = false;
@@ -1682,7 +1648,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
         auto last_defer_blocks = std::move(defer_blocks);
         bool was_emitting_block_with_defer = emitting_function_with_defer;
 
-        Defer _([&]{ // yes, using a defer RAII struct to emit defers. sigh
+        Defer _([&] { // yes, using a defer RAII struct to emit defers. sigh
           defer_blocks = std::move(last_defer_blocks);
           emitting_function_with_defer = was_emitting_block_with_defer;
         });
@@ -1690,7 +1656,7 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
         defer_blocks.clear();
         emitting_function_with_defer = node->has_defer;
         block->accept(this);
-        
+
       } else {
         emitting_function_with_defer = false;
         block->accept(this);
@@ -1787,7 +1753,7 @@ std::any Emitter::visit(ASTReturn *node) {
     if (node->declaring_block.is_not_null() && block->has_defer) {
       (*ss) << ";\n";
       (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
-    } else if (block->return_type != -1 && block->return_type != void_type()){
+    } else if (block->return_type != -1 && block->return_type != void_type()) {
       (*ss) << ";\nreturn " << defer_return_value_key << ";\n";
     } else {
       (*ss) << ";\nreturn;\n";
@@ -1805,9 +1771,7 @@ std::any Emitter::visit(ASTReturn *node) {
 
 std::any Emitter::visit(ASTDefer *node) {
   auto old = ss;
-  Defer _([&] {
-    ss = old;
-  });
+  Defer _([&] { ss = old; });
   std::stringstream defer_ss;
   ss = &defer_ss;
   node->statement->accept(this);
@@ -1839,7 +1803,6 @@ std::any Emitter::visit(ASTBlock *node) {
     newline();
   }
 
-  
   if (node->has_defer) {
     for (int i = node->defer_count; i > 0 && defer_blocks.size() > 0; --i) {
       (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
@@ -1856,4 +1819,3 @@ std::any Emitter::visit(ASTBlock *node) {
   ctx.exit_scope();
   return {};
 }
-

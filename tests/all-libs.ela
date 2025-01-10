@@ -17,7 +17,7 @@
 
 // * This def is for 'memory' where we have ArenaOf![T] 
 // * since generics are broken and it's shown in another test
-// ! REMOVE 'GENERICS_ENABLED' in 'lib/memory.ela'
+// ! REMOVE 'GENERICS_ENABLED' in 'lib/memory.ela' when we've fixed generic methods.
 // #def GENERICS_ENABLED
 
 #import memory;// * this uses generics.

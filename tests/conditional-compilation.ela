@@ -85,3 +85,13 @@
     assert("ndef", false);
   }
 }
+
+
+#test test_constexpr_if :: fn() {
+  #if true {
+    n := 0;
+  } else {
+    n := 1;
+  }
+  assert("`#if true` failed", n == 0);
+}

@@ -645,8 +645,8 @@ ASTProgram *Parser::parse() {
 
     if (peek().type == TType::Directive) {
       eat();
-      auto identifer = expect(TType::Identifier).value;
-      auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifer);
+      InternedString identifier = eat().value;
+      auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
       if (result.is_not_null()) {
         auto statement = static_cast<ASTStatement *>(result.get());
         if (statement) {
@@ -1146,6 +1146,18 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+  // * '#' Directives.
+  if (tok.type == TType::Directive) {
+    eat();
+    auto directive_name = eat().value;
+    auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
+    if (!statement) {
+      throw_error(std::format("Directive '{}' did not return a valid statement node", directive_name), range);
+    }
+    end_node(statement, range);
+    return statement;
+  }
+
   if (peek().type == TType::Defer) {
     return parse_defer();
   }
@@ -1184,17 +1196,6 @@ ASTStatement *Parser::parse_statement() {
     return decl;
   }
 
-  // * '#' Directives.
-  if (tok.type == TType::Directive) {
-    eat();
-    auto statement = dynamic_cast<ASTStatement *>(
-        process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value).get());
-    if (!statement) {
-      throw_error(std::format("Directive '{}' did not return a valid statement node", tok.value), range);
-    }
-    end_node(statement, range);
-    return statement;
-  }
 
   // * Control flow
   {
@@ -1993,8 +1994,8 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
 Nullable<ASTExpr> Parser::try_parse_directive_expr() {
   if (peek().type == TType::Directive) {
     eat();
-    auto identifier = expect(TType::Identifier);
-    Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier.value);
+    InternedString identifier = eat().value;
+    Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier);
 
     auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
     if (expr.is_not_null()) {

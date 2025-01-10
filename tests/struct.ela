@@ -84,4 +84,6 @@ impl Static {
   for i in 0..10 {
     assert("Static member method with static local failed", Static::counter() == i);
   }
+  n := Static::counter();
+  Static::counter();
 }
