@@ -165,12 +165,46 @@ Vector2 :: struct {
   x: float;
   y: float;
 }
+
 impl Vector2 {
   scalar :: fn(f: float) -> #self {
     return {
       x: f, y: f
     };
   }
+  to_string :: fn(self*) -> string {
+    return $"x: {self.x}, y: {self.y}";
+  }
+
+  add :: fn(self* other: Vector2) -> Vector2 {
+    return { x: self.x + other.x, y: self.y + other.y };
+  }
+
+  subtract :: fn(self* other: Vector2) -> Vector2 {
+    return { x: self.x - other.x, y: self.y - other.y };
+  }
+
+  multiply :: fn(self* scalar: float) -> Vector2 {
+    return { x: self.x * scalar, y: self.y * scalar };
+  }
+
+  divide :: fn(self* scalar: float) -> Vector2 {
+    return { x: self.x / scalar, y: self.y / scalar };
+  }
+
+  dot :: fn(self* other: Vector2) -> float64 {
+    return self.x * other.x + self.y * other.y;
+  }
+
+  length :: fn(self*) -> float64 {
+    return sqrt(self.x * self.x + self.y * self.y);
+  }
+
+  normalize :: fn(self*) -> Vector2 {
+    len := self.length();
+    return { x: (self.x / len) as float32, y: (self.y / len) as float32 };
+  }
+
 }
 
 Vector3 :: struct {
@@ -180,9 +214,46 @@ Vector3 :: struct {
 }
 
 impl Vector3 {
-  to_string :: fn(self) -> string {
+  to_string :: fn(self*) -> string {
     return $"x: {self.x}, y: {self.y}, z: {self.z}"
   }
+  add :: fn(self* other: Vector3) -> Vector3 {
+    return { x: self.x + other.x, y: self.y + other.y, z: self.z + other.z };
+  }
+
+  subtract :: fn(self* other: Vector3) -> Vector3 {
+    return { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z };
+  }
+
+  multiply :: fn(self* scalar: float) -> Vector3 {
+    return { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar };
+  }
+
+  divide :: fn(self* scalar: float) -> Vector3 {
+    return { x: self.x / scalar, y: self.y / scalar, z: self.z / scalar };
+  }
+
+  dot :: fn(self* other: Vector3) -> float {
+    return self.x * other.x + self.y * other.y + self.z * other.z;
+  }
+
+  cross :: fn(self* other: Vector3) -> Vector3 {
+    return {
+      x: self.y * other.z - self.z * other.y,
+      y: self.z * other.x - self.x * other.z,
+      z: self.x * other.y - self.y * other.x
+    };
+  }
+
+  length :: fn(self*) -> float64 {
+    return sqrt(self.x * self.x + self.y * self.y + self.z * self.z);
+  }
+
+  normalize :: fn(self*) -> Vector3 {
+    len := self.length();
+    return { x: (self.x / len) as float32, y: (self.y / len) as float32, z: (self.z / len) as float32 };
+  }
+
 }
 
 Rectangle :: struct {
@@ -615,7 +686,7 @@ SliderF :: struct {
 }
 
 impl SliderF {
-  adjust_slider_value :: fn(self) {
+  adjust_slider_value :: fn(self*) {
     increment: float;
     if IsKeyDown(Key::LeftShift) {
       increment = (self.max_value - self.min_value) / 100;
@@ -646,7 +717,7 @@ impl SliderF {
     }
   }
 
-  draw :: fn(self) {
+  draw :: fn(self*) {
     // Draw the slider background
     DrawRectangleV(Vector2{ x: self.rect.x, y: self.rect.y}, Vector2{ x: self.rect.width, y: self.rect.height}, self.style.background);
 
@@ -690,7 +761,7 @@ SliderI :: struct {
 }
 
 impl SliderI {
-  adjust_slider_value :: fn(self) {
+  adjust_slider_value :: fn(self*) {
     increment: float;
     if IsKeyDown(Key::LeftShift) {
       increment = (self.max_value - self.min_value) / 100;
@@ -721,7 +792,7 @@ impl SliderI {
     }
   }
 
-  draw :: fn(self) {
+  draw :: fn(self*) {
     DrawRectangleV(Vector2{ x: self.rect.x, y: self.rect.y}, Vector2{ x: self.rect.width, y: self.rect.height}, self.style.background);
 
     v_f := (*self.value) as float;

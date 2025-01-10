@@ -3,13 +3,13 @@ File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
 src/ast.cpp                                  190            101           1722
 src/emit.cpp                                 206             96           1515
-src/typer.cpp                                179             42           1127
-include/ast.hpp                               92             21            627
+src/typer.cpp                                179             42           1126
+include/ast.hpp                               92             19            621
 src/type.cpp                                  83             51            585
 include/boilerplate.hpp                       70             12            476
 src/ast_copier.cpp                             5              0            367
 include/lex.hpp                               39              4            311
-include/type.hpp                              53             14            252
+include/type.hpp                              55             13            248
 include/core.hpp                              26              2            227
 src/lex.cpp                                   19              2            225
 include/constexpr.hpp                         31              0            217
@@ -25,5 +25,5 @@ src/visitor.cpp                                6             14             46
 include/ast_copier.hpp                         3              0             42
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1187            435           8860
+SUM:                                        1189            432           8849
 -----------------------------------------------------------------------------------------

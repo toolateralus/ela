@@ -1025,19 +1025,18 @@ std::any Typer::visit(ASTDotExpr *node) {
 std::any Typer::visit(ASTScopeResolution *node) {
   auto id = int_from_any(node->base->accept(this));
   auto base_ty = global_get_type(id);
-
   Scope *scope = base_ty->get_info()->scope;
-
   if (!scope) {
     throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
   }
-
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     return member->type_id;
-  } else if (auto type = scope->find_type_id(node->member_name, {}); type != -1) {
+  } else if (auto type = scope->find_type_id(node->member_name, {})) {
+    if (type < 0) goto ERROR_CASE;
     return type;
   } else {
+    ERROR_CASE:
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
                 node->source_range);
   }

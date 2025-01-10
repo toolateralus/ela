@@ -508,7 +508,6 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
 
 ASTProgram *Parser::parse() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
-
   while (true) {
     if (peek().type == TType::Eof && !states.empty()) {
       states.pop_back();
