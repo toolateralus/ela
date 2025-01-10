@@ -752,6 +752,8 @@ std::any Emitter::visit(ASTDotExpr *node) {
 
   return {};
 }
+
+// TODO: remove this dog crap node.
 std::any Emitter::visit(ASTMake *node) {
   auto type = global_get_type(node->type_arg->resolved_type);
   if (node->kind == MAKE_CAST) {
@@ -764,6 +766,14 @@ std::any Emitter::visit(ASTMake *node) {
     node->arguments->arguments[0]->accept(this);
   } else if (node->kind == MAKE_CTOR || node->kind == MAKE_COPY_CTOR) {
     (*ss) << to_cpp_string(type);
+
+    auto &args = node->arguments->arguments;
+
+    if (args.size() == 1 && args[0]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+      args[0]->accept(this);
+      return {};
+    }
+
     node->arguments->accept(this);
   }
   return {};
@@ -808,11 +818,11 @@ std::any Emitter::visit(ASTInitializerList *node) {
 }
 
 std::any Emitter::visit(ASTRange *node) {
-  (*ss) << "Range(";
+  (*ss) << "Range{.first =";
   node->left->accept(this);
-  (*ss) << ", ";
+  (*ss) << ", .last = ";
   node->right->accept(this);
-  (*ss) << ")";
+  (*ss) << "}";
   return {};
 }
 std::any Emitter::visit(ASTSwitch *node) {

@@ -12,24 +12,8 @@ struct string;
 
 struct Range {
   using value_type = signed long long;
-  Range() {}
-  Range(value_type first, value_type last, value_type increment = 1)
-      : first(first), last(last), span(last - first), is_reverse(first > last), increment(increment) {
-    if (is_reverse) {
-      first--;
-      span = first - last;
-    }
-  }
-  Range(const Range &other) {
-    first = other.first;
-    last = other.last;
-    span = other.span;
-    is_reverse = other.is_reverse;
-    increment = other.increment;
-  }
   value_type first = 0, last = 0, span = 0, increment = 1;
   bool is_reverse = false;
-
   struct iterator {
     value_type current, end_value, increment;
     bool is_reverse;
@@ -54,16 +38,12 @@ struct Range {
       }
     }
   };
-
   iterator begin() const { return iterator(first, last, is_reverse, increment); }
   iterator end() const { return iterator(first, last, is_reverse, increment); }
   iterator begin() { return iterator(first, last, is_reverse, increment); }
   iterator end() { return iterator(first, last, is_reverse, increment); }
-
   bool operator==(const value_type number) const { return number >= first && number <= last; }
-
   bool contains(const value_type number) { return number >= first && number <= last; }
-
 #if USE_STD_LIB
   string to_string() const;
 #endif
@@ -478,7 +458,9 @@ static _array<string> &Env_args() {
 
 #define assert(message, condition)                                                                                     \
   if (!(condition))                                                                                                    \
-    throw __test_exception("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), \n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n", #condition, message);
+    throw __test_exception("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "        \
+                           "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                         \
+                           #condition, message);
 
 extern "C" int snprintf(char *buf, size_t size, const char *fmt, ...);
 extern "C" int strcpy(const char *, char *);
@@ -540,12 +522,12 @@ struct __COMPILER_GENERATED_TEST {
         failed++;                                                                                                      \
       }                                                                                                                \
     }                                                                                                                  \
-    printf("\033[1;31mfailed: %d, \033[1;32mpassed: "                                              \
+    printf("\033[1;31mfailed: %d, \033[1;32mpassed: "                                                                  \
            "%d\033[0m\n",                                                                                              \
            failed, passed);                                                                                            \
     if (failed > 0) {                                                                                                  \
       for (int i = 0; i < failed_index; ++i) {                                                                         \
-        printf("\033[1;31mfailed \033[0m::(\033[1;35m%s\033[0m)\n", failed_tests[i]);                                                                             \
+        printf("\033[1;31mfailed \033[0m::(\033[1;35m%s\033[0m)\n", failed_tests[i]);                                  \
       }                                                                                                                \
     }                                                                                                                  \
   }

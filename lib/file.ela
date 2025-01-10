@@ -55,7 +55,7 @@ impl File {
     fseek(file, 0, SeekPosition::End);
     len := ftell(file);
     fseek(file, 0, SeekPosition::Begin);
-    return #make(u32, len);
+    return len as u32;
   }
   read_all :: fn(filename: string) -> string {
     file := fopen(filename.data, "r");

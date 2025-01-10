@@ -39,6 +39,7 @@ Context::Context() {
     range_scope->insert("first", s64_type());
     range_scope->insert("last", s64_type());
     range_scope->insert("span", s64_type());
+    range_scope->insert("increment", s64_type());
 
     auto func = FunctionTypeInfo{};
     func.params_len = 1;

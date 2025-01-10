@@ -79,7 +79,7 @@ impl Xaryu {
 
   dynamic : s64[][];
   for x in 0..5 {
-    dynamic ~= #make(s64[]);
+    dynamic ~= {};
     for y in 0..5 {
       dynamic[x] ~= x * y;
     }
@@ -98,9 +98,9 @@ impl Xaryu {
   variables: int[string];
   map1: int*[char*];
 
-  str1 := #make(string, "Key1");
-  str2 := #make(string, "Key2");
-  str3 := #make(string, "shouldn't exist");
+  str1 : string = "Key1";
+  str2 : string = "Key2";
+  str3 : string = "shouldn't exist";
 
   variables[str1] = 100;
   variables[str2] = 200;
@@ -139,8 +139,9 @@ impl Xaryu {
 
 
 #test subscript_string :: fn() {
-  s: string = #make(string, "0,1,2,3");
+  s: string = "0,1,2,3";
   s[0] = 10;
+  assert("subscript assign string failed", s[0] == (10 as char));
 }
 
 #test test_range_var :: fn() {
@@ -155,14 +156,15 @@ impl Xaryu {
 }
 
 #test test_slicing_array :: fn() {
-  arr := #make(s64[], 1000);
-  assert("Length", arr.length == 1000);
+  arr := s64[] {
+    0, 0, 0,
+    0, 0, 0,
+    0, 0, 0,
+    0, 0,
+  };
+  
+  assert("Length", arr.length == 11);
 
-  /*
-    Ranges are always max-exclusive right now.
-    0..10 == 0->9;
-    We don't currently have a way to represent max inclusive ranges.
-  */
   for i in 0..10 {
     arr[i] = 100;
   }

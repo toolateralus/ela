@@ -241,7 +241,7 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50
   r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  return #make(Color, {r: r, g: g, b: b, a: 255 as u8});
+  return {r: r, g: g, b: b, a: 255 as u8};
 }
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {

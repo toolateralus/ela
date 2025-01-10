@@ -388,7 +388,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        ASTType *type = ast_alloc<ASTType>();
+        NODE_ALLOC(ASTType, type, range, defer, parser);
         if (parser->current_union_decl) {
           type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_union_decl.get()->name);
         } else if (parser->current_struct_decl) {
@@ -794,7 +794,8 @@ ASTExpr *Parser::parse_postfix() {
       NODE_ALLOC(ASTMake, node, range, _, this)
       node->type_arg = type;
       node->kind = MAKE_CAST;
-      node->arguments = ast_alloc<ASTArguments>();
+      NODE_ALLOC(ASTArguments, args, args_range, args_defer, this);
+      node->arguments = args;
       node->arguments->arguments.push_back(left);
       left = node;
     }
@@ -1012,7 +1013,8 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::RParen);
         node->type_arg = type;
         node->kind = MAKE_CAST;
-        node->arguments = ast_alloc<ASTArguments>();
+        NODE_ALLOC(ASTArguments, args, args_range, defer_args, this);
+        node->arguments = args;
         node->arguments->arguments.push_back(parse_unary());
         return node;
       }
@@ -1029,7 +1031,7 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::RParen);
         NODE_ALLOC(ASTTuple, tuple, range, _, this)
         tuple->values = exprs;
-        tuple->type = ast_alloc<ASTType>();
+        tuple->type = ast_alloc<ASTType>(); // ! why is this here?
         return tuple;
       }
       if (peek().type != TType::RParen) {
@@ -1254,7 +1256,8 @@ ASTStatement *Parser::parse_statement() {
 
       if (peek().type == TType::Then) {
         eat();
-        node->block = ast_alloc<ASTBlock>();
+        NODE_ALLOC(ASTBlock, block, _range, defer, this);
+        node->block = block;
         ctx.set_scope();
         auto statement = parse_statement();
         node->block->statements = {statement};
@@ -1477,7 +1480,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 
   if (peek().type == TType::ExpressionBody) {
     expect(TType::ExpressionBody);
-    auto $return = ast_alloc<ASTReturn>();
+    NODE_ALLOC(ASTReturn, $return, range, _, this);
     $return->expression = parse_expr();
     block->statements = {$return};
     block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
