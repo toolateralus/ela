@@ -1619,6 +1619,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   expect(TType::Fn);
 
   auto function = ast_alloc<ASTFunctionDeclaration>();
+  function->has_defer = false;
 
   if (peek().type == TType::GenericBrace) {
     function->generic_parameters = parse_generic_parameters();

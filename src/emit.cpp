@@ -1,5 +1,6 @@
 #include <any>
 #include <functional>
+#include <ostream>
 #include <sstream>
 #include <string>
 
@@ -1668,19 +1669,32 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
   }
 
 */
+
 std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
     node->return_type->accept(this);
     (*ss) << " " + name;
     node->params->accept(this);
     if (node->block.is_not_null()) {
-      auto last_defer_blocks = std::move(defer_blocks);
-      defer_blocks.clear();
-      bool was_emitting_block_with_defer = emitting_block_with_defer;
-      emitting_block_with_defer = node->has_defer;
-      node->block.get()->accept(this);
-      defer_blocks = std::move(last_defer_blocks);
-      emitting_block_with_defer = was_emitting_block_with_defer;
+      auto block = node->block.get();
+      // move around defer blocks when emitting a deferred statement.
+      if (node->has_defer && block->has_defer) {
+        auto last_defer_blocks = std::move(defer_blocks);
+        bool was_emitting_block_with_defer = emitting_function_with_defer;
+
+        Defer _([&]{ // yes, using a defer RAII struct to emit defers. sigh
+          defer_blocks = std::move(last_defer_blocks);
+          emitting_function_with_defer = was_emitting_block_with_defer;
+        });
+
+        defer_blocks.clear();
+        emitting_function_with_defer = node->has_defer;
+        block->accept(this);
+        
+      } else {
+        emitting_function_with_defer = false;
+        block->accept(this);
+      }
     }
   };
 
@@ -1762,6 +1776,33 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   return {};
 }
 
+std::any Emitter::visit(ASTReturn *node) {
+  emit_line_directive(node);
+  if (emitting_function_with_defer) {
+    if (node->expression.is_not_null()) {
+      (*ss) << defer_return_value_key << " = ";
+      node->expression.get()->accept(this);
+    }
+    auto block = node->declaring_block.get();
+    if (node->declaring_block.is_not_null() && block->has_defer) {
+      (*ss) << ";\n";
+      (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
+    } else if (block->return_type != -1 && block->return_type != void_type()){
+      (*ss) << ";\nreturn " << defer_return_value_key << ";\n";
+    } else {
+      (*ss) << ";\nreturn;\n";
+    }
+  } else {
+    indented("return");
+    if (node->expression.is_not_null()) {
+      space();
+      node->expression.get()->accept(this);
+    }
+    (*ss) << ";\n";
+  }
+  return {};
+}
+
 std::any Emitter::visit(ASTDefer *node) {
   auto old = ss;
   Defer _([&] {
@@ -1781,7 +1822,7 @@ std::any Emitter::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
 
-  if (emitting_block_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+  if (emitting_function_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
     if (node->return_type != void_type()) {
       auto type = global_get_type(node->return_type);
       (*ss) << to_cpp_string(type) << " " << defer_return_value_key << ";\n";
@@ -1798,18 +1839,15 @@ std::any Emitter::visit(ASTBlock *node) {
     newline();
   }
 
-  if (node->parent != nullptr && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-    auto fn = static_cast<ASTFunctionDeclaration*>(node->parent);
-    if (fn->has_defer) {
-      while (!defer_blocks.empty()) {
-        (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
-        (*ss) << defer_blocks.back().str();
-        defer_blocks.pop_back();
-      }
-
-      if (fn->return_type->resolved_type != void_type() && fn->return_type->resolved_type != -1) {
-        (*ss) << "return " << defer_return_value_key << ";\n";
-      }
+  
+  if (node->has_defer) {
+    for (int i = node->defer_count; i > 0 && defer_blocks.size() > 0; --i) {
+      (*ss) << "DEFER_" << defer_blocks.size() - 1 << ":\n";
+      (*ss) << defer_blocks.back().str();
+      defer_blocks.pop_back();
+    }
+    if (node->return_type != void_type() && node->return_type != -1) {
+      (*ss) << "return " << defer_return_value_key << ";\n";
     }
   }
 
@@ -1819,24 +1857,3 @@ std::any Emitter::visit(ASTBlock *node) {
   return {};
 }
 
-std::any Emitter::visit(ASTReturn *node) {
-  emit_line_directive(node);
-
-  if (emitting_block_with_defer) {
-    if (node->expression.is_not_null()) {
-      (*ss) << defer_return_value_key << " = ";
-      node->expression.get()->accept(this);
-    }
-    (*ss) << ";\n";
-    (*ss) << "goto DEFER_" << defer_blocks.size() - 1 << ";\n";
-  } else {
-    indented("return");
-    if (node->expression.is_not_null()) {
-      space();
-      node->expression.get()->accept(this);
-    }
-    (*ss) << ";\n";
-  }
-
-  return {};
-}

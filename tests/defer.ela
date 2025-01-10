@@ -1,17 +1,13 @@
 #import core;
 
-get_null_after_malloc :: fn() -> void* {
-  n := malloc(16);
-  defer {
-    free(n);
-    n = null;
-  } 
-  return n;
-}
 
-#test test_defer :: fn() {
-  assert("defer failed", get_null_after_malloc() == null);
-}
+/* 
+ * :: Important :: 
+  - Some of these value based returns from defers may be surprising that they do not mutate the variables.
+  - This is because the defer is always executed after the return value is already obtained: they are merely for mutating state on exit,
+    such as calling cleanup functions, not changing the value of the return value post return.
+*/
+
 
 nested_defer_test :: fn() -> int {
   x := 0;
@@ -27,8 +23,7 @@ nested_defer_test :: fn() -> int {
 }
 
 #test test_nested_defer :: fn() {
-  println(nested_defer_test());
-  assert("nested defer failed", nested_defer_test() == 3);
+  assert("nested defer failed", nested_defer_test() == 2);
 }
 
 loop_defer_test :: fn() -> int {
@@ -60,5 +55,35 @@ early_return_defer_test :: fn() -> int {
 }
 
 #test test_early_return_defer :: fn() {
-  assert("early return defer failed", early_return_defer_test() == 3);
+  assert("early return defer failed", early_return_defer_test() == 0);
+}
+
+DeferCleanup :: struct {
+  ptr : void*;
+}
+
+// Return statements are evaluated BEFORE the defer, so
+// do not try to change a non-pointer, or what a pointer points to,
+// and expect that to propogate to the caller via return.
+
+// here we show that the ptr as a u64 is passed back to the caller before it's set to null
+// in the defer block. which is absolutely expected behaviour.
+defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
+  assert("defer cleanup got null input", c.ptr != null);
+  defer {
+    free(c.ptr);
+    c.ptr = null;
+  }
+  return c.ptr as u64;
+}
+
+#test test_defer_cleanup_routine :: fn() {
+  ptr := malloc(8);
+  cleanup := DeferCleanup {
+    ptr: ptr
+  };
+  ptr_as_int : u64 = ptr as u64;
+  n := defer_cleanup_routine(&cleanup);
+  assert("yep", n == ptr_as_int);
+  assert("cleanup on defer failed", cleanup.ptr == null);
 }

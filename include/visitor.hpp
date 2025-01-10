@@ -106,7 +106,7 @@ struct Emitter : VisitorBase {
   Typer &typer;
 
   // used to cache up defers.
-  bool emitting_block_with_defer = false;
+  bool emitting_function_with_defer = false;
 
   // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
   // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
