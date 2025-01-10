@@ -2,24 +2,22 @@
 #import core;
 #import net;
 
-MAX_BUFFER_LENGTH  : int = 80;
 PORT : u16 = 8080;
 
 chatting :: fn(connfd: int) {
-  buff : char[MAX_BUFFER_LENGTH];
-
+  buff : char[80];
   while true {
-    memset(buff, 0, MAX_BUFFER_LENGTH);
-    read(connfd, buff, MAX_BUFFER_LENGTH);
+    memset(buff, 0, 80);
+    read(connfd, buff, 80);
     println($"From client: {(char*)buff}   To client : ");
-    memset(buff, 0, MAX_BUFFER_LENGTH);
+    memset(buff, 0, 80);
     n: int;
-    while n < MAX_BUFFER_LENGTH && ((buff[n++] = getchar()) != '\n') {}
-    if (n >= 4 && strncmp("exit", (char*)buff, 4) == 0) {
+    while n < 80 && ((buff[n++] = getchar()) != '\n') {}
+    write(connfd, buff, 80);
+    if (strncmp("exit", (char*)buff, 4) == 0) {
       printf("Server Exit...\n");
       break;
     }
-    write(connfd, buff, MAX_BUFFER_LENGTH);
   }
 }
 
@@ -37,7 +35,8 @@ main :: fn() -> int {
   servaddr.sin_addr.s_addr = htonl(INADDR_ANY);
   servaddr.sin_port = htons(PORT);
 
-  result := bind(sockfd, (sockaddr*)&servaddr, sizeof(sockaddr_in));
+  addr : sockaddr* = &servaddr;
+  result := bind(sockfd, addr, sizeof(sockaddr_in));
 
   if (result != 0) {
     panic("socket bind failed...");

@@ -80,7 +80,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   if (base < 0) {
-    throw_error("global_find_type_id() got a negative base index", {});
+    return -1;
   }
 
   if (!type_extensions.has_extensions()) {
@@ -683,5 +683,3 @@ int Type::take_pointer_to() const {
   ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
 }
-
-

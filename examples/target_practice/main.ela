@@ -1,96 +1,89 @@
 #import raylib;
 #import core;
 
-#c_flags "-g"
-
-/*
-  * TODO
-  * We should probably make the game a bit more balanced in score and add some goals. *
-  ? - Rounds? increased spawn rate, rogue like- advancing by completing N clears, and when you fail to clear it in X time per round, you go back to the start.
-  ? - High score leaderboard
-*/
-
 Scene :: enum {
   MainMenu,
   Game,
 }
 
-button_style : Style = {
-  WHITE,
-  CLEAR,
-  CYAN.with_alpha(24),
-  20
-};
+#region Global Variables {
+  button_style : Style = {
+    foreground: WHITE,
+    background: CLEAR,
+    highlighted: CYAN.with_alpha(24),
+    font_size: 20
+  };
 
-jiggly_text_style : Style = {
-  WHITE,
-  CLEAR,
-  CYAN.with_alpha(24),
-  40
-};
+  jiggly_text_style : Style = {
+    foreground: WHITE,
+    background: CLEAR,
+    highlighted: CYAN.with_alpha(24),
+    font_size: 40
+  };
 
-round_base_num_enemies_to_advance: int = 6;
-round_index : int = 1;
-round_failed := false;
-camera: Camera2D;
-scene: int = Scene::MainMenu;
+  round_base_num_enemies_to_advance: int = 6;
+  round_index : int = 1;
+  round_failed := false;
+  camera: Camera2D;
+  scene: int = Scene::MainMenu;
 
-max_tilt : float = 16;
-screen_width : float;
-screen_height : float;
-zero : Vector2 = {0, 0};
+  max_tilt : float = 16;
+  screen_width : float;
+  screen_height : float;
+  zero : Vector2 = {x: 0, y: 0};
 
-player_drag := 0.87;
+  player_drag := 0.87;
 
-bullet_start_velocity := -15.0;
-bullet_min_velocity := 0.3;
-bullet_scale := 32.0;
-bullet_drag := 0.99;
+  bullet_start_velocity := -15.0;
+  bullet_min_velocity := 0.3;
+  bullet_scale := 32.0;
+  bullet_drag := 0.99;
 
-enemy_scale := 48.0;
-enemy_rotation_speed := 13.0;
-enemy_max_speed := 1.0;
+  enemy_scale := 48.0;
+  enemy_rotation_speed := 13.0;
+  enemy_max_speed := 1.0;
 
-score : int  = 0;
-targets_destroyed : int = 0;
-num_enemies_spawned : int = 0;
-can_burst := true;
+  score : int  = 0;
+  targets_destroyed : int = 0;
+  num_enemies_spawned : int = 0;
+  can_burst := true;
 
-bullet_max_burst: int = 3;
+  bullet_max_burst: int = 3;
 
-smoke_particle_init_scale : Vector2 = {15, 15};
-smoke_particle_max_burst := 6;
-smoke_particle_density := 1.5;
+  smoke_particle_init_scale : Vector2 = {x: 15, y: 15};
+  smoke_particle_max_burst := 6;
+  smoke_particle_density := 1.5;
 
-player_smoke_color : Color;
+  player_smoke_color : Color;
 
-fire_particle_density := 3.0;
-fire_particle_max_burst := 6;
+  fire_particle_density := 3.0;
+  fire_particle_max_burst := 6;
 
-game_start_time : float;
-fade_in_length : float = 3.0;
-misses_this_round : s8 = 0;
-round_finish_start_time : float = -1;
+  game_start_time : float;
+  fade_in_length : float = 3.0;
+  misses_this_round : s8 = 0;
+  round_finish_start_time : float = -1;
 
-background_rect : Rectangle;
+  background_rect : Rectangle;
 
-format_buffer: char* = malloc(sizeof(char) * 1024);
+  format_buffer: char* = malloc(sizeof(char) * 1024);
 
-game_music: Music;
-menu_music: Music;
-current_music: Music*;
+  game_music: Music;
+  menu_music: Music;
+  current_music: Music*;
 
-spark_color : Color = {
-  YELLOW.r,
-  YELLOW.g,
-  YELLOW.b,
-  25 as u8
-};
+  spark_color : Color = {
+    r: YELLOW.r,
+    g: YELLOW.g,
+    b: YELLOW.b,
+    a: 25 as u8
+  };
 
-bg_color : Color = BLACK;
+  bg_color : Color = BLACK;
 
-target_bg_color : Color = {
-  75 as u8, 75 as u8, 75 as u8, 255 as u8,
+  target_bg_color : Color = {
+    r: 75 as u8, g: 75 as u8, b: 75 as u8, a: 255 as u8,
+  }
 }
 
 ParticleKind :: enum {
@@ -101,14 +94,21 @@ ParticleKind :: enum {
 RenderInfo :: struct {
   texture: Texture2D;
   tex_rect : Rectangle;
-  #ctor :: fn(tex: Texture2D) {
+}
+
+impl RenderInfo {
+  create :: fn(tex: Texture2D) -> #self {
+    self: #self;
     w := tex.width as float;
     h := tex.height as float;
-    tex_rect = {
-      0, 0,
-      w, h
+    self.tex_rect = {
+      x: 0, 
+      y: 0,
+      width: w,
+      height: h
     };
-    texture = tex;
+    self.texture = tex;
+    return self;
   }
 }
 
@@ -142,12 +142,17 @@ Bullet :: struct {
   render_info: RenderInfo*;
   origin: Vector2;
   rect: Rectangle;
-  #ctor :: fn(_rect: Rectangle, info: RenderInfo*, vel : Vector2, rot: float) {
-    rotation = rot;
-    render_info = info;
-    rect = _rect;
-    origin = { rect.width / 2, rect.height / 2 };
-    velocity = vel;
+}
+
+impl Bullet {
+  create :: fn(_rect: Rectangle, info: RenderInfo*, vel : Vector2, rot: float) -> #self{
+    self: #self;
+    self.rotation = rot;
+    self.render_info = info;
+    self.rect = _rect;
+    self.origin = { x:  _rect.width / 2, y: _rect.height / 2 };
+    self.velocity = vel;
+    return self;
   }
 }
 
@@ -160,13 +165,17 @@ Enemy :: struct {
   target: Vector2;
   rotation: float;
   speed: float;
-  #ctor :: fn(_rect: Rectangle, info: RenderInfo*) {
-    render_info = info;
-    rect = _rect;
-    origin = { rect.width / 2, rect.height / 2 };
-  }
 };
 
+impl Enemy {
+  create :: fn(_rect: Rectangle, info: RenderInfo*) -> #self{
+    self: #self;
+    self.render_info = info;
+    self.rect = _rect;
+    self.origin = { x: _rect.width / 2, y: _rect.height / 2 };
+    return self;
+  }
+}
 
 TextParticle :: struct {
   position: Vector2;
@@ -177,39 +186,46 @@ TextParticle :: struct {
   color: Color = WHITE;
 }
 
+#region Global Variables {
+  timer : Timer;
 
-timer : Timer;
+  bullet_render_info: RenderInfo;
+  enemy_render_info: RenderInfo;
+  smoke_particle_render_info: RenderInfo;
+  fire_particle_render_info: RenderInfo;
+  background_texture : Texture2D;
 
-bullet_render_info: RenderInfo*;
-enemy_render_info: RenderInfo*;
-smoke_particle_render_info: RenderInfo*;
-fire_particle_render_info: RenderInfo*;
-background_texture : Texture2D;
+  character : Character;
+  bullets: Bullet*[];
+  enemies: Enemy*[];
+  particles: Particle*[];
+  text_particles: TextParticle*[];
 
-character : Character;
-bullets: Bullet*[];
-enemies: Enemy*[];
-particles: Particle*[];
-text_particles: TextParticle*[];
+  shot_sound: Sound;
+  explosion_sound: Sound;
+  thud_sound: Sound;
+  fail_sound: Sound;
 
-shot_sound: Sound;
-explosion_sound: Sound;
-thud_sound: Sound;
-fail_sound: Sound;
+  ui_text_color : Color = WHITE;
+}
 
-ui_text_color : Color = WHITE;
+alloc :: fn![T]() -> T* {
+  ptr := malloc(#type(T).size) as T*;
+  *ptr = {};
+  return ptr;
+}
 
 get_center_screen_rect:: fn(width: float, height, offset: Vector2) -> Rectangle {
-  return #make(Rectangle, {
-    screen_width / 2 + offset.x,
-    screen_width / 2 + offset.y,
-    width,
-    height
-  });
+  return {
+    x: screen_width / 2 + offset.x,
+    y: screen_width / 2 + offset.y,
+    width: width,
+    height: height
+  };
 }
 
 make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifetime: float) {
-  particle := new TextParticle();
+  particle := alloc![TextParticle]();
   particle.position = position;
   particle.font_size = font_size;
   particle.text = text;
@@ -225,14 +241,7 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50
   r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  return #make(Color, {r, g, b, 255 as u8});
-}
-
-random_vector2 :: fn(origin: Vector2, max: float) -> Vector2 {
-  result: Vector2;
-  result.x = origin.x + Random::next(1) * max;
-  result.y = origin.y + Random::next(1) * max;
-  return origin;
+  return #make(Color, {r: r, g: g, b: b, a: 255 as u8});
 }
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
@@ -243,12 +252,12 @@ random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
 }
 
 make_particle :: fn(kind: int, position: Vector2, tint: Color) {
-  particle := new Particle;
+  particle := alloc![Particle]();
 
   if kind == ParticleKind::Smoke {
     max_vel := 3.0;
-    particle.position = random_vector2(position, max_vel);
-    particle.velocity = random_vector2(Vector2{0.0, 0.0}, Vector2{-max_vel, -1.0}, Vector2{max_vel, max_vel});
+    particle.position = random_vector2(position, {x: 0, y: 0}, {x: max_vel, y: max_vel});
+    particle.velocity = random_vector2({x: 0.0, y: 0.0}, {x: -max_vel, y: -1.0}, {x: max_vel, y: max_vel});
     burst : int = (Random::next(1) * smoke_particle_max_burst) as int;
     if can_burst && burst > 1 {
       can_burst = false;
@@ -257,13 +266,13 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     }
 
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
-    particle.render_info = smoke_particle_render_info;
+    particle.render_info = &smoke_particle_render_info;
     particle.lifetime = 1.0;
     particle.scale = smoke_particle_init_scale * Random::next(1) * 6400.0;
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
-    particle.position = random_vector2(position, max_spread);
+    particle.position = random_vector2(position, Vector2::scalar(max_spread));
 
     burst : int = 24;
 
@@ -329,7 +338,9 @@ make_enemy :: fn() {
   rect.x = clamp(rect.x, 0, screen_width);
   rect.y = clamp(rect.y, 0, screen_height / 1.5);
 
-  enemy := new Enemy(rect, enemy_render_info);
+  enemy := alloc![Enemy]();
+  *enemy = Enemy::create(rect, enemy_render_info);
+
   enemy_move_towards_or_get_new_target(enemy);
 
   for _ in 0..10 {
@@ -351,7 +362,13 @@ make_bullet :: fn(x: float, y, rotation) {
   radians := (rotation / 360) * 3.14159265 * 2;
   direction : Vector2 = {-(sin(radians) as float), cos(radians) as float};
   start_velocity := Vector2Scale(direction, bullet_start_velocity);
-  bullets ~= new Bullet(rect, bullet_render_info, start_velocity, rotation);
+  
+  {
+    bullet := alloc![Bullet]();
+    *bullet = Bullet::create(rect, bullet_render_info, start_velocity, rotation);
+    bullets ~= bullet;
+  }
+
   make_particle(ParticleKind::Smoke, {rect.x, rect.y}, PINK);
   fire_pos : Vector2 = {rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, rect.y - bullet_scale};
   make_particle(ParticleKind::Fire, fire_pos, WHITE);
@@ -407,10 +424,13 @@ BulletRoutine :: struct {
   count : int = 0;
   timer: Timer;
   interval: float = 0.1;
-  spawn :: fn() -> bool {
-    timer.interval = interval;
-    if timer.tick() {
-      count -= 1;
+}
+
+impl BulletRoutine {
+  spawn :: fn(self*) -> bool {
+    self.timer.interval = self.interval;
+    if self.timer.tick() {
+      self.count -= 1;
       PlaySound(shot_sound);
       make_bullet(character.rect.x, character.rect.y, character.rotation); 
       if count == 0 {
@@ -684,10 +704,10 @@ init :: fn() {
 
   character.origin = { character.rect.width / 2, character.rect.height / 2 };
 
-  bullet_render_info = new RenderInfo(LoadTexture("res/bullet.png"));
-  enemy_render_info = new RenderInfo(LoadTexture("res/enemy.png"));
-  smoke_particle_render_info = new RenderInfo(LoadTexture("res/smoke.png"));
-  fire_particle_render_info = new RenderInfo(LoadTexture("res/fire.png"));
+  bullet_render_info = RenderInfo::create(LoadTexture("res/bullet.png"));
+  enemy_render_info = RenderInfo::create(LoadTexture("res/enemy.png"));
+  smoke_particle_render_info = RenderInfo::create(LoadTexture("res/smoke.png"));
+  fire_particle_render_info = RenderInfo::create(LoadTexture("res/fire.png"));
   timer.interval = 3;
 
 }
@@ -882,12 +902,6 @@ main :: fn() {
   }
 
   CloseAudioDevice();
-
-  delete(bullet_render_info,
-        fire_particle_render_info,
-        smoke_particle_render_info,
-        enemy_render_info);
-
   free(format_buffer);
   return;
 }

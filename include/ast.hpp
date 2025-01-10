@@ -149,10 +149,10 @@ struct ASTType : ASTExpr {
     TUPLE,
     FUNCTION,
   } kind = NORMAL;
-  
+
   union {
     struct {
-      ASTExpr* base;
+      ASTExpr *base;
       std::vector<ASTType *> generic_arguments;
     } normal;
     struct {
@@ -235,7 +235,7 @@ struct ASTUnaryExpr : ASTExpr {
 };
 struct ASTIdentifier : ASTExpr {
   ASTIdentifier() {}
-  ASTIdentifier(const InternedString& value): value(value) {}
+  ASTIdentifier(const InternedString &value) : value(value) {}
   InternedString value;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
@@ -546,7 +546,6 @@ struct ASTDefer : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
-
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
@@ -583,7 +582,7 @@ struct ASTDefer : ASTStatement {
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
-  std::any visit(ASTDefer *node) override {};\
+  std::any visit(ASTDefer *node) override {};                                                                          \
   std::any visit(ASTTaggedUnionDeclaration *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
@@ -736,3 +735,13 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   node->declaring_block = Parser::current_block;
   return node;
 }
+
+#define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
+  type *node = ast_alloc<type>();                                                                                      \
+  auto range = parser->begin_node();                                                                                   \
+  Defer defer([&] { parser->end_node(node, range); });
+
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                                  \
+  type *node = ast_alloc<type>();                                                                                      \
+  auto range = parser->begin_node();                                                                                   \
+  Defer defer([&] { parser->end_node(node, range); deferred; });

@@ -164,50 +164,13 @@ Texture2D :: struct {
 Vector2 :: struct {
   x: float;
   y: float;
-
-  // #operator(+) :: fn(other: #self) -> #self {
-  //   return #make(#self, { x + other.x, y + other.y });
-  // }
-
-  // #operator(-) :: fn(other: #self) -> #self {
-  //   return #make(#self, {x - other.x, y - other.y });
-  // }
-
-  // #operator(*) :: fn(scalar: float) -> #self {
-  //   return #make(#self, {x * scalar, y * scalar });
-  // }
-
-  // #operator(/) :: fn(scalar: float) -> #self {
-  //   return #make(#self, {x / scalar, y / scalar });
-  // }
-
-  // #operator(+=) :: fn(other: #self) -> #self {
-  //   x += other.x;
-  //   y += other.y;
-  //   return *this;
-  // }
-
-  // #operator(-=) :: fn(other: #self) -> #self {
-  //   x -= other.x;
-  //   y -= other.y;
-  //   return *this;
-  // }
-
-  // #operator(*=) :: fn(scalar: float) -> #self {
-  //   x *= scalar;
-  //   y *= scalar;
-  //   return *this;
-  // }
-
-  // #operator(/=) :: fn(scalar: float) -> #self {
-  //   x /= scalar;
-  //   y /= scalar;
-  //   return *this;
-  // }
-
-  // to_string :: fn() -> string {
-  //   return $"x: {x}, y: {y}"
-  // }
+}
+impl Vector2 {
+  scalar :: fn(f: float) -> #self {
+    return {
+      x: f, y: f
+    };
+  }
 }
 
 Vector3 :: struct {
@@ -632,9 +595,8 @@ impl Timer {
       self.last_tick_time = now;
       return true;
     }
-    if now > (self.last_tick_time + self.interval) {
-      its := ((now - self.last_tick_time) / self.interval) as int;
-      self.last_tick_time += its * self.interval as int;
+    if now >= (self.last_tick_time + self.interval) {
+      self.last_tick_time = now;
       return true;
     }
     return false;

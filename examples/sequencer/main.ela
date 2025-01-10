@@ -12,87 +12,111 @@ beats: int = 4;
 total_notes: int = 4;
 
 bpm_slider : SliderF = {
-  "bpm", // text
-  Rectangle{0,0, 150, 40}, // rectangle
-  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
-  30,  // min
-  240,   // max
-  &bpm,  // value
-  false, // held
+  text: "bpm", 
+  rect: {x: 0, y: 0, width: 150, height: 40}, 
+  style: Style { 
+    foreground: WHITE.with_alpha(75), 
+    background: BLACK,
+    highlighted: GREEN,
+    font_size: 16,
+    use_jiggly_text: false,
+    jiggle_intensity: 0.0,
+    jiggle_rate: 0.0 
+  },
+  min_value: 30, 
+  max_value: 240,
+  value: &bpm, 
+  held: false, 
 };
 
 subdivision_slider : SliderI = {
-  string{"subdivisions"}, // text
-  Rectangle{0, 110, 150, 40}, // rectangle
-  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
-  1,  // min
-  20,   // max
-  &subdivisions,  // value
-  false // held
+  text: string::from("subdivisions"), 
+  rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
+  style: Style { 
+    foreground: WHITE.with_alpha(75),
+    background: BLACK,
+    highlighted: GREEN,
+    font_size: 16,
+    use_jiggly_text: false,
+    jiggle_intensity: 0.0,
+    jiggle_rate: 0.0
+  }, 
+  min_value: 1,  
+  max_value: 20,   
+  value: &subdivisions,  
+  held: false 
 };
 
 bg_color := LIGHTCYAN;
 
 beats_slider : SliderI = {
-  string{"beats"}, // text
-  Rectangle{150, 110, 150, 40}, // rectangle
-  Style { WHITE.with_alpha(75), BLACK, GREEN, 16, false, 0.0, 0.0 }, // style
-  1,  // min
-  20,   // max
-  &beats,  // value
-  false // held
+  text: string::from("beats"), 
+  rect: {x: 150, y: 110, width: 150, height: 40}, 
+  style: Style { 
+    foreground: WHITE.with_alpha(75),
+    background: BLACK,
+    highlighted: GREEN,
+    font_size: 16,
+    use_jiggly_text: false,
+    jiggle_intensity: 0.0,
+    jiggle_rate: 0.0
+  },
+  min_value: 1,  
+  max_value: 20,   
+  value: &beats,  
+  held: false 
 };
 
 play_button_style : Style = {
-  WHITE,
-  CLEAR,
-  GREEN,
-  16,
-  true,
-  5.0,
-  2.0,
+  foreground: WHITE,
+  background: CLEAR,
+  highlighted: GREEN,
+  font_size: 16,
+  use_jiggly_text: true,
+  jiggle_intensity: 5.0,
+  jiggle_rate: 2.0,
 };
 
 file_dropdown_style : Style = {
-  WHITE,
-  GRAY,
-  GREEN,
-  16,
-  true,
-  5.0,
-  2.0,
+  foreground: WHITE,
+  background: GRAY,
+  highlighted: GREEN,
+  font_size: 16,
+  use_jiggly_text: true,
+  jiggle_intensity: 5.0,
+  jiggle_rate: 2.0,
 }
 
 sequence_channel_style : Style = {
-  WHITE,
-  GRAY,
-  GREEN,
-  16,
-  true,
-  5.0,
-  2.0,
+  foreground: WHITE,
+  background: GRAY,
+  highlighted: GREEN,
+  font_size: 16,
+  use_jiggly_text: true,
+  jiggle_intensity: 5.0,
+  jiggle_rate: 2.0,
 }
 
 check_buttons: CheckButton[];
 
 check_button_style: Style = {
-  WHITE,
-  RED,
-  GREEN,
-  16,
-  false,
-  5.0,
-  2.0,
+  foreground: WHITE,
+  background: RED,
+  highlighted: GREEN,
+  font_size: 16,
+  use_jiggly_text: false,
+  jiggle_intensity: 5.0,
+  jiggle_rate: 2.0,
 }
 
 reset_button_style : Style = {
-  WHITE,
-  RED,
-  GREEN,
-  16,
-  false,
-  5.0,
-  2.0,
+  foreground: WHITE,
+  background: RED,
+  highlighted: GREEN,
+  font_size: 16,
+  use_jiggly_text: false,
+  jiggle_intensity: 5.0,
+  jiggle_rate: 2.0,
 };
 
 index : s32 = 0;
@@ -124,54 +148,57 @@ SequenceChannel :: struct {
   volume : int = 50;
   old_volume : int = 50;
   volume_slider: SliderI;
-  #ctor :: fn() {}
-  #ctor :: fn(_sound: Sound, _style: Style, name: string) {
-    sound = _sound;
-    style = _style;
-    volume_slider = {
-      name, // text
-      Rectangle{0, 0, 146, 36}, // rectangle
-      _style, // style
-      0,  // min
-      100,   // max
-    }
+}
+
+impl SequenceChannel {
+  create :: fn(_sound: Sound, _style: Style, name: string) -> #self {
+    self: #self;
+    self.sound = _sound;
+    self.style = _style;
+    self.volume_slider = {
+      text: name,                     // text
+      rect: {x: 0, y: 0, width: 146, height: 36}, // rectangle
+      style: _style,                   // style
+      min_value: 0,                        // min
+      max_value: 100,                      // max
+    };
+    return self;
   }
-  draw :: fn(x: float, y: float) {
-    if total_notes != check_buttons.length {
-      while total_notes > check_buttons.length {
-        _x : float = x + 150 + ((check_buttons.length * 40) as float) + 2;
-        check_buttons ~= {
-          false,
-          Rectangle{_x, y, 36, 36},
-          style,
-          string{null},
-          true,
+  draw :: fn(self*, x: float, y: float) {
+    if total_notes != self.check_buttons.length {
+      while total_notes > self.check_buttons.length {
+        _x : float = x + 150 + ((self.check_buttons.length * 40) as float) + 2;
+        self.check_buttons ~= {
+          value:      false,
+          rect:       Rectangle{x: _x, y: y, width: 36, height: 36},
+          style:      self.style,
+          text:       string::empty(),
+          allow_hold: true,
         }
       }
-      while check_buttons.length > total_notes {
-        button := ~check_buttons;
+      while self.check_buttons.length > total_notes {
+        button := ~self.check_buttons;
       }
     }
-    volume_slider.value = &volume;
-    volume_slider.rect.x = x + 2;
-    volume_slider.rect.y = y + 2;
-    volume_slider.draw();
+    self.volume_slider.value = &self.volume;
+    self.volume_slider.rect.x = x + 2;
+    self.volume_slider.rect.y = y + 2;
+    self.volume_slider.draw();
     index := 0;
-    for *button in check_buttons {
+    for *button in self.check_buttons {
       button.rect.x = x + 150 + index * 40 + 2;
       button.rect.y = y + 2;
       index++;
       button.draw();
     }
   }
-
-  update :: fn(index: int) {
-    if volume != old_volume {
-      old_volume = volume;
-      SetSoundVolume(sound, (volume as float) / 100.0);
+  update :: fn(self*, index: int) {
+    if self.volume != self.old_volume {
+      self.old_volume = self.volume;
+      SetSoundVolume(self.sound, (self.volume as float) / 100.0);
     }
-    if check_buttons[index].value {
-      PlaySound(sound);
+    if self.check_buttons[index].value {
+      PlaySound(self.sound);
     }
   }
 }
@@ -191,19 +218,16 @@ on_reset :: fn() {
 on_file_selected :: fn(index: int);
 
 file_dropdown : DropDown = {
-  string[]{},
-  Rectangle{0, 250, 125, 30},
-  file_dropdown_style,
-  -1,
-  false,
-  &on_file_selected,
-  null,
-  "New Channel"
+  options: {},
+  rect: {x: 0, y: 250, width: 125, height: 30},
+  style: file_dropdown_style,
+  on_selected: &on_file_selected,
+  label: "New Channel"
 };
 
 on_file_selected :: fn(index: int) {
   fileName := file_dropdown.options[index];
-  channels ~= #make(SequenceChannel,
+  channels ~= SequenceChannel::create(
     LoadSound(fileName.data),
     get_sequencer_style(check_button_style),
     fileName
@@ -233,7 +257,7 @@ main :: fn() {
   SetTargetFPS(1000);
 
   for file in dir.files {
-    if string::ends_with(file, ".wav") || string::ends_with(file, ".mp3") || string::ends_with(file, ".ogg") {
+    if file.ends_with(".wav") || file.ends_with(".mp3") || file.ends_with(".ogg") {
       file_dropdown.options ~= file;
     }
   }
@@ -270,8 +294,8 @@ main :: fn() {
       subdivision_slider.draw();
       beats_slider.draw();
 
-      draw_button("reset (no undo)", {(GetScreenWidth() as float) - 210.0, 10, 200, 40}, reset_button_style, &on_reset);
-      draw_button("remove channel", Rectangle{0, 215, 125, 30}, reset_button_style, &on_remove_channel);
+      draw_button("reset (no undo)", {x: (GetScreenWidth() as float) - 210.0, y: 10, width: 200, height: 40}, reset_button_style, &on_reset);
+      draw_button("remove channel", {x: 0, y: 215, width: 125, height: 30}, reset_button_style, &on_remove_channel);
 
       for *channel in channels {
         channel.draw(seq_x, seq_y);
@@ -286,7 +310,7 @@ main :: fn() {
         } else {
           play_button_style.highlighted = GREEN;
         }
-        draw_button("play", {0, 50, 100, 40}, play_button_style, &play_callback);
+        draw_button("play", {x: 0, y: 50, width: 100, height: 40}, play_button_style, &play_callback);
       }
     EndDrawing();
   }

@@ -166,8 +166,6 @@ std::any Emitter::visit(ASTCall *node) {
   auto node_type = node->function->get_node_type();
   auto base_symbol = typer.get_symbol(node->function);
 
-  
-
   auto symbol = base_symbol.get();
   if (base_symbol && node_type == AST_NODE_DOT_EXPR && symbol->declaring_node.is_not_null() &&
       symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
