@@ -185,7 +185,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return literal;
       },
     },
-
     // #read
     // Read a file into a string at compile time. Nice for embedding resources
     // into your program.
@@ -206,7 +205,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         string->value = ss.str();
         return string;
     }},
-
     // #test
     // declare a test function. Only gets compiled into --test builds, and
     // produces a test main, a builtin test suite.
@@ -229,7 +227,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
         return func;
     }},
-
     // #foreign
     // Declare a foreign function, like C's extern. Super janky and bad because
     // our boilerplate is crap and uses stdlib stuff.
@@ -266,7 +263,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->end_node(function, range);
         return function;
     }},
-
     // #error, for throwing compiler errors.
     {.identifier = "error",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -279,7 +275,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         throw_error(literal->value.get_str(), error->source_range);
         return nullptr;
     }},
-
     // #type
     // get a 'Type *' struct ptr to reflect on a given type.
     // has .fields and .size only currently
@@ -297,40 +292,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         outer->pointing_to = type;
         return outer;
     }},
-
-    // '#ctor' for declaring a constructor for a struct
-    {.identifier = "ctor",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->expect(TType::DoubleColon);
-        auto func_decl = parser->parse_function_declaration(get_unique_identifier());
-        func_decl->flags |= (FUNCTION_IS_CTOR | FUNCTION_IS_METHOD);
-        return func_decl;
-    }},
-
-    // '#dtor' for declaring a destructor for a struct
-    {.identifier = "dtor",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->expect(TType::DoubleColon);
-        auto func_decl = parser->parse_function_declaration(get_unique_identifier());
-        func_decl->flags |= (FUNCTION_IS_DTOR | FUNCTION_IS_METHOD);
-        return func_decl;
-    }},
-
-    // #make, which also serves as a casting and copy construction method, as
-    // well
-    // as normal ctors.
-    {.identifier = "make",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto range = parser->begin_node();
-        parser->eat();
-        parser->eat();
-        parser->end_node(nullptr, range);
-        throw_error("#make has been removed. just use an initializer list for example,\n'{x: 0, y: 0}'\nor Type{x: 0, y: 0}\nOr for casting use 'as' casting.\nfor example, '10 as s32'", range);
-    }},
-
     // #c_flags, for adding stuff like linker options, -g etc from within
     // your program or header.
     {.identifier = "c_flags",
@@ -343,7 +304,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         compile_command.add_compilation_flag(string.get_str());
         return nullptr;
     }},
-
     // #flags, for making an enum declaration auto increment with a flags value.
     // #flags MyEnum :: enum {...};
     {.identifier = "flags",
@@ -355,7 +315,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         enum_decl->is_flags = true;
         return enum_decl;
     }},
-
     // #alias for making type aliases. #alias NewName :: OldName;
     {.identifier = "alias",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -367,7 +326,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return alias;
       }
     },
-
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_EXPRESSION,
@@ -385,7 +343,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->append_type_extensions(type);
         return type;
     }},
-
     // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -407,50 +364,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error("Expected struct or union after #anon ::...", SourceRange{(int64_t)tok.location.line});
         }
     }},
-
-    // #operator, for operator overloads.
-    {.identifier = "operator",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto range = parser->begin_node();
-        parser->expect(TType::LParen);
-        auto op = parser->eat();
-
-        if (parser->peek().type == TType::RParen && parser->lookahead_buf()[1].type == TType::RParen) {
-          parser->eat();
-        } else if (parser->peek().type == TType::RBrace) {
-          parser->eat();
-        }
-
-        parser->expect(TType::RParen);
-
-        if (op.family != TFamily::Operator) {
-          parser->end_node(nullptr, range);
-          throw_error(std::format("Operator overload failed; {} was not a "
-                                  "valid operator to overload",
-                                  op.value),
-                      range);
-        }
-
-        parser->expect(TType::DoubleColon);
-        Token token;
-
-        // Do we want to do it with the unique identifier?
-        auto func_decl = parser->parse_function_declaration(get_unique_identifier());
-
-        if (op.is_comp_assign() || op.type == TType::Increment || op.type == TType::Decrement) {
-          func_decl->flags |= FUNCTION_IS_MUTATING;
-        }
-
-        func_decl->flags |= (FUNCTION_IS_OPERATOR | FUNCTION_IS_METHOD);
-
-        func_decl->name = op.value;
-
-        emit_warnings_or_errors_for_operator_overloads(op.type, func_decl->source_range);
-
-        return func_decl;
-    }},
-
     // #export, for exporting a non-mangled name to a dll or C library
     // primarily.
     // Equivalent to marking a function extern "C" in C++.
@@ -468,7 +381,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         func_decl->flags |= FUNCTION_IS_EXPORTED;
         return func_decl;
     }},
-
     // #typeid, integer version of #type. can be used to compare types without
     // the pointers.
     {.identifier = "typeid",
@@ -484,7 +396,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         literal->source_range = type->source_range;
         return literal;
     }},
-
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
     // a
@@ -503,7 +414,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         decl->bitsize = size.value;
         return decl;
     }}, 
-
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
     {.identifier = "static",
@@ -517,7 +427,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return statement;
     }},
-
     // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -526,7 +435,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         while (parser->peek().type == TType::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
-
     // #undef, remove a #def
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -535,7 +443,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         while (parser->peek().type == TType::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
-
     // #ifdef, conditional compilation based on a #def being present.
     {.identifier = "ifdef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -544,7 +451,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
         return list;
     }},
-
     // #ifndef, conditional compilation based on a #def not being present.
     {.identifier = "ifndef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -553,7 +459,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
         return list;
     }},
-
     // #if, conditional compilation based on compile time value.
     {.identifier = "if",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -562,7 +467,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
     }},
-
     // #region, for named/unnnamed regions. just for organization, has no compilation implications.
     // can have anything between the #region directive and the {} block
     // #region My code region 1 {...} is legal.
@@ -817,20 +721,6 @@ ASTExpr *Parser::parse_primary() {
       end_node(node, range);
       return node;
     }
-    case TType::DoubleColon: {
-      eat();
-      if (peek().type != TType::Identifier) {
-        end_node(nullptr, range);
-        throw_error("::Something syntax is only for using enum variants that are "
-                    "in your current scope.",
-                    range);
-      }
-      NODE_ALLOC(ASTScopeResolution, scope_res, range, _, this)
-      scope_res->base = nullptr;
-      scope_res->member_name = expect(TType::Identifier).value;
-      end_node(scope_res, range);
-      return scope_res;
-    }
     case TType::Dollar: {
       eat();
       auto str = expect(TType::String);
@@ -873,7 +763,6 @@ ASTExpr *Parser::parse_primary() {
     case TType::LCurly: {
       eat();
       NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
-
       if (peek().type == TType::RCurly) {
         init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
       } else if (lookahead_buf()[1].type != TType::Colon) {
@@ -909,9 +798,8 @@ ASTExpr *Parser::parse_primary() {
           }
           static_cast<ASTInitializerList*>(init_list)->target_type = type;
           return init_list;
-        } else {
-          return type;
-        }
+        } 
+        return type;
       }
       eat();
       NODE_ALLOC(ASTIdentifier, iden, range, _, this)
@@ -970,7 +858,6 @@ ASTExpr *Parser::parse_primary() {
     case TType::LParen: {
       expect(TType::LParen); // (
       const auto lookahead = lookahead_buf();
-
       auto expr = parse_expr();
       if (peek().type == TType::Comma) {
         eat();
@@ -987,17 +874,16 @@ ASTExpr *Parser::parse_primary() {
         return tuple;
       }
       if (peek().type != TType::RParen) {
-        throw_error("Expected ')'", SourceRange{token_idx - 5, token_idx});
+        throw_error("Expected ')'", SourceRange{token_idx, token_idx+1});
       }
-
-      eat(); // consume ')'
+      eat();
       end_node(expr, range);
       return expr;
     }
     default: {
       throw_error(
           std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
-          {token_idx - 5, token_idx});
+          {token_idx, token_idx+1});
       return nullptr;
     }
   }

@@ -1066,9 +1066,10 @@ Shader :: struct {
 }
 
 impl Shader {
-  #dtor :: fn(self*) {
-    glDeleteProgram(self.handle);
-  }
+  // *fixme
+  // #dtor :: fn(self*) {
+  //   glDeleteProgram(self.handle);
+  // }
   use :: fn(self*) {
     glUseProgram(self.handle);
   }

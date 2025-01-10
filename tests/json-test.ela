@@ -9,11 +9,12 @@ impl JsonValueDeleter {
   add :: fn(self*, val: JsonValue*) {
     self.vals ~= val;
   }
-  #dtor :: fn(self*) {
-    for val in self.vals {
-      free(val);
-    }
-  }
+  // *fixme
+  // #dtor :: fn(self*) {
+  //   for val in self.vals {
+  //     free(val);
+  //   }
+  // }
 }
 
 #test test_json_types :: fn() {
