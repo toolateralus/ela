@@ -753,31 +753,7 @@ std::any Emitter::visit(ASTDotExpr *node) {
   return {};
 }
 
-// TODO: remove this dog crap node.
-std::any Emitter::visit(ASTMake *node) {
-  auto type = global_get_type(node->type_arg->resolved_type);
-  if (node->kind == MAKE_CAST) {
-    if (node->arguments->arguments.empty()) {
-      throw_error("cannot create a pointer currently with #make. it only casts "
-                  "pointers.",
-                  node->source_range);
-    }
-    (*ss) << "(" << to_cpp_string(type) << ")";
-    node->arguments->arguments[0]->accept(this);
-  } else if (node->kind == MAKE_CTOR || node->kind == MAKE_COPY_CTOR) {
-    (*ss) << to_cpp_string(type);
 
-    auto &args = node->arguments->arguments;
-
-    if (args.size() == 1 && args[0]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
-      args[0]->accept(this);
-      return {};
-    }
-
-    node->arguments->accept(this);
-  }
-  return {};
-}
 std::any Emitter::visit(ASTSubscript *node) {
   node->left->accept(this);
   (*ss) << '[';
@@ -786,7 +762,13 @@ std::any Emitter::visit(ASTSubscript *node) {
   return {};
 }
 std::any Emitter::visit(ASTInitializerList *node) {
-  (*ss) << "{";
+  auto type = global_get_type(node->resolved_type);
+
+  if (!type->get_ext().is_fixed_sized_array()) {
+    (*ss) << to_cpp_string(type); 
+  } 
+  (*ss) << " {";
+
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
       (*ss) << "}";
@@ -812,7 +794,6 @@ std::any Emitter::visit(ASTInitializerList *node) {
       }
     } break;
   }
-
   (*ss) << "}";
   return {};
 }
@@ -943,7 +924,7 @@ std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::s
 }
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
-  StringBuilder tss;
+  std::stringstream tss;
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
@@ -1158,7 +1139,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
                 {});
   }
 
-  StringBuilder ss;
+  std::stringstream ss;
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
   auto return_type = global_get_type(info->return_type);
@@ -1425,7 +1406,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 }
 
 std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
-  StringBuilder ss;
+  std::stringstream ss;
 
   // TODO: we need to fix the emitting of 'c_string' as const char*,
   // right now it's fricked up.
@@ -1825,5 +1806,12 @@ std::any Emitter::visit(ASTBlock *node) {
   indentLevel--;
   indented("}");
   ctx.exit_scope();
+  return {};
+}
+
+std::any Emitter::visit(ASTCast *node) {
+  auto type_string = to_cpp_string(global_get_type(node->target_type->resolved_type));
+  (*ss) << "("<< type_string << ")";
+  node->expression->accept(this);
   return {};
 }

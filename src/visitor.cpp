@@ -44,7 +44,7 @@ std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->vi
 std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTScopeResolution::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTMake::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTCast::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }

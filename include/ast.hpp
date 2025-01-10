@@ -48,7 +48,6 @@ enum ASTNodeType {
   AST_NODE_DOT_EXPR,
   AST_NODE_SCOPE_RESOLUTION,
   AST_NODE_SUBSCRIPT,
-  AST_NODE_MAKE,
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_ENUM_DECLARATION,
   AST_NODE_UNION_DECLARATION,
@@ -57,6 +56,7 @@ enum ASTNodeType {
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
   AST_NODE_DEFER,
+  AST_NODE_CAST,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
@@ -314,21 +314,7 @@ struct ASTArguments : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
 };
 
-// we'll use this node for several things,
-// to reduce ast amount
-enum ASTMakeKind {
-  MAKE_CTOR,
-  MAKE_COPY_CTOR,
-  MAKE_CAST,
-};
 
-struct ASTMake : ASTExpr {
-  int kind = MAKE_CTOR;
-  ASTType *type_arg;
-  ASTArguments *arguments;
-  std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_MAKE; }
-};
 struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
@@ -439,7 +425,6 @@ struct ASTStructDeclaration : ASTStatement {
 struct ASTInitializerList : ASTExpr {
   ASTInitializerList() {}
   ~ASTInitializerList() {}
-
   ASTInitializerList(const ASTInitializerList &other) {
     tag = other.tag;
     switch (tag) {
@@ -453,7 +438,6 @@ struct ASTInitializerList : ASTExpr {
         break;
     }
   }
-
   // Key values.
   union {
     std::vector<std::pair<InternedString, ASTExpr *>> key_values;
@@ -466,6 +450,7 @@ struct ASTInitializerList : ASTExpr {
     INIT_LIST_COLLECTION,
   } tag;
 
+  Nullable<ASTType> target_type;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
@@ -546,6 +531,14 @@ struct ASTDefer : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTCast : ASTExpr {
+  ASTExpr *expression;
+  ASTType *target_type;
+  ASTNodeType get_node_type() const override { return AST_NODE_CAST; }
+  std::any accept(VisitorBase *visitor) override;
+};
+
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
@@ -573,7 +566,6 @@ struct ASTDefer : ASTStatement {
   std::any visit(ASTStructDeclaration *node) override {}                                                               \
   std::any visit(ASTDotExpr *node) override {}                                                                         \
   std::any visit(ASTSubscript *node) override {}                                                                       \
-  std::any visit(ASTMake *node) override {}                                                                            \
   std::any visit(ASTInitializerList *node) override {}                                                                 \
   std::any visit(ASTEnumDeclaration *node) override {}                                                                 \
   std::any visit(ASTUnionDeclaration *node) override {}                                                                \
@@ -583,11 +575,13 @@ struct ASTDefer : ASTStatement {
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
   std::any visit(ASTDefer *node) override {};                                                                          \
+  std::any visit(ASTCast *node) override {};                                                                \
   std::any visit(ASTTaggedUnionDeclaration *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   std::any visit(ASTNoop *noop) { return {}; }                                                                         \
   virtual std::any visit(ASTScopeResolution *node) = 0;                                                                \
+  virtual std::any visit(ASTCast *node) = 0;                                                                \
   virtual std::any visit(ASTProgram *node) = 0;                                                                        \
   virtual std::any visit(ASTBlock *node) = 0;                                                                          \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                                                            \
@@ -612,7 +606,6 @@ struct ASTDefer : ASTStatement {
   virtual std::any visit(ASTStructDeclaration *node) = 0;                                                              \
   virtual std::any visit(ASTDotExpr *node) = 0;                                                                        \
   virtual std::any visit(ASTSubscript *node) = 0;                                                                      \
-  virtual std::any visit(ASTMake *node) = 0;                                                                           \
   virtual std::any visit(ASTInitializerList *node) = 0;                                                                \
   virtual std::any visit(ASTEnumDeclaration *node) = 0;                                                                \
   virtual std::any visit(ASTUnionDeclaration *node) = 0;                                                               \

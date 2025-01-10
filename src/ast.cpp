@@ -324,27 +324,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "make",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTMake, make, range, _, parser)
-        auto args = parser->parse_arguments();
-        auto type = args->arguments[0];
-        if (type->get_node_type() != AST_NODE_TYPE) {
-          parser->end_node(type, range);
-          throw_error("Expect a type as the first argument in a #make call.", range);
-        }
-        auto type_arg = static_cast<ASTType *>(type);
-        args->arguments.erase(args->arguments.begin());
-        make->type_arg = type_arg;
-        make->arguments = args;
-        make->kind = MAKE_CTOR;
-        parser->end_node(make, range);
-        if (!type_arg->extensions.empty()) {
-          if (type_arg->extensions.back().type == TYPE_EXT_POINTER) {
-            make->kind = MAKE_CAST;
-          } else if (type_arg->extensions.back().type == TYPE_EXT_FIXED_ARRAY) {
-            throw_error("Cannot use #make on fixed array types.", range);
-          }
-        }
-        return make;
+        auto range = parser->begin_node();
+        parser->eat();
+        parser->eat();
+        parser->end_node(nullptr, range);
+        throw_error("#make has been removed. just use an initializer list for example,\n'{x: 0, y: 0}'\nor Type{x: 0, y: 0}\nOr for casting use 'as' casting.\nfor example, '10 as s32'", range);
     }},
 
     // #c_flags, for adding stuff like linker options, -g etc from within
@@ -715,20 +699,13 @@ ASTExpr *Parser::parse_unary() {
     auto op = eat();
     auto expr = parse_unary();
     NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
+
+    // TODO: make a more comprehensive rvalue evaluator.
+    // We need to use it later for self* method calls
     auto is_rvalue =
         expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
-    // don't need to do this if we already got one of the previous ones.
-    auto ctor = is_rvalue || [&] {
-      if (expr->get_node_type() != AST_NODE_MAKE) {
-        return false;
-      }
-      auto make = static_cast<ASTMake *>(expr);
-      if (make && (make->kind == MAKE_CTOR || make->kind == MAKE_COPY_CTOR)) {
-        return true;
-      }
-      return false;
-    }();
-    if ((is_rvalue || ctor) && (op.type == TType::And || op.type == TType::Mul)) {
+
+    if ((is_rvalue) && (op.type == TType::And || op.type == TType::Mul)) {
       end_node(nullptr, range);
       throw_error("Cannot take the address of, or dereference a literal or "
                   "'rvalue'\nlike a function result or constructor result. It "
@@ -790,13 +767,9 @@ ASTExpr *Parser::parse_postfix() {
       return node;
     } else if (peek().type == TType::As) {
       eat();
-      auto type = parse_type();
-      NODE_ALLOC(ASTMake, node, range, _, this)
-      node->type_arg = type;
-      node->kind = MAKE_CAST;
-      NODE_ALLOC(ASTArguments, args, args_range, args_defer, this);
-      node->arguments = args;
-      node->arguments->arguments.push_back(left);
+      NODE_ALLOC(ASTCast, node, range, _, this)
+      node->target_type = parse_type();
+      node->expression = left;
       left = node;
     }
   }
@@ -931,12 +904,11 @@ ASTExpr *Parser::parse_primary() {
         auto type = parse_type();
         if (peek().type == TType::LCurly) {
           auto init_list = parse_expr();
-          NODE_ALLOC(ASTMake, make, range, _, this)
-          NODE_ALLOC(ASTArguments, args, args_range, _1, this)
-          args->arguments.push_back(init_list);
-          make->type_arg = type;
-          make->arguments = args;
-          return make;
+          if (init_list->get_node_type() != AST_NODE_INITIALIZER_LIST) {
+            throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?", init_list->source_range);
+          }
+          static_cast<ASTInitializerList*>(init_list)->target_type = type;
+          return init_list;
         } else {
           return type;
         }
@@ -998,26 +970,6 @@ ASTExpr *Parser::parse_primary() {
     case TType::LParen: {
       expect(TType::LParen); // (
       const auto lookahead = lookahead_buf();
-
-      // for (Type)expr;
-      if (ctx.scope->find_type_id(peek().value, {}) != -1 &&
-          (lookahead_buf()[1].type == TType::RParen || lookahead_buf()[1].type == TType::Mul)) {
-        // CLEANUP: We probably don't wanna use ASTMake for so many things,
-        // but for now it's okay. Actually, we don't want ASTMake at all, it
-        // should get eliminated and ASTConstruct and ASTCast should probably be
-        // added to replace it. This would help us have a more consistent and
-        // clear syntax.
-
-        auto type = parse_type();
-        NODE_ALLOC(ASTMake, node, range, _, this)
-        expect(TType::RParen);
-        node->type_arg = type;
-        node->kind = MAKE_CAST;
-        NODE_ALLOC(ASTArguments, args, args_range, defer_args, this);
-        node->arguments = args;
-        node->arguments->arguments.push_back(parse_unary());
-        return node;
-      }
 
       auto expr = parse_expr();
       if (peek().type == TType::Comma) {
@@ -2171,4 +2123,5 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
 

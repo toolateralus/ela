@@ -48,6 +48,7 @@ struct Typer : VisitorBase {
   std::any visit(ASTUnaryExpr *node) override;
   std::any visit(ASTIdentifier *node) override;
   std::any visit(ASTLiteral *node) override;
+  std::any visit(ASTCast *node) override;
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
 
@@ -72,7 +73,6 @@ struct Typer : VisitorBase {
   std::any visit(ASTWhile *node) override;
   std::any visit(ASTDotExpr *node) override;
   std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
@@ -204,7 +204,6 @@ struct Emitter : VisitorBase {
   std ::any visit(ASTWhile *node) override;
   std::any visit(ASTDotExpr *node) override;
   std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
   std::any visit(ASTInitializerList *node) override;
   std::any visit(ASTEnumDeclaration *node) override;
   std::any visit(ASTUnionDeclaration *node) override;
@@ -217,6 +216,7 @@ struct Emitter : VisitorBase {
   std::any visit(ASTImpl *node) override;
   std::any visit(ASTDefer *node) override;
   std::any visit(ASTTaggedUnionDeclaration *node) override;
+  std::any visit(ASTCast *node) override;
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);

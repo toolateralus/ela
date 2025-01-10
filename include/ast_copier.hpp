@@ -31,7 +31,6 @@ struct ASTCopier {
   ASTStructDeclaration *copy_struct_declaration(ASTStructDeclaration *node);
   ASTDotExpr *copy_dot_expr(ASTDotExpr *node);
   ASTSubscript *copy_subscript(ASTSubscript *node);
-  ASTMake *copy_make(ASTMake *node);
   ASTInitializerList *copy_initializer_list(ASTInitializerList *node);
   ASTEnumDeclaration *copy_enum_declaration(ASTEnumDeclaration *node);
   ASTUnionDeclaration *copy_union_declaration(ASTUnionDeclaration *node);

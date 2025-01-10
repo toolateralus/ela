@@ -203,12 +203,7 @@ ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
   new_node->subscript = static_cast<ASTExpr *>(copy_node(node->subscript));
   return new_node;
 }
-ASTMake *ASTCopier::copy_make(ASTMake *node) {
-  auto new_node = new (ast_alloc<ASTMake>()) ASTMake(*node);
-  new_node->type_arg = static_cast<ASTType *>(copy_node(node->type_arg));
-  new_node->arguments = static_cast<ASTArguments *>(copy_node(node->arguments));
-  return new_node;
-}
+
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
   auto new_node = new (ast_alloc<ASTInitializerList>()) ASTInitializerList(*node);
   new_node->key_values.clear();
@@ -354,8 +349,6 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_scope_resolution(static_cast<ASTScopeResolution *>(node));
     case AST_NODE_SUBSCRIPT:
       return copy_subscript(static_cast<ASTSubscript *>(node));
-    case AST_NODE_MAKE:
-      return copy_make(static_cast<ASTMake *>(node));
     case AST_NODE_INITIALIZER_LIST:
       return copy_initializer_list(static_cast<ASTInitializerList *>(node));
     case AST_NODE_ENUM_DECLARATION:

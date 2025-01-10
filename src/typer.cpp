@@ -1083,24 +1083,15 @@ std::any Typer::visit(ASTSubscript *node) {
   }
   return left_ty->get_element_type();
 }
-std::any Typer::visit(ASTMake *node) {
-  auto type = int_from_any(node->type_arg->accept(this));
-  auto old_ty = declaring_or_assigning_type;
-  Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-  declaring_or_assigning_type = type;
-  if (!node->arguments->arguments.empty()) {
-    node->arguments->accept(this);
-  }
-  if (type == -1) {
-    throw_error("Cannot make non existent type", node->source_range);
-  }
-  return type;
-}
 
-// ! BUG :: Initializer lists passed to functions that take a self parameter try to construct self/self* from the init
-// list, ! instead of skipping that argument. Hmm.
+
 std::any Typer::visit(ASTInitializerList *node) {
-  auto target_type = global_get_type(declaring_or_assigning_type);
+  Type *target_type;
+  if (node->target_type.is_null()) {
+    target_type = global_get_type(declaring_or_assigning_type);
+  } else {
+    target_type = global_get_type(int_from_any((node->target_type.get()->accept(this))));
+  }
   if (!target_type) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
@@ -1128,7 +1119,7 @@ std::any Typer::visit(ASTInitializerList *node) {
       // we would probably prefer a type::default(),
       // but for now we'll leave it.
       if (node->key_values.empty()) {
-        return declaring_or_assigning_type;
+        return node->resolved_type = target_type->id;
       }
 
       for (const auto &[id, value] : node->key_values) {
@@ -1161,7 +1152,7 @@ std::any Typer::visit(ASTInitializerList *node) {
       auto &values = node->values;
 
       if (values.empty()) {
-        return declaring_or_assigning_type;
+        return node->resolved_type = target_type->id;
       }
 
       auto target_element_type = target_type->get_element_type();
@@ -1192,7 +1183,7 @@ std::any Typer::visit(ASTInitializerList *node) {
 
         // We allow implicit downcasting/ sign casting, just to prevent annoyances.
         if (target_info->is_integral && elem_info->is_integral) {
-          return declaring_or_assigning_type;
+          return node->resolved_type = target_type->id;
         }
       }
 
@@ -1200,13 +1191,13 @@ std::any Typer::visit(ASTInitializerList *node) {
           element_type, target_element_type, node->source_range, "to {} from {}",
           "Failed to assign element type from value passed into collection-style initializer list");
 
-      return declaring_or_assigning_type;
+      return node->resolved_type = target_type->id;
     } break;
     case ASTInitializerList::INIT_LIST_EMPTY:
-      return declaring_or_assigning_type;
+      return node->resolved_type = target_type->id;
   }
 
-  return declaring_or_assigning_type;
+  return node->resolved_type = target_type->id;
 }
 
 std::any Typer::visit(ASTRange *node) {
@@ -1344,4 +1335,14 @@ std::any Typer::visit(ASTImpl *node) {
 std::any Typer::visit(ASTDefer *node) {
   node->statement->accept(this);
   return {};
+}
+
+std::any Typer::visit(ASTCast *node) {
+  auto expr_type = global_get_type(int_from_any(node->expression->accept(this)));
+  auto type = global_get_type(int_from_any(node->target_type->accept(this)));
+  auto conversion = type_conversion_rule(expr_type, type);
+  if (conversion == CONVERT_PROHIBITED) {
+    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()), node->source_range);
+  }
+  return node->resolved_type = type->id;
 }
