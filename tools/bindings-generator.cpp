@@ -8,10 +8,21 @@
 #include <iostream>
 #include <ostream>
 #include <sstream>
+#include <string>
 #include <unordered_map>
 #include <fstream>
 #include <vector>
 #include <print>
+
+// used for anonymous structs etc.
+std::string get_unique_identifier() {
+  static int num = 0;
+  auto tok = "__bind_gen__anon_D" + std::to_string(num);
+  num++;
+  return tok;
+}
+
+static std::unordered_map<std::string, bool> emitted_types;
 
 #define LOG(message, data) data->logfile << "[" << current_timestamp() << "] INFO: " << message << "\n";
 #define ERROR(message, data) data->logfile << "[" << current_timestamp() << "] ERROR: " << message << "\n";
@@ -39,6 +50,8 @@ struct ClangVisitData {
   std::ofstream logfile;
 };
 
+
+
 // Helper function to get the type name as a string and translate C types to custom types
 static inline std::string wrapgen_get_type_name(CXType type) {
   if (type.kind == CXType_Typedef) {
@@ -54,6 +67,10 @@ static inline std::string wrapgen_get_type_name(CXType type) {
   if (constPos != std::string::npos) {
     result.erase(constPos, 6);
   }
+  size_t restrictPos = result.find("restrict");
+  if (restrictPos != std::string::npos) {
+    result.erase(restrictPos, 9);
+  }
 
   static std::unordered_map<std::string, std::string> type_map = {{"char", "u8"},
                                                                   {"signed char", "s8"},
@@ -62,14 +79,14 @@ static inline std::string wrapgen_get_type_name(CXType type) {
                                                                   {"unsigned short", "u16"},
                                                                   {"int", "s32"},
                                                                   {"unsigned int", "u32"},
-                                                                  {"long", "i64"},
+                                                                  {"long", "s64"},
                                                                   {"unsigned long", "u64"},
                                                                   {"long long", "s64"},
                                                                   {"unsigned long long", "u64"},
                                                                   {"float", "float32"},
-                                                                  {"double", "float64"},
-                                                                  {"long double", "f64"},
-                                                                  {"signed", "i32"},
+                                                                  {"double", "float32"},
+                                                                  {"long double", "float64"},
+                                                                  {"signed", "s32"},
                                                                   {"unsigned", "u32"},
                                                                   {"_Bool", "bool"},
                                                                   {"wchar_t", "wchar"},
@@ -92,7 +109,7 @@ static inline std::string wrapgen_get_type_name(CXType type) {
                                                                   {"void", "void"}};
 
   if (result.contains("unnamed at")) {
-    result = "UnnamedType";
+    result = get_unique_identifier();
   }
 
   auto it = type_map.find(result);
@@ -121,7 +138,40 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
     if (underlyingTypeName.contains("va_list")) {
       return;
     }
-    data->output << "#alias " << typeName << " :: " << underlyingTypeName << ";\n";
+
+    if (emitted_types.contains(typeName)) {
+      return;
+    }
+
+    if (underlyingType.kind == CXType_Pointer && clang_getPointeeType(underlyingType).kind == CXType_FunctionProto) {
+      CXType pointeeType = clang_getPointeeType(underlyingType);
+      std::string pointeeTypeName = wrapgen_get_type_name(pointeeType);
+
+      std::string returnType = wrapgen_get_type_name(clang_getResultType(pointeeType));
+      std::string args;
+      int numArgs = clang_getNumArgTypes(pointeeType);
+      for (int i = 0; i < numArgs; ++i) {
+        if (i > 0) {
+          args += ", ";
+        }
+        args += wrapgen_get_type_name(clang_getArgType(pointeeType, i));
+      }
+
+      data->output << "#alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+    } else if (underlyingType.kind == CXType_FunctionProto) {
+      std::string returnType = wrapgen_get_type_name(clang_getResultType(underlyingType));
+      std::string args;
+      int numArgs = clang_getNumArgTypes(underlyingType);
+      for (int i = 0; i < numArgs; ++i) {
+        if (i > 0) {
+          args += ", ";
+        }
+        args += wrapgen_get_type_name(clang_getArgType(underlyingType, i));
+      }
+      data->output << "#alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+    } else {
+      data->output << "#alias " << typeName << " :: " << underlyingTypeName << ";\n";
+    }
   } else {
     data->output << "type " << typeName << ";\n";
   }
@@ -134,34 +184,65 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
   std::string typeName = wrapgen_get_type_name(type);
   clang_disposeString(name);
 
-  data->output << kind << " " << typeName << " {\n";
+  if (emitted_types.find(typeName) != emitted_types.end()) {
+    return;
+  }
+
+  emitted_types[typeName] = true;
+
+  std::stringstream temp_output;
+  std::stringstream anon_output;
+  temp_output << typeName << " :: " << kind << " {\n";
 
   clang_visitChildren(
       cursor,
       [](CXCursor c, CXCursor parent, CXClientData client_data) {
         ClangVisitData *data = (ClangVisitData *)client_data;
+        std::stringstream &temp_output = *(std::stringstream *)client_data;
+        std::stringstream &anon_output = *(std::stringstream *)client_data;
         if (clang_getCursorKind(c) == CXCursor_FieldDecl) {
           CXString fieldName = clang_getCursorSpelling(c);
           std::string fieldNameStr = clang_getCString(fieldName);
           clang_disposeString(fieldName);
-
           CXType fieldType = clang_getCursorType(c);
           std::string fieldTypeName = wrapgen_get_type_name(fieldType);
 
-          data->output << "  " << fieldTypeName << " " << fieldNameStr << ";\n";
+          if (fieldNameStr.empty()) {
+            if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
+              std::string anonTypeName = get_unique_identifier();
+              anon_output << anonTypeName << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              anon_output << "};\n";
+              temp_output << "  " << anonTypeName << " : #anon :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              temp_output << "  };\n";
+            }
+          } else {
+            if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
+              std::string anonTypeName = get_unique_identifier();
+              anon_output << anonTypeName << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              anon_output << "};\n";
+              temp_output << "  " << fieldNameStr << " : " << anonTypeName << ";\n";
+            } else {
+              temp_output << "  " << fieldNameStr << " : " << fieldTypeName << ";\n";
+            }
+          }
         } else if (clang_getCursorKind(c) == CXCursor_EnumConstantDecl) {
           CXString variantName = clang_getCursorSpelling(c);
           std::string variantNameStr = clang_getCString(variantName);
           clang_disposeString(variantName);
 
           long long enumValue = clang_getEnumConstantDeclValue(c);
-          data->output << "  " << variantNameStr << " = " << enumValue << ";\n";
+          temp_output << "  " << variantNameStr << " = " << enumValue << ";\n";
         }
         return CXChildVisit_Continue;
       },
-      data);
+      &temp_output);
 
-  data->output << "};\n";
+  temp_output << "};\n";
+  data->output << anon_output.str();
+  data->output << temp_output.str();
 }
 
 static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor parent, CXClientData client_data) {
@@ -184,9 +265,11 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
       std::string arg_name_str = clang_getCString(arg_name);
       clang_disposeString(arg_name);
 
+      if (arg_name_str.empty()) {
+        arg_name_str = "param" + std::to_string(i);
+      }
       CXType arg_type = clang_getCursorType(arg_cursor);
       std::string arg_type_name = wrapgen_get_type_name(arg_type);
-
       if (i > 0) {
         data->output << ", ";
       }
@@ -200,7 +283,7 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
     clang_disposeString(name);
     CXType variable_type = clang_getCursorType(cursor);
     std::string variable_type_name = wrapgen_get_type_name(variable_type);
-    data->output << "var " << variable_name << ": " << variable_type_name << ";\n";
+    data->output << variable_name << ": " << variable_type_name << ";\n";
   } else if (kind == CXCursor_StructDecl) {
     wrapgen_visit_struct_union_enum(cursor, data, "struct");
   } else if (kind == CXCursor_UnionDecl) {
@@ -285,7 +368,7 @@ static inline ClangVisitData wrapgen_import_c_header_into_module(const std::stri
   data.logfile.open("wrapgen.log");
 
   CXCursor cursor = clang_getTranslationUnitCursor(unit);
-  clang_visitChildren(cursor, wrapgen_visitor, &data);
+  clang_visitChildren(cursor, &wrapgen_visitor, &data);
   clang_disposeTranslationUnit(unit);
   clang_disposeIndex(index);
   return data;
