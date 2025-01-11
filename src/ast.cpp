@@ -1566,6 +1566,9 @@ ASTImpl *Parser::parse_impl() {
   expect(TType::Impl);
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, impl, range, _, this, current_impl = nullptr)
   
+  ctx.set_scope();
+  impl->scope = ctx.exit_scope();
+
   if (peek().type == TType::GenericBrace) {
     impl->generic_parameters = parse_generic_parameters();
   }
@@ -1573,7 +1576,10 @@ ASTImpl *Parser::parse_impl() {
   current_impl = impl;
   impl->target = parse_type();
 
+  // TODO: make it so we dont have to get the scope of the type, we shouldn't be doing much typing
+  // during parse time.
   auto type = global_get_type(std::any_cast<int>(impl->target->accept(typer)));
+  impl->target->resolved_type = -1;
   Scope *scope = type->get_info()->scope;
 
   auto block = parse_block(scope);

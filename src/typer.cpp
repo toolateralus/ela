@@ -1332,16 +1332,9 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 };
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
-  auto type = global_get_type(int_from_any(node->target->accept(this)));
-  if (!type) {
-    throw_error("Impl used on a non-existent type.", node->source_range);
-  }
-
-  // TODO: this should be a scope on the impl ast
-  Scope *scope = type->get_info()->scope;
   auto previous = ctx.scope;
-  ctx.set_scope(scope);
-
+  ctx.set_scope(node->scope);
+  
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -1349,6 +1342,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       generic_arg++;
     }
   }
+
+  auto type = global_get_type(int_from_any(node->target->accept(this)));
+  if (!type) {
+    throw_error("Impl used on a non-existent type.", node->source_range);
+  }
+
+  Scope *scope = type->get_info()->scope;
+  ctx.set_scope(scope);
 
   for (const auto &method : node->methods) {
     method->accept(this);

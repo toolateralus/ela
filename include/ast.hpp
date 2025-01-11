@@ -513,6 +513,7 @@ struct ASTImpl : ASTStatement {
   ASTType *target;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
+  Scope *scope;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
