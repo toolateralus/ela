@@ -396,6 +396,7 @@ struct ASTSubscript : ASTExpr {
 };
 
 struct ASTUnionDeclaration;
+struct ASTImpl;
 
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
@@ -408,6 +409,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::vector<ASTUnionDeclaration *> unions;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTImpl *> impls;
 
   std::any accept(VisitorBase *visitor) override;
 

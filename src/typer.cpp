@@ -40,9 +40,10 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
 
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
-    case AST_NODE_SUBSCRIPT: return nullptr;
+    case AST_NODE_SUBSCRIPT:
+      return nullptr;
     case AST_NODE_TYPE: {
-      auto type_node = static_cast<ASTType*>(node);
+      auto type_node = static_cast<ASTType *>(node);
 
       if (type_node->kind != ASTType::NORMAL) {
         return nullptr;
@@ -64,7 +65,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
       auto scope = type->get_info()->scope;
       return scope->local_lookup(srnode->member_name);
     } break;
-    
+
     default:
       throw_error("Get symbol cannot be used on this node type", node->source_range);
   }
@@ -99,7 +100,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
       ctx.scope->types[param] = *generic_arg;
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type(node->name, node->scope));
+    type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
   ctx.scope->insert("this", type->take_pointer_to());
@@ -238,19 +239,16 @@ std::any Typer::visit(ASTTaggedUnionDeclaration *node) {
   auto type = global_get_type(node->resolved_type);
   auto info = type->get_info()->as<TaggedUnionTypeInfo>();
   ctx.set_scope(node->scope);
-  for (const auto &member: node->members) {
+  for (const auto &member : node->members) {
     auto type = int_from_any(member->accept(this));
     InternedString name;
     if (member->get_node_type() == AST_NODE_DECLARATION) {
-      name = static_cast<ASTDeclaration*>(member)->name;
+      name = static_cast<ASTDeclaration *>(member)->name;
     } else if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      name = static_cast<ASTStructDeclaration*>(member)->name;
+      name = static_cast<ASTStructDeclaration *>(member)->name;
     }
-    info->variants.push_back(TaggedUnionVariant{
-      name,
-      type
-    });
-  } 
+    info->variants.push_back(TaggedUnionVariant{name, type});
+  }
   ctx.exit_scope();
   return node->resolved_type;
 }
@@ -385,9 +383,7 @@ std::any Typer::visit(ASTBlock *node) {
   ControlFlow block_cf = {BLOCK_FLAGS_FALL_THROUGH, -1};
 
   int last_statement_idx = current_block_statement_idx;
-  Defer _([&]{
-    current_block_statement_idx = last_statement_idx;
-  });
+  Defer _([&] { current_block_statement_idx = last_statement_idx; });
 
   int statement_idx = 0;
   for (auto &statement : node->statements) {
@@ -408,7 +404,6 @@ std::any Typer::visit(ASTBlock *node) {
     }
     statement_idx++;
   }
-  
 
   node->flags = block_cf.flags;
   node->return_type = block_cf.type == -1 ? void_type() : block_cf.type;
@@ -583,6 +578,28 @@ int find_generic_instance(std::vector<GenericInstance> instantiations, const std
 // with this function syntax, using #make(Type, ...) is really clunky
 // and annoying;
 std::any Typer::visit(ASTCall *node) {
+  auto func_node_type = node->function->get_node_type();
+  if (func_node_type == AST_NODE_DOT_EXPR || func_node_type == AST_NODE_SCOPE_RESOLUTION) {
+    Type *base_ty;
+    if (func_node_type == AST_NODE_DOT_EXPR) {
+      base_ty = global_get_type(int_from_any(static_cast<ASTDotExpr *>(node->function)->base->accept(this)));
+    } else {
+      base_ty = global_get_type(int_from_any(static_cast<ASTScopeResolution *>(node->function)->base->accept(this)));
+    }
+    auto symbol = ctx.scope->lookup(base_ty->get_base());
+    if (symbol && symbol->declaring_node.is_not_null()) {
+      auto declaring_node = symbol->declaring_node.get();
+      auto declaring_node_type = declaring_node->get_node_type();
+      // TODO: implement other generics like unions
+      if (declaring_node_type == AST_NODE_STRUCT_DECLARATION) {
+        auto struct_decl = static_cast<ASTStructDeclaration *>(declaring_node);
+        for (auto &impl : struct_decl->impls) {
+          // TODO: only visit the ones that haven't already been visited.
+          visit_impl_declaration(impl, true, base_ty->generic_args);
+        }
+      }
+    }
+  }
   auto type = global_get_type(int_from_any(node->function->accept(this)));
 
   auto old_ty = declaring_or_assigning_type;
@@ -609,6 +626,7 @@ std::any Typer::visit(ASTCall *node) {
       func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
       method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
     }
+
 
     if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
       // * Inferred generic argumetns based on only function arguments.
@@ -1013,7 +1031,6 @@ std::any Typer::visit(ASTDotExpr *node) {
   }
 
   Scope *base_scope = base_ty->get_info()->scope;
-
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     return member->type_id;
@@ -1302,7 +1319,8 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
     auto iden = node->idens[i];
     if (ctx.scope->local_lookup(iden->value) && node->op != TType::Assign) {
       throw_error(std::format("Redefinition of a variable is not allowed in a tuple with :="
-                              "deconstruction yet.\nOffending variable {}\n use `var, var1 := ...`, if both `var` and var1` exist already.",
+                              "deconstruction yet.\nOffending variable {}\n use `var, var1 := ...`, if both `var` and "
+                              "var1` exist already.",
                               iden->value),
                   node->source_range);
     }
@@ -1313,20 +1331,47 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
   return {};
 };
 
-std::any Typer::visit(ASTImpl *node) {
+void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto type = global_get_type(int_from_any(node->target->accept(this)));
   if (!type) {
     throw_error("Impl used on a non-existent type.", node->source_range);
   }
-  Scope *scope = type->get_info()->scope;
 
+  // TODO: this should be a scope on the impl ast
+  Scope *scope = type->get_info()->scope;
   auto previous = ctx.scope;
   ctx.set_scope(scope);
+
+  if (generic_instantiation) {
+    auto generic_arg = generic_args.begin();
+    for (const auto &param : node->generic_parameters) {
+      ctx.scope->types[param] = *generic_arg;
+      generic_arg++;
+    }
+  }
+
   for (const auto &method : node->methods) {
     method->accept(this);
   }
-  ctx.set_scope(previous);
 
+  ctx.set_scope(previous);
+}
+
+std::any Typer::visit(ASTImpl *node) {
+  if (!node->generic_parameters.empty()) {
+    auto symbol_nullable = get_symbol(node->target);
+    if (symbol_nullable.is_null() || symbol_nullable.get()->declaring_node.is_null()) {
+      throw_error("Generic impls only for generic types for now.", node->source_range);
+    }
+    auto declaring_node = symbol_nullable.get()->declaring_node.get();
+    if (declaring_node->get_node_type() != AST_NODE_STRUCT_DECLARATION) {
+      throw_error("Generic impls are only for struct types for now.", node->source_range);
+    }
+    auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
+    node_as_struct->impls.push_back(node);
+  } else {
+    visit_impl_declaration(node, false);
+  }
   return {};
 }
 

@@ -254,7 +254,7 @@ Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
-int global_create_struct_type(const InternedString &, Scope *);
+int global_create_struct_type(const InternedString &, Scope *, std::vector<int> generic_args = {});
 int global_create_tagged_union_type(const InternedString &, Scope *);
 int global_create_enum_type(const InternedString &, Scope *, bool = false,
                             size_t element_type = s32_type());
@@ -277,6 +277,7 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 struct Type {
   int id = invalid_id;
   int base_id = invalid_id;
+  std::vector<int> generic_args{};
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
