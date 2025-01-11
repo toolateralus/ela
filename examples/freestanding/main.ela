@@ -60,7 +60,7 @@ Vector2 :: struct {
 #export main :: fn() -> int {
   print("\e[1;4;32mHello Free(standing) World!\e[0m\n");
   
-  while true {
+  while {
     // example of getting a 'dynamically allocated' struct.
     v: Vector2* = allocator.alloc(sizeof(Vector2));
     v1: Vector2* = allocator.alloc(sizeof(Vector2));

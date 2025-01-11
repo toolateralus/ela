@@ -29,6 +29,14 @@
       "program": "${fileDirname}/${fileBasenameNoExtension}",
       "cwd": "${fileDirname}"
     },
+    {
+      "preLaunchTask": "compile_current_test",
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug current file (tests)",
+      "program": "${fileDirname}/${fileBasenameNoExtension}",
+      "cwd": "${fileDirname}"
+    },
     
     // If you have an ela_source/dummy.ela you can use these configurations to test
     // miscellaneous problems you may have.

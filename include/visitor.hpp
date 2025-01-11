@@ -217,8 +217,10 @@ struct Emitter : VisitorBase {
   std::any visit(ASTDefer *node) override;
   std::any visit(ASTTaggedUnionDeclaration *node) override;
   std::any visit(ASTCast *node) override;
+  
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
+      emit_line_directive(stmt);
       stmt->accept(this);
       (*ss) << ";";
     }

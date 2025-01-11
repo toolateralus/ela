@@ -1,0 +1,23 @@
+
+Struct :: struct![T] {
+  n: T;
+}
+
+
+main :: fn() {
+  //! these all fail
+  f: Struct![int][];     // interpreted as array<Struct>, which doesn't exist.
+  f1: Struct![int]*[];
+  f2: Struct![int]*;
+  f3: Struct![int][string];
+  f4: Struct![int][]*;          // more type problems with generics
+
+  n: Struct; // This passes our compiler, but clearly it's not possible.
+
+  // ? This fails, but also because Struct![T] doesn't implement a hashing function. We won't really have a succinct syntax until
+  // ? both generics & interfaces are very solid, they're our foundation here.
+  // * f5: string[Struct![int]]; 
+
+  // ? this works for some reason?
+  w1: (Struct![int], Struct![int]);
+}

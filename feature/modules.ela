@@ -1,7 +1,7 @@
 // declare a module (rest of this file will be inside this)
 #mod std::mem;
 
-Allocator :: interface {
+Allocator :: interface![T] {
   #static alloc :: fn![T]() -> T*;
 }
 

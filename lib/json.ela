@@ -77,17 +77,18 @@ JsonLexer :: struct {
   input : string;
   lookahead_buffer : JsonToken[];
 }
+
 impl JsonLexer {
   err :: fn(self*, token: JsonToken, msg: string) -> (JsonError, JsonToken) {
     return (JsonError::Error($"[{self.file}:{token.line}:{token.column}] {msg}"), token);
   }
 
   create :: fn(_file: c_string, _input: string) -> #self {
-    self: #self;
-    self.file = _file;
-    self.input = _input;
-    self.length = self.input.length;
-    return self;
+    return {
+      file: _file,
+      input: _input,
+      length: _input.length
+    };
   }
 
   get_token :: fn(self*) -> (JsonError, JsonToken) {
@@ -429,6 +430,7 @@ impl JsonValue {
     return false; // or handle error
   }
 }
+
 json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
   value : JsonValue* = malloc(sizeof(JsonValue));
   err, token := lexer.expect_types({
@@ -508,12 +510,12 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
 }
 
 json_parse_file :: fn(file: c_string) -> (JsonError, JsonValue*) {
-  lexer := JsonLexer{file: file, input: File::read_all(file)};
+  lexer := JsonLexer::create(file, File::read_all(file));
   return json_parse(&lexer);
 }
 
 json_parse_string :: fn(str: c_string) -> (JsonError, JsonValue*) {
-  lexer := JsonLexer { file: "string", input: str };
+  lexer := JsonLexer::create("from:string", str);
   return json_parse(&lexer);
 }
 json_serialize_scalar :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {

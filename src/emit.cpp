@@ -859,6 +859,7 @@ std::any Emitter::visit(ASTTuple *node) {
   return {};
 }
 std::any Emitter::visit(ASTTupleDeconstruction *node) {
+  emit_line_directive(node);
   if (node->op == TType::ColonEquals) {
     (*ss) << "auto [";
     for (auto &iden : node->idens) {

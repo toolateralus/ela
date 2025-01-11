@@ -12,11 +12,13 @@ To search for all info comments in the source just use vscodes regex search with
   - quick lambdas.
   - interfaces.
   - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
+  - `for i, v in some_array {} getting an index from an iterator.
 
 ## out-of-language features
 - config file/ project. So we can organize submodules, add compilation commands & library paths, source ela libraries, etc.
 
 # reworks.
+- rework iterators completely, no more relying on C++ iterators. they suck anyway
 - destructors are like totally broken and just destroy any struct with a destructor when the function it was created in exits.
 - type inference for generics is near non existent
 - A lot of libraries in /lib need to be rewritten because of impl/ no more constructor/destructor reworks
@@ -24,7 +26,7 @@ To search for all info comments in the source just use vscodes regex search with
 - we need to instantiate templates for generics where most appropriate, not just when theyre declared.
 
 - we should make it so `boilerplate.hpp` doesn't exist, and use our own language, where applicable.
-- if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions.
+- if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions. (I wrote a binding generator, it might be fine.)
 
 ## general
 - clean up everything. the parser is a mess, a ton of ast can be simplified, and made more performant even.
