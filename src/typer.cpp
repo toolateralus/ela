@@ -594,8 +594,7 @@ std::any Typer::visit(ASTCall *node) {
       if (declaring_node_type == AST_NODE_STRUCT_DECLARATION) {
         auto struct_decl = static_cast<ASTStructDeclaration *>(declaring_node);
         for (auto &impl : struct_decl->impls) {
-          // TODO: only visit the ones that haven't already been visited.
-          visit_impl_declaration(impl, true, base_ty->generic_args);
+          visit_generic<ASTImpl>(&Typer::visit_impl_declaration, impl, base_ty->generic_args);
         }
       }
     }
@@ -1335,7 +1334,7 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
   return {};
 };
 
-void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
+int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
@@ -1358,12 +1357,15 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   ctx.set_scope(scope);
 
   for (const auto &method : node->methods) {
-    method->scope->parent = scope;
+    if (generic_instantiation) {
+      method->scope->parent = scope;
+    }
     method->accept(this);
   }
   // for (auto &symbol : node->scope->symbols) {
   //   scope->symbols[symbol.first] = symbol.second;
   // }
+  return -1;
 }
 
 std::any Typer::visit(ASTImpl *node) {

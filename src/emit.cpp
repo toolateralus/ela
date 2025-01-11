@@ -1506,7 +1506,6 @@ std::any Emitter::visit(ASTScopeResolution *node) {
 }
 
 std::any Emitter::visit(ASTImpl *node) {
-  // TODO: we need to emit generic instantiations.
   if (!node->generic_instantiations.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       instantiation.node->accept(this);
