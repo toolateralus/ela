@@ -3,6 +3,7 @@
 #include <cstddef>
 #include <ostream>
 #include <sstream>
+#include <vector>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -327,10 +328,11 @@ std::string Type::to_string() const {
   }
 }
 
-int global_create_struct_type(const InternedString &name, Scope *scope) {
+int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
   type_table.emplace_back(type_table.size(), TYPE_STRUCT);
   Type *type = &type_table.back();
   type->set_base(name);
+  type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
   info->scope = scope;
   type->set_info(info);

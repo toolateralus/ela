@@ -61,6 +61,8 @@ struct Typer : VisitorBase {
                                std::vector<int> generic_args = {});
   int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
                               std::vector<int> generic_args = {});
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
+                              std::vector<int> generic_args = {});
 
   std::any visit(ASTCall *node) override;
   std::any visit(ASTArguments *node) override;

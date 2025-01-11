@@ -396,6 +396,7 @@ struct ASTSubscript : ASTExpr {
 };
 
 struct ASTUnionDeclaration;
+struct ASTImpl;
 
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
@@ -408,6 +409,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::vector<ASTUnionDeclaration *> unions;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTImpl *> impls;
 
   std::any accept(VisitorBase *visitor) override;
 
@@ -511,6 +513,7 @@ struct ASTImpl : ASTStatement {
   ASTType *target;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
+  Scope *scope;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
