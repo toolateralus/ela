@@ -14,7 +14,7 @@ main :: fn() {
 
   n: Struct; // This passes our compiler, but clearly it's not possible.
 
-  // ? This fails, but also because Struct![T] doesn't implement a hashing function. We won't really have a succinct syntax until
+  // ? This fails, but also because  Struct![T] doesn't implement a hashing function. We won't really have a succinct syntax until
   // ? both generics & interfaces are very solid, they're our foundation here.
   // * f5: string[Struct![int]]; 
 
