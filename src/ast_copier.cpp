@@ -283,12 +283,13 @@ ASTScopeResolution *ASTCopier::copy_scope_resolution(ASTScopeResolution *node) {
   return new_node;
 }
 
-ASTImpl *ASTCopier::copy_impl(ASTImpl* node) {
+ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   auto new_node = new (ast_alloc<ASTImpl>()) ASTImpl(*node);
   new_node->target = static_cast<ASTType *>(copy_node(node->target));
+  new_node->scope = copy_scope(new_node->scope);
   new_node->methods.clear();
-  for (const auto &method: node->methods) {
-    new_node->methods.push_back(static_cast<ASTFunctionDeclaration*>(copy_node(method)));
+  for (const auto &method : node->methods) {
+    new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
   }
   return new_node;
 }
@@ -296,7 +297,7 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl* node) {
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_IMPL:
-      return copy_impl(static_cast<ASTImpl*>(node));
+      return copy_impl(static_cast<ASTImpl *>(node));
     case AST_NODE_PROGRAM:
       return copy_program(static_cast<ASTProgram *>(node));
     case AST_NODE_BLOCK:
