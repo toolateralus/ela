@@ -188,24 +188,25 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   int type_id = -1;
   FunctionTypeInfo info;
   // Get function type id from header.
-  {
-    info.return_type = node->return_type->resolved_type;
-    info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
-    for (const auto &param : node->params->params) {
-      if (param->default_value.is_not_null())
-        info.default_params++;
-      ctx.scope->insert(param->name, param->type->resolved_type);
-      info.parameter_types[info.params_len] = param->type->resolved_type;
-      info.params_len++;
-    }
-    if (info.return_type != -2)
-      type_id = global_find_function_type_id(info, {});
+  info.return_type = node->return_type->resolved_type;
+  info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
+  for (const auto &param : node->params->params) {
+    if (param->default_value.is_not_null())
+      info.default_params++;
+    ctx.scope->insert(param->name, param->type->resolved_type);
+    info.parameter_types[info.params_len] = param->type->resolved_type;
+    info.params_len++;
+  }
+  if (info.return_type != -2) {
+    type_id = global_find_function_type_id(info, {});
+  } else {
+    throw_error("Internal Compiler error: unresolved generic return type.", node->source_range);
   }
 
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
     ctx.scope->parent->insert(node->name, type_id, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
     ctx.scope->parent->lookup(node->name)->declaring_node = node;
-    return {};
+    return type_id;
   }
 
   if (!generic_instantiation) {
@@ -214,7 +215,7 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   }
 
   if ((node->flags & FUNCTION_IS_FOREIGN) != 0)
-    return {};
+    return type_id;
 
   auto old_ty = declaring_or_assigning_type;
   auto _defer = Defer([&] { declaring_or_assigning_type = old_ty; });
@@ -626,7 +627,6 @@ std::any Typer::visit(ASTCall *node) {
       func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
       method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
     }
-
 
     if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
       // * Inferred generic argumetns based on only function arguments.
@@ -1055,10 +1055,11 @@ std::any Typer::visit(ASTScopeResolution *node) {
     node->resolved_type = member->type_id;
     return member->type_id;
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type < 0) goto ERROR_CASE;
+    if (type < 0)
+      goto ERROR_CASE;
     return type;
   } else {
-    ERROR_CASE:
+  ERROR_CASE:
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
                 node->source_range);
   }
@@ -1103,7 +1104,6 @@ std::any Typer::visit(ASTSubscript *node) {
   }
   return left_ty->get_element_type();
 }
-
 
 std::any Typer::visit(ASTInitializerList *node) {
   Type *target_type;
@@ -1338,11 +1338,9 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
-  Defer _([&]{
-    ctx.set_scope(previous);
-  });
+  Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
-  
+
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -1352,30 +1350,21 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   auto type = global_get_type(int_from_any(node->target->accept(this)));
-
-  std::cout << "instantiating impl for :" << type->to_string() << '\n';
   if (!type) {
     throw_error("Impl used on a non-existent type.", node->source_range);
   }
 
   Scope *scope = type->get_info()->scope;
-  
+
   ctx.set_scope(scope);
 
-  if (generic_instantiation) {
-    auto generic_arg = generic_args.begin();
-    for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
-      generic_arg++;
-    }
-  }
-
   for (const auto &method : node->methods) {
-    if (method->block.is_not_null()) {
-      method->block.get()->scope->parent = scope;
-    }
+    method->scope->parent = scope;
     method->accept(this);
   }
+  // for (auto &symbol : node->scope->symbols) {
+  //   scope->symbols[symbol.first] = symbol.second;
+  // }
 }
 
 std::any Typer::visit(ASTImpl *node) {
@@ -1406,7 +1395,8 @@ std::any Typer::visit(ASTCast *node) {
   auto type = global_get_type(int_from_any(node->target_type->accept(this)));
   auto conversion = type_conversion_rule(expr_type, type);
   if (conversion == CONVERT_PROHIBITED) {
-    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()), node->source_range);
+    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()),
+                node->source_range);
   }
   return node->resolved_type = type->id;
 }
