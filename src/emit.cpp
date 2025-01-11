@@ -753,7 +753,6 @@ std::any Emitter::visit(ASTDotExpr *node) {
   return {};
 }
 
-
 std::any Emitter::visit(ASTSubscript *node) {
   node->left->accept(this);
   (*ss) << '[';
@@ -765,8 +764,8 @@ std::any Emitter::visit(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
 
   if (!type->get_ext().is_fixed_sized_array()) {
-    (*ss) << to_cpp_string(type); 
-  } 
+    (*ss) << to_cpp_string(type);
+  }
   (*ss) << " {";
 
   switch (node->tag) {
@@ -1548,12 +1547,13 @@ std::any Emitter::visit(ASTImpl *node) {
 }
 
 std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
-  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
-
+  (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() <<  ";\n";
+  auto name = node->name.get_str();
   for (const auto &member : node->members) {
     if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      (*ss) << "struct {\n";
+      auto subtype_name = name + "_" + struct_node->name.get_str();
+      (*ss) << "typedef struct " << subtype_name << "{\n";
       for (const auto &field : struct_node->fields) {
         field->accept(this);
         (*ss) << ";\n";
@@ -1561,19 +1561,40 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
       for (const auto &$union : struct_node->unions) {
         $union->accept(this);
       }
-      (*ss) << "} " << struct_node->name.get_str() << ";\n";
+      (*ss) << "} " << subtype_name << ";\n";
     } else if (member->get_node_type() == AST_NODE_DECLARATION) {
       auto declaration_node = static_cast<ASTDeclaration *>(member);
+      auto subtype_name = name + "_" + declaration_node->name.get_str();
+
+      (*ss) << "typedef ";
+      declaration_node->type->accept(this);
+      (*ss) << " " << subtype_name << ";\n";
+
       // TODO: put this error in the typer.
-      auto old = emit_default_init;
-      emit_default_init = false;
-      if (declaration_node->value.is_not_null()) {
-        throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
-      }
-      declaration_node->accept(this);
-      emit_default_init = old;
-      (*ss) << ";\n";
+      // auto old = emit_default_init;
+      // emit_default_init = false;
+      // if (declaration_node->value.is_not_null()) {
+      //   throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
+      // }
+      // declaration_node->accept(this);
+      // emit_default_init = old;
+      // (*ss) << ";\n";
     }
+  }
+
+  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
+
+  int n = 0;
+  for (const auto &member : node->members) {
+    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      auto struct_node = static_cast<ASTStructDeclaration *>(member);
+      (*ss) << name + "_" + struct_node->name.get_str()  << " $index_" << std::to_string(n) << ";\n";
+    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
+      auto declaration_node = static_cast<ASTDeclaration *>(member);
+      auto alias = name + "_" + declaration_node->name.get_str();
+      (*ss) << alias << " $index_" << std::to_string(n) << ";\n";
+    }
+    n++;
   }
   (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
   return {};
@@ -1812,7 +1833,7 @@ std::any Emitter::visit(ASTBlock *node) {
 
 std::any Emitter::visit(ASTCast *node) {
   auto type_string = to_cpp_string(global_get_type(node->target_type->resolved_type));
-  (*ss) << "("<< type_string << ")";
+  (*ss) << "(" << type_string << ")";
   node->expression->accept(this);
   return {};
 }

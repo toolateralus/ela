@@ -69,11 +69,11 @@ DeferCleanup :: struct {
 // here we show that the ptr as a u64 is passed back to the caller before it's set to null
 // in the defer block. which is absolutely expected behaviour.
 defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
-  assert("defer cleanup got null input", c.ptr != null);
   defer {
     free(c.ptr);
     c.ptr = null;
   }
+  assert("defer cleanup got null input", c.ptr != null);
   return c.ptr as u64;
 }
 
