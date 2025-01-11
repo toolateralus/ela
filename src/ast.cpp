@@ -684,6 +684,7 @@ ASTExpr *Parser::parse_postfix() {
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
   auto range = begin_node();
+  
   // if theres a #... that returns a value, use that.
   if (auto directive_expr = try_parse_directive_expr()) {
     return directive_expr.get();
@@ -787,6 +788,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(init_list, range);
       return init_list;
     }
+    
     case TType::Identifier: {
       if (ctx.scope->find_type_id(tok.value, {}) != -1) {
         auto type = parse_type();

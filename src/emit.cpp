@@ -141,9 +141,8 @@ std::any Emitter::visit(ASTType *node) {
 
 int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   switch (node->get_node_type()) {
-    case AST_NODE_TYPE: {
+    case AST_NODE_TYPE: 
       return std::any_cast<int>(node->accept(&typer));
-    }
     case AST_NODE_IDENTIFIER:
       return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
     case AST_NODE_DOT_EXPR: {
@@ -1107,7 +1106,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     } else if (type->is_kind(TYPE_TUPLE)) {
       auto info = type->get_info()->as<TupleTypeInfo>();
       for (int i = 0; i < info->types.size(); ++i) {
-        (*ss) << "get<" << std::to_string(i) << ">(";
+        (*ss) << "std::get<" << std::to_string(i) << ">(";
         value->accept(this);
         (*ss) << ")";
         if (i != info->types.size() - 1) {
@@ -1569,16 +1568,6 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
       (*ss) << "typedef ";
       declaration_node->type->accept(this);
       (*ss) << " " << subtype_name << ";\n";
-
-      // TODO: put this error in the typer.
-      // auto old = emit_default_init;
-      // emit_default_init = false;
-      // if (declaration_node->value.is_not_null()) {
-      //   throw_error("Cannot use default values for a tagged enum variant", declaration_node->source_range);
-      // }
-      // declaration_node->accept(this);
-      // emit_default_init = old;
-      // (*ss) << ";\n";
     }
   }
 
@@ -1600,52 +1589,6 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
   return {};
 }
 
-// TODO:
-/*
-  To accomplish defer, we will have to look at the parent block this is used from, until we get to a function
-  declaration's block, then for all the blocks in the code path, or really the whole thing, we turn all the returns
-  into a variable assignment, and then when we would've returned, we use a goto to the defer block header, if it's
-  applicable, then we return the assigned variable once we've executed defer.
-
-  so, for
-
-  getter :: fn() -> int {
-    handle := get_handle();
-    defer handle.destroy();
-
-    if handle.is_good() {
-      defer handle.drop_consumer();
-      if handle.has_consumer {
-        return handle.id;
-      }
-    }
-
-    return get_invalid_handle_id();
-  }
-
-  we would compile
-  getter :: fn() -> int {
-    handle := get_handle();
-
-    __defer_retval : int;
-
-    if handle.is_good() {
-      defer handle.drop_consumer();
-      if handle.has_consumer {
-        __defer_retval = handle.id;
-        goto DEFER_1;
-      }
-      goto DEFER_1;
-    }
-    __defer_retval = get_invalid_handle_id();
-
-    DEFER_1:
-      handle.drop_consumer();
-    DEFER_0:
-      handle.destroy();
-  }
-
-*/
 
 std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {

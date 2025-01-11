@@ -1014,6 +1014,10 @@ std::any Typer::visit(ASTDotExpr *node) {
 
   Scope *base_scope = base_ty->get_info()->scope;
 
+  if (!base_scope) {
+    throw_error("Internal compiler error: dot expression used on a type that had a null scope", node->source_range);
+  }
+
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     return member->type_id;

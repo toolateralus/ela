@@ -694,12 +694,13 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
 
   type->set_info(info);
   type->set_ext(ext);
+  info->scope = create_child(root_scope);
   return type->id;
 }
 
 InternedString get_tuple_type_name(const std::vector<int> &types) {
   std::stringstream ss;
-  ss << "<";
+  ss << "(";
   for (auto it = types.begin(); it != types.end(); ++it) {
     auto type = global_get_type(*it);
 
@@ -709,7 +710,7 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
       ss << ", ";
     }
   }
-  ss << ">";
+  ss << ")";
   return ss.str();
 }
 int Type::take_pointer_to() const {
