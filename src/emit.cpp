@@ -176,8 +176,7 @@ std::any Emitter::visit(ASTCall *node) {
       throw_error("cannot call a static method from an instance", node->source_range);
     }
 
-    ASTExpr *base = nullptr;
-    base = static_cast<ASTDotExpr *>(node->function)->base;
+    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
     Type *function_type = global_get_type(base_symbol.get()->type_id);
     auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
     auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
@@ -1512,10 +1511,11 @@ std::any Emitter::visit(ASTImpl *node) {
     }
     return {};
   }
-
-  auto target = global_get_type(std::any_cast<int>(node->target->accept(&typer)));
+  
+  auto target = global_get_type(node->target->resolved_type);
   current_impl = node;
   Defer _([&] { current_impl = nullptr; });
+
   for (const auto &method : node->methods) {
     method->return_type->accept(this);
     auto name = to_cpp_string(target);

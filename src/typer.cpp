@@ -703,6 +703,7 @@ std::any Typer::visit(ASTArguments *node) {
     auto arg = node->arguments[i];
 
     if (!info) {
+      // * Why is this here? CLEANUP
       auto arg_ty = int_from_any(arg->accept(this));
       argument_types.push_back(arg_ty);
       continue;
