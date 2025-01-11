@@ -1366,7 +1366,7 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
   // for (auto &symbol : node->scope->symbols) {
   //   scope->symbols[symbol.first] = symbol.second;
   // }
-  return -1;
+  return type->id;
 }
 
 std::any Typer::visit(ASTImpl *node) {
