@@ -737,6 +737,7 @@ int Typer::visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>)
     auto copy = static_cast<T *>(deep_copy_ast(definition));
     type_id = (this->*visit_method)(copy, true, args);
     copy->generic_parameters.clear();
+    copy->generic_instantiations.clear();
     definition->generic_instantiations.push_back({args, copy, type_id});
   }
   return type_id;
