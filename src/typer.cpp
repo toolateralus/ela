@@ -103,6 +103,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
+  type->declaring_node = node;
   ctx.scope->insert("this", type->take_pointer_to());
 
   for (auto subunion : node->unions) {
@@ -587,9 +588,7 @@ std::any Typer::visit(ASTCall *node) {
     } else {
       base_ty = global_get_type(int_from_any(static_cast<ASTScopeResolution *>(node->function)->base->accept(this)));
     }
-    auto symbol = ctx.scope->lookup(base_ty->get_base());
-    if (symbol && symbol->declaring_node.is_not_null()) {
-      auto declaring_node = symbol->declaring_node.get();
+    if (auto declaring_node = base_ty->declaring_node.get()) {
       auto declaring_node_type = declaring_node->get_node_type();
       // TODO: implement other generics like unions
       if (declaring_node_type == AST_NODE_STRUCT_DECLARATION) {

@@ -425,19 +425,10 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   }
 }
 
-std::string mangled_type_args(const std::vector<int> &args) {
-  std::string s;
-  for (const auto &arg : args) {
-    s += "_" + std::to_string(arg);
-  }
-  return s;
-}
-
 std::any Emitter::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.type);
-      type->set_base(type->get_base().get_str() + mangled_type_args(instantiation.arguments));
       static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
       instantiation.node->accept(this);
     }
@@ -1524,12 +1515,12 @@ std::any Emitter::visit(ASTImpl *node) {
   }
 
   auto target = global_get_type(std::any_cast<int>(node->target->accept(&typer)));
-  auto target_base = target->get_base();
   current_impl = node;
   Defer _([&] { current_impl = nullptr; });
   for (const auto &method : node->methods) {
     method->return_type->accept(this);
-    (*ss) << ' ' << target->get_base().get_str() << '_' << method->name.get_str();
+    auto name = to_cpp_string(target);
+    (*ss) << ' ' << name << '_' << method->name.get_str();
     (*ss) << "(";
     for (const auto &param : method->params->params) {
       param->accept(this);

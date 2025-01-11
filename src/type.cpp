@@ -328,10 +328,27 @@ std::string Type::to_string() const {
   }
 }
 
+std::string mangled_type_args(const std::vector<int> &args) {
+  std::string s;
+  int i = 0;
+  for (const auto &arg : args) {
+    if (i > 0) {
+      s += "_" + std::to_string(arg);
+    } else {
+      s += "$" + std::to_string(arg);
+    }
+  }
+  return s;
+}
+
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
   type_table.emplace_back(type_table.size(), TYPE_STRUCT);
   Type *type = &type_table.back();
-  type->set_base(name);
+  std::string base = name.get_str();
+  if (!generic_args.empty()) {
+    base += mangled_type_args(generic_args);
+  }
+  type->set_base(base);
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
   info->scope = scope;

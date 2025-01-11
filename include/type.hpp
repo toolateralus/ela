@@ -274,10 +274,13 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
 
+struct ASTNode;
+
 struct Type {
   int id = invalid_id;
   int base_id = invalid_id;
   std::vector<int> generic_args{};
+  Nullable<ASTNode> declaring_node;
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
