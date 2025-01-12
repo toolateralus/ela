@@ -355,8 +355,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_union_decl.get()->name);
         } else if (parser->current_struct_decl) {
           type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_struct_decl.get()->name);
-        } else if (parser->current_impl) {
-          type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl.get()->target));
+        } else if (parser->current_impl_decl) {
+          type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl_decl.get()->target));
         } else {
           throw_error("#self is only valid in unions, structs, and impl's.",{});
         }
@@ -1404,12 +1404,19 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
         end_node(nullptr, range);
         throw_error("\"self\" must appear first in method parameters.", range);
       }
-      if (!current_impl) {
+      if (!current_impl_decl && !current_interface_decl) {
         end_node(nullptr, range);
-        throw_error("\"self\" can only appear in method parameters.", range);
+        throw_error("\"self\" can only appear in method parameters, either in an interface declaration, or an impl.", range);
       }
+
+      ASTType *type;
+      if (current_impl_decl) {
+        type = static_cast<ASTType *>(deep_copy_ast(current_impl_decl.get()->target));
+      } else {
+        type = ast_alloc<ASTType>();
+      }
+
       params->has_self = true;
-      auto type = static_cast<ASTType *>(deep_copy_ast(current_impl.get()->target));
       append_type_extensions(type);
       NODE_ALLOC(ASTParamDecl, param, range, _, this)
       param->type = type;
@@ -1495,7 +1502,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   ctx.set_scope();
 
-  if (current_impl) {
+  if (current_impl_decl) {
     if (function->params->has_self) {
       function->flags |= FUNCTION_IS_METHOD;
     } else {
@@ -1588,7 +1595,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 
 ASTImpl *Parser::parse_impl() {
   expect(TType::Impl);
-  NODE_ALLOC_EXTRA_DEFER(ASTImpl, impl, range, _, this, current_impl = nullptr)
+  NODE_ALLOC_EXTRA_DEFER(ASTImpl, impl, range, _, this, current_impl_decl = nullptr)
 
   ctx.set_scope();
   impl->scope = ctx.exit_scope();
@@ -1597,7 +1604,7 @@ ASTImpl *Parser::parse_impl() {
     impl->generic_parameters = parse_generic_parameters();
   }
 
-  current_impl = impl;
+  current_impl_decl = impl;
   auto target = parse_type();
 
   // Handle 'impl INTERFACE for TYPE'
@@ -1670,7 +1677,13 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
 
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   expect(TType::Interface);
-  NODE_ALLOC(ASTInterfaceDeclaration, interface, range, _, this);
+  
+  auto previous = current_interface_decl;
+  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, interface, range, _, this, {
+    current_interface_decl = previous;
+  });
+  current_interface_decl = interface;
+
   if (peek().type == TType::GenericBrace) {
     interface->generic_parameters = parse_generic_parameters();
   }

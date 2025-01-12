@@ -724,7 +724,8 @@ struct Parser {
   Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  Nullable<ASTImpl> current_impl = nullptr;
+  Nullable<ASTImpl> current_impl_decl = nullptr;
+  Nullable<ASTInterfaceDeclaration> current_interface_decl = nullptr;
 
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
