@@ -38,6 +38,7 @@ struct ASTCopier {
   ASTSwitch *copy_switch(ASTSwitch *node);
   ASTTuple *copy_tuple(ASTTuple *node);
   ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
+  ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
 };

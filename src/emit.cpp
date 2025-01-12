@@ -1243,6 +1243,9 @@ std::string get_type_flags(Type *type) {
     case TYPE_TAGGED_UNION:
       kind_flags = TYPE_FLAGS_TAGGED_UNION;
       break;
+    case TYPE_INTERFACE:
+      kind_flags = 0;
+      break;
   }
   for (const auto &ext : type->get_ext().extensions) {
     switch (ext.type) {
@@ -1443,7 +1446,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 
 std::string Emitter::to_cpp_string(Type *type) {
   auto output = std::string{};
-  switch (type->kind) {
+  switch (type->kind ) {
     case TYPE_FUNCTION:
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
@@ -1467,6 +1470,9 @@ std::string Emitter::to_cpp_string(Type *type) {
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
+    case TYPE_INTERFACE:
+      throw_error("can't declare an instance of an interface", {});
+      break;
   }
   return output;
 }
@@ -1777,3 +1783,4 @@ std::any Emitter::visit(ASTCast *node) {
 std::any Emitter::visit(ASTInterfaceDeclaration *node) {
   return {};
 }
+

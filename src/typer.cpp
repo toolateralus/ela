@@ -237,6 +237,60 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   return type_id;
 }
 
+int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
+  auto previous = ctx.scope;
+  Defer _([&] { ctx.set_scope(previous); });
+  ctx.set_scope(node->scope);
+
+  if (generic_instantiation) {
+    auto generic_arg = generic_args.begin();
+    for (const auto &param : node->generic_parameters) {
+      ctx.scope->types[param] = *generic_arg;
+      generic_arg++;
+    }
+  }
+
+  auto type = global_get_type(int_from_any(node->target->accept(this)));
+  if (!type) {
+    throw_error("Impl used on a non-existent type.", node->source_range);
+  }
+
+  if (node->interface) {
+    auto type_id = int_from_any(node->interface.get()->accept(this));
+    std::cout << "interface type \e[1;33m" << (global_get_type(type_id)->to_string()) << "\n";
+  }
+
+  Scope *scope = type->get_info()->scope;
+
+  ctx.set_scope(scope);
+
+  for (const auto &method : node->methods) {
+    if (generic_instantiation) {
+      method->scope->parent = scope;
+    }
+    method->accept(this);
+  }
+
+  return type->id;
+}
+
+int Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
+                                       std::vector<int> generic_args) {
+  auto previous = ctx.scope;
+  Defer _([&] { ctx.set_scope(previous); });
+  ctx.set_scope(node->scope);
+
+  if (generic_instantiation) {
+    auto generic_arg = generic_args.begin();
+    for (const auto &param : node->generic_parameters) {
+      ctx.scope->types[param] = *generic_arg;
+      generic_arg++;
+    }
+  }
+
+  return -2;
+}
+
 std::any Typer::visit(ASTTaggedUnionDeclaration *node) {
   auto type = global_get_type(node->resolved_type);
   auto info = type->get_info()->as<TaggedUnionTypeInfo>();
@@ -786,12 +840,14 @@ std::any Typer::visit(ASTType *node) {
       }
       int type_id = -1;
       if (declaring_node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-        type_id = visit_generic<ASTStructDeclaration>(&Typer::visit_struct_declaration, declaring_node, generic_args);
+        type_id = visit_generic(&Typer::visit_struct_declaration, declaring_node, generic_args);
       } else if (declaring_node->get_node_type() == AST_NODE_UNION_DECLARATION) {
-        type_id = visit_generic<ASTUnionDeclaration>(&Typer::visit_union_declaration, declaring_node, generic_args);
+        type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
       } else if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         type_id =
-            visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration, declaring_node, generic_args);
+            visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
+      } else if (declaring_node->get_node_type() == AST_NODE_INTERFACE_DECLARATION) {
+        type_id = visit_generic(&Typer::visit_interface_declaration, declaring_node, generic_args);
       }
       if (type_id == -1) {
         throw_error("Invalid target to generic args", node->source_range);
@@ -1341,47 +1397,6 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
 
   return {};
 };
-
-int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
-  auto previous = ctx.scope;
-  Defer _([&] { ctx.set_scope(previous); });
-  ctx.set_scope(node->scope);
-
-  if (generic_instantiation) {
-    auto generic_arg = generic_args.begin();
-    for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
-      generic_arg++;
-    }
-  }
-
-  auto type = global_get_type(int_from_any(node->target->accept(this)));
-  if (!type) {
-    throw_error("Impl used on a non-existent type.", node->source_range);
-  }
-
-  if (node->interface) {
-    auto symbol = get_symbol(node->interface.get()->normal.base);
-    if (!symbol) {
-      throw_error("Interface on impl did not exist", node->source_range);
-    }
-  }
-
-  Scope *scope = type->get_info()->scope;
-
-  ctx.set_scope(scope);
-
-  for (const auto &method : node->methods) {
-    if (generic_instantiation) {
-      method->scope->parent = scope;
-    }
-    method->accept(this);
-  }
-  // for (auto &symbol : node->scope->symbols) {
-  //   scope->symbols[symbol.first] = symbol.second;
-  // }
-  return type->id;
-}
 
 std::any Typer::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {

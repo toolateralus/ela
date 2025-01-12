@@ -55,7 +55,7 @@ enum ASTNodeType {
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
-  AST_NODE_INTERFACE,
+  AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_DEFER,
   AST_NODE_CAST,
   AST_NODE_RANGE,
@@ -511,8 +511,9 @@ struct ASTInterfaceDeclaration : ASTStatement {
   InternedString name;
   Scope *scope;
   std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
   std::vector<ASTFunctionDeclaration *> methods;
-  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE; }
+  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
   std::any accept(VisitorBase *visitor) override;
 };
 

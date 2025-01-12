@@ -93,6 +93,10 @@ struct Scope {
     return id;
   }
 
+  int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
+    return types[name] = global_create_interface_type(name, scope, generic_args);
+  }
+
   int create_struct_type(const InternedString &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
     types[name] = id;

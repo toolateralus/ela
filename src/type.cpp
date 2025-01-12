@@ -181,7 +181,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     }
   }
 
-  // allow pointer arithmetic, from scalar type pointers, to numerical types. 
+  // allow pointer arithmetic, from scalar type pointers, to numerical types.
   const auto from_is_scalar_ptr = from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer();
   const auto to_is_non_ptr_number = type_is_numerical(to) && to->get_ext().has_no_extensions();
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
@@ -215,8 +215,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
 
-  // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C interop.
-  // This is far too C-like and highly unsafe.
+  // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C
+  // interop. This is far too C-like and highly unsafe.
   if (implicit_ptr_cast || implicit_fixed_array_to_ptr_cast) {
     return CONVERT_IMPLICIT;
   }
@@ -254,7 +254,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       }
     }
   }
-
 
   // * if the type extensions are equal, return the conversion rule for the bases.
   {
@@ -321,8 +320,8 @@ std::string Type::to_string() const {
       return base.get_str() + extensions.to_string();
     case TYPE_ENUM:
     case TYPE_UNION:
-      return base.get_str();
     case TYPE_TAGGED_UNION:
+    case TYPE_INTERFACE:
       return base.get_str();
       break;
   }
@@ -339,6 +338,18 @@ std::string mangled_type_args(const std::vector<int> &args) {
     }
   }
   return s;
+}
+
+int global_create_interface_type(const InternedString &name, Scope *scope,
+                                 std::vector<int> generic_args) {
+  type_table.emplace_back(type_table.size(), TYPE_INTERFACE);
+  Type *type = &type_table.back();
+  type->set_base(name);
+  type->generic_args = generic_args;
+  InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
+  info->scope = scope;
+  type->set_info(info);
+  return type->id;
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
@@ -737,5 +748,3 @@ int Type::take_pointer_to() const {
   ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
 }
-
-
