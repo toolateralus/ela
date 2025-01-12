@@ -284,6 +284,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"as", TType::As},
     {"impl", TType::Impl},
     {"defer", TType::Defer},
+    {"interface", TType::Interface},
 };
 
 static std::unordered_map<std::string, TType> operators{

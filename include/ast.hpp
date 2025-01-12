@@ -666,6 +666,8 @@ struct Parser {
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
+
+  ASTInterfaceDeclaration *parse_interface_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
