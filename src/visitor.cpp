@@ -51,10 +51,9 @@ std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTImpl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTDefer::accept(VisitorBase *visitor) {
-  return visitor->visit(this);
-}
+std::any ASTDefer::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTStatementList::accept(VisitorBase *visitor) { return visitor->visit(this); }
+std::any ASTInterfaceDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 
 // clang-format on
 // }

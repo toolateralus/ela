@@ -1773,3 +1773,7 @@ std::any Emitter::visit(ASTCast *node) {
   node->expression->accept(this);
   return {};
 }
+
+std::any Emitter::visit(ASTInterfaceDeclaration *node) {
+  return {};
+}

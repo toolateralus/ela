@@ -55,6 +55,7 @@ enum ASTNodeType {
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
+  AST_NODE_INTERFACE,
   AST_NODE_DEFER,
   AST_NODE_CAST,
   AST_NODE_RANGE,
@@ -306,7 +307,6 @@ struct ASTArguments : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
 };
 
-
 struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
@@ -507,6 +507,14 @@ struct ASTAlias : ASTStatement {
   std::any accept(VisitorBase *visitor) override;
 };
 
+struct ASTInterfaceDeclaration : ASTStatement {
+  Scope *scope;
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<ASTFunctionDeclaration *> methods;
+  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE; }
+  std::any accept(VisitorBase *visitor) override;
+};
+
 // TODO: add interface field, once we have interfaces lol.
 struct ASTImpl : ASTStatement {
   // impl 'target' or impl *interface for 'target'
@@ -532,7 +540,6 @@ struct ASTCast : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_CAST; }
   std::any accept(VisitorBase *visitor) override;
 };
-
 
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
@@ -570,13 +577,14 @@ struct ASTCast : ASTExpr {
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
   std::any visit(ASTDefer *node) override {};                                                                          \
-  std::any visit(ASTCast *node) override {};                                                                \
-  std::any visit(ASTTaggedUnionDeclaration *node) override {};
+  std::any visit(ASTCast *node) override {};                                                                           \
+  std::any visit(ASTTaggedUnionDeclaration *node) override {};                                                         \
+  std::any visit(ASTInterfaceDeclaration *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   std::any visit(ASTNoop *noop) { return {}; }                                                                         \
   virtual std::any visit(ASTScopeResolution *node) = 0;                                                                \
-  virtual std::any visit(ASTCast *node) = 0;                                                                \
+  virtual std::any visit(ASTCast *node) = 0;                                                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                                                        \
   virtual std::any visit(ASTBlock *node) = 0;                                                                          \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                                                            \
@@ -611,6 +619,7 @@ struct ASTCast : ASTExpr {
   virtual std::any visit(ASTImpl *node) = 0;                                                                           \
   virtual std::any visit(ASTTupleDeconstruction *node) = 0;                                                            \
   virtual std::any visit(ASTDefer *node) = 0;                                                                          \
+  virtual std::any visit(ASTInterfaceDeclaration *node) = 0;                                                           \
   virtual std::any visit(ASTTaggedUnionDeclaration *node) = 0;
 
 enum DirectiveKind {
@@ -657,6 +666,8 @@ struct Parser {
   ASTProgram *parse();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
+
+  ASTInterfaceDeclaration *parse_interface_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTDeclaration *parse_declaration();
@@ -729,7 +740,10 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                                  \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
   type *node = ast_alloc<type>();                                                                                      \
   auto range = parser->begin_node();                                                                                   \
-  Defer defer([&] { parser->end_node(node, range); deferred; });
+  Defer defer([&] {                                                                                                    \
+    parser->end_node(node, range);                                                                                     \
+    deferred;                                                                                                          \
+  });

@@ -51,8 +51,8 @@ struct Typer : VisitorBase {
   std::any visit(ASTCast *node) override;
   std::any visit(ASTType *node) override;
   std::any visit(ASTScopeResolution *node) override;
+  std::any visit(ASTInterfaceDeclaration *node) override;
 
-  
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
   int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
@@ -219,7 +219,8 @@ struct Emitter : VisitorBase {
   std::any visit(ASTDefer *node) override;
   std::any visit(ASTTaggedUnionDeclaration *node) override;
   std::any visit(ASTCast *node) override;
-  
+  std::any visit(ASTInterfaceDeclaration *node) override;
+
   std::any visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       emit_line_directive(stmt);

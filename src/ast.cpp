@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <any>
 #include <cassert>
+#include <cstdlib>
 #include <filesystem>
 #include <format>
 #include <fstream>
@@ -1151,6 +1152,10 @@ ASTStatement *Parser::parse_statement() {
       auto node = parse_function_declaration(tok);
       return node;
     }
+    if (peek().type == TType::Interface) {
+      auto interface = parse_interface_declaration(tok);
+      return interface;
+    }
     if (peek().type == TType::Struct) {
       auto struct_decl = parse_struct_declaration(tok);
       return struct_decl;
@@ -1645,12 +1650,32 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
     }
   }
 }
-
 // TODO:
 // We need to clean up the struct & union parsing, make it more consistent.
 // Maybe use a generic function, they're strangely different.
 // Also, we need to declare generic parameters types here with like -2 so
 // casting and T:: works and shtuff.
+
+ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
+  expect(TType::Interface);
+  NODE_ALLOC(ASTInterfaceDeclaration, interface, range, _, this);
+  if (peek().type == TType::GenericBrace) {
+    interface->generic_parameters = parse_generic_parameters();
+  }
+  ctx.set_scope();
+  auto block = parse_block();
+  for (const auto &node: block->statements) {
+    if (auto function = dynamic_cast<ASTFunctionDeclaration*>(node)) {
+      if (function->block.is_not_null()) {
+        throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
+      }
+      interface->methods.push_back(function);
+    }
+  }
+  interface->scope = ctx.exit_scope();
+  return interface;
+}
+
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   expect(TType::Struct);
 
@@ -2033,3 +2058,5 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
+
