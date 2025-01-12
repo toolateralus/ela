@@ -50,8 +50,6 @@ struct ClangVisitData {
   std::ofstream logfile;
 };
 
-
-
 // Helper function to get the type name as a string and translate C types to custom types
 static inline std::string wrapgen_get_type_name(CXType type) {
   if (type.kind == CXType_Typedef) {
@@ -70,6 +68,10 @@ static inline std::string wrapgen_get_type_name(CXType type) {
   size_t restrictPos = result.find("restrict");
   if (restrictPos != std::string::npos) {
     result.erase(restrictPos, 9);
+  }
+  size_t unsignedPos = result.find("unsigned");
+  if (unsignedPos != std::string::npos){
+    result.erase(unsignedPos, 9);
   }
 
   static std::unordered_map<std::string, std::string> type_map = {{"char", "u8"},
@@ -232,9 +234,8 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
           CXString variantName = clang_getCursorSpelling(c);
           std::string variantNameStr = clang_getCString(variantName);
           clang_disposeString(variantName);
-
           long long enumValue = clang_getEnumConstantDeclValue(c);
-          temp_output << "  " << variantNameStr << " = " << enumValue << ";\n";
+          temp_output << "  " << variantNameStr << " = " << enumValue << ",\n";
         }
         return CXChildVisit_Continue;
       },

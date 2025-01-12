@@ -1,5 +1,6 @@
 #include "ast.hpp"
 
+
 #include <algorithm>
 #include <any>
 #include <cassert>
@@ -193,17 +194,35 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "read",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) {
+        parser->expect(TType::LParen);
         auto filename = parser->expect(TType::String).value;
+
+        InternedString mode = "text";
+        if (parser->peek().type == TType::Comma) {
+          parser->eat();
+          // could be binary, and whatever other options
+          mode = parser->eat().value; 
+        }
         if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
-        std::stringstream ss;
-        std::ifstream isftr(filename.get_str());
-        ss << isftr.rdbuf();
+        
+
+        parser->expect(TType::RParen);
         NODE_ALLOC(ASTLiteral, string, range, _, parser)
         string->tag = ASTLiteral::RawString;
-        string->value = ss.str();
-        return string;
+        std::stringstream ss;
+        if (mode == "binary") {
+          std::ifstream isftr(filename.get_str(), std::ios::binary);
+          ss << isftr.rdbuf();
+          string->value = ss.str();
+          return string;
+        } else {
+          std::ifstream isftr(filename.get_str());
+          ss << isftr.rdbuf();
+          string->value = ss.str();
+          return string;
+        }
     }},
     // #test
     // declare a test function. Only gets compiled into --test builds, and
@@ -593,7 +612,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 }
 
 ASTExpr *Parser::parse_unary() {
-
   // bitwise not is a unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
   if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot ||
@@ -684,7 +702,7 @@ ASTExpr *Parser::parse_postfix() {
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
   auto range = begin_node();
-  
+
   // if theres a #... that returns a value, use that.
   if (auto directive_expr = try_parse_directive_expr()) {
     return directive_expr.get();
@@ -788,18 +806,19 @@ ASTExpr *Parser::parse_primary() {
       end_node(init_list, range);
       return init_list;
     }
-    
+
     case TType::Identifier: {
       if (ctx.scope->find_type_id(tok.value, {}) != -1) {
         auto type = parse_type();
         if (peek().type == TType::LCurly) {
           auto init_list = parse_expr();
           if (init_list->get_node_type() != AST_NODE_INITIALIZER_LIST) {
-            throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?", init_list->source_range);
+            throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
+                        init_list->source_range);
           }
-          static_cast<ASTInitializerList*>(init_list)->target_type = type;
+          static_cast<ASTInitializerList *>(init_list)->target_type = type;
           return init_list;
-        } 
+        }
         return type;
       }
       eat();
@@ -875,7 +894,7 @@ ASTExpr *Parser::parse_primary() {
         return tuple;
       }
       if (peek().type != TType::RParen) {
-        throw_error("Expected ')'", SourceRange{token_idx, token_idx+1});
+        throw_error("Expected ')'", SourceRange{token_idx, token_idx + 1});
       }
       eat();
       end_node(expr, range);
@@ -884,14 +903,13 @@ ASTExpr *Parser::parse_primary() {
     default: {
       throw_error(
           std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
-          {token_idx, token_idx+1});
+          {token_idx, token_idx + 1});
       return nullptr;
     }
   }
 }
 
 ASTType *Parser::parse_type() {
-
   if (peek().type == TType::LParen) {
     eat();
     std::vector<ASTType *> types;
@@ -933,12 +951,12 @@ ASTType *Parser::parse_type() {
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
 
-
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
   }
 
-  if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::LParen) {
+  if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier &&
+      lookahead_buf()[2].type == TType::LParen) {
     // this is a function call to a static, single depth function.
     return node;
   }
@@ -1016,7 +1034,6 @@ ASTStatement *Parser::parse_statement() {
     auto decl = parse_declaration();
     return decl;
   }
-
 
   // * Control flow
   {
@@ -1567,7 +1584,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 ASTImpl *Parser::parse_impl() {
   expect(TType::Impl);
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, impl, range, _, this, current_impl = nullptr)
-  
+
   ctx.set_scope();
   impl->scope = ctx.exit_scope();
 
@@ -2016,5 +2033,3 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
-
-

@@ -253,7 +253,7 @@ main :: fn() {
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
 
-  SetWindowState(ConfigFlags::WindowResizable);
+  SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);
 
   for file in dir.files {
@@ -265,7 +265,7 @@ main :: fn() {
   while !WindowShouldClose() {
     ClearBackground(WHITE.scaled_rgb(0.05));
     BeginDrawing();
-      if IsKeyPressed(Key::Space) then play_callback();
+      if IsKeyPressed(KeyboardKey::KEY_SPACE) then play_callback();
 
       seq_y := GetScreenHeight() / 2.0;
       seq_x := 0.0;

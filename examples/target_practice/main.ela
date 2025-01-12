@@ -209,12 +209,6 @@ TextParticle :: struct {
   ui_text_color : Color = WHITE;
 }
 
-alloc :: fn![T]() -> T* {
-  ptr := malloc(#type(T).size) as T*;
-  *ptr = {};
-  return ptr;
-}
-
 get_center_screen_rect:: fn(width: float, height, offset: Vector2) -> Rectangle {
   return {
     x: screen_width / 2 + offset.x,
@@ -225,7 +219,7 @@ get_center_screen_rect:: fn(width: float, height, offset: Vector2) -> Rectangle 
 }
 
 make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifetime: float) {
-  particle := alloc![TextParticle]();
+  particle : TextParticle* = malloc(sizeof(TextParticle));
   particle.position = position;
   particle.font_size = font_size;
   particle.text = text;
@@ -251,9 +245,16 @@ random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
   return result;
 }
 
-make_particle :: fn(kind: int, position: Vector2, tint: Color) {
-  particle := alloc![Particle]();
+random_vector2_scalar :: fn(max: float32) -> Vector2 {
+  result: Vector2;
+  value := Random::next(max);
+  result.x = value
+  result.y = value;
+  return result;
+}
 
+make_particle :: fn(kind: int, position: Vector2, tint: Color) {
+  particle : Particle* = malloc(sizeof(Particle));
   if kind == ParticleKind::Smoke {
     max_vel := 3.0;
     particle.position = random_vector2(position, {x: 0, y: 0}, {x: max_vel, y: max_vel});
@@ -268,11 +269,11 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
     particle.render_info = &smoke_particle_render_info;
     particle.lifetime = 1.0;
-    particle.scale = smoke_particle_init_scale * Random::next(1) * 6400.0;
+    particle.scale = smoke_particle_init_scale.scale(Random::next(6400.0));
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
-    particle.position = random_vector2(position, Vector2::scalar(max_spread));
+    particle.position = random_vector2(position, Vector2::zero(), Vector2::scalar(max_spread));
 
     burst : int = 24;
 
@@ -282,9 +283,9 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
       can_burst = true;
     }
 
-    particle.render_info = fire_particle_render_info;
-    particle.lifetime = 4.0 / 60; // ? show for one frame?
-    particle.scale = {16.0, 16.0}; // ? this right?
+    particle.render_info = &fire_particle_render_info;
+    particle.lifetime = 4.0 / 60;
+    particle.scale = {x: 16.0, y: 16.0};
     particle.spawn_time = GetTime();
     particle.color = tint;
   }
@@ -295,8 +296,9 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
 update_particle :: fn(particle: Particle*) -> bool {
   time := GetTime();
   if particle.kind == ParticleKind::Smoke {
-    particle.position = Vector2Add(particle.position, particle.velocity);
-    particle.velocity = Vector2Scale(particle.velocity, 0.98)
+    particle.position = particle.position.add(particle.velocity);
+    particle.velocity = particle.velocity.scale(0.98);
+
     t := particle.spawn_time / time;
     scale := lerp(smoke_particle_init_scale.x * 0.15, smoke_particle_init_scale.x, t);
     delta := time - particle.spawn_time;
@@ -304,7 +306,7 @@ update_particle :: fn(particle: Particle*) -> bool {
     if delta > particle.lifetime {
       return t < 0.1 && particle.color.a == 0;
     }
-    particle.scale = {scale, scale};
+    particle.scale = {x: scale, y: scale};
   } else if  particle.kind == ParticleKind::Fire {
     particle.scale.x *= 0.95;
     particle.scale.y *= 0.95;
@@ -316,14 +318,17 @@ update_particle :: fn(particle: Particle*) -> bool {
 }
 
 enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
-  position : Vector2 = {enemy.rect.x, enemy.rect.y};
-  if Vector2Distance(position, enemy.target) < 5 || Vector2Equals(zero, enemy.target) {
-    enemy.target = { Random::next(1) * screen_width, Random::next(1) * screen_height };
+  position : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
+  if position.distance(enemy.target) < 5 || zero.equals(enemy.target) {
+    enemy.target = { 
+      x: Random::next(1) * screen_width, 
+      y: Random::next(1) * screen_height 
+    };
     enemy.target.y = clamp(enemy.target.y, 0, screen_height / 1.5);
     enemy.speed = Random::next(1) * enemy_max_speed * round_index;
   } else {
-    direction := Vector2Normalize(Vector2Subtract(enemy.target, position));
-    position = Vector2Add(position, Vector2Scale(direction, enemy.speed));
+    direction := enemy.target.sub(position).normalize();
+    position = direction.scale(enemy.speed).add(position);
     position.y = clamp(position.y, 0, screen_height / 1.5);
     enemy.rect.x = position.x;
     enemy.rect.y = position.y;
@@ -333,18 +338,18 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 make_enemy :: fn() {
   x := Random::next(1) * screen_width;
   y := Random::next(1) * screen_height;
-  rect : Rectangle = {x, y, enemy_scale, enemy_scale};
+  rect : Rectangle = {x: x, y: y, width: enemy_scale, height: enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);
   rect.y = clamp(rect.y, 0, screen_height / 1.5);
 
-  enemy := alloc![Enemy]();
-  *enemy = Enemy::create(rect, enemy_render_info);
+  enemy : Enemy* = malloc(sizeof(Enemy));
+  *enemy = Enemy::create(rect, &enemy_render_info);
 
   enemy_move_towards_or_get_new_target(enemy);
 
   for _ in 0..10 {
-    make_particle(ParticleKind::Smoke, {rect.x, rect.y}, BLUE);
+    make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, BLUE);
   }
 
   enemy.id = enemies.length;
@@ -358,33 +363,42 @@ make_bullet :: fn(x: float, y, rotation) {
   } else {
     offset = (bullet_scale / 2.0);
   }
-  rect : Rectangle = {x + offset, y - bullet_scale, bullet_scale, bullet_scale};
+  rect : Rectangle = {x: x + offset, y: y - bullet_scale, width: bullet_scale, height: bullet_scale};
   radians := (rotation / 360) * 3.14159265 * 2;
-  direction : Vector2 = {-(sin(radians) as float), cos(radians) as float};
-  start_velocity := Vector2Scale(direction, bullet_start_velocity);
+  direction : Vector2 = {x: -(sin(radians) as float), y: cos(radians) as float};
+  start_velocity := direction.scale(bullet_start_velocity);
   
-  {
-    bullet := alloc![Bullet]();
-    *bullet = Bullet::create(rect, bullet_render_info, start_velocity, rotation);
+  { 
+    bullet: Bullet* = malloc(sizeof(Bullet));
+    *bullet = Bullet::create(rect, &bullet_render_info, start_velocity, rotation);
     bullets ~= bullet;
   }
 
-  make_particle(ParticleKind::Smoke, {rect.x, rect.y}, PINK);
-  fire_pos : Vector2 = {rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, rect.y - bullet_scale};
+  make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, PINK);
+  fire_pos : Vector2 = {x: rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, y: rect.y - bullet_scale};
   make_particle(ParticleKind::Fire, fire_pos, WHITE);
 }
 
 draw_background :: fn() {
-  bg_color = color_lerp(bg_color, target_bg_color, 0.25);
-  DrawTexturePro(background_texture, background_rect, {0.0, 0.0, screen_width, screen_height}, {0.0, 0.0}, 0.0, bg_color);
+  bg_color = Color::lerp(bg_color, target_bg_color, 0.25);
+  
+  DrawTexturePro(background_texture, background_rect, {
+    x: 0.0,
+    y: 0.0,
+    width: screen_width, 
+    height: screen_height
+  }, {x: 0.0, y: 0.0}, 0.0, bg_color);
+
   now : float = GetTime() as float; 
   t := (now - game_start_time) / fade_in_length;
   if scene == Scene::Game && t < fade_in_length {
-    DrawRectangle(0, 0, screen_width as int, screen_height as int, color_lerp(BLACK, CLEAR, t));
+    DrawRectangle(0, 0, screen_width as int, screen_height as int, Color::lerp(BLACK, CLEAR, t));
   }
 }
 
 draw_game :: fn() {
+  // println($"Drawing game. enemies: {enemies.length}, bullets: {bullets.length}, particles: {particles.length}, text_particles: {text_particles.length}" );
+
   if IsWindowResized() {
     character.rect.y = screen_height / 1.2;
   }
@@ -393,14 +407,15 @@ draw_game :: fn() {
     DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);
   }
   for enemy in enemies {
+    // println($"{enemy.render_info.tex_rect.x}, {enemy.render_info.tex_rect.y}, {enemy.render_info.tex_rect.width}, {enemy.render_info.tex_rect.height}")
     DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);
   }
   for particle in particles {
     rect : Rectangle = {
-      particle.position.x,
-      particle.position.y,
-      particle.scale.x,
-      particle.scale.y,
+      x: particle.position.x,
+      y: particle.position.y,
+      width: particle.scale.x,
+      height: particle.scale.y,
     };
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);
   }
@@ -433,7 +448,7 @@ impl BulletRoutine {
       self.count -= 1;
       PlaySound(shot_sound);
       make_bullet(character.rect.x, character.rect.y, character.rotation); 
-      if count == 0 {
+      if self.count == 0 {
         character.cannon_idx = !character.cannon_idx;
         return true;
       }
@@ -465,9 +480,9 @@ on_bullet_fizzle :: fn() {
 
 on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: int) {
   PlaySound(explosion_sound);
-  make_particle(ParticleKind::Fire, {enemy.rect.x, enemy.rect.y}, WHITE);
+  make_particle(ParticleKind::Fire, {x: enemy.rect.x, y: enemy.rect.y}, WHITE);
   for _ in 0..4 {
-    make_particle(ParticleKind::Smoke, {enemy.rect.x, enemy.rect.y}, spark_color);
+    make_particle(ParticleKind::Smoke, {x: enemy.rect.x, y: enemy.rect.y}, spark_color);
   }
   // bonus score.
   if n_enemies_killed_this_frame >= enemies.length {
@@ -487,16 +502,16 @@ update_game :: fn() {
     if now - round_finish_start_time < 2.0 {
       text : string = $"Round: {round_index + 1}...";
       style := jiggly_text_style;
-      style.foreground = color_lerp(GREEN, CYAN, 0.5);
+      style.foreground = Color::lerp(GREEN, CYAN, 0.5);
       style.font_size = 18;
       style.jiggle_intensity = 2;
       style.jiggle_rate = 10;
 
       text_w := measure_jiggly_text(text.data, style) / 4.0;
-      jiggly_text(text.data, get_center_screen_rect(24, 12, {-(text_w * 3), 0.0}), style);
+      jiggly_text(text.data, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
 
       text = $"Requires {round_base_num_enemies_to_advance * round_index} enemies to pass.";
-      jiggly_text(text.data, get_center_screen_rect(24, 12, {-(text_w * 3), 24}), style);
+      jiggly_text(text.data, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
 
     } else {
       misses_this_round = 0;
@@ -506,12 +521,12 @@ update_game :: fn() {
     }
   }
 
-  if IsKeyReleased(Key::Space) && space_down {
+  if IsKeyReleased(KeyboardKey::KEY_SPACE) && space_down {
     space_down = false;
     character.cannon_idx = !character.cannon_idx;
   }
 
-  if bullet_routine.count > 0 && IsKeyDown(Key::Space) {
+  if bullet_routine.count > 0 && IsKeyDown(KeyboardKey::KEY_SPACE) {
     space_down = true;
     bullet_routine.spawn();
   } else {
@@ -534,11 +549,11 @@ update_game :: fn() {
     // }
   }
   moved := false;
-  if IsKeyDown(Key::A) {
+  if IsKeyDown(KeyboardKey::KEY_A) {
     character.horizontal_velocity -= character.speed;
     moved = true;
   }
-  if IsKeyDown(Key::D) {
+  if IsKeyDown(KeyboardKey::KEY_D) {
     character.horizontal_velocity += character.speed;
     moved = true;
   }
@@ -546,8 +561,8 @@ update_game :: fn() {
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
     for i in 0..fabs(character.horizontal_velocity * smoke_particle_density) as s64 {
       make_particle(ParticleKind::Smoke, {
-        character.rect.x - 10,
-        character.rect.y + (character.rect.height / 3),
+        x: character.rect.x - 10,
+        y: character.rect.y + (character.rect.height / 3),
       }, player_smoke_color);
     }
   }
@@ -557,7 +572,7 @@ update_game :: fn() {
   tilt := (character.horizontal_velocity / character.speed) * max_tilt / 4;
   character.rotation = clamp(tilt, -max_tilt, max_tilt);
 
-  if IsKeyPressed(Key::Space) && bullet_routine.count == 0 {
+  if IsKeyPressed(KeyboardKey::KEY_SPACE) && bullet_routine.count == 0 {
     bullet_routine.count = bullet_max_burst;
   }
 
@@ -575,9 +590,9 @@ update_game :: fn() {
   }
 
   screen_rect : Rectangle = {
-    0.0, 0.0,
-    GetScreenWidth() as float,
-    GetScreenHeight() as float,
+    x: 0.0, y: 0.0,
+    width: GetScreenWidth() as float,
+    height: GetScreenHeight() as float,
   };
 
   // update bullets and perform collision against enemies.
@@ -588,7 +603,7 @@ update_game :: fn() {
     bullet.velocity.y *= bullet_drag;
 
     // mark stopped bullets or bullets off-screen as dead.
-    if !CheckCollisionRecs(screen_rect, bullet.rect) || Vector2LengthSqr(bullet.velocity) <= bullet_min_velocity {
+    if !CheckCollisionRecs(screen_rect, bullet.rect) || bullet.velocity.length_sqr() <= bullet_min_velocity {
       dead_bullets ~= bullet
       bullet.dead = true;
       on_bullet_fizzle();
@@ -618,9 +633,9 @@ update_game :: fn() {
         }
         targets_destroyed++;
 
-        enemy_pos : Vector2 = {enemy.rect.x, enemy.rect.y};
-        character_pos : Vector2 = {character.rect.x, character.rect.y};
-        distance := Vector2Distance(enemy_pos, character_pos);
+        enemy_pos : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
+        character_pos : Vector2 = {x: character.rect.x, y: character.rect.y};
+        distance := enemy_pos.distance(character_pos);
         amount : int = (distance * round_index) as int;
         score += amount
         ui_text_color.a = 255 as u8;
@@ -632,12 +647,12 @@ update_game :: fn() {
 
   for bullet in dead_bullets {
     bullets ~~ bullet;
-    delete(bullet);
+    free(bullet);
   }
 
   for enemy in dead_enemies {
     enemies ~~ enemy;
-    delete(enemy);
+    free(enemy);
   }
 
   dead_particles: Particle*[];
@@ -648,12 +663,12 @@ update_game :: fn() {
 
   for particle in dead_particles {
     particles ~~ particle;
-    delete(particle);
+    free(particle);
   }
 
   dead_text_particles : TextParticle*[];
   for particle in text_particles {
-    particle.position = Vector2Add(particle.position, {0.1, 0.1});
+    particle.position = particle.position.add(Vector2::scalar(0.1));
     now := GetTime() as float;
     particle.color.a = lerp(particle.color.a, 0, (now - particle.spawn_time) / particle.lifetime);
     if now - particle.spawn_time >= particle.lifetime {
@@ -663,28 +678,27 @@ update_game :: fn() {
 
   for particle in dead_text_particles {
     text_particles ~~ particle;
-    delete(particle);
+    free(particle);
   }
 
 }
 
 init :: fn() {
-
-
-
   background_texture = LoadTexture("res/background.png");
 
   screen_width =  GetScreenWidth() as float;
   screen_height = GetScreenHeight() as float;
 
   background_rect = {
-    0.0, 0.0,
-    background_texture.width as float, background_texture.height as float
+    x: 0.0,
+    y: 0.0,
+    width: background_texture.width as float,
+    height: background_texture.height as float
   };
 
   character.texture = LoadTexture("res/character.png");
-  player_smoke_color = CYAN;
 
+  player_smoke_color = CYAN;
   player_smoke_color.r /= 2;
   player_smoke_color.g /= 2;
   player_smoke_color.b /= 2;
@@ -692,17 +706,17 @@ init :: fn() {
   w := character.texture.width  as float;
   h := character.texture.height as float;
   character.tex_rect = {
-    0, 0,
-    w, h
+    x: 0, y: 0,
+    width: w, height: h
   };
 
   character.rect = {
-    screen_width / 2,
-    screen_height / 1.25,
-    64, 64
+    x: screen_width / 2,
+    y: screen_height / 1.25,
+    width: 64, height: 64
   };
 
-  character.origin = { character.rect.width / 2, character.rect.height / 2 };
+  character.origin = { x: character.rect.width / 2, y: character.rect.height / 2 };
 
   bullet_render_info = RenderInfo::create(LoadTexture("res/bullet.png"));
   enemy_render_info = RenderInfo::create(LoadTexture("res/enemy.png"));
@@ -789,13 +803,18 @@ start_game_callback :: fn() {
 draw_main_menu :: fn() {
   width : float = 72;
   height : float = 48;
-  draw_button("Start game", {screen_width / 2 - (width / 2), screen_height / 1.2 - (height / 2), width, height}, button_style, &start_game_callback);
+  draw_button("Start game", {
+    x: screen_width / 2 - (width / 2),
+    y: screen_height / 1.2 - (height / 2),
+    width: width, 
+    height: height},
+  button_style, &start_game_callback);
 
   rect : Rectangle = {
-    screen_width / 7,
-    screen_height / 10,
-    screen_width / 2,
-    screen_height / 10
+    x: screen_width / 7,
+    y: screen_height / 10,
+    width: screen_width / 2,
+    height: screen_height / 10
   };
 
   jiggly_text("target practice", rect, jiggly_text_style);
@@ -803,10 +822,10 @@ draw_main_menu :: fn() {
   if round_failed {
     style := jiggly_text_style;
     rect : Rectangle = {
-      screen_width / 7,
-      screen_height / 3,
-      screen_width / 2,
-      screen_height / 10
+      x: screen_width / 7,
+      y: screen_height / 3,
+      width: screen_width / 2,
+      height: screen_height / 10
     };
     style.foreground = RED;
     jiggly_text("You Lost!", rect, style);
@@ -853,11 +872,11 @@ draw_game_menu :: fn() {
 
   style := button_style;
   style.use_jiggly_text = false;
-  draw_button("swap music", {screen_width - width * 8, screen_height - height * 1.2, width, height}, style, &switch_music_callback);
+  draw_button("swap music", {x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height}, style, &switch_music_callback);
 
   style = button_style;
   style.use_jiggly_text = false;
-  draw_button("mute music", {screen_width - width * 3, screen_height - height * 1.2, width, height}, style, &mute_music_callback);
+  draw_button("mute music", {x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height}, style, &mute_music_callback);
 
 
 
@@ -888,7 +907,7 @@ main :: fn() {
         draw_main_menu();
       } else {
 
-        if IsKeyPressed(Key::Backspace) {
+        if IsKeyPressed(KeyboardKey::KEY_BACKSPACE) {
           scene = Scene::MainMenu;
           swap_music();
         }
