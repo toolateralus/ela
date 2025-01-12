@@ -1598,7 +1598,19 @@ ASTImpl *Parser::parse_impl() {
   }
 
   current_impl = impl;
-  impl->target = parse_type();
+  auto target = parse_type();
+
+  // Handle 'impl INTERFACE for TYPE'
+  // or normal 'impl TYPE'
+  ASTType *interface = nullptr;
+  if (peek().type == TType::For) {
+    expect(TType::For);
+    interface = parse_type();
+    impl->interface = target;
+    impl->target = interface;
+  } else {
+    impl->target = target;
+  }
 
   // TODO: make it so we dont have to get the scope of the type, we shouldn't be doing much typing
   // during parse time.

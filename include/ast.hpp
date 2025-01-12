@@ -519,6 +519,7 @@ struct ASTInterfaceDeclaration : ASTStatement {
 struct ASTImpl : ASTStatement {
   // impl 'target' or impl *interface for 'target'
   ASTType *target;
+  Nullable<ASTType> interface;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
   Scope *scope;
