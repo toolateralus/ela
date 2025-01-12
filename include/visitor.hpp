@@ -28,9 +28,7 @@ struct Typer : VisitorBase {
   template <typename T>
   int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
                     std::vector<int> args);
-  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
-  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  Nullable<ASTType> type_context = nullptr;
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;

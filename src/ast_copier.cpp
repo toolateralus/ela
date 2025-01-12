@@ -35,9 +35,11 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
   new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
   new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
   new_node->generic_instantiations.clear();
-  new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
-  current_scope = new_node->scope;
+  if (node->scope) {
+    new_node->scope = copy_scope(node->scope);
+    current_scope = new_node->scope;
+  }
   if (node->block) {
     new_node->block = static_cast<ASTBlock *>(copy_node(node->block.get()));
     node->block.get()->scope->parent = new_node->scope;

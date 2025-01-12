@@ -1409,18 +1409,14 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
         throw_error("\"self\" can only appear in method parameters, either in an interface declaration, or an impl.", range);
       }
 
-      ASTType *type;
-      if (current_impl_decl) {
-        type = static_cast<ASTType *>(deep_copy_ast(current_impl_decl.get()->target));
-      } else {
-        type = ast_alloc<ASTType>();
-      }
-
+      auto type = ast_alloc<ASTType>();
+      
       params->has_self = true;
       append_type_extensions(type);
       NODE_ALLOC(ASTParamDecl, param, range, _, this)
       param->type = type;
       param->name = name;
+      param->is_self = true;
       params->params.push_back(param);
       if (peek().type == TType::Comma)
         eat();
@@ -1687,8 +1683,9 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   if (peek().type == TType::GenericBrace) {
     interface->generic_parameters = parse_generic_parameters();
   }
-  ctx.set_scope();
-  auto block = parse_block();
+  auto scope = create_child(ctx.scope);
+  interface->scope = scope;
+  auto block = parse_block(scope);
   for (const auto &node: block->statements) {
     if (auto function = dynamic_cast<ASTFunctionDeclaration*>(node)) {
       if (function->block.is_not_null()) {
@@ -1697,7 +1694,6 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
       interface->methods.push_back(function);
     }
   }
-  interface->scope = ctx.exit_scope();
   return interface;
 }
 

@@ -80,10 +80,6 @@ std::any Typer::visit(ASTProgram *node) {
 
 int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                     std::vector<int> generic_args) {
-  auto last_decl = current_struct_decl;
-  current_struct_decl = node;
-  Defer _([&] { current_struct_decl = last_decl; });
-
   auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
 
@@ -126,11 +122,6 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
     return {};
   }
 
-  auto last_decl = current_union_decl;
-
-  current_union_decl = node;
-  Defer _([&] { current_union_decl = last_decl; });
-
   auto type = global_get_type(node->resolved_type);
 
   auto old_scope = ctx.scope;
@@ -167,13 +158,8 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   // Setup context.
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
-  auto last_decl = current_func_decl;
-  current_func_decl = node;
 
-  Defer _([&] {
-    current_func_decl = last_decl;
-    ctx.set_scope(old_scope);
-  });
+  Defer _([&] { ctx.set_scope(old_scope); });
 
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -239,7 +225,12 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
 
 int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
-  Defer _([&] { ctx.set_scope(previous); });
+  auto old_type = type_context;
+  Defer _([&] {
+    ctx.set_scope(previous);
+    type_context = old_type;
+  });
+  type_context = node->target;
   ctx.set_scope(node->scope);
 
   if (generic_instantiation) {
@@ -255,9 +246,14 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
     throw_error("Impl used on a non-existent type.", node->source_range);
   }
 
+  Type *interface_ty = nullptr;
+
   if (node->interface) {
     auto type_id = int_from_any(node->interface.get()->accept(this));
-    std::cout << "interface type \e[1;33m" << (global_get_type(type_id)->to_string()) << "\n";
+    if (type_id == Type::invalid_id) {
+      throw_error("Internal compiler error: type of impl interface was invalid", node->source_range);
+    }
+    interface_ty = global_get_type(type_id);
   }
 
   Scope *scope = type->get_info()->scope;
@@ -269,6 +265,32 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
       method->scope->parent = scope;
     }
     method->accept(this);
+  }
+  if (interface_ty) {
+    auto declaring_node = interface_ty->declaring_node.get();
+    if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
+      throw_error("\"for type\" impls must impl an interface", node->source_range);
+    }
+    auto interface_scope = static_cast<ASTInterfaceDeclaration *>(declaring_node)->scope;
+    for (auto &interface_kvp : interface_scope->symbols) {
+      if (auto impl_symbol = scope->local_lookup(interface_kvp.first)) {
+        if (interface_kvp.second.type_id != impl_symbol->type_id) {
+          throw_error(std::format("Signature of implemented method \"{}\" doesn't match interface",
+                                  interface_kvp.first),
+                      node->source_range);
+        }
+      } else {
+        throw_error(std::format("Interface method \"{}\" not implemented in impl", interface_kvp.first),
+                    node->source_range);
+      }
+    }
+    for (auto &impl_kvp : scope->symbols) {
+      if (!interface_scope->local_lookup(impl_kvp.first)) {
+        throw_error(std::format("impl method \"{}\" not found in interface", impl_kvp.first),
+                    impl_kvp.second.declaring_node.get()->source_range);
+      }
+    }
+    type->interfaces.push_back(interface_ty->id);
   }
 
   return type->id;
@@ -287,8 +309,12 @@ int Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gener
       generic_arg++;
     }
   }
-
-  return -2;
+  auto type = global_get_type(global_create_interface_type(node->name, node->scope, generic_args));
+  for (auto &decl : node->methods) {
+    decl->accept(this);
+  }
+  type->declaring_node = node;
+  return type->id;
 }
 
 std::any Typer::visit(ASTTaggedUnionDeclaration *node) {
@@ -473,7 +499,17 @@ std::any Typer::visit(ASTParamsDecl *node) {
   return {};
 }
 std::any Typer::visit(ASTParamDecl *node) {
-  auto id = int_from_any(node->type->accept(this));
+  if (node->is_self) {
+    if (!type_context) {
+      throw_error("No target type for self", node->source_range);
+    }
+    auto extensions = node->type->extensions;
+    node->type = (ASTType *)deep_copy_ast(type_context.get());
+    for (auto &ext : extensions) {
+      node->type->extensions.push_back(ext);
+    }
+  }
+  int id = int_from_any(node->type->accept(this));
 
   if (id == -1) {
     throw_error("Use of undeclared type.", node->source_range);
@@ -831,7 +867,7 @@ std::any Typer::visit(ASTType *node) {
     if (!base_ty) {
       throw_error("Target type not found", node->source_range);
     }
-    auto symbol = ctx.scope->lookup(base_ty->get_base());
+    auto symbol = get_symbol(normal_ty.base).get();
     if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
       auto declaring_node = symbol->declaring_node.get();
       std::vector<int> generic_args;
@@ -844,8 +880,7 @@ std::any Typer::visit(ASTType *node) {
       } else if (declaring_node->get_node_type() == AST_NODE_UNION_DECLARATION) {
         type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
       } else if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        type_id =
-            visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
+        type_id = visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
       } else if (declaring_node->get_node_type() == AST_NODE_INTERFACE_DECLARATION) {
         type_id = visit_generic(&Typer::visit_interface_declaration, declaring_node, generic_args);
       }

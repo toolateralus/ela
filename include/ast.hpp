@@ -269,6 +269,7 @@ struct ASTParamDecl : ASTNode {
   ASTType *type;
   Nullable<ASTExpr> default_value;
   InternedString name;
+  bool is_self = false;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PARAM_DECL; }
 };

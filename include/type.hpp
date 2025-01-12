@@ -290,6 +290,7 @@ struct Type {
   int id = invalid_id;
   int base_id = invalid_id;
   std::vector<int> generic_args{};
+  std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
