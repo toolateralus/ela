@@ -159,11 +159,18 @@ struct TypeExtensions {
 
 using GenericParameter = InternedString;
 
+struct InterfaceImpl {
+  InternedString name;
+  // <method_name, type_signature>.
+  std::vector<std::pair<InternedString, int>> methods;
+};
+
 struct TypeInfo {
   // Now that we have impl & our own free-func methods, any object can have a method.
   Scope *scope = nullptr;
   std::vector<int> implicit_cast_table;
   std::vector<int> explicit_cast_table;
+  std::vector<InterfaceImpl> implemented_interfaces;
   TypeInfo() {}
   // Use this instead of the clunky static casts everywhere.
   template <class T>
@@ -176,7 +183,6 @@ struct TypeInfo {
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
-
 struct TaggedUnionVariant {
   InternedString name;
   int type;
@@ -185,6 +191,8 @@ struct TaggedUnionVariant {
 struct TaggedUnionTypeInfo: TypeInfo {
   std::vector<TaggedUnionVariant> variants;
 };
+
+struct ASTFunctionDeclaration;
 
 struct FunctionTypeInfo : TypeInfo {
   FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
@@ -255,6 +263,8 @@ InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
 int global_create_struct_type(const InternedString &, Scope *, std::vector<int> generic_args = {});
+
+
 int global_create_tagged_union_type(const InternedString &, Scope *);
 int global_create_enum_type(const InternedString &, Scope *, bool = false,
                             size_t element_type = s32_type());

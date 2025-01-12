@@ -163,3 +163,16 @@ impl Iter![RangeIterator] for RangeIterator {
     return (self.current >= self.max, self.current);
   }
 }
+
+
+// * We do this
+takes :: fn![T](i: T) where T impl UIElement {
+  i.resize(global::draw_area).draw();
+  i.set_dirty(false);
+}
+
+// * instead of this
+takes :: fn(i: UIElement) {
+  i.resize(global::draw_area).draw();
+  i.set_dirty(false);
+}

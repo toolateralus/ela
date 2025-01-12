@@ -32,6 +32,7 @@ jstl::Arena ast_arena{MB(333)};
 
 std::vector<Type> type_table{};
 
+
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
 

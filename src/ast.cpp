@@ -1677,13 +1677,13 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
 
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   expect(TType::Interface);
-  
   auto previous = current_interface_decl;
   NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, interface, range, _, this, {
     current_interface_decl = previous;
   });
+  
+  interface->name = name.value;
   current_interface_decl = interface;
-
   if (peek().type == TType::GenericBrace) {
     interface->generic_parameters = parse_generic_parameters();
   }

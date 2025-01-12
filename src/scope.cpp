@@ -1,5 +1,5 @@
+#include "ast.hpp"
 #include "scope.hpp"
-
 #include "core.hpp"
 #include "type.hpp"
 
@@ -87,8 +87,7 @@ Context::Context() {
     auto type_ptr = global_find_type_id(type_id, {.extensions = {{TYPE_EXT_POINTER}}});
 
     // Field*[]
-    auto field_arr =
-        global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
+    auto field_arr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
     // Element[]
     auto element_arr = global_find_type_id(element_id, {.extensions = {{TYPE_EXT_ARRAY}}});
     // Field*
@@ -170,8 +169,7 @@ Context::Context() {
 
     auto func = FunctionTypeInfo{};
     func.params_len = 0;
-    auto str_array =
-        global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}});
+    auto str_array = global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}});
     func.return_type = str_array;
     scope->insert("args", global_find_function_type_id(func, {}));
     scope->parent = root_scope;
@@ -189,7 +187,6 @@ Context::Context() {
 
   // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
   root_scope->insert("get", global_find_function_type_id(info, {}), SYMBOL_IS_FUNCTION);
-
 
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].get_info()->scope) {
@@ -217,4 +214,11 @@ Symbol *Scope::lookup(const InternedString &name) {
 void Scope::erase(const InternedString &name) {
   symbols.erase(name);
   ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
+}
+
+void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
+  symbols[name] = {
+    .name = name,
+    .declaring_node = Nullable<ASTNode>(node),
+  };
 }

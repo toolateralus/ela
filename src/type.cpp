@@ -737,3 +737,5 @@ int Type::take_pointer_to() const {
   ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
 }
+
+

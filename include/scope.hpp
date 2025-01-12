@@ -30,6 +30,7 @@ struct Symbol {
 };
 
 struct ASTFunctionDeclaration;
+struct ASTInterfaceDeclaration;
 extern Scope *root_scope;
 struct Scope {
   bool is_struct_or_union_scope = false;
@@ -83,6 +84,8 @@ struct Scope {
     types[name] = id;
     return id;
   }
+
+  void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
   int create_tagged_union(const InternedString &name, Scope *scope) {
     auto id = global_create_tagged_union_type(name, scope);

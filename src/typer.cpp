@@ -1360,6 +1360,13 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
     throw_error("Impl used on a non-existent type.", node->source_range);
   }
 
+  if (node->interface) {
+    auto symbol = get_symbol(node->interface.get()->normal.base);
+    if (!symbol) {
+      throw_error("Interface on impl did not exist", node->source_range);
+    }
+  }
+
   Scope *scope = type->get_info()->scope;
 
   ctx.set_scope(scope);
@@ -1411,5 +1418,6 @@ std::any Typer::visit(ASTCast *node) {
 }
 
 std::any Typer::visit(ASTInterfaceDeclaration *node) {
+  ctx.scope->declare_interface(node->name, node);
   return {};
 }

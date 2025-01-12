@@ -508,6 +508,7 @@ struct ASTAlias : ASTStatement {
 };
 
 struct ASTInterfaceDeclaration : ASTStatement {
+  InternedString name;
   Scope *scope;
   std::vector<GenericParameter> generic_parameters;
   std::vector<ASTFunctionDeclaration *> methods;
