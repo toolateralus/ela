@@ -269,18 +269,21 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
-      throw_error("\"for type\" impls must impl an interface", node->source_range);
+      throw_error(std::format("\'impl <interface> for <type>\' must implement an interface. got {}",
+                              interface_ty->to_string()),
+                  node->source_range);
     }
     auto interface_scope = static_cast<ASTInterfaceDeclaration *>(declaring_node)->scope;
-    for (auto &interface_kvp : interface_scope->symbols) {
-      if (auto impl_symbol = scope->local_lookup(interface_kvp.first)) {
-        if (interface_kvp.second.type_id != impl_symbol->type_id) {
-          throw_error(std::format("Signature of implemented method \"{}\" doesn't match interface",
-                                  interface_kvp.first),
+    for (auto &[name, method] : interface_scope->symbols) {
+      if (auto impl_symbol = scope->local_lookup(name)) {
+        if (method.type_id != impl_symbol->type_id) {
+          throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
+                                  global_get_type(method.type_id)->to_string(),
+                                  global_get_type(impl_symbol->type_id)->to_string()),
                       node->source_range);
         }
       } else {
-        throw_error(std::format("Interface method \"{}\" not implemented in impl", interface_kvp.first),
+        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name, interface_ty->to_string()),
                     node->source_range);
       }
     }
