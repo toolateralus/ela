@@ -774,6 +774,9 @@ std::any Typer::visit(ASTType *node) {
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
     auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
+    if (!base_ty) {
+      throw_error("Target type not found", node->source_range);
+    }
     auto symbol = ctx.scope->lookup(base_ty->get_base());
     if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
       auto declaring_node = symbol->declaring_node.get();
@@ -808,6 +811,9 @@ std::any Typer::visit(ASTType *node) {
   } else if (node->kind == ASTType::REFLECTION) {
     auto &normal_ty = node->normal;
     auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
+    if (!base_ty) {
+      throw_error("Target type not found", node->source_range);
+    }
     node->pointing_to.get()->accept(this);
     node->resolved_type = global_find_type_id(base_ty->id, extensions);
   } else if (node->kind == ASTType::FUNCTION) {
