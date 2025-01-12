@@ -1403,3 +1403,7 @@ std::any Typer::visit(ASTCast *node) {
   }
   return node->resolved_type = type->id;
 }
+
+std::any Typer::visit(ASTInterfaceDeclaration *node) {
+  return {};
+}

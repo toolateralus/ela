@@ -54,37 +54,34 @@ impl Arena {
   }
 }
 
-
 // Super basic arena allocator, with a constructor that allocates a big block,
 // an allocate method that returns u8*, and a destructor that frees the block.
+ArenaOf :: struct![T] {
+  count: u64;
+  size: u64;
+  memory: T*;
+}
 
-#ifdef GENERICS_ENABLED {
-  ArenaOf :: struct![T] {
-    count: u64;
-    size: u64;
-    memory: T*;
+// ! This crashes.
+impl![T] ArenaOf![T] {
+  create :: fn(size: u64) -> #self {
+    self: #self;
+    self.size = size;
+    self.memory = (malloc(sizeof(T) * size) as T*);
+    return self;
   }
 
-  impl ArenaOf![T] {
-    create :: fn(size: u64) -> #self {
-      self: #self;
-      self.size = size;
-      self.memory = (malloc(sizeof(T) * size) as T*);
-      return self;
+  dealloc :: fn(self*) {
+    free(self.memory as T*);
+    self. memory = null;
+  }
+  
+  allocate :: fn(self*) -> T* {
+    oom := self.count > self.size;
+    if oom {
+      return null as T*;
     }
-
-    dealloc :: fn(self*) {
-      free(self.memory as T*);
-      self. memory = null;
-    }
-    
-    allocate :: fn(self*) -> T* {
-      oom := self.count > self.size;
-      if oom {
-        return null as T*;
-      }
-      self.count++;
-      return (&self.memory[self.count]) as T*;
-    }
+    self.count++;
+    return (&self.memory[self.count]) as T*;
   }
 }

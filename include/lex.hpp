@@ -98,9 +98,11 @@ enum struct TType {
 
   GenericBrace,   // '!<' for ![T, T1]
   As,             // 'as' for casting
-  Impl,
   ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
   Defer,
+
+  Impl,           // impl
+  Interface,      // interface
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -109,6 +111,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Interface);
     TTYPE_CASE(Defer);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
