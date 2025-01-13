@@ -258,6 +258,17 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
 
   auto type_scope = type->get_info()->scope;
   for (const auto &method : node->methods) {
+    if (auto symbol = type_scope->local_lookup(method->name)) {
+      if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
+        throw_error("Redefinition of method", method->source_range);
+      } else {
+        symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
+      }
+    } else {
+      type_scope->insert(method->name, Type::invalid_id, SYMBOL_IS_FUNCTION);
+      auto sym = ctx.scope->lookup(method->name);
+      sym->declaring_node = method;
+    }
     if (generic_instantiation) {
       method->scope->parent = node->scope;
     }
