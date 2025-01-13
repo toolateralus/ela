@@ -219,6 +219,7 @@ void Scope::erase(const InternedString &name) {
 void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
   symbols[name] = {
     .name = name,
+    .type_id = -1,
     .declaring_node = node,
   };
 }

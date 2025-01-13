@@ -868,7 +868,7 @@ std::any Typer::visit(ASTType *node) {
     auto &normal_ty = node->normal;
     auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
     if (!base_ty) {
-      throw_error("Target type not found", node->source_range);
+      throw_error(std::format("use of undeclared type"), node->source_range);
     }
     auto symbol = get_symbol(normal_ty.base).get();
     if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
@@ -906,7 +906,7 @@ std::any Typer::visit(ASTType *node) {
     auto &normal_ty = node->normal;
     auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
     if (!base_ty) {
-      throw_error("Target type not found", node->source_range);
+      throw_error("use of undeclared type", node->source_range);
     }
     node->pointing_to.get()->accept(this);
     node->resolved_type = global_find_type_id(base_ty->id, extensions);
