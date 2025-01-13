@@ -700,15 +700,6 @@ std::any Typer::visit(ASTCall *node) {
   // Resolve the type of the function being called
   Type *type = global_get_type(int_from_any(node->function->accept(this)));
 
-
-  // ! This breaks everything. Why were we doing this?
-  // if (type) {
-    // declaring_or_assigning_type = type->id;
-  // }
-
-  auto old_ty = declaring_or_assigning_type;
-  Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-
   auto symbol_nullable = get_symbol(node->function);
   bool method_call = false;
 
