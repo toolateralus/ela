@@ -256,26 +256,31 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
     interface_ty = global_get_type(type_id);
   }
 
-  Scope *scope = type->get_info()->scope;
-
-  ctx.set_scope(scope);
-
+  auto type_scope = type->get_info()->scope;
   for (const auto &method : node->methods) {
     if (generic_instantiation) {
-      method->scope->parent = scope;
+      method->scope->parent = node->scope;
     }
     method->accept(this);
+    type_scope->symbols[method->name] = node->scope->symbols[method->name];
   }
+
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
-      throw_error(std::format("\'impl <interface> for <type>\' must implement an interface. got {}",
-                              interface_ty->to_string()),
-                  node->source_range);
+      throw_error(
+          std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
+          node->source_range);
     }
-    auto interface_scope = static_cast<ASTInterfaceDeclaration *>(declaring_node)->scope;
-    for (auto &[name, method] : interface_scope->symbols) {
-      if (auto impl_symbol = scope->local_lookup(name)) {
+    auto interface = static_cast<ASTInterfaceDeclaration *>(declaring_node);
+    interface = (ASTInterfaceDeclaration *)deep_copy_ast(interface);
+    ctx.set_scope(interface->scope);
+    for (auto &decl : interface->methods) {
+      decl->accept(this);
+    }
+    ctx.set_scope(node->scope);
+    for (auto &[name, method] : interface->scope->symbols) {
+      if (auto impl_symbol = node->scope->local_lookup(name)) {
         if (method.type_id != impl_symbol->type_id) {
           throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
                                   global_get_type(method.type_id)->to_string(),
@@ -283,12 +288,13 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
                       node->source_range);
         }
       } else {
-        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name, interface_ty->to_string()),
+        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
+                                interface_ty->to_string()),
                     node->source_range);
       }
     }
-    for (auto &impl_kvp : scope->symbols) {
-      if (!interface_scope->local_lookup(impl_kvp.first)) {
+    for (auto &impl_kvp : node->scope->symbols) {
+      if (!interface->scope->local_lookup(impl_kvp.first)) {
         throw_error(std::format("impl method \"{}\" not found in interface", impl_kvp.first),
                     impl_kvp.second.declaring_node.get()->source_range);
       }
@@ -313,9 +319,6 @@ int Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gener
     }
   }
   auto type = global_get_type(global_create_interface_type(node->name, node->scope, generic_args));
-  for (auto &decl : node->methods) {
-    decl->accept(this);
-  }
   type->declaring_node = node;
   return type->id;
 }
@@ -866,10 +869,6 @@ std::any Typer::visit(ASTType *node) {
 
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
-    auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
-    if (!base_ty) {
-      throw_error(std::format("use of undeclared type"), node->source_range);
-    }
     auto symbol = get_symbol(normal_ty.base).get();
     if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
       auto declaring_node = symbol->declaring_node.get();
@@ -878,22 +877,32 @@ std::any Typer::visit(ASTType *node) {
         generic_args.push_back(int_from_any(arg->accept(this)));
       }
       int type_id = -1;
-      if (declaring_node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-        type_id = visit_generic(&Typer::visit_struct_declaration, declaring_node, generic_args);
-      } else if (declaring_node->get_node_type() == AST_NODE_UNION_DECLARATION) {
-        type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
-      } else if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-        type_id = visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
-      } else if (declaring_node->get_node_type() == AST_NODE_INTERFACE_DECLARATION) {
-        type_id = visit_generic(&Typer::visit_interface_declaration, declaring_node, generic_args);
+      switch (declaring_node->get_node_type()) {
+        case AST_NODE_STRUCT_DECLARATION:
+          type_id = visit_generic(&Typer::visit_struct_declaration, declaring_node, generic_args);
+          break;
+        case AST_NODE_UNION_DECLARATION:
+          type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
+          break;
+        case AST_NODE_FUNCTION_DECLARATION:
+          type_id = visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
+          break;
+        case AST_NODE_INTERFACE_DECLARATION:
+          type_id = visit_generic(&Typer::visit_interface_declaration, declaring_node, generic_args);
+          break;
+        default:
+          throw_error("Invalid target to generic args", node->source_range);
+          break;
       }
-      if (type_id == -1) {
-        throw_error("Invalid target to generic args", node->source_range);
-      } else if (type_id == -2) {
+      if (type_id == -2) {
         throw_error("Template instantiation argument count mismatch", node->source_range);
       }
       node->resolved_type = global_find_type_id(type_id, extensions);
     } else {
+      auto base_ty = global_get_type(int_from_any(normal_ty.base->accept(this)));
+      if (!base_ty) {
+        throw_error(std::format("use of undeclared type"), node->source_range);
+      }
       node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }
   } else if (node->kind == ASTType::TUPLE) {
@@ -1471,6 +1480,10 @@ std::any Typer::visit(ASTCast *node) {
 }
 
 std::any Typer::visit(ASTInterfaceDeclaration *node) {
-  ctx.scope->declare_interface(node->name, node);
+  if (!node->generic_parameters.empty()) {
+    ctx.scope->declare_interface(node->name, node);
+  } else {
+    ctx.scope->insert(node->name, visit_interface_declaration(node, false));
+  }
   return {};
 }

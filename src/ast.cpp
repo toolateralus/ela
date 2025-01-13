@@ -1410,7 +1410,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       }
 
       auto type = ast_alloc<ASTType>();
-      
+
       params->has_self = true;
       append_type_extensions(type);
       NODE_ALLOC(ASTParamDecl, param, range, _, this)
@@ -1619,9 +1619,8 @@ ASTImpl *Parser::parse_impl() {
   // during parse time.
   auto type = global_get_type(std::any_cast<int>(impl->target->accept(typer)));
   impl->target->resolved_type = -1;
-  Scope *scope = type->get_info()->scope;
 
-  auto block = parse_block(scope);
+  auto block = parse_block(impl->scope);
   end_node(impl, range);
 
   for (const auto &statement : block->statements) {
