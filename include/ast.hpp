@@ -29,7 +29,7 @@ enum ASTNodeType {
   AST_NODE_PARAM_DECL,
   AST_NODE_DECLARATION,
   AST_NODE_EXPR_STATEMENT,
-  AST_NODE_SELF,
+  AST_NODE_SELF_TYPE,
   AST_NODE_BIN_EXPR,
   AST_NODE_UNARY_EXPR,
   AST_NODE_IDENTIFIER,
@@ -190,9 +190,9 @@ struct ASTType : ASTExpr {
 };
 
 // #self
-struct ASTSelf : ASTType {
+struct ASTSelfType : ASTType {
   std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_SELF; }
+  ASTNodeType get_node_type() const override { return AST_NODE_SELF_TYPE; }
 };
 
 struct ASTExprStatement : ASTStatement {
@@ -598,7 +598,7 @@ struct ASTCast : ASTExpr {
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
-  std::any visit(ASTSelf *node) override {};                                                            \
+  std::any visit(ASTSelfType *node) override {};                                                            \
   std::any visit(ASTDefer *node) override {};                                                                          \
   std::any visit(ASTCast *node) override {};                                                                           \
   std::any visit(ASTTaggedUnionDeclaration *node) override {};                                                         \
@@ -609,7 +609,7 @@ struct ASTCast : ASTExpr {
   virtual std::any visit(ASTScopeResolution *node) = 0;                                                                \
   virtual std::any visit(ASTCast *node) = 0;                                                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                                                        \
-  virtual std::any visit(ASTSelf *node) = 0;                                                                        \
+  virtual std::any visit(ASTSelfType *node) = 0;                                                                        \
   virtual std::any visit(ASTBlock *node) = 0;                                                                          \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                                                            \
   virtual std::any visit(ASTParamsDecl *node) = 0;                                                                     \

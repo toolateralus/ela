@@ -1516,7 +1516,10 @@ std::any Typer::visit(ASTInterfaceDeclaration *node) {
   return {};
 }
 
-std::any Typer::visit(ASTSelf *node) { return 0; }
+std::any Typer::visit(ASTSelfType *node) { 
+  auto base = get_self_type();
+  return node->resolved_type = global_find_type_id(base, {accept_extensions(node->extensions)});
+}
 
 int Typer::get_self_type() {
   if (type_context.is_not_null()) {

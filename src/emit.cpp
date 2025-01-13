@@ -1786,8 +1786,10 @@ std::any Emitter::visit(ASTInterfaceDeclaration *node) {
   return {};
 }
 
-std ::any Emitter::visit(ASTSelf *node) {
-  return 0;
+std ::any Emitter::visit(ASTSelfType *node) {
+  auto type = global_get_type(node->resolved_type);
+  (*ss) << to_cpp_string(type);
+  return {};
 }
 
 

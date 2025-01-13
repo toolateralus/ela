@@ -1,0 +1,17 @@
+#foreign printf :: fn(str: c_string, ...) -> int;
+
+Strukt :: struct {}
+
+impl Strukt {
+  recurse :: fn(self*, n : int) -> int {
+    printf("%s\n", #type(self.recurse).name); // prints "Strukt*"
+    if n < 100 => self.recurse(n+1);          // cannot find function call?
+    return n;
+  }
+}
+
+
+main :: fn() {
+  s: Strukt;
+  s.recurse(0);
+}

@@ -71,7 +71,7 @@ struct Typer : VisitorBase {
   void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
 
   std::any visit(ASTCall *node) override;
-  std::any visit(ASTSelf *node) override;
+  std::any visit(ASTSelfType *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
   std::any visit(ASTContinue *node) override;
@@ -202,7 +202,7 @@ struct Emitter : VisitorBase {
   std ::any visit(ASTIdentifier *node) override;
   std ::any visit(ASTLiteral *node) override;
   std ::any visit(ASTType *node) override;
-  std ::any visit(ASTSelf *node) override;
+  std ::any visit(ASTSelfType *node) override;
   std ::any visit(ASTCall *node) override;
   std ::any visit(ASTArguments *node) override;
   std ::any visit(ASTReturn *node) override;
