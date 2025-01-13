@@ -94,30 +94,22 @@ Ela compiler:
 #import core;
 #import raylib;
 
-// See "/usr/local/lib/ela/raylib.ela" for api info.
-
 main :: fn() {
   InitWindow(800, 600, "Hello, Raylib");
+  SetTargetFPS(60);
 
-  style := Style {
-    WHITE, // foreground: Color;
-    CLEAR, // background: Color;
-    CLEAR, // highlighted: Color;
-    16,    // font_size: int;
-    true,  // use_jiggly_text: bool;
-    5.0   // jiggle_intensity: float;
-    4.0    // jiggle_rate: float;
-  };
+  x_origin, y_origin := (330, 250);
+  amplitude, speed, time := (15, 1.0, 0.0 as float64);
+  x, y := (x_origin, y_origin);
 
   while !WindowShouldClose() {
+    time += GetFrameTime() * speed;
+
     BeginDrawing();
       ClearBackground(BLACK);
       DrawCircle(400, 300, 100, RED);
-
-      // fun wavy text. DrawText for normal text, of course.
-      jiggly_text("Hello, Raylib", Rectangle{
-        300, 200, 50, 50,
-      }, style)
+      y = y_origin + sin(time) * amplitude;
+      DrawText("Hello, Raylib", x, y, 24, WHITE);
     EndDrawing();
   }
 }

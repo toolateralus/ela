@@ -143,6 +143,7 @@ struct ASTType : ASTExpr {
     REFLECTION,
     TUPLE,
     FUNCTION,
+    SELF,
   } kind = NORMAL;
 
   union {
@@ -166,6 +167,7 @@ struct ASTType : ASTExpr {
     pointing_to = other.pointing_to;
     switch (kind) {
       case NORMAL:
+      case SELF:
       case REFLECTION:
         normal = decltype(normal)(other.normal);
         break;
@@ -174,6 +176,7 @@ struct ASTType : ASTExpr {
         break;
       case FUNCTION:
         function = decltype(function)(other.function);
+        break;
         break;
     }
   }
@@ -187,12 +190,6 @@ struct ASTType : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void();
   std::any accept(VisitorBase *visitor) override;
-};
-
-// #self
-struct ASTSelfType : ASTType {
-  std::any accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_SELF_TYPE; }
 };
 
 struct ASTExprStatement : ASTStatement {
@@ -598,7 +595,6 @@ struct ASTCast : ASTExpr {
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
-  std::any visit(ASTSelfType *node) override {};                                                            \
   std::any visit(ASTDefer *node) override {};                                                                          \
   std::any visit(ASTCast *node) override {};                                                                           \
   std::any visit(ASTTaggedUnionDeclaration *node) override {};                                                         \
@@ -609,7 +605,6 @@ struct ASTCast : ASTExpr {
   virtual std::any visit(ASTScopeResolution *node) = 0;                                                                \
   virtual std::any visit(ASTCast *node) = 0;                                                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                                                        \
-  virtual std::any visit(ASTSelfType *node) = 0;                                                                        \
   virtual std::any visit(ASTBlock *node) = 0;                                                                          \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                                                            \
   virtual std::any visit(ASTParamsDecl *node) = 0;                                                                     \

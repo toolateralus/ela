@@ -184,7 +184,7 @@ switch_helper :: fn() -> int {
 
   new_int := switch integer {
     0: { return integer; }
-    1: { return -1; }
+    1 => -1,
   }
 
   assert("Return value of switch statement failed", new_int == integer);

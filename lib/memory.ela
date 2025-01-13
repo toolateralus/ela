@@ -1,61 +1,61 @@
-#import core;
+// #import core;
 
-#flags ArenaFlags :: enum {
-  None,        // default.
-  AlignAllocations,   // if self flag is set, the allocator will fix alignment automatically when a misaligned allocation is found. Else it will naively allocate regardless of size.
-  OutOfMemory, // if self flag is set, the program will exit and print a message on out of memory. Otherwise it will silently return null.
-}
+// #flags ArenaFlags :: enum {
+//   None,        // default.
+//   AlignAllocations,   // if self flag is set, the allocator will fix alignment automatically when a misaligned allocation is found. Else it will naively allocate regardless of size.
+//   OutOfMemory, // if self flag is set, the program will exit and print a message on out of memory. Otherwise it will silently return null.
+// }
 
-// Super basic arena allocator, with a constructor that allocates a big block,
-// an allocate method that returns u8*, and a destructor that frees the block.
-Arena :: struct {
-  ptr: u64;
-  size: u64;
-  memory: u8*;
-  flags: ArenaFlags = ArenaFlags::None as ArenaFlags;
-  alignment : int = 8;
-}
+// // Super basic arena allocator, with a constructor that allocates a big block,
+// // an allocate method that returns u8*, and a destructor that frees the block.
+// Arena :: struct {
+//   ptr: u64;
+//   size: u64;
+//   memory: u8*;
+//   flags: ArenaFlags = ArenaFlags::None as ArenaFlags;
+//   alignment : int = 8;
+// }
 
-impl Arena {
-  create :: fn(size: u64, flags: ArenaFlags) -> #self {
-    self: #self;
-    self.size = size;
-    self.flags = flags;
-    self.memory = malloc(sizeof(u8) * size);
-    return self;
-  }
+// impl Arena {
+//   create :: fn(size: u64, flags: ArenaFlags) -> #self {
+//     self: #self;
+//     self.size = size;
+//     self.flags = flags;
+//     self.memory = malloc(sizeof(u8) * size);
+//     return self;
+//   }
 
-  deinit :: fn(self*) {
-    free(self.memory);
-    self.memory = null;
-  }
+//   deinit :: fn(self*) {
+//     free(self.memory);
+//     self.memory = null;
+//   }
   
-  allocate :: fn(self*, size: u64) -> u8* {
-    if size == 0 {
-      return null;
-    }
+//   allocate :: fn(self*, size: u64) -> u8* {
+//     if size == 0 {
+//       return null;
+//     }
     
-    aligned_ptr := self.ptr;
-    if self.flags & ArenaFlags::AlignAllocations != 0 {
-      aligned_ptr = (self.ptr + self.alignment - 1) & ~(self.alignment - 1);
-    }
+//     aligned_ptr := self.ptr;
+//     if self.flags & ArenaFlags::AlignAllocations != 0 {
+//       aligned_ptr = (self.ptr + self.alignment - 1) & ~(self.alignment - 1);
+//     }
     
-    oom := aligned_ptr + size > self.size;
+//     oom := aligned_ptr + size > self.size;
     
-    if oom && self.flags & ArenaFlags::OutOfMemory != 0 {
-      panic("Arena Allocator: Ran out of memory\n");
-    } else if oom {
-      return null;
-    }
+//     if oom && self.flags & ArenaFlags::OutOfMemory != 0 {
+//       panic("Arena Allocator: Ran out of memory\n");
+//     } else if oom {
+//       return null;
+//     }
     
-    result := self.memory + aligned_ptr;
-    self.ptr = aligned_ptr + size;
-    return result;
-  }
-}
+//     result := self.memory + aligned_ptr;
+//     self.ptr = aligned_ptr + size;
+//     return result;
+//   }
+// }
 
-// Super basic arena allocator, with a constructor that allocates a big block,
-// an allocate method that returns u8*, and a destructor that frees the block.
+// // Super basic arena allocator, with a constructor that allocates a big block,
+// // an allocate method that returns u8*, and a destructor that frees the block.
 ArenaOf :: struct![T] {
   count: u64;
   size: u64;

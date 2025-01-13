@@ -651,8 +651,11 @@ std::any Typer::visit(ASTFor *node) {
 }
 std::any Typer::visit(ASTIf *node) {
   auto cond_ty = int_from_any(node->condition->accept(this));
-  assert_types_can_cast_or_equal(cond_ty, bool_type(), node->source_range, "expected: {}, got {}",
-                                 "if statement condition was not convertible to boolean");
+  auto conversion_rule = type_conversion_rule(global_get_type(cond_ty), global_get_type(bool_type()));
+
+  if (conversion_rule == CONVERT_PROHIBITED) {
+    throw_error(std::format("cannot convert 'if' condition to a boolean, implicitly nor explicitly. got type \"{}\"", global_get_type(cond_ty)->to_string()), node->source_range);
+  }
 
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
   if (node->_else.is_not_null()) {
@@ -697,9 +700,11 @@ std::any Typer::visit(ASTCall *node) {
   // Resolve the type of the function being called
   Type *type = global_get_type(int_from_any(node->function->accept(this)));
 
-  if (type) {
-    declaring_or_assigning_type = type->id;
-  }
+
+  // ! This breaks everything. Why were we doing this?
+  // if (type) {
+    // declaring_or_assigning_type = type->id;
+  // }
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
@@ -881,12 +886,26 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
 }
 
 std::any Typer::visit(ASTType *node) {
+
+
   if (node->resolved_type != Type::invalid_id) {
     return node->resolved_type;
   }
 
   TypeExtensions extensions;
   extensions.extensions = accept_extensions(node->extensions);
+
+  if (node->kind == ASTType::SELF) {
+    auto self = get_self_type();
+    if (self == -1) {
+      throw_error("Cannot locate #self type.", node->source_range);
+    }
+    auto self_w_ext = global_find_type_id(self, extensions);
+    if (self_w_ext == -1) {
+      throw_error("Cannot locate #self type with extensions", node->source_range);
+    }
+    return node->resolved_type = self_w_ext;
+  }
 
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
@@ -1516,10 +1535,6 @@ std::any Typer::visit(ASTInterfaceDeclaration *node) {
   return {};
 }
 
-std::any Typer::visit(ASTSelfType *node) { 
-  auto base = get_self_type();
-  return node->resolved_type = global_find_type_id(base, {accept_extensions(node->extensions)});
-}
 
 int Typer::get_self_type() {
   if (type_context.is_not_null()) {

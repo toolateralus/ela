@@ -172,11 +172,16 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
-  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && to->is_kind(TYPE_SCALAR) &&
-      to->get_ext().has_no_extensions()) {
+  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && 
+      to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
-      if (numerical_type_safe_to_upcast(from, to))
+      if (numerical_type_safe_to_upcast(from, to)) {
         return CONVERT_IMPLICIT;
+      }
+      return CONVERT_EXPLICIT;
+    } else if ((from->id == bool_type() && type_is_numerical(to)) || to->id == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
+      // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
+      // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
     }
   }
@@ -192,6 +197,10 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // cast all numerical types and pointers to booleans implicitly.
   if ((type_is_numerical(from) || from->get_ext().is_pointer()) && to->id == bool_type()) {
     return CONVERT_IMPLICIT;
+  }
+
+  if (type_is_numerical(from) && to->id == bool_type()) {
+    return CONVERT_EXPLICIT;
   }
 
   // ! This needs to be re-evaluated. We should not be able to cast any pointer, to any other pointer.

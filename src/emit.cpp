@@ -114,6 +114,10 @@ std::any Emitter::visit(ASTArguments *node) {
 std::any Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
 
+  if (!type) {
+    throw_error("internal compiler error: ASTType* resolved to null in emitter.", node->source_range);
+  }
+
   // For reflection
   if (node->kind == ASTType::REFLECTION) {
     int pointed_to_ty = std::any_cast<int>(node->pointing_to.get()->accept(&typer));
@@ -1783,12 +1787,6 @@ std::any Emitter::visit(ASTCast *node) {
 }
 
 std::any Emitter::visit(ASTInterfaceDeclaration *node) {
-  return {};
-}
-
-std ::any Emitter::visit(ASTSelfType *node) {
-  auto type = global_get_type(node->resolved_type);
-  (*ss) << to_cpp_string(type);
   return {};
 }
 

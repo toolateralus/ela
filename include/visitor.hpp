@@ -20,18 +20,18 @@ struct VisitorBase {
 };
 
 struct Typer : VisitorBase {
-  Nullable<Symbol> get_symbol(ASTNode *);
 
+  Nullable<ASTType> type_context = nullptr;
   int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
 
   template <typename T>
   int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
                     std::vector<int> args);
-  Nullable<ASTType> type_context = nullptr;
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
+  Nullable<Symbol> get_symbol(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
   std::any visit(ASTStructDeclaration *node) override;
@@ -71,7 +71,6 @@ struct Typer : VisitorBase {
   void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
 
   std::any visit(ASTCall *node) override;
-  std::any visit(ASTSelfType *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
   std::any visit(ASTContinue *node) override;
@@ -202,7 +201,6 @@ struct Emitter : VisitorBase {
   std ::any visit(ASTIdentifier *node) override;
   std ::any visit(ASTLiteral *node) override;
   std ::any visit(ASTType *node) override;
-  std ::any visit(ASTSelfType *node) override;
   std ::any visit(ASTCall *node) override;
   std ::any visit(ASTArguments *node) override;
   std ::any visit(ASTReturn *node) override;

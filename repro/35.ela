@@ -3,6 +3,7 @@
 Strukt :: struct {}
 
 impl Strukt {
+  // Recursive function in an impl causes an error?
   recurse :: fn(self*, n : int) -> int {
     printf("%s\n", #type(self.recurse).name); // prints "Strukt*"
     if n < 100 => self.recurse(n+1);          // cannot find function call?

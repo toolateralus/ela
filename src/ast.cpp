@@ -1,6 +1,5 @@
 #include "ast.hpp"
 
-
 #include <algorithm>
 #include <any>
 #include <cassert>
@@ -12,7 +11,6 @@
 #include <string>
 #include <unordered_set>
 #include "visitor.hpp"
-#include "ast_copier.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -351,17 +349,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
-        if (parser->current_union_decl) {
-          type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_union_decl.get()->name);
-        } else if (parser->current_struct_decl) {
-          type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_struct_decl.get()->name);
-        } else if (parser->current_impl_decl) {
-          type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl_decl.get()->target));
-        } else if (parser->current_interface_decl) {
-          type = ast_alloc<ASTType>();
-        } else {
-          throw_error("#self is only valid in unions, structs, and impl's.",{});
-        }
+        type->kind = ASTType::SELF;
         parser->append_type_extensions(type);
         return type;
     }},
@@ -720,7 +708,9 @@ ASTExpr *Parser::parse_primary() {
       while (peek().type != TType::RCurly) {
         SwitchCase _case;
         _case.expression = parse_expr();
-        expect(TType::Colon);
+        if (peek().type != TType::ExpressionBody) {
+          expect(TType::Colon);
+        }
         _case.block = parse_block();
         cases.push_back(_case);
         if (peek().type == TType::Comma) {
@@ -935,7 +925,7 @@ ASTType *Parser::parse_type() {
   if (peek().type == TType::Directive) {
     auto range = begin_node();
     auto expr = try_parse_directive_expr().get();
-    if (expr->get_node_type() != AST_NODE_TYPE) {
+    if (expr->get_node_type() != AST_NODE_TYPE && expr->get_node_type() != AST_NODE_SELF_TYPE) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
                   range);
@@ -1669,10 +1659,8 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   expect(TType::Interface);
   auto previous = current_interface_decl;
-  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, interface, range, _, this, {
-    current_interface_decl = previous;
-  });
-  
+  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, interface, range, _, this, { current_interface_decl = previous; });
+
   interface->name = name.value;
   current_interface_decl = interface;
   if (peek().type == TType::GenericBrace) {
@@ -1681,8 +1669,8 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   auto scope = create_child(ctx.scope);
   interface->scope = scope;
   auto block = parse_block(scope);
-  for (const auto &node: block->statements) {
-    if (auto function = dynamic_cast<ASTFunctionDeclaration*>(node)) {
+  for (const auto &node : block->statements) {
+    if (auto function = dynamic_cast<ASTFunctionDeclaration *>(node)) {
       if (function->block.is_not_null()) {
         throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
       }
@@ -2074,5 +2062,3 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
-
-

@@ -14,7 +14,6 @@
 // {
 
 // clang-format off
-std::any ASTSelfType::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTSwitch::accept(VisitorBase *visitor) { return visitor->visit(this); }
 std::any ASTProgram::accept(VisitorBase *visitor) {return visitor->visit(this); }
