@@ -29,6 +29,7 @@ enum ASTNodeType {
   AST_NODE_PARAM_DECL,
   AST_NODE_DECLARATION,
   AST_NODE_EXPR_STATEMENT,
+  AST_NODE_SELF,
   AST_NODE_BIN_EXPR,
   AST_NODE_UNARY_EXPR,
   AST_NODE_IDENTIFIER,
@@ -188,6 +189,12 @@ struct ASTType : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
 };
 
+// #self
+struct ASTSelf : ASTType {
+  std::any accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_SELF; }
+};
+
 struct ASTExprStatement : ASTStatement {
   ASTExpr *expression;
   std::any accept(VisitorBase *visitor) override;
@@ -266,10 +273,22 @@ struct ASTTuple : ASTExpr {
 };
 
 struct ASTParamDecl : ASTNode {
-  ASTType *type;
-  Nullable<ASTExpr> default_value;
-  InternedString name;
-  bool is_self = false;
+  enum {
+    Normal,
+    Self,
+  } tag;
+  union {
+    struct {
+      ASTType *type;
+      Nullable<ASTExpr> default_value;
+      InternedString name;
+    } normal;
+    struct {
+      bool is_pointer;
+    } self;
+  };
+  ~ASTParamDecl() {}
+  ASTParamDecl() {}
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PARAM_DECL; }
 };
@@ -312,7 +331,6 @@ struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
   std::vector<ASTType *> generic_arguments;
-  int type = Type::invalid_id;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
@@ -580,6 +598,7 @@ struct ASTCast : ASTExpr {
   std::any visit(ASTTuple *node) override {};                                                                          \
   std::any visit(ASTAlias *node) override {};                                                                          \
   std::any visit(ASTTupleDeconstruction *node) override {};                                                            \
+  std::any visit(ASTSelf *node) override {};                                                            \
   std::any visit(ASTDefer *node) override {};                                                                          \
   std::any visit(ASTCast *node) override {};                                                                           \
   std::any visit(ASTTaggedUnionDeclaration *node) override {};                                                         \
@@ -590,6 +609,7 @@ struct ASTCast : ASTExpr {
   virtual std::any visit(ASTScopeResolution *node) = 0;                                                                \
   virtual std::any visit(ASTCast *node) = 0;                                                                           \
   virtual std::any visit(ASTProgram *node) = 0;                                                                        \
+  virtual std::any visit(ASTSelf *node) = 0;                                                                        \
   virtual std::any visit(ASTBlock *node) = 0;                                                                          \
   virtual std::any visit(ASTFunctionDeclaration *node) = 0;                                                            \
   virtual std::any visit(ASTParamsDecl *node) = 0;                                                                     \

@@ -411,7 +411,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   space();
   (*ss) << node->name.get_str() << '(';
   for (const auto &param : node->params->params) {
-    (*ss) << get_cpp_scalar_type(param->type->resolved_type);
+    (*ss) << get_cpp_scalar_type(param->resolved_type);
     if (param != node->params->params.back()) {
       (*ss) << ", ";
     }
@@ -555,19 +555,21 @@ std::any Emitter::visit(ASTUnionDeclaration *node) {
   return {};
 }
 std::any Emitter::visit(ASTParamDecl *node) {
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = global_get_type(node->resolved_type);
 
-  if (type->is_kind(TYPE_FUNCTION)) {
-    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
+  if (node->tag == ASTParamDecl::Normal) {
+    if (type->is_kind(TYPE_FUNCTION)) {
+      (*ss) << get_declaration_type_signature_and_identifier(node->normal.name.get_str(), type);
+    } else {
+      node->normal.type->accept(this);
+      (*ss) << ' ' << node->normal.name.get_str();
+    }
+    if (node->normal.default_value.is_not_null() && emit_default_args) {
+      (*ss) << " = ";
+      node->normal.default_value.get()->accept(this);
+    }
   } else {
-    node->type->accept(this);
-    auto sym = ctx.scope->local_lookup(node->name);
-    (*ss) << ' ' << node->name.get_str();
-  }
-
-  if (node->default_value.is_not_null() && emit_default_args) {
-    (*ss) << " = ";
-    node->default_value.get()->accept(this);
+    (*ss) << ' ' << to_cpp_string(type) << " self";
   }
   return {};
 }
@@ -1783,4 +1785,9 @@ std::any Emitter::visit(ASTCast *node) {
 std::any Emitter::visit(ASTInterfaceDeclaration *node) {
   return {};
 }
+
+std ::any Emitter::visit(ASTSelf *node) {
+  return 0;
+}
+
 

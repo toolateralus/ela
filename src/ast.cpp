@@ -357,6 +357,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(parser->current_struct_decl.get()->name);
         } else if (parser->current_impl_decl) {
           type = static_cast<ASTType*>(deep_copy_ast(parser->current_impl_decl.get()->target));
+        } else if (parser->current_interface_decl) {
+          type = ast_alloc<ASTType>();
         } else {
           throw_error("#self is only valid in unions, structs, and impl's.",{});
         }
@@ -1328,7 +1330,7 @@ ASTDeclaration *Parser::parse_declaration() {
   if (ctx.scope->local_lookup(iden.value)) {
     throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
-  ctx.scope->insert(iden.value, -1);
+  ctx.scope->insert(iden.value, -1, decl);
   return decl;
 }
 
@@ -1398,26 +1400,21 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     auto name = expect(TType::Identifier).value;
 
-    // Self param for impls.
     if (name == "self") {
       if (!params->params.empty()) {
         end_node(nullptr, range);
         throw_error("\"self\" must appear first in method parameters.", range);
       }
-      if (!current_impl_decl && !current_interface_decl) {
-        end_node(nullptr, range);
-        throw_error("\"self\" can only appear in method parameters, either in an interface declaration, or an impl.", range);
+      params->has_self = true;
+      NODE_ALLOC(ASTParamDecl, param, range, _, this)
+      param->tag = ASTParamDecl::Self;
+      params->params.push_back(param);
+
+      if (peek().type == TType::Mul) {
+        eat();
+        param->self.is_pointer = true;
       }
 
-      auto type = ast_alloc<ASTType>();
-
-      params->has_self = true;
-      append_type_extensions(type);
-      NODE_ALLOC(ASTParamDecl, param, range, _, this)
-      param->type = type;
-      param->name = name;
-      param->is_self = true;
-      params->params.push_back(param);
       if (peek().type == TType::Comma)
         eat();
       continue;
@@ -1429,12 +1426,13 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     }
 
     NODE_ALLOC(ASTParamDecl, param, range, _, this)
-    param->type = type;
-    param->name = name;
+    param->tag = ASTParamDecl::Normal;
+    param->normal.type = type;
+    param->normal.name = name;
 
     if (peek().type == TType::Assign) {
       eat();
-      param->default_value = parse_expr();
+      param->normal.default_value = parse_expr();
     }
 
     params->params.push_back(param);
@@ -1478,9 +1476,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     };
   }
 
-  ctx.scope->insert(name.value, -1, SYMBOL_IS_FUNCTION);
-  auto sym = ctx.scope->lookup(name.value);
-  sym->declaring_node = function;
+  ctx.scope->insert(name.value, -1, function, SYMBOL_IS_FUNCTION);
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
@@ -1655,7 +1651,7 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
       }
       decl->unions.push_back(union_decl);
       for (const auto &field : union_decl->fields) {
-        decl->scope->insert(field->name, field->type->resolved_type);
+        decl->scope->insert(field->name, field->type->resolved_type, field);
       }
     } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
       visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
@@ -1827,7 +1823,7 @@ ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
       }
       decl->structs.push_back(struct_decl);
       for (const auto &field : struct_decl->fields) {
-        block->scope->insert(field->name, field->type->resolved_type);
+        block->scope->insert(field->name, field->type->resolved_type, field);
       }
     } else {
       throw_error("Non field declarations not allowed in union", range);

@@ -57,9 +57,13 @@ ASTParamsDecl *ASTCopier::copy_params_decl(ASTParamsDecl *node) {
 }
 ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = new (ast_alloc<ASTParamDecl>()) ASTParamDecl(*node);
-  new_node->type = static_cast<ASTType *>(copy_node(node->type));
-  if (node->default_value)
-    new_node->default_value = static_cast<ASTExpr *>(copy_node(node->default_value.get()));
+  if (new_node->tag == ASTParamDecl::Normal) {
+    new_node->normal.type = static_cast<ASTType *>(copy_node(node->normal.type));
+    if (node->normal.default_value)
+      new_node->normal.default_value = static_cast<ASTExpr *>(copy_node(node->normal.default_value.get()));
+  } else {
+    new_node->self.is_pointer = node->self.is_pointer;
+  }
   return new_node;
 }
 ASTDeclaration *ASTCopier::copy_declaration(ASTDeclaration *node) {
@@ -376,7 +380,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_TUPLE_DECONSTRUCTION:
       return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
     case AST_NODE_INTERFACE_DECLARATION:
-      return copy_interface_declaration(static_cast<ASTInterfaceDeclaration*>(node));
+      return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
     default:
       return nullptr;
   }

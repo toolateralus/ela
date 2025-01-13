@@ -416,7 +416,7 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   ss << "fn ";
   ss << "(";
   for (const auto &param : decl->params->params) {
-    ss << global_get_type(param->type->resolved_type)->to_string();
+    ss << global_get_type(param->resolved_type)->to_string();
     if (param != decl->params->params.back()) {
       ss << ", ";
     }
@@ -429,7 +429,7 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 int Type::get_element_type() const {
   if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array() &&
       !extensions.is_map()) {
-    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array/map type. {}",
+    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array/map type\ngot type: \"{}\"",
                             to_string()),
                 {});
   }

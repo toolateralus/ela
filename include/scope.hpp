@@ -22,7 +22,7 @@ struct ASTNode;
 
 struct Symbol {
   InternedString name;
-  int type_id;
+  int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
   Nullable<ASTNode> declaring_node;
   Value value;
@@ -66,7 +66,7 @@ struct Scope {
     return fields;
   }
 
-  void insert(const InternedString &name, int type_id, int flags = SYMBOL_IS_VARIABLE);
+  void insert(const InternedString &name, int type_id, ASTNode* declaring_node, int flags = SYMBOL_IS_VARIABLE);
 
   Symbol *lookup(const InternedString &name);
 

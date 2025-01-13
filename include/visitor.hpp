@@ -63,7 +63,15 @@ struct Typer : VisitorBase {
                               std::vector<int> generic_args = {});
   int visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
+
+  int get_self_type();
+
+  void type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info);
+  void try_resolve_generic_function_call(ASTCall *&node, Type *&type, Nullable<Symbol> &symbol_nullable, bool &method_call);
+  void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
+
   std::any visit(ASTCall *node) override;
+  std::any visit(ASTSelf *node) override;
   std::any visit(ASTArguments *node) override;
   std::any visit(ASTReturn *node) override;
   std::any visit(ASTContinue *node) override;
@@ -194,6 +202,7 @@ struct Emitter : VisitorBase {
   std ::any visit(ASTIdentifier *node) override;
   std ::any visit(ASTLiteral *node) override;
   std ::any visit(ASTType *node) override;
+  std ::any visit(ASTSelf *node) override;
   std ::any visit(ASTCall *node) override;
   std ::any visit(ASTArguments *node) override;
   std ::any visit(ASTReturn *node) override;
