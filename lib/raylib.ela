@@ -1857,3 +1857,15 @@ impl Vector4 {
     return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z) + (self.w - other.w) * (self.w - other.w)) as float32;
   }
 }
+
+impl Color {
+  random :: fn(max: u8) -> #self {
+    return {
+      r: GetRandomValue(0, max) as u8,
+      g: GetRandomValue(0, max) as u8,
+      b: GetRandomValue(0, max) as u8,
+      a: 255 as u8,
+    };
+  }
+
+}
