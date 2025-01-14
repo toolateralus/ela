@@ -1,4 +1,0 @@
-
-#export _start :: fn() -> int {
-  return 0;
-}
