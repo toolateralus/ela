@@ -551,7 +551,24 @@ ASTProgram *Parser::parse() {
       continue;
     }
 
-    program->statements.push_back(parse_statement());
+    auto statement = parse_statement();
+
+    auto type = statement->get_node_type();
+    switch (type) {
+      case AST_NODE_STRUCT_DECLARATION:
+      case AST_NODE_FUNCTION_DECLARATION:
+      case AST_NODE_INTERFACE_DECLARATION:
+      case AST_NODE_ENUM_DECLARATION:
+      case AST_NODE_UNION_DECLARATION:
+      case AST_NODE_TAGGED_UNION_DECLARATION:
+      case AST_NODE_ALIAS:
+      case AST_NODE_DECLARATION:
+      case AST_NODE_NOOP:
+      case AST_NODE_IMPL: break;
+      default: throw_error("Statement not allowed at the top-level of a program", statement->source_range);
+    }
+
+    program->statements.push_back(statement);
 
     while (semicolon())
       eat();
@@ -1414,8 +1431,9 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
         param->self.is_pointer = true;
       }
 
-      if (peek().type == TType::Comma)
-        eat();
+      if (peek().type != TType::RParen)
+        expect(TType::Comma);
+
       continue;
     }
 

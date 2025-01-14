@@ -1,6 +1,8 @@
 global print
 extern strlen
 
+; This is just a junky print written by chatgpt.
+
 print:
   ; Save registers that will be used
   push rbx

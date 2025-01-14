@@ -133,6 +133,11 @@ main :: fn() {
   }
 
   compile_command = CompileCommand(argc, argv);
+
+  if (compile_command.has_flag("freestanding")) {
+    compile_command.compilation_flags += " -ffreestanding -nostdlib ";
+  }
+  
   if (compile_command.has_flag("x")) compile_command.print();
 
   {

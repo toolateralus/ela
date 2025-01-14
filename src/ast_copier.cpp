@@ -107,6 +107,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
     new_node->pointing_to = static_cast<ASTType *>(copy_node(node->pointing_to.get()));
   switch (new_node->kind) {
     case ASTType::NORMAL:
+    case ASTType::SELF:
     case ASTType::REFLECTION:
       new_node->normal.generic_arguments.clear();
       for (auto arg : node->normal.generic_arguments) {

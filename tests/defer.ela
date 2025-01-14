@@ -1,6 +1,6 @@
 #import core;
 
-
+#error "These tests pass, but the behavior is completely wrong. See the emitter for why"
 /* 
  * :: Important :: 
   - Some of these value based returns from defers may be surprising that they do not mutate the variables.

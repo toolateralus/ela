@@ -1,5 +1,10 @@
+// assert that --freestanding was used in compiler invocation.
+#ifndef FREESTANDING { #error "This is only supposed to be used freestanding " }
+
 // compile in a freestanding environment and compile to an object file.
-#c_flags "-fPIC -c -m64 -ffreestanding -fno-stack-protector -nostdlib -o main.o"
+#c_flags "-fPIC -c -m64 -fno-stack-protector -o main.o"
+
+
 
 // our function declared in print.s
 #foreign print :: fn(f: char *);
@@ -65,7 +70,7 @@ Vector2 :: struct {
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
 // and 'export' is declaring an externally visible symbol.
 #export main :: fn() -> int {
-  print("\e[1;4;32mHello Free(standing) World!\e[0m\n"c);
+  print("\e[1;4;32mHello (free-standing) World!\e[0m\n"c);
   
   while {
 
