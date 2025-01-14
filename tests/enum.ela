@@ -14,7 +14,7 @@
 */
 #test test_flags_enum :: fn() {
   flags := Banana::Unripe | Banana::Overripe;
-  assert("flags & Banana::Unripe failed.", (flags & Banana::Unripe) != 0);
+  assert("flags & Banana::Unripe failed."c, (flags & Banana::Unripe) != 0);
 }
 
 MyEnum :: enum {
@@ -25,6 +25,6 @@ MyEnum :: enum {
 #test test_regular_enum :: fn() {
   value := MyEnum::Some;
   value1 := MyEnum::Value;
-  assert("MyEnum::Value failed to == 100 * 2", value1 == 100 * 2);
-  assert("Zero case of enum did not equal 0", value == 0);
+  assert("MyEnum::Value failed to == 100 * 2"c, value1 == 100 * 2);
+  assert("Zero case of enum did not equal 0"c, value == 0);
 }

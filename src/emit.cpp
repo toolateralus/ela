@@ -227,7 +227,11 @@ std::any Emitter::visit(ASTLiteral *node) {
       (*ss) << "(std::nullptr_t)nullptr";
       return {};
     case ASTLiteral::String:
-      output = std::format("\"{}\"", node->value);
+      if (node->resolved_type == string_type()) {
+        output = std::format("string{{\"{}\"}}", node->value);
+      } else if (node->resolved_type == c_string_type()) {
+        output = std::format("\"{}\"", node->value);
+      }
       break;
     case ASTLiteral::RawString:
       output = std::format("R\"__({})__\"", node->value);

@@ -79,10 +79,10 @@ main :: fn() {
   }
 
   switch greeting {
-    string::from("Hello"): {
+    "Hello": {
       println("Hello")
     },
-    string::from("Goodbye"): {
+    "Goodbye": {
       println("Goodbye!");
     }
   }

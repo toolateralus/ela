@@ -2,66 +2,66 @@
 
 #test test_for :: fn() {
   for i in 0..10 {
-    assert("i should be less than 10", i < 10);
+    assert("i should be less than 10"c, i < 10);
     return;
   }
 
   for i in 10..0 {
-    assert("i should be greater than 0", i > 0);
+    assert("i should be greater than 0"c, i > 0);
     return;
   }
 
   arr: s32[];
   for v in arr {
-      assert("Unexpected case in array loop", false);
+      assert("Unexpected case in array loop"c, false);
       return;
   }
-  assert("End of test_for reached", true);
+  assert("End of test_for reached"c, true);
 }
 
 #test test_while :: fn() {
   b: bool = true;
   while b {
-      assert("while condition == true", b == true);
+      assert("while condition == true"c, b == true);
       return;
   }
-  assert("End of test_while reached", true);
+  assert("End of test_while reached"c, true);
 }
 
 #test test_if_1 :: fn() {
   v: bool = true;
   hit: bool = false;
   if v {
-      assert("v should be true", v == true);
+      assert("v should be true"c, v == true);
       hit = true;
   } else {
-      assert("Unexpected case", false);
+      assert("Unexpected case"c, false);
   }
-  assert("failed to fall through if statement", hit);
+  assert("failed to fall through if statement"c, hit);
 }
 
 #test test_if_2 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
-      assert("Unexpected case", false);
+      assert("Unexpected case"c, false);
   } else if !v {
       hit = true;
   }
-  assert("fell through if else, but didn't set the variable", hit);
+  assert("fell through if else, but didn't set the variable"c, hit);
 }
 
 #test test_if_3 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
-      assert("Unexpected case", false);
+      assert("Unexpected case"c, false);
   } else if v {
-      assert("Unexpected case", false);
+      assert("Unexpected case"c, false);
   } else {
       hit = true;
   }
-  assert("fell though if,if_else,else but didn't set the variable", hit);
+  assert("fell though if,if_else,else but didn't set the variable"c, hit);
 }
 
 
@@ -86,10 +86,10 @@
 
 #test test_range_iterator :: fn() {
   for i in Range{first: 0, last: 10, increment: 2} {
-    assert("iter increment failed to be divisible by 2", i % 2 == 0);
+    assert("iter increment failed to be divisible by 2"c, i % 2 == 0);
   }
   for i in Range{first: 0, last: 10, increment: 3} {
-    assert("iter increment failed to be divisible by 3", i % 3 == 0);
+    assert("iter increment failed to be divisible by 3"c, i % 3 == 0);
   }
 }
 
@@ -97,7 +97,7 @@
   array: s8[] = {0,1,2,3};
   n: int ;
   for *v in array {
-    assert("", n == *v);
+    assert(""c, n == *v);
     ++n;
   }
 
@@ -106,7 +106,7 @@
   *arr = s8[]{0,1,2,3};
 
   for v in *arr {
-    assert("", n == v);
+    assert(""c, n == v);
     ++n;
   }
   free(arr);
@@ -133,7 +133,7 @@
     n = i;
   }
 
-  assert("Range based for loop failed.", n == 9);
+  assert("Range based for loop failed."c, n == 9);
 }
 
 SwitchCaseEnum :: enum {
@@ -156,18 +156,18 @@ switch_helper :: fn() -> int {
   passed := false;
   switch integer {
     0: { passed = true; }
-    1: { assert("Switch on int case failed", false);  }
+    1: { assert("Switch on int case failed"c, false);  }
   }
 
-  assert("Failed to hit positive switch case for integer", passed);
+  assert("Failed to hit positive switch case for integer"c, passed);
   str: string = "Hello!";
 
   passed = false;
   switch str {
-    string::from("Hello"): { assert("Switch case on string failed", false); }
-    string::from("Hello!"): { passed = true; }
+    "Hello": { assert("Switch case on string failed"c, false); }
+    "Hello!": { passed = true; }
   }
-  assert("Failed to hit positive switch case for string", passed);
+  assert("Failed to hit positive switch case for string"c, passed);
 
   passed = false;
   switch SwitchCaseEnum::SwitchVariant0 {
@@ -175,10 +175,10 @@ switch_helper :: fn() -> int {
       passed = true;
     }
     SwitchCaseEnum::SwitchVariant1: {
-      assert("Switch on enum value failed", false);
+      assert("Switch on enum value failed"c, false);
     }
   }
-  assert("Failed to hit positive switch case for enum", passed);
+  assert("Failed to hit positive switch case for enum"c, passed);
 
   /*  With return value as expression :  */
 
@@ -187,7 +187,7 @@ switch_helper :: fn() -> int {
     1 => -1,
   }
 
-  assert("Return value of switch statement failed", new_int == integer);
+  assert("Return value of switch statement failed"c, new_int == integer);
 
   // test range based shiz.
   passed = false;
@@ -196,12 +196,12 @@ switch_helper :: fn() -> int {
       passed = true;
     }
     10..20: {
-      assert("switch on range passing in number failed", false);
+      assert("switch on range passing in number failed"c, false);
     }
   }
-  assert("Failed to pass range based switch statement", passed);
+  assert("Failed to pass range based switch statement"c, passed);
 
-  assert("Returns in switched failed", switch_helper() == 5);
+  assert("Returns in switched failed"c, switch_helper() == 5);
 }
 
 

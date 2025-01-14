@@ -3,10 +3,10 @@
 
 #test test_malloc :: fn() {
   ptr: s32* = malloc(4);
-  assert("malloc'd pointer was null", ptr != null);
+  assert("malloc'd pointer was null"c, ptr != null);
   free(ptr);
   ptr = null;
-  assert("freed ptr and set to null was not == null", ptr == null);
+  assert("freed ptr and set to null was not == null"c, ptr == null);
 }
 
 many_params :: fn(a: float32, b, c, d) -> float32 {
@@ -18,8 +18,8 @@ mul_params :: fn(n: float32, f) -> float32 {
 }
 
 #test test_param :: fn() {
-  assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
-  assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0, 1.0) == 8.0);
+  assert("params of 1.5 * 2.0 expected to equal 3.0"c, mul_params(1.5, 2.0) == 3.0);
+  assert("multiplying many params failed, or default param"c, many_params(1.0, 2.0, 4.0, 1.0) == 8.0);
 }
 
 returns :: fn() -> s32  {
@@ -27,12 +27,12 @@ returns :: fn() -> s32  {
 }
 
 #test test_return_value :: fn() {
-  assert("function expected to return 1", returns() == 1);
+  assert("function expected to return 1"c, returns() == 1);
 }
 
 #test test_local_function :: fn() {
   local_function :: fn() -> s32 {
     return 0;
   }
-  assert("failed to get 0 from local function call", local_function() == 0);
+  assert("failed to get 0 from local function call"c, local_function() == 0);
 }

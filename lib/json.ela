@@ -332,12 +332,12 @@ impl JsonValue {
       return $"{32 as char}{self.data._string}{32 as char}";
     } else if self.type == JsonValueType::Boolean {
       if self.data.boolean == true {
-        return string::from("true");
+        return "true";
       } else {
-        return string::from("false");
+        return "false";
       }
     } else if self.type == JsonValueType::Null {
-      return string::from("null");
+      return "null";
     } else {
       return string::empty();
     }

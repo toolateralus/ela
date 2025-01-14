@@ -20,7 +20,7 @@ New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   // ?? unless we specify XarBarInitListTestStruct{}
   v := New({x: 0.0, y: 0.0});
   // v := New(XarBarInitListTestStruct{x: 0.0, y: 0.0});
-  assert("failed", v.x == 0.0 && v.y == 0.0);
+  assert("failed"c, v.x == 0.0 && v.y == 0.0);
 }
 
 InitListTest :: struct {
@@ -42,7 +42,7 @@ infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
 }
 
 #test test_init_list_comprehensive :: fn() {
-  assert("Init list failed to return from function", returns_an_init_list().n == 0);
-  assert("Init list failed to infer from parameter signature", infers_argument_from_init_list(InitListTest{n: 0}).n == 0);
+  assert("Init list failed to return from function"c, returns_an_init_list().n == 0);
+  assert("Init list failed to infer from parameter signature"c, infers_argument_from_init_list(InitListTest{n: 0}).n == 0);
   empty_init_list := InitListTest{};
 }

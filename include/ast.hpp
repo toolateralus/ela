@@ -250,6 +250,7 @@ struct ASTLiteral : ASTExpr {
   } tag;
   std::vector<ASTExpr *> interpolated_values{};
   InternedString value;
+  bool is_c_string = false;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
