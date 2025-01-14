@@ -1,6 +1,0 @@
-
-n : int;
-
-main :: fn() {
-  n = false as int; // ! casting bool to int is strictly prohibited.
-}

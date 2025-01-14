@@ -1,7 +1,8 @@
-/* 
-  ? Main can return void or an integer.
-  ? Unlike C, if you return integer, all code paths must return a valie.
-*/
+
+
+// Main can never take arguments, nor can it ever return a value.
+// Always use 'Env::args()' to get cmd line arguments,
+// and use 'exit(return_code)' for returning an exit code.
 
 /* So this is valid.. */
 main :: fn() {
@@ -10,17 +11,17 @@ main :: fn() {
 }
 
 /* As well as this.. */
-main :: fn() { }
-
-/* And this is valid.. */
-main :: fn() -> int {
-  if 1 then return 1;
-  return 0;
+main :: fn() { 
+  
 }
 
-/* But this is not. */
-main :: fn() -> int {
-  if 1 {
-    return 1;
+
+main :: fn() {
+  args := Env::args();
+  if args.length > 2 { 
+    exit(1); 
+  }
+  else { 
+    exit(244); 
   }
 }

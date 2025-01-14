@@ -1,0 +1,23 @@
+
+MyStruct :: struct {
+  a: s32;
+  b: s32;
+  c: s32;
+}
+
+main :: fn() {
+  // Initializer lists, unless used for an array, must name the fields it is assigning.
+  // You can place the type right before the list
+  instance := MyStruct {
+    a: 10,
+    b: 20,
+    c: 30,
+  }
+
+  // Or you can infer it. In many places this is valid, such as returning from a function, in a parameter where the type is known, etc.
+  instance1 : MyStruct = {
+    a: 10,
+    b: 20,
+    c: 30
+  }
+}

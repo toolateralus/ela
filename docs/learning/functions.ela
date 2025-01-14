@@ -1,7 +1,5 @@
 
-
 /* functions are simply defined with NAME :: fn(parameters) -> RETURN_TYPE {..block..} syntax. */
-
 add :: fn(a: s32, b: s32) -> s32 {
   return a + b;
 }
@@ -10,18 +8,49 @@ add :: fn(a: s32, b: s32) -> s32 {
   You can omit the type of parameters that are repeat types of the previous param.
   In the following example, 'b' and 'c' are both 's32' because 'a' is marked 's32'.
 */
-
-
 // ✅ valid
 add :: fn(a: s32, b, c) -> s32 {
   return a + b + c;
 }
 
 // ❌ invalid. we do not use odin-like syntax for doing this.
-add :: fn(a, b, c: s32) -> s32 {
- 
+// add :: fn(a, b, c: s32) -> s32 {
+//   return a + b + c;
+// }
+
+// Note: for all generics, (structs, functions, unions, tagged unions, interfaces)
+// the syntax will always be the same. ![T, T1, T2];
+
+// No function overloading. Use generics instead, as such:
+// At the time of writing, there is no 'where' clause, or any sort of type constraints on generics.
+// To be implemented, but if you wanted, you can use runtime reflection as a hack to achieving this.
+generic :: fn![T](t: T) -> T {
+  return t * 2;
 }
 
-// No function overloading. Use generics [todo write that section]
+generic1 :: fn![T, T1](t: T, t1: T1) -> T {
+  return t * t1;
+}
+
+
+// For functions (or control flow) that return perform a single expression, you can use 'expression body'.
+// this is basically an implicit returning body.
+
+getter :: fn() -> int => 10;
+print_something :: fn() => println("swoop");
+
+
+main :: fn() {
+  // at the time of writing this, generic inference is bad.
+  // argument signature that exactly match the generic signature (such as 'generic' or 'generic1') it will work, 
+  // but if you have non-generic parameters in the function, it won't work.
+
+  generic(10); // infers.
+  generic(20); // infers.
+
+  // To specify explicitly
+  generic![int](10);
+  generic![int, float](10, 10.0);
+}
 
 
