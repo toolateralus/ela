@@ -9,12 +9,12 @@ chatting :: fn(connfd: int) {
   while true {
     memset(buff, 0, 80);
     read(connfd, buff, 80);
-    println($"From client: {(char*)buff}   To client : ");
+    println($"From client: {buff as char*}   To client : ");
     memset(buff, 0, 80);
     n: int;
     while n < 80 && ((buff[n++] = getchar()) != '\n') {}
     write(connfd, buff, 80);
-    if (strncmp("exit"c, (char*)buff, 4) == 0) {
+    if (strncmp("exit"c, buff as char*, 4) == 0) {
       printf("Server Exit...\n"c);
       break;
     }

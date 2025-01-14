@@ -895,6 +895,11 @@ ASTExpr *Parser::parse_primary() {
       }
       eat();
       end_node(expr, range);
+
+      if (expr->get_node_type() == AST_NODE_TYPE || expr->get_node_type() == AST_NODE_SELF_TYPE) {
+        throw_error("using (TYPE)expr style casts are deprecated. use `expr as TYPE` syntax", range);
+      }
+
       return expr;
     }
     default: {

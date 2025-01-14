@@ -21,7 +21,7 @@ chatting :: fn(sockfd: int) {
 
     read(sockfd, buffer, 80);
 
-    println($"From Server : {(char*)buffer}");
+    println($"From Server : {buffer as char*}");
 
     if ((strncmp(buffer, "exit"c, 4)) == 0) {
       println("Client Exit...");
