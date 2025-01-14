@@ -44,6 +44,11 @@ main :: fn() {
   // * c-style character literals
   c : char = 'c';
   code := '\0';
+
+
+  // Some literals, as expected.
+  x := 0xFFFFFFFFF;
+  x1 := 0b1;
 }
 
 
