@@ -30,7 +30,7 @@ bpm_slider : SliderF = {
 };
 
 subdivision_slider : SliderI = {
-  text: string::from("subdivisions"), 
+  text: "subdivisions", 
   rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
   style: Style { 
     foreground: WHITE.with_alpha(75),
@@ -50,7 +50,7 @@ subdivision_slider : SliderI = {
 bg_color := LIGHTCYAN;
 
 beats_slider : SliderI = {
-  text: string::from("beats"), 
+  text: "beats", 
   rect: {x: 150, y: 110, width: 150, height: 40}, 
   style: Style { 
     foreground: WHITE.with_alpha(75),
@@ -251,7 +251,7 @@ main :: fn() {
   dir := Directory::open(".");
 
   InitAudioDevice();
-  InitWindow(800, 600, "Sequencer");
+  InitWindow(800, 600, "Sequencer"c);
 
   SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);

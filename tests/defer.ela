@@ -23,7 +23,7 @@ nested_defer_test :: fn() -> int {
 }
 
 #test test_nested_defer :: fn() {
-  assert("nested defer failed", nested_defer_test() == 2);
+  assert("nested defer failed"c, nested_defer_test() == 2);
 }
 
 loop_defer_test :: fn() -> int {
@@ -37,7 +37,7 @@ loop_defer_test :: fn() -> int {
 }
 
 #test test_loop_defer :: fn() {
-  assert("loop defer failed", loop_defer_test() == 3);
+  assert("loop defer failed"c, loop_defer_test() == 3);
 }
 
 early_return_defer_test :: fn() -> int {
@@ -55,7 +55,7 @@ early_return_defer_test :: fn() -> int {
 }
 
 #test test_early_return_defer :: fn() {
-  assert("early return defer failed", early_return_defer_test() == 0);
+  assert("early return defer failed"c, early_return_defer_test() == 0);
 }
 
 DeferCleanup :: struct {
@@ -73,7 +73,7 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
     free(c.ptr);
     c.ptr = null;
   }
-  assert("defer cleanup got null input", c.ptr != null);
+  assert("defer cleanup got null input"c, c.ptr != null);
   return c.ptr as u64;
 }
 
@@ -84,6 +84,6 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
   };
   ptr_as_int : u64 = ptr as u64;
   n := defer_cleanup_routine(&cleanup);
-  assert("yep", n == ptr_as_int);
-  assert("cleanup on defer failed", cleanup.ptr == null);
+  assert("yep"c, n == ptr_as_int);
+  assert("cleanup on defer failed"c, cleanup.ptr == null);
 }

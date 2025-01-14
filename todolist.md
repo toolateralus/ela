@@ -6,20 +6,22 @@ To search for all info comments in the source just use vscodes regex search with
 ### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
 
 # features(in order)
-  - tagged unions.
+  - interfaces (kind of started)
   - modules.
   - we need mut/const semantics for variables and parameters etc.
-  - quick lambdas.
-  - interfaces.
-  - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
   - `for i, v in some_array {} getting an index from an iterator.
+  - tagged unions.
+  - quick lambdas.
+  - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
 
 ## out-of-language features
 - config file/ project. So we can organize submodules, add compilation commands & library paths, source ela libraries, etc.
 
 # reworks.
 - rework iterators completely, no more relying on C++ iterators. they suck anyway
-- destructors are like totally broken and just destroy any struct with a destructor when the function it was created in exits.
+- defer is totally busted.
+- tuples need to be completely refactored in the backend.
+- interpolated strings are trash
 - type inference for generics is near non existent
 - A lot of libraries in /lib need to be rewritten because of impl/ no more constructor/destructor reworks
 

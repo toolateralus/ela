@@ -57,14 +57,15 @@ my_concatenated_string := $"{a}{b}";
 
 // * my_concatenated_string = "Hello World!";
 
-Hello :: struct {
-  to_string :: fn() -> string {
+Hello :: struct;
+World :: struct;
+impl Hello {
+  to_string :: fn(self) -> string {
     return "Hello";
   }
 }
-
-World :: struct {
-  to_string :: fn() -> string {
+impl World {
+  to_string :: fn(self) -> string {
     return " World!";
   }
 }

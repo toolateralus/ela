@@ -1,5 +1,4 @@
 // #self in a generic impl crashes the compiler.
-
 Strakt :: struct![T] {}
 
 impl![T] Strakt![T] {

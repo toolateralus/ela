@@ -480,6 +480,11 @@ std::any Typer::visit(ASTDeclaration *node) {
 
   auto type = global_get_type(node->type->resolved_type);
 
+  // If we declare a c_string, we skip the normal string construction procedure.
+  if (node->value.get() && node->value.get()->resolved_type == string_type() && type->id == string_type()) {
+    node->value.get()->resolved_type = c_string_type();
+  }
+
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
   }
@@ -1126,8 +1131,13 @@ std::any Typer::visit(ASTLiteral *node) {
       return float32_type();
     case ASTLiteral::RawString:
     case ASTLiteral::String:
-      return c_string_type(); // TODO: we should just use our string, not c string. can use some like "literal" or
-                              // something like that.
+      if (declaring_or_assigning_type == c_string_type() || node->is_c_string) {
+        node->resolved_type = c_string_type();
+        return c_string_type();
+      } else {
+        node->resolved_type = string_type();
+        return string_type(); 
+      }
       break;
     case ASTLiteral::Bool:
       return bool_type();

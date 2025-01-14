@@ -866,6 +866,10 @@ ASTExpr *Parser::parse_primary() {
       literal->tag = ASTLiteral::String;
       literal->value = tok.value;
       end_node(literal, range);
+      if (peek().type == TType::Identifier && peek().value == "c") {
+        eat();
+        literal->is_c_string = true;
+      }
       return literal;
     }
     case TType::LParen: {
@@ -891,6 +895,11 @@ ASTExpr *Parser::parse_primary() {
       }
       eat();
       end_node(expr, range);
+
+      if (expr->get_node_type() == AST_NODE_TYPE || expr->get_node_type() == AST_NODE_SELF_TYPE) {
+        throw_error("using (TYPE)expr style casts are deprecated. use `expr as TYPE` syntax", range);
+      }
+
       return expr;
     }
     default: {

@@ -11,7 +11,7 @@
     CONSTANT0 :: 10;
   }
   
-  assert("ifdef failed", CONSTANT0 == 20);
+  assert("ifdef failed"c, CONSTANT0 == 20);
   #undef CHEESE;
 
   #def HAMBURGER;
@@ -24,7 +24,7 @@
     CONSTANT1 :: 10;
   }
   
-  assert("ifdef failed", CONSTANT1 == 100);
+  assert("ifdef failed"c, CONSTANT1 == 100);
 
   #undef HAMBURGER;
   
@@ -37,13 +37,13 @@
   }
 
   
-  assert("ifdef failed", CONSTANT2 == 10);
+  assert("ifdef failed"c, CONSTANT2 == 10);
 
   #ifndef HAMBURGER {
     CONSTANT3 :: 100;
   } 
 
-  assert("ifndef failed", CONSTANT3 == 100);
+  assert("ifndef failed"c, CONSTANT3 == 100);
 
   #def thing
 
@@ -54,7 +54,7 @@
         n -= 2;
       }
     }
-    assert("ndef", false);
+    assert("ndef"c, false);
   } else {
     for i in 0..100 {
       n := i;
@@ -62,7 +62,7 @@
         n -= 2;
       }
     }
-    assert("ndef", true);
+    assert("ndef"c, true);
   }
 
   #undef thing;
@@ -74,7 +74,7 @@
         n -= 2;
       }
     }
-    assert("ndef", true);
+    assert("ndef"c, true);
   } else {
     for i in 0..100 {
       n := i;
@@ -82,7 +82,7 @@
         n -= 2;
       }
     }
-    assert("ndef", false);
+    assert("ndef"c, false);
   }
 }
 
@@ -93,5 +93,5 @@
   } else {
     n := 1;
   }
-  assert("`#if true` failed", n == 0);
+  assert("`#if true` failed"c, n == 0);
 }

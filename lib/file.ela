@@ -58,7 +58,7 @@ impl File {
     return len as u32;
   }
   read_all :: fn(filename: string) -> string {
-    file := fopen(filename.data, "r");
+    file := fopen(filename.data, "r"c);
     str: string;
     c: char;
     while ((c = fgetc(file)) != EOF) {
@@ -69,7 +69,7 @@ impl File {
   }
 
   read_bytes :: fn(filename: string) -> u8[] {
-    file := fopen(filename.data, "r");
+    file := fopen(filename.data, "r"c);
     result: u8[];
     c: char;
     while ((c = fgetc(file)) != EOF) {
@@ -80,7 +80,7 @@ impl File {
   }
 
   write_all :: fn(filename: string, data: string) -> void {
-    file := fopen(filename.data, "w");
+    file := fopen(filename.data, "w"c);
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);
   }

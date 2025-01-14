@@ -27,10 +27,10 @@
       return self.a
     }
     method_get_self :: fn(self*) -> #self {
-      return {a: 100}
+      return { a: 100 }
     }
     static_get_self :: fn() -> #self {
-      return {a: 100};
+      return { a: 100 };
     }
   }
 }
@@ -72,20 +72,20 @@
 }
 
 #test basic_struct :: fn() {
-  assert("interface failed", Struct::static_get() == 0);
-  assert("interface failed", Struct::static_get_self().a == 100);
+  assert("interface failed"c, Struct::static_get() == 0);
+  assert("interface failed"c, Struct::static_get_self().a == 100);
   instance: Struct;
-  assert("interface failed", instance.method_get() == 0);
-  assert("interface failed", instance.method_get_ptr() == 0);
-  assert("interface failed", instance.method_get_self().a == 0);
+  assert("interface failed"c, instance.method_get() == 0);
+  assert("interface failed"c, instance.method_get_ptr() == 0);
+  assert("interface failed"c, instance.method_get_self().a == 0);
 }
 
 #test generic_interface_regular_struct :: fn() {
-  assert("interface failed", Struct1::static_get() == 0);
-  assert("interface failed", Struct1::static_get_self().a == 100);
+  assert("interface failed"c, Struct1::static_get() == 0);
+  assert("interface failed"c, Struct1::static_get_self().a == 100);
   instance: Struct1;
-  assert("interface failed", instance.method_get() == 0);
-  assert("interface failed", instance.method_get_ptr() == 0);
-  assert("interface failed", instance.method_get_self().a == 0);
+  assert("interface failed"c, instance.method_get() == 0);
+  assert("interface failed"c, instance.method_get_ptr() == 0);
+  assert("interface failed"c, instance.method_get_self().a == 0);
 }
 
