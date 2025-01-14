@@ -230,8 +230,8 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
 
 // great function name
 get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
-  gray_value : u8 = clamp(Random::next(1) * 255.0, 0, 255) as u8;
-  variance :: fn() -> u8 { return (Random::next(1) * _variance) as u8; };
+  gray_value : u8 = clamp(GetRandomValue(0, 1) * 255.0, 0, 255) as u8;
+  variance :: fn() -> u8 { return (GetRandomValue(0, 1) * _variance) as u8; };
   r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
   b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
@@ -240,14 +240,14 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
   result: Vector2;
-  result.x = origin.x + min.x + Random::next(1) * (max.x - min.x);
-  result.y = origin.y + min.y + Random::next(1) * (max.y - min.y);
+  result.x = origin.x + min.x + GetRandomValue(0, 1) * (max.x - min.x);
+  result.y = origin.y + min.y + GetRandomValue(0, 1) * (max.y - min.y);
   return result;
 }
 
 random_vector2_scalar :: fn(max: float32) -> Vector2 {
   result: Vector2;
-  value := Random::next(max);
+  value := GetRandomValue(0, max as s32);
   result.x = value
   result.y = value;
   return result;
@@ -259,7 +259,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     max_vel := 3.0;
     particle.position = random_vector2(position, {x: 0, y: 0}, {x: max_vel, y: max_vel});
     particle.velocity = random_vector2({x: 0.0, y: 0.0}, {x: -max_vel, y: -1.0}, {x: max_vel, y: max_vel});
-    burst : int = (Random::next(1) * smoke_particle_max_burst) as int;
+    burst : int = (GetRandomValue(0, 1) * smoke_particle_max_burst) as int;
     if can_burst && burst > 1 {
       can_burst = false;
       for _ in 0..burst { make_particle(kind, position, tint); }
@@ -269,7 +269,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
     particle.render_info = &smoke_particle_render_info;
     particle.lifetime = 1.0;
-    particle.scale = smoke_particle_init_scale.scale(Random::next(6400.0));
+    particle.scale = smoke_particle_init_scale.scale(GetRandomValue(0, 6400));
     particle.spawn_time = GetTime();
   } else if kind == ParticleKind::Fire {
     max_spread := 24.0;
@@ -321,11 +321,11 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
   position : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
   if position.distance(enemy.target) < 5 || zero.equals(enemy.target) {
     enemy.target = { 
-      x: Random::next(1) * screen_width, 
-      y: Random::next(1) * screen_height 
+      x: GetRandomValue(0, 1) * screen_width, 
+      y: GetRandomValue(0, 1) * screen_height 
     };
     enemy.target.y = clamp(enemy.target.y, 0, screen_height / 1.5);
-    enemy.speed = Random::next(1) * enemy_max_speed * round_index;
+    enemy.speed = GetRandomValue(0, 1) * enemy_max_speed * round_index;
   } else {
     direction := enemy.target.sub(position).normalize();
     position = direction.scale(enemy.speed).add(position);
@@ -336,8 +336,8 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 }
 
 make_enemy :: fn() {
-  x := Random::next(1) * screen_width;
-  y := Random::next(1) * screen_height;
+  x : float = GetRandomValue(0, 1) * screen_width;
+  y : float = GetRandomValue(0, 1) * screen_height;
   rect : Rectangle = {x: x, y: y, width: enemy_scale, height: enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);
@@ -893,30 +893,25 @@ main :: fn() {
     screen_width = GetScreenWidth();
     screen_height = GetScreenHeight();
 
-
     UpdateMusicStream(*current_music);
     BeginDrawing();
-    BeginMode2D(camera);
+    // BeginMode2D(camera);
       ClearBackground(bg_color);
       draw_background();
-
-      // ? DrawFPS(0, 72); For debugging framerate.
-
+      DrawFPS(0, 72);
       if scene == Scene::MainMenu {
-
         draw_main_menu();
       } else {
-
         if IsKeyPressed(KeyboardKey::KEY_BACKSPACE) {
           scene = Scene::MainMenu;
           swap_music();
         }
-
         update_game();
         draw_game();
         draw_game_menu();
       }
-    EndMode2D();
+      DrawText("This game is totally broken right now!!\n fix me please\n Raylib bindings are the source of\n the problem, they changed\n And the previous bindings,\n were totally wrong\n\n It's mostly the Timer object I think\n and the Camera."c, 0, 120, 32, RED);
+    // EndMode2D();
     EndDrawing();
   }
 
