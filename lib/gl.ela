@@ -746,7 +746,7 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
-    printf("Shader compilation failed: %s\n", info_log);
+    printf("Shader compilation failed: %s\n"cc, info_log);
     free(info_log);
     return 0 as u32;
   }
@@ -773,7 +773,7 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
-    printf("Program linking failed: %s\n", info_log);
+    printf("Program linking failed: %s\n"cc, info_log);
     free(info_log);
     return 0 as u32;
   }
@@ -787,19 +787,19 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
 check_error :: fn(location: c_string) {
   err: int = glGetError();
   if err == GL::INVALID_ENUM {
-    printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_ENUM"c, location);
   } else if err == GL::INVALID_VALUE {
-    printf("error: %s, from: %s\n", "GL::INVALID_VALUE", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_VALUE"c, location);
   } else if err == GL::INVALID_OPERATION {
-    printf("error: %s, from: %s\n", "GL::INVALID_OPERATION", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_OPERATION"c, location);
   } else if err == GL::STACK_OVERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_OVERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_OVERFLOW"c, location);
   } else if err == GL::STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_UNDERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_UNDERFLOW"c, location);
   } else if err == GL::OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n", "GL::OUT_OF_MEMORY", location);
+    printf("error: %s, from: %s\n"c, "GL::OUT_OF_MEMORY"c, location);
   } else if err != 0 {
-    printf("unknown gl error: %d, from: %s\n", err, location);
+    printf("unknown gl error: %d, from: %s\n"c, err, location);
   }
 }
 
@@ -1083,7 +1083,7 @@ impl Shader {
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec4 :: fn(self*, name: c_string, v: Vec4*) {
@@ -1091,7 +1091,7 @@ impl Shader {
     if index != -1 {
       glUniform4fv(index, 1, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec3 :: fn(self*, name: c_string, v: Vec3*) {
@@ -1099,7 +1099,7 @@ impl Shader {
     if index != -1 {
       glUniform3fv(index, 1, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec2 :: fn(self*, name: c_string, v: Vec2*) {
@@ -1107,7 +1107,7 @@ impl Shader {
     if index != -1 {
       glUniform2fv(index, 1, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_float :: fn(self*, name: c_string, v: float) {
@@ -1115,7 +1115,7 @@ impl Shader {
     if index != -1 {
       glUniform1f(index, v);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
 }
@@ -1128,18 +1128,18 @@ impl Window {
   create :: fn(width: int, height: int, title: c_string) -> #self {
     self: #self;
     if !glfwInit() {
-      printf("Failed to initialize glfw\n");
+      printf("Failed to initialize glfw\n"c);
       return self;
     }
     self.handle = glfwCreateWindow(width, height, title, null, null);
     if self.handle == null {
-      printf("Failed to create window\n");
+      printf("Failed to create window\n"c);
       glfwTerminate();
       return self;
     }
     glfwMakeContextCurrent(self.handle);
     if glewInit() != 0 {
-      printf("Failed to initialize glew\n");
+      printf("Failed to initialize glew\n"c);
       glfwTerminate();
       return self;
     }

@@ -40,7 +40,7 @@ Allocator :: struct {
     ptr += size;
     
     if (ptr > size) {
-      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n");
+      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n"c);
       exit(1);
     }
     return data;

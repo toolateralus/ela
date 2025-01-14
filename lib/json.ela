@@ -206,17 +206,17 @@ impl JsonLexer {
       token.value = string::from_ptr(&self.input[start], &self.input[start] + len);
       token.type = JsonTokenType::String;
       return (JsonError::Ok(), token);
-    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "true", 4) == 0 {
+    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "true"c, 4) == 0 {
       token.value = "true";
       token.type = JsonTokenType::True;
       self.position += 4;
       return (JsonError::Ok(), token);
-    } else if self.position + 5 <= self.length && strncmp(&self.input[self.position], "false", 5) == 0 {
+    } else if self.position + 5 <= self.length && strncmp(&self.input[self.position], "false"c, 5) == 0 {
       token.value = "false";
       token.type = JsonTokenType::False;
       self.position += 5;
       return (JsonError::Ok(), token);
-    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "null", 4) == 0 {
+    } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "null"c, 4) == 0 {
       token.value = "null";
       token.type = JsonTokenType::Null;
       self.position += 4;

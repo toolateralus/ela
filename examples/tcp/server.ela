@@ -14,8 +14,8 @@ chatting :: fn(connfd: int) {
     n: int;
     while n < 80 && ((buff[n++] = getchar()) != '\n') {}
     write(connfd, buff, 80);
-    if (strncmp("exit", (char*)buff, 4) == 0) {
-      printf("Server Exit...\n");
+    if (strncmp("exit"c, (char*)buff, 4) == 0) {
+      printf("Server Exit...\n"c);
       break;
     }
   }

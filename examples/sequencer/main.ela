@@ -251,7 +251,7 @@ main :: fn() {
   dir := Directory::open(".");
 
   InitAudioDevice();
-  InitWindow(800, 600, "Sequencer");
+  InitWindow(800, 600, "Sequencer"c);
 
   SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);

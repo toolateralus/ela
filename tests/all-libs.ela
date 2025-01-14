@@ -15,8 +15,8 @@
 
 // These will be relatively hard to refactor.
 
-#import memory;
-#import json;
+// #import memory;
+// #import json;
 #import raylib;
 // this has confliction definitions with raylib.
 // #import gl;
