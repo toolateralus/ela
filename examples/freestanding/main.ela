@@ -31,23 +31,30 @@ Allocator :: struct {
   mem : char[1024 * 24];
   ptr : u32;
   size: u32;
-  #ctor :: fn() {
-    size = 1024 * 24;
-    memset((char*)mem, 0, size);
+}
+
+impl Allocator {
+  create :: fn() -> #self {
+    self: #self;
+    self.size = 1024 * 24;
+    memset(self.mem as char*, 0, self.size);
+    return self;
   }
-  alloc :: fn(size: u32) -> char* {
-    data := &mem[ptr];
-    ptr += size;
+
+  alloc :: fn(self*, size: u32) -> char* {
+    data := &self.mem[self.ptr];
+    self.ptr += size;
     
-    if (ptr > size) {
+    if (self.ptr > self.size) {
       print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n"c);
       exit(1);
     }
+
     return data;
   }
 }
 
-allocator: Allocator;
+allocator := Allocator::create();
 
 Vector2 :: struct {
   x: float;
@@ -58,13 +65,14 @@ Vector2 :: struct {
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
 // and 'export' is declaring an externally visible symbol.
 #export main :: fn() -> int {
-  print("\e[1;4;32mHello Free(standing) World!\e[0m\n");
+  print("\e[1;4;32mHello Free(standing) World!\e[0m\n"c);
   
   while {
+
     // example of getting a 'dynamically allocated' struct.
     v: Vector2* = allocator.alloc(sizeof(Vector2));
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
-    memcpy((char**)&v1, (char*)v, sizeof(Vector2));
+    memcpy((&v1) as char**, v as char*, sizeof(Vector2));
     // we do this in a loop to show that our exit(1) call works to 
     // 'panic' on an error.
   }

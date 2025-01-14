@@ -145,7 +145,7 @@ std::any Emitter::visit(ASTType *node) {
 
 int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   switch (node->get_node_type()) {
-    case AST_NODE_TYPE: 
+    case AST_NODE_TYPE:
       return std::any_cast<int>(node->accept(&typer));
     case AST_NODE_IDENTIFIER:
       return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
@@ -620,7 +620,10 @@ std::any Emitter::visit(ASTProgram *node) {
       if (type->get_base() == "Type")
         continue;
 
-      if (ext.is_array() && !ext.is_fixed_sized_array()) {
+
+      // hack for string array becasue env makes it.
+      if (ext.is_array() && !ext.is_fixed_sized_array() &&
+          type->id != global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}})) {
         throw_error(std::format("You cannot use dynamic arrays in a freestanding or nostdlib "
                                 "environment, due to lack of allocators. Type: {}",
                                 type->to_string()),
@@ -1456,7 +1459,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 
 std::string Emitter::to_cpp_string(Type *type) {
   auto output = std::string{};
-  switch (type->kind ) {
+  switch (type->kind) {
     case TYPE_FUNCTION:
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
@@ -1527,7 +1530,7 @@ std::any Emitter::visit(ASTImpl *node) {
     }
     return {};
   }
-  
+
   auto target = global_get_type(node->target->resolved_type);
   current_impl = node;
   Defer _([&] { current_impl = nullptr; });
@@ -1555,7 +1558,7 @@ std::any Emitter::visit(ASTImpl *node) {
 }
 
 std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
-  (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() <<  ";\n";
+  (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
   auto name = node->name.get_str();
   for (const auto &member : node->members) {
     if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
@@ -1586,7 +1589,7 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
   for (const auto &member : node->members) {
     if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
       auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      (*ss) << name + "_" + struct_node->name.get_str()  << " $index_" << std::to_string(n) << ";\n";
+      (*ss) << name + "_" + struct_node->name.get_str() << " $index_" << std::to_string(n) << ";\n";
     } else if (member->get_node_type() == AST_NODE_DECLARATION) {
       auto declaration_node = static_cast<ASTDeclaration *>(member);
       auto alias = name + "_" + declaration_node->name.get_str();
@@ -1597,7 +1600,6 @@ std::any Emitter::visit(ASTTaggedUnionDeclaration *node) {
   (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
   return {};
 }
-
 
 std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
@@ -1668,7 +1670,6 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
         (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
         node->block.get()->accept(this);
       } else {
-        (*ss) << "int ";
         emit_function_signature_and_body(node->name.get_str());
       }
     } else {
@@ -1790,8 +1791,4 @@ std::any Emitter::visit(ASTCast *node) {
   return {};
 }
 
-std::any Emitter::visit(ASTInterfaceDeclaration *node) {
-  return {};
-}
-
-
+std::any Emitter::visit(ASTInterfaceDeclaration *node) { return {}; }

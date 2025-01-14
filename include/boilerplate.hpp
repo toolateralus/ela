@@ -86,13 +86,6 @@ extern "C" int strlen(const char *);
 #undef RAND_MAX
 #undef assert
 
-// TODO: implement `Any` type... not sure how we want to approach it.
-// template <class T> struct Any {
-//   T value;
-//   template <class U> Any(U&& v) : value(std::forward<U>(v)) {}
-//   template <class U> operator U() { return static_cast<U>(value); }
-// };
-
 template <class T> struct _array {
   T *data = nullptr;
   s32 length = 0;

@@ -21,9 +21,9 @@ main :: fn() -> int {
   
   ctx: DrawContext;
   
-  SetTargetFPS(60);
-  
-  InitWindow(0, 0, "Testing DLL"c);
+  SetTargetFPS(240);
+  InitWindow(800, 600, "Testing DLL"c);
+
   while !WindowShouldClose() {
     for key in 0..256 {
       ctx.inputState[key] = IsKeyDown(key);
