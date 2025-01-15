@@ -1,5 +1,5 @@
 #import core;
-#import raylib;
+#import rayui;
 
 #import directory;
 #import file;
@@ -263,7 +263,7 @@ main :: fn() {
   }
 
   while !WindowShouldClose() {
-    ClearBackground(WHITE.scaled_rgb(0.05));
+    ClearBackground(GRAY);
     BeginDrawing();
       if IsKeyPressed(KeyboardKey::KEY_SPACE) then play_callback();
 

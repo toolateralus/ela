@@ -2,7 +2,8 @@
 // fails to compile because we use c++ overloading instead of using template<T>
 // We have to use some sort of mangling to avoid this.
 generic :: fn![T]() -> T {
-  return {};
+  _default: T;
+  return _default;
 }
 
 main :: fn() {

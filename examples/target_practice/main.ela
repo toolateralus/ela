@@ -1,5 +1,4 @@
-#import raylib;
-#import core;
+#import rayui;
 
 Scene :: enum {
   MainMenu,
@@ -507,11 +506,11 @@ update_game :: fn() {
       style.jiggle_intensity = 2;
       style.jiggle_rate = 10;
 
-      text_w := measure_jiggly_text(text.data, style) / 4.0;
-      jiggly_text(text.data, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
+      text_w := measure_jiggly_text(text, style) / 4.0;
+      jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
 
       text = $"Requires {round_base_num_enemies_to_advance * round_index} enemies to pass.";
-      jiggly_text(text.data, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
+      jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
 
     } else {
       misses_this_round = 0;
@@ -835,11 +834,11 @@ draw_main_menu :: fn() {
     style.foreground = CYAN;
     style.jiggle_intensity = 3.0;
     style.jiggle_rate = 1.0;
-    jiggly_text($"reached round {round_index},".data, rect, style);
+    jiggly_text($"reached round {round_index},", rect, style);
     rect.y += 64;
-    jiggly_text($"{targets_destroyed} targets taken down".data, rect, style);
+    jiggly_text($"{targets_destroyed} targets taken down", rect, style);
     rect.y += 64;
-    jiggly_text($"scored {score} points".data, rect, style);
+    jiggly_text($"scored {score} points", rect, style);
 
   }
 }
