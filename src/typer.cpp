@@ -1146,8 +1146,10 @@ std::any Typer::visit(ASTLiteral *node) {
     case ASTLiteral::Null:
       return voidptr_type();
     case ASTLiteral::InterpolatedString: {
-      for (const auto &arg : node->interpolated_values) {
-        arg->accept(this);
+      auto current = node->interpolated_string_root;
+      while (current) {
+        if (current->expression) current->expression->accept(this);
+        current = current->next;
       }
       return string_type();
     }

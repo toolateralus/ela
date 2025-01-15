@@ -237,6 +237,13 @@ struct ASTIdentifier : ASTExpr {
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 };
+
+struct InterpolatedStringSegment {
+  InternedString             prefix;
+  ASTExpr                   *expression;
+  InterpolatedStringSegment *next = nullptr;
+};
+
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
@@ -248,12 +255,19 @@ struct ASTLiteral : ASTExpr {
     Bool,
     Null,
   } tag;
-  std::vector<ASTExpr *> interpolated_values{};
+
+  ~ASTLiteral() {
+    if (tag == InterpolatedString) {
+      delete(interpolated_string_root);
+    }
+  }
+  InterpolatedStringSegment *interpolated_string_root;
   InternedString value;
   bool is_c_string = false;
   std::any accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
+
 
 struct ASTTupleDeconstruction : ASTStatement {
   std::vector<ASTIdentifier *> idens;
@@ -703,6 +717,7 @@ struct Parser {
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
+  ASTExpr *parse_interpolated_string();
   ASTExpr *parse_primary();
   ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();
@@ -755,6 +770,8 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   node->declaring_block = Parser::current_block;
   return node;
 }
+
+
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
   type *node = ast_alloc<type>();                                                                                      \

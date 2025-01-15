@@ -1023,106 +1023,91 @@ std::string get_format_str(int type_id, ASTNode *node) {
 void Emitter::interpolate_string(ASTLiteral *node) {
   emit_line_directive(node);
 
-  if (node->value.get_str().empty()) {
-    throw_warning(WarningEmptyStringInterpolation, "Empty interpolated string.", node->source_range);
-    (*ss) << "string()";
-    return;
-  }
-
   std::string str;
+  auto current = node->interpolated_string_root;
+  std::stringstream interp_ss;
 
-  auto replace_next_brace_pair = [&](std::string &in, const std::string &replacement) {
-    auto start = in.find('{');
-    if (start != std::string::npos) {
-      auto end = in.find('}', start);
-      if (end != std::string::npos) {
-        in.replace(start, end - start + 1, replacement);
-      }
+  while (current) {
+    interp_ss << current->prefix.get_str();
+    if (current->expression) {
+      auto type_id = std::any_cast<int>(current->expression->accept(&typer));
+      interp_ss << get_format_str(type_id, node);
     }
-  };
-
-  for (const auto &value : node->interpolated_values) {
-    auto type_id = std::any_cast<int>(value->accept(&typer));
-    std::string format_specifier = get_format_str(type_id, node);
-    auto v = node->value.get_str();
-    replace_next_brace_pair(v, format_specifier);
-    node->value = v;
+    current = current->next;
   }
 
-  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << node->value.get_str() << "\",";
+  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << interp_ss.str() << "\",";
 
-  auto interpolate_value = [&](ASTExpr *value) {
-    auto type_id = std::any_cast<int>(value->accept(&typer));
-    auto type = global_get_type(type_id);
+  current = node->interpolated_string_root;
+  while (current) {
+    if (current->expression) {
+      auto type_id = std::any_cast<int>(current->expression->accept(&typer));
+      auto type = global_get_type(type_id);
 
-    auto interpolate_to_string_struct_union = [&](Scope *scope) {
-      auto sym = scope->lookup("to_string");
+      const auto interpolate_to_string_struct_union = [&](Scope *scope) {
+        auto sym = scope->lookup("to_string");
 
-      if (!sym)
-        throw_error("Cannot use a struct in an interpolated string without defining a "
-                    "`to_string` function that returns either a char* or a string",
-                    value->source_range);
+        if (!sym)
+          throw_error("Cannot use a struct in an interpolated string without defining a "
+                      "`to_string` function that returns either a char* or a string",
+                      current->expression->source_range);
 
-      auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+        auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+        auto return_ty = global_get_type(sym_ty->return_type);
+        auto param_0 = global_get_type(sym_ty->parameter_types[0]);
+        auto takes_pointer = param_0->get_ext().is_pointer();
+        auto &extensions = type->get_ext();
+        auto name = type->get_base();
 
-      auto return_ty = global_get_type(sym_ty->return_type);
-      auto param_0 = global_get_type(sym_ty->parameter_types[0]);
-      auto takes_pointer = param_0->get_ext().is_pointer();
-      auto &extensions = type->get_ext();
-      auto name = type->get_base();
-      // TODO: we need to check against the method type more appropriately
-      if (extensions.back_type() == TYPE_EXT_POINTER) {
-        (*ss) << name.get_str() << "_to_string(";
-        if (!takes_pointer) {
-          (*ss) << "*";
+        if (extensions.back_type() == TYPE_EXT_POINTER) {
+          (*ss) << name.get_str() << "_to_string(";
+          if (!takes_pointer) {
+            (*ss) << "*";
+          }
+          current->expression->accept(this);
+          (*ss) << ")";
+        } else {
+          (*ss) << name.get_str() << "_to_string(";
+          if (takes_pointer) {
+            (*ss) << "&";
+          }
+          current->expression->accept(this);
+          (*ss) << ")";
         }
-        value->accept(this);
-        (*ss) << ")";
-      } else {
-        (*ss) << name.get_str() << "_to_string(";
-        if (takes_pointer) {
-          (*ss) << "&";
-        }
-        value->accept(this);
-        (*ss) << ")";
-      }
 
-      if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
+        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
+          (*ss) << ".data";
+        }
+      };
+
+      if (type->id == bool_type()) {
+        current->expression->accept(this);
+        (*ss) << " ? \"true\" : \"false\"";
+      } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+        current->expression->accept(this);
         (*ss) << ".data";
-      }
-    };
-
-    if (type->id == bool_type()) {
-      value->accept(this);
-      (*ss) << " ? \"true\" : \"false\"";
-    } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
-      value->accept(this);
-      (*ss) << ".data";
-    } else if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->get_info()->as<StructTypeInfo>());
-      interpolate_to_string_struct_union(info->scope);
-    } else if (type->is_kind(TYPE_UNION)) {
-      auto info = (type->get_info()->as<UnionTypeInfo>());
-      interpolate_to_string_struct_union(info->scope);
-    } else if (type->is_kind(TYPE_TUPLE)) {
-      auto info = type->get_info()->as<TupleTypeInfo>();
-      for (int i = 0; i < info->types.size(); ++i) {
-        (*ss) << "std::get<" << std::to_string(i) << ">(";
-        value->accept(this);
-        (*ss) << ")";
-        if (i != info->types.size() - 1) {
-          (*ss) << ", ";
+      } else if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+        auto info = (type->get_info()->as<StructTypeInfo>());
+        interpolate_to_string_struct_union(info->scope);
+      } else if (type->is_kind(TYPE_TUPLE)) {
+        auto info = type->get_info()->as<TupleTypeInfo>();
+        for (int i = 0; i < info->types.size(); ++i) {
+          (*ss) << "std::get<" << std::to_string(i) << ">(";
+          current->expression->accept(this);
+          (*ss) << ")";
+          if (i != info->types.size() - 1) {
+            (*ss) << ", ";
+          }
         }
+      } else {
+        current->expression->accept(this);
       }
-    } else {
-      value->accept(this);
+      if (current->next && current->next->expression) {
+        (*ss) << ", ";
+      }
     }
-    if (value != node->interpolated_values.back())
-      (*ss) << ", ";
-  };
-
-  for (const auto &value : node->interpolated_values)
-    interpolate_value(value);
+    current = current->next;
+  }
 
   (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
            "strlen(buf); return str; }()";
