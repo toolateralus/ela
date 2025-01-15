@@ -50,8 +50,53 @@ struct ClangVisitData {
   std::ofstream logfile;
 };
 
-// Helper function to get the type name as a string and translate C types to custom types
+static std::vector<std::pair<std::string, std::string>> type_map = {{"char", "u8"},
+                                                                    {"float", "float32"},
+                                                                    {"double", "float64"},
+                                                                    {"long double", "float64"},
+                                                                    {"_Bool", "bool"},
+                                                                    {"usize", "u64"},
+                                                                    {"signed char", "s8"},
+                                                                    {"short", "s16"},
+                                                                    {"int", "s32"},
+                                                                    {"long", "s64"},
+                                                                    {"long long", "s64"},
+                                                                    {"ssize_t", "s64"},
+                                                                    {"ptrdiff_t", "u64"},
+                                                                    {"intptr_t", "s64"},
+                                                                    {"intmax_t", "s64"},
+                                                                    {"int8_t", "s8"},
+                                                                    {"int16_t", "s16"},
+                                                                    {"int32_t", "s32"},
+                                                                    {"int64_t", "s64"},
+                                                                    {"size_t", "u64"},
+                                                                    {"unsigned char", "u8"},
+                                                                    {"unsigned short", "u16"},
+                                                                    {"unsigned long long", "u64"},
+                                                                    {"unsigned int", "u32"},
+                                                                    {"unsigned long", "u64"},
+                                                                    {"uint8_t", "u8"},
+                                                                    {"uintptr_t", "u64"},
+                                                                    {"uintmax_t", "u64"},
+                                                                    {"uint16_t", "u16"},
+                                                                    {"uint32_t", "u32"},
+                                                                    {"uint64_t", "u64"},
+                                                                    {"signed", "s32"},
+                                                                    {"unsigned", "u32"},
+                                                                    {"void", "void"}};
+
 static inline std::string wrapgen_get_type_name(CXType type) {
+  if (type.kind == CXType_Pointer) {
+    std::string result = wrapgen_get_type_name(clang_getPointeeType(type)) + " *";
+    return result;
+  }
+
+  if (type.kind == CXType_ConstantArray) {
+    long long arraySize = clang_getArraySize(type);
+    std::string result = wrapgen_get_type_name(clang_getArrayElementType(type)) + "[" + std::to_string(arraySize) + "]";
+    return result;
+  }
+
   if (type.kind == CXType_Typedef) {
     CXType underlyingType = clang_getTypedefDeclUnderlyingType(clang_getTypeDeclaration(type));
     return wrapgen_get_type_name(underlyingType);
@@ -69,61 +114,27 @@ static inline std::string wrapgen_get_type_name(CXType type) {
   if (restrictPos != std::string::npos) {
     result.erase(restrictPos, 9);
   }
-  size_t unsignedPos = result.find("unsigned");
-  if (unsignedPos != std::string::npos){
-    result.erase(unsignedPos, 9);
-  }
 
-  static std::unordered_map<std::string, std::string> type_map = {{"char", "u8"},
-                                                                  {"signed char", "s8"},
-                                                                  {"unsigned char", "u8"},
-                                                                  {"short", "s16"},
-                                                                  {"unsigned short", "u16"},
-                                                                  {"int", "s32"},
-                                                                  {"unsigned int", "u32"},
-                                                                  {"long", "s64"},
-                                                                  {"unsigned long", "u64"},
-                                                                  {"long long", "s64"},
-                                                                  {"unsigned long long", "u64"},
-                                                                  {"float", "float32"},
-                                                                  {"double", "float32"},
-                                                                  {"long double", "float64"},
-                                                                  {"signed", "s32"},
-                                                                  {"unsigned", "u32"},
-                                                                  {"_Bool", "bool"},
-                                                                  {"wchar_t", "wchar"},
-                                                                  {"size_t", "u64"},
-                                                                  {"ssize_t", "s64"},
-                                                                  {"ptrdiff_t", "u64"},
-                                                                  {"intptr_t", "s64"},
-                                                                  {"uintptr_t", "u64"},
-                                                                  {"intmax_t", "s64"},
-                                                                  {"uintmax_t", "u64"},
-                                                                  {"int8_t", "s8"},
-                                                                  {"int16_t", "s16"},
-                                                                  {"int32_t", "s32"},
-                                                                  {"int64_t", "s64"},
-                                                                  {"uint8_t", "u8"},
-                                                                  {"uint16_t", "u16"},
-                                                                  {"uint32_t", "u32"},
-                                                                  {"uint64_t", "u64"},
-                                                                  {"usize", "u64"},
-                                                                  {"void", "void"}};
-
-  if (result.contains("unnamed at")) {
+  if (result.find("unnamed at") != std::string::npos) {
     result = get_unique_identifier();
   }
 
-  auto it = type_map.find(result);
-  if (it != type_map.end()) {
-    result = it->second;
-  } else if (result.starts_with("struct ")) {
+  // Replace all occurrences of keys in type_map with their corresponding values
+  for (const auto &[key, value] : type_map) {
+    if (result == key) {
+      result = value;
+      break;
+    }
+  }
+
+  if (result.starts_with("struct ")) {
     result = result.substr(7);
   } else if (result.starts_with("union ")) {
     result = result.substr(6);
   } else if (result.starts_with("enum ")) {
     result = result.substr(5);
   }
+
   return result;
 }
 
@@ -212,18 +223,25 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
           if (fieldNameStr.empty()) {
             if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
               std::string anonTypeName = get_unique_identifier();
-              anon_output << anonTypeName << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
-              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              anon_output << anonTypeName
+                          << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
+              wrapgen_visit_struct_union_enum(c, data,
+                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
               anon_output << "};\n";
-              temp_output << "  " << anonTypeName << " : #anon :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
-              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              temp_output << "  " << anonTypeName
+                          << " : #anon :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union")
+                          << " {\n";
+              wrapgen_visit_struct_union_enum(c, data,
+                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
               temp_output << "  };\n";
             }
           } else {
             if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
               std::string anonTypeName = get_unique_identifier();
-              anon_output << anonTypeName << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
-              wrapgen_visit_struct_union_enum(c, data, clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              anon_output << anonTypeName
+                          << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
+              wrapgen_visit_struct_union_enum(c, data,
+                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
               anon_output << "};\n";
               temp_output << "  " << fieldNameStr << " : " << anonTypeName << ";\n";
             } else {
@@ -300,7 +318,8 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
 
 static inline std::string preprocess_header(const std::string &filename) {
   std::string command = "clang -E -P -frewrite-includes -I/usr/include -I/usr/local/include " + filename;
-  std::string preprocessed_file = filename + ".inc";
+  std::string preprocessed_file =
+      std::filesystem::current_path().string() + "/" + std::filesystem::path(filename).filename().string() + ".inc";
   command += " -o " + preprocessed_file;
 
   int result = system(command.c_str());
@@ -383,13 +402,19 @@ int main(int argc, char **argv) {
 
   std::string filename = argv[1];
   auto path = std::filesystem::current_path();
-  std::println("{}", path.string());
+
   try {
     auto data = wrapgen_import_c_header_into_module(filename);
-    std::ofstream ela_file(std::filesystem::current_path() / (filename + ".ela"));
+    std::string output_filename = std::filesystem::path(filename).filename().replace_extension(".ela").string();
+    std::cout << "at path: " << output_filename << '\n';
+    std::ofstream ela_file(path / output_filename);
     if (!ela_file.is_open()) {
       throw std::runtime_error("Unable to open .ela file for writing.");
     }
+    ela_file << R"_(/*
+  These bindings were auto generated by 'ela-bindings-generator'. 
+*/
+)_";
     ela_file << data.output.str();
     ela_file.close();
   } catch (const std::exception &e) {

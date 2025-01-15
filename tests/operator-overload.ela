@@ -9,7 +9,7 @@ Add :: interface![Left, Right, Result] {
 }
 
 impl Add![Vec2, Vec2, Vec2] for Vec2 {
-  add :: fn(left: Vec2, right: Vec2) -> #self {
+  add :: fn(left: Vec2, right: Vec2) -> Vec2 {
     return {
       x: left.x + right.x,
       y: left.y + right.y
