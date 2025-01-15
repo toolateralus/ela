@@ -1,6 +1,7 @@
 #include <any>
 #include <cassert>
 #include <format>
+#include <new>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -697,6 +698,8 @@ std::any Typer::visit(ASTWhile *node) {
 }
 
 std::any Typer::visit(ASTCall *node) {
+
+
   auto func_node_type = node->function->get_node_type();
 
   // Try to visit implementation on call if not emitted.
@@ -733,6 +736,10 @@ std::any Typer::visit(ASTCall *node) {
 }
 
 void Typer::type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info) {
+  auto old_type = declaring_or_assigning_type;
+  Defer _([&](){
+    declaring_or_assigning_type = old_type;
+  });
   auto args = node->arguments->arguments;
   auto args_ct = args.size();
   auto params_ct = info->params_len - (method_call ? 1 : 0);

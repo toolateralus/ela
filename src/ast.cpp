@@ -752,7 +752,6 @@ ASTExpr *Parser::parse_interpolated_string() {
       current = segment;
       prefix.clear();
     }
-
     pos = end + 1;
   }
 
@@ -768,7 +767,6 @@ ASTExpr *Parser::parse_interpolated_string() {
   end_node(node, range);
   return node;
 }
-
 
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
