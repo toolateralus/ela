@@ -1492,8 +1492,23 @@ std::any Typer::visit(ASTSwitch *node) {
 }
 std::any Typer::visit(ASTTuple *node) {
   std::vector<int> types;
+  auto declaring_tuple = global_get_type(declaring_or_assigning_type);
+
+  int type_index = 0;
   for (const auto &v : node->values) {
+    auto old = declaring_or_assigning_type;
+    Defer _([&]{
+      declaring_or_assigning_type = old;
+    });
+    if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
+      auto info = declaring_tuple->get_info()->as<TupleTypeInfo>();
+      if (info->types.size() < type_index) {
+        throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()), v->source_range);
+      }
+      declaring_or_assigning_type = info->types[type_index];
+    }
     types.push_back(int_from_any(v->accept(this)));
+    type_index++;
   }
   TypeExtensions extensions;
   extensions.extensions = accept_extensions(node->type->extensions);
