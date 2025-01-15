@@ -53,7 +53,7 @@ struct Typer : VisitorBase {
 
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
-  int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
+  int visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
                                  std::vector<int> generic_args = {});
   int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                std::vector<int> generic_args = {});
@@ -63,6 +63,7 @@ struct Typer : VisitorBase {
                               std::vector<int> generic_args = {});
   int visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
+  void visit_function_body(ASTFunctionDeclaration *node, int return_type);
 
   int get_self_type();
 

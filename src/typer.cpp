@@ -168,8 +168,35 @@ int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_insta
   return type->id;
 }
 
-int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
-                                      std::vector<int> generic_args) {
+void Typer::visit_function_body(ASTFunctionDeclaration *node, int return_type) {
+  auto old_ty = declaring_or_assigning_type;
+  auto old_scope = ctx.scope;
+  auto _defer = Defer([&] {
+    ctx.set_scope(old_scope);
+    declaring_or_assigning_type = old_ty;
+  });
+  ctx.set_scope(node->scope);
+  declaring_or_assigning_type = return_type;
+  auto block = node->block.get();
+  if (!block) {
+    throw_error("Expression bodies not yet supported", node->source_range);
+  }
+  auto control_flow = std::any_cast<ControlFlow>(block->accept(this));
+  if (control_flow.type == -1)
+    control_flow.type = void_type();
+  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0)
+    throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
+  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0)
+    throw_error("Keyword \"break\" must be in a loop.", node->source_range);
+  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && return_type != void_type())
+    throw_error("Not all code paths return a value.", node->source_range);
+  assert_types_can_cast_or_equal(control_flow.type, return_type, node->source_range,
+                                 "invalid return type.. expected '{}', got '{}'",
+                                 std::format("function: '{}'", node->name.get_str()));
+}
+
+int Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
+                                    std::vector<int> generic_args) {
   // Setup context.
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
@@ -187,7 +214,6 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
   node->return_type->accept(this);
   node->params->accept(this);
 
-  int type_id = -1;
   FunctionTypeInfo info;
   // Get function type id from header.
   info.return_type = node->return_type->resolved_type;
@@ -212,42 +238,11 @@ int Typer::visit_function_declaration(ASTFunctionDeclaration *node, bool generic
 
     info.params_len++;
   }
-  
-  if (info.return_type != -2) {
-    type_id = global_find_function_type_id(info, {});
-  } else {
+
+  if (info.return_type == -2) {
     throw_error("Internal Compiler error: unresolved generic return type.", node->source_range);
   }
-
-  if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-    ctx.scope->parent->insert(node->name, type_id, node, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
-    return type_id;
-  }
-
-  if (!generic_instantiation) {
-    ctx.scope->parent->insert(node->name, type_id, node, SYMBOL_IS_FUNCTION);
-  }
-
-  if ((node->flags & FUNCTION_IS_FOREIGN) != 0)
-    return type_id;
-
-  auto old_ty = declaring_or_assigning_type;
-  auto _defer = Defer([&] { declaring_or_assigning_type = old_ty; });
-  declaring_or_assigning_type = info.return_type;
-
-  auto control_flow = std::any_cast<ControlFlow>(node->block.get()->accept(this));
-  if (control_flow.type == -1)
-    control_flow.type = void_type();
-  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0)
-    throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
-  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0)
-    throw_error("Keyword \"break\" must be in a loop.", node->source_range);
-  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && info.return_type != void_type())
-    throw_error("Not all code paths return a value.", node->source_range);
-  assert_types_can_cast_or_equal(control_flow.type, info.return_type, node->source_range,
-                                 "invalid return type.. expected '{}', got '{}'",
-                                 std::format("function: '{}'", node->name.get_str()));
-  return type_id;
+  return global_find_function_type_id(info, {});
 }
 
 int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
@@ -285,6 +280,11 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
 
   auto type_scope = type->get_info()->scope;
   for (const auto &method : node->methods) {
+    if (!method->generic_parameters.empty()) {
+      ctx.scope->insert(method->name, -1, method, SYMBOL_IS_FUNCTION);
+      continue;
+    }
+    auto func_ty_id = visit_function_signature(method, false);
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
         throw_error("Redefinition of method", method->source_range);
@@ -292,13 +292,18 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
         symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
       }
     } else {
-      type_scope->insert(method->name, Type::invalid_id, method, SYMBOL_IS_FUNCTION);
+      if ((method->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+        type_scope->insert(method->name, func_ty_id, method, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
+      } else {
+        type_scope->insert(method->name, func_ty_id, method, SYMBOL_IS_FUNCTION);
+      }
+      node->scope->symbols[method->name] = type_scope->symbols[method->name];
+      if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+        continue;
+      }
     }
-    if (generic_instantiation) {
-      method->scope->parent = node->scope;
-    }
-    method->accept(this);
-    type_scope->symbols[method->name] = node->scope->symbols[method->name];
+    auto info = global_get_type(func_ty_id)->get_info()->as<FunctionTypeInfo>();
+    visit_function_body(method, info->return_type);
   }
 
   if (interface_ty) {
@@ -422,7 +427,23 @@ std::any Typer::visit(ASTFunctionDeclaration *node) {
     ctx.scope->insert(node->name, -1, node, SYMBOL_IS_FUNCTION);
     return {};
   }
-  return visit_function_declaration(node, false);
+  auto type_id = visit_function_signature(node, false);
+
+  if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+    ctx.scope->insert(node->name, type_id, node, SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION);
+    return type_id;
+  }
+
+  ctx.scope->insert(node->name, type_id, node, SYMBOL_IS_FUNCTION);
+
+  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
+    return type_id;
+  }
+
+  auto info = global_get_type(type_id)->get_info()->as<FunctionTypeInfo>();
+  visit_function_body(node, info->return_type);
+
+  return type_id;
 }
 
 std::any Typer::visit(ASTDeclaration *node) {
@@ -659,7 +680,9 @@ std::any Typer::visit(ASTIf *node) {
   auto conversion_rule = type_conversion_rule(global_get_type(cond_ty), global_get_type(bool_type()));
 
   if (conversion_rule == CONVERT_PROHIBITED) {
-    throw_error(std::format("cannot convert 'if' condition to a boolean, implicitly nor explicitly. got type \"{}\"", global_get_type(cond_ty)->to_string()), node->source_range);
+    throw_error(std::format("cannot convert 'if' condition to a boolean, implicitly nor explicitly. got type \"{}\"",
+                            global_get_type(cond_ty)->to_string()),
+                node->source_range);
   }
 
   auto control_flow = std::any_cast<ControlFlow>(node->block->accept(this));
@@ -777,13 +800,17 @@ void Typer::try_resolve_generic_function_call(ASTCall *&node, Type *&type, Nulla
     if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
       auto gen_args = node->generic_arguments.empty() ? std::any_cast<std::vector<int>>(node->arguments->accept(this))
                                                       : get_generic_arg_types(node->generic_arguments);
-      auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_declaration,
-                                                           symbol->declaring_node.get(), gen_args);
+      auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_signature, func, gen_args);
+
       if (type_id == -2) {
         throw_error("Template instantiation argument count mismatch", node->source_range);
       }
+
       type = global_get_type(type_id);
       symbol_nullable = nullptr;
+
+      auto info = type->get_info()->as<FunctionTypeInfo>();
+      visit_function_body(func, info->return_type);
     }
   }
 }
@@ -882,8 +909,6 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
 }
 
 std::any Typer::visit(ASTType *node) {
-
-
   if (node->resolved_type != Type::invalid_id) {
     return node->resolved_type;
   }
@@ -921,7 +946,7 @@ std::any Typer::visit(ASTType *node) {
           type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
           break;
         case AST_NODE_FUNCTION_DECLARATION:
-          type_id = visit_generic(&Typer::visit_function_declaration, declaring_node, generic_args);
+          type_id = visit_generic(&Typer::visit_function_signature, declaring_node, generic_args);
           break;
         case AST_NODE_INTERFACE_DECLARATION:
           type_id = visit_generic(&Typer::visit_interface_declaration, declaring_node, generic_args);
@@ -932,6 +957,10 @@ std::any Typer::visit(ASTType *node) {
       }
       if (type_id == -2) {
         throw_error("Template instantiation argument count mismatch", node->source_range);
+      }
+      if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+        auto info = global_get_type(type_id)->get_info()->as<FunctionTypeInfo>();
+        visit_function_body(static_cast<ASTFunctionDeclaration *>(declaring_node), info->return_type);
       }
       node->resolved_type = global_find_type_id(type_id, extensions);
     } else {
@@ -1136,7 +1165,7 @@ std::any Typer::visit(ASTLiteral *node) {
         return c_string_type();
       } else {
         node->resolved_type = string_type();
-        return string_type(); 
+        return string_type();
       }
       break;
     case ASTLiteral::Bool:
@@ -1535,7 +1564,6 @@ std::any Typer::visit(ASTInterfaceDeclaration *node) {
   }
   return {};
 }
-
 
 int Typer::get_self_type() {
   if (type_context.is_not_null()) {
