@@ -1,3 +1,6 @@
 A simple program that compiles with no C runtime or ela runtime, prints a hello string.
 
-We have to define our own _start and print symbols to actually do anything useful, but this is just an example of how you might use ela to write an operating system or embedded applications.
+We have to define our own _start and print symbols to actually do anything "useful", 
+but this is just an example of how you might use ela  to write an operating system or embedded applications.
+
+Note that this depends on 'nasm' assembler.

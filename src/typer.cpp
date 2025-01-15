@@ -1,6 +1,7 @@
 #include <any>
 #include <cassert>
 #include <format>
+#include <new>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -720,6 +721,8 @@ std::any Typer::visit(ASTWhile *node) {
 }
 
 std::any Typer::visit(ASTCall *node) {
+
+
   auto func_node_type = node->function->get_node_type();
 
   // Try to visit implementation on call if not emitted.
@@ -756,6 +759,10 @@ std::any Typer::visit(ASTCall *node) {
 }
 
 void Typer::type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info) {
+  auto old_type = declaring_or_assigning_type;
+  Defer _([&](){
+    declaring_or_assigning_type = old_type;
+  });
   auto args = node->arguments->arguments;
   auto args_ct = args.size();
   auto params_ct = info->params_len - (method_call ? 1 : 0);
@@ -907,7 +914,6 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   }
   return extensions;
 }
-
 std::any Typer::visit(ASTType *node) {
   if (node->resolved_type != Type::invalid_id) {
     return node->resolved_type;
@@ -1008,10 +1014,10 @@ std::any Typer::visit(ASTBinExpr *node) {
 
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
+
   if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) {
     declaring_or_assigning_type = left;
   }
-
   if (node->op.type == TType::Concat) {
     auto type = global_get_type(left);
     // TODO: if the array is a pointer to an array, we should probably have an
@@ -1020,14 +1026,21 @@ std::any Typer::visit(ASTBinExpr *node) {
   }
 
   auto right = int_from_any(node->right->accept(this));
-  auto type = global_get_type(left);
+  auto left_ty = global_get_type(left);
+
+  if (left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() && node->op.type != TType::Assign && !node->op.is_comp_assign()) {
+    node->is_operator_overload = true;
+    auto function_type = find_operator_overload(node->op.type, left_ty);
+    // TODO: actually type check against the function?
+    return global_get_type(function_type)->get_info()->as<FunctionTypeInfo>()->return_type;
+  }
 
   // array remove operator.
   if (node->op.type == TType::Erase) {
-    if (!type->get_ext().is_array()) {
+    if (!left_ty->get_ext().is_array()) {
       throw_error("Cannot use concat operator on a non-array", node->source_range);
     }
-    auto element_ty = type->get_element_type();
+    auto element_ty = left_ty->get_element_type();
     assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}",
                                    "invalid type in array concatenation expression");
     return element_ty;
@@ -1039,10 +1052,10 @@ std::any Typer::visit(ASTBinExpr *node) {
 
   // TODO: clean up this hacky mess.
   if (node->op.type == TType::Concat) {
-    if (!type->get_ext().is_array()) {
+    if (!left_ty->get_ext().is_array()) {
       throw_error("Cannot use concat operator on a non-array", node->source_range);
     }
-    auto element_ty = type->get_element_type();
+    auto element_ty = left_ty->get_element_type();
     assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}",
                                    "invalid type in array concatenation expression");
     return void_type();
@@ -1074,18 +1087,14 @@ std::any Typer::visit(ASTBinExpr *node) {
 std::any Typer::visit(ASTUnaryExpr *node) {
   auto operand_ty = int_from_any(node->operand->accept(this));
 
-  if (node->op.type == TType::Increment || node->op.type == TType::Decrement || node->op.type == TType::And ||
-      node->op.type == TType::Mul || node->op.type == TType::Not) {
-  }
-
   if (node->op.type == TType::And) {
-    return global_get_type(operand_ty)->take_pointer_to();
+    return node->resolved_type = global_get_type(operand_ty)->take_pointer_to();
   }
 
   if (node->op.type == TType::Mul) {
     auto type = global_get_type(operand_ty);
     if (type->get_ext().is_pointer()) {
-      return type->get_element_type();
+      return node->resolved_type = type->get_element_type();
     } else {
       throw_error(std::format("Cannot dereference a non-pointer type, got \"{}\"", type->to_string()),
                   node->source_range);
@@ -1096,7 +1105,7 @@ std::any Typer::visit(ASTUnaryExpr *node) {
   auto left_ty = global_get_type(operand_ty);
 
   if (left_ty->get_ext().is_array() && node->op.type == TType::Not) {
-    return left_ty->get_element_type();
+    return node->resolved_type = left_ty->get_element_type();
   }
 
   // * Again, operator overloading once was here.
@@ -1109,11 +1118,11 @@ std::any Typer::visit(ASTUnaryExpr *node) {
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
 
     if (node->op.type == TType::LogicalNot && can_convert) {
-      return bool_type();
+      return node->resolved_type = bool_type();
     }
   }
 
-  return operand_ty;
+  return node->resolved_type = operand_ty;
 }
 std::any Typer::visit(ASTIdentifier *node) {
   auto str = node->value.get_str();
@@ -1159,22 +1168,26 @@ std::any Typer::visit(ASTLiteral *node) {
     case ASTLiteral::Float:
       return float32_type();
     case ASTLiteral::RawString:
-    case ASTLiteral::String:
-      if (declaring_or_assigning_type == c_string_type() || node->is_c_string) {
+    case ASTLiteral::String: {
+      static auto freestanding = compile_command.has_flag("freestanding");
+      if (node->is_c_string || freestanding) {
         node->resolved_type = c_string_type();
         return c_string_type();
       } else {
         node->resolved_type = string_type();
         return string_type();
       }
+    }
       break;
     case ASTLiteral::Bool:
       return bool_type();
     case ASTLiteral::Null:
       return voidptr_type();
     case ASTLiteral::InterpolatedString: {
-      for (const auto &arg : node->interpolated_values) {
-        arg->accept(this);
+      auto current = node->interpolated_string_root;
+      while (current) {
+        if (current->expression) current->expression->accept(this);
+        current = current->next;
       }
       return string_type();
     }
@@ -1260,10 +1273,10 @@ std::any Typer::visit(ASTSubscript *node) {
  */
   if (left_ty->id == string_type()) {
     if (subscript == range_type()) {
-      return left_ty->id;
+      return node->resolved_type =  left_ty->id;
     }
     auto element_id = char_type();
-    return element_id;
+    return node->resolved_type = element_id;
   }
 
   // * Todo: reimplement operator overloads with interfaces.
@@ -1273,7 +1286,7 @@ std::any Typer::visit(ASTSubscript *node) {
   if (ext.is_map()) {
     assert_types_can_cast_or_equal(subscript, ext.extensions.back().key_type, node->source_range,
                                    "expected : {}, got {}", "Invalid type when subscripting map");
-    return left_ty->get_element_type();
+    return node->resolved_type = left_ty->get_element_type();
   }
 
   if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() &&
@@ -1283,12 +1296,12 @@ std::any Typer::visit(ASTSubscript *node) {
 
   if (left_ty->get_ext().is_array()) {
     if (subscript == range_type()) {
-      return left_ty->id;
+      return node->resolved_type = left_ty->id;
     }
     auto element_id = left_ty->get_element_type();
-    return element_id;
+    return node->resolved_type = element_id;
   }
-  return left_ty->get_element_type();
+  return node->resolved_type = left_ty->get_element_type();
 }
 
 std::any Typer::visit(ASTInitializerList *node) {

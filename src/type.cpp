@@ -246,24 +246,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     }
   }
 
-  // TODO: actually implement this? or remove it.
-  // * we literally only use it for char* -> string.
-  // I like implicit casts to bool sometims, but that can always be replaced with a
-  // Truth interface or soemthing, where .truth() returns a bool indiciating the truthiness?
-  {
-    auto info = to->get_info();
-    for (const auto &cast : info->implicit_cast_table) {
-      if (cast == from->id) {
-        return CONVERT_IMPLICIT;
-      }
-    }
-    for (const auto &cast : info->explicit_cast_table) {
-      if (cast == from->id) {
-        return CONVERT_EXPLICIT;
-      }
-    }
-  }
-
   // * if the type extensions are equal, return the conversion rule for the bases.
   {
     // this allows int[] to cast to s8[] etc;
@@ -756,4 +738,18 @@ int Type::take_pointer_to() const {
   auto ext = this->extensions;
   ext.extensions.push_back({TYPE_EXT_POINTER});
   return global_find_type_id(id, ext);
+}
+
+int find_operator_overload(TType op, Type *type) {
+  std::string op_str = TTypeToString(op);
+  std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
+  auto scope = type->get_info()->scope;
+  if (!scope) return -1;
+  // TODO: make a system for type checking against this.
+  if (auto symbol = scope->local_lookup(op_str)) {
+    if (symbol->is_function() && symbol->type_id > 0) {
+      return symbol->type_id;
+    }
+  }
+  return -1;
 }

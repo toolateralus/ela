@@ -161,8 +161,6 @@ using GenericParameter = InternedString;
 struct TypeInfo {
   // Now that we have impl & our own free-func methods, any object can have a method.
   Scope *scope = nullptr;
-  std::vector<int> implicit_cast_table;
-  std::vector<int> explicit_cast_table;
   std::vector<int> implemented_interfaces;
   TypeInfo() {}
   // Use this instead of the clunky static casts everywhere.
@@ -329,3 +327,5 @@ public:
 struct ASTFunctionDeclaration;
 InternedString get_function_typename(ASTFunctionDeclaration *);
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
+
+int find_operator_overload(TType op, Type *);

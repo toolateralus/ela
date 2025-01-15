@@ -3,6 +3,7 @@
 #include <algorithm>
 #include <any>
 #include <cassert>
+#include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
@@ -551,7 +552,26 @@ ASTProgram *Parser::parse() {
       continue;
     }
 
-    program->statements.push_back(parse_statement());
+    auto statement = parse_statement();
+
+    auto type = statement->get_node_type();
+    switch (type) {
+      case AST_NODE_STRUCT_DECLARATION:
+      case AST_NODE_FUNCTION_DECLARATION:
+      case AST_NODE_INTERFACE_DECLARATION:
+      case AST_NODE_ENUM_DECLARATION:
+      case AST_NODE_UNION_DECLARATION:
+      case AST_NODE_TAGGED_UNION_DECLARATION:
+      case AST_NODE_ALIAS:
+      case AST_NODE_DECLARATION:
+      case AST_NODE_NOOP:
+      case AST_NODE_IMPL:
+        break;
+      default:
+        throw_error("Statement not allowed at the top-level of a program", statement->source_range);
+    }
+
+    program->statements.push_back(statement);
 
     while (semicolon())
       eat();
@@ -690,6 +710,64 @@ ASTExpr *Parser::parse_postfix() {
   return left;
 }
 
+ASTExpr *Parser::parse_interpolated_string() {
+  eat();
+  auto str = expect(TType::String);
+  NODE_ALLOC(ASTLiteral, node, range, _, this)
+  node->tag = ASTLiteral::InterpolatedString;
+  std::string value = str.value.get_str();
+  InterpolatedStringSegment *current = nullptr;
+  std::string prefix;
+  size_t pos = 0;
+
+  while (pos < value.length()) {
+    size_t start = value.find('{', pos);
+    if (start == std::string::npos) {
+      prefix += value.substr(pos);
+      break;
+    }
+
+    prefix += value.substr(pos, start - pos);
+
+    size_t end = value.find('}', start);
+    if (end == std::string::npos) {
+      end_node(nullptr, range);
+      throw_error("Unmatched '{' in interpolated string", range);
+    }
+
+    std::string expr_text = value.substr(start + 1, end - start - 1);
+    auto state = Lexer::State::from_string(expr_text);
+    states.push_back(state);
+    fill_buffer_if_needed();
+    auto expr = parse_expr();
+    states.pop_back();
+
+    if (!prefix.empty() || expr) {
+      InterpolatedStringSegment *segment = new InterpolatedStringSegment{prefix, expr, nullptr};
+      if (!current) {
+        node->interpolated_string_root = segment;
+      } else {
+        current->next = segment;
+      }
+      current = segment;
+      prefix.clear();
+    }
+    pos = end + 1;
+  }
+
+  if (!prefix.empty()) {
+    InterpolatedStringSegment *segment = new InterpolatedStringSegment{prefix, nullptr, nullptr};
+    if (!current) {
+      node->interpolated_string_root = segment;
+    } else {
+      current->next = segment;
+    }
+  }
+
+  end_node(node, range);
+  return node;
+}
+
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
   auto range = begin_node();
@@ -733,43 +811,7 @@ ASTExpr *Parser::parse_primary() {
       return node;
     }
     case TType::Dollar: {
-      eat();
-      auto str = expect(TType::String);
-      NODE_ALLOC(ASTLiteral, node, range, _, this)
-      node->tag = ASTLiteral::InterpolatedString;
-      auto lexer_state = Lexer::State::from_string(str.value.get_str());
-      states.push_back(lexer_state);
-      std::vector<ASTExpr *> exprs;
-      fill_buffer_if_needed();
-      while (lexer_state == states.back() && peek().type != TType::Eof) {
-        if (peek().type == TType::LCurly) {
-          eat();
-          exprs.push_back(parse_expr());
-        } else {
-          eat();
-        }
-      }
-      if (states.back() == lexer_state) {
-        states.pop_back();
-      }
-      auto pos = 0;
-      std::string value = str.value.get_str();
-      while (pos < value.length()) {
-        if (value[pos] == '{') {
-          pos++;
-          auto start = pos;
-          while (value[pos] != '}') {
-            pos++;
-          }
-          value.erase(start, pos - start);
-        } else {
-          ++pos;
-        }
-      }
-      node->value = {value};
-      node->interpolated_values = exprs;
-      end_node(node, range);
-      return node;
+      return parse_interpolated_string();
     }
     case TType::LCurly: {
       eat();
@@ -1414,8 +1456,9 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
         param->self.is_pointer = true;
       }
 
-      if (peek().type == TType::Comma)
-        eat();
+      if (peek().type != TType::RParen)
+        expect(TType::Comma);
+
       continue;
     }
 

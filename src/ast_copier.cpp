@@ -93,12 +93,26 @@ ASTUnaryExpr *ASTCopier::copy_unary_expr(ASTUnaryExpr *node) {
 ASTIdentifier *ASTCopier::copy_identifier(ASTIdentifier *node) {
   return new (ast_alloc<ASTIdentifier>()) ASTIdentifier(*node);
 }
+
+InterpolatedStringSegment *ASTCopier::copy_interp_string_segment(InterpolatedStringSegment *segment) {
+  if (!segment) {
+    return nullptr;
+  }
+  auto new_segment = new InterpolatedStringSegment(*segment);
+  if (segment->expression) {
+    new_segment->expression = static_cast<ASTExpr *>(copy_node(segment->expression));
+  }
+  new_segment->next = copy_interp_string_segment(segment->next);
+  return new_segment;
+}
+
 ASTLiteral *ASTCopier::copy_literal(ASTLiteral *node) {
   auto new_node = new (ast_alloc<ASTLiteral>()) ASTLiteral(*node);
-  new_node->interpolated_values.clear();
-  for (auto expr : node->interpolated_values) {
-    new_node->interpolated_values.push_back(static_cast<ASTExpr *>(copy_node(expr)));
+
+  if (node->tag == ASTLiteral::InterpolatedString) {
+    new_node->interpolated_string_root = copy_interp_string_segment(node->interpolated_string_root);
   }
+
   return new_node;
 }
 ASTType *ASTCopier::copy_type(ASTType *node) {
@@ -107,6 +121,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
     new_node->pointing_to = static_cast<ASTType *>(copy_node(node->pointing_to.get()));
   switch (new_node->kind) {
     case ASTType::NORMAL:
+    case ASTType::SELF:
     case ASTType::REFLECTION:
       new_node->normal.generic_arguments.clear();
       for (auto arg : node->normal.generic_arguments) {

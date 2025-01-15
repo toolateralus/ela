@@ -85,7 +85,7 @@ impl JsonLexer {
 
   create :: fn(_file: c_string, _input: string) -> #self {
     return {
-      file: _file,
+      file: string::from(_file),
       input: _input,
       length: _input.length
     };

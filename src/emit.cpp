@@ -227,7 +227,7 @@ std::any Emitter::visit(ASTLiteral *node) {
       (*ss) << "(std::nullptr_t)nullptr";
       return {};
     case ASTLiteral::String:
-      if (node->resolved_type == string_type()) {
+      if (node->resolved_type == string_type() && !is_freestanding) {
         output = std::format("string{{\"{}\"}}", node->value);
       } else if (node->resolved_type == c_string_type()) {
         output = std::format("\"{}\"", node->value);
@@ -287,6 +287,32 @@ std::any Emitter::visit(ASTUnaryExpr *node) {
   return {};
 }
 std::any Emitter::visit(ASTBinExpr *node) {
+  // ! How is this ever null??
+  // ! instead of returning anything in the typer emitter,
+  // ! all of those function should be absolutely voids.
+  // ! then, we acn just get the type from the reslting node.
+  auto left_ty = global_get_type(node->left->resolved_type);
+
+  if (left_ty && node->is_operator_overload) {
+    //!! THIS IS A TOTAL HACK!!!
+    // !! JUST TRYING THIS OUT!!!
+    std::string op_str = TTypeToString(node->op.type);
+    std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
+    auto function_type = find_operator_overload(node->op.type, left_ty);
+    auto call = ast_alloc<ASTCall>();
+    auto sr = ast_alloc<ASTScopeResolution>();
+    auto left_id = ast_alloc<ASTIdentifier>();
+    left_id->value = to_cpp_string(left_ty);
+    sr->base = left_id;
+    sr->member_name = op_str;
+    call->function = sr;
+    call->arguments = ast_alloc<ASTArguments>();
+    call->arguments->arguments = {node->left, node->right};
+    call->accept(&typer);
+    call->accept(this);
+    return {};
+  }
+
   if (node->op.type == TType::Erase) {
     node->left->accept(this);
     (*ss) << ".erase(";
@@ -573,6 +599,7 @@ std::any Emitter::visit(ASTParamDecl *node) {
       (*ss) << ' ' << node->normal.name.get_str();
     }
     if (node->normal.default_value.is_not_null() && emit_default_args) {
+      std::cout << "emitting default arg\n";
       (*ss) << " = ";
       node->normal.default_value.get()->accept(this);
     }
@@ -609,34 +636,6 @@ std::any Emitter::visit(ASTProgram *node) {
   if (!is_freestanding) {
     code << "#define USE_STD_LIB 1\n";
   } else {
-    for (int i = 0; i < type_table.size(); ++i) {
-      Type *type = &type_table[i];
-      TypeExtensions ext = type->get_ext();
-
-      if (type->get_base() == "Field")
-        continue;
-      if (type->get_base() == "Element")
-        continue;
-      if (type->get_base() == "Type")
-        continue;
-
-
-      // hack for string array becasue env makes it.
-      if (ext.is_array() && !ext.is_fixed_sized_array() &&
-          type->id != global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}})) {
-        throw_error(std::format("You cannot use dynamic arrays in a freestanding or nostdlib "
-                                "environment, due to lack of allocators. Type: {}",
-                                type->to_string()),
-                    {});
-      }
-      if (ext.is_map()) {
-        throw_error(std::format("You cannot use maps in a freestanding or nostdlib "
-                                "environment, due to lack of allocators. Type: {}",
-                                type->to_string()),
-                    {});
-      }
-    }
-
     if (compile_command.has_flag("test")) {
       throw_error("You cannot use unit tests in a freestanding or nostlib "
                   "environment due to lack of exception handling",
@@ -677,17 +676,16 @@ std::any Emitter::visit(ASTProgram *node) {
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   } else {
-    if (has_user_defined_main && !is_freestanding)
-      code << R"__(
+    if (has_user_defined_main && !is_freestanding) {
+code << R"__(
 int main (int argc, char** argv) {
-  // Bootstrap the env
   for (int i = 0; i < argc; ++i) {
     Env_args().push(string(argv[i]));
   }
-  // call our user's main function.
   __ela_main_();
 }
 )__";
+    } // C calls main() for freestanding
   }
 
   // Emit runtime reflection type info for requested types, only when we have
@@ -1025,106 +1023,91 @@ std::string get_format_str(int type_id, ASTNode *node) {
 void Emitter::interpolate_string(ASTLiteral *node) {
   emit_line_directive(node);
 
-  if (node->value.get_str().empty()) {
-    throw_warning(WarningEmptyStringInterpolation, "Empty interpolated string.", node->source_range);
-    (*ss) << "string()";
-    return;
-  }
-
   std::string str;
+  auto current = node->interpolated_string_root;
+  std::stringstream interp_ss;
 
-  auto replace_next_brace_pair = [&](std::string &in, const std::string &replacement) {
-    auto start = in.find('{');
-    if (start != std::string::npos) {
-      auto end = in.find('}', start);
-      if (end != std::string::npos) {
-        in.replace(start, end - start + 1, replacement);
-      }
+  while (current) {
+    interp_ss << current->prefix.get_str();
+    if (current->expression) {
+      auto type_id = std::any_cast<int>(current->expression->accept(&typer));
+      interp_ss << get_format_str(type_id, node);
     }
-  };
-
-  for (const auto &value : node->interpolated_values) {
-    auto type_id = std::any_cast<int>(value->accept(&typer));
-    std::string format_specifier = get_format_str(type_id, node);
-    auto v = node->value.get_str();
-    replace_next_brace_pair(v, format_specifier);
-    node->value = v;
+    current = current->next;
   }
 
-  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << node->value.get_str() << "\",";
+  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << interp_ss.str() << "\",";
 
-  auto interpolate_value = [&](ASTExpr *value) {
-    auto type_id = std::any_cast<int>(value->accept(&typer));
-    auto type = global_get_type(type_id);
+  current = node->interpolated_string_root;
+  while (current) {
+    if (current->expression) {
+      auto type_id = std::any_cast<int>(current->expression->accept(&typer));
+      auto type = global_get_type(type_id);
 
-    auto interpolate_to_string_struct_union = [&](Scope *scope) {
-      auto sym = scope->lookup("to_string");
+      const auto interpolate_to_string_struct_union = [&](Scope *scope) {
+        auto sym = scope->lookup("to_string");
 
-      if (!sym)
-        throw_error("Cannot use a struct in an interpolated string without defining a "
-                    "`to_string` function that returns either a char* or a string",
-                    value->source_range);
+        if (!sym)
+          throw_error("Cannot use a struct in an interpolated string without defining a "
+                      "`to_string` function that returns either a char* or a string",
+                      current->expression->source_range);
 
-      auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+        auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
+        auto return_ty = global_get_type(sym_ty->return_type);
+        auto param_0 = global_get_type(sym_ty->parameter_types[0]);
+        auto takes_pointer = param_0->get_ext().is_pointer();
+        auto &extensions = type->get_ext();
+        auto name = type->get_base();
 
-      auto return_ty = global_get_type(sym_ty->return_type);
-      auto param_0 = global_get_type(sym_ty->parameter_types[0]);
-      auto takes_pointer = param_0->get_ext().is_pointer();
-      auto &extensions = type->get_ext();
-      auto name = type->get_base();
-      // TODO: we need to check against the method type more appropriately
-      if (extensions.back_type() == TYPE_EXT_POINTER) {
-        (*ss) << name.get_str() << "_to_string(";
-        if (!takes_pointer) {
-          (*ss) << "*";
+        if (extensions.back_type() == TYPE_EXT_POINTER) {
+          (*ss) << name.get_str() << "_to_string(";
+          if (!takes_pointer) {
+            (*ss) << "*";
+          }
+          current->expression->accept(this);
+          (*ss) << ")";
+        } else {
+          (*ss) << name.get_str() << "_to_string(";
+          if (takes_pointer) {
+            (*ss) << "&";
+          }
+          current->expression->accept(this);
+          (*ss) << ")";
         }
-        value->accept(this);
-        (*ss) << ")";
-      } else {
-        (*ss) << name.get_str() << "_to_string(";
-        if (takes_pointer) {
-          (*ss) << "&";
-        }
-        value->accept(this);
-        (*ss) << ")";
-      }
 
-      if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
+        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
+          (*ss) << ".data";
+        }
+      };
+
+      if (type->id == bool_type()) {
+        current->expression->accept(this);
+        (*ss) << " ? \"true\" : \"false\"";
+      } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
+        current->expression->accept(this);
         (*ss) << ".data";
-      }
-    };
-
-    if (type->id == bool_type()) {
-      value->accept(this);
-      (*ss) << " ? \"true\" : \"false\"";
-    } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
-      value->accept(this);
-      (*ss) << ".data";
-    } else if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->get_info()->as<StructTypeInfo>());
-      interpolate_to_string_struct_union(info->scope);
-    } else if (type->is_kind(TYPE_UNION)) {
-      auto info = (type->get_info()->as<UnionTypeInfo>());
-      interpolate_to_string_struct_union(info->scope);
-    } else if (type->is_kind(TYPE_TUPLE)) {
-      auto info = type->get_info()->as<TupleTypeInfo>();
-      for (int i = 0; i < info->types.size(); ++i) {
-        (*ss) << "std::get<" << std::to_string(i) << ">(";
-        value->accept(this);
-        (*ss) << ")";
-        if (i != info->types.size() - 1) {
-          (*ss) << ", ";
+      } else if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+        auto info = (type->get_info()->as<StructTypeInfo>());
+        interpolate_to_string_struct_union(info->scope);
+      } else if (type->is_kind(TYPE_TUPLE)) {
+        auto info = type->get_info()->as<TupleTypeInfo>();
+        for (int i = 0; i < info->types.size(); ++i) {
+          (*ss) << "std::get<" << std::to_string(i) << ">(";
+          current->expression->accept(this);
+          (*ss) << ")";
+          if (i != info->types.size() - 1) {
+            (*ss) << ", ";
+          }
         }
+      } else {
+        current->expression->accept(this);
       }
-    } else {
-      value->accept(this);
+      if (current->next && current->next->expression) {
+        (*ss) << ", ";
+      }
     }
-    if (value != node->interpolated_values.back())
-      (*ss) << ", ";
-  };
-
-  for (const auto &value : node->interpolated_values)
-    interpolate_value(value);
+    current = current->next;
+  }
 
   (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
            "strlen(buf); return str; }()";
@@ -1605,7 +1588,9 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
     node->return_type->accept(this);
     (*ss) << " " + name;
+    emit_default_args = true;
     node->params->accept(this);
+    emit_default_args = false;
     if (node->block.is_not_null()) {
       auto block = node->block.get();
       // move around defer blocks when emitting a deferred statement.
@@ -1647,10 +1632,6 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
         emit_forward_declaration(node);
         return;
       }
-    }
-
-    if ((node->flags & FUNCTION_IS_STATIC) != 0) {
-      (*ss) << "static ";
     }
 
     // local function
@@ -1706,6 +1687,10 @@ std::any Emitter::visit(ASTFunctionDeclaration *node) {
   return {};
 }
 
+// TODO(Josh) 1/14/2025, 1:04:14 PM
+// * We need to emit defers on continue, break, return, etc, anything that modifies control-flow.
+// * this is also too complicated: it should be a relatively straight-forward thing, call a function to emit a block
+// * of deferred statements up to a specific point
 std::any Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
   if (emitting_function_with_defer) {
