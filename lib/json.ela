@@ -83,9 +83,9 @@ impl JsonLexer {
     return (JsonError::Error($"[{self.file}:{token.line}:{token.column}] {msg}"), token);
   }
 
-  create :: fn(_file: c_string, _input: string) -> #self {
+  create :: fn(_file: string, _input: string) -> #self {
     return {
-      file: string::from(_file),
+      file: _file,
       input: _input,
       length: _input.length
     };
@@ -509,12 +509,12 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
   return (JsonError::Ok(), value);
 }
 
-json_parse_file :: fn(file: c_string) -> (JsonError, JsonValue*) {
+json_parse_file :: fn(file: string) -> (JsonError, JsonValue*) {
   lexer := JsonLexer::create(file, File::read_all(file));
   return json_parse(&lexer);
 }
 
-json_parse_string :: fn(str: c_string) -> (JsonError, JsonValue*) {
+json_parse_string :: fn(str: string) -> (JsonError, JsonValue*) {
   lexer := JsonLexer::create("from:string", str);
   return json_parse(&lexer);
 }
@@ -585,7 +585,7 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
   val.data.object = JsonKeyValuePair[]{};
   for field in type.fields {
     field_kvp: JsonKeyValuePair;
-    field_kvp.key = field.name;
+    field_kvp.key = string::from(field.name);
     err, value := json_serialize(object as u8* + field.offset, field.type);
     if err.has_value {
       return (err, null);

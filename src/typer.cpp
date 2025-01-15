@@ -324,10 +324,17 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
     for (auto &[name, method] : interface->scope->symbols) {
       if (auto impl_symbol = node->scope->local_lookup(name)) {
         if (method.type_id != impl_symbol->type_id) {
-          throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
-                                  global_get_type(method.type_id)->to_string(),
-                                  global_get_type(impl_symbol->type_id)->to_string()),
-                      node->source_range);
+          if (method.type_id != -1 && impl_symbol->type_id != -1) {
+            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
+                                    global_get_type(method.type_id)->to_string(),
+                                    global_get_type(impl_symbol->type_id)->to_string()),
+                        node->source_range);
+          } else {
+            std:: cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(method.type_id) << "\033[0m\n";
+            std:: cout << "\033[1;90mimpl_symbol.type_id == \033[1;31m" << std::to_string(impl_symbol->type_id) << "\033[0m\n";
+            throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null",
+                        method.declaring_node ? method.declaring_node.get()->source_range : node->source_range);
+          }
         }
       } else {
         throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
@@ -520,8 +527,6 @@ std::any Typer::visit(ASTDeclaration *node) {
                   node->value.get()->source_range);
     }
   }
-
-  
 
   return node->resolved_type;
 }
@@ -723,8 +728,6 @@ std::any Typer::visit(ASTWhile *node) {
 }
 
 std::any Typer::visit(ASTCall *node) {
-
-
   auto func_node_type = node->function->get_node_type();
 
   // Try to visit implementation on call if not emitted.
@@ -762,9 +765,7 @@ std::any Typer::visit(ASTCall *node) {
 
 void Typer::type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info) {
   auto old_type = declaring_or_assigning_type;
-  Defer _([&](){
-    declaring_or_assigning_type = old_type;
-  });
+  Defer _([&]() { declaring_or_assigning_type = old_type; });
   auto args = node->arguments->arguments;
   auto args_ct = args.size();
   auto params_ct = info->params_len - (method_call ? 1 : 0);
@@ -1031,12 +1032,13 @@ std::any Typer::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
-      ctx.scope->insert(((ASTIdentifier*)node->left)->value, node->left->resolved_type, node->right);
+      ctx.scope->insert(((ASTIdentifier *)node->left)->value, node->left->resolved_type, node->right);
     }
   }
   auto left_ty = global_get_type(left);
 
-  if (left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() && node->op.type != TType::Assign && !node->op.is_comp_assign()) {
+  if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() && node->op.type != TType::Assign &&
+      !node->op.is_comp_assign()) {
     node->is_operator_overload = true;
     auto function_type = find_operator_overload(node->op.type, left_ty);
     // TODO: actually type check against the function?
@@ -1185,8 +1187,7 @@ std::any Typer::visit(ASTLiteral *node) {
         node->resolved_type = string_type();
         return string_type();
       }
-    }
-      break;
+    } break;
     case ASTLiteral::Bool:
       return bool_type();
     case ASTLiteral::Null:
@@ -1194,7 +1195,8 @@ std::any Typer::visit(ASTLiteral *node) {
     case ASTLiteral::InterpolatedString: {
       auto current = node->interpolated_string_root;
       while (current) {
-        if (current->expression) current->expression->accept(this);
+        if (current->expression)
+          current->expression->accept(this);
         current = current->next;
       }
       return string_type();
@@ -1281,7 +1283,7 @@ std::any Typer::visit(ASTSubscript *node) {
  */
   if (left_ty->id == string_type()) {
     if (subscript == range_type()) {
-      return node->resolved_type =  left_ty->id;
+      return node->resolved_type = left_ty->id;
     }
     auto element_id = char_type();
     return node->resolved_type = element_id;

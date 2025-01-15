@@ -1,6 +1,8 @@
 #import core;
 #import json;
 
+// #error "This is crashing because we call delete[] in our string implementation in boilerplate.hpp, but we fill the strings with malloc'd data in string::from";
+
 JsonValueDeleter :: struct {
   vals: JsonValue*[];
 }
@@ -87,7 +89,7 @@ impl JsonValueDeleter {
     assert($"{err.message}".data, false);
   }
   deleter.add(val);
-  assert("number"c, val.as_number() == atof("32.1"));
+  assert("number"c, val.as_number() == atof("32.1"c));
 
   err, val = json_parse_string("\"hello\"");
   if err.has_value {
@@ -182,7 +184,7 @@ impl MyJsonStruct {
 
   object_val := val.get("object");
   assert("nested_string"c, object_val.get("nested_string").as_string() == "Nested Hello");
-  assert("nested_number"c, object_val.get("nested_number").as_number() == atof("3.14"));
+  assert("nested_number"c, object_val.get("nested_number").as_number() == atof("3.14"c));
   assert("nested_boolean"c, object_val.get("nested_boolean").as_boolean() == false);
 
   nested_array_val := object_val.get("nested_array");
