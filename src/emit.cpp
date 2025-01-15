@@ -1270,6 +1270,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
+     
   if (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array()) {
     ss << get_elements_function(type) << ",\n";
   }

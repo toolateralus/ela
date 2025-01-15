@@ -117,6 +117,7 @@ ASTLiteral *ASTCopier::copy_literal(ASTLiteral *node) {
 }
 ASTType *ASTCopier::copy_type(ASTType *node) {
   auto new_node = new (ast_alloc<ASTType>()) ASTType(*node);
+  new_node->resolved_type = -1;
   if (node->pointing_to)
     new_node->pointing_to = static_cast<ASTType *>(copy_node(node->pointing_to.get()));
   switch (new_node->kind) {

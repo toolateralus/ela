@@ -253,6 +253,7 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
     ctx.set_scope(previous);
     type_context = old_type;
   });
+
   type_context = node->target;
   ctx.set_scope(node->scope);
 
@@ -519,6 +520,8 @@ std::any Typer::visit(ASTDeclaration *node) {
                   node->value.get()->source_range);
     }
   }
+
+  
 
   return node->resolved_type;
 }
@@ -1014,7 +1017,7 @@ std::any Typer::visit(ASTBinExpr *node) {
   auto old_ty = declaring_or_assigning_type;
   Defer _defer([&] { declaring_or_assigning_type = old_ty; });
 
-  if (node->op.type == TType::Assign || node->op.type == TType::ColonEquals) {
+  if (node->op.type == TType::Assign) {
     declaring_or_assigning_type = left;
   }
   if (node->op.type == TType::Concat) {
@@ -1025,6 +1028,12 @@ std::any Typer::visit(ASTBinExpr *node) {
   }
 
   auto right = int_from_any(node->right->accept(this));
+
+  if (node->op.type == TType::Assign) {
+    if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
+      ctx.scope->insert(((ASTIdentifier*)node->left)->value, node->left->resolved_type, node->right);
+    }
+  }
   auto left_ty = global_get_type(left);
 
   if (left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() && node->op.type != TType::Assign && !node->op.is_comp_assign()) {

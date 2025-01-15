@@ -5,7 +5,13 @@
 Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
   switch (node->get_node_type()) {
     case AST_NODE_IDENTIFIER: {
-      throw_error("Not yet implemented: constexprs will soon have identifier access.", node->source_range);
+      auto name = static_cast<ASTIdentifier*>(node);
+      auto symbol = ctx.scope->lookup(name->value);
+      if (symbol->declaring_node.is_not_null() && symbol->declaring_node.get()->is_expr()) {
+        return evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
+      } else {
+        throw_error("unable to evaluate value of symbol", node->source_range);
+      }
     }
     case AST_NODE_BIN_EXPR: {
       auto binary = static_cast<ASTBinExpr *>(node);

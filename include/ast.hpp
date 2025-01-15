@@ -73,6 +73,30 @@ struct ASTNode {
   virtual ~ASTNode() = default;
   virtual std::any accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
+
+  inline bool is_expr() {
+    switch (get_node_type()) {
+      case AST_NODE_BIN_EXPR:
+      case AST_NODE_UNARY_EXPR:
+      case AST_NODE_IDENTIFIER:
+      case AST_NODE_LITERAL:
+      case AST_NODE_TYPE:
+      case AST_NODE_TUPLE:
+      case AST_NODE_CALL:
+      case AST_NODE_ARGUMENTS:
+      case AST_NODE_SELF_TYPE:
+      case AST_NODE_DOT_EXPR:
+      case AST_NODE_SCOPE_RESOLUTION:
+      case AST_NODE_SUBSCRIPT:
+      case AST_NODE_INITIALIZER_LIST:
+      case AST_NODE_CAST:
+      case AST_NODE_RANGE:
+      case AST_NODE_SWITCH:
+      return true;
+      default:
+      return false;
+    }
+  }
 };
 
 struct ASTStatement : ASTNode {

@@ -20,6 +20,15 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+// TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
+// TODO: we should not have reserved words from host language leak into this langauge.
+static std::set<std::string> reserved = {
+    "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
+    "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
+    "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
+    "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
+    "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
+
 enum PreprocKind {
   PREPROC_IF,
   PREPROC_IFDEF,
@@ -1091,10 +1100,8 @@ ASTStatement *Parser::parse_statement() {
 
   bool is_colon_or_colon_equals =
       lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals;
-  bool is_double_colon_with_valid_following =
-      lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family != TFamily::Keyword;
 
-  if (tok.type == TType::Identifier && (is_colon_or_colon_equals || is_double_colon_with_valid_following)) {
+  if (tok.type == TType::Identifier && is_colon_or_colon_equals) {
     auto decl = parse_declaration();
     return decl;
   }
@@ -1241,7 +1248,26 @@ ASTStatement *Parser::parse_statement() {
       return union_decl;
     }
 
-    throw_error("invalid :: statement, expected '(' (for a function), 'struct', or 'enum", parent_range);
+    NODE_ALLOC(ASTDeclaration, decl, range, _, this);
+    decl->name = tok.value;
+    decl->value = parse_expr();
+
+    if (ctx.scope->find_type_id(tok.value, {}) != -1 || keywords.contains(tok.value.get_str()) ||
+        reserved.contains(tok.value.get_str())) {
+      end_node(nullptr, range);
+      throw_error("Invalid variable declaration: a type or keyword exists with "
+                  "that name,",
+                  range);
+    }
+
+    end_node(decl, range);
+    if (ctx.scope->local_lookup(tok.value)) {
+      throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
+    }
+
+    ctx.scope->insert(tok.value, -1, decl->value.get());
+
+    return decl;
   }
 
   // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
@@ -1355,13 +1381,6 @@ ASTDeclaration *Parser::parse_declaration() {
   auto iden = eat();
   decl->name = iden.value;
 
-  static std::set<std::string> reserved = {
-      "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
-      "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
-      "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
-      "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
-      "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
-
   if (ctx.scope->find_type_id(iden.value, {}) != -1 || keywords.contains(iden.value.get_str()) ||
       reserved.contains(iden.value.get_str())) {
     end_node(nullptr, range);
@@ -1391,7 +1410,9 @@ ASTDeclaration *Parser::parse_declaration() {
   if (ctx.scope->local_lookup(iden.value)) {
     throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
-  ctx.scope->insert(iden.value, -1, decl);
+
+  ctx.scope->insert(iden.value, -1, decl->value.get());
+
   return decl;
 }
 
