@@ -147,23 +147,43 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto iden = parser->expect(TType::Identifier).value;
 #ifdef _WIN32
         auto filename =
-            std::filesystem::path("C:\\Program Files\\ela").string() + "\\" + iden.get_str() + ".ela";
+            std::filesystem::path("C:\\Program Files\\ela").string() + std::filesystem::path::preferred_separator + iden.get_str();
 #else
         auto filename =
-            std::filesystem::path("/usr/local/lib/ela").string() + "/" + iden.get_str() + ".ela";
+            std::filesystem::path("/usr/local/lib/ela").string() + std::filesystem::path::preferred_separator + iden.get_str();
 #endif
+
         // Right now, we just return noop if we're double including.
-        if (import_set.contains(filename)) {
+        auto module_name = filename;
+        if (import_set.contains(module_name)) {
           return nullptr;
         }
-        if (!std::filesystem::exists(filename)) {
-          throw_error(std::format("Couldn't find imported module: {}", filename), {});
+        if (std::filesystem::is_directory(filename)) {
+            filename += std::filesystem::path::preferred_separator;
+            filename.append("lib.ela");
+        } else {
+          filename += ".ela";
         }
-        import_set.insert(filename);
+
+        if (!std::filesystem::exists(filename)) { 
+          throw_error(std::format("Couldn't find imported module: {}\nIf you're writing a directory based module, make sure you have a 'lib.ela' as your lib main.", module_name), {});
+        }
+
+        import_set.insert(module_name);
         parser->states.push_back(Lexer::State::from_file(filename));
         parser->fill_buffer_if_needed();
         return nullptr;
     }},
+
+    {.identifier = "print",
+     .kind = DIRECTIVE_KIND_STATEMENT,
+     .run = [](Parser *parser) -> Nullable<ASTNode> {
+        auto str = parser->expect(TType::String);
+        std::cout << str.value.get_str() << "\n";
+        return nullptr;
+     }
+    },
+
     // #raw
     // string literals delimited by #raw and can span multiple lines.
     // u8 *string = #raw string literal goes here #raw
