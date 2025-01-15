@@ -1,4 +1,4 @@
-
+#import core;
 #import _raybindings;
 
 #c_flags " -lraylib "
