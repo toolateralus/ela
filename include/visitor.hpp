@@ -98,6 +98,8 @@ struct Typer : VisitorBase {
 };
 
 struct Emitter : VisitorBase {
+
+  void emit_deferred_statements(ASTBlock *parent, bool is_return);
   static constexpr const char * defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
