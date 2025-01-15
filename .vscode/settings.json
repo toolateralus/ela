@@ -19,6 +19,7 @@
     "**/*vcxproj.user": true,
     "**/*.bat": true,
     "**/*.sln": true,
+    "**/*.cache": true
   }
 }
 

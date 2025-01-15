@@ -127,10 +127,12 @@ iovec :: struct {
 #foreign __uint16_identity :: fn(__x: __uint16_t) -> __uint16_t;
 #foreign __uint32_identity :: fn(__x: __uint32_t) -> __uint32_t;
 #foreign __uint64_identity :: fn(__x: __uint64_t) -> __uint64_t;
+
 __sigset_t :: struct {
   __val : u64[16];
 };
 #alias sigset_t :: __sigset_t;
+
 timeval :: struct {
   tv_sec : __time_t;
   tv_usec : __suseconds_t;
@@ -139,11 +141,14 @@ timespec :: struct {
   tv_sec : __time_t;
   tv_nsec : __syscall_slong_t;
 };
+
 #alias suseconds_t :: __suseconds_t;
 #alias __fd_mask :: s64;
+
 fd_set :: struct {
   __fds_bits : __fd_mask[16];
 };
+
 #alias fd_mask :: __fd_mask;
 #foreign select :: fn(__nfds: s32, __readfds: fd_set *, __writefds: fd_set *, __exceptfds: fd_set *, __timeout: timeval *) -> s32;
 #foreign pselect :: fn(__nfds: s32, __readfds: fd_set *, __writefds: fd_set *, __exceptfds: fd_set *, __timeout: timespec *, __sigmask: __sigset_t *) -> s32;

@@ -1,0 +1,13 @@
+#foreign exit :: fn(n: int);
+
+unwrap :: fn![T](tuple: (string, T)) -> T {
+  a, b := tuple;
+  if a.length { // segfault on Emitter::get_symbol("a") when visiting this dot expression? even though it's fine when we type check it.
+    exit(1);
+  }
+  return b;
+}
+
+main :: fn() { 
+  unwrap![int](("Error", 100));
+}

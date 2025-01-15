@@ -72,6 +72,7 @@ Context::Context() {
     scope->insert("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr, SYMBOL_IS_FUNCTION);
   }
 
+
   // string, env, reflection types. Only if we're compiling with stdlib.
   if (!compile_command.has_flag("freestanding")) {
       // define types used for reflection.

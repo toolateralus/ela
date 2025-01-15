@@ -330,8 +330,9 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);
           } else {
-            std:: cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(method.type_id) << "\033[0m\n";
-            std:: cout << "\033[1;90mimpl_symbol.type_id == \033[1;31m" << std::to_string(impl_symbol->type_id) << "\033[0m\n";
+            std::cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(method.type_id) << "\033[0m\n";
+            std::cout << "\033[1;90mimpl_symbol.type_id == \033[1;31m" << std::to_string(impl_symbol->type_id)
+                      << "\033[0m\n";
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null",
                         method.declaring_node ? method.declaring_node.get()->source_range : node->source_range);
           }
@@ -1037,8 +1038,8 @@ std::any Typer::visit(ASTBinExpr *node) {
   }
   auto left_ty = global_get_type(left);
 
-  if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() && node->op.type != TType::Assign &&
-      !node->op.is_comp_assign()) {
+  if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() &&
+      node->op.type != TType::Assign && !node->op.is_comp_assign()) {
     node->is_operator_overload = true;
     auto function_type = find_operator_overload(node->op.type, left_ty);
     // TODO: actually type check against the function?
@@ -1531,14 +1532,7 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-    if (ctx.scope->local_lookup(iden->value) && node->op != TType::Assign) {
-      throw_error(std::format("Redefinition of a variable is not allowed in a tuple with :="
-                              "deconstruction yet.\nOffending variable {}\n use `var, var1 := ...`, if both `var` and "
-                              "var1` exist already.",
-                              iden->value),
-                  node->source_range);
-    }
-
+    std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " << global_get_type(type)->to_string() << "}\n";
     ctx.scope->insert(iden->value, type, node);
   }
 

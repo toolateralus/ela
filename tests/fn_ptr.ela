@@ -11,6 +11,8 @@ function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
   ptr := &function_pointer_helper;
   assert("Function pointer call"c, ptr(2, 3) == 6);
 
+  #error "Everything past this is broken, and the errors are so ugly it's best to just not see it."
+
   array: FunctionPointer[] = {&function_pointer_helper};
   from_arr : FunctionPointer = &array[0];
   assert("Array of function pointers"c, from_arr(2, 3) == 6);

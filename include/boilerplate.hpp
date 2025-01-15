@@ -54,6 +54,7 @@ struct Range {
 #include <initializer_list>
 #include <stdint.h>
 #include <unordered_map>
+#include <errno.h>
 
 // TODO: replace these with our own types.
 // They may not be faster, but they might be. What will be faster is compilation

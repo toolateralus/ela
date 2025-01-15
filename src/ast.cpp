@@ -765,6 +765,11 @@ ASTExpr *Parser::parse_interpolated_string() {
     }
 
     std::string expr_text = value.substr(start + 1, end - start - 1);
+
+    if (expr_text.empty()) {
+      throw_error("Interpolated string expression block '{}' was empty, which is not valid.", node->source_range);
+    }
+
     auto state = Lexer::State::from_string(expr_text);
     states.push_back(state);
     fill_buffer_if_needed();
@@ -1372,6 +1377,18 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                 "deconstruction. Use a, b, c := ....",
                 range);
   }
+
+  for (const auto &iden: node->idens) {
+    auto symbol = ctx.scope->local_lookup(iden->value);
+    if (node->op == TType::ColonEquals) {
+      if (symbol) throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
+      ctx.scope->insert(iden->value, -1, node);
+    } else {
+      if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      ctx.scope->insert(iden->value, -1, node);
+    }
+  }
+  
   end_node(node, range);
   return node;
 }
