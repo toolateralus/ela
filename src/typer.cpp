@@ -298,7 +298,6 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
       } else {
         type_scope->insert(method->name, func_ty_id, method, SYMBOL_IS_FUNCTION);
       }
-      node->scope->symbols[method->name] = type_scope->symbols[method->name];
       if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
         continue;
       }
