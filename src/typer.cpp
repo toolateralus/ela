@@ -1543,11 +1543,12 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
                             info->types.size(), node->idens.size()),
                 node->source_range);
   }
-
+  
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-    std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " << global_get_type(type)->to_string() << "}\n";
+    // TODO: fix repro 41, this is helpful for that.
+    // std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " << global_get_type(type)->to_string() << "}\n";
     ctx.scope->insert(iden->value, type, node);
   }
 

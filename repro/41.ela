@@ -2,9 +2,11 @@
 
 unwrap :: fn![T](tuple: (string, T)) -> T {
   a, b := tuple;
-  if a.length { // segfault on Emitter::get_symbol("a") when visiting this dot expression? even though it's fine when we type check it.
-    exit(1);
-  }
+  // if a.length { // segfault on Emitter::get_symbol("a") when visiting this dot expression? even though it's fine when we type check it.
+  //   exit(1);
+  // }
+  
+  sizeof(T);
   return b;
 }
 

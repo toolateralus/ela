@@ -2,7 +2,7 @@
 Strakt :: struct![T] {}
 
 impl![T] Strakt![T] {
-  fukt :: fn() -> #self {
+  a_flupped :: fn() -> #self {
     n : #self;
     return n;
   }

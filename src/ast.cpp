@@ -1378,18 +1378,20 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                 range);
   }
 
+  end_node(node, range);
+
   for (const auto &iden: node->idens) {
     auto symbol = ctx.scope->local_lookup(iden->value);
     if (node->op == TType::ColonEquals) {
       if (symbol) throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
       ctx.scope->insert(iden->value, -1, node);
     } else {
-      if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      // TODO: reimplement this error in a sane way.
+      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
       ctx.scope->insert(iden->value, -1, node);
     }
   }
   
-  end_node(node, range);
   return node;
 }
 
