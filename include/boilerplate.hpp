@@ -89,8 +89,8 @@ extern "C" int strlen(const char *);
 
 template <class T> struct _array {
   T *data = nullptr;
-  s32 length = 0;
-  s32 capacity = 0;
+  u32 length = 0;
+  u32 capacity = 0;
   bool is_view = false;
 
   _array() : data(nullptr), length(0), capacity(0), is_view(false) {}
@@ -230,7 +230,7 @@ template <class T> struct _array {
 // For now, we'll just use a simple null terminated string.
 struct string {
   char *data = nullptr;
-  s32 length = 0;
+  u32 length = 0;
   bool is_view = false;
   string() {}
   string(char *str) {
