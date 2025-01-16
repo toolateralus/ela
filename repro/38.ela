@@ -1,8 +1,0 @@
-// Null type in emit, for t: T;
-get :: fn![T]() {
-  t: T;
-}
-
-main :: fn() {
-  get![int]();
-}

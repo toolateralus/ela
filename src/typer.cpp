@@ -821,7 +821,12 @@ void Typer::try_resolve_generic_function_call(ASTCall *&node, Type *&type, Nulla
       symbol_nullable = nullptr;
 
       auto info = type->get_info()->as<FunctionTypeInfo>();
-      visit_function_body(func, info->return_type);
+      for (auto &instantiation : func->generic_instantiations) {
+        if (instantiation.type == type_id) {
+          visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation.node), info->return_type);
+          break;
+        }
+      }
     }
   }
 }
@@ -970,7 +975,13 @@ std::any Typer::visit(ASTType *node) {
       }
       if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         auto info = global_get_type(type_id)->get_info()->as<FunctionTypeInfo>();
-        visit_function_body(static_cast<ASTFunctionDeclaration *>(declaring_node), info->return_type);
+        auto func = static_cast<ASTFunctionDeclaration *>(declaring_node);
+        for (auto &instantiation : func->generic_instantiations) {
+          if (instantiation.type == type_id) {
+            visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation.node), info->return_type);
+            break;
+          }
+        }
       }
       node->resolved_type = global_find_type_id(type_id, extensions);
     } else {
@@ -1497,13 +1508,12 @@ std::any Typer::visit(ASTTuple *node) {
   int type_index = 0;
   for (const auto &v : node->values) {
     auto old = declaring_or_assigning_type;
-    Defer _([&]{
-      declaring_or_assigning_type = old;
-    });
+    Defer _([&] { declaring_or_assigning_type = old; });
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
       auto info = declaring_tuple->get_info()->as<TupleTypeInfo>();
       if (info->types.size() < type_index) {
-        throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()), v->source_range);
+        throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()),
+                    v->source_range);
       }
       declaring_or_assigning_type = info->types[type_index];
     }
@@ -1543,12 +1553,13 @@ std::any Typer::visit(ASTTupleDeconstruction *node) {
                             info->types.size(), node->idens.size()),
                 node->source_range);
   }
-  
+
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
     // TODO: fix repro 41, this is helpful for that.
-    // std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " << global_get_type(type)->to_string() << "}\n";
+    // std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " <<
+    // global_get_type(type)->to_string() << "}\n";
     ctx.scope->insert(iden->value, type, node);
   }
 

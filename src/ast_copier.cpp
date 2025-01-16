@@ -321,10 +321,13 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   auto new_node = new (ast_alloc<ASTImpl>()) ASTImpl(*node);
   new_node->target = static_cast<ASTType *>(copy_node(node->target));
   new_node->scope = copy_scope(new_node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
   new_node->methods.clear();
   for (const auto &method : node->methods) {
     new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
   }
+  current_scope = old_scope;
   return new_node;
 }
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
