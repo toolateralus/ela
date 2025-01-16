@@ -160,7 +160,7 @@ Context::Context() {
         // };
 
         str_scope->insert("data", charptr_type(), nullptr);
-        str_scope->insert("length", s32_type(), nullptr);
+        str_scope->insert("length", u32_type(), nullptr);
         str_scope->insert("is_view", bool_type(), nullptr);
         auto func = FunctionTypeInfo{};
         func.parameter_types[0] = char_type();

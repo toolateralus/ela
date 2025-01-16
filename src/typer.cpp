@@ -1231,7 +1231,7 @@ std::any Typer::visit(ASTDotExpr *node) {
   // TODO: remove this hack to get array length
   if (base_ty->get_ext().is_array()) {
     if (node->member_name == "length") {
-      return s32_type();
+      return u32_type();
     }
     if (node->member_name == "data") {
       return global_get_type(base_ty->get_element_type())->take_pointer_to();
