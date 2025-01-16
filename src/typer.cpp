@@ -281,6 +281,7 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
   }
 
   auto type_scope = type->get_info()->scope;
+  Scope impl_scope = {};
   for (const auto &method : node->methods) {
     if (!method->generic_parameters.empty()) {
       ctx.scope->insert(method->name, -1, method, SYMBOL_IS_FUNCTION);
@@ -299,6 +300,7 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
       } else {
         type_scope->insert(method->name, func_ty_id, method, SYMBOL_IS_FUNCTION);
       }
+      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
         continue;
       }
@@ -321,20 +323,20 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
       decl->accept(this);
     }
     ctx.set_scope(node->scope);
-    for (auto &[name, method] : interface->scope->symbols) {
-      if (auto impl_symbol = node->scope->local_lookup(name)) {
-        if (method.type_id != impl_symbol->type_id) {
-          if (method.type_id != -1 && impl_symbol->type_id != -1) {
+    for (auto &[name, interface_sym] : interface->scope->symbols) {
+      if (auto impl_symbol = impl_scope.local_lookup(name)) {
+        if (interface_sym.type_id != impl_symbol->type_id) {
+          if (interface_sym.type_id != -1 && impl_symbol->type_id != -1) {
             throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
-                                    global_get_type(method.type_id)->to_string(),
+                                    global_get_type(interface_sym.type_id)->to_string(),
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);
           } else {
-            std::cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(method.type_id) << "\033[0m\n";
+            std::cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(interface_sym.type_id) << "\033[0m\n";
             std::cout << "\033[1;90mimpl_symbol.type_id == \033[1;31m" << std::to_string(impl_symbol->type_id)
                       << "\033[0m\n";
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null",
-                        method.declaring_node ? method.declaring_node.get()->source_range : node->source_range);
+                        interface_sym.declaring_node ? interface_sym.declaring_node.get()->source_range : node->source_range);
           }
         }
       } else {
@@ -343,10 +345,10 @@ int Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std
                     node->source_range);
       }
     }
-    for (auto &impl_kvp : node->scope->symbols) {
-      if (!interface->scope->local_lookup(impl_kvp.first)) {
-        throw_error(std::format("impl method \"{}\" not found in interface", impl_kvp.first),
-                    impl_kvp.second.declaring_node.get()->source_range);
+    for (auto &[name, impl_sym] : impl_scope.symbols) {
+      if (!interface->scope->local_lookup(name)) {
+        throw_error(std::format("impl method \"{}\" not found in interface", name),
+                    impl_sym.declaring_node.get()->source_range);
       }
     }
     type->interfaces.push_back(interface_ty->id);
