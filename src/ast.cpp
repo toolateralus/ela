@@ -1,7 +1,7 @@
 #include "ast.hpp"
 
 #include <algorithm>
-#include <any>
+
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -430,9 +430,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::LParen);
         auto type = parser->parse_type();
         parser->expect(TType::RParen);
-        auto id = std::any_cast<int>(type->accept(parser->typer));
+        type->accept(parser->typer);
         literal->tag = ASTLiteral::Integer;
-        literal->value = std::to_string(id);
+        // TODO: we should move this out of here.
+        literal->value = std::to_string(type->resolved_type);
         literal->source_range = type->source_range;
         return literal;
     }},
@@ -1715,7 +1716,9 @@ ASTImpl *Parser::parse_impl() {
 
   // TODO: make it so we dont have to get the scope of the type, we shouldn't be doing much typing
   // during parse time.
-  auto type = global_get_type(std::any_cast<int>(impl->target->accept(typer)));
+  
+  impl->target->accept(typer);
+  auto type = global_get_type(impl->target->resolved_type);
   impl->target->resolved_type = -1;
 
   auto block = parse_block(impl->scope);
