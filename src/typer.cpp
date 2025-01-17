@@ -58,7 +58,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       dotnode->base->accept(this);
-      auto type = global_get_type(dotnode->resolved_type);
+      auto type = global_get_type(dotnode->base->resolved_type);
       auto scope = type->get_info()->scope;
       return scope->local_lookup(dotnode->member_name);
     } break;
