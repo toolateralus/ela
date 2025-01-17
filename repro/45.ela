@@ -1,0 +1,23 @@
+
+Struct :: struct {
+  fd: int;
+}
+
+#foreign read :: fn(fd: int, buffer: void*, len: int) -> s32;
+
+// This works because the CT interpreter doesn't care about type checking,
+// it just evaluates the expression and infers the type.
+buffer: u8[CONSTANT]; 
+
+impl Struct {
+  read_from :: fn(self*) {
+    // This doesn't work, because the arguments depend on a resolved type to check,
+    // of course, and since we use-before-declare, we don't know the type and it says the type is -1.
+    read(self.fd, null, CONSTANT); 
+  }
+}
+
+CONSTANT :: 45;
+
+main :: fn() { 
+}

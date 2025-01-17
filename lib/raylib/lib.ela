@@ -4,8 +4,6 @@
 #c_flags " -lraylib "
 
 
-
-
 impl Color {
   scaled_rgb :: fn(self, scale: float32) -> #self {
     return {
