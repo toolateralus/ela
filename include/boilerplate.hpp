@@ -87,6 +87,11 @@ extern "C" int strlen(const char *);
 #undef RAND_MAX
 #undef assert
 
+extern "C" void *malloc(size_t size);
+extern "C" void free(void *ptr);
+extern "C" void *realloc(void *ptr, size_t size);
+extern "C" void *calloc(size_t num, size_t size);
+
 template <class T> struct _array {
   T *data = nullptr;
   u32 length = 0;
@@ -94,22 +99,20 @@ template <class T> struct _array {
   bool is_view = false;
 
   _array() : data(nullptr), length(0), capacity(0), is_view(false) {}
-
-  _array(int length) : data(new T[length]), length(length), capacity(length), is_view(false) {}
-
-  _array(T *array, int len) : data(new T[len]), length(len), capacity(len), is_view(false) {
+  _array(int length) : data(static_cast<T *>(calloc(length, sizeof(T)))), length(length), capacity(length), is_view(false) {}
+  _array(T *array, int len) : data(static_cast<T *>(calloc(len, sizeof(T)))), length(len), capacity(len), is_view(false) {
     std::copy(array, array + len, data);
   }
 
   _array(T *begin, T *end) {
-    length = std::distance(end - begin);
+    length = std::distance(begin, end);
     capacity = length;
-    data = new T[length];
+    data = static_cast<T *>(calloc(length, sizeof(T)));
     std::copy(begin, end, data);
   }
 
   _array(const _array &other)
-      : data(new T[other.length]), length(other.length), capacity(other.capacity), is_view(other.is_view) {
+      : data(static_cast<T *>(calloc(other.length, sizeof(T)))), length(other.length), capacity(other.capacity), is_view(other.is_view) {
     std::copy(other.data, other.data + other.length, data);
   }
 
@@ -123,10 +126,10 @@ template <class T> struct _array {
 
   _array &operator=(const _array &other) {
     if (this != &other) {
-      T *new_data = new T[other.length];
+      T *new_data = static_cast<T *>(calloc(other.length, sizeof(T)));
       std::copy(other.data, other.data + other.length, new_data);
       if (data && !is_view) {
-        delete[] data;
+        free(data);
       }
       data = new_data;
       length = other.length;
@@ -139,7 +142,7 @@ template <class T> struct _array {
   _array &operator=(_array &&other) noexcept {
     if (this != &other) {
       if (data && !is_view)
-        delete[] data;
+        free(data);
       data = other.data;
       length = other.length;
       capacity = other.capacity;
@@ -154,26 +157,21 @@ template <class T> struct _array {
 
   _array(std::initializer_list<T> list) : length(list.size()), capacity(list.size()), is_view(false) {
     if (list.size() != 0) {
-      data = new T[list.size()];
+      data = static_cast<T *>(calloc(list.size(), sizeof(T)));
       std::copy(list.begin(), list.end(), data);
     }
-    length = list.size();
   }
 
   ~_array() {
     if (!is_view && data) {
-      delete[] data;
+      free(data);
       data = nullptr;
     }
   }
 
   void resize(int new_capacity) {
     if (new_capacity > capacity) {
-      T *new_data = new T[new_capacity];
-      std::move(data, data + length, new_data);
-      if (data && !is_view) {
-        delete[] data;
-      }
+      T *new_data = static_cast<T *>(realloc(data, new_capacity * sizeof(T)));
       data = new_data;
       capacity = new_capacity;
     }
@@ -183,7 +181,7 @@ template <class T> struct _array {
     if (length >= capacity) {
       resize(capacity == 0 ? 1 : capacity * 2);
     }
-    data[length++] = value;
+    new (&data[length++]) T(value);
   }
 
   T pop() { return data[--length]; }
@@ -241,7 +239,7 @@ struct string {
     while (str[length] != '\0') {
       ++length;
     }
-    data = new char[length + 1];
+    data = static_cast<char *>(malloc(length + 1));
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
@@ -252,14 +250,14 @@ struct string {
       length = std::distance(begin, end);
     } else {
       length = std::distance(begin, end);
-      data = new char[length + 1];
+      data = static_cast<char *>(malloc(length + 1));
       std::copy(begin, end, data);
       data[length] = '\0';
     }
   }
   ~string() {
     if (data && !is_view)
-      delete[] data;
+      free(data);
   }
   char &operator[](int n) { return data[n]; }
   explicit operator char *() { return data; }
@@ -279,11 +277,11 @@ struct string {
   string substr(const Range &r) const { return substr(r.first, r.last); }
 
   void push(const char &value) {
-    char *new_data = new char[length + 2];
+    char *new_data = static_cast<char *>(malloc(length + 2));
     std::copy(data, data + length, new_data);
     new_data[length] = value;
     new_data[length + 1] = '\0';
-    delete[] data;
+    free(data);
     data = new_data;
     ++length;
   }
@@ -292,10 +290,10 @@ struct string {
     if (index < 0 || index >= length || length <= 0) {
       return;
     }
-    char *new_data = new char[length];
+    char *new_data = static_cast<char *>(malloc(length));
     std::copy(data, data + index, new_data);
     std::copy(data + index + 1, data + length, new_data + index);
-    delete[] data;
+    free(data);
     data = new_data;
     --length;
     data[length] = '\0';
@@ -303,37 +301,37 @@ struct string {
 
   void insert_at(int index, const char &value) {
     if (data == nullptr) {
-      data = new char[2];
+      data = static_cast<char *>(malloc(2));
       data[0] = value;
       data[1] = '\0';
       length = 1;
       return;
     }
-    char *new_data = new char[length + 2];
+    char *new_data = static_cast<char *>(malloc(length + 2));
     std::copy(data, data + index, new_data);
     new_data[index] = value;
     std::copy(data + index, data + length, new_data + index + 1);
     new_data[length + 1] = '\0';
-    delete[] data;
+    free(data);
     data = new_data;
     ++length;
   }
 
   void insert_substr_at(int index, const string &substr) {
     if (data == nullptr) {
-      data = new char[substr.length + 1];
+      data = static_cast<char *>(malloc(substr.length + 1));
       std::copy(substr.data, substr.data + substr.length, data);
       data[substr.length] = '\0';
       length = substr.length;
       return;
     }
     int substr_length = substr.length;
-    char *new_data = new char[length + substr_length + 1];
+    char *new_data = static_cast<char *>(malloc(length + substr_length + 1));
     std::copy(data, data + index, new_data);
     std::copy(substr.data, substr.data + substr_length, new_data + index);
     std::copy(data + index, data + length, new_data + index + substr_length);
     new_data[length + substr_length] = '\0';
-    delete[] data;
+    free(data);
     data = new_data;
     length += substr_length;
   }
@@ -343,10 +341,10 @@ struct string {
       return 0;
     }
     char value = data[length - 1];
-    char *new_data = new char[length];
+    char *new_data = static_cast<char *>(malloc(length));
     std::copy(data, data + length - 1, new_data);
     new_data[length - 1] = '\0';
-    delete[] data;
+    free(data);
     data = new_data;
     --length;
     return value;
@@ -355,17 +353,17 @@ struct string {
   string(const string &other) {
     if (other.data) {
       length = other.length;
-      data = new char[length + 1];
+      data = static_cast<char *>(malloc(length + 1));
       std::copy(other.data, other.data + length, data);
       data[length] = '\0';
     }
   }
   string &operator=(const string &other) {
     if (this != &other) {
-      delete[] data;
+      free(data);
       if (other.data) {
         length = other.length;
-        data = new char[length + 1];
+        data = static_cast<char *>(malloc(length + 1));
         std::copy(other.data, other.data + length, data);
         data[length] = '\0';
       } else {
