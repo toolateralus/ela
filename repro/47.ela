@@ -1,0 +1,19 @@
+Array :: struct![T] {
+  data:     T*;    
+  length:   u64;
+  capacity: u64;
+}
+
+// Even trying to compile this just crashes in the emitter??
+impl![T] Array![T] {
+ push :: fn(self*, t: T) { }
+ resize :: fn(self*, capacity : u64) {}
+ pop :: fn(self*) -> T { return {} }
+ deinit :: fn(self*) {}
+}
+
+main :: fn() {
+//  array: Array![int];
+}
+
+

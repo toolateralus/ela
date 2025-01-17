@@ -62,7 +62,13 @@ impl File {
     str: string;
     c: char;
     while ((c = fgetc(file)) != EOF) {
-      str = $"{str}{c}";
+      if str.length == 0 {
+         str = $"{c}";
+         continue;
+      }
+      else {
+        str = $"{str}{c}";
+      }
     }
     fclose(file);
     return str;

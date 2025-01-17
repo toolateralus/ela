@@ -272,6 +272,7 @@ SHUT_RD :: 0;
 SHUT_WR :: 1;
 SHUT_RDWR :: 2;
 
+
 #foreign socket :: fn(__domain: s32, __type: s32, __protocol: s32) -> s32;
 #foreign socketpair :: fn(__domain: s32, __type: s32, __protocol: s32, __fds: s32*) -> s32;
 #foreign bind :: fn(__fd: s32, __addr: sockaddr *, __len: socklen_t) -> s32;

@@ -1507,7 +1507,15 @@ std::any Emitter::visit(ASTImpl *node) {
     return {};
   }
 
-  auto target = global_get_type(node->target->resolved_type);
+  // !! If we visit this here, we get 'use of undeclared identifier T'
+  // !! if we just use the resolved type, we get -1.
+  // !! it's a lose lose, what is causing this?
+  auto target = global_get_type(std::any_cast<int>(node->target->accept(&typer)));
+
+  if (!target) {
+    throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
+  }
+  
   current_impl = node;
   Defer _([&] { current_impl = nullptr; });
 
