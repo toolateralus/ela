@@ -45,6 +45,7 @@ impl File {
   flush :: fn(self*) {
     fflush(self.fd);
   }
+
   close :: fn(self*) -> void {
     fflush(self.fd);
     fclose(self.fd);
@@ -57,19 +58,24 @@ impl File {
     fseek(file, 0, SeekPosition::Begin);
     return len as u32;
   }
-  read_all :: fn(filename: string) -> string {
+
+  read_all :: fn(filename: string) -> (Error, string) {
     file := fopen(filename.data, "r"c);
+
+    if !file then return ($"Couldn't open file {filename}", {});
+    
     str: string;
     c: char;
     while ((c = fgetc(file)) != EOF) {
       str = $"{str}{c}";
     }
     fclose(file);
-    return str;
+    return ({}, str);
   }
 
   read_bytes :: fn(filename: string) -> u8[] {
     file := fopen(filename.data, "r"c);
+    if !file then return {};
     result: u8[];
     c: char;
     while ((c = fgetc(file)) != EOF) {
@@ -79,10 +85,12 @@ impl File {
     return result;
   }
 
-  write_all :: fn(filename: string, data: string) -> void {
+  write_all :: fn(filename: string, data: string) -> Error {
     file := fopen(filename.data, "w"c);
+    if !file then return $"Unable to open file {filename}";
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);
+    return string::empty();
   }
 
   // Used to convert our flag enum to a string for fopen/fclose etc.
@@ -94,14 +102,17 @@ impl File {
       then s = $"{s}w";
     return s;
   }
+
   open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
     return File{
       fd: fopen(filename.data, File::flags_to_string(flags).data)
     };
   }
+
   read :: fn(self*, buffer: u8*, size: u64) -> u64 {
     return fread(buffer, 1, size, self.fd);
   }
+
   write :: fn(self*, buffer: u8*, size: u64) -> u64 {
     return fwrite(buffer, 1, size, self.fd);
   }

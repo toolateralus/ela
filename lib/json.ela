@@ -510,7 +510,11 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
 }
 
 json_parse_file :: fn(file: string) -> (JsonError, JsonValue*) {
-  lexer := JsonLexer::create(file, File::read_all(file));
+  err, data := File::read_all(file);
+  if err.length != 0 {
+    return (JsonError::Error(err), null);
+  }
+  lexer := JsonLexer::create(file, data);
   return json_parse(&lexer);
 }
 

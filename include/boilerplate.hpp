@@ -83,14 +83,14 @@ extern "C" int sprintf(char *str, const char *format, ...);
 extern "C" void *memcpy(void *, void *, size_t);
 extern "C" void *memset(void *, int, size_t);
 extern "C" int strlen(const char *);
-
-#undef RAND_MAX
-#undef assert
-
 extern "C" void *malloc(size_t size);
 extern "C" void free(void *ptr);
 extern "C" void *realloc(void *ptr, size_t size);
 extern "C" void *calloc(size_t num, size_t size);
+
+#undef RAND_MAX
+#undef assert
+
 
 template <class T> struct _array {
   T *data = nullptr;
@@ -231,6 +231,7 @@ struct string {
   u32 length = 0;
   bool is_view = false;
   string() {}
+
   string(char *str) {
     if (str == nullptr) {
       return;
@@ -243,6 +244,7 @@ struct string {
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
+
   string(char *begin, char *end, bool is_view = false) {
     this->is_view = is_view;
     if (is_view) {
@@ -255,112 +257,31 @@ struct string {
       data[length] = '\0';
     }
   }
+  
   ~string() {
-    if (data && !is_view)
+    if (length != 0 && data && !is_view)
       free(data);
   }
+
   char &operator[](int n) { return data[n]; }
-  explicit operator char *() { return data; }
 
   string operator[](const Range &range) const {
     string result(data + range.first, data + range.last, true);
     return result;
   }
 
-  string substr(int start, int end) const {
-    if (start < 0 || end > length || start > end) {
-      return string();
-    }
-    return string(data + start, data + end, false);
-  }
-
-  string substr(const Range &r) const { return substr(r.first, r.last); }
-
-  void push(const char &value) {
-    char *new_data = static_cast<char *>(malloc(length + 2));
-    std::copy(data, data + length, new_data);
-    new_data[length] = value;
-    new_data[length + 1] = '\0';
-    free(data);
-    data = new_data;
-    ++length;
-  }
-
-  void erase_at(int index) {
-    if (index < 0 || index >= length || length <= 0) {
-      return;
-    }
-    char *new_data = static_cast<char *>(malloc(length));
-    std::copy(data, data + index, new_data);
-    std::copy(data + index + 1, data + length, new_data + index);
-    free(data);
-    data = new_data;
-    --length;
-    data[length] = '\0';
-  }
-
-  void insert_at(int index, const char &value) {
-    if (data == nullptr) {
-      data = static_cast<char *>(malloc(2));
-      data[0] = value;
-      data[1] = '\0';
-      length = 1;
-      return;
-    }
-    char *new_data = static_cast<char *>(malloc(length + 2));
-    std::copy(data, data + index, new_data);
-    new_data[index] = value;
-    std::copy(data + index, data + length, new_data + index + 1);
-    new_data[length + 1] = '\0';
-    free(data);
-    data = new_data;
-    ++length;
-  }
-
-  void insert_substr_at(int index, const string &substr) {
-    if (data == nullptr) {
-      data = static_cast<char *>(malloc(substr.length + 1));
-      std::copy(substr.data, substr.data + substr.length, data);
-      data[substr.length] = '\0';
-      length = substr.length;
-      return;
-    }
-    int substr_length = substr.length;
-    char *new_data = static_cast<char *>(malloc(length + substr_length + 1));
-    std::copy(data, data + index, new_data);
-    std::copy(substr.data, substr.data + substr_length, new_data + index);
-    std::copy(data + index, data + length, new_data + index + substr_length);
-    new_data[length + substr_length] = '\0';
-    free(data);
-    data = new_data;
-    length += substr_length;
-  }
-
-  char pop() {
-    if (length <= 0) {
-      return 0;
-    }
-    char value = data[length - 1];
-    char *new_data = static_cast<char *>(malloc(length));
-    std::copy(data, data + length - 1, new_data);
-    new_data[length - 1] = '\0';
-    free(data);
-    data = new_data;
-    --length;
-    return value;
-  }
-
   string(const string &other) {
-    if (other.data) {
+    if (other.data && other.length != 0) {
       length = other.length;
       data = static_cast<char *>(malloc(length + 1));
       std::copy(other.data, other.data + length, data);
       data[length] = '\0';
     }
   }
+
   string &operator=(const string &other) {
     if (this != &other) {
-      free(data);
+      if (length != 0 && data) free(data);
       if (other.data) {
         length = other.length;
         data = static_cast<char *>(malloc(length + 1));
@@ -373,8 +294,11 @@ struct string {
     }
     return *this;
   }
+
   auto begin() { return data; }
   auto end() { return data + length; }
+  auto begin() const { return data; }
+  auto end() const { return data + length; }
 
   bool operator==(const string &other) const {
     if (length != other.length)
@@ -385,11 +309,7 @@ struct string {
     }
     return true;
   }
-
   bool operator!=(const string &other) const { return !(*this == other); }
-
-  auto begin() const { return data; }
-  auto end() const { return data + length; }
 };
 
 inline string Range::to_string() const {
