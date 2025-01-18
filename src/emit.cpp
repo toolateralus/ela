@@ -91,7 +91,6 @@ void Emitter::visit(ASTFor *node) {
 
 void Emitter::visit(ASTAlias *node) { return; }
 
-
 void Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
@@ -492,11 +491,10 @@ void Emitter::visit(ASTStructDeclaration *node) {
   indentLevel++;
 
   auto old = emit_default_init;
-  if (node->is_union) emit_default_init = false;
+  if (node->is_union)
+    emit_default_init = false;
 
-  Defer _defer1([&]{
-    emit_default_init = old;
-  });
+  Defer _defer1([&] { emit_default_init = old; });
 
   for (const auto &subtype : node->subtypes) {
     indented("");
@@ -633,7 +631,7 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-code << R"__(
+      code << R"__(
 int main (int argc, char** argv) {
   for (int i = 0; i < argc; ++i) {
     Env_args().push(string(argv[i]));
@@ -852,22 +850,21 @@ std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::s
   //? we need to emit _array<void(*)()>
   //? or possibly _array<_array<void(*)()>*>
 
-// TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
-// It shouldn't be bad finding the real problem
-// #define SLIGHTLY_AWFUL_HACK
-// #ifdef SLIGHTLY_AWFUL_HACK
-//   std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
-//   // This probably won't work for nested arrays
-// #elif defined(TERRIBLE_HACK)
-//   // We could just purge off the problematic characters?
-//   // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do that.
-//   auto string = to_cpp_string(type->get_ext(), type_string);
-//   size_t pos = 0;
-//   while ((pos = string.find(")*>", pos)) != std::string::npos) {
-//     string.replace(pos, 3, ")>");
-//     pos += 2;
-//   }
-// #endif
+  // TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
+  // It shouldn't be bad finding the real problem
+  // #define SLIGHTLY_AWFUL_HACK
+  // #ifdef SLIGHTLY_AWFUL_HACK
+  //   std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
+  //   // This probably won't work for nested arrays
+  // #elif defined(TERRIBLE_HACK)
+  //   // We could just purge off the problematic characters?
+  //   // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do
+  //   that. auto string = to_cpp_string(type->get_ext(), type_string); size_t pos = 0; while ((pos = string.find(")*>",
+  //   pos)) != std::string::npos) {
+  //     string.replace(pos, 3, ")>");
+  //     pos += 2;
+  //   }
+  // #endif
   auto string = to_cpp_string(type->get_ext(), type_string);
 
   if (!string.contains(' ' + name + ' ')) {
@@ -1233,7 +1230,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
-     
+
   if (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array()) {
     ss << get_elements_function(type) << ",\n";
   }
@@ -1477,7 +1474,7 @@ void Emitter::visit(ASTImpl *node) {
   if (!target) {
     throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
   }
-  
+
   current_impl = node;
   Defer _([&] { current_impl = nullptr; });
 
@@ -1511,7 +1508,6 @@ void Emitter::visit(ASTCast *node) {
 }
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
-
 
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
   (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
@@ -1570,7 +1566,7 @@ void Emitter::emit_deferred_statements(ASTBlock *parent, bool is_return) {
     for (auto i = 0; i < parent->defer_count && defer_blocks.size() > 0; ++i) {
       defer_blocks.pop_back();
       parent->defer_count--;
-    } 
+    }
   } else {
     for (int i = parent->defer_count; defer_blocks.size() > 0 && i > 0; ++i) {
       (*ss) << defer_blocks.back().str();
@@ -1684,7 +1680,8 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
 void Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
-  if (emitting_function_with_defer || (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+  if (emitting_function_with_defer ||
+      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
       (*ss) << defer_return_value_key << " = ";
       node->expression.get()->accept(this);
@@ -1709,7 +1706,8 @@ void Emitter::visit(ASTReturn *node) {
 
 void Emitter::visit(ASTBreak *node) {
   emit_line_directive(node);
-  if (emitting_function_with_defer || (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+  if (emitting_function_with_defer ||
+      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     emit_deferred_statements(node->declaring_block.get(), false);
   }
   indented("break;\n");
@@ -1718,7 +1716,8 @@ void Emitter::visit(ASTBreak *node) {
 
 void Emitter::visit(ASTContinue *node) {
   emit_line_directive(node);
-  if (emitting_function_with_defer || (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+  if (emitting_function_with_defer ||
+      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     emit_deferred_statements(node->declaring_block.get(), false);
   }
   indented("continue;\n");
@@ -1773,4 +1772,11 @@ void Emitter::visit(ASTBlock *node) {
   indented("}");
   ctx.exit_scope();
   return;
+}
+void Emitter::visit(ASTLambda *node) {
+  (*ss) << "+[]";
+  node->params->accept(this);
+  (*ss) << " -> ";
+  node->return_type->accept(this);
+  node->block->accept(this);
 }

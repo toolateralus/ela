@@ -90,6 +90,7 @@ struct Typer : VisitorBase {
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
   void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTLambda *node) override;
 
   InternedString type_name(ASTExpr *node);
 };
@@ -224,6 +225,7 @@ struct Emitter : VisitorBase {
   void visit(ASTTaggedUnionDeclaration *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTLambda *node) override;
 
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {

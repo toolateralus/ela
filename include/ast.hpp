@@ -58,6 +58,7 @@ enum ASTNodeType {
   AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_DEFER,
   AST_NODE_CAST,
+  AST_NODE_LAMBDA,
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
@@ -588,10 +589,20 @@ struct ASTCast : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+// These do not support closures!!
+struct ASTLambda : ASTExpr {
+  ASTParamsDecl* params;
+  ASTType* return_type;
+  ASTBlock* block;
+  ASTNodeType get_node_type() const override { return AST_NODE_LAMBDA; }
+  void accept(VisitorBase *visitor) override;
+};
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
   void visit(ASTProgram *node) override {}                                                                         \
+  void visit(ASTLambda *node) override {}                                                                         \
   void visit(ASTBlock *node) override {}                                                                           \
   void visit(ASTFunctionDeclaration *node) override {}                                                             \
   void visit(ASTParamsDecl *node) override {}                                                                      \
@@ -631,6 +642,7 @@ struct ASTCast : ASTExpr {
   void visit(ASTNoop *noop) { return; }                                                                         \
   virtual void visit(ASTScopeResolution *node) = 0;                                                                \
   virtual void visit(ASTCast *node) = 0;                                                                           \
+  virtual void visit(ASTLambda *node) = 0;                                                                           \
   virtual void visit(ASTProgram *node) = 0;                                                                        \
   virtual void visit(ASTBlock *node) = 0;                                                                          \
   virtual void visit(ASTFunctionDeclaration *node) = 0;                                                            \
@@ -723,6 +735,7 @@ struct Parser {
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   void visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements);
   ASTEnumDeclaration *parse_enum_declaration(Token);
+  ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();

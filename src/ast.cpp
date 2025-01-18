@@ -806,6 +806,9 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Fn: {
+      return parse_lambda();
+    }
     case TType::Switch: {
       expect(TType::Switch);
       auto expr = parse_expr();
@@ -2068,6 +2071,20 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
     node->source_range = range;
 }
 
+ASTLambda *Parser::parse_lambda() {
+  expect(TType::Fn);
+  NODE_ALLOC(ASTLambda, node, range, _, this);
+  node->params = parse_parameters();
+  if (peek().type == TType::Arrow) {
+    eat();
+    node->return_type = parse_type();
+  } else {
+    node->return_type = ASTType::get_void();
+  }
+  node->block = parse_block();
+  return node;
+}
+
 Token Parser::peek() const {
   if (states.empty()) {
     return Token::Eof();
@@ -2090,3 +2107,4 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+

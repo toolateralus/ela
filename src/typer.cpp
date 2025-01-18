@@ -71,7 +71,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
     } break;
 
     default:
-      throw_error("Get symbol cannot be used on this node type", node->source_range);
+      return nullptr; // TODO: verify this isn't strange.
   }
   return nullptr;
 }
@@ -166,6 +166,26 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node, int return_type) {
   assert_types_can_cast_or_equal(control_flow.type, return_type, node->source_range,
                                  "invalid return type.. expected '{}', got '{}'",
                                  std::format("function: '{}'", node->name.get_str()));
+}
+
+
+void Typer::visit(ASTLambda *node) {
+  node->params->accept(this);
+  node->return_type->accept(this);
+  std::vector<int> param_types;
+  FunctionTypeInfo info;
+  int parameter_index = 0;
+  for (const auto &param: node->params->params) {
+    info.parameter_types[parameter_index] = param->resolved_type;
+    info.params_len++;
+    node->block->scope->insert(param->normal.name, param->resolved_type, param);
+    parameter_index++;
+  }
+  info.return_type = node->return_type->resolved_type;
+  auto type = global_find_function_type_id(info, {});
+  node->block->accept(this);
+  // TODO: Do we want to always take a function pointer?
+  node->resolved_type = global_get_type(type)->take_pointer_to();
 }
 
 int Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
@@ -1608,9 +1628,6 @@ void Typer::visit(ASTTupleDeconstruction *node) {
   for (int i = 0; i < node->idens.size(); ++i) {
     auto type = info->types[i];
     auto iden = node->idens[i];
-    // TODO: fix repro 41, this is helpful for that.
-    // std::cout << "tuple[" << std::to_string(i) << "] = { \"" << iden->value.get_str() << "\", " <<
-    // global_get_type(type)->to_string() << "}\n";
     ctx.scope->insert(iden->value, type, node);
   }
 
