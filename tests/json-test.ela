@@ -121,7 +121,7 @@ impl JsonValueDeleter {
   n : int = 100;
   err, json := json_serialize(&n, #type(int));
   if err.has_value {
-    assert($"{err.message} deserialize int".data, false);
+    assert($"{err.message} serialize int".data, false);
   }
   deleter: JsonValueDeleter;
   deleter.add(json);
@@ -149,7 +149,7 @@ impl MyJsonStruct {
   };
   err, json := json_serialize(&n, #type(MyJsonStruct));
   if err.has_value {
-    assert($"{err.message} test_struct_deserialization MyJsonStruct".data, false);
+    assert($"{err.message}".data, false);
   }
   deleter: JsonValueDeleter;
   deleter.add(json);

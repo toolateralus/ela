@@ -22,20 +22,19 @@ constexpr auto TYPE_FLAGS_INTEGER = 1 << 0;
 constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
 constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
 constexpr auto TYPE_FLAGS_STRING = 1 << 3;
-constexpr auto TYPE_FLAGS_STRUCT = 1 << 5;
-constexpr auto TYPE_FLAGS_UNION = 1 << 6;
-constexpr auto TYPE_FLAGS_ENUM = 1 << 7;
-constexpr auto TYPE_FLAGS_TUPLE = 1 << 8;
+constexpr auto TYPE_FLAGS_STRUCT = 1 << 4;
+constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 5;
+constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
+constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 9;
-constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 10;
-constexpr auto TYPE_FLAGS_MAP = 1 << 11;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 12;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 13;
+constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
+constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 9;
+constexpr auto TYPE_FLAGS_MAP = 1 << 10;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 11;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 12;
 
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 14;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 15;
-constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 16;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 13;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 14;
 
 void Emitter::visit(ASTWhile *node) {
   emit_condition_block(node, "while", node->condition, node->block);
@@ -104,7 +103,6 @@ void Emitter::visit(ASTArguments *node) {
 }
 void Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
-
   if (!type) {
     throw_error("internal compiler error: ASTType* resolved to null in emitter.", node->source_range);
   }

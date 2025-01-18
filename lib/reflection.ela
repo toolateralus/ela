@@ -1,31 +1,24 @@
 #import core;
 
+
+
 // TODO: fix this for new modified union structure.
 #flags TypeFlags :: enum {
-  // Scalars.
   INTEGER,
   FLOAT,
   BOOL,
   STRING,
-
-  // Type definitions
   STRUCT,
-  UNION,
+  TAGGED_UNION,
   ENUM,
-
-  // Non scalar type extensions
   TUPLE,
   ARRAY,
   FIXED_ARRAY,
   MAP,
   FUNCTION,
   POINTER,
-
-  // Integer sign.
   SIGNED,
   UNSIGNED,
-  
-  TAGGED_UNION,
 }
 
 impl Type  {
@@ -62,10 +55,6 @@ impl Type  {
 
   is_struct :: fn(type: Type*) -> bool {
     return type.flags & TypeFlags::STRUCT != 0;
-  }
-
-  is_union :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::UNION != 0;
   }
 
   is_enum :: fn(type: Type*) -> bool {

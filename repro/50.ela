@@ -1,0 +1,9 @@
+Json_Serializer :: struct {}
+
+impl Json_Serializer {
+  serialize :: fn![T](t: T) -> int {
+    return 0;
+  }
+}
+
+main :: fn() { }

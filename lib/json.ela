@@ -526,59 +526,36 @@ json_serialize_scalar :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
   val : JsonValue* = malloc(sizeof(JsonValue));
   if Type::is_float(type) {
     val.type = JsonValueType::Number;
-    if type.id == #typeid(float) {
-      val.data.number = *(object as float*);
-      return (JsonError::Ok(), val);
-    } else if type.id == #typeid(float64) {
+    if type.size == 8 {
       val.data.number = *(object as float64*);
-      return (JsonError::Ok(), val);
-    } else if type.id == #typeid(float32) {
+    } else {
       val.data.number = *(object as float32*);
-      return (JsonError::Ok(), val);
     }
+    return (JsonError::Ok(), val);
   } else if Type::is_integral(type) {
     val.type = JsonValueType::Number;
     if Type::is_signed(type) {
-      if type.id == #typeid(char) {
-        val.data.number = *(object as c_string);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(s8) {
-        val.data.number = *(object as s8*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(s16) {
-        val.data.number = *(object as s16*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(s32) {
-        val.data.number = *(object as s32*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(s64) {
-        val.data.number = *(object as s64*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(int) {
-        val.data.number = *(object as int*);
-        return (JsonError::Ok(), val);
+      switch type.size {
+        8: { val.data.number = *(object as s64*); }
+        4: { val.data.number = *(object as s32*); }
+        2: { val.data.number = *(object as s16*); }
+        1: { val.data.number = *(object as s8*); }
       }
     } else {
-      if type.id == #typeid(u8) {
-        val.data.number = *(object as u8*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(u16) {
-        val.data.number = *(object as u16*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(u32) {
-        val.data.number = *(object as u32*);
-        return (JsonError::Ok(), val);
-      } else if type.id == #typeid(u64) {
-        val.data.number = *(object as u64*);
-        return (JsonError::Ok(), val);
+      switch type.size {
+        8: { val.data.number = *(object as u64*); }
+        4: { val.data.number = *(object as u32*); }
+        2: { val.data.number = *(object as u16*); }
+        1: { val.data.number = *(object as u8*); }
       }
     }
+    return (JsonError::Ok(), val);
   } else if Type::is_bool(type) {
     val.type = JsonValueType::Boolean;
     val.data.boolean = *(object as bool*);
     return (JsonError::Ok(), val);
   }
-  return (JsonError::Error("Unsupported type"), null);
+  return (JsonError::Error($"Unsupported type :: '{type.name}'"), null);
 }
 
 json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*);
@@ -629,7 +606,7 @@ json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
   } else if Type::is_array(type) || Type::is_fixed_array(type) {
     return json_serialize_array(object, type);
   }
-  return (JsonError::Error("Unsupported type"), null);
+  return (JsonError::Error($"Unsupported type :: '{type.name}'"), null);
 }
 
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError;
