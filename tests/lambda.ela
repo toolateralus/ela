@@ -2,6 +2,7 @@
 
 
 #alias Lambda :: fn * (int,int) -> int;
+
 takes_lambda :: fn(lambda: Lambda, a: int, b: int) -> int{
   return lambda(a, b);
 }

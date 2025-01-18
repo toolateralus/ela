@@ -174,6 +174,8 @@ void Typer::visit(ASTLambda *node) {
   node->return_type->accept(this);
   std::vector<int> param_types;
   FunctionTypeInfo info;
+  // TODO:
+  // We need to make it so the lambda block's parent is the root scope, so that it doesn't give the impression that it can do closures.
   int parameter_index = 0;
   for (const auto &param: node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
