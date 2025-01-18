@@ -1078,6 +1078,7 @@ void Typer::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign) {
     declaring_or_assigning_type = left;
   }
+
   if (node->op.type == TType::Concat) {
     auto type = global_get_type(left);
     // TODO: if the array is a pointer to an array, we should probably have an implicit dereference.
@@ -1092,6 +1093,7 @@ void Typer::visit(ASTBinExpr *node) {
       ctx.scope->insert(((ASTIdentifier *)node->left)->value, node->left->resolved_type, node->right);
     }
   }
+
   auto left_ty = global_get_type(left);
 
   if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() &&
@@ -1131,6 +1133,7 @@ void Typer::visit(ASTBinExpr *node) {
     assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}",
                                    "invalid type in array concatenation expression");
     node->resolved_type = void_type();
+    return;
   }
 
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
@@ -1143,6 +1146,7 @@ void Typer::visit(ASTBinExpr *node) {
     auto right_t = global_get_type(right);
     auto conv_rule_0 = type_conversion_rule(left_t, right_t, node->left->source_range);
     auto conv_rule_1 = type_conversion_rule(right_t, left_t, node->right->source_range);
+
     if (((conv_rule_0 == CONVERT_PROHIBITED) && (conv_rule_1 == CONVERT_PROHIBITED)) ||
         ((conv_rule_0 == CONVERT_EXPLICIT) && (conv_rule_1 == CONVERT_EXPLICIT))) {
       throw_error(std::format("Type error in binary expression: cannot convert between {} and {}", left_t->to_string(),
