@@ -784,17 +784,20 @@ void Typer::visit(ASTCall *node) {
     throw_error("use of undeclared function", node->source_range);
   }
 
-  // I hoisted this out of try_resolve_generic_function_call because it really didn't belong there.
-  // ! Somehow methods aren't being detected as methods anymore??? what???
-  // ! in the parser everything is correct, it must be smoething that's changed I have no idea.
-  if (symbol_nullable.is_not_null() && symbol_nullable.get()->declaring_node.is_not_null() &&
-        symbol_nullable.get()->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      auto func = static_cast<ASTFunctionDeclaration *>(symbol_nullable.get()->declaring_node.get());
-      method_call = (func->flags & FUNCTION_IS_METHOD) != 0 || func->params->has_self;
+  if (auto symbol = symbol_nullable.get()) {
+    if (!type) {
+      type = global_get_type(symbol->type_id);
     }
-
-  // Try to resolve generic function call
-  try_resolve_generic_function_call(node, type, symbol_nullable, method_call);
+    if (symbol->declaring_node.is_not_null() &&
+        symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+      method_call = (func->flags & FUNCTION_IS_METHOD) != 0 || func->params->has_self;
+      // Try to resolve generic function call
+      if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
+        resolve_generic_function_call(node, type, func);
+      }
+    }
+  }
 
   if (!type) {
     throw_error("unable to locate type for function call", node->source_range);
@@ -841,45 +844,28 @@ void Typer::type_check_arguments(ASTCall *&node, Type *&type, bool &method_call,
   }
 }
 
-void Typer::try_resolve_generic_function_call(ASTCall *&node, Type *&type, Nullable<Symbol> &symbol_nullable,
-                                              bool &method_call) {
-  if (symbol_nullable) {
-    auto symbol = symbol_nullable.get();
-    if (!type) {
-      type = global_get_type(symbol->type_id);
-    }
-    ASTFunctionDeclaration *func = nullptr;
+void Typer::resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func) {
+  std::vector<int> gen_args;
+  if (node->generic_arguments.empty()) {
+    node->arguments->accept(this);
+    gen_args = node->arguments->resolved_argument_types;
+  } else {
+    gen_args = get_generic_arg_types(node->generic_arguments);
+  }
 
-    if (symbol->declaring_node.is_not_null() &&
-        symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
-    }
+  auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_signature, func, gen_args);
 
-    if (!node->generic_arguments.empty() || (func && !func->generic_parameters.empty())) {
-      std::vector<int> gen_args;
-      if (node->generic_arguments.empty()) {
-        node->arguments->accept(this);
-        gen_args = node->arguments->resolved_argument_types;
-      } else {
-        gen_args = get_generic_arg_types(node->generic_arguments);
-      }
+  if (type_id == -2) {
+    throw_error("Template instantiation argument count mismatch", node->source_range);
+  }
 
-      auto type_id = visit_generic<ASTFunctionDeclaration>(&Typer::visit_function_signature, func, gen_args);
+  type = global_get_type(type_id);
+  auto info = type->get_info()->as<FunctionTypeInfo>();
 
-      if (type_id == -2) {
-        throw_error("Template instantiation argument count mismatch", node->source_range);
-      }
-
-      type = global_get_type(type_id);
-      symbol_nullable = nullptr;
-      auto info = type->get_info()->as<FunctionTypeInfo>();
-
-      for (auto &instantiation : func->generic_instantiations) {
-        if (instantiation.type == type_id) {
-          visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation.node), info->return_type);
-          break;
-        }
-      }
+  for (auto &instantiation : func->generic_instantiations) {
+    if (instantiation.type == type_id) {
+      visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation.node), info->return_type);
+      break;
     }
   }
 }

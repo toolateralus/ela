@@ -68,7 +68,7 @@ struct Typer : VisitorBase {
   int get_self_type();
 
   void type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info);
-  void try_resolve_generic_function_call(ASTCall *&node, Type *&type, Nullable<Symbol> &symbol_nullable, bool &method_call);
+  void resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
   void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
 
   void visit(ASTCall *node) override;
