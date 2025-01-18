@@ -219,18 +219,11 @@ impl string {
 #alias Error :: string;
 
 to_string :: fn(num: s64) -> string {
-  switch num {
-    0: { return "0"; }
-    1: { return "1"; }
-    2: { return "2"; }
-    3: { return "3"; }
-    4: { return "4"; }
-    5: { return "5"; }
-    6: { return "6"; }
-    7: { return "7"; }
-    8: { return "8"; }
-    9: { return "9"; }
-  }
+  #static table : string[] = {
+    "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+  };
+
+  if num < 10 then return table[num];
 
   negative := false;
   if num < 0 {
