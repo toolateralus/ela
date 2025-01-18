@@ -659,6 +659,7 @@ void Typer::visit(ASTReturn *node) {
   } else {
     type = ctx.scope->find_type_id("void", {});
   }
+  node->resolved_type = type;
   node->control_flow = ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
 void Typer::visit(ASTContinue *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_CONTINUE, -1}; }
@@ -1617,7 +1618,9 @@ void Typer::visit(ASTTuple *node) {
   }
   TypeExtensions extensions;
   extensions.extensions = accept_extensions(node->type->extensions);
+  // TODO: remove the node->type, that makes no freaking sense.
   node->type->resolved_type = global_find_type_id(types, extensions);
+  node->resolved_type = node->type->resolved_type;
 }
 void Typer::visit(ASTAlias *node) {
   node->type->accept(this);

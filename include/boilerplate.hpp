@@ -270,7 +270,7 @@ struct string {
   }
   string &operator=(const string &other) {
     if (this != &other) {
-      if (data) delete[] data;
+      if (data && length != 0) delete[] data;
       if (other.data) {
         length = other.length;
         data = new char[length + 1];
