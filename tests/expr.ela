@@ -152,7 +152,7 @@ Array :: struct {
 
 // This whole directive, #make() needs to be removed.
 // it's noisy and unneccesary.
-#test test_make_cast :: fn() {
+#test test_cast :: fn() {
   big:  u16 = 65365 as u16;
   small: u8 = big as u8;
   assert("failed to down cast"c, small == (big % 255));

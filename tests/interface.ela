@@ -34,12 +34,13 @@
   }
 }
 
-#region uninstantiated generic {
-  GenericWithoutInstance :: struct![T] { }
-
-  impl![T] GenericWithoutInstance![T] {
-    thing :: fn(self*, t: T) { }
-  }
+#test basic_struct :: fn() {
+  assert("interface failed"c, Struct::static_get() == 0);
+  assert("interface failed"c, Struct::static_get_self().a == 100);
+  instance: Struct;
+  assert("interface failed"c, instance.method_get() == 0);
+  assert("interface failed"c, instance.method_get_ptr() == 0);
+  assert("interface failed"c, instance.method_get_self().a == 100);
 }
 
 #region generic_interface_regular_struct {
@@ -74,17 +75,6 @@
       return Struct1 {a: 100};
     }
   }
-}
-
-
-
-#test basic_struct :: fn() {
-  assert("interface failed"c, Struct::static_get() == 0);
-  assert("interface failed"c, Struct::static_get_self().a == 100);
-  instance: Struct;
-  assert("interface failed"c, instance.method_get() == 0);
-  assert("interface failed"c, instance.method_get_ptr() == 0);
-  assert("interface failed"c, instance.method_get_self().a == 100);
 }
 
 #test generic_interface_regular_struct :: fn() {
@@ -132,4 +122,12 @@
   assert("interface failed"c, instance.method_get() == 0);
   assert("interface failed"c, instance.method_get_ptr() == 0);
   assert("interface failed"c, instance.method_get_self().n == 0);
+}
+
+#region uninstantiated generic {
+  GenericWithoutInstance :: struct![T] { }
+
+  impl![T] GenericWithoutInstance![T] {
+    thing :: fn(self*, t: T) { }
+  }
 }
