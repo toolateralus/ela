@@ -36,7 +36,7 @@ void ASTBreak::accept(VisitorBase *visitor) { visitor->visit(this); };
 void ASTContinue::accept(VisitorBase *visitor) { visitor->visit(this); };
 void ASTFor::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTIf::accept(VisitorBase *visitor) { visitor->visit(this); }
-
+void ASTLambda::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTNoop::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTElse::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhile::accept(VisitorBase *visitor) { visitor->visit(this); }
