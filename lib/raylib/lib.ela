@@ -1,7 +1,11 @@
 #import core;
 
 #include "_raybindings.ela";
-#c_flags " -lraylib "
+
+// NOTE: 
+// If you use static libraries in your .ela library, you should provide that dependency in your lib/ dir, and just link against it as such.
+// do not use -lsome_system_library, or you will have a terrible library.
+#c_flags " /usr/local/lib/ela/raylib/libraylib.a "
 
 
 impl Color {

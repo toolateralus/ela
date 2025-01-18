@@ -510,7 +510,7 @@ struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
   int element_type;
   InternedString name;
-  std::vector<std::pair<InternedString, Nullable<ASTExpr>>> key_values;
+  std::vector<std::pair<InternedString, ASTExpr*>> key_values;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };

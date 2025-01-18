@@ -531,9 +531,9 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     if (node->is_flags) {
       (*ss) << " = ";
       (*ss) << std::to_string(1 << n);
-    } else if (value.is_not_null()) {
+    } else if (value) {
       (*ss) << " = ";
-      value.get()->accept(this);
+      value->accept(this);
     }
     if (n != node->key_values.size() - 1) {
       (*ss) << ",\n";
@@ -854,20 +854,21 @@ std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::s
 
 // TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
 // It shouldn't be bad finding the real problem
-#define SLIGHTLY_AWFUL_HACK
-#ifdef SLIGHTLY_AWFUL_HACK
-  std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
-  // This probably won't work for nested arrays
-#elif defined(TERRIBLE_HACK)
-  // We could just purge off the problematic characters?
-  // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do that.
+// #define SLIGHTLY_AWFUL_HACK
+// #ifdef SLIGHTLY_AWFUL_HACK
+//   std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
+//   // This probably won't work for nested arrays
+// #elif defined(TERRIBLE_HACK)
+//   // We could just purge off the problematic characters?
+//   // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do that.
+//   auto string = to_cpp_string(type->get_ext(), type_string);
+//   size_t pos = 0;
+//   while ((pos = string.find(")*>", pos)) != std::string::npos) {
+//     string.replace(pos, 3, ")>");
+//     pos += 2;
+//   }
+// #endif
   auto string = to_cpp_string(type->get_ext(), type_string);
-  size_t pos = 0;
-  while ((pos = string.find(")*>", pos)) != std::string::npos) {
-    string.replace(pos, 3, ")>");
-    pos += 2;
-  }
-#endif
 
   if (!string.contains(' ' + name + ' ')) {
     return string + ' ' + name;

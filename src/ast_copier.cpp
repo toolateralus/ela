@@ -233,8 +233,7 @@ ASTEnumDeclaration *ASTCopier::copy_enum_declaration(ASTEnumDeclaration *node) {
   auto new_node = new (ast_alloc<ASTEnumDeclaration>()) ASTEnumDeclaration(*node);
   new_node->key_values.clear();
   for (auto &kv : node->key_values) {
-    new_node->key_values.push_back(
-        {kv.first, kv.second.is_not_null() ? (ASTExpr *)copy_node(kv.second.get()) : nullptr});
+    new_node->key_values.push_back({kv.first, (ASTExpr*)copy_node(kv.second)});
   }
   return new_node;
 }
@@ -247,6 +246,10 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   new_node->fields.clear();
   for (auto field : node->fields) {
     new_node->fields.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
+  }
+  new_node->subtypes.clear();
+  for (auto subtype: node->subtypes) {
+    new_node->subtypes.push_back(static_cast<ASTStructDeclaration *>(copy_node(subtype)));
   }
   current_scope = old_scope;
   return new_node;

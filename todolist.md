@@ -38,3 +38,19 @@ To search for all info comments in the source just use vscodes regex search with
 
 ## ambitious
 - out of order compilation.
+
+
+## things that need to be tidy'd up before we can transpile to c
+
+- (easy) using generics in boilerplate.hpp, we should rewrite _array and map<T> and string in our own language.
+  this kind of depends on transpiling to C, because when using C++ you need obnoxious constructors like copy assignment that we just
+  cannot provide.
+
+- (hard) using std::tuple<T> instead of compiling our own tuple structs per instantition
+
+- (hard) generics need to work on types that are defined AFTER the generic is defined.
+
+- (hard) All the lambdas we use for interpolated strings, local functions, quick lambdas, switch expressions (if/while expressions)
+  need to be compiled to some kind of alternative structure.
+
+- (easy) we need to emit stuff as typedef ... NAME {} .. NAME;

@@ -387,8 +387,8 @@ void Typer::visit(ASTEnumDeclaration *node) {
 
   // TODO: why is value still nullable? we don't even check if it exists before we use it.
   for (const auto &[key, value] : node->key_values) {
-    value.get()->accept(this);
-    auto node_ty = value.get()->resolved_type;
+    value->accept(this);
+    auto node_ty = value->resolved_type;
     info->scope->insert(key, node_ty, node);
     if (elem_type == -1) {
       elem_type = node_ty;
