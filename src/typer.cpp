@@ -922,6 +922,7 @@ void Typer::visit(ASTExprStatement *node) {
   if (auto _switch = dynamic_cast<ASTSwitch *>(node->expression)) {
     node->control_flow = _switch->control_flow;
     node->resolved_type = _switch->resolved_type;
+    node->resolved_type = _switch->resolved_type;
   }
 }
 
