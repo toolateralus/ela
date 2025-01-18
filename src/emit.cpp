@@ -467,29 +467,40 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   // TODO: fix forward declarations not emitting?
 
+  auto type_tag = node->is_union ? " union " : " struct ";
+
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
       (*ss) << "extern \"C\" ";
     }
-    (*ss) << "struct " << type->get_base().get_str() << ";\n";
+    (*ss) << type_tag << type->get_base().get_str() << ";\n";
     return;
   }
 
   ctx.set_scope(node->scope);
 
   if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
-    (*ss) << "struct {\n";
+    (*ss) << type_tag;
+    (*ss) << "{\n";
   } else {
     if (node->is_extern) {
       (*ss) << "extern \"C\" ";
     }
-    (*ss) << "struct " << type->get_base().get_str() << "{\n";
+    (*ss) << type_tag;
+    (*ss) << type->get_base().get_str() << "{\n";
   }
   indentLevel++;
 
-  for (const auto &_union : node->unions) {
+  auto old = emit_default_init;
+  if (node->is_union) emit_default_init = false;
+
+  Defer _defer1([&]{
+    emit_default_init = old;
+  });
+
+  for (const auto &subtype : node->subtypes) {
     indented("");
-    _union->accept(this);
+    subtype->accept(this);
     semicolon();
     newline();
   }
@@ -532,53 +543,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
   (*ss) << "};\n";
   return;
 }
-void Emitter::visit(ASTUnionDeclaration *node) {
-  auto type = global_get_type(node->resolved_type);
-  auto info = type->get_info()->as<UnionTypeInfo>();
-  if (node->is_fwd_decl) {
-    (*ss) << "union " << node->name.get_str() << ";\n";
-    return;
-  }
 
-  Defer _([&] { current_union_decl = nullptr; });
-  current_union_decl = node;
-
-  if ((info->flags & UNION_IS_ANONYMOUS) != 0) {
-    (*ss) << "union " << "{\n";
-  } else {
-    (*ss) << "union " << node->name.get_str() << "{\n";
-  }
-
-  indentLevel++;
-  ctx.set_scope(node->scope);
-  emit_default_init = false;
-
-  bool has_default_ctor = false;
-  bool has_dtor = false;
-
-  for (const auto &field : node->fields) {
-    if (field == node->fields.front()) {
-      emit_default_init = true;
-      field->accept(this);
-      emit_default_init = false;
-    } else {
-      field->accept(this);
-    }
-
-    (*ss) << ";\n";
-  }
-
-  for (const auto &_struct : node->structs) {
-    _struct->accept(this);
-    (*ss) << ";\n";
-  }
-
-  emit_default_init = true;
-  indentLevel--;
-  ctx.exit_scope();
-  (*ss) << "};\n";
-  return;
-}
 void Emitter::visit(ASTParamDecl *node) {
   auto type = global_get_type(node->resolved_type);
 
@@ -969,7 +934,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
     return format_str;
   }
 
-  if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+  if (type->is_kind(TYPE_STRUCT)) {
     return "%s";
   }
   if (type->id == charptr_type() || (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
@@ -1074,7 +1039,7 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
         current->expression->accept(this);
         (*ss) << ".data";
-      } else if (type->is_kind(TYPE_STRUCT) || type->is_kind(TYPE_UNION)) {
+      } else if (type->is_kind(TYPE_STRUCT)) {
         auto info = (type->get_info()->as<StructTypeInfo>());
         interpolate_to_string_struct_union(info->scope);
       } else if (type->is_kind(TYPE_TUPLE)) {
@@ -1218,9 +1183,10 @@ std::string get_type_flags(Type *type) {
     case TYPE_ENUM:
       kind_flags = TYPE_FLAGS_ENUM;
       break;
-    case TYPE_UNION:
-      kind_flags = TYPE_FLAGS_UNION;
-      break;
+    // TODO: We need to let struct types know that they're a union when they are.
+    // case TYPE_UNION:
+    //   kind_flags = TYPE_FLAGS_UNION;
+    //   break;
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;
@@ -1303,7 +1269,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
   // starting point, ! but it could be far better.
 
   std::stringstream fields_ss;
-  if (type->kind == TYPE_STRUCT || type->kind == TYPE_UNION) {
+  if (type->kind == TYPE_STRUCT) {
     auto info = type->get_info();
     if (info->scope->symbols.empty()) {
       return get_type_struct(type, id, context, "{}");
@@ -1436,7 +1402,6 @@ std::string Emitter::to_cpp_string(Type *type) {
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
     case TYPE_ENUM:
-    case TYPE_UNION:
     case TYPE_STRUCT:
     case TYPE_TAGGED_UNION: {
       output = to_cpp_string(type->get_ext(), type->get_base().get_str());
@@ -1559,7 +1524,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
         field->accept(this);
         (*ss) << ";\n";
       }
-      for (const auto &$union : struct_node->unions) {
+      for (const auto &$union : struct_node->subtypes) {
         $union->accept(this);
       }
       (*ss) << "} " << subtype_name << ";\n";

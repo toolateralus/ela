@@ -310,7 +310,6 @@ std::string Type::to_string() const {
     case TYPE_SCALAR:
       return base.get_str() + extensions.to_string();
     case TYPE_ENUM:
-    case TYPE_UNION:
     case TYPE_TAGGED_UNION:
     case TYPE_INTERFACE:
       return base.get_str();
@@ -368,17 +367,6 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
   return type->id;
 }
 
-int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
-  type_table.emplace_back(type_table.size(), TYPE_UNION);
-  Type *type = &type_table.back();
-  type->set_base(name);
-  UnionTypeInfo *info = type_info_alloc<UnionTypeInfo>();
-  info->flags = kind;
-  info->scope = scope;
-  info->scope = scope;
-  type->set_info(info);
-  return type->id;
-}
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
   type_table.emplace_back(type_table.size(), TYPE_ENUM);
   Type *type = &type_table.back();

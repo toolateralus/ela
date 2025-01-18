@@ -54,7 +54,6 @@ enum TypeKind {
   TYPE_FUNCTION,
   TYPE_STRUCT,
   TYPE_ENUM,
-  TYPE_UNION,
   TYPE_TUPLE,
   TYPE_TAGGED_UNION,
   TYPE_INTERFACE,
@@ -80,15 +79,10 @@ enum FunctionInstanceFlags : size_t {
   FUNCTION_IS_FOREIGN = 1 << 8,
 };
 
-enum UnionFlags {
-  UNION_IS_NORMAL = 1 << 0,
-  UNION_IS_FORWARD_DECLARED = 1 << 2,
-  UNION_IS_ANONYMOUS = 1 << 3,
-};
-
 enum StructTypeFlags {
   STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
   STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
+  STRUCT_FLAG_IS_UNION = 1 << 2,
 };
 
 struct ASTExpr;
@@ -217,10 +211,6 @@ struct EnumTypeInfo : TypeInfo {
   EnumTypeInfo() {};
 };
 
-struct UnionTypeInfo : TypeInfo {
-  int flags;
-  UnionTypeInfo() {}
-};
 
 struct StructTypeInfo : TypeInfo {
   int flags;
@@ -267,7 +257,6 @@ int global_create_interface_type(const InternedString &name, Scope *scope,
 int global_create_tagged_union_type(const InternedString &, Scope *);
 int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
-int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
 int charptr_type();

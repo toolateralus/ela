@@ -51,7 +51,6 @@ enum ASTNodeType {
   AST_NODE_SUBSCRIPT,
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_ENUM_DECLARATION,
-  AST_NODE_UNION_DECLARATION,
   AST_NODE_TAGGED_UNION_DECLARATION,
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
@@ -457,24 +456,20 @@ struct ASTSubscript : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
 };
 
-struct ASTUnionDeclaration;
 struct ASTImpl;
 
 struct ASTStructDeclaration : ASTStatement {
   Scope *scope;
   InternedString name;
-
   bool is_fwd_decl = false;
   bool is_extern = false;
-
+  bool is_union = false;
   std::vector<ASTDeclaration *> fields;
-  std::vector<ASTUnionDeclaration *> unions;
+  std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
   std::vector<ASTImpl *> impls;
-
   void accept(VisitorBase *visitor) override;
-
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };
 
@@ -520,19 +515,6 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
-struct ASTUnionDeclaration : ASTStatement {
-  Scope *scope;
-  InternedString name;
-  int kind = UNION_IS_NORMAL;
-  bool is_fwd_decl = false;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
-  std::vector<ASTDeclaration *> fields;
-  std::vector<ASTStructDeclaration *> structs;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
-};
-
 struct ASTTaggedUnionDeclaration : ASTStatement {
   InternedString name;
   Scope *scope;
@@ -540,7 +522,7 @@ struct ASTTaggedUnionDeclaration : ASTStatement {
   std::vector<GenericInstance> generic_instantiations;
   std::vector<ASTNode *> members;
   void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_UNION_DECLARATION; }
+  ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
 };
 
 struct SwitchCase {
@@ -635,7 +617,6 @@ struct ASTCast : ASTExpr {
   void visit(ASTSubscript *node) override {}                                                                       \
   void visit(ASTInitializerList *node) override {}                                                                 \
   void visit(ASTEnumDeclaration *node) override {}                                                                 \
-  void visit(ASTUnionDeclaration *node) override {}                                                                \
   void visit(ASTRange *node) override {};                                                                          \
   void visit(ASTSwitch *node) override {};                                                                         \
   void visit(ASTTuple *node) override {};                                                                          \
@@ -676,7 +657,6 @@ struct ASTCast : ASTExpr {
   virtual void visit(ASTSubscript *node) = 0;                                                                      \
   virtual void visit(ASTInitializerList *node) = 0;                                                                \
   virtual void visit(ASTEnumDeclaration *node) = 0;                                                                \
-  virtual void visit(ASTUnionDeclaration *node) = 0;                                                               \
   virtual void visit(ASTRange *node) = 0;                                                                          \
   virtual void visit(ASTSwitch *node) = 0;                                                                         \
   virtual void visit(ASTTuple *node) = 0;                                                                          \
@@ -739,7 +719,6 @@ struct Parser {
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTType *> parse_generic_arguments();
-  ASTUnionDeclaration *parse_union_declaration(Token);
   ASTTaggedUnionDeclaration *parse_tagged_union_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   void visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements);
@@ -786,7 +765,6 @@ struct Parser {
   Context &ctx;
   Lexer lexer{};
   std::vector<Lexer::State> states;
-  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl_decl = nullptr;

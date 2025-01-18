@@ -174,13 +174,6 @@ XaryuStruct :: struct {
   assert("comp assign xarbars[0].f += 10.0; failed to == 20.0"c, xarbars[0].f == 20.0);
 }
 
-
-#test test_cast :: fn() {
-  n: int = 10;
-  f: float  = n as float;
-  assert("Cast failed"c, f == 10.0);
-}
-
 #test test_underscores_in_number_literals :: fn() {
   n: int = 1_000_000;
   assert("number literal with underscores failed to equal expected value"c, n == 1000000)

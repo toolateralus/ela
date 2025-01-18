@@ -33,7 +33,7 @@ struct ASTFunctionDeclaration;
 struct ASTInterfaceDeclaration;
 extern Scope *root_scope;
 struct Scope {
-  bool is_struct_or_union_scope = false;
+  bool is_struct_scope = false; // TODO: do we need this anymore?
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::unordered_map<InternedString, int> types;
@@ -112,12 +112,6 @@ struct Scope {
   int create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
     auto id = global_create_tuple_type(types, ext);
     this->types[get_tuple_type_name(types)] = id;
-    return id;
-  }
-
-  int create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
-    auto id = global_create_union_type(name, scope, kind);
-    types[name] = id;
     return id;
   }
 

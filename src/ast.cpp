@@ -388,17 +388,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto tok = parser->expect(TType::DoubleColon);
-        if (parser->peek().type == TType::Struct) {
+        if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           auto decl = parser->parse_struct_declaration(get_unique_identifier());
           auto t = global_get_type(decl->resolved_type);
           auto info = (t->get_info()->as<StructTypeInfo>());
           info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
-          return decl;
-        } else if (parser->peek().type == TType::Union){
-          auto decl = parser->parse_union_declaration(get_unique_identifier());
-          auto t = global_get_type(decl->resolved_type);
-          auto info = (t->get_info()->as<UnionTypeInfo>());
-          info->flags |= UNION_IS_ANONYMOUS;
           return decl;
         } else {
           throw_error("Expected struct or union after #anon ::...", SourceRange{(int64_t)tok.location.line});
@@ -412,7 +406,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto name = parser->expect(TType::Identifier);
         parser->expect(TType::DoubleColon);
-        if (parser->peek().type == TType::Struct) {
+        if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           auto decl = parser->parse_struct_declaration(name);
           decl->is_extern = true;
           return decl;
@@ -590,7 +584,6 @@ ASTProgram *Parser::parse() {
       case AST_NODE_FUNCTION_DECLARATION:
       case AST_NODE_INTERFACE_DECLARATION:
       case AST_NODE_ENUM_DECLARATION:
-      case AST_NODE_UNION_DECLARATION:
       case AST_NODE_TAGGED_UNION_DECLARATION:
       case AST_NODE_ALIAS:
       case AST_NODE_DECLARATION:
@@ -1232,7 +1225,7 @@ ASTStatement *Parser::parse_statement() {
       auto interface = parse_interface_declaration(tok);
       return interface;
     }
-    if (peek().type == TType::Struct) {
+    if (peek().type == TType::Struct || peek().type == TType::Union) {
       auto struct_decl = parse_struct_declaration(tok);
       return struct_decl;
     }
@@ -1248,10 +1241,6 @@ ASTStatement *Parser::parse_statement() {
       }
       auto enum_decl = parse_enum_declaration(tok);
       return enum_decl;
-    }
-    if (peek().type == TType::Union) {
-      auto union_decl = parse_union_declaration(tok);
-      return union_decl;
     }
 
     NODE_ALLOC(ASTDeclaration, decl, range, _, this);
@@ -1747,14 +1736,14 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
   for (const auto &statement : statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_UNION_DECLARATION) {
-      auto union_decl = static_cast<ASTUnionDeclaration *>(statement);
+    } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+      auto union_decl = static_cast<ASTStructDeclaration *>(statement);
       auto type = global_get_type(union_decl->resolved_type);
-      auto info = (type->get_info()->as<UnionTypeInfo>());
-      if ((info->flags & UNION_IS_ANONYMOUS) == 0) {
-        throw_error("can only use #anon union declarations within struct types.", decl->source_range);
+      auto info = (type->get_info()->as<StructTypeInfo>());
+      if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
+        throw_error("can only use '#anon :: union // #anon :: struct' declarations within struct types.", decl->source_range);
       }
-      decl->unions.push_back(union_decl);
+      decl->subtypes.push_back(union_decl);
       for (const auto &field : union_decl->fields) {
         decl->scope->insert(field->name, field->type->resolved_type, field);
       }
@@ -1796,14 +1785,24 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
 }
 
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
-  expect(TType::Struct);
+  bool is_union = false;
+
+  if (peek().type == TType::Struct) { 
+    expect(TType::Struct);
+  }
+  else {
+    is_union = true;
+    expect(TType::Union);
+  }
+  
 
   auto old = current_struct_decl;
-  NODE_ALLOC(ASTStructDeclaration, decl, range, _, this)
-  current_struct_decl = decl;
+  NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
+  node->is_union = is_union;
+  current_struct_decl = node;
 
   if (peek().type == TType::GenericBrace) {
-    decl->generic_parameters = parse_generic_parameters();
+    node->generic_parameters = parse_generic_parameters();
   }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
@@ -1823,118 +1822,32 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     type_id = ctx.scope->create_struct_type(name.value, {});
   }
 
-  decl->name = name.value;
-  decl->resolved_type = type_id;
+  node->name = name.value;
+  node->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
-  info->scope = decl->scope = create_child(ctx.scope);
-  info->scope->is_struct_or_union_scope = true;
+  info->scope = node->scope = create_child(ctx.scope);
+  info->scope->is_struct_scope = true;
+  if (is_union) info->flags |= STRUCT_FLAG_IS_UNION;
 
-  for (const auto &param : decl->generic_parameters) {
+  for (const auto &param : node->generic_parameters) {
     info->scope->types[param] = -2;
   }
 
   if (!semicolon()) {
-    auto block = parse_block(decl->scope);
-    visit_struct_statements(decl, block->statements);
-    decl->scope = block->scope;
+    auto block = parse_block(node->scope);
+    visit_struct_statements(node, block->statements);
+    node->scope = block->scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-    info->scope = decl->scope;
+    info->scope = node->scope;
   } else {
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
-    decl->is_fwd_decl = true;
+    node->is_fwd_decl = true;
   }
 
   current_struct_decl = old;
-  end_node(decl, range);
-  return decl;
-}
-
-ASTUnionDeclaration *Parser::parse_union_declaration(Token name) {
-  NODE_ALLOC_EXTRA_DEFER(ASTUnionDeclaration, decl, range, _, this, current_union_decl = nullptr)
-  current_union_decl = decl;
-  decl->name = name.value;
-  auto id = ctx.scope->find_type_id(name.value, {});
-  decl->resolved_type = id;
-  if (id != -1) {
-    auto type = global_get_type(id);
-
-    if (!type->is_kind(TYPE_UNION)) {
-      end_node(nullptr, range);
-      throw_error("cannot redefine already existing type", range);
-    }
-    auto info = (type->get_info()->as<UnionTypeInfo>());
-
-    if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
-      end_node(nullptr, range);
-      throw_error("cannot redefine already existing union type", range);
-    }
-  }
-
-  expect(TType::Union);
-
-  if (peek().type == TType::GenericBrace) {
-    decl->generic_parameters = parse_generic_parameters();
-  }
-
-  auto type_id = ctx.scope->find_type_id(name.value, {});
-  auto type = global_get_type(type_id);
-
-  if (type && type->is_kind(TYPE_UNION)) {
-    auto info = (type->get_info()->as<UnionTypeInfo>());
-    if ((info->flags & UNION_IS_FORWARD_DECLARED) == 0) {
-      end_node(nullptr, range);
-      throw_error("Redefinition of non forward-declared union type.", range);
-    }
-    info->flags &= ~UNION_IS_FORWARD_DECLARED;
-  } else {
-    // if we didn't find a foward declaration, instantiate a new empty union
-    // type, and resolve the node type, cause might as well.
-    type_id = decl->resolved_type = ctx.scope->create_union_type(name.value, nullptr, UNION_IS_NORMAL);
-  }
-
-  type = global_get_type(type_id);
-  auto info = (type->get_info()->as<UnionTypeInfo>());
-
-  if (peek().type == TType::Semi) {
-    eat();
-    decl->is_fwd_decl = true;
-    type = global_get_type(type_id);
-    auto info = (type->get_info()->as<UnionTypeInfo>());
-    info->flags |= UNION_IS_FORWARD_DECLARED;
-    return decl;
-  }
-
-  info->scope = decl->scope = create_child(ctx.scope);
-  info->scope->is_struct_or_union_scope = true;
-
-  for (const auto &param : decl->generic_parameters) {
-    info->scope->types[param] = -2;
-  }
-
-  auto block = parse_block(info->scope);
-
-  for (auto &statement : block->statements) {
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
-      decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_decl = static_cast<ASTStructDeclaration *>(statement);
-      auto type = global_get_type(struct_decl->resolved_type);
-      auto info = (type->get_info()->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        throw_error("can only use #anon struct declarations within union types.", decl->source_range);
-      }
-      decl->structs.push_back(struct_decl);
-      for (const auto &field : struct_decl->fields) {
-        block->scope->insert(field->name, field->type->resolved_type, field);
-      }
-    } else {
-      throw_error("Non field declarations not allowed in union", range);
-    }
-  }
-
-  end_node(decl, range);
-  return decl;
+  end_node(node, range);
+  return node;
 }
 
 ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {

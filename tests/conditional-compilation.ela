@@ -94,4 +94,14 @@
     n := 1;
   }
   assert("`#if true` failed"c, n == 0);
+
+  CONSTANT_EXPR :: 100 * 2;
+  #if CONSTANT_EXPR > 199 {
+    n = 1;
+  } else {
+    n = 0;
+  }
+
+  assert("#if V(200) > 199 failed"c, n == 1)
+
 }

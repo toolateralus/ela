@@ -1,5 +1,6 @@
 #import core;
 
+// TODO: fix this for new modified union structure.
 #flags TypeFlags :: enum {
   // Scalars.
   INTEGER,

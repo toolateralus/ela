@@ -34,7 +34,6 @@ struct ASTCopier {
   ASTSubscript *copy_subscript(ASTSubscript *node);
   ASTInitializerList *copy_initializer_list(ASTInitializerList *node);
   ASTEnumDeclaration *copy_enum_declaration(ASTEnumDeclaration *node);
-  ASTUnionDeclaration *copy_union_declaration(ASTUnionDeclaration *node);
   ASTRange *copy_range(ASTRange *node);
   ASTSwitch *copy_switch(ASTSwitch *node);
   ASTTuple *copy_tuple(ASTTuple *node);

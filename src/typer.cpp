@@ -125,7 +125,7 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
   type->declaring_node = node;
   ctx.scope->insert("this", type->take_pointer_to(), node);
 
-  for (auto subunion : node->unions) {
+  for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->fields) {
       field->accept(this);
       node->scope->insert(field->name, field->type->resolved_type, field);
@@ -133,46 +133,6 @@ int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_ins
   }
   for (auto decl : node->fields) {
     decl->accept(this);
-  }
-
-  ctx.set_scope(old_scope);
-  return type->id;
-}
-
-// TODO: remove union declaration node and UnionTypeInfo and TYPE_UNION,
-// we should just use struct & just have a union flag for various semantic differences
-// and emit time stuff. It will make things a lot more solid and reduce a ton of code.
-int Typer::visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
-                                   std::vector<int> generic_args) {
-  if (node->is_fwd_decl) {
-    return -1;
-  }
-
-  auto type = global_get_type(node->resolved_type);
-
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-
-  if (generic_instantiation) {
-    auto generic_arg = generic_args.begin();
-    for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
-      generic_arg++;
-    }
-    type = global_get_type(global_create_union_type(node->name, node->scope, UNION_IS_NORMAL));
-  }
-
-  ctx.scope->insert("this", type->take_pointer_to(), node);
-
-  for (const auto &_struct : node->structs) {
-    for (const auto &field : _struct->fields) {
-      field->accept(this);
-      node->scope->insert(field->name, field->type->resolved_type, field);
-    }
-  }
-
-  for (const auto &field : node->fields) {
-    field->accept(this);
   }
 
   ctx.set_scope(old_scope);
@@ -418,14 +378,6 @@ void Typer::visit(ASTStructDeclaration *node) {
   node->resolved_type = visit_struct_declaration(node, false);
 }
 
-void Typer::visit(ASTUnionDeclaration *node) {
-  if (!node->generic_parameters.empty()) {
-    ctx.scope->insert(node->name, -1, node, SYMBOL_IS_VARIABLE);
-    return;
-  }
-  // TODO: verify this is correct for generic instantiations?
-  node->resolved_type = visit_union_declaration(node, false);
-}
 
 void Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = -1;
@@ -1000,9 +952,6 @@ void Typer::visit(ASTType *node) {
         case AST_NODE_STRUCT_DECLARATION:
           type_id = visit_generic(&Typer::visit_struct_declaration, declaring_node, generic_args);
           break;
-        case AST_NODE_UNION_DECLARATION:
-          type_id = visit_generic(&Typer::visit_union_declaration, declaring_node, generic_args);
-          break;
         case AST_NODE_FUNCTION_DECLARATION:
           type_id = visit_generic(&Typer::visit_function_signature, declaring_node, generic_args);
           break;
@@ -1435,7 +1384,7 @@ void Typer::visit(ASTInitializerList *node) {
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_NAMED: {
-      if (!target_type->is_kind(TYPE_STRUCT) && !target_type->is_kind(TYPE_UNION)) {
+      if (!target_type->is_kind(TYPE_STRUCT)) {
         throw_error(std::format("named initializer lists can only be used for structs & unions, got type {}\nNote, for "
                                 "unions, you can only provide one value.",
                                 target_type->to_string()),

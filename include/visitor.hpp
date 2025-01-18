@@ -57,8 +57,6 @@ struct Typer : VisitorBase {
                                  std::vector<int> generic_args = {});
   int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                std::vector<int> generic_args = {});
-  int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
-                              std::vector<int> generic_args = {});
   int visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
                               std::vector<int> generic_args = {});
   int visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
@@ -84,7 +82,6 @@ struct Typer : VisitorBase {
   void visit(ASTSubscript *node) override;
   void visit(ASTInitializerList *node) override;
   void visit(ASTEnumDeclaration *node) override;
-  void visit(ASTUnionDeclaration *node) override;
   void visit(ASTRange *node) override;
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
@@ -110,7 +107,6 @@ struct Emitter : VisitorBase {
   std::vector<std::function<void()>> pending_statements;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl = nullptr;
 
@@ -217,7 +213,6 @@ struct Emitter : VisitorBase {
   void visit(ASTSubscript *node) override;
   void visit(ASTInitializerList *node) override;
   void visit(ASTEnumDeclaration *node) override;
-  void visit(ASTUnionDeclaration *node) override;
   void visit(ASTRange *node) override;
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
