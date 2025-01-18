@@ -71,7 +71,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
       return type->id;
     }
   }
-  auto base = -1;
+  auto base = Type::invalid_id;
   auto type_name = info.to_string();
   auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   if (type_extensions.has_extensions()) {
@@ -82,7 +82,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   if (base < 0) {
-    return -1;
+    return Type::invalid_id;
   }
 
   if (!type_extensions.has_extensions()) {
@@ -720,14 +720,14 @@ int find_operator_overload(TType op, Type *type) {
   std::string op_str = TTypeToString(op);
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
   auto scope = type->get_info()->scope;
-  if (!scope) return -1;
+  if (!scope) return Type::invalid_id;
   // TODO: make a system for type checking against this.
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {
       return symbol->type_id;
     }
   }
-  return -1;
+  return Type::invalid_id;
 }
 std::string mangled_type_args(const std::vector<int> &args) {
   std::string s;

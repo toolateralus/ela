@@ -150,7 +150,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
                               (int)node->get_node_type()),
                   node->source_range);
   }
-  return -1;
+  return Type::invalid_id;
 }
 
 void Emitter::visit(ASTCall *node) {
@@ -347,7 +347,7 @@ void Emitter::visit(ASTExprStatement *node) {
 void Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
 
-  if (node->type->resolved_type == -1) {
+  if (node->type->resolved_type == Type::invalid_id) {
     throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
@@ -464,9 +464,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
-  current_struct_decl = node;
-
-  Defer _defer([&] { current_struct_decl = nullptr; });
 
   // TODO: fix forward declarations not emitting?
 
@@ -576,7 +573,7 @@ void Emitter::visit(ASTParamsDecl *node) {
     ++i;
   }
 
-  if (current_func_decl.is_not_null() && (current_func_decl.get()->flags & FUNCTION_IS_VARARGS) != 0) {
+  if (node->is_varargs) {
     (*ss) << ", ...)";
     return;
   }
@@ -1470,34 +1467,19 @@ void Emitter::visit(ASTImpl *node) {
   }
 
   // !! If we visit this here, we get 'use of undeclared identifier T'
-  // !! if we just use the resolved type, we get -1.
+  // !! if we just use the resolved type, we get Type::invalid_id.
   // !! it's a lose lose, what is causing this?
   auto target = global_get_type(node->target->resolved_type);
 
   if (!target) {
     throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
   }
-
-  current_impl = node;
-  Defer _([&] { current_impl = nullptr; });
+  auto old_type = type_context;
+  type_context = node->target;
+  Defer _([&]{ type_context = old_type; });
 
   for (const auto &method : node->methods) {
-    method->return_type->accept(this);
-    auto name = to_cpp_string(target);
-    (*ss) << ' ' << name << '_' << method->name.get_str();
-    (*ss) << "(";
-    for (const auto &param : method->params->params) {
-      param->accept(this);
-      if (param != method->params->params.back()) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << ")";
-
-    //* forward declarations?
-    if (method->block) {
-      method->block.get()->accept(this);
-    }
+    method->accept(this);
   }
 
   return;
@@ -1638,30 +1620,33 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       (*ss) << "extern \"C\" ";
     }
 
-    if (node->name == "main") {
-      if (!is_freestanding) {
-        has_user_defined_main = true;
-        node->return_type->accept(this);
-        (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
-        node->block.get()->accept(this);
-      } else {
-        emit_function_signature_and_body(node->name.get_str());
-      }
+    std::string name;
+    if (type_context) {
+      auto type = global_get_type(type_context.get()->resolved_type);
+      name += to_cpp_string(type) + "_";
+    }
+    name += node->name.get_str();
+    if (!node->generic_arguments.empty()) {
+      name += mangled_type_args(node->generic_arguments);
+    }
+
+    if (node->name == "main" && !is_freestanding) {
+      has_user_defined_main = true;
+      node->return_type->accept(this);
+      (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
+      node->block.get()->accept(this);
     } else {
-      emit_function_signature_and_body(node->name.get_str() + mangled_type_args(node->generic_arguments));
+      emit_function_signature_and_body(name);
     }
   };
 
   emit_line_directive(node);
 
-  auto last_func_decl = current_func_decl;
-  current_func_decl = node;
 
   auto test_flag = compile_command.has_flag("test");
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer deferred = {[&]() {
-    current_func_decl = last_func_decl;
     ctx.set_scope(old_scope);
   }};
 
@@ -1766,7 +1751,7 @@ void Emitter::visit(ASTBlock *node) {
       (*ss) << defer_blocks.back().str();
       defer_blocks.pop_back();
     }
-    if (node->return_type != void_type() && node->return_type != -1) {
+    if (node->return_type != void_type() && node->return_type != Type::invalid_id) {
       (*ss) << "return " << defer_return_value_key << ";\n";
     }
   }

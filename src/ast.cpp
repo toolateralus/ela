@@ -874,7 +874,7 @@ ASTExpr *Parser::parse_primary() {
     }
 
     case TType::Identifier: {
-      if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+      if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
         auto type = parse_type();
         if (peek().type == TType::LCurly) {
           auto init_list = parse_expr();
@@ -995,7 +995,7 @@ ASTType *Parser::parse_type() {
     }
     expect(TType::RParen);
     NODE_ALLOC(ASTType, node, range, _, this)
-    node->resolved_type = -1;
+    node->resolved_type = Type::invalid_id;
     node->kind = ASTType::TUPLE;
     node->tuple_types = types;
     // grab up more extensions if they exist.
@@ -1250,7 +1250,7 @@ ASTStatement *Parser::parse_statement() {
     decl->name = tok.value;
     decl->value = parse_expr();
 
-    if (ctx.scope->find_type_id(tok.value, {}) != -1 || keywords.contains(tok.value.get_str()) ||
+    if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id || keywords.contains(tok.value.get_str()) ||
         reserved.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
@@ -1263,7 +1263,7 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
 
-    ctx.scope->insert(tok.value, -1, decl->value.get());
+    ctx.scope->insert(tok.value, Type::invalid_id, decl->value.get());
 
     return decl;
   }
@@ -1331,7 +1331,7 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->find_type_id(tok.value, {}) == -1) {
+    if (ctx.scope->find_type_id(tok.value, {}) == Type::invalid_id) {
       eat();
       throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
     }
@@ -1377,11 +1377,11 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
     auto symbol = ctx.scope->local_lookup(iden->value);
     if (node->op == TType::ColonEquals) {
       if (symbol) throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
-      ctx.scope->insert(iden->value, -1, node);
+      ctx.scope->insert(iden->value, Type::invalid_id, node);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
-      ctx.scope->insert(iden->value, -1, node);
+      ctx.scope->insert(iden->value, Type::invalid_id, node);
     }
   }
   
@@ -1393,7 +1393,7 @@ ASTDeclaration *Parser::parse_declaration() {
   auto iden = eat();
   decl->name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != -1 || keywords.contains(iden.value.get_str()) ||
+  if (ctx.scope->find_type_id(iden.value, {}) != Type::invalid_id || keywords.contains(iden.value.get_str()) ||
       reserved.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
@@ -1423,7 +1423,7 @@ ASTDeclaration *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
 
-  ctx.scope->insert(iden.value, -1, decl->value.get());
+  ctx.scope->insert(iden.value, Type::invalid_id, decl->value.get());
 
   return decl;
 }
@@ -1576,7 +1576,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     };
   }
 
-  ctx.scope->insert(name.value, -1, function, SYMBOL_IS_FUNCTION);
+  ctx.scope->insert(name.value, Type::invalid_id, function, SYMBOL_IS_FUNCTION);
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
@@ -1626,7 +1626,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   NODE_ALLOC(ASTEnumDeclaration, node, range, _, this)
   node->name = tok.value;
   expect(TType::LCurly);
-  if (ctx.scope->find_type_id(tok.value, {}) != -1) {
+  if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
@@ -1716,7 +1716,7 @@ ASTImpl *Parser::parse_impl() {
   
   impl->target->accept(typer);
   auto type = global_get_type(impl->target->resolved_type);
-  impl->target->resolved_type = -1;
+  impl->target->resolved_type = Type::invalid_id;
 
   auto block = parse_block(impl->scope);
   end_node(impl, range);
@@ -1815,7 +1815,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
 
-  if (type_id != -1) {
+  if (type_id != Type::invalid_id) {
     auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {

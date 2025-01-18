@@ -109,10 +109,7 @@ struct Emitter : VisitorBase {
   int num_tests = 0;
 
   std::vector<std::function<void()>> pending_statements;
-
-  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
-  Nullable<ASTImpl> current_impl = nullptr;
+  Nullable<ASTType> type_context;
 
   Typer &typer;
 
