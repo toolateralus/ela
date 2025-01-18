@@ -19,5 +19,4 @@ impl Struct {
 
 CONSTANT :: 45;
 
-main :: fn() { 
-}
+main :: fn() {}

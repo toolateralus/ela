@@ -1476,6 +1476,10 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
   expect(TType::LParen);
   ASTType *type = nullptr;
   while (peek().type != TType::RParen) {
+    if (params->is_varargs) {
+      end_node(nullptr, range);
+      throw_error("var args \"...\" must be the last parameter", range);
+    }
     auto subrange = begin_node();
 
     if (peek().type == TType::Varargs) {
@@ -1486,6 +1490,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
                     range);
       }
       current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
+      params->is_varargs = true;
       continue;
     }
 
