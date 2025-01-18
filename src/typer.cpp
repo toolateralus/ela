@@ -102,11 +102,12 @@ int find_generic_instance(std::vector<GenericInstance> instantiations, const std
 
 int Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                     std::vector<int> generic_args) {
+
   auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
-    return -1;
+    return node->resolved_type;
   }
 
   auto old_scope = ctx.scope;
