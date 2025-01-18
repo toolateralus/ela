@@ -159,6 +159,11 @@ void Emitter::visit(ASTCall *node) {
   auto node_type = node->function->get_node_type();
   auto base_symbol = typer.get_symbol(node->function);
 
+  std::vector<int> generic_args;
+  for (const auto arg : node->generic_arguments) {
+    generic_args.push_back(arg->resolved_type);
+  }
+
   auto symbol = base_symbol.get();
   if (base_symbol && node_type == AST_NODE_DOT_EXPR && symbol->declaring_node.is_not_null() &&
       symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -178,6 +183,7 @@ void Emitter::visit(ASTCall *node) {
       throw_error("Internal compiler error: unable to find method call", node->source_range);
     }
     (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
+    (*ss) << mangled_type_args(generic_args);
     (*ss) << "(";
 
     if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
@@ -196,10 +202,10 @@ void Emitter::visit(ASTCall *node) {
       }
     }
     (*ss) << ")";
-    return;
   } else {
     // normal function call, or a static method.
     node->function->accept(this);
+    (*ss) << mangled_type_args(generic_args);
     node->arguments->accept(this);
   }
 
@@ -1644,7 +1650,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
         emit_function_signature_and_body(node->name.get_str());
       }
     } else {
-      emit_function_signature_and_body(node->name.get_str());
+      emit_function_signature_and_body(node->name.get_str() + mangled_type_args(node->generic_arguments));
     }
   };
 

@@ -352,6 +352,7 @@ struct GenericInstance {
 struct ASTFunctionDeclaration : ASTStatement {
   size_t flags = 0;
   bool has_defer = false;
+  std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
 

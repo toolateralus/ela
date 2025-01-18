@@ -738,6 +738,7 @@ std::string mangled_type_args(const std::vector<int> &args) {
     } else {
       s += "$" + std::to_string(arg);
     }
+    i++;
   }
   return s;
 }

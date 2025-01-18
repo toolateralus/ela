@@ -843,15 +843,20 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
 }
 
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func) {
-  std::vector<int> gen_args;
+  std::vector<int> generic_args;
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
-    gen_args = node->arguments->resolved_argument_types;
+    generic_args = node->arguments->resolved_argument_types;
+    for (auto generic_arg : generic_args) {
+      auto type = ast_alloc<ASTType>();
+      type->resolved_type = generic_arg;
+      node->generic_arguments.push_back(type);
+    }
   } else {
-    gen_args = get_generic_arg_types(node->generic_arguments);
+    generic_args = get_generic_arg_types(node->generic_arguments);
   }
 
-  auto instantiation = visit_generic(&Typer::visit_function_signature, func, gen_args);
+  auto instantiation = visit_generic(&Typer::visit_function_signature, func, generic_args);
 
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", node->source_range);
@@ -859,6 +864,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, Type
 
   type = global_get_type(instantiation->resolved_type);
   auto info = type->get_info()->as<FunctionTypeInfo>();
+  instantiation->generic_arguments = generic_args;
   visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation), info->return_type);
   return instantiation;
 }
@@ -1005,7 +1011,9 @@ void Typer::visit(ASTType *node) {
       }
       if (declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
         auto info = global_get_type(instantiation->resolved_type)->get_info()->as<FunctionTypeInfo>();
-        visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation), info->return_type);
+        auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
+        func->generic_arguments = generic_args;
+        visit_function_body(func, info->return_type);
       }
       node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
     } else {
