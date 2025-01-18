@@ -214,7 +214,9 @@ impl string {
   }
 }
 
-
+// For now until we have a nice, builtin error handling system (likely like zig or odin)
+// We just use tuples with strings for returning err/ok
+#alias Error :: string;
 
 to_string :: fn(num: s64) -> string {
   switch num {

@@ -921,6 +921,7 @@ void Typer::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   if (auto _switch = dynamic_cast<ASTSwitch *>(node->expression)) {
     node->control_flow = _switch->control_flow;
+    node->resolved_type = _switch->resolved_type;
   }
 }
 
@@ -1584,7 +1585,7 @@ void Typer::visit(ASTSwitch *node) {
                                      "Invalid switch case.");
     }
   }
-  node->resolved_type = return_type;
+  node->resolved_type = node->return_type = return_type;
   if (node->is_statement) {
     node->control_flow = ControlFlow{flags, return_type};
   } else {

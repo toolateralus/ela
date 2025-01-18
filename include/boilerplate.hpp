@@ -86,9 +86,14 @@ extern "C" void free(void*);
 extern "C" void *memset(void *, int, size_t);
 extern "C" void *realloc(void*, size_t);
 extern "C" int strlen(const char *);
+extern "C" void *malloc(size_t size);
+extern "C" void free(void *ptr);
+extern "C" void *realloc(void *ptr, size_t size);
+extern "C" void *calloc(size_t num, size_t size);
 
 #undef RAND_MAX
 #undef assert
+
 
 template <class T> struct _array {
   T *data = nullptr;
@@ -97,20 +102,21 @@ template <class T> struct _array {
   bool is_view = false;
 
   _array() : data(nullptr), length(0), capacity(0), is_view(false) {}
+  _array(int length) : data(static_cast<T *>(calloc(length, sizeof(T)))), length(length), capacity(length), is_view(false) {}
+  _array(T *array, int len) : data(static_cast<T *>(calloc(len, sizeof(T)))), length(len), capacity(len), is_view(false) {
+    std::copy(array, array + len, data);
+  }
 
-  _array(int length) : length(length), capacity(length), is_view(false) {
-    data = static_cast<T*>(malloc(sizeof(T) * length));
-    if (data) {
-      memset(data, 0, sizeof(T) * length);
-    }
+  _array(T *begin, T *end) {
+    length = std::distance(begin, end);
+    capacity = length;
+    data = static_cast<T *>(calloc(length, sizeof(T)));
+    std::copy(begin, end, data);
   }
 
   _array(const _array &other)
-      : length(other.length), capacity(other.capacity), is_view(other.is_view) {
-    data = static_cast<T*>(malloc(sizeof(T) * other.length));
-    if (data) {
-      std::copy(other.data, other.data + other.length, data);
-    }
+      : data(static_cast<T *>(calloc(other.length, sizeof(T)))), length(other.length), capacity(other.capacity), is_view(other.is_view) {
+    std::copy(other.data, other.data + other.length, data);
   }
 
   _array(_array &&other) noexcept
@@ -123,26 +129,23 @@ template <class T> struct _array {
 
   _array &operator=(const _array &other) {
     if (this != &other) {
-      T *new_data = static_cast<T*>(malloc(sizeof(T) * other.length));
-      if (new_data) {
-        std::copy(other.data, other.data + other.length, new_data);
-        if (length != 0 && data && !is_view) {
-          free(data);
-        }
-        data = new_data;
-        length = other.length;
-        capacity = other.capacity;
-        is_view = other.is_view;
+      T *new_data = static_cast<T *>(calloc(other.length, sizeof(T)));
+      std::copy(other.data, other.data + other.length, new_data);
+      if (data && !is_view) {
+        free(data);
       }
+      data = new_data;
+      length = other.length;
+      capacity = other.capacity;
+      is_view = other.is_view;
     }
     return *this;
   }
 
   _array &operator=(_array &&other) noexcept {
     if (this != &other) {
-      if (data && length != 0 && !is_view) {
+      if (data && !is_view)
         free(data);
-      }
       data = other.data;
       length = other.length;
       capacity = other.capacity;
@@ -157,15 +160,13 @@ template <class T> struct _array {
 
   _array(std::initializer_list<T> list) : length(list.size()), capacity(list.size()), is_view(false) {
     if (list.size() != 0) {
-      data = static_cast<T*>(malloc(list.size() * sizeof(T)));
-      if (data) {
-        std::copy(list.begin(), list.end(), data);
-      }
+      data = static_cast<T *>(calloc(list.size(), sizeof(T)));
+      std::copy(list.begin(), list.end(), data);
     }
   }
 
   ~_array() {
-    if (length != 0 && !is_view && data) {
+    if (!is_view && data) {
       free(data);
       data = nullptr;
     }
@@ -173,11 +174,9 @@ template <class T> struct _array {
 
   void resize(int new_capacity) {
     if (new_capacity > capacity) {
-      T *new_data = static_cast<T*>(realloc(data, new_capacity * sizeof(T)));
-      if (new_data) {
-        data = new_data;
-        capacity = new_capacity;
-      }
+      T *new_data = static_cast<T *>(realloc(data, new_capacity * sizeof(T)));
+      data = new_data;
+      capacity = new_capacity;
     }
   }
 
@@ -185,7 +184,7 @@ template <class T> struct _array {
     if (length >= capacity) {
       resize(capacity == 0 ? 1 : capacity * 2);
     }
-    data[length++] = value;
+    new (&data[length++]) T(value);
   }
 
   T pop() {
@@ -235,6 +234,7 @@ struct string {
   u32 length = 0;
   bool is_view = false;
   string() {}
+
   string(char *str) {
     if (str == nullptr) {
       return;
@@ -243,10 +243,11 @@ struct string {
     while (str[length] != '\0') {
       ++length;
     }
-    data = (char*)malloc(length + 1);
+    data = static_cast<char *>(malloc(length + 1));
     data[length] = '\0';
     std::copy(str, str + length, data);
   }
+
   string(char *begin, char *end, bool is_view = false) {
     this->is_view = is_view;
     if (is_view) {
@@ -254,26 +255,39 @@ struct string {
       length = std::distance(begin, end);
     } else {
       length = std::distance(begin, end);
-      data = new char[length + 1];
+      data = static_cast<char *>(malloc(length + 1));
       std::copy(begin, end, data);
       data[length] = '\0';
     }
   }
   
+  ~string() {
+    if (length != 0 && data && !is_view)
+      free(data);
+  }
+
+  char &operator[](int n) { return data[n]; }
+
+  string operator[](const Range &range) const {
+    string result(data + range.first, data + range.last, true);
+    return result;
+  }
+
   string(const string &other) {
-    if (other.data) {
+    if (other.data && other.length != 0) {
       length = other.length;
-      data = new char[length + 1];
+      data = static_cast<char *>(malloc(length + 1));
       std::copy(other.data, other.data + length, data);
       data[length] = '\0';
     }
   }
+
   string &operator=(const string &other) {
     if (this != &other) {
-      if (data && length != 0) delete[] data;
+      if (length != 0 && data) free(data);
       if (other.data) {
         length = other.length;
-        data = new char[length + 1];
+        data = static_cast<char *>(malloc(length + 1));
         std::copy(other.data, other.data + length, data);
         data[length] = '\0';
       } else {
@@ -283,21 +297,11 @@ struct string {
     }
     return *this;
   }
- 
-  ~string() {
-    if (data && !is_view && length != 0)
-      delete[] data;
-  }
-  
-  char &operator[](int n) { return data[n]; }
-
-  string operator[](const Range &range) const {
-    string result(data + range.first, data + range.last, true);
-    return result;
-  }
 
   auto begin() { return data; }
   auto end() { return data + length; }
+  auto begin() const { return data; }
+  auto end() const { return data + length; }
 
   bool operator==(const string &other) const {
     if (length != other.length)
@@ -308,11 +312,7 @@ struct string {
     }
     return true;
   }
-
   bool operator!=(const string &other) const { return !(*this == other); }
-
-  auto begin() const { return data; }
-  auto end() const { return data + length; }
 };
 
 inline string Range::to_string() const {
