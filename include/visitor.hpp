@@ -26,7 +26,9 @@ struct Typer : VisitorBase {
   int declaring_or_assigning_type = -1;
 
   template <typename T>
-  int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
+  using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
+  template <typename T>
+  T visit_generic(VisitorMethod<T> visit_method, T declaring_node,
                     std::vector<int> args);
 
   Typer(Context &context) : ctx(context) {}
@@ -53,20 +55,21 @@ struct Typer : VisitorBase {
 
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
-  int visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
+  void visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
                                  std::vector<int> generic_args = {});
-  int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+  void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                std::vector<int> generic_args = {});
-  int visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
                               std::vector<int> generic_args = {});
-  int visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
+  void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node, int return_type);
 
   int get_self_type();
 
-  void type_check_arguments(ASTCall *&node, Type *&type, bool &method_call, FunctionTypeInfo *&info);
-  void resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params);
+  void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
   void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
 
   void visit(ASTCall *node) override;

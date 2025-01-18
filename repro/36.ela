@@ -1,9 +1,0 @@
-// #self in a generic impl crashes the compiler.
-Strakt :: struct![T] {}
-
-impl![T] Strakt![T] {
-  a_flupped :: fn() -> #self {
-    n : #self;
-    return n;
-  }
-}

@@ -15,3 +15,5 @@ impl Struct {
     static_method();
   }
 }
+
+main :: fn() {}

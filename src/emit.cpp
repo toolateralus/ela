@@ -553,7 +553,6 @@ void Emitter::visit(ASTParamDecl *node) {
       (*ss) << ' ' << node->normal.name.get_str();
     }
     if (node->normal.default_value.is_not_null() && emit_default_args) {
-      std::cout << "emitting default arg\n";
       (*ss) << " = ";
       node->normal.default_value.get()->accept(this);
     }
