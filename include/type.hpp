@@ -87,6 +87,8 @@ enum StructTypeFlags {
 
 struct ASTExpr;
 
+std::string mangled_type_args(const std::vector<int> &args);
+
 struct TypeExtension {
   TypeExtEnum type;
   union {

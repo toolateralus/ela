@@ -317,18 +317,6 @@ std::string Type::to_string() const {
   }
 }
 
-std::string mangled_type_args(const std::vector<int> &args) {
-  std::string s;
-  int i = 0;
-  for (const auto &arg : args) {
-    if (i > 0) {
-      s += "_" + std::to_string(arg);
-    } else {
-      s += "$" + std::to_string(arg);
-    }
-  }
-  return s;
-}
 
 int global_create_interface_type(const InternedString &name, Scope *scope,
                                  std::vector<int> generic_args) {
@@ -740,4 +728,16 @@ int find_operator_overload(TType op, Type *type) {
     }
   }
   return -1;
+}
+std::string mangled_type_args(const std::vector<int> &args) {
+  std::string s;
+  int i = 0;
+  for (const auto &arg : args) {
+    if (i > 0) {
+      s += "_" + std::to_string(arg);
+    } else {
+      s += "$" + std::to_string(arg);
+    }
+  }
+  return s;
 }
