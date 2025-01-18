@@ -188,7 +188,6 @@ void Typer::visit(ASTLambda *node) {
   auto type = global_find_function_type_id(info, {});
   // TODO: Do we want to always take a function pointer?
   node->resolved_type = global_get_type(type)->take_pointer_to();
-  std::cout << "Parsing lambda :: " << global_get_type(type)->to_string() << '\n';
 }
 
 void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
