@@ -6,14 +6,14 @@ Array :: struct![T] {
 
 // Even trying to compile this just crashes in the emitter??
 impl![T] Array![T] {
- push :: fn(self*, t: T) { }
- resize :: fn(self*, capacity : u64) {}
- pop :: fn(self*) -> T { return {} }
- deinit :: fn(self*) {}
+  push :: fn(self*, t: T) { }
+  resize :: fn(self*, capacity : u64) {}
+  pop :: fn(self*) -> T { return {} }
+  deinit :: fn(self*) {}
 }
 
 main :: fn() {
-//  array: Array![int];
+  //  array: Array![int];
 }
 
 
