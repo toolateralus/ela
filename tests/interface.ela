@@ -88,3 +88,8 @@
   assert("interface failed"c, instance.method_get_self().a == 100);
 }
 
+GenericWithoutInstance :: struct![T] { }
+
+impl![T] GenericWithoutInstance![T] {
+  thing :: fn(self*, t: T) { }
+}
