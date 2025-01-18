@@ -1496,7 +1496,7 @@ void Emitter::visit(ASTScopeResolution *node) {
 }
 
 void Emitter::visit(ASTImpl *node) {
-  if (!node->generic_instantiations.empty()) {
+  if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       instantiation.node->accept(this);
     }

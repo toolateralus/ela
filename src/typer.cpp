@@ -1681,7 +1681,7 @@ void Typer::visit(ASTImpl *node) {
     auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
     node_as_struct->impls.push_back(node);
   } else {
-    visit_impl_declaration(node, false);
+    node->resolved_type = visit_impl_declaration(node, false);
   }
   return;
 }
