@@ -2,5 +2,6 @@
 !*.gitignore
 !*.ela
 !run.sh
+!run_all.sh
 !new.sh
 !counter
