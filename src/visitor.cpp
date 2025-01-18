@@ -1,6 +1,6 @@
 #include "visitor.hpp"
 
-#include <any>
+
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -14,46 +14,46 @@
 // {
 
 // clang-format off
-std::any ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTSwitch::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTProgram::accept(VisitorBase *visitor) {return visitor->visit(this); }
-std::any ASTBlock::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTType::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTExprStatement::accept(VisitorBase *visitor) {return visitor->visit(this); }
-std::any ASTDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTBinExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTUnaryExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTIdentifier::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTLiteral::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTParamDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTParamsDecl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTFunctionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTTuple::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTCall::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTArguments::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTReturn::accept(VisitorBase *visitor) { return visitor->visit(this); };
-std::any ASTBreak::accept(VisitorBase *visitor) { return visitor->visit(this); };
-std::any ASTContinue::accept(VisitorBase *visitor) { return visitor->visit(this); };
-std::any ASTFor::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTIf::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTUnionDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTNoop::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTElse::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTWhile::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTStructDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTDotExpr::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTScopeResolution::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTSubscript::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTCast::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTEnumDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTInitializerList::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTRange::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTTupleDeconstruction::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTAlias::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTImpl::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTDefer::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTStatementList::accept(VisitorBase *visitor) { return visitor->visit(this); }
-std::any ASTInterfaceDeclaration::accept(VisitorBase *visitor) { return visitor->visit(this); }
+void ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTSwitch::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTProgram::accept(VisitorBase *visitor) {visitor->visit(this); }
+void ASTBlock::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTType::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTExprStatement::accept(VisitorBase *visitor) {visitor->visit(this); }
+void ASTDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTBinExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTUnaryExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTIdentifier::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTLiteral::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTParamDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTParamsDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTFunctionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTTuple::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTCall::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTArguments::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTReturn::accept(VisitorBase *visitor) { visitor->visit(this); };
+void ASTBreak::accept(VisitorBase *visitor) { visitor->visit(this); };
+void ASTContinue::accept(VisitorBase *visitor) { visitor->visit(this); };
+void ASTFor::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTIf::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTUnionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTNoop::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTElse::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTWhile::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTStructDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTDotExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTScopeResolution::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTSubscript::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTCast::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTEnumDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTInitializerList::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTRange::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTTupleDeconstruction::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTAlias::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTImpl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTDefer::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTStatementList::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTInterfaceDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 
 // clang-format on
 // }

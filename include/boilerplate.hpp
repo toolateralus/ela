@@ -81,7 +81,10 @@ extern "C" int printf(const char *format, ...);
 extern "C" int snprintf(char *str, size_t size, const char *format, ...);
 extern "C" int sprintf(char *str, const char *format, ...);
 extern "C" void *memcpy(void *, void *, size_t);
+extern "C" void *malloc(size_t);
+extern "C" void free(void*);
 extern "C" void *memset(void *, int, size_t);
+extern "C" void *realloc(void*, size_t);
 extern "C" int strlen(const char *);
 extern "C" void *malloc(size_t size);
 extern "C" void free(void *ptr);
@@ -184,17 +187,22 @@ template <class T> struct _array {
     new (&data[length++]) T(value);
   }
 
-  T pop() { return data[--length]; }
+  T pop() {
+    if (length > 0) {
+      return data[--length];
+    }
+    return T(); // Return default-constructed T if array is empty
+  }
 
   void erase(const T &value) {
-    std::size_t writeIndex = 0;
-    for (std::size_t readIndex = 0; readIndex < length; ++readIndex) {
-      if (data[readIndex] != value) {
-        data[writeIndex] = data[readIndex];
-        ++writeIndex;
+    size_t write_index = 0;
+    for (size_t read_index = 0; read_index < length; ++read_index) {
+      if (data[read_index] != value) {
+        data[write_index] = data[read_index];
+        ++write_index;
       }
     }
-    length = writeIndex;
+    length = write_index;
   }
 
   T &operator[](int n) { return data[n]; }
@@ -216,11 +224,6 @@ template <class T> struct _array {
 
   bool operator!=(const _array &other) const { return !(*this == other); }
 
-  explicit operator void *() { return (void *)data; }
-  explicit operator T *() { return (T *)data; }
-
-  auto begin() const { return data; }
-  auto end() const { return data + length; }
   auto begin() { return data; }
   auto end() { return data + length; }
 };
