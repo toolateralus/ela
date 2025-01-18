@@ -1,8 +1,5 @@
 #import core;
 
-
-
-// TODO: fix this for new modified union structure.
 #flags TypeFlags :: enum {
   INTEGER,
   FLOAT,
@@ -22,79 +19,79 @@
 }
 
 impl Type  {
-  is_signed :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::SIGNED != 0;
+  is_signed :: fn(self*) -> bool {
+    return self.flags & TypeFlags::SIGNED != 0;
   }
 
-  is_unsigned :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::UNSIGNED != 0;
+  is_unsigned :: fn(self*) -> bool {
+    return self.flags & TypeFlags::UNSIGNED != 0;
   }
 
-  has_no_extension :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::POINTER == 0 &&
-          type.flags & TypeFlags::MAP == 0 &&
-          type.flags & TypeFlags::ARRAY == 0 &&
-          type.flags & TypeFlags::FIXED_ARRAY == 0;
+  has_no_extension :: fn(self*) -> bool {
+    return self.flags & TypeFlags::POINTER == 0 &&
+          self.flags & TypeFlags::MAP == 0 &&
+          self.flags & TypeFlags::ARRAY == 0 &&
+          self.flags & TypeFlags::FIXED_ARRAY == 0;
   }
 
-  is_array :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::ARRAY != 0;
+  is_array :: fn(self*) -> bool {
+    return self.flags & TypeFlags::ARRAY != 0;
   }
 
-  is_string :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::STRING != 0;
+  is_string :: fn(self*) -> bool {
+    return self.flags & TypeFlags::STRING != 0;
   }
 
-  is_scalar :: fn(type: Type*) -> bool {
-    return Type::has_no_extension(type) &&
-          (type.flags & TypeFlags::INTEGER != 0 ||
-            type.flags & TypeFlags::FLOAT != 0   ||
-            type.flags & TypeFlags::BOOL != 0    ||
-            type.flags & TypeFlags::STRING != 0);
+  is_scalar :: fn(self*) -> bool {
+    return Type::has_no_extension(self) &&
+          (self.flags & TypeFlags::INTEGER != 0 ||
+            self.flags & TypeFlags::FLOAT != 0   ||
+            self.flags & TypeFlags::BOOL != 0    ||
+            self.flags & TypeFlags::STRING != 0);
   }
 
-  is_struct :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::STRUCT != 0;
+  is_struct :: fn(self*) -> bool {
+    return self.flags & TypeFlags::STRUCT != 0;
   }
 
-  is_enum :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::ENUM != 0;
+  is_enum :: fn(self*) -> bool {
+    return self.flags & TypeFlags::ENUM != 0;
   }
 
-  is_integral :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::INTEGER != 0;
+  is_integral :: fn(self*) -> bool {
+    return self.flags & TypeFlags::INTEGER != 0;
   }
 
-  is_float :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::FLOAT != 0;
+  is_float :: fn(self*) -> bool {
+    return self.flags & TypeFlags::FLOAT != 0;
   }
 
-  is_bool :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::BOOL != 0;
+  is_bool :: fn(self*) -> bool {
+    return self.flags & TypeFlags::BOOL != 0;
   }
 
-  is_tuple :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::TUPLE != 0;
+  is_tuple :: fn(self*) -> bool {
+    return self.flags & TypeFlags::TUPLE != 0;
   }
 
-  is_map :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::MAP != 0;
+  is_map :: fn(self*) -> bool {
+    return self.flags & TypeFlags::MAP != 0;
   }
 
-  is_function :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::FUNCTION != 0;
+  is_function :: fn(self*) -> bool {
+    return self.flags & TypeFlags::FUNCTION != 0;
   }
 
-  is_pointer :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::POINTER != 0;
+  is_pointer :: fn(self*) -> bool {
+    return self.flags & TypeFlags::POINTER != 0;
   }
 
-  is_fixed_array :: fn(type: Type*) -> bool {
-    return type.flags & TypeFlags::FIXED_ARRAY != 0;
+  is_fixed_array :: fn(self*) -> bool {
+    return self.flags & TypeFlags::FIXED_ARRAY != 0;
   }
 
-  get_field :: fn(type: Type*, name: string) -> Field* {
-    for field in type.fields {
+  get_field :: fn(self*, name: string) -> Field* {
+    for field in self.fields {
       if strcmp(field.name, name.data) == 0 {
         return field;
       }
