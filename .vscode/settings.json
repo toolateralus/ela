@@ -5,9 +5,21 @@
   "files.associations": {
       "*.ela": "jai",
   },
+
   "files.exclude": {
     "**/.clock_diff.txt": true,
     "**/compile_commands.json": true,
+    "**/bin": true,
+    "**/build": true,
+    "**/objs": true,
+  
+    // For windows users, remove these.
+    "**/*vcxproj": true,
+    "**/*vcxproj.filters": true,
+    "**/*vcxproj.user": true,
+    "**/*.bat": true,
+    "**/*.sln": true,
+    "**/*.cache": true
   }
 }
 

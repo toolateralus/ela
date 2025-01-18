@@ -1,0 +1,178 @@
+
+
+Struct :: struct {
+  x: s32;
+  y: s32;
+}
+
+#ifdef ABSTRACT_INTERFACE {
+  // abstract interface.
+  // each method has to be implemented or compiler errors.
+  Format :: interface![T] {
+    to_string :: fn(self*) -> string;
+    parse     :: fn(input: string) -> #self;
+  }
+
+  // impl generic Format interface for Struct.
+  impl Format![Struct] for Struct {
+    to_string :: fn(self*)         -> string {
+      return $"Struct {{x: {self.x}, y: {self.y}}}";
+    }
+    parse     :: fn(input: string) -> #self {
+      // omitted for simplicity.
+      self: #self;
+      return self;
+    }
+  }
+
+} else if AUTO_INTERFACE {
+  // non-abstract interface, can be partially or completely automatically implemented.
+  Format :: interface![T] {
+    to_string :: fn(self*) -> string {
+      return $"{*self}";              // omitted for simplicity.
+    }
+    parse     :: fn(self*) -> #self {
+      return std::parse![T](self);    // again, omitted for simplicity.
+    }
+  }
+
+  // block of auto impls;
+  impl(auto) { 
+    Format![Struct] for Struct,
+    OtherInterface![Struct] for Struct,
+    AnotherInterface![Struct] for Struct,
+  };
+
+  // can use a regular auto impl
+  impl(auto) Format![Struct] for Struct;
+} 
+
+
+// #### ################################# ###
+// #### Example usage / Disallowed usages ###
+// #### ################################# ###
+
+Speak :: interface {
+  greet :: fn(self*);
+}
+
+Dog :: struct {}
+Cat :: struct {}
+
+impl Speak for Dog {
+  greet :: fn(self*) {
+    println("woof");
+  }
+}
+
+impl Speak for Cat {
+  greet :: fn(self*) {
+    println("meow");
+  }
+}
+
+// A type like this:
+  interface(Speak)
+
+// is similar to rust's 'dyn Trait'
+// where it is a dynamic dispatch object.
+// this is a huge benny for things like a GUI library, 
+// where you have Element and you want to call draw,
+// but the type of that field can change at runtime,
+// and we don't want to implement a ton of hacks to get that done.
+make_speak :: fn(speaker: interface(Speak)) {
+  speaker.speak();
+}
+
+main :: fn () {
+  dog: Dog;
+  cat: Cat;
+  
+  //             No dynamic dispatch needed for these 2 calls: just call the function.
+  dog.speak();                     // print "woof";  
+  cat.speak();                     // print "meow";
+
+
+  // dynamic dispatch & storing variables:
+  speaker: dyn(Speak);
+  speaker.speak();                 //! runtime error. dynamic call to speak had no target, null reference exception kinda.
+
+  speaker = dog;                   //! invalid, interfaces can only be taken by pointer.
+  speaker = &dog;                  // valid.
+
+  speaker.speak();                 // print "woof";
+
+  make_speak(dog);                 // !invalid, again, interfaces can only be taken by pointer.
+  make_speak(speaker);             // valid. print "woof"
+  make_speak(&cat);                // valid. print "meow"
+
+  switch speaker {
+    Dog: {
+      println("собака");
+    },
+    Cat: {
+      println("кошка");
+    }
+  }
+
+}
+
+// Implicit conversion
+IConvert :: interface![To] {
+  iconvert :: fn(self) -> To;
+}
+
+From :: interface![From, To] {
+  from :: fn(value: From) -> To;
+}
+
+Copy :: interface![T] {
+  copy :: fn(self*) -> T;
+}
+
+Arithmetic :: interface![Left, Right, Result] {
+  add :: fn(l: Left, right: Right) -> Result;
+  sub :: fn(l: Left, right: Right) -> Result;
+  mul :: fn(l: Left, right: Right) -> Result;
+  div :: fn(l: Left, right: Right) -> Result;
+  mod :: fn(l: Left, right: Right) -> Result;
+}
+
+Iter :: interface![T] {
+  reset :: fn(self*);
+  current :: fn(self*) -> T::value_type;
+  next :: fn(self*) -> (bool, T::value_type);
+}
+
+RangeIterator :: struct {
+  #alias  value_type :: int;
+  value:  value_type;
+  min:    value_type;
+  max:    value_type;
+}
+
+impl Iter![RangeIterator] for RangeIterator {
+  reset :: fn(self*){
+    self.value = self.min;
+  }
+  current :: fn(self*) -> int {
+    return self.value;
+  }
+  next :: fn(self*) -> (bool, int) {
+    self.current++;
+    return (self.current >= self.max, self.current);
+  }
+}
+
+
+// * We do this
+takes :: fn![T](i: T) where T impl UIElement {
+  i.resize(global::draw_area).draw();
+  i.set_dirty(false);
+}
+
+// * instead of this
+takes :: fn(i: UIElement) {
+  i.resize(global::draw_area).draw();
+  i.set_dirty(false);
+}

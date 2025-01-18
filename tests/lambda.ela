@@ -1,0 +1,21 @@
+#import core;
+
+
+#alias Lambda :: fn * (int,int) -> int;
+
+takes_lambda :: fn(lambda: Lambda, a: int, b: int) -> int{
+  return lambda(a, b);
+}
+
+#test test_lambda :: fn() {
+  n := fn(a: int, b: int) -> int {
+    return a + b;
+  }
+  assert("lambda add failed"c, n(1, 2) == 3);
+
+  // This looks weird, but it can be useful.
+  assert("inline lambda failed"c, fn(a: int, b: int) -> int { return a + b; }(1, 2) == 3);
+
+  assert("lambda arg failed"c, takes_lambda(n, 1, 2) == 3);
+  assert("lambda inline arg failed"c, takes_lambda(fn(a: int, b: int) -> int { return a + b; }, 1, 2) == 3);
+}

@@ -1,0 +1,177 @@
+#import core;
+
+
+#test test_string :: fn() {
+  my_string : string = "Xaryu Baryu";
+  assert("string length failed to equal expected value"c, my_string.length == 11);
+}
+
+#test test_array :: fn() {
+  array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  assert("array length failed to equal expected value"c, array.length == 11);
+}
+
+
+Xaryu :: struct {
+  value: int;
+}
+
+impl Xaryu {
+  to_string :: fn(self) -> string {
+    return "XarBar";
+  }
+}
+
+#test test_string_interpolation :: fn() {
+  xarbar: Xaryu;
+  interp: string = $"{xarbar}";
+  assert("unexpected interpolated string value"c, strcmp(interp.data, "XarBar"c) == 0);
+  interp = $"{(1 + 1) * 2}";
+  assert("unexpected interpolated string value"c, strcmp(interp.data, "4"c) == 0);
+}
+
+
+
+/* 
+  These operators will be removed as soon as we finish this massive rewrite.
+  Where [] array is implemented in ela, and we can just have generic methods for these operations.
+*/
+#test test_array_concat_operator :: fn() {
+  array: int[];
+  array ~= 10;
+  assert("concat operator failed"c, array.length == 1);
+}
+
+#test test_array_pop_operator :: fn() {
+  array: int[];
+  for i in 0..100 {
+    array ~= 10;
+  }
+  n: int;
+  for i in 0..100 {
+    n = ~array;
+  }
+  assert("pop operator failed"c, array.length == 0 && n == 10);
+}
+
+#test test_array_erase_operator :: fn() {
+  array: int[] ;
+  array ~= 10;
+  array ~~ 10;
+  assert("failed to erase element from array with ~~"c, array.length == 0);
+}
+
+
+
+#test test_multidimensional_arrays :: fn() {
+  array: int[5][5];
+  for x in 0..5 {
+    for y in 0..5 {
+      array[x][y] = x * y;
+    }
+  }
+
+  for x in 0..5 {
+    for y in 0..5 {
+      assert("multidimensional failure"c, array[x][y] == x * y);
+    }
+  }
+
+  dynamic : s64[][];
+  for x in 0..5 {
+    dynamic ~= {};
+    for y in 0..5 {
+      dynamic[x] ~= x * y;
+    }
+  }
+
+  assert("length failed"c, dynamic.length == 5);
+
+  for x in 0..5 {
+    for y in 0..5 {
+      assert("multidimensional failure"c, dynamic[x][y] == x * y);
+    }
+  }
+}
+
+#test test_map_aka_associative_array :: fn() {
+  variables: int[string];
+  map1: int*[char*];
+
+  str1 : string = "Key1";
+  str2 : string = "Key2";
+  str3 : string = "shouldn't exist";
+
+  variables[str1] = 100;
+  variables[str2] = 200;
+
+  assert("Expected: 100"c, variables[str1] == 100);
+  assert("Expected: 200"c, variables[str2] == 200);
+
+  variables[str1] = 300;
+  assert("Expected: 300"c, variables[str1] == 300);
+
+  variables[str1] = 0;
+  assert("Expected: 0"c, variables[str1] == 0);
+
+  ptr := malloc(sizeof(int)) as int*;
+  *ptr = 200;
+  map1["Something"c] = ptr;
+  assert("Expected: 200"c, *map1["Something"c] == 200);
+
+  *map1["Something"c] = 400;
+  assert("Expected: 400"c, *map1["Something"c] == 400);
+
+  ptr = malloc(sizeof(int)) as int*;
+  *ptr = 500;
+  map1["Another"c] = ptr;
+  assert("Expected: 500"c, *map1["Another"c] == 500);
+
+  free(map1["Something"c]);
+  free(map1["Another"c]);
+
+  // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
+  // ! really, maps should be eliminated and be replaced once generics are back in the language.
+}
+
+
+#test subscript_string :: fn() {
+  s: string = "0,1,2,3";
+  s[0] = 10;
+  assert("subscript assign string failed"c, s[0] == (10 as char));
+}
+
+#test test_range_var :: fn() {
+  r : Range = 0..10;
+  assert("range variable failed"c, r.first == 0 && r.last == 10);
+
+  i: int;
+  for z in r {
+    assert("range iteration failed"c, i == z);
+    i++;
+  }
+}
+
+#test test_slicing_array :: fn() {
+  arr := s64[] {
+    0, 0, 0,
+    0, 0, 0,
+    0, 0, 0,
+    0, 0,
+  };
+  
+  assert("Length"c, arr.length == 11);
+
+  for i in 0..10 {
+    arr[i] = 100;
+  }
+
+  subarr := arr[0..10];
+
+  for i in 0..10 {
+    assert("Slice failed"c, subarr[i] == arr[i]);
+  }
+
+  assert("Slice failed"c, subarr.length == 10);
+}
+

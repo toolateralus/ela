@@ -1,12 +1,20 @@
 {
-    "version": "2.0.0",
-    "tasks": [
-        {
-            "label": "compile_current",
-            "command": "${workspaceFolder}/bin/ela",
-            "args": [
-                "${file}"
-            ]
-        }
-    ]
+  "version": "2.0.0",
+  "tasks": [
+    {
+      "label": "compile_current",
+      "command": "${workspaceFolder}/bin/ela",
+      "args": [
+        "${file}"
+      ]
+    },
+    {
+      "label": "compile_current_test",
+      "command": "${workspaceFolder}/bin/ela",
+      "args": [
+        "${file}",
+        "--test"
+      ]
+    }
+  ]
 }

@@ -7,13 +7,13 @@
 #c_flags "-Wl,-rpath,.";
 
 main :: fn() -> int {
-  handle := dlopen("test.so", Rtld::Now);
+  handle := dlopen("test.so"c, Rtld::Now);
   
   if !handle {
     panic("unable to open library");
   }
 
-  hook: function = dlsym(handle, "test_call");
+  hook: function = dlsym(handle, "test_call"c);
   
   if !hook {
     panic("Failed to open library, or get function from shared lib");
@@ -21,9 +21,9 @@ main :: fn() -> int {
   
   ctx: DrawContext;
   
-  SetTargetFPS(60);
-  
-  InitWindow(0, 0, "Testing DLL");
+  SetTargetFPS(240);
+  InitWindow(800, 600, "Testing DLL"c);
+
   while !WindowShouldClose() {
     for key in 0..256 {
       ctx.inputState[key] = IsKeyDown(key);

@@ -1,0 +1,47 @@
+#import core;
+
+#test test_initializer_lists :: fn() {
+  scalar: int;
+  arr: int[]  = {0, 1, 2};
+  fixed: int[3] = {0, 1, 2};
+}
+
+XarBarInitListTestStruct :: struct {
+  x: float;
+  y: float;
+}
+
+New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
+  return v;
+}
+
+#test test_init_list_as_implicit_parameter :: fn() {
+  v := New({x: 0.0, y: 0.0});
+  v1 := New(XarBarInitListTestStruct{x: 0.0, y: 0.0});
+  assert("failed"c, v.x == 0.0 && v.y == 0.0);
+  assert("failed"c, v1.x == 0.0 && v1.y == 0.0);
+}
+
+InitListTest :: struct {
+  n : int;
+}
+
+InitListStruct :: struct {
+  a: int;
+  b: int;
+  c: int;
+}
+
+returns_an_init_list  :: fn() -> InitListTest {
+  return {n: 0};
+}
+
+infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
+  return t;
+}
+
+#test test_init_list_comprehensive :: fn() {
+  assert("Init list failed to return from function"c, returns_an_init_list().n == 0);
+  assert("Init list failed to infer from parameter signature"c, infers_argument_from_init_list(InitListTest{n: 0}).n == 0);
+  empty_init_list := InitListTest{};
+}

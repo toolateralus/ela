@@ -32,11 +32,6 @@ enum ConversionRule {
 
 Token get_unique_identifier();
 
-enum StructTypeFlags {
-  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
-  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
-};
-
 enum ScalarType {
   TYPE_VOID,
   TYPE_S8,
@@ -59,8 +54,9 @@ enum TypeKind {
   TYPE_FUNCTION,
   TYPE_STRUCT,
   TYPE_ENUM,
-  TYPE_UNION,
   TYPE_TUPLE,
+  TYPE_TAGGED_UNION,
+  TYPE_INTERFACE,
 };
 
 enum TypeExtEnum {
@@ -71,34 +67,27 @@ enum TypeExtEnum {
   TYPE_EXT_MAP,
 };
 
-enum FunctionInstanceFlags {
+enum FunctionInstanceFlags : size_t {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
-  FUNCTION_IS_CTOR = 1 << 3,
-  FUNCTION_IS_DTOR = 1 << 4,
-  FUNCTION_IS_VARARGS = 1 << 5,
-  FUNCTION_IS_OPERATOR = 1 << 6,
-  FUNCTION_IS_EXPORTED = 1 << 7,
-  FUNCTION_IS_MUTATING = 1 << 9,
-  FUNCTION_IS_FORWARD_DECLARED = 1 << 10,
-  FUNCTION_IS_STATIC = 1 << 11,
+  FUNCTION_IS_VARARGS = 1 << 3,
+  FUNCTION_IS_EXPORTED = 1 << 4,
+  FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
+  FUNCTION_IS_STATIC = 1 << 6,
+  FUNCTION_IS_LOCAL = 1 << 7,
+  FUNCTION_IS_FOREIGN = 1 << 8,
 };
 
-enum struct FunctionMetaType {
-  FUNCTION_TYPE_NORMAL,
-  FUNCTION_TYPE_FOREIGN,
-};
-
-enum UnionFlags {
-  // this and UNION_IS_SUM_TYPE should never be present at the same itme.
-  UNION_IS_NORMAL = 1 << 0,
-  UNION_IS_SUM_TYPE = 1 << 1,
-  UNION_IS_FORWARD_DECLARED = 1 << 2,
-  UNION_IS_ANONYMOUS = 1 << 3,
+enum StructTypeFlags {
+  STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
+  STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
+  STRUCT_FLAG_IS_UNION = 1 << 2,
 };
 
 struct ASTExpr;
+
+std::string mangled_type_args(const std::vector<int> &args);
 
 struct TypeExtension {
   TypeExtEnum type;
@@ -118,6 +107,7 @@ struct TypeExtension {
     return true;
   }
 };
+
 struct TypeExtensions {
   // this stores things like * and [], [20] etc.
   // for each type extension that is [], -1 == dynamic array, every other value is fixed array size.
@@ -165,11 +155,10 @@ struct TypeExtensions {
 using GenericParameter = InternedString;
 
 struct TypeInfo {
-  std::vector<int> implicit_cast_table;
-  std::vector<int> explicit_cast_table;
-
+  // Now that we have impl & our own free-func methods, any object can have a method.
+  Scope *scope = nullptr;
+  std::vector<int> implemented_interfaces;
   TypeInfo() {}
-
   // Use this instead of the clunky static casts everywhere.
   template <class T>
     requires std::derived_from<T, TypeInfo>
@@ -181,9 +170,25 @@ struct TypeInfo {
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
+struct InterfaceTypeInfo : TypeInfo {
+  InternedString name;
+  // <method_name, type_signature>.
+  std::vector<std::pair<InternedString, int>> methods;
+};
+
+struct TaggedUnionVariant {
+  InternedString name;
+  int type;
+};
+
+struct TaggedUnionTypeInfo : TypeInfo {
+  std::vector<TaggedUnionVariant> variants;
+};
+
+struct ASTFunctionDeclaration;
+
 struct FunctionTypeInfo : TypeInfo {
   FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
-  FunctionMetaType meta_type = FunctionMetaType::FUNCTION_TYPE_NORMAL;
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
@@ -205,22 +210,13 @@ struct ScalarTypeInfo : TypeInfo {
 struct EnumTypeInfo : TypeInfo {
   int element_type = 0;
   bool is_flags = false;
-  std::vector<InternedString> keys;
   EnumTypeInfo() {};
 };
 
-struct UnionTypeInfo : TypeInfo {
-  int flags;
-  Scope *scope;
-  UnionTypeInfo() {}
-};
 
 struct StructTypeInfo : TypeInfo {
   int flags;
-  Scope *scope;
-
   virtual std::string to_string() const override { return ""; }
-
   StructTypeInfo() {}
 };
 
@@ -255,12 +251,15 @@ Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
-int global_create_struct_type(const InternedString &, Scope *);
-int global_create_enum_type(const InternedString &, const std::vector<InternedString> &, bool = false,
-                            size_t element_type = s32_type());
+int global_create_struct_type(const InternedString &, Scope *, std::vector<int> generic_args = {});
+
+int global_create_interface_type(const InternedString &name, Scope *scope,
+                                 std::vector<int> generic_args);
+
+int global_create_tagged_union_type(const InternedString &, Scope *);
+int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
-int global_create_union_type(const InternedString &name, Scope *scope, UnionFlags kind);
-ConversionRule type_conversion_rule(const Type *, const Type *, const SourceRange & = {});
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
 int charptr_type();
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
@@ -274,9 +273,14 @@ constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
 void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
 
+struct ASTNode;
+
 struct Type {
   int id = invalid_id;
   int base_id = invalid_id;
+  std::vector<int> generic_args{};
+  std::vector<int> interfaces{};
+  Nullable<ASTNode> declaring_node;
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
@@ -314,3 +318,5 @@ public:
 struct ASTFunctionDeclaration;
 InternedString get_function_typename(ASTFunctionDeclaration *);
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
+
+int find_operator_overload(TType op, Type *);

@@ -14,7 +14,7 @@ extern jstl::Arena scope_arena;
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_HAS_OVERLOADS = 1 << 3,
+  SYMBOL_IS_METHOD = 1 << 4,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
 };
 
@@ -22,18 +22,18 @@ struct ASTNode;
 
 struct Symbol {
   InternedString name;
-  int type_id;
+  int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
-  std::vector<int> function_overload_types;
   Nullable<ASTNode> declaring_node;
   Value value;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
 };
 
 struct ASTFunctionDeclaration;
+struct ASTInterfaceDeclaration;
 extern Scope *root_scope;
 struct Scope {
-  bool is_struct_or_union_scope = false;
+  bool is_struct_scope = false; // TODO: do we need this anymore?
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::unordered_map<InternedString, int> types;
@@ -66,7 +66,7 @@ struct Scope {
     return fields;
   }
 
-  void insert(const InternedString &name, int type_id, int flags = SYMBOL_IS_VARIABLE);
+  void insert(const InternedString &name, int type_id, ASTNode* declaring_node, int flags = SYMBOL_IS_VARIABLE);
 
   Symbol *lookup(const InternedString &name);
 
@@ -85,14 +85,26 @@ struct Scope {
     return id;
   }
 
+  void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
+
+  int create_tagged_union(const InternedString &name, Scope *scope) {
+    auto id = global_create_tagged_union_type(name, scope);
+    types[name] = id;
+    return id;
+  }
+
+  int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
+    return types[name] = global_create_interface_type(name, scope, generic_args);
+  }
+
   int create_struct_type(const InternedString &name, Scope *scope) {
     auto id = global_create_struct_type(name, scope);
     types[name] = id;
     return id;
   }
 
-  int create_enum_type(const InternedString &name, const std::vector<InternedString> &fields, bool flags) {
-    auto id = global_create_enum_type(name, fields, flags);
+  int create_enum_type(const InternedString &name, Scope *scope, bool flags) {
+    auto id = global_create_enum_type(name, scope, flags);
     types[name] = id;
     return id;
   }
@@ -100,12 +112,6 @@ struct Scope {
   int create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
     auto id = global_create_tuple_type(types, ext);
     this->types[get_tuple_type_name(types)] = id;
-    return id;
-  }
-
-  int create_union_type(const InternedString &name, Scope *scope, UnionFlags kind) {
-    auto id = global_create_union_type(name, scope, kind);
-    types[name] = id;
     return id;
   }
 

@@ -46,7 +46,8 @@ static bool supports_color() {
     return false;
   }
   const char *term = getenv("TERM");
-  if (term == NULL) return false;
+  if (term == NULL)
+    return false;
   return strstr(term, "color") != NULL || strstr(term, "xterm") != NULL || strstr(term, "screen") != NULL ||
          strstr(term, "tmux") != NULL;
 }
@@ -81,34 +82,26 @@ static std::string format_source_location(const SourceRange &source_range, Error
   if (terminal_supports_color) {
     switch (severity) {
       case ERROR_INFO:
-        color = "\033[36m";         // Cyan
-        code_color = "\033[1;36m";  // Bold Cyan
+        color = "\033[36m";        // Cyan
+        code_color = "\033[1;36m"; // Bold Cyan
         break;
       case ERROR_WARNING:
-        color = "\033[33m";         // Yellow
-        code_color = "\033[1;33m";  // Bold Yellow
+        color = "\033[33m";        // Yellow
+        code_color = "\033[1;33m"; // Bold Yellow
         break;
       case ERROR_FAILURE:
-        color = "\033[31m";         // Red
-        code_color = "\033[1;31m";  // Bold Red
+        color = "\033[31m";        // Red
+        code_color = "\033[1;31m"; // Bold Red
         break;
     }
   }
 
-  // nocheckin
   if (span.empty()) {
     return "Error: No tokens in source range\n";
   }
 
   std::stringstream ss;
-  if (terminal_supports_color) ss << "\033[90m";
-  ss << std::string(80, '-');
-  if (terminal_supports_color) ss << "\033[0m\n";
-  ss << '\n';
   ss << color << span.front().location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
-  if (terminal_supports_color) ss << "\033[90m";
-  ss << std::string(80, '-');
-  if (terminal_supports_color) ss << "\033[0m";
   ss << '\n';
 
   // Read the source file
@@ -130,50 +123,74 @@ static std::string format_source_location(const SourceRange &source_range, Error
   size_t line_end = 0;
   size_t current_line = 1;
 
+  // Find the start and end positions for the lines around the error
+  size_t error_line_start = 0;
+  size_t error_line_end = 0;
+  size_t context_start = 0;
+  size_t context_end = 0;
+
   for (size_t i = 0; i < file_content.size(); ++i) {
     if (file_content[i] == '\n') {
       current_line++;
+      if (current_line == first.location.line - 2) {
+        context_start = i + 1;
+      }
       if (current_line == first.location.line) {
-        line_start = i + 1;
-      } else if (current_line == first.location.line + 1) {
-        line_end = i;
+        error_line_start = i + 1;
+      }
+      if (current_line == first.location.line + 1) {
+        error_line_end = i;
+      }
+      if (current_line == first.location.line + 3) {
+        context_end = i;
         break;
       }
     }
   }
 
-  if (line_end == 0) {
-    line_end = file_content.size();
+  if (context_end == 0) {
+    context_end = file_content.size();
   }
 
-  std::string line = file_content.substr(line_start, line_end - line_start);
-  source_code << line << '\n';
+  std::string context = file_content.substr(context_start, context_end - context_start);
+  source_code << context << '\n';
 
+  // Generate the caret indicator
+  size_t caret_line_start = error_line_start - context_start;
+  std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
   caret_indicator = std::string(first.location.column - 1, ' ');
-  caret_indicator += std::string(first.value.get_str().length(), '^');
+  caret_indicator += std::string(std::max((size_t)3, first.value.get_str().length()), '^');
 
-  if (terminal_supports_color) ss << "\033[34m";
+  if (terminal_supports_color)
+    ss << "\033[90;3m";
 
-  ss << source_code.str();
+  // Insert the context lines
+  std::istringstream context_stream(context);
+  std::string line;
+  size_t line_count = 0;
+  while (std::getline(context_stream, line)) {
+    ss << line << '\n';
+    line_count++;
+    if (line_count == 3) { // Insert caret indicator after the error line
+      ss << caret_indicator << '\n';
+    }
+  }
 
-  if (terminal_supports_color) ss << "\033[32m";
-
-  ss << caret_indicator << '\n';
-
-  if (terminal_supports_color) ss << "\033[0m";
+  if (terminal_supports_color)
+    ss << "\033[0m";
 
   return ss.str();
 }
 enum WarningFlags {
   WarningNone = 0,
-  WarningUseDotNotArrowOperatorOverload = 1 << 0,  // --Wno-arrow-operator
-  WarningInaccessibleDeclaration = 1 << 1,         // --Wno-inaccessible-decl
-  WarningEmptyStringInterpolation = 1 << 2,        // --Wno-empty-string-interp
-  WarningNonNullDeletedPointer = 1 << 3,           // --Wno-non-null-deleted
-  WarningAmbigousVariants = 1 << 4,                // --Wno-amiguous-variant
-  WarningSwitchBreak = 1 << 5,                     // --Wno-switch-break
-  WarningDownCastFixedArrayParam = 1 << 6,         // --Wno-array-param
-  WarningIgnoreAll = 1 << 7,                       // --Wignore-all
+  WarningUseDotNotArrowOperatorOverload = 1 << 0, // --Wno-arrow-operator
+  WarningInaccessibleDeclaration = 1 << 1,        // --Wno-inaccessible-decl
+  WarningEmptyStringInterpolation = 1 << 2,       // --Wno-empty-string-interp
+  WarningNonNullDeletedPointer = 1 << 3,          // --Wno-non-null-deleted
+  WarningAmbigousVariants = 1 << 4,               // --Wno-amiguous-variant
+  WarningSwitchBreak = 1 << 5,                    // --Wno-switch-break
+  WarningDownCastFixedArrayParam = 1 << 6,        // --Wno-array-param
+  WarningIgnoreAll = 1 << 7,                      // --Wignore-all
 };
 
 extern int ignored_warnings;
@@ -183,9 +200,11 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
     return;
   }
   std::stringstream ss;
-  if (terminal_supports_color) ss << "\033[36m";
+  if (terminal_supports_color)
+    ss << "\033[36m";
   ss << "Warning:\n\t" << format_message(message);
-  if (terminal_supports_color) ss << "\033[0m\n";
+  if (terminal_supports_color)
+    ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_WARNING);
   const auto token_str = ss.str();
   std::cerr << token_str << std::endl;
@@ -193,11 +212,17 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
 
 [[noreturn]] static void throw_error(const std::string &message, const SourceRange &source_range) {
   std::stringstream ss;
-  if (terminal_supports_color) ss << "\033[31m";
-  ss << "Error:\n\t" << message;
-  if (terminal_supports_color) ss << "\033[0m\n";
-  ss << format_source_location(source_range, ERROR_FAILURE);
-  const auto token_str = ss.str();
-  printf("%s\n", token_str.c_str());
+
+  std::string lower_message = message;
+  std::transform(lower_message.begin(), lower_message.end(), lower_message.begin(), ::tolower);
+
+  if (lower_message.contains("undeclared") || lower_message.contains("use of") && compile_command.has_flag("freestanding")) {
+    lower_message += "\n You are in a freestanding environment. Many types that are normally built in, are not included in this mode";
+  }
+
+  ss << "\033[1;31m" << format_message(message) << "\033[0m";
+  ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
+  const auto err = ss.str();
+  printf("%s\n", err.c_str());
   exit(1);
 }

@@ -67,36 +67,19 @@
   - Gets a `Type *` struct pointer to reflect on a given type.
 - **Example**:
   ```cpp
-  #type MyType
+  #type(MyType)
   ```
 
-#### `#ctor` and `#dtor`
-- **Kind**: `Statement`
-- **Usage**: 
-  - Declares constructor (`#ctor`) and destructor (`#dtor`) functions.
-- **Example**:
-  ```cpp
-  #ctor :: fn() { ... }
-  #dtor :: fn() { ... }
-  ```
-
-#### `#make`
-- **Kind**: `Expression`
-- **Usage**: 
-  - Serves as a casting and copy construction method, as well as normal constructors.
-- **Example**:
-  ```cpp
-  #make(MyType, arg1, arg2)
-  ```
 
 #### `#c_flags`
 - **Kind**: `Statement`
 - **Usage**: 
-  - Adds compiler flags like linker options, `-g`, etc., from within your program or header.
-  - This is only a thing because of us using the C++ compiler stll for a backend.
+  - Adds compiler flags like linker options, `-ffreestanding -fno-std-lib | -fsanitize=address | -L/my_lib/path`, etc., from within your program or header.
+  - you don't need `-g` or `-O<N>` flags, just pass `--release` to the compiler invocation to build in a non-debug mode. this defaults to `-O3`
+  - the most common usage of this is a library that needs to link against a certain static/dynamic C library.
 - **Example**:
   ```cpp
-  #c_flags "-g -O2"
+  #c_flags "-L/lib/local/custom-c-libs -lraylib-custom"
   ```
 
 #### `#flags`
@@ -139,36 +122,6 @@
   #anon :: struct { ... } fieldName;
   ```
 
-#### `#operator`
-- **Kind**: `Statement`
-- **Usage**: 
-  - Declare an operator overload for a given struct or union. There is not an official list of banned or non-overrideable operators, but () is one of them.
-- **Example**:
-  ```cpp
-  
-  Vec2 :: struct {
-    x: float;
-    y: float;
-    // Note: you have to manually override both + and += if you want them both supported.
-    #operator(+) :: fn(other: #self) -> #self {
-      // at the time of writing this, you have to use
-      // #make(#self, {..init_list..}) for return types.
-      // however for parameters, arguments, and all other declarations,
-      // you do not need to manually call a constructor for an initializer list.
-      
-      // ! This works right now though: 
-      // ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- 
-      //  return #make(#self {x + other.x, y + other.y});
-      // ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- ----- 
-      
-      // but this will be fixed soon.
-      
-      return {x + other.x, y + other.y};
-    }
-  }
-  
-  ```
-  
 #### `#export`
 - **Kind**: `Statement`
 - **Usage**: 

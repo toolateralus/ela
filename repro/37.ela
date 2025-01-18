@@ -1,0 +1,11 @@
+#import core;
+
+Struct :: struct {
+  CONSTANT :: 100;
+}
+
+main :: fn() {
+  // this gets treated as a type.
+  // compiles to printf("%d\n", int);
+  println(Struct::CONSTANT);
+} 

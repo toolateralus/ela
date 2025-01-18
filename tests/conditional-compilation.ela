@@ -1,0 +1,107 @@
+#import core;
+
+#test test_conditional_compilation :: fn() {
+  #def CHEESE;
+
+  #ifdef HAMBURGER {
+    CONSTANT0 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT0 :: 20;
+  } else {
+    CONSTANT0 :: 10;
+  }
+  
+  assert("ifdef failed"c, CONSTANT0 == 20);
+  #undef CHEESE;
+
+  #def HAMBURGER;
+
+  #ifdef HAMBURGER {
+    CONSTANT1 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT1 :: 20;
+  } else if true {
+    CONSTANT1 :: 10;
+  }
+  
+  assert("ifdef failed"c, CONSTANT1 == 100);
+
+  #undef HAMBURGER;
+  
+  #ifdef HAMBURGER {
+    CONSTANT2 :: 100;
+  } else ifdef CHEESE {
+    CONSTANT2 :: 20;
+  } else  {
+    CONSTANT2 :: 10;
+  }
+
+  
+  assert("ifdef failed"c, CONSTANT2 == 10);
+
+  #ifndef HAMBURGER {
+    CONSTANT3 :: 100;
+  } 
+
+  assert("ifndef failed"c, CONSTANT3 == 100);
+
+  #def thing
+
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef"c, false);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef"c, true);
+  }
+
+  #undef thing;
+  
+  #ifndef thing {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef"c, true);
+  } else {
+    for i in 0..100 {
+      n := i;
+      if i % 3 == 1 {
+        n -= 2;
+      }
+    }
+    assert("ndef"c, false);
+  }
+}
+
+
+#test test_constexpr_if :: fn() {
+  #if true {
+    n := 0;
+  } else {
+    n := 1;
+  }
+  assert("`#if true` failed"c, n == 0);
+
+  CONSTANT_EXPR :: 100 * 2;
+  #if CONSTANT_EXPR > 199 {
+    n = 1;
+  } else {
+    n = 0;
+  }
+
+  assert("#if V(200) > 199 failed"c, n == 1)
+
+}

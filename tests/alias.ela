@@ -1,0 +1,25 @@
+#import core; 
+
+#test test_type_alias :: fn() {
+  #alias XaryuBarSchnar :: int;
+  i: XaryuBarSchnar = 0;
+  assert("type alias failed"c, i == 0);
+}
+
+#test test_ptr_alias :: fn() {
+  #alias int_ptr :: int*;
+  p: int* = malloc(sizeof(int));
+  other: int_ptr  = p;
+  assert("alias failed to equal pointed to type field."c, p == other);
+  free(p);
+}
+
+Funky :: fn() -> int {
+  return 102;
+}
+
+#test test_fn_alias :: fn() {
+  #alias func :: fn* () -> int;
+  f: func = &Funky;
+  assert("function pointer failed"c, f() == 102);
+}

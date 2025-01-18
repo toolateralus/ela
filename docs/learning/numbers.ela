@@ -19,7 +19,6 @@ f64: float64;
 b: bool;
 
 
-
 /* 
   * you can safely up cast integer/ float types but down casting or casting between integers and floats 
   * requires an explicit cast.
@@ -33,24 +32,24 @@ main :: fn() {
   x64 = x32 = x16 = x8;
 
   // safe, but requires the explicit casts.
-  x8 = (s8)x16 = (s16)x32 = (s32)x64;
+  x8 = x16 as s8 = x32 as s16 = x64 as s32;
 
-  x32 = (s32)f32;
-  x32 = (s32)f64;
+  x32 = f32 as s32;
+  x32 = f64 as s32;
+  f32 = x32 as float32;
+  f32 = x64 as float32;
+  f32 = x16 as float32;
+  f32 = x8 as float32;
 
-  f32 = (float32)x32;
-  f32 = (float32)x64;
-  f32 = (float32)x16;
-  f32 = (float32)x8;
+  // * c-style character literals
+  c : char = 'c';
+  code := '\0';
+
+
+  // Some literals, as expected.
+  x := 0xFFFFFFFFF;
+  x1 := 0b1;
 }
 
-
-/* 
-  * character literals
-*/
-
-c : char = 'c';
-
-code := '\0';
 
 

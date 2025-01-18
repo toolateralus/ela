@@ -33,58 +33,73 @@ SeekPosition :: enum {
 }
 
 File :: struct {
-  #static length :: fn(file: FILE*) -> u32 {
+  fd: FILE*;
+}
+
+impl File {
+  // TODO: fix me
+  // #dtor :: fn(self*) {
+  //   if fd then close();
+  // }
+
+  flush :: fn(self*) {
+    fflush(self.fd);
+  }
+
+  close :: fn(self*) -> void {
+    fflush(self.fd);
+    fclose(self.fd);
+    self.fd = null;
+  }
+
+  length :: fn(file: FILE*) -> u32 {
     fseek(file, 0, SeekPosition::End);
     len := ftell(file);
     fseek(file, 0, SeekPosition::Begin);
-    return #make(u32, len);
+    return len as u32;
   }
-  #static read_all :: fn(file: FILE*, len: u32*) -> string {
-    *len = File::length(file);
-    c: char;
-    str: string;
-    while ((c = fgetc(file)) != EOF) {
-      str.push(c);
-    }
-    return str;
-  }
-  #static read_all :: fn(filename: char*) -> string {
-    file := fopen(filename, "r");
+
+  read_all :: fn(filename: string) -> (Error, string) {
+    file := fopen(filename.data, "r"c);
+
+    if !file then return ($"Couldn't open file {filename}", {});
+    
     str: string;
     c: char;
     while ((c = fgetc(file)) != EOF) {
-      str.push(c);
-    }
-    fclose(file);
-    return str;
-  }
-  #static read_all :: fn(filename: string) -> string {
-    file := fopen(filename.data, "r");
-    str: string;
-    c: char;
-    while ((c = fgetc(file)) != EOF) {
-      str.push(c);
+      if str.length != 0 { 
+        str = $"{str}{c}";
+      }
+      else {
+        str = $"{c}";
+      } 
     }
     fclose(file);
-    return str;
+    return ({}, str);
   }
-  #static write_all :: fn(filename: string, data: string) -> void {
-    file := fopen(filename.data, "w");
+
+  read_bytes :: fn(filename: string) -> u8[] {
+    file := fopen(filename.data, "r"c);
+    if !file then return {};
+    result: u8[];
+    c: char;
+    while ((c = fgetc(file)) != EOF) {
+      result ~= c as u8;
+    }
+    fclose(file);
+    return result;
+  }
+
+  write_all :: fn(filename: string, data: string) -> Error {
+    file := fopen(filename.data, "w"c);
+    if !file then return $"Unable to open file {filename}";
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);
+    return string::empty();
   }
-  #static write_all :: fn(filename: string, data: char*, nbytes: u64) -> void {
-    file := fopen(filename.data, "w");
-    fwrite(data, sizeof(char), nbytes, file);
-    fclose(file);
-  }
-  #static write_all :: fn(filename: char*, data: char*, nbytes: u64) -> void {
-    file := fopen(filename, "w");
-    fwrite(data, sizeof(char), nbytes, file);
-    fclose(file);
-  }
+
   // Used to convert our flag enum to a string for fopen/fclose etc.
-  #static flags_to_string :: fn(flags: int) -> string {
+  flags_to_string :: fn(flags: int) -> string {
     s : string;
     if (flags & FileOpenFlags::Read != 0) 
       then s = "r";
@@ -92,35 +107,18 @@ File :: struct {
       then s = $"{s}w";
     return s;
   }
-  #static open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
-    return {fopen(filename.data, flags_to_string(flags).data)};
+
+  open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
+    return File{
+      fd: fopen(filename.data, File::flags_to_string(flags).data)
+    };
   }
 
-  /* INSTANCE DATA & METHODS */
-
-  fd: FILE*;
-
-
-  read :: fn(buffer: u8*, size: u64) -> u64 {
-    return fread(buffer, 1, size, fd);
+  read :: fn(self*, buffer: u8*, size: u64) -> u64 {
+    return fread(buffer, 1, size, self.fd);
   }
 
-  write :: fn(buffer: u8*, size: u64) -> u64 {
-    return fwrite(buffer, 1, size, fd);
+  write :: fn(self*, buffer: u8*, size: u64) -> u64 {
+    return fwrite(buffer, 1, size, self.fd);
   }
-
-  flush :: fn() {
-    fflush(fd);
-  }
-
-  close :: fn() -> void {
-    fflush(fd);
-    fclose(fd);
-    fd = null;
-  }
-  
-  #dtor :: fn() {
-    if fd then close();
-  }
-
 }

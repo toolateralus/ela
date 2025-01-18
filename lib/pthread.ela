@@ -1,8 +1,123 @@
+#import core;
+
+__bind_gen__anon_D0 :: struct {
+  __low : u32;
+  __high : u32;
+};
+
+__atomic_wide_counter :: union {
+  __value64 : u64;
+  __value32 : __bind_gen__anon_D0;
+};
+
+__pthread_internal_list :: struct {
+  __prev : __pthread_internal_list *;
+  __next : __pthread_internal_list *;
+};
+#alias __pthread_list_t :: __pthread_internal_list;
+
+__pthread_internal_slist :: struct {
+  __next : __pthread_internal_slist *;
+};
+#alias __pthread_slist_t :: __pthread_internal_slist;
+
+__pthread_mutex_s :: struct {
+  __lock : s32;
+  __count : u32;
+  __owner : s32;
+  __nusers : u32;
+  __kind : s32;
+  __spins : s16;
+  __elision : s16;
+  __list : __pthread_list_t;
+};
+
+__pthread_rwlock_arch_t :: struct {
+  __readers : u32;
+  __writers : u32;
+  __wrphase_futex : u32;
+  __writers_futex : u32;
+  __pad3 : u32;
+  __pad4 : u32;
+  __cur_writer : s32;
+  __shared : s32;
+  __rwelision : s8;
+  __pad1 : u8[7];
+  __pad2 : u64;
+  __flags : u32;
+};
+
+__pthread_cond_s :: struct {
+  __wseq : __atomic_wide_counter;
+  __g1_start : __atomic_wide_counter;
+  __g_refs : u32[2];
+  __g_size : u32[2];
+  __g1_orig_size : u32;
+  __wrefs : u32;
+  __g_signals : u32[2];
+};
+
+#alias __tss_t :: u32;
+#alias __thrd_t :: u64;
+__once_flag :: struct {
+  __data : s32;
+};
 #alias pthread_t :: u64;
 
-pthread_attr_t :: union;
+pthread_mutexattr_t :: union {
+  __size : u8[4];
+  __align : s32;
+};
 
-#alias ThreadFunction :: fn* ();
+pthread_condattr_t :: union {
+  __size : u8[4];
+  __align : s32;
+};
+
+#alias pthread_key_t :: u32;
+#alias pthread_once_t :: s32;
+
+pthread_attr_t :: union {
+  __size : u8[56];
+  __align : s64;
+};
+
+pthread_mutex_t :: union {
+  __data : __pthread_mutex_s;
+  __size : u8[40];
+  __align : s64;
+};
+
+pthread_cond_t :: union {
+  __data : __pthread_cond_s;
+  __size : u8[48];
+  __align : s64;
+};
+
+pthread_rwlock_t :: union {
+  __data : __pthread_rwlock_arch_t;
+  __size : u8[56];
+  __align : s64;
+};
+
+pthread_rwlockattr_t :: union {
+  __size : u8[8];
+  __align : s64;
+};
+
+#alias pthread_spinlock_t :: int;
+
+pthread_barrier_t :: union {
+  __size : u8[32];
+  __align : s64;
+};
+
+pthread_barrierattr_t :: union {
+  __size : u8[4];
+  __align : s32;
+};
+
+#alias ThreadFunction :: fn*(void*);
 #alias ThreadStartRoutine :: fn* (void*)-> void*;
 
 #foreign pthread_create :: fn(thread: pthread_t*, attr: pthread_attr_t*, start_routine: ThreadStartRoutine, arg: void*) -> int;
@@ -14,38 +129,33 @@ start_thread :: fn(arg: void*) -> void*;
 /* Simple thread struct */
 Thread :: struct {
   handle: pthread_t;
-  start_function: ThreadFunction;
-  
-  start :: fn(function: ThreadFunction, arg: void*) {
-    this.start_function = function;
-    pthread_create(&this.handle, null, &start_thread, arg);  
+}
+
+impl Thread {    
+  start :: fn(start_function: ThreadFunction, arg: void*) -> #self {
+    self: #self;
+    // this memory gets deleted in start_thread();
+    parameters : (ThreadFunction, void*)* = malloc(#type((ThreadFunction, void*)).size);
+    *parameters = (start_function, arg);
+    pthread_create(&self.handle, null, &start_thread, parameters);
+    return self;
   }
   
-  #ctor :: fn() {}
-  #ctor :: fn(function: ThreadFunction) {
-    start(function, this);
-  }
-  
-  join :: fn() -> void* {
-    n : void* = null;
-    pthread_join(&this.handle, &n);
+  join :: fn(self*) -> void* {
+    #static n : void* = null; // this is discarded.
+    pthread_join(&self.handle, &n);
     return n;
   }
-  #dtor :: fn() {
-    join();
-  }
 }
 
-/* wrapper calback to init Thread struct. */ 
+/* wrapper callback to init Thread struct. */ 
 start_thread :: fn(arg: void*) -> void* {
-  thread : Thread* = arg;
-  if (thread.start_function != null) {
-    thread.start_function();
-  }
+  function, user_arg := *(arg as (ThreadFunction, void*)*);
+  function(user_arg);
+  free(arg);   // allocated by Thread::start();
   return null;
 }
-
-#alias pthread_mutex_t :: u64;
+  
 #foreign pthread_mutex_init :: fn(mutex: pthread_mutex_t*, attr: void*) -> int;
 #foreign pthread_mutex_lock :: fn(mutex: pthread_mutex_t*) -> int;
 #foreign pthread_mutex_unlock :: fn(mutex: pthread_mutex_t*) -> int;
@@ -54,17 +164,21 @@ start_thread :: fn(arg: void*) -> void* {
 /* Simple mutex */
 Mutex :: struct {
   handle: pthread_mutex_t;
-  #ctor :: fn() {
-    pthread_mutex_init(&this.handle, null);
-  }
-  lock :: fn() {
-    pthread_mutex_lock(&this.handle);
-  }
-  unlock :: fn() {
-    pthread_mutex_unlock(&this.handle);
-  }
-  #dtor :: fn() {
-    pthread_mutex_destroy(&this.handle);
-  }
 }
 
+impl Mutex {
+  create :: fn() -> #self {
+    self: #self;
+    pthread_mutex_init(&self.handle, null);
+    return self;
+  }
+  lock :: fn(self*) {
+    pthread_mutex_lock(&self.handle);
+  }
+  unlock :: fn(self*) {
+    pthread_mutex_unlock(&self.handle);
+  }
+  free :: fn(self*) {
+    pthread_mutex_destroy(&self.handle);
+  }
+}

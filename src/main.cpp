@@ -4,6 +4,7 @@
 #include <ostream>
 #include <unordered_map>
 
+#include "arena.hpp"
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -30,6 +31,7 @@ jstl::Arena scope_arena{MB(333)};
 jstl::Arena ast_arena{MB(333)};
 
 std::vector<Type> type_table{};
+
 
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
@@ -92,30 +94,22 @@ Ela compiler:
 #import core;
 #import raylib;
 
-// See "/usr/local/lib/ela/raylib.ela" for api info.
-
 main :: fn() {
   InitWindow(800, 600, "Hello, Raylib");
+  SetTargetFPS(60);
 
-  style := Style {
-    WHITE, // foreground: Color;
-    CLEAR, // background: Color;
-    CLEAR, // highlighted: Color;
-    16,    // font_size: int;
-    true,  // use_jiggly_text: bool;
-    5.0   // jiggle_intensity: float;
-    4.0    // jiggle_rate: float;
-  };
+  x_origin, y_origin := (330, 250);
+  amplitude, speed, time := (15, 1.0, 0.0 as float64);
+  x, y := (x_origin, y_origin);
 
   while !WindowShouldClose() {
+    time += GetFrameTime() * speed;
+
     BeginDrawing();
       ClearBackground(BLACK);
       DrawCircle(400, 300, 100, RED);
-
-      // fun wavy text. DrawText for normal text, of course.
-      jiggly_text("Hello, Raylib", Rectangle{
-        300, 200, 50, 50,
-      }, style)
+      y = y_origin + sin(time) * amplitude;
+      DrawText("Hello, Raylib", x, y, 24, WHITE);
     EndDrawing();
   }
 }
@@ -139,6 +133,11 @@ main :: fn() {
   }
 
   compile_command = CompileCommand(argc, argv);
+
+  if (compile_command.has_flag("freestanding")) {
+    compile_command.compilation_flags += " -ffreestanding -nostdlib ";
+  }
+  
   if (compile_command.has_flag("x")) compile_command.print();
 
   {
@@ -170,6 +169,10 @@ main :: fn() {
 
   init_type_system();
   auto result = compile_command.compile();
+  using arena = jstl::Arena;
+  // scope_arena.~arena();
+  // type_info_arena.~arena();
+  // ast_arena.~arena();
 
   if (run_on_finished) {
     if (result == 0) {
@@ -204,16 +207,6 @@ int CompileCommand::compile() {
   lower.begin();
   Typer type_visitor{context};
   type_visitor.visit(root);
-
-  if (has_flag("verbose")) {
-    SerializeVisitor serializer(context);
-    auto serialized_view = std::any_cast<std::string>(serializer.visit(root));
-    printf("%s\n", serialized_view.c_str());
-    std::ofstream ast(binary_path.string() + ".coffee");
-    ast << serialized_view;
-    ast.flush();
-    ast.close();
-  }
 
   Emitter emit(context, type_visitor);
   emit.visit(root);

@@ -1,0 +1,18 @@
+
+getter :: fn() -> int => 100;
+
+#test test_expr_body_fn :: fn() {
+  assert("expr body != 100"c, getter() == 100);
+}
+
+#test test_expr_body_local_fn :: fn() {
+  local_func :: fn() -> int => 150;
+  assert("expr body w/ local func failed"c, local_func() == 150);
+}
+
+#test test_expr_body_switch :: fn() {
+  assert("switch with expr-bodies failed"c, switch true {
+    true: => 100,
+    false: => 200,
+  } == 100);
+}

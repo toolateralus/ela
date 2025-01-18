@@ -21,12 +21,14 @@ fi
 
 cd ..
 
+if [ -d /usr/local/lib/ela ]; then
+  sudo rm -r /usr/local/lib/ela
+fi
 # Create the destination directory if it doesn't exist
-mkdir -p /usr/local/lib/ela
-
+sudo mkdir -p /usr/local/lib/ela
 # Move the contents of ./lib to /usr/local/lib/ela
-sudo cp ./lib/* /usr/local/lib/ela/
+sudo cp -r ./lib/* /usr/local/lib/ela/
 
-sudo cp ./ela_source/boilerplate.hpp /usr/local/lib/ela/boilerplate.hpp
+sudo cp ./include/boilerplate.hpp /usr/local/lib/ela/boilerplate.hpp
 
 sudo ln -sf $(pwd)/bin/ela /usr/local/bin/ela

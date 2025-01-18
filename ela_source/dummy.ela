@@ -1,7 +1,0 @@
-overloaded :: fn![T](n : T) {
-
-}
-
-main :: fn() {
-  overloaded(100 as s32);  
-}

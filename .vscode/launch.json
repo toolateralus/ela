@@ -14,6 +14,14 @@
       "args": ["${file}"]
     },
     {
+      "type": "lldb",
+      "request": "launch",
+      "name": "Debug current file compilation (tests)",
+      "program": "${workspaceFolder}/bin/ela",
+      "cwd": "${fileDirname}",
+      "args": ["${file}", "--test"]
+    },
+    {
       "preLaunchTask": "compile_current",
       "type": "lldb",
       "request": "launch",
@@ -22,51 +30,22 @@
       "cwd": "${fileDirname}"
     },
     {
+      "preLaunchTask": "compile_current_test",
       "type": "lldb",
       "request": "launch",
-      "name": "Debug repro executable",
-      "program": "${workspaceFolder}/repro/generic_fn",
-      "args": [],
-      "cwd": "${workspaceFolder}/repro"
+      "name": "Debug current file (tests)",
+      "program": "${fileDirname}/${fileBasenameNoExtension}",
+      "cwd": "${fileDirname}"
     },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug test",
-      "program": "${workspaceFolder}/bin/ela",
-      "args": ["test.ela",  "--test", "--s"],
-      "cwd": "${workspaceFolder}/ela_source"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug test executable",
-      "program": "${workspaceFolder}/ela_source/test",
-      "args": [],
-      "cwd": "${workspaceFolder}/ela_source"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug target practice executable",
-      "program": "${workspaceFolder}/examples/target_practice/main",
-      "args": [],
-      "cwd": "${workspaceFolder}/examples/target_practice"
-    },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug target practice",
-      "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela"],
-      "cwd": "${workspaceFolder}/examples/target_practice"
-    },
+    
+    // If you have an ela_source/dummy.ela you can use these configurations to test
+    // miscellaneous problems you may have.
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["dummy.ela", "--s", "--sanitize"],
+      "args": ["dummy.ela", "--s"],
       "cwd": "${workspaceFolder}/ela_source"
     },
     {
@@ -85,18 +64,5 @@
       "args": ["dummy.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source"
     },
-    {
-      "type": "lldb",
-      "request": "launch",
-      "name": "Debug sequencer",
-      "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", "--s"],
-      "cwd": "${workspaceFolder}/examples/sequencer"
-    }
-
-
-
-
-
   ]
 }

@@ -1,4 +1,4 @@
-ela main.ela 
+ela main.ela --freestanding --release
 
 if ! command -v nasm &> /dev/null
 then

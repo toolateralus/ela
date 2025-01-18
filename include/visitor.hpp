@@ -1,6 +1,6 @@
 #pragma once
-#include <any>
-#include <sstream>
+
+#include <deque>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -9,135 +9,99 @@
 #include "string_builder.hpp"
 
 struct VisitorBase {
-  enum VisitorFlags {
-    FLAG_NO_STATE = 0,
-    FLAG_FUNCTION_ROOT_LEVEL_BLOCK = 1 << 2,
-  };
-  int visitor_flags = FLAG_NO_STATE;
   virtual ~VisitorBase() = default;
   DECLARE_VISIT_BASE_METHODS()
-
-  virtual std::any visit(ASTStatementList *node) {
+  virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
     }
-    return {};
+    return;
   };
 };
 
-struct SerializeVisitor : VisitorBase {
-  SerializeVisitor(Context &context) : context(context) {}
-  std::stringstream ss{};
-  int indentLevel = 0;
-  Context &context;
-  std::string indent();
-
-  std::any visit(ASTProgram *node) override;
-  std::any visit(ASTFunctionDeclaration *node) override;
-  std::any visit(ASTBlock *node) override;
-  std::any visit(ASTParamsDecl *node) override;
-  std::any visit(ASTParamDecl *node) override;
-  std::any visit(ASTDeclaration *node) override;
-  std::any visit(ASTExprStatement *node) override;
-  std::any visit(ASTBinExpr *node) override;
-  std::any visit(ASTUnaryExpr *node) override;
-  std::any visit(ASTIdentifier *node) override;
-  std::any visit(ASTLiteral *node) override;
-  std::any visit(ASTType *node) override;
-  std::any visit(ASTCall *node) override;
-  std::any visit(ASTArguments *node) override;
-  std::any visit(ASTReturn *node) override;
-  std::any visit(ASTContinue *node) override;
-  std::any visit(ASTBreak *node) override;
-  std::any visit(ASTFor *node) override;
-  std::any visit(ASTIf *node) override;
-  std::any visit(ASTElse *node) override;
-  std::any visit(ASTWhile *node) override;
-  std::any visit(ASTStructDeclaration *node) override;
-  std::any visit(ASTDotExpr *node) override;
-  std::any visit(ASTScopeResolution *node) override;
-  std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
-  std::any visit(ASTInitializerList *node) override;
-  std::any visit(ASTEnumDeclaration *node) override;
-  std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
-  std::any visit(ASTTuple *node) override;
-  std::any visit(ASTAlias *node) override;
-
-  // TODO: implement me.
-
-  std::any visit(ASTRange *node) override { return {}; }
-  std::any visit(ASTSwitch *node) override { return {}; };
-  std::any visit(ASTTupleDeconstruction *node) override { return {}; };
-};
-
 struct Typer : VisitorBase {
-  Nullable<Symbol> get_symbol(ASTNode *);
 
+  Nullable<ASTType> type_context = nullptr;
+  int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
 
   template <typename T>
-  int visit_generic(int (Typer::*visit_method)(T *, bool, std::vector<int>), ASTNode *declaring_node,
+  using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
+  template <typename T>
+  T visit_generic(VisitorMethod<T> visit_method, T declaring_node,
                     std::vector<int> args);
-  Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
-  Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
+  Nullable<Symbol> get_symbol(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
-  std::any visit(ASTStructDeclaration *node) override;
-  std::any visit(ASTProgram *node) override;
-  std::any visit(ASTFunctionDeclaration *node) override;
-  std::any visit(ASTBlock *node) override;
-  std::any visit(ASTParamsDecl *node) override;
-  std::any visit(ASTParamDecl *node) override;
-  std::any visit(ASTDeclaration *node) override;
-  std::any visit(ASTExprStatement *node) override;
-  std::any visit(ASTBinExpr *node) override;
-  std::any visit(ASTUnaryExpr *node) override;
-  std::any visit(ASTIdentifier *node) override;
-  std::any visit(ASTLiteral *node) override;
-  std::any visit(ASTType *node) override;
-  std::any visit(ASTScopeResolution *node) override;
-  int get_function_type(ASTFunctionDeclaration *);
-  void find_function_overload(ASTCall *&node, Symbol *&symbol, std::vector<int> &arg_tys, Type *&type);
+  void visit(ASTStructDeclaration *node) override;
+  void visit(ASTProgram *node) override;
+  void visit(ASTFunctionDeclaration *node) override;
+  void visit(ASTBlock *node) override;
+  void visit(ASTParamsDecl *node) override;
+  void visit(ASTParamDecl *node) override;
+  void visit(ASTDeclaration *node) override;
+  void visit(ASTExprStatement *node) override;
+  void visit(ASTBinExpr *node) override;
+  void visit(ASTUnaryExpr *node) override;
+  void visit(ASTIdentifier *node) override;
+  void visit(ASTLiteral *node) override;
+  void visit(ASTCast *node) override;
+  void visit(ASTType *node) override;
+  void visit(ASTScopeResolution *node) override;
+  void visit(ASTInterfaceDeclaration *node) override;
+
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
-  int visit_function_declaration(ASTFunctionDeclaration *node, bool generic_instantiation,
+  void visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
                                  std::vector<int> generic_args = {});
-  int visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+  void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                std::vector<int> generic_args = {});
-  int visit_union_declaration(ASTUnionDeclaration *node, bool generic_instantiation,
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
+                              std::vector<int> generic_args = {});
+  void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
+  void visit_function_body(ASTFunctionDeclaration *node, int return_type);
 
-  std::any visit(ASTCall *node) override;
-  std::any visit(ASTArguments *node) override;
-  std::any visit(ASTReturn *node) override;
-  std::any visit(ASTContinue *node) override;
-  std::any visit(ASTBreak *node) override;
-  std::any visit(ASTFor *node) override;
-  std::any visit(ASTIf *node) override;
-  std::any visit(ASTElse *node) override;
-  std::any visit(ASTWhile *node) override;
-  std::any visit(ASTDotExpr *node) override;
-  std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
-  std::any visit(ASTInitializerList *node) override;
-  std::any visit(ASTEnumDeclaration *node) override;
-  std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
-  std::any visit(ASTRange *node) override;
-  std::any visit(ASTSwitch *node) override;
-  std::any visit(ASTTuple *node) override;
-  std::any visit(ASTTupleDeconstruction *node) override;
-  std::any visit(ASTAlias *node) override;
+  int get_self_type();
+
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params);
+  void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
+  void try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type);
+
+  void visit(ASTCall *node) override;
+  void visit(ASTArguments *node) override;
+  void visit(ASTReturn *node) override;
+  void visit(ASTContinue *node) override;
+  void visit(ASTBreak *node) override;
+  void visit(ASTFor *node) override;
+  void visit(ASTIf *node) override;
+  void visit(ASTElse *node) override;
+  void visit(ASTWhile *node) override;
+  void visit(ASTDotExpr *node) override;
+  void visit(ASTSubscript *node) override;
+  void visit(ASTInitializerList *node) override;
+  void visit(ASTEnumDeclaration *node) override;
+  void visit(ASTRange *node) override;
+  void visit(ASTSwitch *node) override;
+  void visit(ASTTuple *node) override;
+  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTAlias *node) override;
+  void visit(ASTImpl *node) override;
+  void visit(ASTDefer *node) override;
+  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTLambda *node) override;
+
   InternedString type_name(ASTExpr *node);
 };
 
 struct Emitter : VisitorBase {
+
+  void emit_deferred_statements(ASTBlock *parent, bool is_return);
+  static constexpr const char * defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
@@ -147,14 +111,22 @@ struct Emitter : VisitorBase {
   std::vector<std::function<void()>> pending_statements;
 
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
-  Nullable<ASTUnionDeclaration> current_union_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
+  Nullable<ASTImpl> current_impl = nullptr;
 
-  Typer &type_visitor;
+  Typer &typer;
 
-  StringBuilder code{};
-  StringBuilder *ss{};
-  StringBuilder test_functions{};
+  // used to cache up defers.
+  bool emitting_function_with_defer = false;
+
+  // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
+  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
+  std::deque<std::stringstream> defer_blocks {};
+
+
+  std::stringstream code{};
+  std::stringstream *ss{};
+  std::stringstream test_functions{};
 
   int indentLevel = 0;
   Context &ctx;
@@ -187,7 +159,7 @@ struct Emitter : VisitorBase {
   }
 
   std::string to_type_struct(Type *type, Context &context);
-  inline Emitter(Context &context, Typer &type_visitor) : type_visitor(type_visitor), ctx(context) { ss = &code; }
+  inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
   inline std::string indent() { return std::string(indentLevel * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
@@ -217,49 +189,53 @@ struct Emitter : VisitorBase {
   std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
                                                              Type *type);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
+  int get_expr_left_type_sr_dot(ASTNode *node);
+  void visit(ASTStructDeclaration *node) override;
+  void visit(ASTProgram *node) override;
+  void visit(ASTBlock *node) override;
+  void visit(ASTFunctionDeclaration *node) override;
+  void visit(ASTParamsDecl *node) override;
+  void visit(ASTParamDecl *node) override;
 
-  std::any visit(ASTStructDeclaration *node) override;
-  std ::any visit(ASTProgram *node) override;
-  std ::any visit(ASTBlock *node) override;
-  std ::any visit(ASTFunctionDeclaration *node) override;
-  std ::any visit(ASTParamsDecl *node) override;
-  std ::any visit(ASTParamDecl *node) override;
+  void visit(ASTDeclaration *node) override;
+  void visit(ASTExprStatement *node) override;
+  void visit(ASTBinExpr *node) override;
+  void visit(ASTUnaryExpr *node) override;
+  void visit(ASTIdentifier *node) override;
+  void visit(ASTLiteral *node) override;
+  void visit(ASTType *node) override;
+  void visit(ASTCall *node) override;
+  void visit(ASTArguments *node) override;
+  void visit(ASTReturn *node) override;
+  void visit(ASTContinue *node) override;
+  void visit(ASTBreak *node) override;
+  void visit(ASTFor *node) override;
+  void visit(ASTIf *node) override;
+  void visit(ASTElse *node) override;
+  void visit(ASTWhile *node) override;
+  void visit(ASTDotExpr *node) override;
+  void visit(ASTSubscript *node) override;
+  void visit(ASTInitializerList *node) override;
+  void visit(ASTEnumDeclaration *node) override;
+  void visit(ASTRange *node) override;
+  void visit(ASTSwitch *node) override;
+  void visit(ASTTuple *node) override;
+  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTScopeResolution *node) override;
+  void visit(ASTAlias *node) override;
+  void visit(ASTImpl *node) override;
+  void visit(ASTDefer *node) override;
+  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTCast *node) override;
+  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTLambda *node) override;
 
-  std ::any visit(ASTDeclaration *node) override;
-  std ::any visit(ASTExprStatement *node) override;
-  std ::any visit(ASTBinExpr *node) override;
-  std ::any visit(ASTUnaryExpr *node) override;
-  std ::any visit(ASTIdentifier *node) override;
-  std ::any visit(ASTLiteral *node) override;
-  std ::any visit(ASTType *node) override;
-  std ::any visit(ASTCall *node) override;
-  std ::any visit(ASTArguments *node) override;
-  std ::any visit(ASTReturn *node) override;
-  std ::any visit(ASTContinue *node) override;
-  std ::any visit(ASTBreak *node) override;
-  std ::any visit(ASTFor *node) override;
-  std ::any visit(ASTIf *node) override;
-  std ::any visit(ASTElse *node) override;
-  std ::any visit(ASTWhile *node) override;
-  std::any visit(ASTDotExpr *node) override;
-  std::any visit(ASTSubscript *node) override;
-  std::any visit(ASTMake *node) override;
-  std::any visit(ASTInitializerList *node) override;
-  std::any visit(ASTEnumDeclaration *node) override;
-  std::any visit(ASTUnionDeclaration *node) override;
-  std::any visit(ASTAllocate *node) override;
-  std::any visit(ASTRange *node) override;
-  std::any visit(ASTSwitch *node) override;
-  std::any visit(ASTTuple *node) override;
-  std::any visit(ASTTupleDeconstruction *node) override;
-  std::any visit(ASTScopeResolution *node) override;
-  std::any visit(ASTAlias *node) override;
-
-  std::any visit(ASTStatementList *node) override {
+  void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
+      emit_line_directive(stmt);
       stmt->accept(this);
       (*ss) << ";";
     }
-    return {};
+    return;
   };
 };

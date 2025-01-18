@@ -1,29 +1,32 @@
 #import net;
 #import core;
 
-MAX_BUFFER_LEN : int = 80
 PORT : u16 = 8080
 
 // Function designed for chat between client and server.
 // sockfd: socket file descriptor.
 chatting :: fn(sockfd: int) { 
-  buffer: char[MAX_BUFFER_LEN];
+  buffer : char[80];
 
   while true {
-    memset(buffer, 0, MAX_BUFFER_LEN);
-    println("Enter message : ");
+    memset(buffer, 0, 80);
+    printf("Enter message : "c);
 
     n: int;
-    while n < MAX_BUFFER_LEN && (buffer[n++] = getchar()) != '\n' {}
+    while n < 80 && (buffer[n++] = getchar()) != '\n' {}
+    
+    write(sockfd, buffer, 80);
 
-    if (n >= 4 && (strncmp(buffer, "exit", 4)) == 0) {
+    memset(buffer, 0, 80);
+
+    read(sockfd, buffer, 80);
+
+    println($"From Server : {buffer as char*}");
+
+    if ((strncmp(buffer, "exit"c, 4)) == 0) {
       println("Client Exit...");
       break;
     }
-    write(sockfd, buffer, MAX_BUFFER_LEN);
-    memset(buffer, 0, MAX_BUFFER_LEN);
-    read(sockfd, buffer, MAX_BUFFER_LEN);
-    println($"From Server : {(char*)buffer}");
   }
 }
 
@@ -37,10 +40,11 @@ main :: fn() {
 
   servaddr: sockaddr_in;
   servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
+  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"c);
   servaddr.sin_port = htons(PORT);
-  
-  if connect(sockfd, (sockaddr*)&servaddr, sizeof(servaddr)) != 0 {
+  servaddr_ptr : sockaddr* = &servaddr;
+
+  if connect(sockfd, servaddr_ptr, sizeof(servaddr)) != 0 {
     panic("connection with the server failed...");
   } else {
     println("connected to the server..");

@@ -89,9 +89,6 @@ enum struct TType {
   Enum,
   Union,
 
-  New,
-  Delete,
-
   Then,
   Colon,
   In,
@@ -99,8 +96,13 @@ enum struct TType {
   Switch,
   Fn,
 
-  GenericBrace, // '!<' for ![T, T1]
-  As,           // 'as' for casting
+  GenericBrace,   // '!<' for ![T, T1]
+  As,             // 'as' for casting
+  ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
+  Defer,
+
+  Impl,           // impl
+  Interface,      // interface
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -109,7 +111,10 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Interface);
+    TTYPE_CASE(Defer);
     TTYPE_CASE(Char);
+    TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
     TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
@@ -182,8 +187,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompMul);
     TTYPE_CASE(CompDiv);
     TTYPE_CASE(CompMod);
-    TTYPE_CASE(New);
-    TTYPE_CASE(Delete);
     TTYPE_CASE(CompAnd);
     TTYPE_CASE(CompOr);
     TTYPE_CASE(CompXor);
@@ -191,6 +194,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHR);
     TTYPE_CASE(Dollar);
     TTYPE_CASE(As);
+    TTYPE_CASE(Impl);
   }
   return "Unknown";
 }
@@ -256,6 +260,7 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
     // control flow
     {"in", TType::In},
+    
     {"fn", TType::Fn},
     {"switch", TType::Switch},
     {"then", TType::Then},
@@ -274,13 +279,16 @@ static std::unordered_map<std::string, TType> keywords{
     {"true", TType::True},
     {"false", TType::False},
     {"null", TType::Null},
-    // intrinsic functions
-    {"new", TType::New},
-    {"delete", TType::Delete},
+
+    // miscellaneous
     {"as", TType::As},
+    {"impl", TType::Impl},
+    {"defer", TType::Defer},
+    {"interface", TType::Interface},
 };
 
 static std::unordered_map<std::string, TType> operators{
+    {"=>", TType::ExpressionBody },
     {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
     {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
     {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},

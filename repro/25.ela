@@ -4,12 +4,10 @@
 // When we instantiate a template instantiation for ArenaOf![T] at the declaration site,
 // this type is not yet declared nor defined.
 // We need to emit generic instantiations at the latest possible site.
-
 My_Struct :: struct{}
 
 main :: fn() {
-  a: ArenaOf![My_Struct] = {
-    1000
-  };
+  // Aditionally, i think Type![T]::method() is probably not working.
+  a := ArenaOf![My_Struct]::create(100)
 }
 

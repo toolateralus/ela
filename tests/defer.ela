@@ -1,0 +1,167 @@
+#import core;
+
+/* 
+ * :: Important :: 
+  - Some of these value-based returns from defers may be surprising in that they do not mutate the variables.
+  - This is because the defer is always executed after the return value is already obtained: they are merely for mutating state on exit,
+    such as calling cleanup functions, not changing the value of the return value post return.
+  - Be aware that defers will not modify the value of the thing being returned as they are executed after the return expression is already evaluated.
+*/
+
+
+nested_defer_test :: fn() -> int {
+  x := 0;
+  defer {
+    x += 1;
+  }
+  if (true) {
+    defer {
+      x += 2;
+    }
+  }
+  return x;
+}
+
+#test test_nested_defer :: fn() {
+  assert("nested defer failed"c, nested_defer_test() == 2);
+}
+
+loop_defer_test :: fn() -> int {
+  x := 0;
+  for i in 0..3 {
+    defer {
+      x += i;
+    }
+  }
+  return x;
+}
+
+#test test_loop_defer :: fn() {
+  assert("loop defer failed"c, loop_defer_test() == 3);
+}
+
+early_return_defer_test :: fn() -> int {
+  x := 0;
+  defer {
+    x += 1;
+  }
+  if (true) {
+    defer {
+      x += 2;
+    }
+    return x;
+  }
+  return x;
+}
+
+#test test_early_return_defer :: fn() {
+  assert("early return defer failed"c, early_return_defer_test() == 0);
+}
+
+DeferCleanup :: struct {
+  ptr : void*;
+}
+
+// Return statements are evaluated BEFORE the defer, so
+// do not try to change a non-pointer, or what a pointer points to,
+// and expect that to propagate to the caller via return.
+
+// here we show that the ptr as a u64 is passed back to the caller before it's set to null
+// in the defer block. which is absolutely expected behaviour.
+defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
+  defer {
+    free(c.ptr);
+    c.ptr = null;
+  }
+  assert("defer cleanup got null input"c, c.ptr != null);
+  return c.ptr as u64;
+}
+
+#test test_defer_cleanup_routine :: fn() {
+  ptr := malloc(8);
+  cleanup := DeferCleanup {
+    ptr: ptr
+  };
+  ptr_as_int : u64 = ptr as u64;
+  n := defer_cleanup_routine(&cleanup);
+  assert("yep"c, n == ptr_as_int);
+  assert("cleanup on defer failed"c, cleanup.ptr == null);
+}
+
+// Additional comprehensive tests
+
+continue_defer_test :: fn() -> int {
+  x := 0;
+  for i in 0..3 {
+    defer {
+      x += 1;
+    }
+    if (i == 1) {
+      continue;
+    }
+    x += 2;
+  }
+  return x;
+}
+
+#test test_continue_defer :: fn() {
+  assert("continue defer failed"c, continue_defer_test() == 6);
+}
+
+// ! DEFER IS STILL BROKEN!
+// ! It has improved, but when we break from within the if, we need to traverse up and emit those defers too.
+// ! x += 1 gets skipped here because the if itself has no defers but the parent block does and that control flow
+// ! affects that block.
+break_defer_test :: fn() -> int {
+  x := 0;
+  for i in 0..3 {
+    defer {
+      x += 1;
+    }
+    if (i == 1) {
+      break;
+    }
+    x += 2;
+  }
+  return x;
+}
+
+#test test_break_defer :: fn() {
+  assert("break defer failed"c, break_defer_test() == 4);
+}
+
+multiple_defer_test :: fn() -> int {
+  x := 0;
+  defer {
+    x += 1;
+  }
+  defer {
+    x += 2;
+  }
+  return x;
+}
+
+#test test_multiple_defer :: fn() {
+  assert("multiple defer failed"c, multiple_defer_test() == 0);
+}
+
+nested_control_flow_defer_test :: fn() -> int {
+  x := 0;
+  for i in 0..3 {
+    defer {
+      x += 1;
+    }
+    if (i == 1) {
+      defer {
+        x += 2;
+      }
+      break;
+    }
+    x += 3;
+  }
+  return x;
+}
+
+#test test_nested_control_flow_defer :: fn() {
+  assert("nested control flow defer failed"c, nested_control_flow_defer_test() == 6);
+}

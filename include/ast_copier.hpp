@@ -5,6 +5,8 @@
 
 struct ASTCopier {
   Scope *current_scope = nullptr;
+  ASTImpl *copy_impl(ASTImpl* node);
+  InterpolatedStringSegment *copy_interp_string_segment(InterpolatedStringSegment* segment);
   Scope *copy_scope(Scope *old);
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);
@@ -30,15 +32,13 @@ struct ASTCopier {
   ASTStructDeclaration *copy_struct_declaration(ASTStructDeclaration *node);
   ASTDotExpr *copy_dot_expr(ASTDotExpr *node);
   ASTSubscript *copy_subscript(ASTSubscript *node);
-  ASTMake *copy_make(ASTMake *node);
   ASTInitializerList *copy_initializer_list(ASTInitializerList *node);
   ASTEnumDeclaration *copy_enum_declaration(ASTEnumDeclaration *node);
-  ASTUnionDeclaration *copy_union_declaration(ASTUnionDeclaration *node);
-  ASTAllocate *copy_allocate(ASTAllocate *node);
   ASTRange *copy_range(ASTRange *node);
   ASTSwitch *copy_switch(ASTSwitch *node);
   ASTTuple *copy_tuple(ASTTuple *node);
   ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
+  ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
 };

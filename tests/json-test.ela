@@ -1,0 +1,198 @@
+#import core;
+#import json;
+
+// #error "This is crashing because we call delete[] in our string implementation in boilerplate.hpp, but we fill the strings with malloc'd data in string::from";
+
+JsonValueDeleter :: struct {
+  vals: JsonValue*[];
+}
+
+impl JsonValueDeleter {
+  add :: fn(self*, val: JsonValue*) {
+    self.vals ~= val;
+  }
+  // *fixme
+  destroy :: fn(self*) {
+    for val in self.vals {
+      free(val);
+    }
+  }
+}
+
+#test test_json_types :: fn() {
+  deleter: JsonValueDeleter;
+  defer deleter.destroy();
+
+  val : JsonValue*;
+  err : JsonError;
+
+  err, val = json_parse_string("true");
+
+  if err.has_value {
+    assert($"{err.message} failed to parse bool".data, false);
+  }
+
+  deleter.add(val);
+  assert("bool"c, val.is_boolean());
+
+  err, val = json_parse_string("32.1");
+  if err.has_value {
+    assert($"{err.message} failed to parse number".data, false);
+  }
+
+  deleter.add(val);
+  assert("number"c, val.is_number());
+
+  err, val = json_parse_string("\"hello\"");
+  if err.has_value {
+    assert($"{err.message} failed to parse string".data, false);
+  }
+  deleter.add(val);
+  assert("string"c, val.is_string());
+
+  err, val = json_parse_string("[1, 2, 3]");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("array"c, val.is_array());
+
+  err, val = json_parse_string("{\"key\": \"value\"}");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("object"c, val.is_object());
+
+  err, val = json_parse_string("null");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("null"c, val.is_null());
+}
+
+#test test_json_values :: fn() {
+  deleter: JsonValueDeleter;
+  val : JsonValue*;
+  err : JsonError;
+
+  err, val = json_parse_string("true");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("bool"c, val.as_boolean() == true);
+
+  err, val = json_parse_string("32.1");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("number"c, val.as_number() == atof("32.1"c));
+
+  err, val = json_parse_string("\"hello\"");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("string"c, val.as_string() == "hello");
+
+  err, val = json_parse_string("[1, 2, 3]");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("array length"c, val.as_array().length == 3);
+  assert("array element 0"c, val.at(0).as_number() == 1);
+  assert("array element 1"c, val.at(1).as_number() == 2);
+  assert("array element 2"c, val.at(2).as_number() == 3);
+
+  err, val = json_parse_string("{\"key\": \"value\"}");
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter.add(val);
+  assert("object key"c, val.get("key").as_string() == "value");
+}
+
+#test test_scalar_deserialization :: fn() {
+  n : int = 100;
+  err, json := json_serialize(&n, #type(int));
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = 0;
+  assert("json  serialize  scalar"c, json.is_number());
+  err = json_deserialize_scalar(json, &n, #type(int));
+  assert("json error"c, !err.has_value);
+  assert("json deserialize scalar"c, n == 100);
+}
+
+MyJsonStruct :: struct {
+  n: s64;
+  b: float32;
+}
+impl MyJsonStruct {
+  to_string ::fn(self*) -> string {
+    return $"MyJsonStruct [n: {self.n}, b: {self.b}]";
+  }
+}
+
+#test test_struct_deserialization :: fn() {
+  n : MyJsonStruct = {
+    n: 100,
+    b: 200.0
+  };
+  err, json := json_serialize(&n, #type(MyJsonStruct));
+  if err.has_value {
+    assert($"{err.message} test_struct_deserialization".data, false);
+  }
+  deleter: JsonValueDeleter;
+  deleter.add(json);
+  n = {};
+  assert("json  serialize  object"c, json.is_object());
+  err = json_deserialize(json, &n, #type(MyJsonStruct));
+  assert("json error"c, !err.has_value);
+  assert("json deserialize object"c, n.n == 100 && n.b == 200.0);
+}
+
+#test test_json_comprehensive :: fn() {
+  deleter: JsonValueDeleter;
+  val : JsonValue*; err: JsonError;
+
+  err, val = json_parse_file("test.json");
+
+  if err.has_value {
+    assert($"{err.message}".data, false);
+  }
+
+  deleter.add(val);
+  assert("string"c, val.get("string").as_string() == "Hello, World!");
+  assert("number"c, val.get("number").as_number() == 42);
+  assert("boolean"c, val.get("boolean").as_boolean() == true);
+  assert("null_value"c, val.get("null_value").is_null());
+
+  array_val := val.get("array");
+  assert("array length"c, array_val.as_array().length == 4);
+  assert("array element 0"c, array_val.at(0).as_number() == 1);
+  assert("array element 1"c, array_val.at(1).as_string() == "two");
+  assert("array element 2"c, array_val.at(2).as_boolean() == false);
+  assert("array element 3"c, array_val.at(3).is_null());
+
+  object_val := val.get("object");
+  assert("nested_string"c, object_val.get("nested_string").as_string() == "Nested Hello");
+  assert("nested_number"c, object_val.get("nested_number").as_number() == atof("3.14"c));
+  assert("nested_boolean"c, object_val.get("nested_boolean").as_boolean() == false);
+
+  nested_array_val := object_val.get("nested_array");
+  assert("nested_array length"c, nested_array_val.as_array().length == 3);
+  assert("nested_array element 0"c, nested_array_val.at(0).as_string() == "a");
+  assert("nested_array element 1"c, nested_array_val.at(1).as_string() == "b");
+  assert("nested_array element 2"c, nested_array_val.at(2).as_string() == "c");
+
+  nested_object_val := object_val.get("nested_object");
+  assert("deeply_nested_key"c, nested_object_val.get("deeply_nested_key").as_string() == "Deep Value");
+} 

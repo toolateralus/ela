@@ -1,8 +1,0 @@
-
-#import core;
-#import file;
-
-main :: fn() {
-  n := File::read_all("Hello");
-}
-

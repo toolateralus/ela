@@ -1,7 +1,0 @@
-*
-.*toml
-!*.ela
-!*.json
-!boilerplate.hpp
-!.gitignore
-!run_test.sh

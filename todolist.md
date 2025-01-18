@@ -5,36 +5,30 @@ To search for all info comments in the source just use vscodes regex search with
 
 ### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
 
-# features, reworks.
-- type checking for constructors is like non-existent.
-- type inference for generics is near non existent as well.
-- A lot of libraries in /lib could be rewritten for newer features.
-- we desperately need modules, for organization. 
-- at that rate, we might as well add private of some sort, with a default public.
-- we need mut/const semantics for variables and parameters etc.
-- constexpr evaluator needs to be an interpreter that can handle structs and stuff.
-- we should add `defer`.
+# features(in order)
+  - interfaces (kind of started)
+  - modules.
+  - we need mut/const semantics for variables and parameters etc.
+  - `for i, v in some_array {} getting an index from an iterator.
+  - tagged unions.
+  - quick lambdas.
+  - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
+
+## out-of-language features
+- config file/ project. So we can organize submodules, add compilation commands & library paths, source ela libraries, etc.
+
+# reworks.
+- rework iterators completely, no more relying on C++ iterators. they suck anyway
+- defer is totally busted.
+- tuples need to be completely refactored in the backend.
+- interpolated strings are trash
+- type inference for generics is near non existent
+- A lot of libraries in /lib need to be rewritten because of impl/ no more constructor/destructor reworks
+
 - we need to instantiate templates for generics where most appropriate, not just when theyre declared.
-  example:
-
-```cpp
-generic :: fn![T]() {
-  ...
-}
-
-my_struct :: struct {
-
-}
-
-// error here, because my_struct is defined after generic, and generic emits all it's instantiations at
-// the root declaration, so cpp cant find my_struct
-generic![my_struct]();
-
-
-```
 
 - we should make it so `boilerplate.hpp` doesn't exist, and use our own language, where applicable.
-- if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions.
+- if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions. (I wrote a binding generator, it might be fine.)
 
 ## general
 - clean up everything. the parser is a mess, a ton of ast can be simplified, and made more performant even.
@@ -44,3 +38,19 @@ generic![my_struct]();
 
 ## ambitious
 - out of order compilation.
+
+
+## things that need to be tidy'd up before we can transpile to c
+
+- (easy) using generics in boilerplate.hpp, we should rewrite _array and map<T> and string in our own language.
+  this kind of depends on transpiling to C, because when using C++ you need obnoxious constructors like copy assignment that we just
+  cannot provide.
+
+- (hard) using std::tuple<T> instead of compiling our own tuple structs per instantition
+
+- (hard) generics need to work on types that are defined AFTER the generic is defined.
+
+- (hard) All the lambdas we use for interpolated strings, local functions, quick lambdas, switch expressions (if/while expressions)
+  need to be compiled to some kind of alternative structure.
+
+- (easy) we need to emit stuff as typedef ... NAME {} .. NAME;

@@ -1,5 +1,8 @@
 #import core;
 
+// TODO: pack these with GL, we need a system for storing .so/.a files with these modules & linking with them properly?
+// TODO Or do we leave it up the the user to do that?
+// TODO: either way, we need a way to specify or add these linking options and an ability to specify where you source your libraries from.
 #c_flags "-lGLEW -lGL -lglfw -lm"
 
 GLFWwindow :: struct;
@@ -743,9 +746,9 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
-    printf("Shader compilation failed: %s\n", info_log);
+    printf("Shader compilation failed: %s\n"cc, info_log);
     free(info_log);
-    return #make(u32, 0);
+    return 0 as u32;
   }
   return shader;
 }
@@ -755,7 +758,7 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   fragment_shader: u32 = compile_shader(GL::FRAGMENT_SHADER, frag_source);
 
   if vertex_shader == 0 || fragment_shader == 0 {
-    return #make(u32, 0);
+    return 0 as u32;
   }
 
   program: u32 = glCreateProgram();
@@ -770,9 +773,9 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
-    printf("Program linking failed: %s\n", info_log);
+    printf("Program linking failed: %s\n"cc, info_log);
     free(info_log);
-    return #make(u32, 0);
+    return 0 as u32;
   }
 
   glDeleteShader(vertex_shader);
@@ -784,21 +787,22 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
 check_error :: fn(location: c_string) {
   err: int = glGetError();
   if err == GL::INVALID_ENUM {
-    printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_ENUM"c, location);
   } else if err == GL::INVALID_VALUE {
-    printf("error: %s, from: %s\n", "GL::INVALID_VALUE", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_VALUE"c, location);
   } else if err == GL::INVALID_OPERATION {
-    printf("error: %s, from: %s\n", "GL::INVALID_OPERATION", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_OPERATION"c, location);
   } else if err == GL::STACK_OVERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_OVERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_OVERFLOW"c, location);
   } else if err == GL::STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_UNDERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_UNDERFLOW"c, location);
   } else if err == GL::OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n", "GL::OUT_OF_MEMORY", location);
+    printf("error: %s, from: %s\n"c, "GL::OUT_OF_MEMORY"c, location);
   } else if err != 0 {
-    printf("unknown gl error: %d, from: %s\n", err, location);
+    printf("unknown gl error: %d, from: %s\n"c, err, location);
   }
 }
+
 Vec4 :: union {
   values: float[4];
   #anon :: struct {
@@ -807,68 +811,56 @@ Vec4 :: union {
     z: float;
     w: float;
   }
-  #ctor :: fn() {}
-  #ctor :: fn(_x: float, _y: float, _z: float, _w: float) {
-    x = _x;
-    y = _y;
-    z = _z;
-    w = _w;
-  }
-  #ctor :: fn(value: float) {
-    x = value;
-    y = value;
-    z = value;
-    w = value;
-  }
 
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    output.z += z;
-    output.w += w;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   output.z += z;
+  //   output.w += w;
+  //   return output;
+  // }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    output.z *= z;
-    output.w *= w;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   output.z *= z;
+  //   output.w *= w;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    output.z /= z;
-    output.w /= w;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   output.z /= z;
+  //   output.w /= w;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other
-    output.x -= x;
-    output.y -= y;
-    output.z -= z;
-    output.w -= w;
-    return output;
-  }
-
-  sqr_mag :: fn() -> float {
-    return x * x + y * y + z * z + w * w;
-  }
-}
-// TODO: replace these with static methods.
-Vec4_one :: fn() -> Vec4 {
-  return #make(Vec4, 1.0);
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other
+  //   output.x -= x;
+  //   output.y -= y;
+  //   output.z -= z;
+  //   output.w -= w;
+  //   return output;
+  // }
 }
 
-Vec4_zero :: fn() -> Vec4 {
-  return #make(Vec4, 0.0);
+impl Vec4 {
+  sqr_mag :: fn(self*) -> float {
+    return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
+  }
+  one :: fn() -> #self {
+    return { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+  }
+  zero :: fn() -> #self {
+    return { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+  }
 }
+
 Vec3 :: union {
   values: float[3];
   #anon :: struct {
@@ -876,116 +868,100 @@ Vec3 :: union {
     y: float;
     z: float;
   }
-  #ctor :: fn(value: float) {
-    x = value;
-    y = value;
-    z = value;
-  }
-  #ctor :: fn() {}
-  #ctor :: fn(_x: float, _y: float, _z: float) {
-    x = _x;
-    y = _y;
-    z = _z;
-  }
 
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    output.z += z;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   output.z += z;
+  //   return output;
+  // }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    output.z *= z;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   output.z *= z;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    output.z /= z;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   output.z /= z;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other;
-    output.x -= x;
-    output.y -= y;
-    output.z -= z;
-    return output;
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x -= x;
+  //   output.y -= y;
+  //   output.z -= z;
+  //   return output;
+  // }
 
-  sqr_mag :: fn() -> float {
-    return x * x + y * y + z * z;
+  
+}
+
+impl Vec3 {
+  sqr_mag :: fn(self*) -> float {
+    return self.x * self.x + self.y * self.y + self.z * self.z;
+  }
+  one :: fn() -> #self {
+    return { x: 1.0, y: 1.0, z: 1.0 };
+  }
+  zero :: fn() -> Vec3 {
+    return { x: 0.0, y: 0.0, z: 0.0 };
   }
 }
 
-Vec3_one :: fn() -> Vec3 {
-  return #make(Vec3, 1.0);
-}
-
-Vec3_zero :: fn() -> Vec3 {
-  return #make(Vec3, 0.0);
-}
 Vec2 :: union {
   values: float[2];
   #anon :: struct {
     x: float;
     y: float;
   }
-  #ctor :: fn() {}
-  #ctor :: fn(_x: float, _y: float) {
-    x = _x;
-    y = _y;
-  }
-  #ctor :: fn(value: float) {
-    x = value;
-    y = value;
-  }
-  #operator(+) :: fn(other: #self) -> #self {
-    output := other;
-    output.x += x;
-    output.y += y;
-    return output;
-  }
 
-  #operator(*) :: fn(other: #self) -> #self {
-    output := other;
-    output.x *= x;
-    output.y *= y;
-    return output;
-  }
+  // #operator(+) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x += x;
+  //   output.y += y;
+  //   return output;
+  // }
 
-  #operator(/) :: fn(other: #self) -> #self {
-    output := other;
-    output.x /= x;
-    output.y /= y;
-    return output;
-  }
+  // #operator(*) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x *= x;
+  //   output.y *= y;
+  //   return output;
+  // }
 
-  #operator(-) :: fn(other: #self) -> #self {
-    output := other;
-    output.x -= x;
-    output.y -= y;
-    return output;
-  }
+  // #operator(/) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x /= x;
+  //   output.y /= y;
+  //   return output;
+  // }
 
-  sqr_mag :: fn() -> float {
-    return x * x + y * y;
-  }
+  // #operator(-) :: fn(other: #self) -> #self {
+  //   output := other;
+  //   output.x -= x;
+  //   output.y -= y;
+  //   return output;
+  // }
 }
 
-Vec2_one :: fn() -> Vec2 {
-  return #make(Vec2, 1.0);
-}
-
-Vec2_zero :: fn() -> Vec2 {
-  return #make(Vec2, 0.0);
+impl Vec2 {
+  sqr_mag :: fn(self*) -> float {
+    return self.x * self.x + self.y * self.y;
+  }
+  one :: fn() -> #self {
+    return { x: 1.0, y: 1.0 };
+  }
+  zero  :: fn() -> #self {
+    return { x: 0.0, y: 0.0 };
+  }
 }
 
 Mat4 :: union {
@@ -1008,159 +984,175 @@ Mat4 :: union {
     M32: float;
     M33: float;
   };
-  #operator(*) :: fn(other: #self) -> #self {
-    matrix: #self = #make(#self);
-    matrix.M00 = M00 * other.M00 + M01 * other.M10 + M02 * other.M20 + M03 * other.M30;
-    matrix.M01 = M00 * other.M01 + M01 * other.M11 + M02 * other.M21 + M03 * other.M31;
-    matrix.M02 = M00 * other.M02 + M01 * other.M12 + M02 * other.M22 + M03 * other.M32;
-    matrix.M03 = M00 * other.M03 + M01 * other.M13 + M02 * other.M23 + M03 * other.M33;
+  // #operator(*) :: fn(self, other: #self) -> #self {
+  //   matrix: #self;
+  //   matrix.M00 = self.M00 * other.M00 + self.M01 * other.M10 + self.M02 * other.M20 + self.M03 * other.M30;
+  //   matrix.M01 = self.M00 * other.M01 + self.M01 * other.M11 + self.M02 * other.M21 + self.M03 * other.M31;
+  //   matrix.M02 = self.M00 * other.M02 + self.M01 * other.M12 + self.M02 * other.M22 + self.M03 * other.M32;
+  //   matrix.M03 = self.M00 * other.M03 + self.M01 * other.M13 + self.M02 * other.M23 + self.M03 * other.M33;
     
-    matrix.M10 = M10 * other.M00 + M11 * other.M10 + M12 * other.M20 + M13 * other.M30;
-    matrix.M11 = M10 * other.M01 + M11 * other.M11 + M12 * other.M21 + M13 * other.M31;
-    matrix.M12 = M10 * other.M02 + M11 * other.M12 + M12 * other.M22 + M13 * other.M32;
-    matrix.M13 = M10 * other.M03 + M11 * other.M13 + M12 * other.M23 + M13 * other.M33;
+  //   matrix.M10 = self.M10 * other.M00 + self.M11 * other.M10 + self.M12 * other.M20 + self.M13 * other.M30;
+  //   matrix.M11 = self.M10 * other.M01 + self.M11 * other.M11 + self.M12 * other.M21 + self.M13 * other.M31;
+  //   matrix.M12 = self.M10 * other.M02 + self.M11 * other.M12 + self.M12 * other.M22 + self.M13 * other.M32;
+  //   matrix.M13 = self.M10 * other.M03 + self.M11 * other.M13 + self.M12 * other.M23 + self.M13 * other.M33;
     
-    matrix.M20 = M20 * other.M00 + M21 * other.M10 + M22 * other.M20 + M23 * other.M30;
-    matrix.M21 = M20 * other.M01 + M21 * other.M11 + M22 * other.M21 + M23 * other.M31;
-    matrix.M22 = M20 * other.M02 + M21 * other.M12 + M22 * other.M22 + M23 * other.M32;
-    matrix.M23 = M20 * other.M03 + M21 * other.M13 + M22 * other.M23 + M23 * other.M33;
+  //   matrix.M20 = self.M20 * other.M00 + self.M21 * other.M10 + self.M22 * other.M20 + self.M23 * other.M30;
+  //   matrix.M21 = self.M20 * other.M01 + self.M21 * other.M11 + self.M22 * other.M21 + self.M23 * other.M31;
+  //   matrix.M22 = self.M20 * other.M02 + self.M21 * other.M12 + self.M22 * other.M22 + self.M23 * other.M32;
+  //   matrix.M23 = self.M20 * other.M03 + self.M21 * other.M13 + self.M22 * other.M23 + self.M23 * other.M33;
     
-    matrix.M30 = M30 * other.M00 + M31 * other.M10 + M32 * other.M20 + M33 * other.M30;
-    matrix.M31 = M30 * other.M01 + M31 * other.M11 + M32 * other.M21 + M33 * other.M31;
-    matrix.M32 = M30 * other.M02 + M31 * other.M12 + M32 * other.M22 + M33 * other.M32;
-    matrix.M33 = M30 * other.M03 + M31 * other.M13 + M32 * other.M23 + M33 * other.M33;
+  //   matrix.M30 = self.M30 * other.M00 + self.M31 * other.M10 + self.M32 * other.M20 + self.M33 * other.M30;
+  //   matrix.M31 = self.M30 * other.M01 + self.M31 * other.M11 + self.M32 * other.M21 + self.M33 * other.M31;
+  //   matrix.M32 = self.M30 * other.M02 + self.M31 * other.M12 + self.M32 * other.M22 + self.M33 * other.M32;
+  //   matrix.M33 = self.M30 * other.M03 + self.M31 * other.M13 + self.M32 * other.M23 + self.M33 * other.M33;
+  //   return matrix;
+  // }
+}
+
+impl Mat4 {
+  scale :: fn(self*, factor: float) -> #self {
+    matrix: #self;
+    matrix.M00 = self.M00 * factor;
+    matrix.M01 = self.M01 * factor;
+    matrix.M02 = self.M02 * factor;
+    matrix.M03 = self.M03 * factor;
+    matrix.M10 = self.M10 * factor;
+    matrix.M11 = self.M11 * factor;
+    matrix.M12 = self.M12 * factor;
+    matrix.M13 = self.M13 * factor;
+    matrix.M20 = self.M20 * factor;
+    matrix.M21 = self.M21 * factor;
+    matrix.M22 = self.M22 * factor;
+    matrix.M23 = self.M23 * factor;
+    matrix.M30 = self.M30 * factor;
+    matrix.M31 = self.M31 * factor;
+    matrix.M32 = self.M32 * factor;
+    matrix.M33 = self.M33 * factor;
     return matrix;
   }
-  scale :: fn(factor: float) -> #self {
-    matrix: #self = #make(#self);
-    matrix.M00 = M00 * factor;
-    matrix.M01 = M01 * factor;
-    matrix.M02 = M02 * factor;
-    matrix.M03 = M03 * factor;
-    matrix.M10 = M10 * factor;
-    matrix.M11 = M11 * factor;
-    matrix.M12 = M12 * factor;
-    matrix.M13 = M13 * factor;
-    matrix.M20 = M20 * factor;
-    matrix.M21 = M21 * factor;
-    matrix.M22 = M22 * factor;
-    matrix.M23 = M23 * factor;
-    matrix.M30 = M30 * factor;
-    matrix.M31 = M31 * factor;
-    matrix.M32 = M32 * factor;
-    matrix.M33 = M33 * factor;
-    return matrix;
-  }
-  determinant :: fn() -> float {
-    r0: float = M00 * (M11 * (M22 * M33 - M23 * M32) - M12 * (M21 * M33 - M23 * M31) + M13 * (M21 * M32 - M22 * M31));
-    r1: float = M01 * (M10 * (M22 * M33 - M23 * M32) - M12 * (M20 * M33 - M23 * M30) + M13 * (M20 * M32 - M22 * M30));
-    r2: float = M02 * (M10 * (M21 * M33 - M23 * M31) - M11 * (M20 * M33 - M23 * M30) + M13 * (M20 * M31 - M21 * M30));
-    r3: float = M03 * (M10 * (M21 * M32 - M22 * M31) - M11 * (M20 * M32 - M22 * M30) + M12 * (M20 * M31 - M21 * M30));
+
+  determinant :: fn(self*) -> float {
+    r0: float = self.M00 * (self.M11 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M21 * self.M33 - self.M23 * self.M31) + self.M13 * (self.M21 * self.M32 - self.M22 * self.M31));
+    r1: float = self.M01 * (self.M10 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M32 - self.M22 * self.M30));
+    r2: float = self.M02 * (self.M10 * (self.M21 * self.M33 - self.M23 * self.M31) - self.M11 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M31 - self.M21 * self.M30));
+    r3: float = self.M03 * (self.M10 * (self.M21 * self.M32 - self.M22 * self.M31) - self.M11 * (self.M20 * self.M32 - self.M22 * self.M30) + self.M12 * (self.M20 * self.M31 - self.M21 * self.M30));
     return r0 - r1 + r2 - r3;
   }
+
+  identity :: fn() -> #self {
+    matrix: #self;
+    matrix.M00 = 1.0;
+    matrix.M01 = 0.0;
+    matrix.M02 = 0.0;
+    matrix.M03 = 0.0;
+    matrix.M10 = 0.0;
+    matrix.M11 = 1.0;
+    matrix.M12 = 0.0;
+    matrix.M13 = 0.0;
+    matrix.M20 = 0.0;
+    matrix.M21 = 0.0;
+    matrix.M22 = 1.0;
+    matrix.M23 = 0.0;
+    matrix.M30 = 0.0;
+    matrix.M31 = 0.0;
+    matrix.M32 = 0.0;
+    matrix.M33 = 1.0;
+    return matrix;
+  }
 }
 
-Mat4_identity :: fn() -> Mat4 {
-  matrix: Mat4;
-  matrix.M00 = 1.0;
-  matrix.M01 = 0.0;
-  matrix.M02 = 0.0;
-  matrix.M03 = 0.0;
-  matrix.M10 = 0.0;
-  matrix.M11 = 1.0;
-  matrix.M12 = 0.0;
-  matrix.M13 = 0.0;
-  matrix.M20 = 0.0;
-  matrix.M21 = 0.0;
-  matrix.M22 = 1.0;
-  matrix.M23 = 0.0;
-  matrix.M30 = 0.0;
-  matrix.M31 = 0.0;
-  matrix.M32 = 0.0;
-  matrix.M33 = 1.0;
-  return matrix;
-}
 Shader :: struct {
   handle: u32;
-  use :: fn() {
-    glUseProgram(handle);
-  }
-  #ctor :: fn(vertexSource: c_string, fragSource: c_string) {
-    handle = create_program(vertexSource, fragSource);
-  }
-  #dtor :: fn() {
-    glDeleteProgram(handle);
-  }
-  set_Mat4 :: fn(name: c_string, v: Mat4*) {
-    index := glGetUniformLocation(handle, name);
-    if index != -1 {
-      glUniformMatrix4fv(index, 1, false, #make(float*, v.values));
-    } else {
-      printf("failed to get uniform : %s\n", name);
-    }
-  }
+}
 
-  set_Vec4 :: fn(name: c_string, v: Vec4*) {
-    index := glGetUniformLocation(handle, name);
+impl Shader {
+  // *fixme
+  // #dtor :: fn(self*) {
+  //   glDeleteProgram(self.handle);
+  // }
+  use :: fn(self*) {
+    glUseProgram(self.handle);
+  }
+  create :: fn(vertexSource: c_string, fragSource: c_string) -> #self {
+    v: #self;
+    v.handle = create_program(vertexSource, fragSource);
+    return v;
+  }
+  set_Mat4 :: fn(self*, name: c_string, v: Mat4*) {
+    index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform4fv(index, 1, #make(float*, v.values));
+      glUniformMatrix4fv(index, 1, false, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
-  set_Vec3 :: fn(name: c_string, v: Vec3*) {
-    index := glGetUniformLocation(handle, name);
+  set_Vec4 :: fn(self*, name: c_string, v: Vec4*) {
+    index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform3fv(index, 1, #make(float*, v.values));
+      glUniform4fv(index, 1, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
-  set_Vec2 :: fn(name: c_string, v: Vec2*) {
-    index := glGetUniformLocation(handle, name);
+  set_Vec3 :: fn(self*, name: c_string, v: Vec3*) {
+    index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform2fv(index, 1, #make(float*, v.values));
+      glUniform3fv(index, 1, v.values as float*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
-  set_float :: fn(name: c_string, v: float) {
-    index := glGetUniformLocation(handle, name);
+  set_Vec2 :: fn(self*, name: c_string, v: Vec2*) {
+    index := glGetUniformLocation(self.handle, name);
+    if index != -1 {
+      glUniform2fv(index, 1, v.values as float*);
+    } else {
+      printf("failed to get uniform : %s\n"c, name);
+    }
+  }
+  set_float :: fn(self*, name: c_string, v: float) {
+    index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform1f(index, v);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
 }
+
 Window :: struct {
   handle: GLFWwindow*;
-  #ctor :: fn(width: int, height: int, title: c_string) {
+}
+
+impl Window {
+  create :: fn(width: int, height: int, title: c_string) -> #self {
+    self: #self;
     if !glfwInit() {
-      printf("Failed to initialize glfw\n");
-      return;
+      printf("Failed to initialize glfw\n"c);
+      return self;
     }
-    handle = glfwCreateWindow(width, height, title, null, null);
-    if handle == null {
-      printf("Failed to create window\n");
+    self.handle = glfwCreateWindow(width, height, title, null, null);
+    if self.handle == null {
+      printf("Failed to create window\n"c);
       glfwTerminate();
-      return;
+      return self;
     }
-    glfwMakeContextCurrent(handle);
+    glfwMakeContextCurrent(self.handle);
     if glewInit() != 0 {
-      printf("Failed to initialize glew\n");
+      printf("Failed to initialize glew\n"c);
       glfwTerminate();
-      return;
+      return self;
     }
+    return self;
   }
-  should_close :: fn() -> bool {
-    return glfwWindowShouldClose(handle);
+  should_close :: fn(self*) -> bool {
+    return glfwWindowShouldClose(self.handle);
   }
-  present :: fn() {
-    glfwSwapBuffers(handle);
+  present :: fn(self*) {
+    glfwSwapBuffers(self.handle);
     glfwPollEvents();
   }
-  clear :: fn() {
-    glClear(GL::COLOR_BUFFER_BIT);
+  clear :: fn(flags: GL = (GL::COLOR_BUFFER_BIT  | GL::DEPTH_BUFFER_BIT) as GL) {
+    glClear(flags);
   }
 }
