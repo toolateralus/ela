@@ -72,6 +72,14 @@ Ela compiler:
     }
   }
 
+  if (const char* env_p = std::getenv("ELA_LIB_PATH")) {
+    if (terminal_supports_color) {
+      std::cout << "\033[1;34mnote\033[0m: environment variable 'ELA_LIB_PATH' is set, loading #import libraries from='\033[1;32m" << env_p << "\033[0m'\n";
+    } else {
+      std::cout << "note: environment variable 'ELA_LIB_PATH' is set, loading #import libraries from='" << env_p << "'\n";
+    }
+  } 
+
   vector<string> original_args(argv + (argc >= 2 ? 2 : 1), argv + argc);
 
   if (argc >= 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
