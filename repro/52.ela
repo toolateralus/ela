@@ -1,0 +1,9 @@
+Strukt :: struct {}
+
+impl Strukt {
+  statik :: fn() {}
+}
+
+main :: fn() {
+  n := &Strukt::statik; // Compiler crash
+}

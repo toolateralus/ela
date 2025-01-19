@@ -1,0 +1,81 @@
+#import core;
+
+Array       :: struct![T] {
+  data:     T*  = null;
+  length:   u64 = 0;
+  capacity: u64 = 0;
+}
+
+IClone      :: interface![T] {
+  clone     :: fn(self*) -> #self;
+}
+
+IArray      :: interface![T] {
+  resize    :: fn(self*);
+  shrink    :: fn(self*);
+  push      :: fn(self*, t: T);
+  pop       :: fn(self*) -> T;
+  subscript :: fn(self*, index: int) -> T;
+}
+
+impl![T] IArray![T] for Array![T] {
+  // resize to sizeof(T) * self.capacity;
+  resize :: fn(self*) {
+    self.data = realloc(self.data, #type(T).size * self.capacity);
+    if !self.data then panic($"failed to allocate for Array![{#type(T).name}]");
+  }
+
+  // truncate to minimum size possible.
+  shrink :: fn(self*) {
+    self.capacity = self.length;
+    self.data = realloc(self.data, #type(T).size * self.capacity);
+    return;
+  }
+
+  push :: fn(self*, t: T) {
+    if self.length >= self.capacity {
+      if self.capacity == 0 then self.capacity = 1;
+      self.capacity *= 2;
+      self.resize();
+    }
+    self.data[self.length] = t;
+    self.length++;
+    return;
+  }
+  
+  pop :: fn(self*) -> T {
+    v := self.data[self.length];
+    self.length--;
+    return v;
+  }
+ 
+  subscript :: fn(self*, index: int) -> T {
+    return self.data[index];
+  }
+}
+
+impl![T] IClone![T] for Array![T] {
+  clone :: fn(self*) -> #self {
+    result: #self;
+    length: s64 = self.length;
+    for i in 0..length {
+      result.push(self.subscript(i));
+    }
+    return result;
+  }
+}
+
+
+main :: fn() {
+  array: Array![string];
+  for i in 0..100 {
+    array.push("Hello");
+  }
+  println($"array: length: [{array.length}], capacity: [{array.capacity}], data: [{array.data as void*}]");
+  println($"array[0] = {array.subscript(0)}");
+  arr1 := array;
+  println($"arr1 is copy: {arr1.data == array.data}");
+
+  cloned := arr1.clone();
+  println($"cloned is clone: {arr1.data == cloned.data}");
+}
