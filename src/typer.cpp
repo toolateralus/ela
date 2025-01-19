@@ -1091,6 +1091,8 @@ void Typer::visit(ASTBinExpr *node) {
 
   auto left_ty = global_get_type(left);
 
+  // TODO: broaden how this works to any type, 
+  // once we start using our own self-defined string{} type.
   if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() &&
       node->op.type != TType::Assign && !node->op.is_comp_assign()) {
     node->is_operator_overload = true;

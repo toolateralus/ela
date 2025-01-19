@@ -6,7 +6,7 @@ total_compile_time=0
 declare -a compile_times
 declare -a test_files
 
-if [ $# -gt 0 ]; then
+if [ $# -gt 0 ] && [ "$1" != "--time" ]; then
   test_file="tests/$1.ela"
   if [ -f "$test_file" ]; then
     echo -e "\e[1;33mRunning test: $test_file\e[0m"
@@ -43,8 +43,7 @@ for test_file in tests/*.ela; do
   fi
 done
 
-read -p "show compile times? [y/n] " show_compile_times
-if [[ "$show_compile_times" == "y" || "$show_compile_times" == "Y" ]]; then
+if [ "$1" == "--time" ]; then
   for i in "${!compile_times[@]}"; do
     echo -e "\e[1;36m\e[1m${test_files[$i]}\e[0m took \e[1;32m\e[1m${compile_times[$i]}ms\e[0m"
   done
