@@ -65,7 +65,7 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
     case AST_NODE_SCOPE_RESOLUTION: {
       auto srnode = static_cast<ASTScopeResolution *>(node);
       srnode->base->accept(this);
-      auto type = global_get_type(srnode->resolved_type);
+      auto type = global_get_type(srnode->base->resolved_type);
       auto scope = type->get_info()->scope;
       return scope->local_lookup(srnode->member_name);
     } break;
@@ -743,10 +743,8 @@ void Typer::visit(ASTWhile *node) {
 }
 
 void Typer::visit(ASTCall *node) {
-  auto func_node_type = node->function->get_node_type();
-
   // Try to visit implementation on call if not emitted.
-  try_visit_impl_on_call(node, func_node_type);
+  try_visit_impl_on_call(node);
 
   // Resolve the type of the function being called
   node->function->accept(this);
@@ -783,20 +781,27 @@ void Typer::visit(ASTCall *node) {
 
   auto info = type->get_info()->as<FunctionTypeInfo>();
   if (func) {
-    type_check_args_from_params(node->arguments, func->params);
+    bool skip_first = false;
+    if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+      if (!func->params->has_self) {
+        throw_error("Calling static methods with instance not allowed", node->source_range);
+      }
+      skip_first = true;
+    }
+    type_check_args_from_params(node->arguments, func->params, skip_first);
   } else {
     type_check_args_from_info(node->arguments, info);
   }
   node->resolved_type = info->return_type;
 }
 
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params) {
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first) {
   auto old_type = declaring_or_assigning_type;
   Defer _([&]() { declaring_or_assigning_type = old_type; });
   auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
   auto largest = args_ct > params_ct ? args_ct : params_ct;
-  int param_index = params->has_self ? 1 : 0;
+  int param_index = skip_first ? 1 : 0;
   for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
       if (arg_index >= args_ct && !params->params[param_index]->normal.default_value) {
@@ -871,7 +876,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, Type
   return instantiation;
 }
 
-void Typer::try_visit_impl_on_call(ASTCall *&node, ASTNodeType &func_node_type) {
+void Typer::try_visit_impl_on_call(ASTCall *node) {
+  auto func_node_type = node->function->get_node_type();
   if (func_node_type == AST_NODE_DOT_EXPR || func_node_type == AST_NODE_SCOPE_RESOLUTION) {
     Type *base_ty = nullptr;
     if (func_node_type == AST_NODE_DOT_EXPR) {
