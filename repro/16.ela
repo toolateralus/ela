@@ -1,5 +1,3 @@
-
-
 main :: fn() {
   str := "This is a string\n";
 // Heap buffer overflow,
@@ -9,8 +7,9 @@ main :: fn() {
 // it can just reallocate in some linked list style allocator /string builder,
 // then concatenate on output.
 
-// As well as our invalid delete[]/free() situation going on with string and _array in 'boilerplate.hpp.'
   for i in 0..1024 {
     str = $"{str}{str}";
   }
+
+  n := .{ x: 10, y: 20 };
 }

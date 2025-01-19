@@ -154,16 +154,23 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto iden = parser->expect(TType::Identifier).value;
-#ifdef _WIN32
-        auto filename =
-            std::filesystem::path("C:\\Program Files\\ela").string() + std::filesystem::path::preferred_separator + iden.get_str();
-#else
-        auto filename =
-            std::filesystem::path("/usr/local/lib/ela").string() + std::filesystem::path::preferred_separator + iden.get_str();
-#endif
 
+        std::string ela_lib_path;
+        if (const char* env_p = std::getenv("ELA_LIB_PATH")) {
+            ela_lib_path = env_p;
+        } else {
+      #ifdef _WIN32
+            ela_lib_path = "C:\\Program Files\\ela";
+      #else
+            ela_lib_path = "/usr/local/lib/ela";
+      #endif
+        }
+
+        std::cout << "loading from " << ela_lib_path << '\n';
+
+        auto module_name = iden;
+        auto filename = std::filesystem::path(ela_lib_path) / iden.get_str();
         // Right now, we just return noop if we're double including.
-        auto module_name = filename;
         if (import_set.contains(module_name)) {
           return nullptr;
         }
