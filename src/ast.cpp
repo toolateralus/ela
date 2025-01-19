@@ -165,9 +165,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
             ela_lib_path = "/usr/local/lib/ela";
       #endif
         }
-
-        std::cout << "loading from " << ela_lib_path << '\n';
-
         auto module_name = iden;
         auto filename = std::filesystem::path(ela_lib_path) / iden.get_str();
         // Right now, we just return noop if we're double including.
