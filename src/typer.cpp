@@ -1460,6 +1460,7 @@ void Typer::visit(ASTInitializerList *node) {
         auto value_ty = value->resolved_type;
         assert_types_can_cast_or_equal(value_ty, symbol->type_id, value->source_range, "from {}, to {}",
                                        "Unable to cast type to target field for named initializer list");
+        value->resolved_type = symbol->type_id; // Again, we do this here to avoid annoyances with lowering to c++
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
@@ -1496,6 +1497,8 @@ void Typer::visit(ASTInitializerList *node) {
         assert_types_can_cast_or_equal(
             type, element_type, values[i]->source_range, "to {} from {}",
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
+
+        values[i]->resolved_type = target_element_type; // We do this here to avoid casting problems with C/C++ init lists.
       }
 
       auto element_ty_ptr = global_get_type(element_type);

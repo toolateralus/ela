@@ -725,6 +725,7 @@ void Emitter::visit(ASTInitializerList *node) {
       for (int i = 0; i < node->key_values.size(); ++i) {
         const auto &[key, value] = node->key_values[i];
         (*ss) << '.' << key.get_str() << " = ";
+        (*ss) << "(" << to_cpp_string(global_get_type(value->resolved_type)) << ")";
         value->accept(this);
         if (i != size - 1) {
           (*ss) << ",\n";
