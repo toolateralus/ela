@@ -281,14 +281,10 @@ void Emitter::visit(ASTUnaryExpr *node) {
   return;
 }
 void Emitter::visit(ASTBinExpr *node) {
-  // ! How is this ever null??
-  // ! instead of returning anything in the typer emitter,
-  // ! all of those function should be absolutely voids.
-  // ! then, we acn just get the type from the reslting node.
   auto left_ty = global_get_type(node->left->resolved_type);
 
   if (left_ty && node->is_operator_overload) {
-    //!! THIS IS A TOTAL HACK!!!
+    // !! THIS IS A TOTAL HACK!!!
     // !! JUST TRYING THIS OUT!!!
     std::string op_str = TTypeToString(node->op.type);
     std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
