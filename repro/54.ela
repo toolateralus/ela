@@ -1,0 +1,20 @@
+
+
+S :: struct![T] {
+  length: u64;
+};
+
+impl![T] S![T] {
+  func :: fn(self*) {
+    // somehow this causes (self.length as s64) to be null??
+    for i in 0..(self.length as s64) {
+
+    }
+  }
+
+}
+
+main :: fn() { 
+  s: S![int];
+  s.func();
+}

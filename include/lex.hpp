@@ -356,3 +356,4 @@ struct Lexer {
 
   void get_token(State &state);
 };
+
