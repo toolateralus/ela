@@ -5,5 +5,9 @@ impl Strukt {
 }
 
 main :: fn() {
-  n := &Strukt::statik; // Compiler crash
+  n := &Strukt::statik;
+//   /home/cooper/repos/languages/ela/ela_source/dummy.ela:8:33: error: expected expression
+//     8 | void(*n)() = (void(*)())(&void(*)());
+//       |                                 ^
+//    1 error generated.
 }
