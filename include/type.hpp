@@ -312,5 +312,6 @@ public:
 struct ASTFunctionDeclaration;
 InternedString get_function_typename(ASTFunctionDeclaration *);
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
-
 int find_operator_overload(TType op, Type *);
+
+
