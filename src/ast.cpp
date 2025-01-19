@@ -165,6 +165,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
             ela_lib_path = "/usr/local/lib/ela";
       #endif
         }
+
         auto module_name = iden;
         auto filename = std::filesystem::path(ela_lib_path) / iden.get_str();
         // Right now, we just return noop if we're double including.
@@ -1992,12 +1993,6 @@ void Parser::append_type_extensions(ASTType *node) {
       expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
         auto expression = parse_expr();
-        if (expression->get_node_type() == AST_NODE_TYPE) {
-          node->extensions.push_back({TYPE_EXT_MAP, expression});
-          auto type = static_cast<ASTType *>(expression);
-          expect(TType::RBrace);
-          continue;
-        }
         node->extensions.push_back({TYPE_EXT_FIXED_ARRAY, expression});
       } else {
         node->extensions.push_back({TYPE_EXT_ARRAY});

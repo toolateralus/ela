@@ -394,9 +394,8 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 }
 
 int Type::get_element_type() const {
-  if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array() &&
-      !extensions.is_map()) {
-    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array/map type\ngot type: \"{}\"",
+  if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array()) {
+    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
                             to_string()),
                 {});
   }
@@ -658,9 +657,6 @@ std::string TypeExtensions::to_string() const {
       case TYPE_EXT_ARRAY: {
         ss << "[]";
       } break;
-      case TYPE_EXT_MAP: {
-        ss << "[" << global_get_type(ext.key_type)->to_string() << "]";
-      } break;
       case TYPE_EXT_FIXED_ARRAY:
         ss << "[" << ext.array_size << "]";
         break;
@@ -672,10 +668,6 @@ std::string TypeExtensions::to_string() const {
   return ss.str();
 }
 
-int get_map_value_type(Type *map_type) {
-  auto id = global_find_type_id(map_type->base_id, map_type->get_ext().without_back());
-  return id;
-}
 
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
   type_table.emplace_back(type_table.size(), TYPE_TUPLE);

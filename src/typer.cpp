@@ -180,15 +180,16 @@ void Typer::visit(ASTLambda *node) {
   FunctionTypeInfo info;
 
   // TODO:
-  // We need to make it so the lambda block's parent is the root scope, so that it doesn't give the impression that it can do closures.
+  // We need to make it so the lambda block's parent is the root scope, so that it doesn't give the impression that it
+  // can do closures.
   int parameter_index = 0;
-  for (const auto &param: node->params->params) {
+  for (const auto &param : node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
     info.params_len++;
     node->block->scope->insert(param->normal.name, param->resolved_type, param);
     parameter_index++;
   }
-  
+
   node->block->accept(this);
   info.return_type = node->return_type->resolved_type;
   auto type = global_find_function_type_id(info, {});
@@ -974,10 +975,6 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
         throw_error("Fixed array must have integer size.", ext.expression->source_range);
       }
       extensions.push_back({ext.type, (size_t)val.integer});
-    } else if (ext.type == TYPE_EXT_MAP) {
-      ext.expression->accept(this);
-      auto type_id = ext.expression->resolved_type;
-      extensions.push_back({.type = ext.type, .key_type = type_id});
     } else {
       extensions.push_back({.type = ext.type});
     }
@@ -1117,7 +1114,7 @@ void Typer::visit(ASTBinExpr *node) {
 
   auto left_ty = global_get_type(left);
 
-  // TODO: broaden how this works to any type, 
+  // TODO: broaden how this works to any type,
   // once we start using our own self-defined string{} type.
   if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() &&
       node->op.type != TType::Assign && !node->op.is_comp_assign()) {
@@ -1334,20 +1331,6 @@ void Typer::visit(ASTDotExpr *node) {
     }
   }
 
-  // TODO: remove this hack as well
-  if (base_ty->get_ext().is_map()) {
-    if (node->member_name == "contains") {
-      static auto contains_ty = [] {
-        auto func = FunctionTypeInfo{};
-        func.is_varargs = true;
-        func.return_type = bool_type();
-        return global_find_function_type_id(func, {});
-      }();
-      node->resolved_type = contains_ty;
-      return;
-    }
-  }
-
   Scope *base_scope = base_ty->get_info()->scope;
 
   if (!base_scope) {
@@ -1407,19 +1390,11 @@ void Typer::visit(ASTSubscript *node) {
 
   auto ext = left_ty->get_ext();
 
-  if (ext.is_map()) {
-    assert_types_can_cast_or_equal(node->subscript->resolved_type, ext.extensions.back().key_type, node->source_range,
-                                   "expected : {}, got {}", "Invalid type when subscripting map");
-    node->resolved_type = left_ty->get_element_type();
-    return;
-  }
-
-  if (!left_ty->get_ext().is_array() && !left_ty->get_ext().is_fixed_sized_array() &&
-      !left_ty->get_ext().is_pointer()) {
+  if (!ext.is_array() && !ext.is_fixed_sized_array() && !ext.is_pointer()) {
     throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), node->source_range);
   }
 
-  if (left_ty->get_ext().is_array()) {
+  if (ext.is_array()) {
     if (subscript_ty->id == range_type()) {
       node->resolved_type = left_ty->id;
       return;
@@ -1490,11 +1465,9 @@ void Typer::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (!target_type->get_ext().is_array() && !target_type->get_ext().is_fixed_sized_array() &&
-          !target_type->get_ext().is_map()) {
+      if (!target_type->get_ext().is_array() && !target_type->get_ext().is_fixed_sized_array()) {
         throw_error(std::format("Collection-style initializer lists like '{{0, 1, 2, ..}} or {{{{key, value}}, {{key, "
-                                "value}}}}' can only be used with "
-                                "arrays, fixed arrays, and maps. Got {}",
+                                "value}}}}' can only be used with arrays and fixed arrays. Got {}",
                                 target_type->to_string()),
                     node->source_range);
       }
@@ -1524,7 +1497,8 @@ void Typer::visit(ASTInitializerList *node) {
             type, element_type, values[i]->source_range, "to {} from {}",
             "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
 
-        values[i]->resolved_type = target_element_type; // We do this here to avoid casting problems with C/C++ init lists.
+        values[i]->resolved_type =
+            target_element_type; // We do this here to avoid casting problems with C/C++ init lists.
       }
 
       auto element_ty_ptr = global_get_type(element_type);

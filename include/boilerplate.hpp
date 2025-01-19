@@ -56,11 +56,6 @@ struct Range {
 #include <unordered_map>
 #include <errno.h>
 
-// TODO: replace these with our own types.
-// They may not be faster, but they might be. What will be faster is compilation
-// times.
-template <class Key, class Value> using _map = std::unordered_map<Key, Value>;
-
 template <class T> void move(T *to, const T from) { *to = std::move(from); }
 
 using float64 = double;
@@ -361,7 +356,7 @@ struct Type {
   u64 flags;                           // defined in reflection.ela and emit.cpp, the values of the flags.
   _array<Field *> fields;              // get a list of struct fields, enum variants.
   _array<Element> (*elements)(char *); // get a list of the Elements, which can be used to reflect on arrays.
-  Type *element_type;                  // the type this type has a pointer to, is an array of, is a map of, etc.
+  Type *element_type;                  // the type this type has a pointer to, is an array of, etc.
 };
 
 static _array<string> &Env_args() {

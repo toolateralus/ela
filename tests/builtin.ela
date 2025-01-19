@@ -94,46 +94,6 @@ impl Xaryu {
   }
 }
 
-#test test_map_aka_associative_array :: fn() {
-  variables: int[string];
-  map1: int*[char*];
-
-  str1 : string = "Key1";
-  str2 : string = "Key2";
-  str3 : string = "shouldn't exist";
-
-  variables[str1] = 100;
-  variables[str2] = 200;
-
-  assert("Expected: 100"c, variables[str1] == 100);
-  assert("Expected: 200"c, variables[str2] == 200);
-
-  variables[str1] = 300;
-  assert("Expected: 300"c, variables[str1] == 300);
-
-  variables[str1] = 0;
-  assert("Expected: 0"c, variables[str1] == 0);
-
-  ptr := malloc(sizeof(int)) as int*;
-  *ptr = 200;
-  map1["Something"c] = ptr;
-  assert("Expected: 200"c, *map1["Something"c] == 200);
-
-  *map1["Something"c] = 400;
-  assert("Expected: 400"c, *map1["Something"c] == 400);
-
-  ptr = malloc(sizeof(int)) as int*;
-  *ptr = 500;
-  map1["Another"c] = ptr;
-  assert("Expected: 500"c, *map1["Another"c] == 500);
-
-  free(map1["Something"c]);
-  free(map1["Another"c]);
-
-  // ! BUG : Cannot use multi-dimensional maps. It's terribly designed and needs a rework.
-  // ! really, maps should be eliminated and be replaced once generics are back in the language.
-}
-
 
 #test subscript_string :: fn() {
   s: string = "0,1,2,3";
