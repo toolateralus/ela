@@ -1,0 +1,73 @@
+//string :: struct; // forward declared just for ToString
+
+// Run a cleanup procedure implicitly when an object goes out of scope.
+// Absolutely equivalent to a C++ Destructor.
+// This could be called explicitly on pointers, but it's not reccomended.
+Drop        :: interface {
+  drop      :: fn(self*);
+}
+
+// Allow an object to be converted to a string
+ToString    :: interface {
+  // convert self to string.
+  to_string :: fn(self*) -> string;
+}
+
+// equivalent to an explicit cast operator overload in C++,
+// allow an object to be constructed from another.
+From        :: interface![T] {
+  // construct a self type from T.
+  from :: fn(v: T) -> #self;
+}
+
+// A deep clone, versus assignment always being a shallow clone in Ela.
+Clone       :: interface {
+  // get a deep clone of self.
+  clone     :: fn(self*) -> #self;
+}
+
+// An object used to iterate over a collection of items.
+Iterator   :: interface![T] {  
+  // Return the current value this iterator points to within the sequence it's iterating over.  
+  current   :: fn(self*) -> T;
+
+  // Returns the same value as 'current()' but a pointer to it, for
+  // 'for *value in ...' to allow mutation, etc.
+  // For those that don't support this, you can just throw an error or something.
+  ptr       :: fn(self*) -> T*;
+  
+  // Advance the iterator by one step.
+  next      :: fn(self*) -> void;
+
+  // Check whether the iterator is complete, or should continue.
+  // return true for 'done',
+  // return false if needs to continue
+  done      :: fn(self*) -> bool;
+}
+
+// A collection or range of items that can be iterated over, with a for loop, or some other means.
+// contains a static assertion that Iter implements IIterator of T, via the 'where' clause.
+
+// TODO: remove the requirement for ![T] on iterator, it should not need an exact match to tell if it satisfies a generic trait implementation
+Iterable   :: interface![Iter] where Iter is Iterator { 
+  // get the IIterator object that was implemented for this type.
+  iter      :: fn(self*) -> Iter;
+}
+
+// Binary arithmetic operator overloads.
+Arithmetic  :: interface![Right] {
+  add       :: fn(self, right: Right) -> #self;   // '+' operator.
+  sub       :: fn(self, right: Right) -> #self;   // '-' operator.
+  mul       :: fn(self, right: Right) -> #self;   // '*' operator.
+  div       :: fn(self, right: Right) -> #self;   // '/' operator.
+  modulo    :: fn(self, right: Right) -> #self;   // '%' operator.
+}
+
+// Binary bitwise operator overloading.
+Bitwise     :: interface![Right] {
+  shr       :: fn(self, right: Right) -> #self;   // '>>' operator.
+  shl       :: fn(self, right: Right) -> #self;   // '<<' operator.
+  xor       :: fn(self, right: Right) -> #self;   //  '^' operator.
+  or        :: fn(self, right: Right) -> #self;   //  '|' operator.
+  and       :: fn(self, right: Right) -> #self;   //  '&' operator.
+}

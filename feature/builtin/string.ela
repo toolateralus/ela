@@ -1,0 +1,42 @@
+#include "interface.ela"
+
+String_Iterator :: struct {
+  str:   string*;
+  index: u64;
+}
+
+impl Iterator![char] for String_Iterator {
+  current :: fn(self*) -> char {
+    return (*self.str)[self.index];
+  }
+  ptr :: fn(self*) -> char* {
+    return &(*self.str)[self.index];
+  }
+  next :: fn(self*) {
+    self.index++;
+  }
+  done :: fn(self*) -> bool {
+    return self.index >= self.str.length;
+  }
+}
+
+impl Iterable![String_Iterator] for string {
+  iter :: fn(self*) -> String_Iterator {
+    return {
+      str: self,
+      index: 0,
+    };
+  }
+}
+
+#import core;
+
+main :: fn() {
+  s : string = "hello!";
+  iterator := s.iter();
+  while !iterator.done() {
+    c := iterator.current();
+    println(c as char);
+    iterator.next();
+  }
+}
