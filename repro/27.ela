@@ -2,6 +2,7 @@
 
 // Impl on an alias crashes.
 // probably a null scope.
+// we should error for this, you probably don't need to impl an alias, that makes no sense.
 impl Alias {
   from :: fn(n: s32) -> #self {
     return n as #self;

@@ -5,7 +5,6 @@ impl Struct {
   static_method :: fn() -> int {
     return 0;
   }
-
   other_method :: fn() {
     // this passes our compiler, but tries to call static_method as a free function,
     // instead of implicitly becoming a static method call.

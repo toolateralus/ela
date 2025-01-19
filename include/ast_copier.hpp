@@ -41,6 +41,7 @@ struct ASTCopier {
   ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
+  ASTCast *copy_cast(ASTCast *node);
 };
 
 ASTNode *deep_copy_ast(ASTNode *root);

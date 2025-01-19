@@ -318,8 +318,19 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   current_scope = old_scope;
   return new_node;
 }
+
+ASTCast *ASTCopier::copy_cast(ASTCast *node) {
+  auto new_node = new (ast_alloc<ASTCast>()) ASTCast(*node);
+  new_node->resolved_type = -1;
+  new_node->expression = (ASTExpr*)copy_node(node->expression);
+  new_node->target_type = (ASTType*)copy_node(node->target_type);
+  return new_node;
+}
+
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   switch (node->get_node_type()) {
+    case AST_NODE_CAST: 
+      return copy_cast(static_cast<ASTCast *>(node));
     case AST_NODE_IMPL:
       return copy_impl(static_cast<ASTImpl *>(node));
     case AST_NODE_PROGRAM:
