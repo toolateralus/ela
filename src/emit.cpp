@@ -455,7 +455,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
 void Emitter::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
-      auto type = global_get_type(instantiation.type);
+      auto type = global_get_type(instantiation.node->resolved_type);
       static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
       instantiation.node->accept(this);
     }

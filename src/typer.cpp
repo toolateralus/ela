@@ -931,10 +931,10 @@ template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T de
   auto instantiation = static_cast<T>(find_generic_instance(definition->generic_instantiations, args));
   if (!instantiation) {
     instantiation = static_cast<T>(deep_copy_ast(definition));
+    definition->generic_instantiations.push_back({args, instantiation});
     (this->*visit_method)(instantiation, true, args);
     instantiation->generic_parameters.clear();
     instantiation->generic_instantiations.clear();
-    definition->generic_instantiations.push_back({args, instantiation, instantiation->resolved_type});
   }
   return instantiation;
 }

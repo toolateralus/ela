@@ -346,7 +346,6 @@ struct ASTParamsDecl : ASTStatement {
 struct GenericInstance {
   std::vector<int> arguments;
   ASTStatement *node;
-  int type;
 };
 
 struct ASTFunctionDeclaration : ASTStatement {
