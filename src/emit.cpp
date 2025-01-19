@@ -745,9 +745,10 @@ void Emitter::visit(ASTInitializerList *node) {
 }
 
 void Emitter::visit(ASTRange *node) {
-  (*ss) << "Range{.first =";
+  // TODO: fix this dog crap casting and lack of calculating the span of the range.
+  (*ss) << "Range{.first = (s64)";
   node->left->accept(this);
-  (*ss) << ", .last = ";
+  (*ss) << ", .last = (s64)";
   node->right->accept(this);
   (*ss) << "}";
   return;
