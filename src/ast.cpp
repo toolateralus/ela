@@ -1377,18 +1377,22 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
   end_node(node, range);
 
-  for (const auto &iden: node->idens) {
+  for (const auto &iden : node->idens) {
     auto symbol = ctx.scope->local_lookup(iden->value);
     if (node->op == TType::ColonEquals) {
-      if (symbol) throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
+      if (symbol)
+        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
+                    "the identifiers",
+                    node->source_range);
       ctx.scope->insert(iden->value, Type::invalid_id, node);
     } else {
       // TODO: reimplement this error in a sane way.
-      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
+      // already exist", node->source_range);
       ctx.scope->insert(iden->value, Type::invalid_id, node);
     }
   }
-  
+
   return node;
 }
 
@@ -1589,6 +1593,12 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     function->return_type = parse_type();
   }
 
+
+  if (peek().type == TType::Where) {
+    function->where_clause = parse_where_clause();
+  }
+
+
   if (peek().type == TType::Semi) {
     function->flags |= FUNCTION_IS_FORWARD_DECLARED;
     end_node(function, range);
@@ -1691,16 +1701,17 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 
 ASTImpl *Parser::parse_impl() {
   expect(TType::Impl);
-  NODE_ALLOC_EXTRA_DEFER(ASTImpl, impl, range, _, this, current_impl_decl = nullptr)
+  NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, _, this, current_impl_decl = nullptr)
 
   ctx.set_scope();
-  impl->scope = ctx.exit_scope();
+  node->scope = ctx.exit_scope();
 
   if (peek().type == TType::GenericBrace) {
-    impl->generic_parameters = parse_generic_parameters();
+    node->generic_parameters = parse_generic_parameters();
   }
 
-  current_impl_decl = impl;
+
+  current_impl_decl = node;
   auto target = parse_type();
 
   // Handle 'impl INTERFACE for TYPE'
@@ -1709,31 +1720,34 @@ ASTImpl *Parser::parse_impl() {
   if (peek().type == TType::For) {
     expect(TType::For);
     interface = parse_type();
-    impl->interface = target;
-    impl->target = interface;
+    node->interface = target;
+    node->target = interface;
   } else {
-    impl->target = target;
+    node->target = target;
   }
 
   // TODO: make it so we dont have to get the scope of the type, we shouldn't be doing much typing
   // during parse time.
-  
-  impl->target->accept(typer);
-  auto type = global_get_type(impl->target->resolved_type);
-  impl->target->resolved_type = Type::invalid_id;
 
-  auto block = parse_block(impl->scope);
-  end_node(impl, range);
+  node->target->accept(typer);
+  auto type = global_get_type(node->target->resolved_type);
+  node->target->resolved_type = Type::invalid_id;
+
+  if (peek().type == TType::Where) {
+    node->where_clause = parse_where_clause();
+  }
+  auto block = parse_block(node->scope);
+  end_node(node, range);
 
   for (const auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
-      impl->methods.push_back(function);
+      node->methods.push_back(function);
     } else {
       throw_error("invalid statement: only methods are allowed in 'impl's", statement->source_range);
     }
   }
-  return impl;
+  return node;
 }
 
 ASTDefer *Parser::parse_defer() {
@@ -1744,6 +1758,25 @@ ASTDefer *Parser::parse_defer() {
   return node;
 }
 
+ASTWhere *Parser::parse_where_clause() {
+  NODE_ALLOC(ASTWhere, node, range, _, this);
+  expect(TType::Where);
+  node->target_type = parse_type();
+  expect(TType::Is);
+  node->predicate = parse_type();
+  while (peek().type == TType::And || peek().type == TType::Or) {
+    auto op = eat();
+    auto right = parse_type();
+    NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+    binexpr->left = node->predicate;
+    binexpr->right = right;
+    binexpr->op = op;
+    node->predicate = binexpr;
+  }
+  return node;
+}
+
+
 void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
   for (const auto &statement : statements) {
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
@@ -1753,7 +1786,8 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
       auto type = global_get_type(union_decl->resolved_type);
       auto info = (type->get_info()->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        throw_error("can only use '#anon :: union // #anon :: struct' declarations within struct types.", decl->source_range);
+        throw_error("can only use '#anon :: union // #anon :: struct' declarations within struct types.",
+                    decl->source_range);
       }
       decl->subtypes.push_back(union_decl);
       for (const auto &field : union_decl->fields) {
@@ -1775,38 +1809,41 @@ void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vect
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   expect(TType::Interface);
   auto previous = current_interface_decl;
-  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, interface, range, _, this, { current_interface_decl = previous; });
+  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, _, this, { current_interface_decl = previous; });
 
-  interface->name = name.value;
-  current_interface_decl = interface;
+  node->name = name.value;
+  current_interface_decl = node;
   if (peek().type == TType::GenericBrace) {
-    interface->generic_parameters = parse_generic_parameters();
+    node->generic_parameters = parse_generic_parameters();
   }
+
+  if (peek().type == TType::Where) {
+    node->where_clause = parse_where_clause();
+  }
+
   auto scope = create_child(ctx.scope);
-  interface->scope = scope;
+  node->scope = scope;
   auto block = parse_block(scope);
-  for (const auto &node : block->statements) {
-    if (auto function = dynamic_cast<ASTFunctionDeclaration *>(node)) {
+  for (const auto &stmt : block->statements) {
+    if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
       if (function->block.is_not_null()) {
         throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
       }
-      interface->methods.push_back(function);
+      node->methods.push_back(function);
     }
   }
-  return interface;
+  return node;
 }
 
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   bool is_union = false;
 
-  if (peek().type == TType::Struct) { 
+  if (peek().type == TType::Struct) {
     expect(TType::Struct);
-  }
-  else {
+  } else {
     is_union = true;
     expect(TType::Union);
   }
-  
 
   auto old = current_struct_decl;
   NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
@@ -1815,6 +1852,10 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
+  }
+
+  if (peek().type == TType::Where) {
+    node->where_clause = parse_where_clause();
   }
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
@@ -1840,7 +1881,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto info = type->get_info()->as<StructTypeInfo>();
   info->scope = node->scope = create_child(ctx.scope);
   info->scope->is_struct_scope = true;
-  if (is_union) info->flags |= STRUCT_FLAG_IS_UNION;
+  if (is_union)
+    info->flags |= STRUCT_FLAG_IS_UNION;
 
   for (const auto &param : node->generic_parameters) {
     info->scope->types[param] = -2;
@@ -2116,4 +2158,3 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
-

@@ -1766,3 +1766,8 @@ void Emitter::visit(ASTLambda *node) {
   node->return_type->accept(this);
   node->block->accept(this);
 }
+
+// This should never get hit.
+void Emitter::visit(ASTWhere *node) {
+  throw_error("Internal compiler error: 'where' expression was visited in the emitter", node->source_range);
+}

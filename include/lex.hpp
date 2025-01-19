@@ -103,6 +103,8 @@ enum struct TType {
 
   Impl,           // impl
   Interface,      // interface
+  Where,
+  Is,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -112,7 +114,9 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Interface);
+    TTYPE_CASE(Where);
     TTYPE_CASE(Defer);
+    TTYPE_CASE(Is);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
@@ -260,6 +264,8 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
     // control flow
     {"in", TType::In},
+    {"where", TType::Where},
+    {"is", TType::Is},
     
     {"fn", TType::Fn},
     {"switch", TType::Switch},

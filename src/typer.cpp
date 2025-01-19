@@ -121,6 +121,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
+  }
+
   type->declaring_node = node;
   ctx.scope->insert("this", type->take_pointer_to(), node);
 
@@ -133,6 +137,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   for (auto decl : node->fields) {
     decl->accept(this);
   }
+
+
 
   ctx.set_scope(old_scope);
   node->resolved_type = type->id;
@@ -206,6 +212,10 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
     }
   }
 
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
+  }
+  
   node->return_type->accept(this);
   node->params->accept(this);
 
@@ -257,6 +267,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       ctx.scope->types[param] = *generic_arg;
       generic_arg++;
     }
+  }
+
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
   }
 
   node->target->accept(this);
@@ -358,6 +372,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
 void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                         std::vector<int> generic_args) {
+  
   auto previous = ctx.scope;
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
@@ -369,6 +384,11 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
       generic_arg++;
     }
   }
+  
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
+  }
+
   auto type = global_get_type(global_create_interface_type(node->name, node->scope, generic_args));
   type->declaring_node = node;
   node->resolved_type = type->id;
@@ -1719,4 +1739,38 @@ int Typer::get_self_type() {
     return type_context.get()->resolved_type;
   }
   return Type::invalid_id;
+}
+
+bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr*>(node);
+      auto op = bin->op.type;
+      if (op == TType::And) {
+        return visit_where_predicate(type, bin->left) && visit_where_predicate(type, bin->right);
+      } else if (op == TType::Or) {
+        return visit_where_predicate(type, bin->left) || visit_where_predicate(type, bin->right);
+      } else {
+        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use 'bitwise' operators for brevity, they're effectively '&&' and '||'.", bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      node->accept(this);
+      // return whether this type implements this trait or not.
+      // also can be used to assert whether it's equal to the type provided or not.
+      return std::ranges::find(type->interfaces, node->resolved_type) != type->interfaces.end() || type->id == node->resolved_type;
+    } break;
+    default: throw_error("Invalid node in 'where' clause predicate", node->source_range);
+  }
+  return false;
+}
+
+void Typer::visit(ASTWhere *node) {
+  node->target_type->accept(this);
+  auto type = global_get_type(node->target_type->resolved_type);
+  auto satisfied = visit_where_predicate(type, node->predicate);
+
+  if (!satisfied) {
+    throw_error(std::format("'where' clause type constraint not satified for {}", type->to_string()), node->source_range);
+  }
 }

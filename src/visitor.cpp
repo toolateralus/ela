@@ -14,6 +14,7 @@
 // {
 
 // clang-format off
+void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSwitch::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTProgram::accept(VisitorBase *visitor) {visitor->visit(this); }

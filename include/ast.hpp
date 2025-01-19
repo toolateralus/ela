@@ -62,6 +62,7 @@ enum ASTNodeType {
   AST_NODE_RANGE,
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
+  AST_NODE_WHERE,
   AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
 
@@ -348,13 +349,15 @@ struct GenericInstance {
   ASTStatement *node;
 };
 
+struct ASTWhere;
+
 struct ASTFunctionDeclaration : ASTStatement {
   size_t flags = 0;
   bool has_defer = false;
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
-
+  Nullable<ASTWhere> where_clause;
   Scope *scope;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
@@ -459,8 +462,9 @@ struct ASTSubscript : ASTExpr {
 };
 
 struct ASTImpl;
-
+struct ASTWhere;
 struct ASTStructDeclaration : ASTStatement {
+  Nullable<ASTWhere> where_clause;
   Scope *scope;
   InternedString name;
   bool is_fwd_decl = false;
@@ -474,6 +478,36 @@ struct ASTStructDeclaration : ASTStatement {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };
+struct ASTInterfaceDeclaration : ASTStatement {
+  Nullable<ASTWhere> where_clause;
+  InternedString name;
+  Scope *scope;
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTFunctionDeclaration *> methods;
+  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
+  void accept(VisitorBase *visitor) override;
+};
+
+struct ASTEnumDeclaration : ASTStatement {
+  bool is_flags = false;
+  int element_type;
+  InternedString name;
+  std::vector<std::pair<InternedString, ASTExpr*>> key_values;
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
+};
+
+struct ASTTaggedUnionDeclaration : ASTStatement {
+  InternedString name;
+  Scope *scope;
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTNode *> members;
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
+};
+
 
 struct ASTInitializerList : ASTExpr {
   ASTInitializerList() {}
@@ -508,24 +542,6 @@ struct ASTInitializerList : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_INITIALIZER_LIST; }
 };
 
-struct ASTEnumDeclaration : ASTStatement {
-  bool is_flags = false;
-  int element_type;
-  InternedString name;
-  std::vector<std::pair<InternedString, ASTExpr*>> key_values;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
-};
-
-struct ASTTaggedUnionDeclaration : ASTStatement {
-  InternedString name;
-  Scope *scope;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
-  std::vector<ASTNode *> members;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
-};
 
 struct SwitchCase {
   ASTExpr *expression;
@@ -546,25 +562,17 @@ struct ASTNoop : ASTStatement {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTAlias : ASTStatement {
+struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic aliases?
   InternedString name;
   ASTType *type;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTInterfaceDeclaration : ASTStatement {
-  InternedString name;
-  Scope *scope;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
-  std::vector<ASTFunctionDeclaration *> methods;
-  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
-  void accept(VisitorBase *visitor) override;
-};
 
 // TODO: add interface field, once we have interfaces lol.
 struct ASTImpl : ASTStatement {
+  Nullable<ASTWhere> where_clause;
   // impl 'target' or impl *interface for 'target'
   ASTType *target;
   Nullable<ASTType> interface;
@@ -599,11 +607,22 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+// where Type impl SomeInterface 
+// where Type impl SomeInterface & AnotherInterface
+// where Type impl SomeInterface | SomeOtherInterface
+struct ASTWhere : ASTExpr {
+  ASTType *target_type;
+  ASTExpr *predicate;
+  ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
+  void accept(VisitorBase *visitor) override;
+};
+
 // Use this only for implementing the methods, so you can use the IDE to expand
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
   void visit(ASTProgram *node) override {}                                                                         \
   void visit(ASTLambda *node) override {}                                                                         \
+  void visit(ASTWhere *node) override {}                                                                         \
   void visit(ASTBlock *node) override {}                                                                           \
   void visit(ASTFunctionDeclaration *node) override {}                                                             \
   void visit(ASTParamsDecl *node) override {}                                                                      \
@@ -643,6 +662,7 @@ struct ASTLambda : ASTExpr {
   void visit(ASTNoop *noop) { return; }                                                                         \
   virtual void visit(ASTScopeResolution *node) = 0;                                                                \
   virtual void visit(ASTCast *node) = 0;                                                                           \
+  virtual void visit(ASTWhere *node) = 0;                                                                           \
   virtual void visit(ASTLambda *node) = 0;                                                                           \
   virtual void visit(ASTProgram *node) = 0;                                                                        \
   virtual void visit(ASTBlock *node) = 0;                                                                          \
@@ -745,6 +765,7 @@ struct Parser {
   ASTExpr *parse_primary();
   ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();
+  ASTWhere *parse_where_clause();
 
   // ASTType* parsing routines
   ASTType *parse_type();

@@ -35,11 +35,17 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
   new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
   new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
   new_node->generic_instantiations.clear();
+
   auto old_scope = current_scope;
   if (node->scope) {
     new_node->scope = copy_scope(node->scope);
     current_scope = new_node->scope;
   }
+
+  if (node->where_clause) {
+    new_node->where_clause = (ASTWhere*)copy_node(node->where_clause.get());
+  }
+
   if (node->block) {
     new_node->block = static_cast<ASTBlock *>(copy_node(node->block.get()));
     node->block.get()->scope->parent = new_node->scope;
@@ -233,7 +239,7 @@ ASTEnumDeclaration *ASTCopier::copy_enum_declaration(ASTEnumDeclaration *node) {
   auto new_node = new (ast_alloc<ASTEnumDeclaration>()) ASTEnumDeclaration(*node);
   new_node->key_values.clear();
   for (auto &kv : node->key_values) {
-    new_node->key_values.push_back({kv.first, (ASTExpr*)copy_node(kv.second)});
+    new_node->key_values.push_back({kv.first, (ASTExpr *)copy_node(kv.second)});
   }
   return new_node;
 }
@@ -244,11 +250,14 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   new_node->fields.clear();
+  if (node->where_clause) {
+    new_node->where_clause = (ASTWhere*)copy_node(node->where_clause.get());
+  }
   for (auto field : node->fields) {
     new_node->fields.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
   }
   new_node->subtypes.clear();
-  for (auto subtype: node->subtypes) {
+  for (auto subtype : node->subtypes) {
     new_node->subtypes.push_back(static_cast<ASTStructDeclaration *>(copy_node(subtype)));
   }
   current_scope = old_scope;
@@ -260,6 +269,9 @@ ASTInterfaceDeclaration *ASTCopier::copy_interface_declaration(ASTInterfaceDecla
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   new_node->methods.clear();
+  if (node->where_clause) {
+    new_node->where_clause = (ASTWhere*)copy_node(node->where_clause.get());
+  }
   for (auto field : node->methods) {
     new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(field)));
   }
@@ -312,6 +324,9 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   new_node->methods.clear();
+  if (node->where_clause) {
+    new_node->where_clause = (ASTWhere*)copy_node(node->where_clause.get());
+  }
   for (const auto &method : node->methods) {
     new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
   }
@@ -322,14 +337,24 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
 ASTCast *ASTCopier::copy_cast(ASTCast *node) {
   auto new_node = new (ast_alloc<ASTCast>()) ASTCast(*node);
   new_node->resolved_type = -1;
-  new_node->expression = (ASTExpr*)copy_node(node->expression);
-  new_node->target_type = (ASTType*)copy_node(node->target_type);
+  new_node->expression = (ASTExpr *)copy_node(node->expression);
+  new_node->target_type = (ASTType *)copy_node(node->target_type);
+  return new_node;
+}
+
+ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
+  auto new_node = new (ast_alloc<ASTWhere>()) ASTWhere(*node);
+  new_node->resolved_type = -1;
+  new_node->predicate = static_cast<ASTExpr *>(copy_node(node->predicate));
+  new_node->target_type = static_cast<ASTType *>(copy_node(node->target_type));
   return new_node;
 }
 
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   switch (node->get_node_type()) {
-    case AST_NODE_CAST: 
+    case AST_NODE_WHERE:
+      return copy_where(static_cast<ASTWhere *>(node));
+    case AST_NODE_CAST:
       return copy_cast(static_cast<ASTCast *>(node));
     case AST_NODE_IMPL:
       return copy_impl(static_cast<ASTImpl *>(node));
