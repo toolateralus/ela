@@ -11,7 +11,6 @@
   TUPLE,
   ARRAY,
   FIXED_ARRAY,
-  MAP,
   FUNCTION,
   POINTER,
   SIGNED,
@@ -29,7 +28,6 @@ impl Type  {
 
   has_no_extension :: fn(self*) -> bool {
     return self.flags & TypeFlags::POINTER == 0 &&
-          self.flags & TypeFlags::MAP == 0 &&
           self.flags & TypeFlags::ARRAY == 0 &&
           self.flags & TypeFlags::FIXED_ARRAY == 0;
   }
@@ -72,10 +70,6 @@ impl Type  {
 
   is_tuple :: fn(self*) -> bool {
     return self.flags & TypeFlags::TUPLE != 0;
-  }
-
-  is_map :: fn(self*) -> bool {
-    return self.flags & TypeFlags::MAP != 0;
   }
 
   is_function :: fn(self*) -> bool {

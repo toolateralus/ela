@@ -29,12 +29,11 @@ constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
 constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
 constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 9;
-constexpr auto TYPE_FLAGS_MAP = 1 << 10;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 11;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 12;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 10;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 11;
 
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 13;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 14;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 12;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 13;
 
 void Emitter::visit(ASTWhile *node) {
   emit_condition_block(node, "while", node->condition, node->block);
@@ -1204,9 +1203,6 @@ std::string get_type_flags(Type *type) {
       case TYPE_EXT_ARRAY:
         kind_flags |= TYPE_FLAGS_ARRAY;
         break;
-      case TYPE_EXT_MAP:
-        kind_flags |= TYPE_FLAGS_MAP;
-        break;
       case TYPE_EXT_INVALID:
         throw_error("Internal Compiler Error: Extension type not set.", {});
         break;
@@ -1233,8 +1229,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     ss << get_elements_function(type) << ",\n";
   }
 
-  if (type->get_ext().is_array() || type->get_ext().is_pointer() || type->get_ext().is_map() ||
-      type->get_ext().is_fixed_sized_array()) {
+  if (type->get_ext().is_array() || type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
     ss << ".element_type = nullptr,\n";
@@ -1361,12 +1356,6 @@ std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::
       ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER) {
       ss << "*";
-    } else if (ext.type == TYPE_EXT_MAP) {
-      std::string current = ss.str();
-      auto key_string = to_cpp_string(global_get_type(ext.key_type));
-      ss.str("");
-      ss.clear();
-      ss << "_map<" << key_string << ", " << current << ">";
     }
   }
   return ss.str();
@@ -1474,7 +1463,7 @@ void Emitter::visit(ASTImpl *node) {
   }
   auto old_type = type_context;
   type_context = node->target;
-  Defer _([&]{ type_context = old_type; });
+  Defer _([&] { type_context = old_type; });
 
   for (const auto &method : node->methods) {
     method->accept(this);
@@ -1640,13 +1629,10 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
   emit_line_directive(node);
 
-
   auto test_flag = compile_command.has_flag("test");
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
-  Defer deferred = {[&]() {
-    ctx.set_scope(old_scope);
-  }};
+  Defer deferred = {[&]() { ctx.set_scope(old_scope); }};
 
   // this also happens to emit the test boilerplate that bootstraps it into the
   // test runner, if applicable.

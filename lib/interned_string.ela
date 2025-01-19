@@ -1,6 +1,6 @@
+#error "Internered string is broken";
 #import core;
 
-#static __interned_string_storage_cache: string[s64];
 
 InternedString :: struct {
   id: s64;
@@ -8,14 +8,10 @@ InternedString :: struct {
 
 impl InternedString {
   from :: fn(value: string) -> #self {
-    #static cache: s64[string];
     #static next_id: s64 = 1;
     self: #self;
-    id := cache[value];
     if id == 0 {
       self.id = next_id++;
-      cache[value] = id;
-      __interned_string_storage_cache[id] = value;
     }
     else { 
       self.id = id; 
