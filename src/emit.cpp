@@ -59,35 +59,94 @@ void Emitter::visit(ASTElse *node) {
   }
   return;
 }
+
 void Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
   auto old_scope = ctx.scope;
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
-  (*ss) << indent() << "for (";
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    // Emit old-style for loop for pointer semantics
-    (*ss) << "auto* ";
-    node->iden->accept(this);
-    (*ss) << " = ";
-    node->range->accept(this);
-    (*ss) << ".begin(); ";
-    node->iden->accept(this);
-    (*ss) << " != ";
-    node->range->accept(this);
-    (*ss) << ".end(); ";
-    node->iden->accept(this);
-    (*ss) << "++";
+
+  auto range_type = global_get_type(node->range->resolved_type);
+  std::string range_type_str = to_cpp_string(range_type);
+
+  // Generate a unique ID for the enumerator
+  std::string unique_id = "$_loop_id" + std::to_string(defer_blocks.size());
+
+  (*ss) << indent() << "{\n";
+  indent_level++;
+
+  // Emit the enumerator initialization
+  std::string symbol_name;
+
+  if (range_type->implements("Enumerable")) {
+    symbol_name = "enumerator";
   } else {
-    // Emit range-based for loop for copy semantics
-    (*ss) << "auto ";
-    node->iden->accept(this);
-    (*ss) << " : ";
-    node->range->accept(this);
+    symbol_name = "iter";
   }
-  (*ss) << ")";
+
+  Type *enumerable_iterator_return_type =
+      global_get_type(global_get_type(range_type->get_info()->scope->local_lookup(symbol_name)->type_id)
+                          ->get_info()
+                          ->as<FunctionTypeInfo>()
+                          ->return_type);
+  std::string enumerable_iterator_type = to_cpp_string(enumerable_iterator_return_type);
+
+  auto current_type = global_get_type(
+      global_get_type(enumerable_iterator_return_type->get_info()->scope->local_lookup("current")->type_id)
+          ->get_info()
+          ->as<FunctionTypeInfo>()
+          ->return_type);
+
+  if (node->value_semantic != VALUE_SEMANTIC_POINTER && current_type->get_ext().is_pointer() && symbol_name == "iter") {
+    current_type = global_get_type(current_type->get_element_type());
+  }
+
+  auto current_type_str = to_cpp_string(current_type);
+
+  (*ss) << indent() << enumerable_iterator_type << " " << unique_id << " = ";
+
+  if (range_type->implements("Enumerable")) {
+    (*ss) << range_type_str << "_enumerator(&";
+  } else {
+    (*ss) << range_type_str << "_iter(&";
+  }
+
+  node->range->accept(this);
+  (*ss) << ");\n";
+
+  (*ss) << indent() << "while (!";
+  (*ss) << enumerable_iterator_type << "_done(&" << unique_id << ")) {\n";
+  indent_level++;
+
+  (*ss) << indent() << current_type_str << ' ';
+
+  node->iden->accept(this);
+
+  (*ss) << " = ";
+  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
+  } else if (enumerable_iterator_return_type->get_ext().is_pointer()) {
+    (*ss) << "*" << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
+  } else {
+    (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
+  }
+
+  // Emit the user code block
   node->block->accept(this);
+
+  // Emit the next call
+  (*ss) << indent();
+  (*ss) << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
+
+  // Emit deferred statements
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+
+  indent_level--;
+  (*ss) << indent() << "}\n";
+
+  indent_level--;
+  (*ss) << indent() << "}\n";
+
   defer_blocks.pop_back();
   ctx.set_scope(old_scope);
   return;
@@ -1567,7 +1626,7 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
     if (defer_block == defer_blocks.rend()) {
       throw_error("Internal Compiler Error: could not find defer block type in stack", {});
     }
-    for (auto defer : defer_block->defers){
+    for (auto defer : defer_block->defers) {
       defer->statement->accept(this);
       semicolon();
       newline();
@@ -1577,7 +1636,7 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
   if (defer_block == defer_blocks.rend()) {
     throw_error("Internal Compiler Error: could not find defer block type in stack", {});
   }
-  for (auto defer : defer_block->defers){
+  for (auto defer : defer_block->defers) {
     defer->statement->accept(this);
     semicolon();
     newline();
@@ -1712,9 +1771,7 @@ void Emitter::visit(ASTContinue *node) {
   indented("continue;\n");
 }
 
-void Emitter::visit(ASTDefer *node) {
-  defer_blocks.back().defers.push_back(node);
-}
+void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
 
 void Emitter::visit(ASTBlock *node) {
   emit_line_directive(node);
