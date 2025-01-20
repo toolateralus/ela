@@ -2151,6 +2151,9 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
+  auto &state = states.back();
+  state.input = "#import bootstrap;\n" + state.input;
+  state.input_len = state.input.length();
   fill_buffer_if_needed();
   typer = new Typer(context);
 }
