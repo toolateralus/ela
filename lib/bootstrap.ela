@@ -1,136 +1,219 @@
-// General utilities. Needs to be expanded for full libc support.
+#region BASIC_INTERFACES {
+  string :: struct;
+  // Run a cleanup procedure implicitly when an object goes out of scope.
+  // Absolutely equivalent to a C++ Destructor.
+  // This could be called explicitly on pointers, but it's not reccomended.
+  Drop        :: interface {
+    drop      :: fn(self*);
+  }
 
-#foreign system :: fn(cmd: c_string) -> int;
-#foreign printf :: fn(format: c_string, ...) -> int;
-#foreign exit :: fn(code: int);
+  // Allow an object to be converted to a string
+  ToString    :: interface {
+    // convert self to string.
+    to_string :: fn(self*) -> string;
+  }
+
+  // equivalent to an explicit cast operator overload in C++,
+  // allow an object to be constructed from another.
+  From        :: interface![T] {
+    // construct a self type from T.
+    from :: fn(v: T) -> #self;
+  }
+
+  // A deep clone, versus assignment always being a shallow clone in Ela.
+  Clone       :: interface {
+    // get a deep clone of self.
+    clone     :: fn(self*) -> #self;
+  }
+
+  // An object used to iterate over a collection of items, or any sequence.
+  Enumerator   :: interface![T] {  
+    // Return the current value this enumerator points to within the sequence it's iterating over.  
+    current   :: fn(self*) -> T;
+    // Advance the enumerator by one step.
+    next      :: fn(self*) -> void;
+    // Check whether the enumerator is complete, or should continue.
+    // return true for 'done',
+    // return false if needs to continue
+    done      :: fn(self*) -> bool;
+  }
+
+  // A collection or range of items that can be enumerated over, with a for loop, or some other means.
+  Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
+    // get the Enumerator object that was implemented for this type.
+    enumerator      :: fn(self*) -> Enum;
+  }
+
+  // Iter is a generic struct that represents an iterator over a collection of type T.
+  // It contains a pointer to the current element (ptr) and a pointer to the end of the collection (end).
+
+  // It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
+  // represented by a chunk of memory that can be trivially traversed.
+  Iter :: struct![T] {
+    ptr: T*;  // Pointer to the current element in the collection.
+    end: T*;  // Pointer to the end of the collection.
+  }
+
+  impl![T] Iter![T] {
+    // Returns a pointer to the current element in the collection.
+    current :: fn(self*) -> T* => self.ptr;
+
+    // Advances the iterator to the next element in the collection.
+    next :: fn(self*) {
+      self.ptr++;
+    }
+
+    // Checks if the iterator has reached the end of the collection.
+    done :: fn(self*) -> bool {
+      return self.ptr >= self.end;
+    }
+  }
+
+  // Iterable is a generic interface that represents a collection that can be iterated over.
+  // It defines a single method, iter, which returns an iterator for the collection.
+  Iterable :: interface![T] {
+    // Returns an iterator for the collection.
+    iter :: fn(self*) -> Iter![T];
+  }
 
 
-// General memory utilities. Missing a TON of them, to be expanded too.
-#foreign free :: fn(ptr: void*) -> void;
-#foreign malloc :: fn(nbytes: u64) -> void*;
-#foreign calloc :: fn(num: u64, size: u64) -> void*;
-#foreign realloc :: fn(ptr: void*, size: u64) -> void*;#foreign free :: fn(ptr: void*) -> void;
+  // Binary arithmetic operator overloads.
+  Arithmetic  :: interface![Right] {
+    add       :: fn(self, right: Right) -> #self;   // '+' operator.
+    sub       :: fn(self, right: Right) -> #self;   // '-' operator.
+    mul       :: fn(self, right: Right) -> #self;   // '*' operator.
+    div       :: fn(self, right: Right) -> #self;   // '/' operator.
+    modulo    :: fn(self, right: Right) -> #self;   // '%' operator.
+  }
 
-#foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
-#foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
-#foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
-
-#foreign strdup :: fn(str: c_string) -> c_string;
-#foreign strndup :: fn(str: c_string, n: u64) -> c_string;
-#foreign strerror :: fn(errnum: int) -> c_string;
-#foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
-#foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
-#foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
-#foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
-#foreign strchr :: fn(str: c_string, c: int) -> c_string;
-#foreign strrchr :: fn(str: c_string, c: int) -> c_string;
-#foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
-#foreign strlen :: fn(str: c_string) -> int;
-#foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
-#foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
-#foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
-#foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
-#foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
-
-#foreign isalnum :: fn(c: int) -> int;
-#foreign isalpha :: fn(c: int) -> int;
-#foreign isspace :: fn(c: int) -> int;
-#foreign isdigit :: fn(c: int) -> int;
-#foreign islower :: fn(c: int) -> int;
-#foreign isupper :: fn(c: int) -> int;
-#foreign isprint :: fn(c: int) -> int;
-#foreign ispunct :: fn(c: int) -> int;
-
-// TODO: fix the mismatch in signedness.
-string :: struct {
-  data:    char*;
-  length:  s32;
-}
-
-Env :: struct {};
-
-impl Env {
-  args :: fn() -> string[]* {
-    #static values: string[];
-    return &values;
+  // Binary bitwise operator overloading.
+  Bitwise     :: interface![Right] {
+    shr       :: fn(self, right: Right) -> #self;   // '>>' operator.
+    shl       :: fn(self, right: Right) -> #self;   // '<<' operator.
+    xor       :: fn(self, right: Right) -> #self;   //  '^' operator.
+    or        :: fn(self, right: Right) -> #self;   //  '|' operator.
+    and       :: fn(self, right: Right) -> #self;   //  '&' operator.
   }
 }
 
-impl string {
-  empty :: fn() -> #self {
-    return {};
+#region LIBC_FORWARD {
+  // General utilities. Needs to be expanded for full libc support.
+  #foreign system :: fn(cmd: c_string) -> int;
+  #foreign printf :: fn(format: c_string, ...) -> int;
+  #foreign exit :: fn(code: int);
+
+
+  // General memory utilities. Missing a TON of them, to be expanded too.
+  #foreign free :: fn(ptr: void*) -> void;
+  #foreign malloc :: fn(nbytes: u64) -> void*;
+  #foreign calloc :: fn(num: u64, size: u64) -> void*;
+  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;#foreign free :: fn(ptr: void*) -> void;
+
+  #foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
+  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+
+  #foreign strdup :: fn(str: c_string) -> c_string;
+  #foreign strndup :: fn(str: c_string, n: u64) -> c_string;
+  #foreign strerror :: fn(errnum: int) -> c_string;
+  #foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
+  #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
+  #foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
+  #foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
+  #foreign strchr :: fn(str: c_string, c: int) -> c_string;
+  #foreign strrchr :: fn(str: c_string, c: int) -> c_string;
+  #foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
+  #foreign strlen :: fn(str: c_string) -> int;
+  #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
+  #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
+  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
+  #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
+  #foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
+
+  #foreign isalnum :: fn(c: int) -> int;
+  #foreign isalpha :: fn(c: int) -> int;
+  #foreign isspace :: fn(c: int) -> int;
+  #foreign isdigit :: fn(c: int) -> int;
+  #foreign islower :: fn(c: int) -> int;
+  #foreign isupper :: fn(c: int) -> int;
+  #foreign isprint :: fn(c: int) -> int;
+  #foreign ispunct :: fn(c: int) -> int;
+}
+
+#region RANGE {
+  Range_Base :: struct![T] {
+    begin: T;
+    end:   T;
   }
-  from :: fn(data: c_string) -> #self{
-    len := strlen(data);
-    str: string;
-    str.data = strdup(data);
-    str.length = len;
-    return str;
+
+  #alias Range :: Range_Base![s64];
+
+  // TODO: support reverse enumeration for this as well.
+  Range_Base_Enumerator :: struct![T] {
+    begin: T;
+    end:   T;
+    idx:   T;
   }
-  from_ptr :: fn(begin: c_string, end: c_string) -> string {
-    str: string;
-    str.length = end - begin;
-    str.data = malloc(str.length + 1);
-    memcpy(str.data, begin, str.length);
-    str.data[str.length] = 0;
-    return str;
-  }
-}
 
-
-#foreign printf :: fn(s: c_string, ...) -> int;
-
-
-Range_Base :: struct![T] {
-  begin: T;
-  end:   T;
-}
-
-#alias Range :: Range_Base![s64];
-
-// An object used to iterate over a collection of items, or any sequence.
-Enumerator   :: interface![T] {  
-  // Return the current value this enumerator points to within the sequence it's iterating over.  
-  current   :: fn(self*) -> T;
-  // Advance the enumerator by one step.
-  next      :: fn(self*) -> void;
-  // Check whether the enumerator is complete, or should continue.
-  // return true for 'done',
-  // return false if needs to continue
-  done      :: fn(self*) -> bool;
-}
-
-// A collection or range of items that can be enumerated over, with a for loop, or some other means.
-Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
-  // get the Enumerator object that was implemented for this type.
-  enumerator      :: fn(self*) -> Enum;
-}
-
-// TODO: support reverse enumeration for this as well.
-Range_Base_Enumerator :: struct![T] {
-  begin: T;
-  end:   T;
-  idx:   T;
-}
-
-impl Enumerator![T] for Range_Base_Enumerator {
-  current   :: fn(self*) -> s64 {
-    return self.idx;
-  }
-  next      :: fn(self*) {
-    self.idx++;
-  };
-  done      :: fn(self*) -> bool {
-    return self.idx >= self.end;
-  }
-}
-
-impl![T] Enumerable![Range_Base_Enumerator, T] for Range_Base {
-  enumerator :: fn(self*) -> Range_Base_Enumerator {
-    return {
-      begin: self.first,
-      end: self.last,
-      idx: 0,
+  impl![T] Enumerator![T] for Range_Base_Enumerator![T] {
+    current   :: fn(self*) -> s64 {
+      return self.idx;
+    }
+    next      :: fn(self*) {
+      self.idx++;
     };
+    done      :: fn(self*) -> bool {
+      return self.idx >= self.end;
+    }
+  }
+
+  impl![T] Enumerable![Range_Base_Enumerator, T] for Range_Base![T] {
+    enumerator :: fn(self*) -> Range_Base_Enumerator {
+      return {
+        begin: self.first,
+        end: self.last,
+        idx: 0,
+      };
+    }
+  }
+  
+}
+
+#region STRING {
+  string :: struct {
+    data:    char*;
+    length:  s32;
+  }
+
+  impl string {
+    empty :: fn() -> #self {
+      return {};
+    }
+    from :: fn(data: c_string) -> #self{
+      len := strlen(data);
+      str: string;
+      str.data = strdup(data);
+      str.length = len;
+      return str;
+    }
+    from_ptr :: fn(begin: c_string, end: c_string) -> string {
+      str: string;
+      str.length = end - begin;
+      str.data = malloc(str.length + 1);
+      memcpy(str.data, begin, str.length);
+      str.data[str.length] = 0;
+      return str;
+    }
+  }
+}
+
+#region ENV {
+  Env :: struct {};
+
+  impl Env {
+    args :: fn() -> string[]* {
+      #static values: string[];
+      return &values;
+    }
   }
 }

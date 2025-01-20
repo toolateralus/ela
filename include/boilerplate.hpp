@@ -7,50 +7,6 @@ template <class T, class... Args> T *construct(void *memory, Args &&...args) {
 }
 #if USE_STD_LIB
 #include <tuple>
-struct string;
-#endif
-
-struct Range {
-  using value_type = signed long long;
-  value_type first = 0, last = 0, span = 0, increment = 1;
-  bool is_reverse = false;
-  struct iterator {
-    value_type current, end_value, increment;
-    bool is_reverse;
-    iterator(value_type start, value_type end_value, bool is_reverse, value_type increment)
-        : current(start), end_value(end_value), is_reverse(is_reverse), increment(increment) {}
-    value_type operator*() const { return current; }
-
-    iterator &operator++() {
-      if (is_reverse) {
-        current -= increment;
-      } else {
-        current += increment;
-      }
-      return *this;
-    }
-
-    bool operator!=(const iterator &other) const {
-      if (is_reverse) {
-        return current > other.end_value;
-      } else {
-        return current < other.end_value;
-      }
-    }
-  };
-  iterator begin() const { return iterator(first, last, is_reverse, increment); }
-  iterator end() const { return iterator(first, last, is_reverse, increment); }
-  iterator begin() { return iterator(first, last, is_reverse, increment); }
-  iterator end() { return iterator(first, last, is_reverse, increment); }
-  bool operator==(const value_type number) const { return number >= first && number <= last; }
-  bool contains(const value_type number) { return number >= first && number <= last; }
-#if USE_STD_LIB
-  string to_string() const;
-#endif
-};
-
-#if USE_STD_LIB
-
 #include <initializer_list>
 #include <stdint.h>
 #include <unordered_map>
@@ -204,14 +160,14 @@ template <class T> struct _array {
 
   const T &operator[](int n) const { return data[n]; }
 
-  _array<T> operator[](const Range &range) {
-    _array<T> result;
-    result.data = data + range.first;
-    result.length = range.last - range.first;
-    result.capacity = result.length;
-    result.is_view = true;
-    return result;
-  }
+  // _array<T> operator[](const Range &range) {
+  //   _array<T> result;
+  //   result.data = data + range.first;
+  //   result.length = range.last - range.first;
+  //   result.capacity = result.length;
+  //   result.is_view = true;
+  //   return result;
+  // }
 
   bool operator==(const _array &other) const {
     return length == other.length && std::equal(data, data + length, other.data);
@@ -222,111 +178,6 @@ template <class T> struct _array {
   auto begin() { return data; }
   auto end() { return data + length; }
 };
-
-// For now, we'll just use a simple null terminated string.
-struct string {
-  char *data = nullptr;
-  u32 length = 0;
-  bool is_view = false;
-  string() {}
-
-  string(char *str) {
-    if (str == nullptr) {
-      return;
-    }
-    length = 0;
-    while (str[length] != '\0') {
-      ++length;
-    }
-    data = static_cast<char *>(malloc(length + 1));
-    data[length] = '\0';
-    std::copy(str, str + length, data);
-  }
-
-  string(char *begin, char *end, bool is_view = false) {
-    this->is_view = is_view;
-    if (is_view) {
-      data = begin;
-      length = std::distance(begin, end);
-    } else {
-      length = std::distance(begin, end);
-      data = static_cast<char *>(malloc(length + 1));
-      std::copy(begin, end, data);
-      data[length] = '\0';
-    }
-  }
-  
-  ~string() {
-    if (length != 0 && data && !is_view)
-      free(data);
-  }
-
-  char &operator[](int n) { return data[n]; }
-
-  string operator[](const Range &range) const {
-    string result(data + range.first, data + range.last, true);
-    return result;
-  }
-
-  string(const string &other) {
-    if (other.data && other.length != 0) {
-      length = other.length;
-      data = static_cast<char *>(malloc(length + 1));
-      std::copy(other.data, other.data + length, data);
-      data[length] = '\0';
-    }
-  }
-
-  string &operator=(const string &other) {
-    if (this != &other) {
-      if (length != 0 && data) free(data);
-      if (other.data) {
-        length = other.length;
-        data = static_cast<char *>(malloc(length + 1));
-        std::copy(other.data, other.data + length, data);
-        data[length] = '\0';
-      } else {
-        data = nullptr;
-        length = 0;
-      }
-    }
-    return *this;
-  }
-
-  auto begin() { return data; }
-  auto end() { return data + length; }
-  auto begin() const { return data; }
-  auto end() const { return data + length; }
-
-  bool operator==(const string &other) const {
-    if (length != other.length)
-      return false;
-    for (int i = 0; i < length; ++i) {
-      if (data[i] != other.data[i])
-        return false;
-    }
-    return true;
-  }
-  bool operator!=(const string &other) const { return !(*this == other); }
-};
-
-inline string Range::to_string() const {
-  char buffer[50];
-  snprintf(buffer, sizeof(buffer), "%lld..%lld", first, last);
-  return string(buffer);
-}
-
-namespace std {
-template <> struct hash<string> {
-  std::size_t operator()(const string &s) const noexcept {
-    std::size_t h = 0;
-    for (char c : s) {
-      h = h * 31 + c;
-    }
-    return h;
-  }
-};
-} // namespace std
 
 struct Type;
 struct Field {
@@ -358,11 +209,6 @@ struct Type {
   _array<Element> (*elements)(char *); // get a list of the Elements, which can be used to reflect on arrays.
   Type *element_type;                  // the type this type has a pointer to, is an array of, etc.
 };
-
-static _array<string> &Env_args() {
-  static _array<string> args;
-  return args;
-}
 
 #ifdef TESTING
 

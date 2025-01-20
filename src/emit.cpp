@@ -652,7 +652,7 @@ void Emitter::visit(ASTProgram *node) {
       code << R"__(
 int main (int argc, char** argv) {
   for (int i = 0; i < argc; ++i) {
-    Env_args().push(string(argv[i]));
+    Env_args()->push(string(argv[i]));
   }
   __ela_main_();
 }
