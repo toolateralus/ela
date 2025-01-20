@@ -1084,7 +1084,10 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     current = current->next;
   }
 
-  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << interp_ss.str() << "\",";
+  // ! ! I refactored string interpolation to return char* for now until we build our string back in to it's full glory,
+  // ! ! Or replace this garbage string interpolation with a format!() function or macro or something.
+  // ! ! However, it leaks like a siev now.
+  (*ss) << "[&] -> char* { char* buf = (char*)malloc(1024); memset(buf, 0, 1024);\nsprintf(buf, \"" << interp_ss.str() << "\",";
 
   current = node->interpolated_string_root;
   while (current) {
@@ -1150,8 +1153,8 @@ void Emitter::interpolate_string(ASTLiteral *node) {
     current = current->next;
   }
 
-  (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
-           "strlen(buf); return str; }()";
+  (*ss) << ");\n "
+           " return buf; }()";
 }
 
 // Identifier may contain a fixed buffer size like name[30] due to the way

@@ -17,7 +17,7 @@ impl Add![Vec2, Vec2] for Vec2 {
 }
 
 impl Vec2 {
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> char* {
     return $"x: {self.x}, y: {self.y}";
   }
 }

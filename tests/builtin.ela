@@ -2,7 +2,7 @@
 
 
 #test test_string :: fn() {
-  my_string : string = "Xaryu Baryu";
+  my_string : string = string::from("Xaryu Baryu");
   assert("string length failed to equal expected value"c, my_string.length == 11);
 }
 

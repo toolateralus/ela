@@ -676,12 +676,27 @@ void Typer::visit(ASTFor *node) {
                   "attempting to iterate, or it was a non-function symbol named 'iter'",
                   node->source_range);
     }
+
+    auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
+    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'current'",
+                  node->source_range);
+    }
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
   } else if (range_type->implements("Enumerable")) {
     auto symbol = scope->local_lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
                   "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
+                  node->source_range);
+    }
+    auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
+    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
@@ -705,6 +720,9 @@ void Typer::visit(ASTFor *node) {
     // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit dereference.
     iter_ty = global_get_type(iter_ty)->get_element_type();
   }
+
+  
+
 
   ctx.scope->insert(iden->value, iter_ty, node);
   node->iden->accept(this);
