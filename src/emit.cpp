@@ -36,7 +36,10 @@ constexpr auto TYPE_FLAGS_SIGNED = 1 << 12;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 13;
 
 void Emitter::visit(ASTWhile *node) {
+  defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   emit_condition_block(node, "while", node->condition, node->block);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  defer_blocks.pop_back();
   return;
 }
 void Emitter::visit(ASTIf *node) {
@@ -59,6 +62,7 @@ void Emitter::visit(ASTElse *node) {
 void Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
   auto old_scope = ctx.scope;
+  defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
   (*ss) << indent() << "for (";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
@@ -83,6 +87,8 @@ void Emitter::visit(ASTFor *node) {
   }
   (*ss) << ")";
   node->block->accept(this);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  defer_blocks.pop_back();
   ctx.set_scope(old_scope);
   return;
 }
@@ -1526,24 +1532,26 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
 }
 
 // Helper function to emit deferred statements
-void Emitter::emit_deferred_statements(ASTBlock *parent, bool is_return) {
-  if (!parent) {
-    throw_error("Parent block was null", {});
+void Emitter::emit_deferred_statements(DeferBlockType type) {
+  auto defer_block = defer_blocks.rbegin();
+  while (defer_block->type != type) {
+    if (defer_block == defer_blocks.rend()) {
+      throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+    }
+    for (auto defer : defer_block->defers){
+      defer->statement->accept(this);
+      semicolon();
+      newline();
+    }
+    defer_block++;
   }
-
-  if (is_return) {
-    for (int i = defer_blocks.size() - 1; i >= 0; --i) {
-      (*ss) << defer_blocks[i].str();
-    }
-    for (auto i = 0; i < parent->defer_count && defer_blocks.size() > 0; ++i) {
-      defer_blocks.pop_back();
-      parent->defer_count--;
-    }
-  } else {
-    for (int i = parent->defer_count; defer_blocks.size() > 0 && i > 0; ++i) {
-      (*ss) << defer_blocks.back().str();
-      defer_blocks.pop_back();
-    }
+  if (defer_block == defer_blocks.rend()) {
+    throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+  }
+  for (auto defer : defer_block->defers){
+    defer->statement->accept(this);
+    semicolon();
+    newline();
   }
 }
 
@@ -1554,27 +1562,13 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     emit_default_args = true;
     node->params->accept(this);
     emit_default_args = false;
+    defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
       auto block = node->block.get();
-      // move around defer blocks when emitting a deferred statement.
-      if (node->has_defer && block->has_defer) {
-        auto last_defer_blocks = std::move(defer_blocks);
-        bool was_emitting_block_with_defer = emitting_function_with_defer;
-
-        Defer _([&] { // yes, using a defer RAII struct to emit defers. sigh
-          defer_blocks = std::move(last_defer_blocks);
-          emitting_function_with_defer = was_emitting_block_with_defer;
-        });
-
-        defer_blocks.clear();
-        emitting_function_with_defer = node->has_defer;
-        block->accept(this);
-
-      } else {
-        emitting_function_with_defer = false;
-        block->accept(this);
-      }
+      block->accept(this);
     }
+    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+    defer_blocks.pop_back();
   };
 
   auto emit_various_function_declarations = [&] {
@@ -1655,11 +1649,12 @@ void Emitter::visit(ASTReturn *node) {
   if (emitting_function_with_defer ||
       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
-      (*ss) << defer_return_value_key << " = ";
+      auto type = global_get_type(node->expression.get()->resolved_type);
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = ";
       node->expression.get()->accept(this);
+      (*ss) << ";\n";
     }
-    (*ss) << ";\n";
-    emit_deferred_statements(node->declaring_block.get(), true);
+    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
     (*ss) << "return";
     if (node->expression.is_not_null()) {
       (*ss) << " " << defer_return_value_key;
@@ -1678,33 +1673,18 @@ void Emitter::visit(ASTReturn *node) {
 
 void Emitter::visit(ASTBreak *node) {
   emit_line_directive(node);
-  if (emitting_function_with_defer ||
-      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-    emit_deferred_statements(node->declaring_block.get(), false);
-  }
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
   indented("break;\n");
-  return;
 }
 
 void Emitter::visit(ASTContinue *node) {
   emit_line_directive(node);
-  if (emitting_function_with_defer ||
-      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-    emit_deferred_statements(node->declaring_block.get(), false);
-  }
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
   indented("continue;\n");
-  return;
 }
 
 void Emitter::visit(ASTDefer *node) {
-  auto old = ss;
-  Defer _([&] { ss = old; });
-  std::stringstream defer_ss;
-  ss = &defer_ss;
-  node->statement->accept(this);
-  (*ss) << ";\n";
-  defer_blocks.push_back(std::move(defer_ss));
-  return;
+  defer_blocks.back().defers.push_back(node);
 }
 
 void Emitter::visit(ASTBlock *node) {
@@ -1713,12 +1693,7 @@ void Emitter::visit(ASTBlock *node) {
   indentLevel++;
   ctx.set_scope(node->scope);
 
-  if (emitting_function_with_defer && node->parent && node->parent->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-    if (node->return_type != void_type()) {
-      auto type = global_get_type(node->return_type);
-      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << ";\n";
-    }
-  }
+  defer_blocks.emplace_back();
 
   for (const auto &statement : node->statements) {
     emit_line_directive(node);
@@ -1730,15 +1705,8 @@ void Emitter::visit(ASTBlock *node) {
     newline();
   }
 
-  if (node->has_defer) {
-    for (int i = node->defer_count; i > 0 && defer_blocks.size() > 0; --i) {
-      (*ss) << defer_blocks.back().str();
-      defer_blocks.pop_back();
-    }
-    if (node->return_type != void_type() && node->return_type != Type::invalid_id) {
-      (*ss) << "return " << defer_return_value_key << ";\n";
-    }
-  }
+  emit_deferred_statements(DEFER_BLOCK_TYPE_OTHER);
+  defer_blocks.pop_back();
 
   indentLevel--;
   indented("}");

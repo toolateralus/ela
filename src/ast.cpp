@@ -1881,7 +1881,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
   info->scope = node->scope = create_child(ctx.scope);
-  info->scope->is_struct_scope = true;
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
 

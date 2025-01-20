@@ -11,13 +11,9 @@
 
 nested_defer_test :: fn() -> int {
   x := 0;
-  defer {
-    x += 1;
-  }
+  defer x += 1;
   if (true) {
-    defer {
-      x += 2;
-    }
+    defer x += 2;
   }
   return x;
 }
@@ -29,9 +25,7 @@ nested_defer_test :: fn() -> int {
 loop_defer_test :: fn() -> int {
   x := 0;
   for i in 0..3 {
-    defer {
-      x += i;
-    }
+    defer x += i;
   }
   return x;
 }
@@ -42,13 +36,9 @@ loop_defer_test :: fn() -> int {
 
 early_return_defer_test :: fn() -> int {
   x := 0;
-  defer {
-    x += 1;
-  }
+  defer x += 1;
   if (true) {
-    defer {
-      x += 2;
-    }
+    defer x += 2;
     return x;
   }
   return x;
@@ -93,9 +83,7 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
 continue_defer_test :: fn() -> int {
   x := 0;
   for i in 0..3 {
-    defer {
-      x += 1;
-    }
+    defer x += 1;
     if (i == 1) {
       continue;
     }
@@ -105,19 +93,13 @@ continue_defer_test :: fn() -> int {
 }
 
 #test test_continue_defer :: fn() {
-  assert("continue defer failed"c, continue_defer_test() == 6);
+  assert("continue defer failed"c, continue_defer_test() == 7);
 }
 
-// ! DEFER IS STILL BROKEN!
-// ! It has improved, but when we break from within the if, we need to traverse up and emit those defers too.
-// ! x += 1 gets skipped here because the if itself has no defers but the parent block does and that control flow
-// ! affects that block.
 break_defer_test :: fn() -> int {
   x := 0;
   for i in 0..3 {
-    defer {
-      x += 1;
-    }
+    defer x += 1;
     if (i == 1) {
       break;
     }
@@ -132,12 +114,8 @@ break_defer_test :: fn() -> int {
 
 multiple_defer_test :: fn() -> int {
   x := 0;
-  defer {
-    x += 1;
-  }
-  defer {
-    x += 2;
-  }
+  defer x += 1;
+  defer x += 2;
   return x;
 }
 
@@ -148,13 +126,9 @@ multiple_defer_test :: fn() -> int {
 nested_control_flow_defer_test :: fn() -> int {
   x := 0;
   for i in 0..3 {
-    defer {
-      x += 1;
-    }
+    defer x += 1;
     if (i == 1) {
-      defer {
-        x += 2;
-      }
+      defer x += 2;
       break;
     }
     x += 3;
@@ -163,5 +137,5 @@ nested_control_flow_defer_test :: fn() -> int {
 }
 
 #test test_nested_control_flow_defer :: fn() {
-  assert("nested control flow defer failed"c, nested_control_flow_defer_test() == 6);
+  assert("nested control flow defer failed"c, nested_control_flow_defer_test() == 7);
 }

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <deque>
+#include <vector>
 
 #include "ast.hpp"
 #include "core.hpp"
@@ -100,17 +101,25 @@ struct Typer : VisitorBase {
   InternedString type_name(ASTExpr *node);
 };
 
-struct Emitter : VisitorBase {
+enum DeferBlockType {
+  DEFER_BLOCK_TYPE_OTHER,
+  DEFER_BLOCK_TYPE_FUNC,
+  DEFER_BLOCK_TYPE_LOOP,
+};
 
-  void emit_deferred_statements(ASTBlock *parent, bool is_return);
+struct DeferBlock {
+  std::vector<ASTDefer *> defers;
+  DeferBlockType type;
+};
+
+struct Emitter : VisitorBase {
+  void emit_deferred_statements(DeferBlockType type);
   static constexpr const char * defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
-  std::vector<int> generic_arguments;
   int num_tests = 0;
 
-  std::vector<std::function<void()>> pending_statements;
   Nullable<ASTType> type_context;
 
   Typer &typer;
@@ -120,7 +129,7 @@ struct Emitter : VisitorBase {
 
   // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
   // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
-  std::deque<std::stringstream> defer_blocks {};
+  std::deque<DeferBlock> defer_blocks {};
 
 
   std::stringstream code{};
