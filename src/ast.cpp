@@ -278,7 +278,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::DoubleColon);
         auto func = parser->parse_function_declaration(name);
         func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
-        return func;
+
+        if (compile_command.has_flag("test")) {
+          return func;
+        } else {
+          parser->ctx.scope->erase(func->name);
+          return nullptr;
+        }
     }},
     // #foreign
     // Declare a foreign function, like C's extern. Super janky and bad because

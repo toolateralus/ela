@@ -708,8 +708,83 @@ int Type::take_pointer_to() const {
   return global_find_type_id(id, ext);
 }
 
-int find_operator_overload(TType op, Type *type) {
-  std::string op_str = TTypeToString(op);
+
+
+std::string get_operator_overload_name(TType op, OperationKind kind) {
+  std::string output = "";
+  switch (op) {
+    case TType::LBrace:
+      return "subscript";
+
+
+    // Do we want this? might be useful for stuff like Array implementations etc.
+    // However, it feels like bringing in the complexity of C++'s
+    // copy constructor, copy assign, copy assign ref, move constructor , etc.
+    case TType::Assign:
+
+    // via interface Arithmetic 
+    case TType::Add:
+    case TType::Sub: {
+      if (kind == OPERATION_UNARY) {
+        return "neg";
+      }
+    }
+    case TType::Mul: {
+      if (kind == OPERATION_UNARY) {
+        return "deref"; // ?? do we want this?
+      }
+    }
+    case TType::Div:
+    case TType::Modulo:
+
+    // via interface Logical
+    case TType::LogicalNot:
+    case TType::LogicalOr:
+    case TType::LogicalAnd:
+
+    // via interface Bitwise
+    case TType::Not:
+    case TType::Or:
+    case TType::And:
+    case TType::SHL:
+    case TType::SHR:
+    case TType::Xor:
+
+    // via interface Compare.
+    case TType::LT:
+    case TType::GT:
+    case TType::EQ:
+    case TType::NEQ:
+    case TType::LE:
+    case TType::GE:
+
+    // via interface Inc/Dec
+    case TType::Increment:
+    case TType::Decrement:
+
+    // via interfaces CompArith/CompBitwise/CompLogical etc.
+    case TType::CompAdd:
+    case TType::CompSub:
+    case TType::CompMul:
+    case TType::CompDiv:
+    case TType::CompMod:
+    case TType::CompAnd:
+    case TType::CompOr:
+    case TType::CompXor:
+    case TType::CompSHL:
+    case TType::CompSHR:
+      output =  TTypeToString(op);
+    default: break;
+  }
+  std::transform(output.begin(), output.end(), output.begin(), ::tolower);
+  return output;
+}
+
+int find_operator_overload(TType op, Type *type, OperationKind kind) {
+  std::string op_str = get_operator_overload_name(op, kind);
+  if (op_str.empty()) {
+    return -1;
+  }
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
   auto scope = type->get_info()->scope;
   if (!scope) return Type::invalid_id;
@@ -721,6 +796,7 @@ int find_operator_overload(TType op, Type *type) {
   }
   return Type::invalid_id;
 }
+
 std::string mangled_type_args(const std::vector<int> &args) {
   std::string s;
   int i = 0;

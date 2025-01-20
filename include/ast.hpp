@@ -256,6 +256,7 @@ struct ASTBinExpr : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
 struct ASTUnaryExpr : ASTExpr {
+  bool is_operator_overload = false;
   ASTExpr *operand;
   Token op;
   void accept(VisitorBase *visitor) override;
@@ -455,6 +456,7 @@ struct ASTWhile : ASTStatement {
 };
 
 struct ASTSubscript : ASTExpr {
+  bool is_operator_overload = false;
   ASTExpr *left;
   ASTExpr *subscript;
   void accept(VisitorBase *visitor) override;

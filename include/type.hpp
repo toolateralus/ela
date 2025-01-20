@@ -312,6 +312,34 @@ public:
 struct ASTFunctionDeclaration;
 InternedString get_function_typename(ASTFunctionDeclaration *);
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
-int find_operator_overload(TType op, Type *);
 
+enum OperationKind {
+  OPERATION_BINARY,
+  OPERATION_UNARY,
+  OPERATION_SUBSCRIPT,
+};
 
+int find_operator_overload(TType op, Type *left_ty, OperationKind kind);
+std::string get_operator_overload_name(TType op, OperationKind kind);
+
+static std::string get_unmangled_name(Type *type) {
+  std::string base = type->get_base().get_str();
+  auto first = base.find("$");
+  if (first != std::string::npos) {
+    base = base.substr(0, first);
+  }
+
+  if (!type->generic_args.empty()) {
+    base += "![";
+    auto it = 0;
+    for (auto id: type->generic_args) {
+      base += get_unmangled_name(global_get_type(id));
+      if (it != type->generic_args.size() - 1) {
+        base += ", ";
+      }
+      it++;
+    }
+    base += "]";
+  }
+  return base;
+}

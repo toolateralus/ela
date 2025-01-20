@@ -1114,14 +1114,10 @@ void Typer::visit(ASTBinExpr *node) {
 
   auto left_ty = global_get_type(left);
 
-  // TODO: broaden how this works to any type,
-  // once we start using our own self-defined string{} type.
-  if (left_ty->id != string_type() && left_ty->is_kind(TYPE_STRUCT) && left_ty->get_ext().has_no_extensions() &&
-      node->op.type != TType::Assign && !node->op.is_comp_assign()) {
+  auto operator_overload_ty = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
+  if (operator_overload_ty != -1) {
     node->is_operator_overload = true;
-    auto function_type = find_operator_overload(node->op.type, left_ty);
-    // TODO: actually type check against the function?
-    node->resolved_type = global_get_type(function_type)->get_info()->as<FunctionTypeInfo>()->return_type;
+    node->resolved_type = global_get_type(operator_overload_ty)->get_info()->as<FunctionTypeInfo>()->return_type;
     return;
   }
 
@@ -1181,6 +1177,15 @@ void Typer::visit(ASTBinExpr *node) {
 void Typer::visit(ASTUnaryExpr *node) {
   node->operand->accept(this);
   auto operand_ty = node->operand->resolved_type;
+
+  auto type = global_get_type(operand_ty);
+
+  auto overload = find_operator_overload(node->op.type, type, OPERATION_UNARY);
+  if (overload != -1) {
+    node->is_operator_overload = true;
+    node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    return;
+  }
 
   // Address-Of.
   if (node->op.type == TType::And) {
@@ -1373,6 +1378,14 @@ void Typer::visit(ASTSubscript *node) {
   node->subscript->accept(this);
   auto left_ty = global_get_type(node->left->resolved_type);
   auto subscript_ty = global_get_type(node->subscript->resolved_type);
+
+
+  auto overload = find_operator_overload(TType::LBrace, left_ty, OPERATION_SUBSCRIPT);
+  if (overload != -1) {
+    node->is_operator_overload = true;
+    node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    return;
+  }
 
   /*
   !HACK FIX STRING SLICING THIS IS TERRIBLE
@@ -1745,6 +1758,6 @@ void Typer::visit(ASTWhere *node) {
   auto satisfied = visit_where_predicate(type, node->predicate);
 
   if (!satisfied) {
-    throw_error(std::format("'where' clause type constraint not satified for {}", type->to_string()), node->source_range);
+    throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)), node->source_range);
   }
 }

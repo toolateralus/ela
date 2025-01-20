@@ -265,6 +265,27 @@ void Emitter::visit(ASTUnaryExpr *node) {
     (*ss) << '(' << type << ')';
   }
   auto left_type = node->operand->resolved_type;
+  auto left_ty = global_get_type(left_type);
+
+  if (left_ty && node->is_operator_overload) {
+    // !! THIS IS A TOTAL HACK!!!
+    // !! JUST TRYING THIS OUT!!!
+    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_UNARY);
+    auto call = ast_alloc<ASTCall>();
+    auto sr = ast_alloc<ASTDotExpr>();
+    auto left_id = ast_alloc<ASTIdentifier>();
+    sr->base = node->operand;
+    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+    call->function = sr;
+    call->arguments = ast_alloc<ASTArguments>();
+    call->accept(&typer);
+    call->accept(this);
+    sr->source_range = node->source_range;
+    call->arguments->source_range = node->source_range;
+    call->source_range = node->source_range;
+    return;
+  }
+
   auto type = global_get_type(left_type);
   if (node->op.type == TType::Not && type->get_ext().is_array()) {
     node->operand->accept(this);
@@ -291,20 +312,20 @@ void Emitter::visit(ASTBinExpr *node) {
   if (left_ty && node->is_operator_overload) {
     // !! THIS IS A TOTAL HACK!!!
     // !! JUST TRYING THIS OUT!!!
-    std::string op_str = TTypeToString(node->op.type);
-    std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
-    auto function_type = find_operator_overload(node->op.type, left_ty);
+    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
     auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTScopeResolution>();
+    auto sr = ast_alloc<ASTDotExpr>();
     auto left_id = ast_alloc<ASTIdentifier>();
-    left_id->value = to_cpp_string(left_ty);
-    sr->base = left_id;
-    sr->member_name = op_str;
+    sr->base = node->left;
+    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
     call->function = sr;
     call->arguments = ast_alloc<ASTArguments>();
-    call->arguments->arguments = {node->left, node->right};
+    call->arguments->arguments = {node->right};
     call->accept(&typer);
     call->accept(this);
+    sr->source_range = node->source_range;
+    call->arguments->source_range = node->source_range;
+    call->source_range = node->source_range;
     return;
   }
 
@@ -706,6 +727,27 @@ void Emitter::visit(ASTDotExpr *node) {
 }
 
 void Emitter::visit(ASTSubscript *node) {
+  auto left_ty = global_get_type(node->left->resolved_type);
+  if (left_ty && node->is_operator_overload) {
+    // !! THIS IS A TOTAL HACK!!!
+    // !! JUST TRYING THIS OUT!!!
+    auto function_type = find_operator_overload(TType::LBrace, left_ty, OPERATION_SUBSCRIPT);
+    auto call = ast_alloc<ASTCall>();
+    auto sr = ast_alloc<ASTDotExpr>();
+    auto left_id = ast_alloc<ASTIdentifier>();
+    sr->base = node->left;
+    sr->member_name = get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT);
+    call->function = sr;
+    call->arguments = ast_alloc<ASTArguments>();
+    call->arguments->arguments = {node->subscript};
+    call->accept(&typer);
+    call->accept(this);
+    sr->source_range = node->source_range;
+    call->arguments->source_range = node->source_range;
+    call->source_range = node->source_range;
+    return;
+  }
+
   node->left->accept(this);
   (*ss) << '[';
   node->subscript->accept(this);

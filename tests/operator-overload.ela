@@ -1,18 +1,17 @@
-
 Vec2 :: struct {
   x: float;
   y: float;
 }
 
-Add :: interface![Left, Right, Result] {
-  add :: fn(left: Left, right: Right) -> Result;
+Add :: interface![Right, Result] {
+  add :: fn(self*, right: Right) -> Result;
 }
 
-impl Add![Vec2, Vec2, Vec2] for Vec2 {
-  add :: fn(left: Vec2, right: Vec2) -> Vec2 {
+impl Add![Vec2, Vec2] for Vec2 {
+  add :: fn(self*, right: Vec2) -> Vec2 {
     return {
-      x: left.x + right.x,
-      y: left.y + right.y
+      x: self.x + right.x,
+      y: self.y + right.y
     };
   }
 }
@@ -28,7 +27,63 @@ impl Vec2 {
 #test test_main :: fn() {
   a, b := (Vec2{x: 1, y: 1}, Vec2{x: 1, y: 1});
   
-  result := a + b;
+  result := a.add(b);
   assert("+ failed"c,  result.x == 2 && result.y == 2);
+}
 
+Sub :: interface![Right, Result] {
+  sub :: fn(self*, right: Right) -> Result;
+}
+
+impl Sub![Vec2, Vec2] for Vec2 {
+  sub :: fn(self*, right: Vec2) -> Vec2 {
+    return {
+      x: self.x - right.x,
+      y: self.y - right.y
+    };
+  }
+}
+
+Neg :: interface![Result] {
+  neg :: fn(self*) -> Result;
+}
+
+impl Neg![Vec2] for Vec2 {
+  neg :: fn(self*) -> Vec2 {
+    return {
+      x: -self.x,
+      y: -self.y
+    };
+  }
+}
+
+impl Vec2 {
+  subscript :: fn(self*, index: int) -> float {
+    if index == 0 {
+        return self.x;
+    } else {
+        return self.y;
+    }
+  }
+}
+
+#test test_sub :: fn() {
+  a, b := (Vec2{x: 3, y: 2}, Vec2{x: 1, y: 1});
+  
+  result := a.sub(b);
+  assert("- failed"c,  result.x == 2 && result.y == 1);
+}
+
+#test test_neg :: fn() {
+  a := Vec2{x: 3, y: 2};
+  
+  result := a.neg();
+  assert("neg failed"c,  result.x == -3 && result.y == -2);
+}
+
+#test test_index :: fn() {
+  a := Vec2{x: 3, y: 2};
+  
+  assert("index 0 failed"c, a[0] == 3);
+  assert("index 1 failed"c, a[1] == 2);
 }
