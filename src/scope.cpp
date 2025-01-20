@@ -32,7 +32,7 @@ Context::Context() {
     scope->types["c_string"] = c_string_type() = charptr_type();
     // ** ------------- ***
   }
-
+ 
   // define some default functions that may or may not be macros.
   {
     // We still define assert and sizeof manually here, because

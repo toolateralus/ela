@@ -1,0 +1,47 @@
+#foreign rand :: fn() -> int;
+#foreign srand :: fn(seed: u32);
+#foreign fmod :: fn(l: float, r: float) -> float;
+#foreign fabs :: fn(f: float64) -> float64;
+#foreign isinf :: fn(arg: float64) -> bool;
+#foreign isnan :: fn(arg: float64) -> bool;
+#foreign pow :: fn(base: float64, exponent: float64) -> float64;
+#foreign sqrt :: fn(f: float64) -> float64;
+#foreign cos :: fn(f: float64) -> float64;
+#foreign sin :: fn(f: float64) -> float64;
+
+Random :: struct {
+  Max :: 2147483647; // !BUG: can't use constants for structs. Emitting it is just empty
+}
+
+impl Random {
+  next :: fn(max: float32) -> float {
+    return (rand() as float) / (2147483647 as float) * max; // ! HACK:: replace this magic number with Random::Max when we fix that problen.
+  }
+}
+
+abs :: fn![T](v: T) -> T {
+  if v < 0 {
+    return -v;
+  }
+  return v;
+}
+
+min :: fn![T](a: T, b: T) -> T {
+  if a > b then return b;
+  return a;
+}
+
+max :: fn![T](a: T, b: T) -> T {
+  if a > b then return a;
+  return b;
+}
+
+clamp :: fn(v: float64, min, max) -> float64 {
+  if v < min then return min;
+  if v > max then return max;
+  return v;
+}
+
+lerp :: fn(a: float, b, t) -> float {
+  return (a * (1.0 - t)) + (b * t);
+}

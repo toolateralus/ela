@@ -136,7 +136,7 @@ struct Emitter : VisitorBase {
   std::stringstream *ss{};
   std::stringstream test_functions{};
 
-  int indentLevel = 0;
+  int indent_level = 0;
   Context &ctx;
 
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
@@ -168,7 +168,7 @@ struct Emitter : VisitorBase {
 
   std::string to_type_struct(Type *type, Context &context);
   inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
-  inline std::string indent() { return std::string(indentLevel * 2, ' '); }
+  inline std::string indent() { return std::string(indent_level * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
   inline void newline() { (*ss) << '\n'; }

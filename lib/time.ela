@@ -1,0 +1,81 @@
+
+#foreign time :: fn(value: void*) -> int;
+timespec_t :: struct {
+  tv_sec: s64;
+  tv_nsec: s64;
+}
+
+#foreign clock_gettime :: fn(clock_id: int, tp: timespec_t*) -> int;
+
+tm_t :: struct {
+  tm_sec: int;
+  tm_min: int;
+  tm_hour: int;
+  tm_mday: int;
+  tm_mon: int;
+  tm_year: int;
+  tm_wday: int;
+  tm_yday: int;
+  tm_isdst: int;
+}
+
+#foreign localtime_r :: fn(timep: s64*, result: tm_t*) -> tm_t*;
+
+Timing :: struct;
+
+impl Timing {
+  // returns the timespec_t for the current time since epoch.
+  get_timespec_since_epoch :: fn() -> timespec_t {
+    ts: timespec_t;
+    clock_gettime(0, &ts);
+    return ts;
+  }
+  
+  // returns a seconds value representing time since epoch
+  seconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) + (ts.tv_nsec as float64) / (1_000_000_000.0 as float64);
+  }
+
+  // returns a milliseconds value representing time since epoch
+  milliseconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) * 1_000.0 + (ts.tv_nsec as float64) / 1_000_000.0 as float64;
+  }
+
+  // returns a microseconds value representing time since epoch
+  microseconds :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) * 1_000_000.0 + (ts.tv_nsec as float64) / 1_000.0;
+  }
+
+  // returns a minutes value representing time since epoch
+  minutes :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) / 60.0 + (ts.tv_nsec as float64) / (60.0 * 1_000_000_000.0);
+  }
+
+  // returns an hours value representing time since epoch
+  hours :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) / 3_600.0 + (ts.tv_nsec as float64) / ((3_600.0 * 1_000_000_000.0) as float64);
+  }
+
+  // returns a days value representing time since epoch
+  days :: fn() -> float64 {
+    ts := #self::get_timespec_since_epoch();
+    return (ts.tv_sec as float64) / 86_400.0 + (ts.tv_nsec as float64) / ((86_400.0 * 1_000_000_000.0) as float64)
+  }
+
+  date_time :: fn() -> c_string {
+    ts := #self::get_timespec_since_epoch();
+    time_t: s64 = ts.tv_sec;
+    tm: tm_t;
+    localtime_r(&time_t, &tm);
+    buffer: char[64];
+    snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d"c,
+             tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
+             tm.tm_hour, tm.tm_min, tm.tm_sec);
+    return c_string::from_ptr(buffer as c_string, buffer as c_string + strlen(buffer));
+  }
+}

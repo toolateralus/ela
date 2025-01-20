@@ -507,7 +507,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
     (*ss) << type_tag;
     (*ss) << type->get_base().get_str() << "{\n";
   }
-  indentLevel++;
+  indent_level++;
 
   auto old = emit_default_init;
   if (node->is_union)
@@ -530,7 +530,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   }
 
   (*ss) << "};\n";
-  indentLevel--;
+  indent_level--;
 
   bool has_default_ctor = false;
   bool has_dtor = false;
@@ -1719,7 +1719,7 @@ void Emitter::visit(ASTDefer *node) {
 void Emitter::visit(ASTBlock *node) {
   emit_line_directive(node);
   (*ss) << (" {\n");
-  indentLevel++;
+  indent_level++;
   ctx.set_scope(node->scope);
 
   defer_blocks.emplace_back();
@@ -1737,7 +1737,7 @@ void Emitter::visit(ASTBlock *node) {
   emit_deferred_statements(DEFER_BLOCK_TYPE_OTHER);
   defer_blocks.pop_back();
 
-  indentLevel--;
+  indent_level--;
   indented("}");
   ctx.exit_scope();
   return;

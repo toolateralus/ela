@@ -97,21 +97,25 @@
 }
 
 #region LIBC_FORWARD {
-  // General utilities. Needs to be expanded for full libc support.
   #foreign system :: fn(cmd: c_string) -> int;
-  #foreign printf :: fn(format: c_string, ...) -> int;
-  #foreign exit :: fn(code: int);
 
-
-  // General memory utilities. Missing a TON of them, to be expanded too.
   #foreign free :: fn(ptr: void*) -> void;
   #foreign malloc :: fn(nbytes: u64) -> void*;
   #foreign calloc :: fn(num: u64, size: u64) -> void*;
-  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;#foreign free :: fn(ptr: void*) -> void;
+  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;
 
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
   #foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
   #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
-  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+
+  #foreign printf :: fn(format: c_string, ...) -> int;
+  #foreign exit :: fn(code: int);
+
+  #foreign scanf :: fn(format: c_string, ...) -> int;
+  #foreign getchar :: fn() -> int;
+
+  #foreign sleep :: fn(seconds: int);
+  #foreign usleep :: fn(c: int);
 
   #foreign strdup :: fn(str: c_string) -> c_string;
   #foreign strndup :: fn(str: c_string, n: u64) -> c_string;
@@ -138,9 +142,12 @@
   #foreign isupper :: fn(c: int) -> int;
   #foreign isprint :: fn(c: int) -> int;
   #foreign ispunct :: fn(c: int) -> int;
+
+  #foreign atoi :: fn(v: c_string) -> int;
+  #foreign atof :: fn(v: c_string) -> float64;
 }
 
-#region RANGE {
+#ifdef RANGE_GENERIC {
   Range_Base :: struct![T] {
     begin: T;
     end:   T;
@@ -167,8 +174,8 @@
     }
   }
 
-  impl![T] Enumerable![Range_Base_Enumerator, T] for Range_Base![T] {
-    enumerator :: fn(self*) -> Range_Base_Enumerator {
+  impl![T] Enumerable![Range_Base_Enumerator![T], T] for Range_Base![T] {
+    enumerator :: fn(self*) -> Range_Base_Enumerator![T] {
       return {
         begin: self.first,
         end: self.last,
@@ -176,7 +183,42 @@
       };
     }
   }
-  
+} else {
+  Range :: struct {
+    begin: s64;
+    end:   s64;
+  }
+
+  // #alias Range :: Range_Base![s64];
+
+  // TODO: support reverse enumeration for this as well.
+  Range_Enumerator :: struct {
+    begin: s64;
+    end:   s64;
+    idx:   s64;
+  }
+
+  impl Enumerator![s64] for Range_Enumerator {
+    current   :: fn(self*) -> s64 {
+      return self.idx;
+    }
+    next      :: fn(self*) {
+      self.idx++;
+    };
+    done      :: fn(self*) -> bool {
+      return self.idx >= self.end;
+    }
+  }
+
+  impl Enumerable![Range_Enumerator, s64] for Range {
+    enumerator :: fn(self*) -> Range_Enumerator {
+      return {
+        begin: self.begin,
+        end:   self.end,
+        idx:          0,
+      };
+    }
+  }
 }
 
 #region STRING {
@@ -204,6 +246,10 @@
       str.data[str.length] = 0;
       return str;
     }
+    deinit :: fn(self*) {
+      free(self.data);
+      self.length = 0;
+    }
   }
 }
 
@@ -214,6 +260,47 @@
     args :: fn() -> string[]* {
       #static values: string[];
       return &values;
+    }
+  }
+}
+
+#ifdef OTHER {
+  impl s64 {
+    to_string :: fn(self) -> c_string {
+      #static table : c_string[] = {
+        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+      };
+
+      if self < 10 then return table[self];
+
+      negative := false;
+      if self < 0 {
+        negative = true;
+        self = -self;
+      }
+
+      buffer: char[20];
+      index: int = 0;
+
+      while self > 0 {
+        buffer[index] = '0' + (self % 10);
+        self /= 10;
+        index++;
+      }
+
+      if negative {
+        buffer[index] = '-';
+        index++;
+      }
+
+      // Reverse the buffer
+      for i in 0..(index / 2) {
+        temp := buffer[i];
+        buffer[i] = buffer[index - i - 1];
+        buffer[index - i - 1] = temp;
+      }
+
+      return c_string::from_ptr(buffer as c_string, (buffer as c_string) + index);
     }
   }
 }
