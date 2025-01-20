@@ -492,12 +492,9 @@ int charptr_type() {
   return type;
 }
 
-int &range_type() {
-  static int type;
-  return type;
+int range_type() {
+  return root_scope->find_type_id("Range", {});
 }
-
-
 
 int &c_string_type() {
   static int type;

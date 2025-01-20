@@ -69,15 +69,20 @@ void Emitter::visit(ASTFor *node) {
   auto range_type = global_get_type(node->range->resolved_type);
   std::string range_type_str = to_cpp_string(range_type);
 
-  // Generate a unique ID for the enumerator
+  // Generate unique IDs for the range and enumerator
+  std::string range_unique_id = "$_range_id" + std::to_string(defer_blocks.size());
   std::string unique_id = "$_loop_id" + std::to_string(defer_blocks.size());
 
   (*ss) << indent() << "{\n";
   indent_level++;
 
+  // Emit the range initialization
+  (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
+  node->range->accept(this);
+  (*ss) << ";\n";
+
   // Emit the enumerator initialization
   std::string symbol_name;
-
   if (range_type->implements("Enumerable")) {
     symbol_name = "enumerator";
   } else {
@@ -104,24 +109,17 @@ void Emitter::visit(ASTFor *node) {
   auto current_type_str = to_cpp_string(current_type);
 
   (*ss) << indent() << enumerable_iterator_type << " " << unique_id << " = ";
-
   if (range_type->implements("Enumerable")) {
-    (*ss) << range_type_str << "_enumerator(&";
+    (*ss) << range_type_str << "_enumerator(&" << range_unique_id << ");\n";
   } else {
-    (*ss) << range_type_str << "_iter(&";
+    (*ss) << range_type_str << "_iter(&" << range_unique_id << ");\n";
   }
 
-  node->range->accept(this);
-  (*ss) << ");\n";
-
-  (*ss) << indent() << "while (!";
-  (*ss) << enumerable_iterator_type << "_done(&" << unique_id << ")) {\n";
+  (*ss) << indent() << "while (!" << enumerable_iterator_type << "_done(&" << unique_id << ")) {\n";
   indent_level++;
 
   (*ss) << indent() << current_type_str << ' ';
-
   node->iden->accept(this);
-
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
     (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
@@ -135,8 +133,7 @@ void Emitter::visit(ASTFor *node) {
   node->block->accept(this);
 
   // Emit the next call
-  (*ss) << indent();
-  (*ss) << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
+  (*ss) << indent() << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
 
   // Emit deferred statements
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
@@ -849,9 +846,9 @@ void Emitter::visit(ASTInitializerList *node) {
 
 void Emitter::visit(ASTRange *node) {
   // TODO: fix this dog crap casting and lack of calculating the span of the range.
-  (*ss) << "Range{.first = (s64)";
+  (*ss) << "Range{.begin = (s64)";
   node->left->accept(this);
-  (*ss) << ", .last = (s64)";
+  (*ss) << ", .end = (s64)";
   node->right->accept(this);
   (*ss) << "}";
   return;
