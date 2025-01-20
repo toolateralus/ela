@@ -129,11 +129,14 @@ void Emitter::visit(ASTFor *node) {
     (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
   }
 
+  // Emit the next call
+  // We do this right after getting current to avoid complexity when it comes to dealing with control flow.
+  // We may want to do that stuff.
+  (*ss) << indent() << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
+
   // Emit the user code block
   node->block->accept(this);
 
-  // Emit the next call
-  (*ss) << indent() << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
 
   // Emit deferred statements
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);

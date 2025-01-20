@@ -17,16 +17,16 @@ Xaryu :: struct {
 }
 
 impl Xaryu {
-  to_string :: fn(self) -> string {
+  to_string :: fn(self) -> c_string {
     return "XarBar";
   }
 }
 
 #test test_string_interpolation :: fn() {
   xarbar: Xaryu;
-  interp: string = $"{xarbar}";
+  interp: string = string::from($"{xarbar}");
   assert("unexpected interpolated string value"c, strcmp(interp.data, "XarBar"c) == 0);
-  interp = $"{(1 + 1) * 2}";
+  interp = string::from($"{(1 + 1) * 2}");
   assert("unexpected interpolated string value"c, strcmp(interp.data, "4"c) == 0);
 }
 
@@ -96,7 +96,7 @@ impl Xaryu {
 
 
 #test subscript_string :: fn() {
-  s: string = "0,1,2,3";
+  s: string = string::from("0,1,2,3");
   s[0] = 10;
   assert("subscript assign string failed"c, s[0] == (10 as char));
 }
