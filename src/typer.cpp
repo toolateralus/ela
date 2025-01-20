@@ -138,8 +138,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     decl->accept(this);
   }
 
-
-
   ctx.set_scope(old_scope);
   node->resolved_type = type->id;
 }
@@ -216,7 +214,7 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
-  
+
   node->return_type->accept(this);
   node->params->accept(this);
 
@@ -373,7 +371,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
 void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                         std::vector<int> generic_args) {
-  
   auto previous = ctx.scope;
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
@@ -385,7 +382,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
       generic_arg++;
     }
   }
-  
+
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
@@ -675,28 +672,44 @@ void Typer::visit(ASTFor *node) {
   }
 
   int iter_ty = Type::invalid_id;
+  auto scope = range_type->get_info()->scope;
+  bool is_enumerable = false;
 
-  // TODO: implement some kind of interface system that we can use for iterators,
-  // no longer can we rely on C++'s crappy 'begin()/end()' since we compile our own free methods.
-  if (range_type_id == string_type()) {
-    iter_ty = char_type();
-  } else if (range_type_id == ::range_type()) {
-    iter_ty = int_type();
-    if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-      throw_error("Cannot use pointer value semantic with a range. use Range{<start>, "
-                  "<end>, <increment>} syntax to increment by a custom value.",
+  if (range_type->implements("Iterable")) {
+    auto symbol = scope->local_lookup("iter");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("Internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'iter'",
                   node->source_range);
     }
-  } else if (range_type->get_ext().is_array() || range_type->get_ext().is_fixed_sized_array()) {
-    iter_ty = range_type->get_element_type();
+    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+  } else if (range_type->implements("Enumerable")) {
+    auto symbol = scope->local_lookup("enumerator");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("Internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
+                  "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
+                  node->source_range);
+    }
+    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+    is_enumerable = true;
   } else {
-    throw_error("Cannot iterate with a range-based for loop over a "
-                "non-collection type.",
+    throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
+                "'Enumerable' interface. "
+                "Please implement at least one of these, note that 'Iterable'/'iter()' will be selected before "
+                "'Enumerable'/'enumerator()', mainly for performance reasons, but also ambiguity",
                 node->source_range);
   }
 
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    iter_ty = global_get_type(iter_ty)->take_pointer_to();
+  if (is_enumerable && node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
+                "'Enumerable'. This is because the enumerable()'s return type is not restricted to being a pointer, "
+                "and we can't guarantee "
+                "that taking a reference to it is safe or even valid.",
+                node->source_range);
+
+  } else if (!is_enumerable && node->value_semantic != VALUE_SEMANTIC_POINTER) {
+    // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit dereference.
+    iter_ty = global_get_type(iter_ty)->get_element_type();
   }
 
   ctx.scope->insert(iden->value, iter_ty, node);
@@ -1379,7 +1392,6 @@ void Typer::visit(ASTSubscript *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   auto subscript_ty = global_get_type(node->subscript->resolved_type);
 
-
   auto overload = find_operator_overload(TType::LBrace, left_ty, OPERATION_SUBSCRIPT);
   if (overload != -1) {
     node->is_operator_overload = true;
@@ -1731,23 +1743,27 @@ int Typer::get_self_type() {
 bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
   switch (node->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr*>(node);
+      auto bin = static_cast<ASTBinExpr *>(node);
       auto op = bin->op.type;
       if (op == TType::And) {
         return visit_where_predicate(type, bin->left) && visit_where_predicate(type, bin->right);
       } else if (op == TType::Or) {
         return visit_where_predicate(type, bin->left) || visit_where_predicate(type, bin->right);
       } else {
-        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use 'bitwise' operators for brevity, they're effectively '&&' and '||'.", bin->source_range);
+        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+                    bin->source_range);
       }
     } break;
     case AST_NODE_TYPE: {
       node->accept(this);
       // return whether this type implements this trait or not.
       // also can be used to assert whether it's equal to the type provided or not.
-      return std::ranges::find(type->interfaces, node->resolved_type) != type->interfaces.end() || type->id == node->resolved_type;
+      return std::ranges::find(type->interfaces, node->resolved_type) != type->interfaces.end() ||
+             type->id == node->resolved_type;
     } break;
-    default: throw_error("Invalid node in 'where' clause predicate", node->source_range);
+    default:
+      throw_error("Invalid node in 'where' clause predicate", node->source_range);
   }
   return false;
 }
@@ -1758,6 +1774,7 @@ void Typer::visit(ASTWhere *node) {
   auto satisfied = visit_where_predicate(type, node->predicate);
 
   if (!satisfied) {
-    throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)), node->source_range);
+    throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)),
+                node->source_range);
   }
 }

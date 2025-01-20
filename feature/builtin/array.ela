@@ -87,6 +87,14 @@ impl![T] Clone for Dynamic_Array![T] {
   } 
 }
 
+impl![T] Iterable![T] for Dynamic_Array![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length-1 // TODO; verify -1 is correct
+    }
+  }
+}
 
 #test test_Dynamic_Array_push_at :: fn() {
   array : Dynamic_Array![int];

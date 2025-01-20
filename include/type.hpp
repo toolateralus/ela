@@ -285,8 +285,18 @@ struct Type {
   inline InternedString const get_base() const { return base; }
   TypeExtensions const get_ext() const { return extensions; }
   TypeExtensions const get_ext_no_compound() const { return extensions; }
-
   TypeInfo *get_info() const { return info; }
+
+  bool implements(const InternedString &interface) {
+    // Is this a reliable way to check this??
+    for (auto id: interfaces) {
+      auto iface = global_get_type(id);
+      if (iface->base.get_str().starts_with(interface.get_str())) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 private:
   TypeInfo *info;
