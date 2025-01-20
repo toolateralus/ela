@@ -1,0 +1,128 @@
+#import core;
+#include "interfaces.ela";
+
+#foreign free :: fn(ptr: void*) -> void;
+#foreign malloc :: fn(nbytes: u64) -> void*;
+#foreign calloc :: fn(num: u64, size: u64) -> void*;
+#foreign realloc :: fn(ptr: void*, size: u64) -> void*;
+
+Dynamic_Array :: struct![T] {
+  data:     T*;
+  length:   u64;
+  capacity: u64;
+}
+
+
+impl![T] Dynamic_Array![T] {
+  // You should probably not call this function, and you do not need to for normal push operations.
+  // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
+  // and this will set your length appropriately.
+  resize :: fn(self*, new_capacity: u64) {
+    if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
+
+    self.capacity = new_capacity;
+    self.data = realloc(self.data, #type(T).size * self.capacity);
+    if !self.data then panic("Failed to allocate in Dynamic_Array![{#type(T).name}]");
+  }
+
+  push   :: fn(self*, v: T) {
+    if self.length + 1 >= self.capacity {
+      if self.capacity == 0 then self.capacity = 4;
+      self.resize(self.capacity * 2);
+    }
+    self.data[self.length] = v;
+    self.length++;
+  }
+
+  pop    :: fn(self*) -> T {
+    if self.length == 0 then panic("Attempted to pop from an empty Dynamic_Array![{#type(T).name}]");
+    value := self.data[self.length - 1];
+    self.length -= 1;
+    return value;
+  }
+
+  deinit :: fn(self*) {
+    free(self.data);
+    self.data = null;
+    self.length = 0;
+  }
+
+  at :: fn(self*, index: u64) -> T {
+    return self.data[index];
+  }
+}
+
+
+#test test_Dynamic_Array_push_at :: fn() {
+  array : Dynamic_Array![int];
+
+  {
+    defer array.deinit();
+    for i in 0..100 {
+      array.push(i);
+    }
+    assert("Array push failed to meet expected length"c, array.length == 100);
+    for i in 0..100 {
+      assert("array.at(i) != i"c, array.at(i) == i);
+    }
+  }
+
+  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);  
+}
+
+#test test_Dynamic_Array_pop :: fn() {
+  array : Dynamic_Array![int];
+
+  {
+    defer array.deinit();
+    for i in 0..100 {
+      array.push(i);
+    }
+    for i in 0..100 {
+      value := array.pop();
+      assert("array.pop() != 99 - i"c, value == 99 - i);
+    }
+    assert("Array pop failed to meet expected length"c, array.length == 0);
+  }
+
+  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+}
+
+#test test_Dynamic_Array_resize :: fn() {
+  array : Dynamic_Array![int];
+
+  {
+    defer array.deinit();
+    array.resize(2);
+    assert("Array resize failed to set capacity"c, array.capacity == 2);
+    for i in 0..2 {
+      array.push(i);
+    }
+    assert("Array resize failed to meet expected length"c, array.length == 2);
+  }
+
+  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+}
+
+#test test_Dynamic_Array_shrink :: fn() {
+  array : Dynamic_Array![int];
+
+  {
+    defer array.deinit();
+    for i in 0..100 {
+      array.push(i);
+    }
+    assert("Array push failed to meet expected length"c, array.length == 100);
+
+    array.resize(50);
+    assert("Array shrink failed to meet expected length"c, array.length == 50);
+    assert("Array shrink failed to set capacity"c, array.capacity == 50);
+
+    for i in 0..50 {
+      assert("array.at(i) != i"c, array.at(i) == i);
+    }
+  }
+
+  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+}
+

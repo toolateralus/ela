@@ -1,4 +1,4 @@
-#include "interface.ela"
+#include "interfaces.ela"
 
 String_Iterator :: struct {
   str:   string*;
