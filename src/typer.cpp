@@ -528,12 +528,6 @@ void Typer::visit(ASTDeclaration *node) {
   symbol->type_id = node->type->resolved_type;
   auto type = global_get_type(node->type->resolved_type);
 
-  // TODO: is this neccesary?
-  // If we declare a c_string, we skip the normal string construction procedure.
-  if (node->value.get() && node->value.get()->resolved_type == string_type() && type->id == string_type()) {
-    node->value.get()->resolved_type = c_string_type();
-  }
-
   if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
   }
@@ -1296,12 +1290,7 @@ void Typer::visit(ASTLiteral *node) {
       return;
     case ASTLiteral::RawString:
     case ASTLiteral::String: {
-      static auto freestanding = compile_command.has_flag("freestanding");
-      if (node->is_c_string || freestanding) {
-        node->resolved_type = c_string_type();
-      } else {
-        node->resolved_type = string_type();
-      }
+      node->resolved_type = c_string_type();
       return;
     }
     case ASTLiteral::Bool:
@@ -1317,7 +1306,7 @@ void Typer::visit(ASTLiteral *node) {
           current->expression->accept(this);
         current = current->next;
       }
-      node->resolved_type = string_type();
+      node->resolved_type = c_string_type();
       return;
     }
     case ASTLiteral::Char:
@@ -1396,18 +1385,6 @@ void Typer::visit(ASTSubscript *node) {
   if (overload != -1) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
-    return;
-  }
-
-  /*
-  !HACK FIX STRING SLICING THIS IS TERRIBLE
- */
-  if (left_ty->id == string_type()) {
-    if (subscript_ty->id == range_type()) {
-      node->resolved_type = left_ty->id;
-      return;
-    }
-    node->resolved_type = char_type();
     return;
   }
 

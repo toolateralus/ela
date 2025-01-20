@@ -38,14 +38,14 @@
       "cwd": "${fileDirname}"
     },
     
-    // If you have an ela_source/dummy.ela you can use these configurations to test
+    // If you have an ela_source/main.ela you can use these configurations to test
     // miscellaneous problems you may have.
     {
       "type": "lldb",
       "request": "launch",
       "name": "Debug dummy",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["dummy.ela", "--s"],
+      "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/ela_source"
     },
     {
@@ -61,7 +61,7 @@
       "request": "launch",
       "name": "Debug dummy tests",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["dummy.ela", "--s", "--test"],
+      "args": ["main.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source"
     },
   ]

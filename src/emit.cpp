@@ -226,11 +226,7 @@ void Emitter::visit(ASTLiteral *node) {
       (*ss) << "(std::nullptr_t)nullptr";
       return;
     case ASTLiteral::String:
-      if (node->resolved_type == string_type() && !is_freestanding) {
-        output = std::format("string{{\"{}\"}}", node->value);
-      } else if (node->resolved_type == c_string_type()) {
-        output = std::format("\"{}\"", node->value);
-      }
+      output = std::format("\"{}\"", node->value);
       break;
     case ASTLiteral::RawString:
       output = std::format("R\"__({})__\"", node->value);
@@ -980,7 +976,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
   if (type->is_kind(TYPE_STRUCT)) {
     return "%s";
   }
-  if (type->id == charptr_type() || (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
+  if (type->id == charptr_type()) {
     return "%s";
   }
   if (type->get_ext().is_pointer()) {
@@ -1070,18 +1066,11 @@ void Emitter::interpolate_string(ASTLiteral *node) {
           current->expression->accept(this);
           (*ss) << ")";
         }
-
-        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
-          (*ss) << ".data";
-        }
       };
 
       if (type->id == bool_type()) {
         current->expression->accept(this);
         (*ss) << " ? \"true\" : \"false\"";
-      } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
-        current->expression->accept(this);
-        (*ss) << ".data";
       } else if (type->is_kind(TYPE_STRUCT)) {
         auto info = (type->get_info()->as<StructTypeInfo>());
         interpolate_to_string_struct_union(info->scope);
@@ -1212,8 +1201,6 @@ std::string get_type_flags(Type *type) {
         kind_flags |= TYPE_FLAGS_FLOAT;
       } else if (type->id == bool_type()) {
         kind_flags |= TYPE_FLAGS_BOOL;
-      } else if (type->get_base() == "string") {
-        kind_flags |= TYPE_FLAGS_STRING;
       }
       break;
     }

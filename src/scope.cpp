@@ -20,8 +20,8 @@ Context::Context() {
   root_scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
-  if (compile_command.has_flag("freestanding")) root_scope->defines().insert("FREESTANDING");
-
+  if (compile_command.has_flag("freestanding"))
+    root_scope->defines().insert("FREESTANDING");
 
   if (compile_command.has_flag("test")) {
     root_scope->add_def("TESTING");
@@ -72,115 +72,75 @@ Context::Context() {
     scope->insert("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr, SYMBOL_IS_FUNCTION);
   }
 
-
   // string, env, reflection types. Only if we're compiling with stdlib.
   if (!compile_command.has_flag("freestanding")) {
-      // define types used for reflection.
-      {
-        auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-        auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-        auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    // define types used for reflection.
+    {
+      auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+      auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+      auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
 
-        type_scope->parent = root_scope;
-        field_scope->parent = root_scope;
-        element_scope->parent = root_scope;
+      type_scope->parent = root_scope;
+      field_scope->parent = root_scope;
+      element_scope->parent = root_scope;
 
-        auto type_id = global_create_struct_type("Type", type_scope);
-        auto field_id = global_create_struct_type("Field", field_scope);
-        auto element_id = global_create_struct_type("Element", element_scope);
+      auto type_id = global_create_struct_type("Type", type_scope);
+      auto field_id = global_create_struct_type("Field", field_scope);
+      auto element_id = global_create_struct_type("Element", element_scope);
 
-        // Type*
-        auto type_ptr = global_find_type_id(type_id, {.extensions = {{TYPE_EXT_POINTER}}});
+      // Type*
+      auto type_ptr = global_find_type_id(type_id, {.extensions = {{TYPE_EXT_POINTER}}});
 
-        // Field*[]
-        auto field_arr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
-        // Element[]
-        auto element_arr = global_find_type_id(element_id, {.extensions = {{TYPE_EXT_ARRAY}}});
-        // Field*
-        auto field_ptr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}}});
+      // Field*[]
+      auto field_arr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
+      // Element[]
+      auto element_arr = global_find_type_id(element_id, {.extensions = {{TYPE_EXT_ARRAY}}});
+      // Field*
+      auto field_ptr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}}});
 
-        type_scope->insert("id", s32_type(), nullptr);
-        type_scope->insert("name", charptr_type(), nullptr);
-        type_scope->insert("fields", field_arr, nullptr);
-        type_scope->insert("size", u64_type(), nullptr);
-        type_scope->insert("flags", u64_type(), nullptr);
-        type_scope->insert("element_type", type_ptr, nullptr);
+      type_scope->insert("id", s32_type(), nullptr);
+      type_scope->insert("name", charptr_type(), nullptr);
+      type_scope->insert("fields", field_arr, nullptr);
+      type_scope->insert("size", u64_type(), nullptr);
+      type_scope->insert("flags", u64_type(), nullptr);
+      type_scope->insert("element_type", type_ptr, nullptr);
 
-        field_scope->insert("name", charptr_type(), nullptr);
-        field_scope->insert("type", type_ptr, nullptr);
-        field_scope->insert("size", u64_type(), nullptr);
-        field_scope->insert("offset", u64_type(), nullptr);
+      field_scope->insert("name", charptr_type(), nullptr);
+      field_scope->insert("type", type_ptr, nullptr);
+      field_scope->insert("size", u64_type(), nullptr);
+      field_scope->insert("offset", u64_type(), nullptr);
 
-        element_scope->insert("data", charptr_type(), nullptr);
-        element_scope->insert("type", type_ptr, nullptr);
+      element_scope->insert("data", charptr_type(), nullptr);
+      element_scope->insert("type", type_ptr, nullptr);
 
-        // field.get()
-        auto get_info = FunctionTypeInfo{};
-        get_info.is_varargs = true;
-        get_info.return_type = charptr_type();
-        auto _t = global_find_function_type_id(get_info, {});
-        field_scope->insert("get", _t, nullptr, SYMBOL_IS_FUNCTION);
-        auto get_sym = field_scope->local_lookup("get");
-        get_sym->type_id = _t;
+      // field.get()
+      auto get_info = FunctionTypeInfo{};
+      get_info.is_varargs = true;
+      get_info.return_type = charptr_type();
+      auto _t = global_find_function_type_id(get_info, {});
+      field_scope->insert("get", _t, nullptr, SYMBOL_IS_FUNCTION);
+      auto get_sym = field_scope->local_lookup("get");
+      get_sym->type_id = _t;
 
-        // field.set()
-        auto set_info = FunctionTypeInfo{};
-        set_info.is_varargs = true;
-        set_info.return_type = void_type();
-        _t = global_find_function_type_id(set_info, {});
-        field_scope->insert("set", _t, nullptr, SYMBOL_IS_FUNCTION);
-        auto set_sym = field_scope->local_lookup("set");
-        set_sym->type_id = _t;
+      // field.set()
+      auto set_info = FunctionTypeInfo{};
+      set_info.is_varargs = true;
+      set_info.return_type = void_type();
+      _t = global_find_function_type_id(set_info, {});
+      field_scope->insert("set", _t, nullptr, SYMBOL_IS_FUNCTION);
+      auto set_sym = field_scope->local_lookup("set");
+      set_sym->type_id = _t;
 
-        // type.elements()
-        auto elements_info = FunctionTypeInfo{};
-        elements_info.return_type = element_arr;
-        elements_info.params_len = 1;
-        elements_info.parameter_types[0] = charptr_type();
-        _t = global_find_function_type_id(elements_info, {});
-        type_scope->insert("elements", _t, nullptr, SYMBOL_IS_FUNCTION);
-        auto elements_sym = type_scope->local_lookup("elements");
-        elements_sym->type_id = _t;
-      }
-      // string struct, stores length info.
-      {
-        auto str_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-        str_scope->parent = root_scope;
-
-        auto type_id = global_create_struct_type("string", str_scope);
-        // ** DO NOT REMOVE **
-        string_type() = type_id;
-        // ** ------------- **
-
-        auto type = global_get_type(type_id);
-        // We stopped doing this.
-        // static_cast<StructTypeInfo *>(type->get_info())->implicit_cast_table = {
-        //     charptr_type(),
-        //     c_string_type(),
-        // };
-
-        str_scope->insert("data", charptr_type(), nullptr);
-        str_scope->insert("length", u32_type(), nullptr);
-        str_scope->insert("is_view", bool_type(), nullptr);
-        auto func = FunctionTypeInfo{};
-        func.parameter_types[0] = char_type();
-        func.return_type = void_type();
-        func.params_len = 1;
-      }
-
-      // Env type & Env::args()
-      {
-        auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-        auto type = global_create_struct_type("Env", scope);
-
-        auto func = FunctionTypeInfo{};
-        func.params_len = 0;
-        auto str_array = global_find_type_id(string_type(), TypeExtensions{.extensions = {{TYPE_EXT_ARRAY}}});
-        func.return_type = str_array;
-        scope->insert("args", global_find_function_type_id(func, {}), nullptr);
-        scope->parent = root_scope;
-        root_scope->types.insert({"Env", type});
-      }
+      // type.elements()
+      auto elements_info = FunctionTypeInfo{};
+      elements_info.return_type = element_arr;
+      elements_info.params_len = 1;
+      elements_info.parameter_types[0] = charptr_type();
+      _t = global_find_function_type_id(elements_info, {});
+      type_scope->insert("elements", _t, nullptr, SYMBOL_IS_FUNCTION);
+      auto elements_sym = type_scope->local_lookup("elements");
+      elements_sym->type_id = _t;
+    }
   }
 
   auto info = FunctionTypeInfo{};

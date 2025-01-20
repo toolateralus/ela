@@ -13,14 +13,14 @@
 #foreign exit :: fn(code: int);
 
 #static print :: fn![T](str: T) {
-  printf("%s"c, $"{str}".data);
+  printf("%s"c, $"{str}");
 }
 
 #static println :: fn![T](str: T) {
-  printf("%s\n"c, $"{str}".data);
+  printf("%s\n"c, $"{str}");
 }
 
-#static panic :: fn(msg: string) {
+#static panic :: fn(msg: c_string) {
   println(msg);
   exit(1);
 }
@@ -74,152 +74,12 @@ impl Random {
   }
 }
 
-impl string {
-  empty :: fn() -> #self {
-    return {};
-  }
-
-  from :: fn(data: c_string) -> #self{
-    len := strlen(data);
-    str: string;
-    str.data = strdup(data);
-    str.length = len;
-    return str;
-  }
-
-  from_ptr :: fn(begin: c_string, end: c_string) -> string {
-    str: string;
-    str.length = end - begin;
-    str.data = malloc(str.length + 1);
-    memcpy(str.data, begin, str.length);
-    str.data[str.length] = 0;
-    return str;
-  }
-
-  insert :: fn(self*, pos: s64, substr: string) {
-    if pos < 0 || pos > self.length {
-      return;
-    }
-    new_data: c_string = malloc(self.length + substr.length + 1);
-    memcpy(new_data, self.data, pos);
-    memcpy(new_data + pos, substr.data, substr.length);
-    memcpy(new_data + pos + substr.length, self.data + pos, self.length - pos);
-    new_data[self.length + substr.length] = 0;
-
-    self.data = new_data;
-    self.length += substr.length;
-  }
-
-  starts_with :: fn(self*, substr: string) -> bool {
-    if self.data == null || substr.data == null
-      then return false;
-
-    str_len: int = self.length;
-    substr_len: int = substr.length;
-
-    if str_len < substr_len
-      then return false;
-
-    if str_len == substr_len && strcmp(self.data, substr.data) == 0
-      then return true;
-
-    return strncmp(self.data, substr.data, substr_len) == 0;
-  }
-
-  ends_with :: fn(self*, pattern: string) -> bool {
-    if !self.data || !pattern.data
-      then return false;
-    len: int = self.length;
-    patlen: int = pattern.length;
-    if len < patlen
-      then return false;
-    return strncmp(self.data + (len - patlen), pattern.data, patlen) == 0;
-  }
-
-  // TODO: fix me, something is super messed up. with type checking the implicit self/self* argument,
-  // TODO: we basicaly just assume if it's missing one argument it has self.
-  replace :: fn(self*, pattern: string, replacement: string) -> string {
-    if !self.data || !pattern.data || !replacement.data
-      then return *self;
-
-    result: string;
-    str_len := self.length;
-    pattern_len := pattern.length;
-    replacement_len := replacement.length;
-
-    i: int;
-    while i < str_len {
-      if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
-        result.insert(result.length, replacement);
-        i += pattern_len;
-      } else {
-        result.insert(result.length, string::from_ptr(self.data + i, self.data + i + 1));
-        i += 1;
-      }
-    }
-
-    return result;
-  }
-
-  substr :: fn(self*, start: int, end: int) -> string {
-    if self.length == 0
-      then return {};
-
-    len: int = self.length;
-
-    if start > end
-      then return {};
-
-    if len < end - start
-      then return {};
-
-    dest: c_string = malloc(sizeof(char) * (end - start) + 1);
-    memcpy(dest, self.data + start, end - start);
-    dest[end - start] = 0;
-
-    return string::from_ptr(dest, dest + (end - start));
-  }
-
-  split :: fn(self*, delimiter: char) -> string[] {
-    if !self.data then return {};
-    result: string[];
-    start: int = 0;
-    str_len: int = self.length;
-    for i in 0..str_len {
-      if self.data[i] == delimiter {
-        if i > start then result ~= string::from_ptr(self.data + start, self.data + i);
-        start = i + 1;
-      }
-    }
-    result ~= string::from_ptr(self.data + start, self.data + str_len);
-    return result;
-  }
-
-  contains :: fn(self*, pattern: string) -> bool {
-    if self.data == null || pattern.data == null
-      then return false;
-
-    str_len: int = self.length;
-    pattern_len: int = pattern.length;
-
-    if str_len < pattern_len
-      then return false;
-
-    for i in 0..(str_len - pattern_len + 1) {
-      if strncmp(self.data + i, pattern.data, pattern_len) == 0 {
-        return true;
-      }
-    }
-    return false;
-  }
-}
-
 // For now until we have a nice, builtin error handling system (likely like zig or odin)
-// We just use tuples with strings for returning err/ok
-#alias Error :: string;
+// We just use tuples with c_strings for returning err/ok
+#alias Error :: c_string;
 
-to_string :: fn(num: s64) -> string {
-  #static table : string[] = {
+to_string :: fn(num: s64) -> c_string {
+  #static table : c_string[] = {
     "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
   };
 
@@ -252,7 +112,7 @@ to_string :: fn(num: s64) -> string {
     buffer[index - i - 1] = temp;
   }
 
-  return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
+  return c_string::from_ptr(buffer as c_string, (buffer as c_string) + index);
 
 
 }
@@ -364,7 +224,7 @@ impl Timing {
     return (ts.tv_sec as float64) / 86_400.0 + (ts.tv_nsec as float64) / ((86_400.0 * 1_000_000_000.0) as float64)
   }
 
-  date_time :: fn() -> string {
+  date_time :: fn() -> c_string {
     ts := #self::get_timespec_since_epoch();
     time_t: s64 = ts.tv_sec;
     tm: tm_t;
@@ -373,6 +233,6 @@ impl Timing {
     snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d"c,
              tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec);
-    return string::from_ptr(buffer as c_string, buffer as c_string + strlen(buffer));
+    return c_string::from_ptr(buffer as c_string, buffer as c_string + strlen(buffer));
   }
 }

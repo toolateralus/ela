@@ -76,3 +76,61 @@ impl string {
     return str;
   }
 }
+
+
+#foreign printf :: fn(s: c_string, ...) -> int;
+
+
+Range_Base :: struct![T] {
+  begin: T;
+  end:   T;
+}
+
+#alias Range :: Range_Base![s64];
+
+// An object used to iterate over a collection of items, or any sequence.
+Enumerator   :: interface![T] {  
+  // Return the current value this enumerator points to within the sequence it's iterating over.  
+  current   :: fn(self*) -> T;
+  // Advance the enumerator by one step.
+  next      :: fn(self*) -> void;
+  // Check whether the enumerator is complete, or should continue.
+  // return true for 'done',
+  // return false if needs to continue
+  done      :: fn(self*) -> bool;
+}
+
+// A collection or range of items that can be enumerated over, with a for loop, or some other means.
+Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
+  // get the Enumerator object that was implemented for this type.
+  enumerator      :: fn(self*) -> Enum;
+}
+
+// TODO: support reverse enumeration for this as well.
+Range_Base_Enumerator :: struct![T] {
+  begin: T;
+  end:   T;
+  idx:   T;
+}
+
+impl Enumerator![T] for Range_Base_Enumerator {
+  current   :: fn(self*) -> s64 {
+    return self.idx;
+  }
+  next      :: fn(self*) {
+    self.idx++;
+  };
+  done      :: fn(self*) -> bool {
+    return self.idx >= self.end;
+  }
+}
+
+impl![T] Enumerable![Range_Base_Enumerator, T] for Range_Base {
+  enumerator :: fn(self*) -> Range_Base_Enumerator {
+    return {
+      begin: self.first,
+      end: self.last,
+      idx: 0,
+    };
+  }
+}

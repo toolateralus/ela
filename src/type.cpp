@@ -497,10 +497,7 @@ int &range_type() {
   return type;
 }
 
-int &string_type() {
-  static int type;
-  return type;
-}
+
 
 int &c_string_type() {
   static int type;
