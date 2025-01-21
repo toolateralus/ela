@@ -320,6 +320,9 @@ ASTScopeResolution *ASTCopier::copy_scope_resolution(ASTScopeResolution *node) {
 ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   auto new_node = new (ast_alloc<ASTImpl>()) ASTImpl(*node);
   new_node->target = static_cast<ASTType *>(copy_node(node->target));
+  if (new_node->interface) {
+    new_node->interface = static_cast<ASTType *>(copy_node(new_node->interface.get()));
+  }
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
