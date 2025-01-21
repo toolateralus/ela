@@ -3,12 +3,12 @@
 
 #test test_string :: fn() {
   my_string : string = string::from("Xaryu Baryu");
-  assert("string length failed to equal expected value"c, my_string.length == 11);
+  assert("string length failed to equal expected value", my_string.length == 11);
 }
 
 #test test_array :: fn() {
   array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  assert("array length failed to equal expected value"c, array.length == 11);
+  assert("array length failed to equal expected value", array.length == 11);
 }
 
 
@@ -25,9 +25,9 @@ impl Xaryu {
 #test test_string_interpolation :: fn() {
   xarbar: Xaryu;
   interp: string = string::from($"{xarbar}");
-  assert("unexpected interpolated string value"c, strcmp(interp.data, "XarBar"c) == 0);
+  assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
   interp = string::from($"{(1 + 1) * 2}");
-  assert("unexpected interpolated string value"c, strcmp(interp.data, "4"c) == 0);
+  assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
 }
 
 
@@ -39,7 +39,7 @@ impl Xaryu {
 #test test_array_concat_operator :: fn() {
   array: int[];
   array ~= 10;
-  assert("concat operator failed"c, array.length == 1);
+  assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
@@ -51,14 +51,14 @@ impl Xaryu {
   for i in 0..100 {
     n = ~array;
   }
-  assert("pop operator failed"c, array.length == 0 && n == 10);
+  assert("pop operator failed", array.length == 0 && n == 10);
 }
 
 #test test_array_erase_operator :: fn() {
   array: int[] ;
   array ~= 10;
   array ~~ 10;
-  assert("failed to erase element from array with ~~"c, array.length == 0);
+  assert("failed to erase element from array with ~~", array.length == 0);
 }
 
 
@@ -73,7 +73,7 @@ impl Xaryu {
 
   for x in 0..5 {
     for y in 0..5 {
-      assert("multidimensional failure"c, array[x][y] == x * y);
+      assert("multidimensional failure", array[x][y] == x * y);
     }
   }
 
@@ -85,11 +85,11 @@ impl Xaryu {
     }
   }
 
-  assert("length failed"c, dynamic.length == 5);
+  assert("length failed", dynamic.length == 5);
 
   for x in 0..5 {
     for y in 0..5 {
-      assert("multidimensional failure"c, dynamic[x][y] == x * y);
+      assert("multidimensional failure", dynamic[x][y] == x * y);
     }
   }
 }
@@ -98,16 +98,16 @@ impl Xaryu {
 #test subscript_string :: fn() {
   s: string = string::from("0,1,2,3");
   s[0] = 10;
-  assert("subscript assign string failed"c, s[0] == (10 as char));
+  assert("subscript assign string failed", s[0] == (10 as char));
 }
 
 #test test_range_var :: fn() {
   r : Range = 0..10;
-  assert("range variable failed"c, r.first == 0 && r.last == 10);
+  assert("range variable failed", r.first == 0 && r.last == 10);
 
   i: int;
   for z in r {
-    assert("range iteration failed"c, i == z);
+    assert("range iteration failed", i == z);
     i++;
   }
 }
@@ -120,7 +120,7 @@ impl Xaryu {
     0, 0,
   };
   
-  assert("Length"c, arr.length == 11);
+  assert("Length", arr.length == 11);
 
   for i in 0..10 {
     arr[i] = 100;
@@ -129,9 +129,9 @@ impl Xaryu {
   subarr := arr[0..10];
 
   for i in 0..10 {
-    assert("Slice failed"c, subarr[i] == arr[i]);
+    assert("Slice failed", subarr[i] == arr[i]);
   }
 
-  assert("Slice failed"c, subarr.length == 10);
+  assert("Slice failed", subarr.length == 10);
 }
 

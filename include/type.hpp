@@ -63,7 +63,6 @@ enum TypeExtEnum {
   TYPE_EXT_INVALID,
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
-  TYPE_EXT_FIXED_ARRAY,
 };
 
 enum FunctionInstanceFlags : size_t {
@@ -97,7 +96,7 @@ struct TypeExtension {
   bool operator==(const TypeExtension &other) const {
     if (type != other.type)
       return false;
-    if (type == TYPE_EXT_FIXED_ARRAY) {
+    if (type == TYPE_EXT_ARRAY) {
       return array_size == other.array_size;
     }
     return true;
@@ -117,9 +116,7 @@ struct TypeExtensions {
     }
   }
 
-  inline bool is_array() const { return back_type() == TYPE_EXT_ARRAY; }
-
-  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_FIXED_ARRAY; }
+  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
 
   inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER; }
 

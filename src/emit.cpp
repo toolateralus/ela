@@ -27,8 +27,7 @@ constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 5;
 constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
 constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
-constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 9;
+constexpr auto TYPE_FLAGS_ARRAY = 1 << 9;
 constexpr auto TYPE_FLAGS_FUNCTION = 1 << 10;
 constexpr auto TYPE_FLAGS_POINTER = 1 << 11;
 
@@ -66,9 +65,6 @@ void Emitter::visit(ASTFor *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
 
-  auto range_type = global_get_type(node->range->resolved_type);
-  std::string range_type_str = to_cpp_string(range_type);
-
   // Generate unique IDs for the range and enumerator
   std::string range_unique_id = "$_range_id" + std::to_string(defer_blocks.size());
   std::string unique_id = "$_loop_id" + std::to_string(defer_blocks.size());
@@ -77,65 +73,46 @@ void Emitter::visit(ASTFor *node) {
   indent_level++;
 
   // Emit the range initialization
+  std::string range_type_str = to_cpp_string(global_get_type(node->range_type));
   (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
   node->range->accept(this);
   (*ss) << ";\n";
 
   // Emit the enumerator initialization
-  std::string symbol_name;
-  if (range_type->implements("Enumerable")) {
-    symbol_name = "enumerator";
-  } else {
-    symbol_name = "iter";
-  }
-
-  Type *enumerable_iterator_return_type =
-      global_get_type(global_get_type(range_type->get_info()->scope->local_lookup(symbol_name)->type_id)
-                          ->get_info()
-                          ->as<FunctionTypeInfo>()
-                          ->return_type);
-  std::string enumerable_iterator_type = to_cpp_string(enumerable_iterator_return_type);
-
-  auto current_type = global_get_type(
-      global_get_type(enumerable_iterator_return_type->get_info()->scope->local_lookup("current")->type_id)
-          ->get_info()
-          ->as<FunctionTypeInfo>()
-          ->return_type);
-
-  if (node->value_semantic != VALUE_SEMANTIC_POINTER && current_type->get_ext().is_pointer() && symbol_name == "iter") {
-    current_type = global_get_type(current_type->get_element_type());
-  }
-
-  auto current_type_str = to_cpp_string(current_type);
-
-  (*ss) << indent() << enumerable_iterator_type << " " << unique_id << " = ";
-  if (range_type->implements("Enumerable")) {
+  std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
+  (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
+  if (node->is_enumerable) {
     (*ss) << range_type_str << "_enumerator(&" << range_unique_id << ");\n";
   } else {
     (*ss) << range_type_str << "_iter(&" << range_unique_id << ");\n";
   }
 
-  (*ss) << indent() << "while (!" << enumerable_iterator_type << "_done(&" << unique_id << ")) {\n";
+  // Emit the while loop
+  (*ss) << indent() << "while (!" << iterable_type_str << "_done(&" << unique_id << ")) {\n";
   indent_level++;
 
-  (*ss) << indent() << current_type_str << ' ';
+  // Emit the current call
+  std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
+  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    (*ss) << indent() << identifier_type_str << "* ";
+  } else {
+    (*ss) << indent() << identifier_type_str << " ";
+  }
   node->iden->accept(this);
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
-  } else if (enumerable_iterator_return_type->get_ext().is_pointer()) {
-    (*ss) << "*" << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
+    (*ss) << iterable_type_str << "_current(&" << unique_id << ");\n";
+  } else if (node->is_enumerable) { // Enumerables don't use the * value semantic.
+    (*ss) << iterable_type_str << "_current(&" << unique_id << ");\n";
   } else {
-    (*ss) << enumerable_iterator_type << "_current(&" << unique_id << ");\n";
+    (*ss) << "*" << iterable_type_str << "_current(&" << unique_id << ");\n";
   }
-
-  // Emit the next call
-  // We do this right after getting current to avoid complexity when it comes to dealing with control flow.
-  // We may want to do that stuff.
-  (*ss) << indent() << enumerable_iterator_type << "_next(&" << unique_id << ");\n";
 
   // Emit the user code block
   node->block->accept(this);
+
+  // Emit the next call
+  (*ss) << indent() << iterable_type_str << "_next(&" << unique_id << ");\n";
 
   // Emit deferred statements
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
@@ -341,12 +318,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   }
 
   auto type = global_get_type(left_type);
-  if (node->op.type == TType::Not && type->get_ext().is_array()) {
-    node->operand->accept(this);
-    (*ss) << ".pop()";
-    return;
-  }
-
+  
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
@@ -382,21 +354,7 @@ void Emitter::visit(ASTBinExpr *node) {
     call->source_range = node->source_range;
     return;
   }
-
-  if (node->op.type == TType::Erase) {
-    node->left->accept(this);
-    (*ss) << ".erase(";
-    node->right->accept(this);
-    (*ss) << ");\n";
-    return;
-  }
-  if (node->op.type == TType::Concat) {
-    node->left->accept(this);
-    (*ss) << ".push(";
-    node->right->accept(this);
-    (*ss) << ");\n";
-    return;
-  }
+  
   auto op_ty = node->op.type;
   (*ss) << "(";
   node->left->accept(this);
@@ -726,9 +684,7 @@ void Emitter::visit(ASTProgram *node) {
     if (has_user_defined_main && !is_freestanding) {
       code << R"__(
 int main (int argc, char** argv) {
-  for (int i = 0; i < argc; ++i) {
-    Env_args()->push(string(argv[i]));
-  }
+  Env_initialize(argc, argv);
   __ela_main_();
 }
 )__";
@@ -960,49 +916,17 @@ void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::string &type_string,
-                                                                    const std::string &name, Type *type) {
-  //? type string will equal something like void(*)();
-  //? we need to emit _array<void(*)()>
-  //? or possibly _array<_array<void(*)()>*>
-
-  // TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
-  // It shouldn't be bad finding the real problem
-  // #define SLIGHTLY_AWFUL_HACK
-  // #ifdef SLIGHTLY_AWFUL_HACK
-  //   std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
-  //   // This probably won't work for nested arrays
-  // #elif defined(TERRIBLE_HACK)
-  //   // We could just purge off the problematic characters?
-  //   // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do
-  //   that. auto string = to_cpp_string(type->get_ext(), type_string); size_t pos = 0; while ((pos = string.find(")*>",
-  //   pos)) != std::string::npos) {
-  //     string.replace(pos, 3, ")>");
-  //     pos += 2;
-  //   }
-  // #endif
-  auto string = to_cpp_string(type->get_ext(), type_string);
-
-  if (!string.contains(' ' + name + ' ')) {
-    return string + ' ' + name;
-  } else {
-    return string;
-  }
-}
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   std::stringstream tss;
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
-    // Fixed array fn*[10]();
+
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
-      // Dynamic array. fn*[]();
-    } else if (ext.is_array()) {
-      auto type_string = get_function_pointer_type_string(type, nullptr);
-      return get_function_pointer_dynamic_array_declaration(type_string, name, type);
     }
+
     return get_function_pointer_type_string(type, &identifier);
   }
   tss << type->get_base().get_str();
@@ -1011,13 +935,9 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   }
   bool emitted_iden = false;
   for (const auto ext : type->get_ext().extensions) {
-    if (ext.type == TYPE_EXT_ARRAY) {
-      std::string current = tss.str();
-      tss.clear();
-      tss << "_array<" << current << ">";
-    } else if (ext.type == TYPE_EXT_POINTER) {
+    if (ext.type == TYPE_EXT_POINTER) {
       tss << "*";
-    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+    } else if (ext.type == TYPE_EXT_ARRAY) {
       if (!emitted_iden) {
         emitted_iden = true;
         tss << ' ' << name;
@@ -1311,9 +1231,6 @@ std::string get_type_flags(Type *type) {
       case TYPE_EXT_POINTER:
         kind_flags |= TYPE_FLAGS_POINTER;
         break;
-      case TYPE_EXT_FIXED_ARRAY:
-        kind_flags |= TYPE_FLAGS_FIXED_ARRAY;
-        break;
       case TYPE_EXT_ARRAY:
         kind_flags |= TYPE_FLAGS_ARRAY;
         break;
@@ -1339,11 +1256,11 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << get_type_flags(type) << ",\n"
      << ".fields = " << fields << ",\n";
 
-  if (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array()) {
+  if (type->get_ext().is_fixed_sized_array()) {
     ss << get_elements_function(type) << ",\n";
   }
 
-  if (type->get_ext().is_array() || type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
+  if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
     ss << ".element_type = nullptr,\n";
@@ -1466,7 +1383,7 @@ std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::
       ss.str("");
       ss.clear();
       ss << "_array<" << current << ">";
-    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+    } else if (ext.type == TYPE_EXT_ARRAY) {
       ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER) {
       ss << "*";
@@ -1831,11 +1748,16 @@ void Emitter::visit(ASTBlock *node) {
   return;
 }
 void Emitter::visit(ASTLambda *node) {
-  (*ss) << "+[]";
+  // We parenthesize this because if you call it on the spot,
+  // it thinks you're trying to do + on whatever this returns.
+
+  
+  (*ss) << "(+[]";
   node->params->accept(this);
   (*ss) << " -> ";
   node->return_type->accept(this);
   node->block->accept(this);
+  (*ss) << ")";
 }
 
 // This should never get hit.

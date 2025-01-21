@@ -10,10 +10,10 @@ generic_return :: fn![T]() -> T {
 }
 
 #test test_generic_add :: fn() {
-  assert("generic_add_float failed"c, add_generic![float](100.0, 100.0) == 200.0);
-  assert("generic_add_int failed"c, add_generic![int](5, 6) == 11);
-  assert("generic_return failed"c, generic_return![int]() == 0)
-  assert("generic_return failed"c, generic_return![float]() == 0.0);
+  assert("generic_add_float failed", add_generic![float](100.0, 100.0) == 200.0);
+  assert("generic_add_int failed", add_generic![int](5, 6) == 11);
+  assert("generic_return failed", generic_return![int]() == 0)
+  assert("generic_return failed", generic_return![float]() == 0.0);
 }
 
 Generic :: struct![T] {

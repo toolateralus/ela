@@ -172,14 +172,15 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
-  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && 
-      to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions()) {
+  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && to->is_kind(TYPE_SCALAR) &&
+      to->get_ext().has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
       if (numerical_type_safe_to_upcast(from, to)) {
         return CONVERT_IMPLICIT;
       }
       return CONVERT_EXPLICIT;
-    } else if ((from->id == bool_type() && type_is_numerical(to)) || to->id == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
+    } else if ((from->id == bool_type() && type_is_numerical(to)) ||
+               to->id == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -317,9 +318,7 @@ std::string Type::to_string() const {
   }
 }
 
-
-int global_create_interface_type(const InternedString &name, Scope *scope,
-                                 std::vector<int> generic_args) {
+int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
   type_table.emplace_back(type_table.size(), TYPE_INTERFACE);
   Type *type = &type_table.back();
   type->set_base(name);
@@ -394,10 +393,11 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 }
 
 int Type::get_element_type() const {
-  if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array()) {
-    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
-                            to_string()),
-                {});
+  if (!extensions.is_pointer() && !extensions.is_fixed_sized_array()) {
+    throw_error(
+        std::format("Internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
+                    to_string()),
+        {});
   }
   auto extensions = this->get_ext().without_back();
   if (is_kind(TYPE_TUPLE)) {
@@ -492,9 +492,7 @@ int charptr_type() {
   return type;
 }
 
-int range_type() {
-  return root_scope->find_type_id("Range", {});
-}
+int range_type() { return root_scope->find_type_id("Range", {}); }
 
 int &c_string_type() {
   static int type;
@@ -648,11 +646,8 @@ std::string TypeExtensions::to_string() const {
       case TYPE_EXT_POINTER:
         ss << "*";
         break;
-      case TYPE_EXT_ARRAY: {
+      case TYPE_EXT_ARRAY:
         ss << "[]";
-      } break;
-      case TYPE_EXT_FIXED_ARRAY:
-        ss << "[" << ext.array_size << "]";
         break;
       case TYPE_EXT_INVALID:
         throw_error("Internal compiler error: extension type invalid", {});
@@ -661,7 +656,6 @@ std::string TypeExtensions::to_string() const {
   }
   return ss.str();
 }
-
 
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
   type_table.emplace_back(type_table.size(), TYPE_TUPLE);
@@ -702,21 +696,18 @@ int Type::take_pointer_to() const {
   return global_find_type_id(id, ext);
 }
 
-
-
 std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
   switch (op) {
     case TType::LBrace:
       return "subscript";
 
-
     // Do we want this? might be useful for stuff like Array implementations etc.
     // However, it feels like bringing in the complexity of C++'s
     // copy constructor, copy assign, copy assign ref, move constructor , etc.
     case TType::Assign:
 
-    // via interface Arithmetic 
+    // via interface Arithmetic
     case TType::Add:
     case TType::Sub: {
       if (kind == OPERATION_UNARY) {
@@ -767,8 +758,9 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::CompXor:
     case TType::CompSHL:
     case TType::CompSHR:
-      output =  TTypeToString(op);
-    default: break;
+      output = TTypeToString(op);
+    default:
+      break;
   }
   std::transform(output.begin(), output.end(), output.begin(), ::tolower);
   return output;
@@ -781,7 +773,8 @@ int find_operator_overload(TType op, Type *type, OperationKind kind) {
   }
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
   auto scope = type->get_info()->scope;
-  if (!scope) return Type::invalid_id;
+  if (!scope)
+    return Type::invalid_id;
   // TODO: make a system for type checking against this.
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {

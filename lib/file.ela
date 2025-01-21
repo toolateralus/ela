@@ -60,7 +60,7 @@ impl File {
   }
 
   read_all :: fn(filename: string) -> (Error, string) {
-    file := fopen(filename.data, "r"c);
+    file := fopen(filename.data, "r");
 
     if !file then return ($"Couldn't open file {filename}", {});
     
@@ -79,7 +79,7 @@ impl File {
   }
 
   read_bytes :: fn(filename: string) -> u8[] {
-    file := fopen(filename.data, "r"c);
+    file := fopen(filename.data, "r");
     if !file then return {};
     result: u8[];
     c: char;
@@ -91,7 +91,7 @@ impl File {
   }
 
   write_all :: fn(filename: string, data: string) -> Error {
-    file := fopen(filename.data, "w"c);
+    file := fopen(filename.data, "w");
     if !file then return $"Unable to open file {filename}";
     fwrite(data.data, sizeof(char), data.length, file);
     fclose(file);

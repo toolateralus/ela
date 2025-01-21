@@ -657,6 +657,7 @@ void Typer::visit(ASTFor *node) {
   node->range->accept(this);
   int range_type_id = node->range->resolved_type;
   Type *range_type = global_get_type(range_type_id);
+  node->range_type = range_type->id;
 
   if (range_type->get_ext().has_extensions() && range_type->get_ext().extensions.back().type == TYPE_EXT_POINTER) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
@@ -677,7 +678,11 @@ void Typer::visit(ASTFor *node) {
                   node->source_range);
     }
 
-    auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
+    auto symbol_ty = global_get_type(symbol->type_id);
+
+    auto iter_return_ty = global_get_type(symbol_ty->get_info()->as<FunctionTypeInfo>()->return_type);
+    node->iterable_type = iter_return_ty->id;
+
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
@@ -693,6 +698,7 @@ void Typer::visit(ASTFor *node) {
                   node->source_range);
     }
     auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
+    node->iterable_type = iter_return_ty->id;
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
@@ -720,10 +726,10 @@ void Typer::visit(ASTFor *node) {
     // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit dereference.
     iter_ty = global_get_type(iter_ty)->get_element_type();
   }
-
   
+  node->is_enumerable = is_enumerable;
 
-
+  node->identifier_type = iter_ty;
   ctx.scope->insert(iden->value, iter_ty, node);
   node->iden->accept(this);
   node->range->accept(this);
@@ -994,7 +1000,7 @@ template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T de
 std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension> ast_extensions) {
   std::vector<TypeExtension> extensions;
   for (auto &ext : ast_extensions) {
-    if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+    if (ext.type == TYPE_EXT_ARRAY) {
       auto val = evaluate_constexpr(ext.expression, ctx);
       if (val.tag != Value::INTEGER) {
         throw_error("Fixed array must have integer size.", ext.expression->source_range);
@@ -1122,12 +1128,6 @@ void Typer::visit(ASTBinExpr *node) {
     declaring_or_assigning_type = left;
   }
 
-  if (node->op.type == TType::Concat) {
-    auto type = global_get_type(left);
-    // TODO: if the array is a pointer to an array, we should probably have an implicit dereference.
-    declaring_or_assigning_type = type->get_element_type();
-  }
-
   node->right->accept(this);
   auto right = node->right->resolved_type;
 
@@ -1143,37 +1143,6 @@ void Typer::visit(ASTBinExpr *node) {
   if (operator_overload_ty != -1) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(operator_overload_ty)->get_info()->as<FunctionTypeInfo>()->return_type;
-    return;
-  }
-
-  // array remove operator.
-  if (node->op.type == TType::Erase) {
-    if (!left_ty->get_ext().is_array()) {
-      throw_error("Cannot use concat operator on a non-array", node->source_range);
-    }
-    auto element_ty = left_ty->get_element_type();
-    assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}",
-                                   "invalid type in array concatenation expression");
-    node->resolved_type = element_ty;
-    return;
-  }
-
-  // There was operator overloading here. Instead, now we're going to wait
-  // until we have traits and a more sensible,
-  // non C++ way to do this.
-  // For now, it's being removed
-  // (edit: you can override operator overloads by implementing functions with the same name as the operator's
-  // ttype.to_lower())
-
-  // TODO: clean up this hacky mess.
-  if (node->op.type == TType::Concat) {
-    if (!left_ty->get_ext().is_array()) {
-      throw_error("Cannot use concat operator on a non-array", node->source_range);
-    }
-    auto element_ty = left_ty->get_element_type();
-    assert_types_can_cast_or_equal(right, element_ty, node->source_range, "expected : {}, got {}",
-                                   "invalid type in array concatenation expression");
-    node->resolved_type = void_type();
     return;
   }
 
@@ -1232,12 +1201,6 @@ void Typer::visit(ASTUnaryExpr *node) {
 
   // unary operator overload.
   auto left_ty = global_get_type(operand_ty);
-
-  // ~ operator, pop on dynamic arrays.
-  if (left_ty->get_ext().is_array() && node->op.type == TType::Not) {
-    node->resolved_type = left_ty->get_element_type();
-    return;
-  }
 
   // * Again, operator overloading once was here.
   // * We need to wait until we have interfaces to do it properly.
@@ -1344,18 +1307,6 @@ void Typer::visit(ASTDotExpr *node) {
                 node->source_range);
   }
 
-  // TODO: remove this hack to get array length
-  if (base_ty->get_ext().is_array()) {
-    if (node->member_name == "length") {
-      node->resolved_type = u32_type();
-      return;
-    }
-    if (node->member_name == "data") {
-      node->resolved_type = global_get_type(base_ty->get_element_type())->take_pointer_to();
-      return;
-    }
-  }
-
   Scope *base_scope = base_ty->get_info()->scope;
 
   if (!base_scope) {
@@ -1410,18 +1361,10 @@ void Typer::visit(ASTSubscript *node) {
 
   auto ext = left_ty->get_ext();
 
-  if (!ext.is_array() && !ext.is_fixed_sized_array() && !ext.is_pointer()) {
-    throw_error(std::format("cannot index into non array type. {}", left_ty->to_string()), node->source_range);
+  if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
+    throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: fn(self*, idx: u32)' method. {}", left_ty->to_string()), node->source_range);
   }
-
-  if (ext.is_array()) {
-    if (subscript_ty->id == range_type()) {
-      node->resolved_type = left_ty->id;
-      return;
-    }
-    node->resolved_type = left_ty->get_element_type();
-    return;
-  }
+  
   node->resolved_type = left_ty->get_element_type();
 }
 
@@ -1485,7 +1428,11 @@ void Typer::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (!target_type->get_ext().is_array() && !target_type->get_ext().is_fixed_sized_array()) {
+      // TODO:
+      // We can support these types of initializer lists, by creating something in-language like
+      // Init_List :: struct![T] {  ptr: T*; length: u64; } and passing this 'dynamic' array to a special function
+
+      if (!target_type->get_ext().is_fixed_sized_array()) {
         throw_error(std::format("Collection-style initializer lists like '{{0, 1, 2, ..}} or {{{{key, value}}, {{key, "
                                 "value}}}}' can only be used with arrays and fixed arrays. Got {}",
                                 target_type->to_string()),

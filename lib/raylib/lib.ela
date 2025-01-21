@@ -1,4 +1,4 @@
-;
+#import math;
 
 #include "_raybindings.ela";
 
@@ -34,7 +34,7 @@ impl Color {
     };
   }
 
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> c_string {
     return $"Color(r: {self.r}, g: {self.g}, b: {self.b}, a: {self.a})";
   }
 }
@@ -100,13 +100,13 @@ All_Colors : Color[] = {
 
 
 impl Rectangle {
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> c_string {
     return $"Rectangle(x: {self.x}, y: {self.y}, width: {self.width}, height: {self.height})";
   }
 }
 
 impl Vector2 {
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> c_string {
     return $"Vector2(x: {self.x}, y: {self.y})";
   }
   zero :: fn() -> #self {
@@ -168,7 +168,7 @@ impl Vector2 {
 }
 
 impl Vector3 {
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> c_string {
     return $"Vector3(x: {self.x}, y: {self.y}, z: {self.z})";
   }
   zero :: fn() -> #self {
@@ -239,7 +239,7 @@ impl Vector3 {
 }
 
 impl Vector4 {
-  to_string :: fn(self*) -> string {
+  to_string :: fn(self*) -> c_string {
     return $"Vector4(x: {self.x}, y: {self.y}, z: {self.z}, w: {self.w})";
   }
 

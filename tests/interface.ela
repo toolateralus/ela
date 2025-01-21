@@ -35,12 +35,12 @@
 }
 
 #test basic_struct :: fn() {
-  assert("interface failed"c, Struct::static_get() == 0);
-  assert("interface failed"c, Struct::static_get_self().a == 100);
+  assert("interface failed", Struct::static_get() == 0);
+  assert("interface failed", Struct::static_get_self().a == 100);
   instance: Struct;
-  assert("interface failed"c, instance.method_get() == 0);
-  assert("interface failed"c, instance.method_get_ptr() == 0);
-  assert("interface failed"c, instance.method_get_self().a == 100);
+  assert("interface failed", instance.method_get() == 0);
+  assert("interface failed", instance.method_get_ptr() == 0);
+  assert("interface failed", instance.method_get_self().a == 100);
 }
 
 #region generic_interface_regular_struct {
@@ -78,12 +78,12 @@
 }
 
 #test generic_interface_regular_struct :: fn() {
-  assert("interface failed"c, Struct1::static_get() == 0);
-  assert("interface failed"c, Struct1::static_get_self().a == 100);
+  assert("interface failed", Struct1::static_get() == 0);
+  assert("interface failed", Struct1::static_get_self().a == 100);
   instance: Struct1;
-  assert("interface failed"c, instance.method_get() == 0);
-  assert("interface failed"c, instance.method_get_ptr() == 0);
-  assert("interface failed"c, instance.method_get_self().a == 100);
+  assert("interface failed", instance.method_get() == 0);
+  assert("interface failed", instance.method_get_ptr() == 0);
+  assert("interface failed", instance.method_get_self().a == 100);
 }
 
 #region generic interface generic struct {
@@ -116,12 +116,12 @@
 }
 
 #test generic_struct_generic_interface :: fn() {
-  assert("interface failed"c, Struct2![int]::static_get() == 0);
-  assert("interface failed"c, Struct2![int]::static_get_self().n == 0);
+  assert("interface failed", Struct2![int]::static_get() == 0);
+  assert("interface failed", Struct2![int]::static_get_self().n == 0);
   instance: Struct2![int];
-  assert("interface failed"c, instance.method_get() == 0);
-  assert("interface failed"c, instance.method_get_ptr() == 0);
-  assert("interface failed"c, instance.method_get_self().n == 0);
+  assert("interface failed", instance.method_get() == 0);
+  assert("interface failed", instance.method_get_ptr() == 0);
+  assert("interface failed", instance.method_get_self().n == 0);
 }
 
 #region uninstantiated generic {

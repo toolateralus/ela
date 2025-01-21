@@ -283,7 +283,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return func;
         } else {
           parser->ctx.scope->erase(func->name);
-          return nullptr;
+          return ast_alloc<ASTNoop>(); 
         }
     }},
     // #foreign
@@ -1301,7 +1301,6 @@ ASTStatement *Parser::parse_statement() {
     const bool is_deref = tok.type == TType::Mul;
 
     const bool is_special_case = tok.type == TType::LParen || // possible parenthesized dereference or something.
-                                 tok.type == TType::Erase ||  // ~vector, for popping and ignoring.
                                  tok.type == TType::Switch;
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
@@ -2003,9 +2002,9 @@ void Parser::append_type_extensions(ASTType *node) {
       expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
         auto expression = parse_expr();
-        node->extensions.push_back({TYPE_EXT_FIXED_ARRAY, expression});
+        node->extensions.push_back({TYPE_EXT_ARRAY, expression});
       } else {
-        node->extensions.push_back({TYPE_EXT_ARRAY});
+        throw_error("Expected a size to an array type [..]. Use List![T] for a dynamic array, for now.", node->source_range);
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {
@@ -2040,8 +2039,6 @@ static Precedence get_operator_precedence(Token token) {
   switch (type) {
     case TType::Assign:
     case TType::ColonEquals:
-    case TType::Concat: // this is for appending to arrays
-    case TType::Erase:  // this is for erase elements for arrays
       return PRECEDENCE_ASSIGNMENT;
     case TType::LogicalOr:
       return PRECEDENCE_LOGICALOR;

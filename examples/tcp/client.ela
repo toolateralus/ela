@@ -10,7 +10,7 @@ chatting :: fn(sockfd: int) {
 
   while true {
     memset(buffer, 0, 80);
-    printf("Enter message : "c);
+    printf("Enter message : ");
 
     n: int;
     while n < 80 && (buffer[n++] = getchar()) != '\n' {}
@@ -23,7 +23,7 @@ chatting :: fn(sockfd: int) {
 
     println($"From Server : {buffer as char*}");
 
-    if ((strncmp(buffer, "exit"c, 4)) == 0) {
+    if ((strncmp(buffer, "exit", 4)) == 0) {
       println("Client Exit...");
       break;
     }
@@ -40,14 +40,14 @@ main :: fn() {
 
   servaddr: sockaddr_in;
   servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"c);
+  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
   servaddr.sin_port = htons(PORT);
   servaddr_ptr : sockaddr* = &servaddr;
 
   if connect(sockfd, servaddr_ptr, sizeof(servaddr)) != 0 {
-    panic("connection with the server failed...");
+    panic("onnection with the server failed...");
   } else {
-    println("connected to the server..");
+    println("onnected to the server..");
   }
 
   chatting(sockfd);

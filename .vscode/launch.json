@@ -43,7 +43,7 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug dummy",
+      "name": "Debug ela_source/main",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/ela_source"
@@ -51,15 +51,15 @@
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug dummy executable",
-      "program": "${workspaceFolder}/ela_source/dummy",
+      "name": "Debug ela_source/main executable",
+      "program": "${workspaceFolder}/ela_source/main",
       "args": [],
       "cwd": "${workspaceFolder}/ela_source/"
     },
     {
       "type": "lldb",
       "request": "launch",
-      "name": "Debug dummy tests",
+      "name": "Debug ela_source/main tests",
       "program": "${workspaceFolder}/bin/ela",
       "args": ["main.ela", "--s", "--test"],
       "cwd": "${workspaceFolder}/ela_source"

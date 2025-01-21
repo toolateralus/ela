@@ -10,7 +10,7 @@
   ENUM,
   TUPLE,
   ARRAY,
-  FIXED_ARRAY,
+  ARRAY,
   FUNCTION,
   POINTER,
   SIGNED,
@@ -29,7 +29,7 @@ impl Type  {
   has_no_extension :: fn(self*) -> bool {
     return self.flags & TypeFlags::POINTER == 0 &&
           self.flags & TypeFlags::ARRAY == 0 &&
-          self.flags & TypeFlags::FIXED_ARRAY == 0;
+          self.flags & TypeFlags::ARRAY == 0;
   }
 
   is_array :: fn(self*) -> bool {
@@ -81,7 +81,7 @@ impl Type  {
   }
 
   is_fixed_array :: fn(self*) -> bool {
-    return self.flags & TypeFlags::FIXED_ARRAY != 0;
+    return self.flags & TypeFlags::ARRAY != 0;
   }
 
   get_field :: fn(self*, name: string) -> Field* {

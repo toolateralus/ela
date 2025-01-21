@@ -12,7 +12,7 @@
   // Allow an object to be converted to a string
   ToString    :: interface {
     // convert self to string.
-    to_string :: fn(self*) -> string;
+    to_string :: fn(self*) -> c_string;
   }
 
   // equivalent to an explicit cast operator overload in C++,
@@ -67,7 +67,7 @@
 
     // Checks if the iterator has reached the end of the collection.
     done :: fn(self*) -> bool {
-      return self.ptr >= self.end;
+      return self.ptr > self.end;
     }
   }
 
@@ -220,78 +220,27 @@
   }
 }
 
-Env :: struct {};
-
-impl Env {
-  args :: fn() -> string[]* {
-    #static values: string[];
-    return &values;
+#region BASICS {
+  #static print :: fn![T](str: T) {
+    printf("%s", $"{str}");
   }
-}
-
-impl s64 {
-  to_string :: fn(self) -> string {
-    #static table : c_string[] = {
-      "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
-    };
-
-    if self < 10 then return string::from(table[self]);
-
-    negative := false;
-    if self < 0 {
-      negative = true;
-      self = -self;
-    }
-
-    buffer: char[20];
-    index: int = 0;
-
-    while self > 0 {
-      buffer[index] = '0' + (self % 10);
-      self /= 10;
-      index++;
-    }
-
-    if negative {
-      buffer[index] = '-';
-      index++;
-    }
-
-    // Reverse the buffer
-    for i in 0..(index / 2) {
-      temp := buffer[i];
-      buffer[i] = buffer[index - i - 1];
-      buffer[index - i - 1] = temp;
-    }
-
-    return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
+  #static println :: fn![T](str: T) {
+    printf("%s\n", $"{str}");
   }
-}
-
-#static print :: fn![T](str: T) {
-  printf("%s"c, $"{str}");
-}
-
-#static println :: fn![T](str: T) {
-  printf("%s\n"c, $"{str}");
-}
-
-#alias Panic_Handler :: fn *(c_string);
-
-panic_handler: Panic_Handler = fn(msg: c_string) {
-  println(msg);
-  exit(1);
-}
-
-#static panic :: fn(msg: c_string) {
-  if !panic_handler {
-    printf("No panic handler set. Exitting\n");
+  #alias Panic_Handler :: fn *(c_string);
+  panic_handler: Panic_Handler = fn(msg: c_string) {
+    println(msg);
     exit(1);
   }
-  panic_handler(msg);
+  #static panic :: fn(msg: c_string) {
+    if !panic_handler {
+      printf("No panic handler set. Exitting\n");
+      exit(1);
+    }
+    panic_handler(msg);
+  }
+  #alias Error :: c_string;
 }
-
-#alias Error :: c_string;
 
 #region LIST  {
   // This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
@@ -382,6 +331,14 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
     }
   }
 
+  impl![T] List![T] {
+    subscript :: fn(self*, idx: s64) -> T {
+      return self.data[idx];
+    }
+  }
+// TODO:
+  // We need to have a way for #import'ed files to purge out their #test functions, and any code behind an #ifdef TESTING {...}
+  // Right now, if you include a library, you inherit all of it's testing, which is garbage. 
   #test test_List_push_at :: fn() {
     array : List![s64];
 
@@ -390,13 +347,13 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
       for i in 0..100 {
         array.push(i);
       }
-      assert("Array push failed to meet expected length"c, array.length == 100);
+      assert("Array push failed to meet expected length", array.length == 100);
       for i in 0..100 {
-        assert("array.at(i) != i"c, array.at(i) == i);
+        assert("array.at(i) != i", array.at(i) == i);
       }
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);  
+    assert("List failed to deinit", array.data == null && array.length == 0);  
   }
 
   #test test_List_pop :: fn() {
@@ -409,12 +366,12 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
       }
       for i in 0..100 {
         value := array.pop();
-        assert("array.pop() != 99 - i"c, value == 99 - i);
+        assert("array.pop() != 99 - i", value == 99 - i);
       }
-      assert("Array pop failed to meet expected length"c, array.length == 0);
+      assert("Array pop failed to meet expected length", array.length == 0);
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);
+    assert("List failed to deinit", array.data == null && array.length == 0);
   }
 
   #test test_List_resize :: fn() {
@@ -423,14 +380,14 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
     {
       defer array.deinit();
       array.resize(2);
-      assert("Array resize failed to set capacity"c, array.capacity == 2);
+      assert("Array resize failed to set capacity", array.capacity == 2);
       for i in 0..2 {
         array.push(i);
       }
-      assert("Array resize failed to meet expected length"c, array.length == 2);
+      assert("Array resize failed to meet expected length", array.length == 2);
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);
+    assert("List failed to deinit", array.data == null && array.length == 0);
   }
 
   #test test_List_shrink :: fn() {
@@ -441,18 +398,18 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
       for i in 0..100 {
         array.push(i);
       }
-      assert("Array push failed to meet expected length"c, array.length == 100);
+      assert("Array push failed to meet expected length", array.length == 100);
 
       array.resize(50);
-      assert("Array shrink failed to meet expected length"c, array.length == 50);
-      assert("Array shrink failed to set capacity"c, array.capacity == 50);
+      assert("Array shrink failed to meet expected length", array.length == 50);
+      assert("Array shrink failed to set capacity", array.capacity == 50);
 
       for i in 0..50 {
-        assert("array.at(i) != i"c, array.at(i) == i);
+        assert("array.at(i) != i", array.at(i) == i);
       }
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);
+    assert("List failed to deinit", array.data == null && array.length == 0);
   }
 
   #test test_List_clone :: fn() {
@@ -468,19 +425,19 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
       defer clone.deinit();
 
 
-      assert("Array clone failed to meet expected length"c, clone.length == 100);
+      assert("Array clone failed to meet expected length", clone.length == 100);
       for i in 0..100 {
-        assert("clone.at(i) != i"c, clone.at(i) == i);
+        assert("lone.at(i) != i", clone.at(i) == i);
       }
 
       // Modify the original array and check if the clone does not reflect the changes
       array.push(100);
-      assert("Clone should not reflect changes in the original array"c, clone.length == 100);
-      assert("clone.at(100) should not exist"c, clone.length == 100);
+      assert("Clone should not reflect changes in the original array", clone.length == 100);
+      assert("lone.at(100) should not exist", clone.length == 100);
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);
-    assert("Clone List failed to deinit"c, clone.data == null && clone.length == 0);
+    assert("List failed to deinit", array.data == null && array.length == 0);
+    assert("Clone List failed to deinit", clone.data == null && clone.length == 0);
   }
 
   #test test_List_view :: fn() {
@@ -495,20 +452,121 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
       // Take a view of the array
       view = array;
 
-      assert("Array view failed to meet expected length"c, view.length == 100);
+      assert("Array view failed to meet expected length", view.length == 100);
       for i in 0..100 {
-        assert("view.at(i) != i"c, view.at(i) == i);
+        assert("view.at(i) != i", view.at(i) == i);
       }
 
       array.push(100);
-      assert("View should reflect changes in the original array"c, view.length == 100);
-      assert("view.at(100) != 100"c, view.at(100) == 100);
+      assert("View should reflect changes in the original array", view.length == 100);
+      assert("view.at(100) != 100", view.at(100) == 100);
     }
 
-    assert("List failed to deinit"c, array.data == null && array.length == 0);
+    assert("List failed to deinit", array.data == null && array.length == 0);
   }
+
+  // #test test_List_for_loop :: fn() {
+  //   array : List![s64];
+
+  //   // ! BUG: 
+  //   // ! We have to call these explicitly before using a for loop, 
+  //   // ! Because otherwise the generic impl never gets instantiated.
+  //   iter := array.iter();
+  //   iter.current();
+
+  //   {
+  //     defer array.deinit();
+  //     for i in 0..100 {
+  //       array.push(i);
+  //     }
+
+  //     // Test 'for v in array'
+  //     idx := 0;
+  //     for v in array {
+  //       assert("for v in array failed", v == idx);
+  //       idx++;
+  //     }
+
+  //     assert("for v in array failed to iterate correctly", idx == 100);
+
+  //     // Test 'for *v in array'
+  //     idx = 0;
+  //     for *v in array {
+  //       assert("for *v in array failed", *v == idx);
+  //       idx++;
+  //     }
+  //     assert("for *v in array failed to iterate correctly", idx == 100);
+  //   }
+
+  //   assert("List failed to deinit", array.data == null && array.length == 0);
+  // }
 
 }
 
+Env :: struct {};
 
+impl Env {
+  args :: fn() -> List![c_string]* {
+    #static values: List![c_string];
+    return &values;
+  }
+
+  initialize :: fn(argc: s32, argv: c_string*) {
+    _args : List![c_string];
+    for i in 0..argc {
+      _args.push(argv[i]);
+    }
+    *#self::args() = _args;
+  }
+}
+
+impl s64 {
+  to_string :: fn(self) -> string {
+    #static table := fn() -> List![c_string] {
+      list: List![c_string]; // We don't have to clone this because it has a static lifetime and is never mutated.
+      list.push("0");
+      list.push("1");
+      list.push("2");
+      list.push("3");
+      list.push("4");
+      list.push("5");
+      list.push("6");
+      list.push("7");
+      list.push("8");
+      list.push("9");
+      return list;
+    }();
+
+    if self < 10 then return string::from(table[self]);
+
+    negative := false;
+    if self < 0 {
+      negative = true;
+      self = -self;
+    }
+
+    buffer: char[20];
+    index: int = 0;
+
+    while self > 0 {
+      buffer[index] = '0' + (self % 10);
+      self /= 10;
+      index++;
+    }
+
+    if negative {
+      buffer[index] = '-';
+      index++;
+    }
+
+    // Reverse the buffer
+    for i in 0..(index / 2) {
+      temp := buffer[i];
+      buffer[i] = buffer[index - i - 1];
+      buffer[index - i - 1] = temp;
+    }
+
+    return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
+  }
+}
 

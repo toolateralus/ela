@@ -12,7 +12,7 @@ Reflector :: struct {
   field := type.fields[0];
   integer: int = 100;
   field.set(&reflector, integer);
-  assert("reflection field.set() failed."c, reflector.n == 100);
+  assert("reflection field.set() failed.", reflector.n == 100);
 }
 
 #test test_get_field_with_reflection :: fn() {
@@ -21,7 +21,7 @@ Reflector :: struct {
   type := #type(Reflector);
   field := type.fields[0];
   n := *(field.get(&reflector) as int*);
-  assert("reflection field.set() failed."c, n == 100);
+  assert("reflection field.set() failed.", n == 100);
 }
 
 #test test_array_reflection :: fn() {
@@ -29,9 +29,9 @@ Reflector :: struct {
   fixed_type := #type(fixed);
   index: int = 0;
   fixed_elements := fixed_type.elements((&fixed) as char*);
-  assert("Fixed array length mismatch"c, fixed_elements.length == 3);
+  assert("Fixed array length mismatch", fixed_elements.length == 3);
   for elem in fixed_elements {
-    assert("Fixed array element mismatch"c, *(elem.data as int*) == fixed[index]);
+    assert("Fixed array element mismatch", *(elem.data as int*) == fixed[index]);
     ++index;
   }
 
@@ -39,9 +39,9 @@ Reflector :: struct {
   dynamic_type := #type(dynamic);
   index = 0;
   dynamic_elements := dynamic_type.elements((&dynamic) as char*);
-  assert("Dynamic array length mismatch"c, dynamic_elements.length == 3);
+  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
   for elem in dynamic_elements {
-    assert("Dynamic array element mismatch"c, *(elem.data as int*) == dynamic[index]);
+    assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
     ++index;
   }
 }

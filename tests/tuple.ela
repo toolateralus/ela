@@ -14,7 +14,7 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   *ptr = (10, 10);
   {
     a, b := *ptr;
-    assert("mallocing with tuple failed"c, a == 10 && b == 10);
+    assert("mallocing with tuple failed", a == 10 && b == 10);
   }
 
   ptr_arr: (int, int)*[];
@@ -22,7 +22,7 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 
   {
     a, b := *(ptr_arr[0]);
-    assert("mallocing into tuple array failed"c, a == 10 && b == 10);
+    assert("mallocing into tuple array failed", a == 10 && b == 10);
   }
 
   free(ptr);
@@ -32,18 +32,18 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   array : (int, int)[] = {(10, 10)};
   array ~= (10, 10);
   a, b := array[0];
-  assert("Storing tuple in array failed"c, a == 10 && b == 10);
+  assert("Storing tuple in array failed", a == 10 && b == 10);
 }
 
 #test test_tuple_fn_interactions :: fn() {
   {
     a, b := func_returns_tuple();
-    assert("returning tuple from function failed"c, a == 10 && b == 10);
+    assert("returning tuple from function failed", a == 10 && b == 10);
   }
 
   tuple := (0, 0);
   a, b := func_takes_tuple_arg(tuple);
-  assert("returning tuple from function that took it as arg and mutated it failed"c, a == 10 && b == 10);
+  assert("returning tuple from function that took it as arg and mutated it failed", a == 10 && b == 10);
 }
 
 #test test_nested_tuple :: fn() {
@@ -51,7 +51,7 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   {
     _, tup := nested;
     a, b := tup;
-    assert("nested tup failed"c, a == 2 && b == 3 && _ == 1);
+    assert("nested tup failed", a == 2 && b == 3 && _ == 1);
   }
 }
 
@@ -59,12 +59,12 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   t1 : (int, int, int) = (0, 1, 2);
   {
     a,b,c := t1;
-    assert("Declaring typed tuple failed."c, a == 0 && b == 1 && c == 2);
+    assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
   }
 
   t2 := (3, 2, 1, 0);
   {
     a,b,c,d := t2;
-    assert("Destructuring inferred tuple failed."c, a == 3 && b == 2 && c == 1 && d == 0);
+    assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
   }
 }

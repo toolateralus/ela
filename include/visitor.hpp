@@ -194,9 +194,8 @@ struct Emitter : VisitorBase {
                             Nullable<ASTBlock> block);
 
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
-  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
-                                                             Type *type);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
+  
   int get_expr_left_type_sr_dot(ASTNode *node);
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;

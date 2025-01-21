@@ -4,21 +4,21 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-#import pthread;
-;
-#import directory;
-#import dlfcn;
-#import file;
-#import net;
-#import reflection;
+// #import pthread;
+// #import directory;
+// #import dlfcn;
+// #import file;
+// #import net;
+// #import reflection;
 // #import interned_string;
 
-// These will be relatively hard to refactor.
 
 #import memory;
-#import json;
+// #import json;
 #import rayui;
-// this has confliction definitions with raylib.
+
+// this has conflicting definitions with raylib.
+// Just occasionally pull this in?
 // #import gl;
 
 main :: fn() {}

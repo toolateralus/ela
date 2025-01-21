@@ -15,11 +15,11 @@
 #foreign exit :: fn(code: int);
 
 #static print :: fn![T](str: T) {
-  printf("%s"c, $"{str}".data);
+  printf("%s", $"{str}".data);
 }
 
 #static println :: fn![T](str: T) {
-  printf("%s\n"c, $"{str}".data);
+  printf("%s\n", $"{str}".data);
 }
 
 // TODO: we could have a panic_handler function pointer so you can have more refined control,
@@ -104,13 +104,13 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     for i in 0..100 {
       array.push(i);
     }
-    assert("Array push failed to meet expected length"c, array.length == 100);
+    assert("Array push failed to meet expected length", array.length == 100);
     for i in 0..100 {
-      assert("array.at(i) != i"c, array.at(i) == i);
+      assert("array.at(i) != i", array.at(i) == i);
     }
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);  
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);  
 }
 
 #test test_Dynamic_Array_pop :: fn() {
@@ -123,12 +123,12 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     }
     for i in 0..100 {
       value := array.pop();
-      assert("array.pop() != 99 - i"c, value == 99 - i);
+      assert("array.pop() != 99 - i", value == 99 - i);
     }
-    assert("Array pop failed to meet expected length"c, array.length == 0);
+    assert("Array pop failed to meet expected length", array.length == 0);
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);
 }
 
 #test test_Dynamic_Array_resize :: fn() {
@@ -137,14 +137,14 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
   {
     defer array.deinit();
     array.resize(2);
-    assert("Array resize failed to set capacity"c, array.capacity == 2);
+    assert("Array resize failed to set capacity", array.capacity == 2);
     for i in 0..2 {
       array.push(i);
     }
-    assert("Array resize failed to meet expected length"c, array.length == 2);
+    assert("Array resize failed to meet expected length", array.length == 2);
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);
 }
 
 #test test_Dynamic_Array_shrink :: fn() {
@@ -155,18 +155,18 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     for i in 0..100 {
       array.push(i);
     }
-    assert("Array push failed to meet expected length"c, array.length == 100);
+    assert("Array push failed to meet expected length", array.length == 100);
 
     array.resize(50);
-    assert("Array shrink failed to meet expected length"c, array.length == 50);
-    assert("Array shrink failed to set capacity"c, array.capacity == 50);
+    assert("Array shrink failed to meet expected length", array.length == 50);
+    assert("Array shrink failed to set capacity", array.capacity == 50);
 
     for i in 0..50 {
-      assert("array.at(i) != i"c, array.at(i) == i);
+      assert("array.at(i) != i", array.at(i) == i);
     }
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);
 }
 
 #test test_Dynamic_Array_clone :: fn() {
@@ -182,19 +182,19 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     defer clone.deinit();
 
 
-    assert("Array clone failed to meet expected length"c, clone.length == 100);
+    assert("Array clone failed to meet expected length", clone.length == 100);
     for i in 0..100 {
-      assert("clone.at(i) != i"c, clone.at(i) == i);
+      assert("lone.at(i) != i", clone.at(i) == i);
     }
 
     // Modify the original array and check if the clone does not reflect the changes
     array.push(100);
-    assert("Clone should not reflect changes in the original array"c, clone.length == 100);
-    assert("clone.at(100) should not exist"c, clone.length == 100);
+    assert("Clone should not reflect changes in the original array", clone.length == 100);
+    assert("lone.at(100) should not exist", clone.length == 100);
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
-  assert("Clone Dynamic_Array failed to deinit"c, clone.data == null && clone.length == 0);
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);
+  assert("Clone Dynamic_Array failed to deinit", clone.data == null && clone.length == 0);
 }
 
 #test test_Dynamic_Array_view :: fn() {
@@ -209,9 +209,9 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     // Take a view of the array
     view = array;
 
-    assert("Array view failed to meet expected length"c, view.length == 100);
+    assert("Array view failed to meet expected length", view.length == 100);
     for i in 0..100 {
-      assert("view.at(i) != i"c, view.at(i) == i);
+      assert("view.at(i) != i", view.at(i) == i);
     }
 
     // ! Document me or change me somehow::
@@ -224,9 +224,9 @@ impl![T] Iterable![T] for Dynamic_Array![T] {
     // ! We could enforce .clone() on non-ptr assignment?
 
     array.push(100);
-    assert("View should reflect changes in the original array"c, view.length == 100);
-    assert("view.at(100) != 100"c, view.at(100) == 100);
+    assert("View should reflect changes in the original array", view.length == 100);
+    assert("view.at(100) != 100", view.at(100) == 100);
   }
 
-  assert("Dynamic_Array failed to deinit"c, array.data == null && array.length == 0);
+  assert("Dynamic_Array failed to deinit", array.data == null && array.length == 0);
 }

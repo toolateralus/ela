@@ -73,7 +73,7 @@ impl Timing {
     tm: tm_t;
     localtime_r(&time_t, &tm);
     buffer: char[64];
-    snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d"c,
+    snprintf(buffer, 64, "%04d-%02d-%02d %02d:%02d:%02d",
              tm.tm_year + 1900, tm.tm_mon + 1, tm.tm_mday,
              tm.tm_hour, tm.tm_min, tm.tm_sec);
     return c_string::from_ptr(buffer as c_string, buffer as c_string + strlen(buffer));

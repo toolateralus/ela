@@ -74,8 +74,7 @@ enum struct TType {
   CompXor,
   CompSHL,
   CompSHR,
-  Concat,
-  Erase,
+  
 
   True,
   False,
@@ -125,8 +124,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Switch);
     TTYPE_CASE(In);
     TTYPE_CASE(Then);
-    TTYPE_CASE(Erase);
-    TTYPE_CASE(Concat);
     TTYPE_CASE(Union);
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
@@ -242,7 +239,7 @@ struct Token {
   inline bool is_comp_assign() const {
     return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
            type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR || type == TType::Concat || type == TType::Erase;
+           type == TType::CompSHL || type == TType::CompSHR;
   }
 
   Token() {}
@@ -295,7 +292,7 @@ static std::unordered_map<std::string, TType> keywords{
 
 static std::unordered_map<std::string, TType> operators{
     {"=>", TType::ExpressionBody },
-    {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
+    {":", TType::Colon},        {"$", TType::Dollar},
     {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
     {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},
     {"..", TType::Range},       {"+", TType::Add},        {"-", TType::Sub},          {"*", TType::Mul},

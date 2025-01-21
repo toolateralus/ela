@@ -424,6 +424,12 @@ struct ASTRange : ASTExpr {
 };
 
 struct ASTFor : ASTStatement {
+
+  int range_type      = Type::invalid_id; // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
+  int iterable_type   = Type::invalid_id; // This is either the type of that implements Enumerator![T], or is Iter![T];
+  int identifier_type = Type::invalid_id; // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
+  bool is_enumerable  = false;
+  
   ASTExpr *iden;
   ASTExpr *range;
   ValueSemantic value_semantic;

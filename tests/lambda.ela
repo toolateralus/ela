@@ -12,12 +12,12 @@ lambda_expr_body := fn() -> int => 3;
   n := fn(a: int, b: int) -> int {
     return a + b;
   }
-  assert("lambda add failed"c, n(1, 2) == 3);
-  assert("inline lambda failed"c, 
+  assert("lambda add failed", n(1, 2) == 3);
+  assert("inline lambda failed", 
       fn(a: int, b: int) -> int { return a + b; }(1, 2) == 3
   );
-  assert("lambda arg failed"c, takes_lambda(n, 1, 2) == 3);
-  assert("lambda inline arg failed"c, takes_lambda(fn(a: int, b: int) -> int { return a + b; }, 1, 2) == 3);
-  assert("lambda expr body failed"c, lambda_expr_body() == 3);
-  assert("lambda expr body inline failed"c, (fn() -> int => 3)() == 3);
+  assert("lambda arg failed", takes_lambda(n, 1, 2) == 3);
+  assert("lambda inline arg failed", takes_lambda(fn(a: int, b: int) -> int { return a + b; }, 1, 2) == 3);
+  assert("lambda expr body failed", lambda_expr_body() == 3);
+  assert("lambda expr body inline failed", (fn() -> int => 3)() == 3);
 }
