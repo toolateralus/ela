@@ -137,7 +137,6 @@ void Emitter::visit(ASTFor *node) {
   // Emit the user code block
   node->block->accept(this);
 
-
   // Emit deferred statements
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
 
@@ -1107,7 +1106,8 @@ void Emitter::interpolate_string(ASTLiteral *node) {
   // ! ! I refactored string interpolation to return char* for now until we build our string back in to it's full glory,
   // ! ! Or replace this garbage string interpolation with a format!() function or macro or something.
   // ! ! However, it leaks like a siev now.
-  (*ss) << "[&] -> char* { char* buf = (char*)malloc(1024); memset(buf, 0, 1024);\nsprintf(buf, \"" << interp_ss.str() << "\",";
+  (*ss) << "[&] -> char* { char* buf = (char*)malloc(1024); memset(buf, 0, 1024);\nsprintf(buf, \"" << interp_ss.str()
+        << "\",";
 
   current = node->interpolated_string_root;
   while (current) {
@@ -1562,7 +1562,6 @@ void Emitter::visit(ASTScopeResolution *node) {
 void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
-      instantiation.node->accept(this);
       for (auto type_id : instantiation.arguments) {
         auto type = global_get_type(type_id);
         if (type->declaring_node) {
@@ -1689,7 +1688,6 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
       for (auto &instantiation : node->generic_instantiations) {
-        instantiation.node->accept(this);
         for (auto type_id : instantiation.arguments) {
           auto type = global_get_type(type_id);
           if (type->declaring_node) {
