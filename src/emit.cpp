@@ -530,19 +530,36 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 
 void Emitter::visit(ASTStructDeclaration *node) {
+  if (node->is_emitted) {
+    return;
+  }
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.node->resolved_type);
       static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
+      for (auto type_id : instantiation.arguments) {
+        auto type = global_get_type(type_id);
+        if (type->declaring_node) {
+          type->declaring_node.get()->accept(this);
+        }
+      }
       instantiation.node->accept(this);
     }
     return;
   }
+
+  for (auto field : node->fields) {
+    auto type = global_get_type(field->type->resolved_type);
+    if (type->declaring_node) {
+      type->declaring_node.get()->accept(this);
+    }
+  }
+
+  node->is_emitted = true;
+
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
-
-  // TODO: fix forward declarations not emitting?
 
   auto type_tag = node->is_union ? " union " : " struct ";
 
