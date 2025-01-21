@@ -15,3 +15,28 @@ generic_return :: fn![T]() -> T {
   assert("generic_return failed"c, generic_return![int]() == 0)
   assert("generic_return failed"c, generic_return![float]() == 0.0);
 }
+
+Generic :: struct![T] {
+  t: T;
+}
+
+generic_fn :: fn![T]() {}
+
+Other :: struct{}
+
+impl![T] Generic![T] {
+  dont :: fn(self*) -> T {
+    t: T;
+    return t;
+  }
+}
+
+My_Struct :: struct {
+  a: Other;
+}
+
+#test test_generic_dependencies :: fn() {
+  a : Generic![My_Struct];
+  generic_fn![Other]();
+  b := a.dont();
+}

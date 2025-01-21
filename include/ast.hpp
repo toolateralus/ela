@@ -92,6 +92,7 @@ struct ASTNode {
   Nullable<ASTBlock> declaring_block;
   SourceRange source_range{};
   int resolved_type = Type::invalid_id;
+  bool is_emitted = false;
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
   virtual ASTNodeType get_node_type() const = 0;
