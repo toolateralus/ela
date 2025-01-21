@@ -19,7 +19,7 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = global_get_type(parameter_types[i]);
-    ss << t->to_string();
+    ss << get_unmangled_name(t);
     if (i < params_len - 1) {
       ss << ", ";
     }
@@ -30,7 +30,7 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   else
     ss << ')';
 
-  ss << " -> " << global_get_type(return_type)->get_base().get_str();
+  ss << " -> " << get_unmangled_name(global_get_type(return_type));
 
   return ss.str();
 }
@@ -309,11 +309,10 @@ std::string Type::to_string() const {
     case TYPE_STRUCT:
     case TYPE_TUPLE:
     case TYPE_SCALAR:
-      return base.get_str() + extensions.to_string();
     case TYPE_ENUM:
     case TYPE_TAGGED_UNION:
     case TYPE_INTERFACE:
-      return base.get_str();
+      return get_unmangled_name(this);
       break;
   }
 }
@@ -767,6 +766,9 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
 }
 
 int find_operator_overload(TType op, Type *type, OperationKind kind) {
+  if (!type) {
+    return -1;
+  }
   std::string op_str = get_operator_overload_name(op, kind);
   if (op_str.empty()) {
     return -1;

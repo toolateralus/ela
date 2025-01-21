@@ -65,9 +65,16 @@ void Emitter::visit(ASTFor *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
 
+
+  static int depth = 0;
   // Generate unique IDs for the range and enumerator
-  std::string range_unique_id = "$_range_id" + std::to_string(defer_blocks.size());
-  std::string unique_id = "$_loop_id" + std::to_string(defer_blocks.size());
+  std::string range_unique_id = "$_range_id" + std::to_string(depth);
+  std::string unique_id = "$_loop_id" + std::to_string(depth);
+  depth++;
+
+  Defer _defer([]{
+    depth--;
+  });
 
   (*ss) << indent() << "{\n";
   indent_level++;
@@ -93,11 +100,8 @@ void Emitter::visit(ASTFor *node) {
 
   // Emit the current call
   std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << indent() << identifier_type_str << "* ";
-  } else {
-    (*ss) << indent() << identifier_type_str << " ";
-  }
+  (*ss) << indent() << identifier_type_str << " ";
+  
   node->iden->accept(this);
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {

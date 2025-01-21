@@ -328,13 +328,12 @@ enum OperationKind {
 int find_operator_overload(TType op, Type *left_ty, OperationKind kind);
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
-static std::string get_unmangled_name(Type *type) {
+static std::string get_unmangled_name(const Type *type) {
   std::string base = type->get_base().get_str();
   auto first = base.find("$");
   if (first != std::string::npos) {
     base = base.substr(0, first);
   }
-
   if (!type->generic_args.empty()) {
     base += "![";
     auto it = 0;
@@ -347,5 +346,6 @@ static std::string get_unmangled_name(Type *type) {
     }
     base += "]";
   }
+  base += type->get_ext().to_string();
   return base;
 }

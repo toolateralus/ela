@@ -10,7 +10,6 @@
   ENUM,
   TUPLE,
   ARRAY,
-  ARRAY,
   FUNCTION,
   POINTER,
   SIGNED,

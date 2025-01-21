@@ -1,0 +1,19 @@
+Changelog:
+
+(1/20/2025 && 1/21/2025) :: {
+  .. Removed built-in array[] and string types. 
+     They still exist, but they're no longer hard-coded into the compiler,
+     they're just in the standard library that's "ghost included" above every translation unit.
+
+  .. Making more built-in interfaces 
+
+  .. Refactor `for i in ...` range based loops. 
+     This improves custom iterators, and also allows us to not depend on C++ for iterators.
+     Now, we use Iterable![T] and Enumerable![T] interfaces.
+  
+  .. Rewrite `Range` type in Ela. Allows us to more easily customize how it works, 
+     without the compiler requiring it as a hard-dependency
+     The same reason as `string` and `T[]` being rewritten.
+
+  .. Improve generic instantiation, more temporally accurate to where it won't have mixups in dependencies (done by Cooper Pilot)
+}

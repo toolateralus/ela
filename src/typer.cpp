@@ -650,6 +650,34 @@ void Typer::visit(ASTReturn *node) {
 void Typer::visit(ASTContinue *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_CONTINUE, Type::invalid_id}; }
 void Typer::visit(ASTBreak *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_BREAK, Type::invalid_id}; }
 
+
+// @CooperPilot I don't think this is very good, I am certain we can do this withotu mocking up function calls.
+void Typer::compiler_mock_function_call_visit_impl(int left_type, const InternedString &method_name) {
+  ASTCall call;
+  ASTArguments arguments;
+  call.arguments = &arguments;
+
+  // Type.
+  ASTIdentifier left;
+  static int depth = 0;
+
+  left.value = "$$temp$$" + std::to_string(depth++);
+  ctx.scope->insert(left.value, left_type, nullptr);
+
+  Defer erase_temp_symbol([&]{
+    depth--;
+    ctx.scope->erase("$$temp$$");
+  });
+
+  // .method
+  ASTDotExpr dot;
+  dot.base = &left;
+  dot.member_name = method_name;
+
+  call.function = &dot;
+  call.accept(this);
+}
+
 void Typer::visit(ASTFor *node) {
   ctx.set_scope(node->block->scope);
 
@@ -671,6 +699,10 @@ void Typer::visit(ASTFor *node) {
   bool is_enumerable = false;
 
   if (range_type->implements("Iterable")) {
+
+    // make sure the impl is actually emitted if this is generic.
+    compiler_mock_function_call_visit_impl(range_type_id, "iter");
+
     auto symbol = scope->local_lookup("iter");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
@@ -679,9 +711,11 @@ void Typer::visit(ASTFor *node) {
     }
 
     auto symbol_ty = global_get_type(symbol->type_id);
-
     auto iter_return_ty = global_get_type(symbol_ty->get_info()->as<FunctionTypeInfo>()->return_type);
     node->iterable_type = iter_return_ty->id;
+
+    // make sure the impl is actually emitted if this is generic. 
+    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
 
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
@@ -691,6 +725,10 @@ void Typer::visit(ASTFor *node) {
     }
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
   } else if (range_type->implements("Enumerable")) {
+
+    // make sure the impl is actually emitted if this is generic. 
+    compiler_mock_function_call_visit_impl(range_type_id, "enumerator");
+    
     auto symbol = scope->local_lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
@@ -699,6 +737,10 @@ void Typer::visit(ASTFor *node) {
     }
     auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
     node->iterable_type = iter_return_ty->id;
+
+    // make sure the impl is actually emitted if this is generic. 
+    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "

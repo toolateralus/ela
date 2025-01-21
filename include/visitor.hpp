@@ -73,11 +73,14 @@ struct Typer : VisitorBase {
   ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
   void try_visit_impl_on_call(ASTCall *node);
 
+  void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
+
   void visit(ASTCall *node) override;
   void visit(ASTArguments *node) override;
   void visit(ASTReturn *node) override;
   void visit(ASTContinue *node) override;
   void visit(ASTBreak *node) override;
+
   void visit(ASTFor *node) override;
   void visit(ASTIf *node) override;
   void visit(ASTElse *node) override;
