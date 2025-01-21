@@ -215,7 +215,7 @@ cmsghdr :: struct {
   cmsg_len : u64;
   cmsg_level : s32;
   cmsg_type : s32;
-  __cmsg_data : char[];
+  __cmsg_data : List![char];
 };
 #foreign __cmsg_nxthdr :: fn(__mhdr: msghdr *, __cmsg: cmsghdr *) -> cmsghdr *;
 

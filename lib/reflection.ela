@@ -27,7 +27,6 @@ impl Type  {
 
   has_no_extension :: fn(self*) -> bool {
     return self.flags & TypeFlags::POINTER == 0 &&
-          self.flags & TypeFlags::ARRAY == 0 &&
           self.flags & TypeFlags::ARRAY == 0;
   }
 
@@ -79,10 +78,6 @@ impl Type  {
     return self.flags & TypeFlags::POINTER != 0;
   }
 
-  is_fixed_array :: fn(self*) -> bool {
-    return self.flags & TypeFlags::ARRAY != 0;
-  }
-
   get_field :: fn(self*, name: string) -> Field* {
     for field in self.fields {
       if strcmp(field.name, name.data) == 0 {
@@ -92,6 +87,6 @@ impl Type  {
     return null;
   }
 
-  // implemented externally.
+  // implemented externally. TODO: remove.
   find_type :: fn(name: string) -> Type *;
 }

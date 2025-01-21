@@ -14,7 +14,7 @@ main :: fn() {
     return Flag::Build;
   }
 
-  arr : s64[] = {0,1,2};
+  arr : List![s64] = {0,1,2};
   value := 2;
 
   // How do we handle where this doesn't reutrn a value in all paths.

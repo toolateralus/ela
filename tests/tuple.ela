@@ -17,8 +17,8 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
     assert("mallocing with tuple failed", a == 10 && b == 10);
   }
 
-  ptr_arr: (int, int)*[];
-  ptr_arr ~= ptr;
+  ptr_arr: List![(int, int)*];
+  ptr_arr.push(ptr);
 
   {
     a, b := *(ptr_arr[0]);
@@ -29,8 +29,8 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 }
 
 #test test_tuple_array :: fn() {
-  array : (int, int)[] = {(10, 10)};
-  array ~= (10, 10);
+  array : List![(int, int)] = {(10, 10)};
+  array.push((10, 10));
   a, b := array[0];
   assert("Storing tuple in array failed", a == 10 && b == 10);
 }

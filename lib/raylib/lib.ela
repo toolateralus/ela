@@ -69,7 +69,7 @@ DARKCYAN: Color = { r: 0 as u8, g: 139 as u8, b: 139 as u8, a: 255 as u8 };
 LIGHTCYAN: Color = { r: 224 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
 
 // Exclude black and white.
-All_Colors : Color[] = {
+All_Colors : List![Color] = {
   WHITE,
   RED,
   GREEN,

@@ -19,7 +19,7 @@ dirent :: struct {
 
 Directory :: struct {
   path: string;
-  files: string[];
+  files: List![string];
 }
 
 impl Directory {
@@ -36,11 +36,11 @@ impl Directory {
       files : {}
     };
 
-    files: string[];
+    files: List![string];
     entry: void*;
     while entry = readdir(dir) {
       ent : dirent* = entry;
-      files ~= string::from(ent.d_name as c_string);
+      files.push(string::from(ent.d_name as c_string));
     }
     closedir(dir);
     return {path: path, files: files};

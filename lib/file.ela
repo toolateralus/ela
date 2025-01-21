@@ -78,13 +78,13 @@ impl File {
     return ({}, str);
   }
 
-  read_bytes :: fn(filename: string) -> u8[] {
+  read_bytes :: fn(filename: string) -> List![u8] {
     file := fopen(filename.data, "r");
     if !file then return {};
-    result: u8[];
+    result: List![u8];
     c: char;
     while ((c = fgetc(file)) != EOF) {
-      result ~= c as u8;
+      result.push(c as u8);
     }
     fclose(file);
     return result;

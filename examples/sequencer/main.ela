@@ -97,7 +97,7 @@ sequence_channel_style : Style = {
   jiggle_rate: 2.0,
 }
 
-check_buttons: CheckButton[];
+check_buttons: List![CheckButton];
 
 check_button_style: Style = {
   foreground: WHITE,
@@ -141,7 +141,7 @@ get_sequencer_style :: fn(style: Style) -> Style {
 }
 
 SequenceChannel :: struct {
-  check_buttons: CheckButton[];
+  check_buttons: List![CheckButton];
   sound: Sound;
   active: bool;
   style: Style;
@@ -168,16 +168,16 @@ impl SequenceChannel {
     if total_notes != self.check_buttons.length {
       while total_notes > self.check_buttons.length {
         _x : float = x + 150 + ((self.check_buttons.length * 40) as float) + 2;
-        self.check_buttons ~= {
+        self.check_buttons.push({
           value:      false,
           rect:       Rectangle{x: _x, y: y, width: 36, height: 36},
           style:      self.style,
           text:       string::empty(),
           allow_hold: true,
-        }
+        });
       }
       while self.check_buttons.length > total_notes {
-        button := ~self.check_buttons;
+        button := self.check_buttons.pop();
       }
     }
     self.volume_slider.value = &self.volume;
@@ -203,15 +203,15 @@ impl SequenceChannel {
   }
 }
 
-channels: SequenceChannel[];
+channels: List![SequenceChannel];
 
 on_remove_channel :: fn() {
-  if channels.length > 0 then _ := ~channels;
+  if channels.length > 0 then _ := channels.pop();
 }
 
 on_reset :: fn() {
   while channels.length > 0 {
-    _ := ~channels;
+    channels.pop();
   }
 }
 
@@ -227,11 +227,11 @@ file_dropdown : DropDown = {
 
 on_file_selected :: fn(index: int) {
   fileName := file_dropdown.options[index];
-  channels ~= SequenceChannel::create(
+  channels.push(SequenceChannel::create(
     LoadSound(fileName.data),
     get_sequencer_style(check_button_style),
     fileName
-  );
+  ));
 }
 
 sequencer :: fn() {
@@ -258,7 +258,7 @@ main :: fn() {
 
   for file in dir.files {
     if file.ends_with(".wav") || file.ends_with(".mp3") || file.ends_with(".ogg") {
-      file_dropdown.options ~= file;
+      file_dropdown.options.push(file);
     }
   }
 

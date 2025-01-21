@@ -1,5 +1,5 @@
-// This is because T[] isn't a generic type.
-impl![T] T[] {  } // Use of undeclared identifier 'T'
+// This is because List![T] isn't a generic type.
+impl![T] List![T] {  } // Use of undeclared identifier 'T'
 
 main :: fn() { 
   

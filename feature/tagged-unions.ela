@@ -14,7 +14,7 @@ AST :: enum(union) {
     op: Operator,
   };
   Program :: struct {
-    statements: AST[];
+    statements: List![AST];
   }
 }
 
@@ -66,11 +66,11 @@ main :: fn() {
     typeof(AST, program) program = {0};
   }
 
-  program.statements ~= AST::Binary {
+  program.statements.push(AST::Binary {
     left: mem::arena::new(AST::Identifier{"Xaryu"}),
     right: new mem::arena::new(AST::Integer{25}),
     op: Operator::Add,
-  };
+  });
 
   node : AST = program.statements.first();
 

@@ -53,7 +53,7 @@ impl JsonToken {
 }
 
 JsonLexer :: struct {
-  tokenTypeNames : string[] = {
+  tokenTypeNames : List![string] = {
     "Invalid",
     "True",
     "False",
@@ -75,7 +75,7 @@ JsonLexer :: struct {
   position: int;
   length: u32;
   input: string;
-  lookahead_buffer : JsonToken[];
+  lookahead_buffer : List![JsonToken];
 }
 
 impl JsonLexer {
@@ -93,7 +93,7 @@ impl JsonLexer {
 
   get_token :: fn(self*) -> (JsonError, JsonToken) {
     if self.lookahead_buffer.length != 0 {
-      token := ~self.lookahead_buffer;
+      token := self.lookahead_buffer.pop();
       return (JsonError::Ok(), token);
     }
     token : JsonToken;
@@ -231,11 +231,11 @@ impl JsonLexer {
     if err.has_value {
       return (err, token);
     }
-    self.lookahead_buffer ~= token;
+    self.lookahead_buffer.push(token);
     return (JsonError::Ok(), token);
   }
 
-  expect_types :: fn(self*, types: s32[]) -> (JsonError, JsonToken) {
+  expect_types :: fn(self*, types: List![s32]) -> (JsonError, JsonToken) {
     err, token := self.get_token();
     if err.has_value {
       return (err, token);
@@ -273,8 +273,9 @@ JsonKeyValuePair :: struct;
 JsonValue :: struct;
 
 // this causes a type error for some reason
-// #alias JsonObject :: JsonKeyValuePair*[];
-// #alias JsonArray :: JsonValue*[];
+
+#alias JsonObject :: List![JsonKeyValuePair*];
+#alias JsonArray  :: List![JsonValue*];
 
 JsonKeyValuePair :: struct {
   key: string;
@@ -285,8 +286,8 @@ JsonValueUnion :: union {
   number: float64;
   boolean: bool;
   _string: string;
-  object: JsonKeyValuePair[];
-  array: JsonValue*[];
+  object: List![JsonKeyValuePair];
+  array: JsonArray;
 }
 
 JsonValue :: struct {
@@ -411,13 +412,13 @@ impl JsonValue {
     }
     return ""; // or handle error
   }
-  as_object :: fn(self*) -> JsonKeyValuePair[] {
+  as_object :: fn(self*) -> List![JsonKeyValuePair] {
     if self.type == JsonValueType::Object {
       return self.data.object;
     }
     return {}; // or handle error
   }
-  as_array :: fn(self*) -> JsonValue*[] {
+  as_array :: fn(self*) -> JsonArray {
     if self.type == JsonValueType::Array {
       return self.data.array;
     }
@@ -447,7 +448,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
   }
   if token.type == JsonTokenType::LBracket {
     value.type = JsonValueType::Array;
-    value.data.array = JsonValue*[]{};
+    value.data.array = JsonArray{};
     peek_err, peek_token := lexer.peek_token();
     if peek_token.type == JsonTokenType::RBracket {
       lexer.get_token();
@@ -458,7 +459,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
       if err.has_value {
         return (err, null);
       }
-      value.data.array ~= val;
+      value.data.array.push(val);
       err, token = lexer.expect_types({JsonTokenType::RBracket, JsonTokenType::Comma});
       if err.has_value {
         return (err, null);
@@ -485,7 +486,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
       if parse_err.has_value {
         return (parse_err, null);
       }
-      value.data.object ~= {key: key.value, value: val};
+      value.data.object.push({key: key.value, value: val});
       err, token = lexer.expect_types({JsonTokenType::RCurly, JsonTokenType::Comma});
       if err.has_value {
         return (err, null);
@@ -563,7 +564,7 @@ json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*);
 json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Object;
-  val.data.object = JsonKeyValuePair[]{};
+  val.data.object = List![JsonKeyValuePair]{};
   for field in type.fields {
     field_kvp: JsonKeyValuePair;
     field_kvp.key = string::from(field.name);
@@ -572,7 +573,7 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
       return (err, null);
     }
     field_kvp.value = value;
-    val.data.object ~= field_kvp;
+    val.data.object.push(field_kvp);
   }
   return (JsonError::Ok(), val);
 }
@@ -580,13 +581,13 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
 json_serialize_array :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Array;
-  val.data.array = JsonValue*[]{};
+  val.data.array = JsonArray{};
   for elem in type.elements(object as c_string) {
     err, elem_val := json_serialize(elem.data, elem.type);
     if err.has_value {
       return (err, null);
     }
-    val.data.array ~= elem_val;
+    val.data.array.push(elem_val);
   }
   return (JsonError::Ok(), val);
 }

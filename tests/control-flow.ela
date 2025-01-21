@@ -11,7 +11,7 @@
     return;
   }
 
-  arr: s32[];
+  arr: List![s32];
   for v in arr {
       assert("Unexpected case in array loop", false);
       return;
@@ -73,7 +73,7 @@
     i = i;
   }
 
-  array: int[];
+  array: List![int];
 
   for k in array {
     k = k;
@@ -94,7 +94,7 @@
 }
 
 #test test_iterate_array :: fn() {
-  array: s8[] = {0,1,2,3};
+  array: List![s8] = {0,1,2,3};
   n: int ;
   for *v in array {
     assert("", n == *v);
@@ -102,8 +102,8 @@
   }
 
   n = 0;
-  arr : s8[]* = malloc(sizeof(s8[])); 
-  *arr = s8[]{0,1,2,3};
+  arr : List![s8]* = malloc(sizeof(List![s8])); 
+  *arr = List![s8]{0,1,2,3};
 
   for v in *arr {
     assert("", n == v);

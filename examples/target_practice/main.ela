@@ -195,10 +195,10 @@ TextParticle :: struct {
   background_texture : Texture2D;
 
   character : Character;
-  bullets: Bullet*[];
-  enemies: Enemy*[];
-  particles: Particle*[];
-  text_particles: TextParticle*[];
+  bullets: List![Bullet*];
+  enemies: List![Enemy*];
+  particles: List![Particle*];
+  text_particles: List![TextParticle*];
 
   shot_sound: Sound;
   explosion_sound: Sound;
@@ -224,7 +224,7 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
   particle.text = text;
   particle.spawn_time = GetTime();
   particle.lifetime = lifetime;
-  text_particles ~= particle;
+  text_particles.push(particle);
 }
 
 // great function name
@@ -289,7 +289,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     particle.color = tint;
   }
 
-  particles ~= particle;
+  particles.push(particle);
 }
 
 update_particle :: fn(particle: Particle*) -> bool {
@@ -352,7 +352,7 @@ make_enemy :: fn() {
   }
 
   enemy.id = enemies.length;
-  enemies ~= enemy;
+  enemies.push(enemy);
 }
 
 make_bullet :: fn(x: float, y, rotation) {
@@ -370,7 +370,7 @@ make_bullet :: fn(x: float, y, rotation) {
   { 
     bullet: Bullet* = malloc(sizeof(Bullet));
     *bullet = Bullet::create(rect, &bullet_render_info, start_velocity, rotation);
-    bullets ~= bullet;
+    bullets.push(bullet);
   }
 
   make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, PINK);
@@ -603,7 +603,7 @@ update_game :: fn() {
 
     // mark stopped bullets or bullets off-screen as dead.
     if !CheckCollisionRecs(screen_rect, bullet.rect) || bullet.velocity.length_sqr() <= bullet_min_velocity {
-      dead_bullets ~= bullet
+      dead_bullets.push(bullet)
       bullet.dead = true;
       on_bullet_fizzle();
       continue;
@@ -622,12 +622,12 @@ update_game :: fn() {
       if sqr_dist < radius * radius {
         if !enemy.dead {
           enemy.dead = true;
-          dead_enemies ~= enemy;
+          dead_enemies.push(enemy);
           n_enemies_killed_this_frame++;
           on_enemy_killed(enemy, n_enemies_killed_this_frame);
         }
         if !bullet.dead {
-          dead_bullets ~= bullet;
+          dead_bullets.push(bullet);
           bullet.dead = true;
         }
         targets_destroyed++;
@@ -645,23 +645,23 @@ update_game :: fn() {
   }
 
   for bullet in dead_bullets {
-    bullets ~~ bullet;
+    bullets.erase(bullet);
     free(bullet);
   }
 
   for enemy in dead_enemies {
-    enemies ~~ enemy;
+    enemies.erase(enemy);
     free(enemy);
   }
 
   dead_particles: Particle*[];
   for particle in particles {
     if !update_particle(particle)
-      then dead_particles ~= particle;
+      then dead_particles.push(particle);
   }
 
   for particle in dead_particles {
-    particles ~~ particle;
+    particles.erase(particle);
     free(particle);
   }
 
@@ -671,12 +671,12 @@ update_game :: fn() {
     now := GetTime() as float;
     particle.color.a = lerp(particle.color.a, 0, (now - particle.spawn_time) / particle.lifetime);
     if now - particle.spawn_time >= particle.lifetime {
-      dead_text_particles ~= particle;
+      dead_text_particles.push(particle);
     }
   }
 
   for particle in dead_text_particles {
-    text_particles ~~ particle;
+    text_particles.erase(particle);
     free(particle);
   }
 
@@ -767,16 +767,16 @@ reset_game_state :: fn() {
 
 
   while bullets.length > 0 {
-    n := ~bullets;
+    n := bullets.pop();
   }
   while particles.length > 0 {
-    n := ~particles;
+    n := particles.pop();
   }
   while enemies.length > 0 {
-    n := ~enemies;
+    n := enemies.pop();
   }
   while text_particles.length > 0 {
-    n := ~text_particles;
+    n := text_particles.pop();
   }
 }
 

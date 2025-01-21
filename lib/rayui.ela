@@ -307,7 +307,7 @@ impl CheckButton {
 }
 
 DropDown :: struct {
-  options: string[];
+  options: List![string];
   rect: Rectangle;
   style: Style;
   selected_index: int = -1;

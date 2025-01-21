@@ -49,8 +49,8 @@ main :: fn() {
   // C equivalent: for (int i = 100; i >= 0; i -= 4) {}
   for i in Range{first: 100, last: 0, incrment: 4} {}
 
-  get_array :: fn() -> s32[] {
-    arr: s32[];
+  get_array :: fn() -> List![s32] {
+    arr: List![s32];
     for i in 0..100 {
       arr != i;
     }

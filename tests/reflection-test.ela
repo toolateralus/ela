@@ -35,7 +35,7 @@ Reflector :: struct {
     ++index;
   }
 
-  dynamic: int[] = {3, 2, 1};
+  dynamic: List![int] = {3, 2, 1};
   dynamic_type := #type(dynamic);
   index = 0;
   dynamic_elements := dynamic_type.elements((&dynamic) as char*);

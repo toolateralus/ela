@@ -7,7 +7,7 @@
 }
 
 #test test_array :: fn() {
-  array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  array : List![int] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
   assert("array length failed to equal expected value", array.length == 11);
 }
 
@@ -31,34 +31,29 @@ impl Xaryu {
 }
 
 
-
-/* 
-  These operators will be removed as soon as we finish this massive rewrite.
-  Where [] array is implemented in ela, and we can just have generic methods for these operations.
-*/
 #test test_array_concat_operator :: fn() {
-  array: int[];
-  array ~= 10;
+  array: List![int];
+  array.push(10);
   assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
-  array: int[];
+  array: List![int];
   for i in 0..100 {
-    array ~= 10;
+    array.push(10);
   }
   n: int;
   for i in 0..100 {
-    n = ~array;
+    n = array.pop();
   }
   assert("pop operator failed", array.length == 0 && n == 10);
 }
 
 #test test_array_erase_operator :: fn() {
-  array: int[] ;
-  array ~= 10;
-  array ~~ 10;
-  assert("failed to erase element from array with ~~", array.length == 0);
+  array: List![int] ;
+  array.push(10);
+  array.erase(10);
+  assert("failed to erase element from array with .erase()", array.length == 0);
 }
 
 
@@ -77,11 +72,11 @@ impl Xaryu {
     }
   }
 
-  dynamic : s64[][];
+  dynamic : List![List![s64]];
   for x in 0..5 {
-    dynamic ~= {};
+    dynamic.push({});
     for y in 0..5 {
-      dynamic[x] ~= x * y;
+      dynamic[x].push(x * y);
     }
   }
 
@@ -113,7 +108,7 @@ impl Xaryu {
 }
 
 #test test_slicing_array :: fn() {
-  arr := s64[] {
+  arr := List![s64] {
     0, 0, 0,
     0, 0, 0,
     0, 0, 0,
