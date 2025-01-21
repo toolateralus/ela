@@ -1,4 +1,4 @@
-#import core;
+;
 
 Union :: union {
   a: int = -1;

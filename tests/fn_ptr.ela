@@ -1,5 +1,5 @@
 
-#import core;
+;
 
 function_pointer_helper :: fn(x: int, y: int) -> int { return x * y; }
 

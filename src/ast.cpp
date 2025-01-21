@@ -1894,6 +1894,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->scope->types[param] = -2;
   }
 
+  // TODO: 
+  //  I think struct fields should just be comma seperated.
+  //  Having semicolons makes little sense and is very unintuitive:
+  //  I always have to correct myself when I place semi's in there.
+
   if (!semicolon()) {
     auto block = parse_block(node->scope);
     visit_struct_statements(node, block->statements);

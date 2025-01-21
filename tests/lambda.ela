@@ -1,4 +1,4 @@
-#import core;
+;
 
 #alias Lambda :: fn*(int, int) -> int;
 

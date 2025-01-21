@@ -1,4 +1,4 @@
-#import core; // import core for interpolated strings.
+; // import core for interpolated strings.
 
 
 // Define a simple vector structure.

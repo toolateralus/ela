@@ -1,5 +1,5 @@
 #import raylib;
-#import core;
+;
 
 // * ########### BUILTIN UI HELPERS ############### //
 // * Function pointer to use with the `draw_button` function.

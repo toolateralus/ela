@@ -1,4 +1,4 @@
-#import core;
+;
 
 main :: fn() {
   /* If statements */

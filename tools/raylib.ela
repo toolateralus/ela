@@ -1184,7 +1184,7 @@ NPatchLayout :: enum {
 #foreign AttachAudioMixedProcessor :: fn(processor: AudioCallback) -> void;
 #foreign DetachAudioMixedProcessor :: fn(processor: AudioCallback) -> void;
 ========
-#import core;
+;
 #import _raybindings;
 
 #c_flags " -lraylib "

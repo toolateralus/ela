@@ -1,4 +1,4 @@
-#import core;
+;
 
 // TODO: pack these with GL, we need a system for storing .so/.a files with these modules & linking with them properly?
 // TODO Or do we leave it up the the user to do that?

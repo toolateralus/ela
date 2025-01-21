@@ -1,5 +1,5 @@
 #error "Internered string is broken";
-#import core;
+;
 
 
 InternedString :: struct {

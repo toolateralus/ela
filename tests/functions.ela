@@ -1,5 +1,5 @@
 
-#import core; 
+; 
 
 #test test_malloc :: fn() {
   ptr: s32* = malloc(4);

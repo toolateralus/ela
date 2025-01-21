@@ -1,4 +1,4 @@
-#import core;
+;
 
 main :: fn() {
   tuple := (1, 2); // tuple by value; equivalent to `tuple: (int, int) = (1, 2)` 

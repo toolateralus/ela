@@ -1,5 +1,3 @@
-
-
 Struct :: struct;
 impl Struct {
   static_method :: fn() -> int {

@@ -1,4 +1,4 @@
-#import core;
+;
 #import file;
 #import reflection;
 

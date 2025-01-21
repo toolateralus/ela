@@ -22,7 +22,7 @@ impl Vec2 {
   }
 }
 
-#import core;
+;
 
 #test test_main :: fn() {
   a, b := (Vec2{x: 1, y: 1}, Vec2{x: 1, y: 1});

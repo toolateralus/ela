@@ -1,4 +1,4 @@
-#import core;
+;
 
 __bind_gen__anon_D0 :: struct {
   __low : u32;

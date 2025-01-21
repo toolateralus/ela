@@ -5,7 +5,7 @@
 */
 
 #import pthread;
-#import core;
+;
 #import directory;
 #import dlfcn;
 #import file;

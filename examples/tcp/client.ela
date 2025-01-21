@@ -1,5 +1,5 @@
 #import net;
-#import core;
+;
 
 PORT : u16 = 8080
 

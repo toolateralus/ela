@@ -1,4 +1,4 @@
-#import core; 
+; 
 
 #test test_type_alias :: fn() {
   #alias XaryuBarSchnar :: int;

@@ -149,51 +149,12 @@
   #foreign atof :: fn(v: c_string) -> float64;
 }
 
-#ifdef RANGE_GENERIC {
-  Range_Base :: struct![T] {
-    begin: T;
-    end:   T;
-  }
-
-  #alias Range :: Range_Base![s64];
-
-  // TODO: support reverse enumeration for this as well.
-  Range_Base_Enumerator :: struct![T] {
-    begin: T;
-    end:   T;
-    idx:   T;
-  }
-
-  impl![T] Enumerator![T] for Range_Base_Enumerator![T] {
-    current   :: fn(self*) -> s64 {
-      return self.idx;
-    }
-    next      :: fn(self*) {
-      self.idx++;
-    };
-    done      :: fn(self*) -> bool {
-      return self.idx >= self.end;
-    }
-  }
-
-  impl![T] Enumerable![Range_Base_Enumerator![T], T] for Range_Base![T] {
-    enumerator :: fn(self*) -> Range_Base_Enumerator![T] {
-      return {
-        begin: self.first,
-        end: self.last,
-        idx: 0,
-      };
-    }
-  }
-} else {
+#region Range {
   Range :: struct {
     begin: s64;
     end:   s64;
   }
 
-  // #alias Range :: Range_Base![s64];
-
-  // TODO: support reverse enumeration for this as well.
   Range_Enumerator :: struct {
     begin: s64;
     end:   s64;
@@ -229,6 +190,10 @@
     length:  s32;
   }
 
+  // TODO: reimplement all the helper functions we used to have.
+  // Also, we should make this not null terminated, rather controlled by length.
+  // Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
+  // So we'll have to rewrite them all for that.
   impl string {
     empty :: fn() -> #self {
       return {};
@@ -255,54 +220,295 @@
   }
 }
 
-#region ENV {
-  Env :: struct {};
+Env :: struct {};
 
-  impl Env {
-    args :: fn() -> string[]* {
-      #static values: string[];
-      return &values;
-    }
+impl Env {
+  args :: fn() -> string[]* {
+    #static values: string[];
+    return &values;
   }
 }
 
-#ifdef OTHER {
-  impl s64 {
-    to_string :: fn(self) -> c_string {
-      #static table : c_string[] = {
-        "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
-      };
+impl s64 {
+  to_string :: fn(self) -> string {
+    #static table : c_string[] = {
+      "0", "1", "2", "3", "4", "5", "6", "7", "8", "9"
+    };
 
-      if self < 10 then return table[self];
+    if self < 10 then return string::from(table[self]);
 
-      negative := false;
-      if self < 0 {
-        negative = true;
-        self = -self;
-      }
-
-      buffer: char[20];
-      index: int = 0;
-
-      while self > 0 {
-        buffer[index] = '0' + (self % 10);
-        self /= 10;
-        index++;
-      }
-
-      if negative {
-        buffer[index] = '-';
-        index++;
-      }
-
-      // Reverse the buffer
-      for i in 0..(index / 2) {
-        temp := buffer[i];
-        buffer[i] = buffer[index - i - 1];
-        buffer[index - i - 1] = temp;
-      }
-
-      return c_string::from_ptr(buffer as c_string, (buffer as c_string) + index);
+    negative := false;
+    if self < 0 {
+      negative = true;
+      self = -self;
     }
+
+    buffer: char[20];
+    index: int = 0;
+
+    while self > 0 {
+      buffer[index] = '0' + (self % 10);
+      self /= 10;
+      index++;
+    }
+
+    if negative {
+      buffer[index] = '-';
+      index++;
+    }
+
+    // Reverse the buffer
+    for i in 0..(index / 2) {
+      temp := buffer[i];
+      buffer[i] = buffer[index - i - 1];
+      buffer[index - i - 1] = temp;
+    }
+
+    return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
   }
 }
+
+#static print :: fn![T](str: T) {
+  printf("%s"c, $"{str}");
+}
+
+#static println :: fn![T](str: T) {
+  printf("%s\n"c, $"{str}");
+}
+
+#alias Panic_Handler :: fn *(c_string);
+
+panic_handler: Panic_Handler = fn(msg: c_string) {
+  println(msg);
+  exit(1);
+}
+
+#static panic :: fn(msg: c_string) {
+  if !panic_handler {
+    printf("No panic handler set. Exitting\n");
+    exit(1);
+  }
+  panic_handler(msg);
+}
+
+#alias Error :: c_string;
+
+#region LIST  {
+  // This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
+  // Vector nomenclature is strange and ambiguous, so I think it's a good name, just as C# did. 
+  // Everyone knows what you mean when you say, I have a list of items etc.
+
+  // It's just a contiguous chunk of memory that dynamically resizes to fit any data pushed/popped into and out of it.
+  // As any other list, taking a reference to some memory within this array has a very high likelyhood to become invalid, if and when it resizes.
+  // If you need a static, unchanging list of items, just use a fixed array such as `T[1024]` or `Type[MAX_BUFFER_LEN]` or whatever.
+
+  // A note about this list type: as of the time of writing this, this list will be inherently unsafe when it comes to assignment.
+  // A simple assignment such as 'variable := some_list' will pose a very strange problem:
+  // The two lists will share MEMORY, but pushing into 'variable' will NOT update the length or capacity of 'some_list'!!!!
+  // This is very important, because taking a view is very practical and natural, it just happens. 
+  // But, mutating a view, will cause you serious bugs and headaches!!
+
+  // If you want to take a deep clone, meaning copying the entire data the list points to, and having a fully detached, new instance of a list
+  // that mirrors the original, call '.clone()' when assigning.
+  
+  // If you want to mutate a list, when passing it into a function or whatever, just pass it by pointer like you would with any other type.
+  // There are no magic assignment or copy constructors in this language, nor destructors, so this is just an important thing to be aware of,
+  // because it applies to any type you create that holds dynamic memory, and also non-pointer values.
+  
+  List :: struct![T] {
+    data:     T*;
+    length:   u64;
+    capacity: u64;
+  }
+
+  impl![T] List![T] {
+    // You should probably not call this function, and you do not need to for normal push operations.
+    // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
+    // and this will set your length appropriately.
+    resize :: fn(self*, new_capacity: u64) {
+      if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
+
+      self.capacity = new_capacity;
+      self.data = realloc(self.data, #type(T).size * self.capacity);
+      if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
+    }
+
+    push   :: fn(self*, v: T) {
+      if self.length + 1 >= self.capacity {
+        if self.capacity == 0 then self.capacity = 4;
+        self.resize(self.capacity * 2);
+      }
+      self.data[self.length] = v;
+      self.length++;
+    }
+
+    pop    :: fn(self*) -> T {
+      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+      value := self.data[self.length - 1];
+      self.length -= 1;
+      return value;
+    }
+
+    deinit :: fn(self*) {
+      free(self.data);
+      self.data = null;
+      self.length = 0;
+    }
+
+    at :: fn(self*, index: u64) -> T {
+      return self.data[index];
+    }
+  }
+
+  impl![T] Clone for List![T] {
+    clone :: fn(self*) -> #self {
+      new_data := malloc(#type(T).size * self.capacity);
+      if !new_data then panic("Failed to allocate in List clone");
+      memcpy(new_data, self.data, #type(T).size * self.length);
+      return {
+        data: new_data,
+        length: self.length,
+        capacity: self.capacity,
+      }
+    } 
+  }
+
+  impl![T] Iterable![T] for List![T] {
+    iter :: fn(self*) -> Iter![T] {
+      return {
+        ptr: self.data,
+        end: self.data + self.length-1 // TODO; verify -1 is correct
+      }
+    }
+  }
+
+  #test test_List_push_at :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+      assert("Array push failed to meet expected length"c, array.length == 100);
+      for i in 0..100 {
+        assert("array.at(i) != i"c, array.at(i) == i);
+      }
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);  
+  }
+
+  #test test_List_pop :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+      for i in 0..100 {
+        value := array.pop();
+        assert("array.pop() != 99 - i"c, value == 99 - i);
+      }
+      assert("Array pop failed to meet expected length"c, array.length == 0);
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);
+  }
+
+  #test test_List_resize :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      array.resize(2);
+      assert("Array resize failed to set capacity"c, array.capacity == 2);
+      for i in 0..2 {
+        array.push(i);
+      }
+      assert("Array resize failed to meet expected length"c, array.length == 2);
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);
+  }
+
+  #test test_List_shrink :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+      assert("Array push failed to meet expected length"c, array.length == 100);
+
+      array.resize(50);
+      assert("Array shrink failed to meet expected length"c, array.length == 50);
+      assert("Array shrink failed to set capacity"c, array.capacity == 50);
+
+      for i in 0..50 {
+        assert("array.at(i) != i"c, array.at(i) == i);
+      }
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);
+  }
+
+  #test test_List_clone :: fn() {
+    array : List![s64];
+    clone : List![s64];
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+
+      clone = array.clone();
+      defer clone.deinit();
+
+
+      assert("Array clone failed to meet expected length"c, clone.length == 100);
+      for i in 0..100 {
+        assert("clone.at(i) != i"c, clone.at(i) == i);
+      }
+
+      // Modify the original array and check if the clone does not reflect the changes
+      array.push(100);
+      assert("Clone should not reflect changes in the original array"c, clone.length == 100);
+      assert("clone.at(100) should not exist"c, clone.length == 100);
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);
+    assert("Clone List failed to deinit"c, clone.data == null && clone.length == 0);
+  }
+
+  #test test_List_view :: fn() {
+    array : List![s64];
+    view  : List![s64];
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+
+      // Take a view of the array
+      view = array;
+
+      assert("Array view failed to meet expected length"c, view.length == 100);
+      for i in 0..100 {
+        assert("view.at(i) != i"c, view.at(i) == i);
+      }
+
+      array.push(100);
+      assert("View should reflect changes in the original array"c, view.length == 100);
+      assert("view.at(100) != 100"c, view.at(100) == 100);
+    }
+
+    assert("List failed to deinit"c, array.data == null && array.length == 0);
+  }
+
+}
+
+
+

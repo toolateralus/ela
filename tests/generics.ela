@@ -1,4 +1,4 @@
-#import core;
+;
 
 add_generic :: fn![T](a: T, b: T) -> T {
   return a + b;

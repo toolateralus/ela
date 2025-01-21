@@ -1,4 +1,4 @@
-#import core;
+;
 
 #test test_comp_assign :: fn() {
   deref: s32 = 1;

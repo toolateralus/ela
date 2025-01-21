@@ -1,4 +1,4 @@
-#import core;
+;
 
 Vector2 :: struct {
   x: float32;

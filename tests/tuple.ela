@@ -1,4 +1,4 @@
-#import core;
+;
 
 func_returns_tuple :: fn() -> (int, int) {
   return (10, 10);
