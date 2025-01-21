@@ -1563,6 +1563,13 @@ void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       instantiation.node->accept(this);
+      for (auto type_id : instantiation.arguments) {
+        auto type = global_get_type(type_id);
+        if (type->declaring_node) {
+          type->declaring_node.get()->accept(this);
+        }
+      }
+      instantiation.node->accept(this);
     }
     return;
   }
@@ -1683,10 +1690,16 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     if (!node->generic_parameters.empty()) {
       for (auto &instantiation : node->generic_instantiations) {
         instantiation.node->accept(this);
+        for (auto type_id : instantiation.arguments) {
+          auto type = global_get_type(type_id);
+          if (type->declaring_node) {
+            type->declaring_node.get()->accept(this);
+          }
+        }
+        instantiation.node->accept(this);
       }
       return;
     }
-
     auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
 
     if (node->name != "main" && !is_local) {
