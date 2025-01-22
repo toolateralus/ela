@@ -69,34 +69,36 @@ DARKCYAN: Color = { r: 0 as u8, g: 139 as u8, b: 139 as u8, a: 255 as u8 };
 LIGHTCYAN: Color = { r: 224 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
 
 // Exclude black and white.
-All_Colors : List![Color] = {
-  WHITE,
-  RED,
-  GREEN,
-  BLUE,
-  YELLOW,
-  PURPLE,
-  ORANGE,
-  GRAY,
-  DARKGRAY,
-  LIGHTGRAY,
-  BROWN,
-  PINK,
-  LIME,
-  DARKGREEN,
-  SKYBLUE,
-  VIOLET,
-  GOLD,
-  BEIGE,
-  MAGENTA,
-  MAROON,
-  DARKBLUE,
-  DARKPURPLE,
-  DARKBROWN,
-  CYAN,
-  DARKCYAN,
-  LIGHTCYAN,
-}
+All_Colors := fn() -> List![Color] {
+  list : List![Color];
+  list.push(WHITE);
+  list.push(RED);
+  list.push(GREEN);
+  list.push(BLUE);
+  list.push(YELLOW);
+  list.push(PURPLE);
+  list.push(ORANGE);
+  list.push(GRAY);
+  list.push(DARKGRAY);
+  list.push(LIGHTGRAY);
+  list.push(BROWN);
+  list.push(PINK);
+  list.push(LIME);
+  list.push(DARKGREEN);
+  list.push(SKYBLUE);
+  list.push(VIOLET);
+  list.push(GOLD);
+  list.push(BEIGE);
+  list.push(MAGENTA);
+  list.push(MAROON);
+  list.push(DARKBLUE);
+  list.push(DARKPURPLE);
+  list.push(DARKBROWN);
+  list.push(CYAN);
+  list.push(DARKCYAN);
+  list.push(LIGHTCYAN);
+  return list;
+}();
 
 
 impl Rectangle {

@@ -334,7 +334,7 @@
     iter :: fn(self*) -> Iter![T] {
       return {
         ptr: self.data,
-        end: self.data + self.length-1 // TODO; verify -1 is correct
+        end: (self.data + self.length - 1) as T*,
       }
     }
   }
