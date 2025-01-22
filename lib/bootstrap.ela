@@ -226,6 +226,49 @@ Bitwise :: interface![Right] {
   }
 }
 
+mem_zero :: fn![T](ptr: T*, count: u64 = 1) {
+  memset(ptr, 0, sizeof(T) * count);
+}
+
+// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string.
+Allocator :: interface {
+  allocate :: fn![T](self*) -> T*;
+  free :: fn![T](self*, ptr: T*);
+  allocate_array :: fn![T](self*, n: u64) -> T*;
+  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
+  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T*;
+}
+
+// Wrapper for C allocators.
+Std_Allocator :: struct {}
+
+impl Allocator for Std_Allocator {
+  allocate :: fn![T](self*) -> T* {
+    return malloc(sizeof(T));
+  }
+  free :: fn![T](self*, ptr: T*) {
+    free(ptr);
+  }
+  allocate_array :: fn![T](self*, n: u64) -> T* {
+    return calloc(sizeof(T) * n);
+  }
+  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
+    return realloc(ptr, sizeof(T) * new_size);
+  }
+  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T* {
+    newptr := self.allocate_array![T](n);
+    memcpy(newptr, ptr, n * sizeof(T));
+    return newptr;
+  }
+}
+
+impl Std_Allocator {
+  get :: fn() -> #self {
+    #static self: #self;
+    return self;
+  }
+}
+
 #region BASICS {
   #static print :: fn![T](str: T) {
     printf("%s", $"{str}");
