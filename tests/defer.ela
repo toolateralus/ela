@@ -1,5 +1,3 @@
-#error "This compiles but hangs up when ran."
-
 /* 
  * :: Important :: 
   - Some of these value-based returns from defers may be surprising in that they do not mutate the variables.

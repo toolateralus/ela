@@ -65,9 +65,7 @@ void Emitter::visit(ASTFor *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
 
-
   static int depth = 0;
-  // Generate unique IDs for the range and enumerator
   std::string range_unique_id = "$_range_id" + std::to_string(depth);
   std::string unique_id = "$_loop_id" + std::to_string(depth);
   depth++;
@@ -79,13 +77,11 @@ void Emitter::visit(ASTFor *node) {
   (*ss) << indent() << "{\n";
   indent_level++;
 
-  // Emit the range initialization
   std::string range_type_str = to_cpp_string(global_get_type(node->range_type));
   (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
   node->range->accept(this);
   (*ss) << ";\n";
 
-  // Emit the enumerator initialization
   std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
   (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
   if (node->is_enumerable) {
@@ -94,11 +90,9 @@ void Emitter::visit(ASTFor *node) {
     (*ss) << range_type_str << "_iter(&" << range_unique_id << ");\n";
   }
 
-  // Emit the while loop
   (*ss) << indent() << "while (!" << iterable_type_str << "_done(&" << unique_id << ")) {\n";
   indent_level++;
 
-  // Emit the current call
   std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
   (*ss) << indent() << identifier_type_str << " ";
   
@@ -112,13 +106,11 @@ void Emitter::visit(ASTFor *node) {
     (*ss) << "*" << iterable_type_str << "_current(&" << unique_id << ");\n";
   }
 
-  // Emit the user code block
-  node->block->accept(this);
-
-  // Emit the next call
+  // this MUST happen before the block or continue will cause a permanent hangup!!!
   (*ss) << indent() << iterable_type_str << "_next(&" << unique_id << ");\n";
 
-  // Emit deferred statements
+  node->block->accept(this);
+
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
 
   indent_level--;
