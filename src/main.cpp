@@ -12,7 +12,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-#include "visitor.hpp"
+#include "strings.hpp"
 
 /*
   #########################
@@ -54,20 +54,7 @@ static bool run_on_finished = false;
 int main(int argc, char *argv[]) {
   for (int i = 0; i < argc; ++i) {
     if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
-      printf(R"_(
-Ela compiler:
-   compile a file: `ela <filename.ela>`
-   compile & run a 'main.ela' in current directory: `ela run`
-   initialize a 'main.ela' file in current directory: `ela init`
-
-   Available flags:
-   --release     Compile with -O3 flag and with no debug information from Ela. defaults to false, which is a debug build.
-   --verbose     Write a file and dump the AST representation of your program to 'stdout'.
-   --no-compile  Transpile to C++ but don't invoke the clang++ compiler automatically.
-   --s           Don't delete the `.hpp` and `.cpp` files used to transpile.
-   --metrics     Write performance metrics to stdout.
-   --test        Only emit functions marked `#test` and create a test runner. You still have to run the binary to run the tests.
-)_");
+      printf(HELP_STRING);
       return 0;
     }
   }
@@ -98,44 +85,9 @@ Ela compiler:
   if (argc >= 2 && (strcmp(argv[1], "init") == 0)) {
     std::ofstream file("main.ela");
     if (argc > 2 && (strcmp(argv[2], "raylib") == 0)) {
-      file << R"__(
-#import core;
-#import raylib;
-
-main :: fn() {
-  InitWindow(800, 600, "Hello, Raylib");
-  SetTargetFPS(60);
-
-  x_origin, y_origin := (330, 250);
-  amplitude, speed, time := (15, 1.0, 0.0 as float64);
-  x, y := (x_origin, y_origin);
-
-  while !WindowShouldClose() {
-    time += GetFrameTime() * speed;
-
-    BeginDrawing();
-      ClearBackground(BLACK);
-      DrawCircle(400, 300, 100, RED);
-      y = y_origin + sin(time) * amplitude;
-      DrawText("Hello, Raylib", x, y, 24, WHITE);
-    EndDrawing();
-  }
-}
-)__";
+      file << RAYLIB_INIT_CODE;
     } else {
-      file << R"__(
-#import core; // for println among many other common utilities.
-
-main :: fn() {
-  // 'Env::args()' returns a 'string[]' of the runtime's arguments.
-  for arg in Env::args() {
-    #static i: s32;
-    println($"arg {i++}: {arg}")
-  }
-  println("Hello World!")
-}
-
-)__";
+      file << MAIN_INIT_CODE;
     }
     return 0;
   }
@@ -148,39 +100,10 @@ main :: fn() {
   
   if (compile_command.has_flag("x")) compile_command.print();
 
-  {
-    if (compile_command.has_flag("--Wignore-all")) {
-      ignored_warnings |= WarningIgnoreAll;
-    }
-    if (compile_command.has_flag("--Wno-arrow-operator")) {
-      ignored_warnings |= WarningUseDotNotArrowOperatorOverload;
-    }
-    if (compile_command.has_flag("--Wno-inaccessible-decl")) {
-      ignored_warnings |= WarningInaccessibleDeclaration;
-    }
-    if (compile_command.has_flag("--Wno-empty-string-interp")) {
-      ignored_warnings |= WarningEmptyStringInterpolation;
-    }
-    if (compile_command.has_flag("--Wno-non-null-deleted")) {
-      ignored_warnings |= WarningNonNullDeletedPointer;
-    }
-    if (compile_command.has_flag("--Wno-ambiguous-variant")) {
-      ignored_warnings |= WarningAmbigousVariants;
-    }
-    if (compile_command.has_flag("--Wno-switch-break")) {
-      ignored_warnings |= WarningSwitchBreak;
-    }
-    if (compile_command.has_flag("--Wno-array-param")) {
-      ignored_warnings |= WarningDownCastFixedArrayParam;
-    }
-  }
+  compile_command.setup_ignored_warnings();
 
   init_type_system();
   auto result = compile_command.compile();
-  using arena = jstl::Arena;
-  // scope_arena.~arena();
-  // type_info_arena.~arena();
-  // ast_arena.~arena();
 
   if (run_on_finished) {
     if (result == 0) {
@@ -196,73 +119,4 @@ main :: fn() {
   }
 
   return result != 0;
-}
-
-bool CompileCommand::has_flag(const std::string &flag) const {
-  auto it = flags.find(flag);
-  return it != flags.end() && it->second;
-}
-
-int CompileCommand::compile() {
-  Lexer lexer{};
-  Context context{};
-  original_path = std::filesystem::current_path();
-  parse.begin();
-  Parser parser(input_path.string(), context);
-  ASTProgram *root = parser.parse();
-  parse.end(std::format("Parsed {} tokens", all_tokens.size()));
-
-  lower.begin();
-  Typer type_visitor{context};
-  type_visitor.visit(root);
-
-  Emitter emit(context, type_visitor);
-  emit.visit(root);
-
-  lower.end("lowering to cpp complete");
-
-  std::string program;
-  if (compile_command.has_flag("test")) {
-    program = "#define TESTING\n" + emit.code.str();
-  } else {
-    program = emit.code.str();
-  }
-
-  std::ofstream output(output_path);
-  output << program;
-  output.flush();
-  output.close();
-  int result = 0;
-
-  if (!has_flag("no-compile")) {
-    std::string extra_flags = compilation_flags;
-
-    // Use '-ftime-trace' for debugging C++ compilation times;
-    // You need google chrome to analyse the JSON results.
-
-    if (has_flag("release"))
-      extra_flags += " -O3 ";
-    else
-      extra_flags += " -g ";
-
-    static std::string ignored_warnings = "-w";
-
-    std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
-
-    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
-                                          output_path.string(), output_flag, extra_flags);
-
-    if (compile_command.has_flag("x")) printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
-
-    cpp.begin();
-    result = system(compilation_string.c_str());
-    cpp.end("compiling and linking cpp");
-    if (!has_flag("s")) {
-      std::filesystem::remove(output_path);
-    }
-  }
-
-  std::filesystem::current_path(original_path);
-  print_metrics();
-  return result;
 }

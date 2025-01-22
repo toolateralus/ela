@@ -33,10 +33,7 @@ Context::Context() {
     // ** ------------- ***
   }
  
-  // define some default functions that may or may not be macros.
   {
-    // We still define assert and sizeof manually here, because
-    // there's no way to do this in language currently, as they're macros
     FunctionTypeInfo assert_info{};
     assert_info.return_type = void_type();
     assert_info.parameter_types[0] = charptr_type();
@@ -47,93 +44,8 @@ Context::Context() {
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;
-    // no other function will ever use this type. thats why we have a ?, because
-    // we have no first class types yet.
     scope->insert("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr, SYMBOL_IS_FUNCTION);
   }
-
-  // string, env, reflection types. Only if we're compiling with stdlib.
-  if (!compile_command.has_flag("freestanding")) {
-    // define types used for reflection.
-    if (true) {
-      auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-      auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-      auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-
-      type_scope->parent = root_scope;
-      field_scope->parent = root_scope;
-      element_scope->parent = root_scope;
-
-      auto type_id = global_create_struct_type("Type", type_scope);
-      auto field_id = global_create_struct_type("Field", field_scope);
-      auto element_id = global_create_struct_type("Element", element_scope);
-
-      // Type*
-      auto type_ptr = global_find_type_id(type_id, {.extensions = {{TYPE_EXT_POINTER}}});
-
-      // Field*[]
-      auto field_arr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}, {TYPE_EXT_ARRAY}}});
-      // Element[]
-      auto element_arr = global_find_type_id(element_id, {.extensions = {{TYPE_EXT_ARRAY}}});
-      // Field*
-      auto field_ptr = global_find_type_id(field_id, {.extensions = {{TYPE_EXT_POINTER}}});
-
-      type_scope->insert("id", s32_type(), nullptr);
-      type_scope->insert("name", charptr_type(), nullptr);
-      type_scope->insert("fields", field_arr, nullptr);
-      type_scope->insert("size", u64_type(), nullptr);
-      type_scope->insert("flags", u64_type(), nullptr);
-      type_scope->insert("element_type", type_ptr, nullptr);
-
-      field_scope->insert("name", charptr_type(), nullptr);
-      field_scope->insert("type", type_ptr, nullptr);
-      field_scope->insert("size", u64_type(), nullptr);
-      field_scope->insert("offset", u64_type(), nullptr);
-
-      element_scope->insert("data", charptr_type(), nullptr);
-      element_scope->insert("type", type_ptr, nullptr);
-
-      // field.get()
-      auto get_info = FunctionTypeInfo{};
-      get_info.is_varargs = true;
-      get_info.return_type = charptr_type();
-      auto _t = global_find_function_type_id(get_info, {});
-      field_scope->insert("get", _t, nullptr, SYMBOL_IS_FUNCTION);
-      auto get_sym = field_scope->local_lookup("get");
-      get_sym->type_id = _t;
-
-      // field.set()
-      auto set_info = FunctionTypeInfo{};
-      set_info.is_varargs = true;
-      set_info.return_type = void_type();
-      _t = global_find_function_type_id(set_info, {});
-      field_scope->insert("set", _t, nullptr, SYMBOL_IS_FUNCTION);
-      auto set_sym = field_scope->local_lookup("set");
-      set_sym->type_id = _t;
-
-      // type.elements()
-      auto elements_info = FunctionTypeInfo{};
-      elements_info.return_type = element_arr;
-      elements_info.params_len = 1;
-      elements_info.parameter_types[0] = charptr_type();
-      _t = global_find_function_type_id(elements_info, {});
-      type_scope->insert("elements", _t, nullptr, SYMBOL_IS_FUNCTION);
-      auto elements_sym = type_scope->local_lookup("elements");
-      elements_sym->type_id = _t;
-    }
-  }
-
-  auto info = FunctionTypeInfo{};
-  info.is_varargs = true;
-  info.return_type = void_type();
-  root_scope->insert("destruct", global_find_function_type_id(info, {}), nullptr, SYMBOL_IS_FUNCTION);
-
-  info.is_varargs = true;
-  info.return_type = void_type();
-  root_scope->insert("move", global_find_function_type_id(info, {}), nullptr, SYMBOL_IS_FUNCTION);
-
-  // TODO: make a more succint way to interact with tuples. This is garbo trash, and it totally dodges our type system.
-  root_scope->insert("get", global_find_function_type_id(info, {}), nullptr, SYMBOL_IS_FUNCTION);
 
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i].get_info()->scope) {

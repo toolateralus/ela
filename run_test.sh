@@ -6,8 +6,10 @@ total_compile_time=0
 declare -a compile_times
 declare -a test_files
 
+cd tests;
+
 if [ $# -gt 0 ] && [ "$1" != "--time" ]; then
-  test_file="tests/$1.ela"
+  test_file="$1.ela"
   if [ -f "$test_file" ]; then
     echo -e "\e[1;33mRunning test: $test_file\e[0m"
     start_time=$(date +%s%N)
@@ -28,7 +30,7 @@ if [ $# -gt 0 ] && [ "$1" != "--time" ]; then
   fi
 fi
 
-for test_file in tests/*.ela; do
+for test_file in *.ela; do
   echo -e "\e[1;33mRunning test: $test_file\e[0m"
   start_time=$(date +%s%N)
   ela "$test_file" --test
@@ -47,5 +49,5 @@ if [ "$1" == "--time" ]; then
   for i in "${!compile_times[@]}"; do
     echo -e "\e[1;36m\e[1m${test_files[$i]}\e[0m took \e[1;32m\e[1m${compile_times[$i]}ms\e[0m"
   done
-  echo -e "\e[0mran \e[1;33m\e[1m${#compile_times[@]}\e[0m tests in \e[1;32m${total_compile_time}ms\e[0m"
+  echo -e "\e[0mran \e[1;33m\e[1m${#compile_times[@]}\e[0m in \e[1;32m${total_compile_time}ms\e[0m"
 fi

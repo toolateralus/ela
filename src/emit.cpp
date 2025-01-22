@@ -410,7 +410,7 @@ void Emitter::visit(ASTLiteral *node) {
       return;
     }
     case ASTLiteral::Null:
-      (*ss) << "(std::nullptr_t)nullptr";
+      (*ss) << "nullptr";
       return;
     case ASTLiteral::String:
       output = std::format("\"{}\"", node->value);
