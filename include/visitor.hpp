@@ -71,7 +71,6 @@ struct Typer : VisitorBase {
   void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
-  void try_visit_impl_on_call(ASTCall *node);
 
   void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
 
