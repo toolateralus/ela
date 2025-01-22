@@ -1,6 +1,6 @@
 /* 
-  We use these defines because porting the boilerplate.hpp
-  to this file has been a monumental source of bugs.
+We use these defines because porting the boilerplate.hpp
+to this file has been a monumental source of bugs.
 */
 
 #def __ELA_INTERFACES
@@ -17,672 +17,609 @@
 // #def __ELA_REFLECTION
 
 
-#ifdef __ELA_INTERFACES  {
 
-  string :: struct;
-  // Run a cleanup procedure implicitly when an object goes out of scope.
-  // Absolutely equivalent to a C++ Destructor.
-  // This could be called explicitly on pointers, but it's not reccomended.
-  Drop        :: interface {
-    drop      :: fn(self*);
+string :: struct;
+// Run a cleanup procedure implicitly when an object goes out of scope.
+// Absolutely equivalent to a C++ Destructor.
+// This could be called explicitly on pointers, but it's not reccomended.
+Drop        :: interface {
+  drop      :: fn(self*);
+}
+
+// Allow an object to be converted to a string
+ToString    :: interface {
+  // convert self to string.
+  to_string :: fn(self*) -> c_string;
+}
+
+// equivalent to an explicit cast operator overload in C++,
+// allow an object to be constructed from another.
+From        :: interface![T] {
+  // construct a self type from T.
+  from :: fn(v: T) -> #self;
+}
+
+// A deep clone, versus assignment always being a shallow clone in Ela.
+Clone       :: interface {
+  // get a deep clone of self.
+  clone     :: fn(self*) -> #self;
+}
+
+// An object used to iterate over a collection of items, or any sequence.
+Enumerator   :: interface![T] {  
+  // Return the current value this enumerator points to within the sequence it's iterating over.  
+  current   :: fn(self*) -> T;
+  // Advance the enumerator by one step.
+  next      :: fn(self*) -> void;
+  // Check whether the enumerator is complete, or should continue.
+  // return true for 'done',
+  // return false if needs to continue
+  done      :: fn(self*) -> bool;
+}
+
+// A collection or range of items that can be enumerated over, with a for loop, or some other means.
+Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
+  // get the Enumerator object that was implemented for this type.
+  enumerator      :: fn(self*) -> Enum;
+}
+
+// Iter is a generic struct that represents an iterator over a collection of type T.
+// It contains a pointer to the current element (ptr) and a pointer to the end of the collection (end).
+
+// It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
+// represented by a chunk of memory that can be trivially traversed.
+Iter :: struct![T] {
+  ptr: T*;  // Pointer to the current element in the collection.
+  end: T*;  // Pointer to the end of the collection.
+}
+
+impl![T] Iter![T] {
+  // Returns a pointer to the current element in the collection.
+  current :: fn(self*) -> T* => self.ptr;
+
+  // Advances the iterator to the next element in the collection.
+  next :: fn(self*) {
+    self.ptr++;
   }
 
-  // Allow an object to be converted to a string
-  ToString    :: interface {
-    // convert self to string.
-    to_string :: fn(self*) -> c_string;
-  }
-
-  // equivalent to an explicit cast operator overload in C++,
-  // allow an object to be constructed from another.
-  From        :: interface![T] {
-    // construct a self type from T.
-    from :: fn(v: T) -> #self;
-  }
-
-  // A deep clone, versus assignment always being a shallow clone in Ela.
-  Clone       :: interface {
-    // get a deep clone of self.
-    clone     :: fn(self*) -> #self;
-  }
-
-  // An object used to iterate over a collection of items, or any sequence.
-  Enumerator   :: interface![T] {  
-    // Return the current value this enumerator points to within the sequence it's iterating over.  
-    current   :: fn(self*) -> T;
-    // Advance the enumerator by one step.
-    next      :: fn(self*) -> void;
-    // Check whether the enumerator is complete, or should continue.
-    // return true for 'done',
-    // return false if needs to continue
-    done      :: fn(self*) -> bool;
-  }
-
-  // A collection or range of items that can be enumerated over, with a for loop, or some other means.
-  Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
-    // get the Enumerator object that was implemented for this type.
-    enumerator      :: fn(self*) -> Enum;
-  }
-
-  // Iter is a generic struct that represents an iterator over a collection of type T.
-  // It contains a pointer to the current element (ptr) and a pointer to the end of the collection (end).
-
-  // It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
-  // represented by a chunk of memory that can be trivially traversed.
-  Iter :: struct![T] {
-    ptr: T*;  // Pointer to the current element in the collection.
-    end: T*;  // Pointer to the end of the collection.
-  }
-
-  impl![T] Iter![T] {
-    // Returns a pointer to the current element in the collection.
-    current :: fn(self*) -> T* => self.ptr;
-
-    // Advances the iterator to the next element in the collection.
-    next :: fn(self*) {
-      self.ptr++;
-    }
-
-    // Checks if the iterator has reached the end of the collection.
-    done :: fn(self*) -> bool {
-      return self.ptr > self.end;
-    }
-  }
-
-  // Iterable is a generic interface that represents a collection that can be iterated over.
-  // It defines a single method, iter, which returns an iterator for the collection.
-  Iterable :: interface![T] {
-    // Returns an iterator for the collection.
-    iter :: fn(self*) -> Iter![T];
-  }
-
-  // Binary arithmetic operator overloads.
-  Arithmetic :: interface![Right] {
-    add       :: fn(self, right: Right) -> #self;   // '+' operator.
-    sub       :: fn(self, right: Right) -> #self;   // '-' operator.
-    mul       :: fn(self, right: Right) -> #self;   // '*' operator.
-    div       :: fn(self, right: Right) -> #self;   // '/' operator.
-    modulo    :: fn(self, right: Right) -> #self;   // '%' operator.
-  }
-
-  // Binary bitwise operator overloading.
-  Bitwise :: interface![Right] {
-    shr       :: fn(self, right: Right) -> #self;   // '>>' operator.
-    shl       :: fn(self, right: Right) -> #self;   // '<<' operator.
-    xor       :: fn(self, right: Right) -> #self;   //  '^' operator.
-    or        :: fn(self, right: Right) -> #self;   //  '|' operator.
-    and       :: fn(self, right: Right) -> #self;   //  '&' operator.
+  // Checks if the iterator has reached the end of the collection.
+  done :: fn(self*) -> bool {
+    return self.ptr > self.end;
   }
 }
 
-#ifdef __ELA_LIBC_FORWARD {
-  #foreign system :: fn(cmd: c_string) -> int;
-
-  #foreign free :: fn(ptr: void*) -> void;
-  #foreign malloc :: fn(nbytes: u64) -> void*;
-  #foreign calloc :: fn(num: u64, size: u64) -> void*;
-  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;
-
-  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
-  #foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
-  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
-
-  #foreign printf :: fn(format: c_string, ...) -> int;
-  #foreign exit :: fn(code: int);
-
-  #foreign scanf :: fn(format: c_string, ...) -> int;
-  #foreign getchar :: fn() -> int;
-
-  #foreign sleep :: fn(seconds: int);
-  #foreign usleep :: fn(c: int);
-
-  #foreign strdup :: fn(str: c_string) -> c_string;
-  #foreign strndup :: fn(str: c_string, n: u64) -> c_string;
-  #foreign strerror :: fn(errnum: int) -> c_string;
-  #foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
-  #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
-  #foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
-  #foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
-  #foreign strchr :: fn(str: c_string, c: int) -> c_string;
-  #foreign strrchr :: fn(str: c_string, c: int) -> c_string;
-  #foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
-  #foreign strlen :: fn(str: c_string) -> int;
-  #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
-  #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
-  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
-  #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
-  #foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
-
-  #foreign isalnum :: fn(c: int) -> int;
-  #foreign isalpha :: fn(c: int) -> int;
-  #foreign isspace :: fn(c: int) -> int;
-  #foreign isdigit :: fn(c: int) -> int;
-  #foreign islower :: fn(c: int) -> int;
-  #foreign isupper :: fn(c: int) -> int;
-  #foreign isprint :: fn(c: int) -> int;
-  #foreign ispunct :: fn(c: int) -> int;
-
-  #foreign atoi :: fn(v: c_string) -> int;
-  #foreign atof :: fn(v: c_string) -> float64;
+// Iterable is a generic interface that represents a collection that can be iterated over.
+// It defines a single method, iter, which returns an iterator for the collection.
+Iterable :: interface![T] {
+  // Returns an iterator for the collection.
+  iter :: fn(self*) -> Iter![T];
 }
 
-#ifdef __ELA_RANGE {
-  Range :: struct {
-    begin: s64;
-    end:   s64;
-  }
+// Binary arithmetic operator overloads.
+Arithmetic :: interface![Right] {
+  add       :: fn(self, right: Right) -> #self;   // '+' operator.
+  sub       :: fn(self, right: Right) -> #self;   // '-' operator.
+  mul       :: fn(self, right: Right) -> #self;   // '*' operator.
+  div       :: fn(self, right: Right) -> #self;   // '/' operator.
+  modulo    :: fn(self, right: Right) -> #self;   // '%' operator.
+}
 
-  Range_Enumerator :: struct {
-    begin: s64;
-    end:   s64;
-    idx:   s64;
-  }
+// Binary bitwise operator overloading.
+Bitwise :: interface![Right] {
+  shr       :: fn(self, right: Right) -> #self;   // '>>' operator.
+  shl       :: fn(self, right: Right) -> #self;   // '<<' operator.
+  xor       :: fn(self, right: Right) -> #self;   //  '^' operator.
+  or        :: fn(self, right: Right) -> #self;   //  '|' operator.
+  and       :: fn(self, right: Right) -> #self;   //  '&' operator.
+}
 
-  impl Enumerator![s64] for Range_Enumerator {
-    current   :: fn(self*) -> s64 {
-      return self.idx;
-    }
-    next      :: fn(self*) {
-      self.idx++;
+
+
+#foreign system :: fn(cmd: c_string) -> int;
+
+#foreign free :: fn(ptr: void*) -> void;
+#foreign malloc :: fn(nbytes: u64) -> void*;
+#foreign calloc :: fn(num: u64, size: u64) -> void*;
+#foreign realloc :: fn(ptr: void*, size: u64) -> void*;
+
+#foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+#foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
+#foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
+
+#foreign printf :: fn(format: c_string, ...) -> int;
+#foreign exit :: fn(code: int);
+
+#foreign scanf :: fn(format: c_string, ...) -> int;
+#foreign getchar :: fn() -> int;
+
+#foreign sleep :: fn(seconds: int);
+#foreign usleep :: fn(c: int);
+
+#foreign strdup :: fn(str: c_string) -> c_string;
+#foreign strndup :: fn(str: c_string, n: u64) -> c_string;
+#foreign strerror :: fn(errnum: int) -> c_string;
+#foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
+#foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
+#foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
+#foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
+#foreign strchr :: fn(str: c_string, c: int) -> c_string;
+#foreign strrchr :: fn(str: c_string, c: int) -> c_string;
+#foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
+#foreign strlen :: fn(str: c_string) -> int;
+#foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
+#foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
+#foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
+#foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
+#foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
+
+#foreign isalnum :: fn(c: int) -> int;
+#foreign isalpha :: fn(c: int) -> int;
+#foreign isspace :: fn(c: int) -> int;
+#foreign isdigit :: fn(c: int) -> int;
+#foreign islower :: fn(c: int) -> int;
+#foreign isupper :: fn(c: int) -> int;
+#foreign isprint :: fn(c: int) -> int;
+#foreign ispunct :: fn(c: int) -> int;
+
+#foreign atoi :: fn(v: c_string) -> int;
+#foreign atof :: fn(v: c_string) -> float64;
+
+Range :: struct {
+  begin: s64;
+  end:   s64;
+}
+
+Range_Enumerator :: struct {
+  begin: s64;
+  end:   s64;
+  idx:   s64;
+}
+
+impl Enumerator![s64] for Range_Enumerator {
+  current   :: fn(self*) -> s64 {
+    return self.idx;
+  }
+  next      :: fn(self*) {
+    self.idx++;
+  };
+  done      :: fn(self*) -> bool {
+    return self.idx >= self.end;
+  }
+}
+
+impl Enumerable![Range_Enumerator, s64] for Range {
+  enumerator :: fn(self*) -> Range_Enumerator {
+    return {
+      begin: self.begin,
+      end:   self.end,
+      idx:          0,
     };
-    done      :: fn(self*) -> bool {
-      return self.idx >= self.end;
-    }
   }
+}
 
-  impl Enumerable![Range_Enumerator, s64] for Range {
-    enumerator :: fn(self*) -> Range_Enumerator {
-      return {
-        begin: self.begin,
-        end:   self.end,
-        idx:          0,
-      };
+string :: struct {
+  data:    char*;
+  length:  s32;
+}
+
+// TODO: reimplement all the helper functions we used to have.
+// Also, we should make this not null terminated, rather controlled by length.
+// Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
+// So we'll have to rewrite them all for that.
+impl string {
+  empty :: fn() -> #self {
+    return {};
+  }
+  from :: fn(data: c_string) -> #self{
+    len := strlen(data);
+    str: string;
+    str.data = strdup(data);
+    str.length = len;
+    return str;
+  }
+  from_ptr :: fn(begin: c_string, end: c_string) -> string {
+    str: string;
+    str.length = end - begin;
+    str.data = malloc(str.length + 1);
+    memcpy(str.data, begin, str.length);
+    str.data[str.length] = 0;
+    return str;
+  }
+  deinit :: fn(self*) {
+    free(self.data);
+    self.length = 0;
+  }
+}
+
+impl Iterable![char] for string { 
+  iter :: fn(self*) -> Iter![char] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length,
     }
   }
 }
 
-#ifdef __ELA_STRING {
-  string :: struct {
-    data:    char*;
-    length:  s32;
-  }
+mem_zero :: fn![T](ptr: T*, count: u64 = 1) {
+  memset(ptr, 0, sizeof(T) * count);
+}
 
-  // TODO: reimplement all the helper functions we used to have.
-  // Also, we should make this not null terminated, rather controlled by length.
-  // Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
-  // So we'll have to rewrite them all for that.
-  impl string {
-    empty :: fn() -> #self {
-      return {};
-    }
-    from :: fn(data: c_string) -> #self{
-      len := strlen(data);
-      str: string;
-      str.data = strdup(data);
-      str.length = len;
-      return str;
-    }
-    from_ptr :: fn(begin: c_string, end: c_string) -> string {
-      str: string;
-      str.length = end - begin;
-      str.data = malloc(str.length + 1);
-      memcpy(str.data, begin, str.length);
-      str.data[str.length] = 0;
-      return str;
-    }
-    deinit :: fn(self*) {
-      free(self.data);
-      self.length = 0;
-    }
-  }
+// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string.
+Allocator :: interface {
+  allocate :: fn![T](self*) -> T*;
+  free :: fn![T](self*, ptr: T*);
+  allocate_array :: fn![T](self*, n: u64) -> T*;
+  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
+  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T*;
+}
 
-  impl Iterable![char] for string { 
-    iter :: fn(self*) -> Iter![char] {
-      return {
-        ptr: self.data,
-        end: self.data + self.length,
-      }
-    }
+// Wrapper for C allocators.
+Std_Allocator :: struct {}
+
+impl Allocator for Std_Allocator {
+  allocate :: fn![T](self*) -> T* {
+    return malloc(sizeof(T));
+  }
+  free :: fn![T](self*, ptr: T*) {
+    free(ptr);
+  }
+  allocate_array :: fn![T](self*, n: u64) -> T* {
+    return calloc(sizeof(T) * n);
+  }
+  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
+    return realloc(ptr, sizeof(T) * new_size);
+  }
+  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T* {
+    newptr := self.allocate_array![T](n);
+    memcpy(newptr, ptr, n * sizeof(T));
+    return newptr;
   }
 }
 
-#ifdef __ELA_MEMORY {
-  mem_zero :: fn![T](ptr: T*, count: u64 = 1) {
-    memset(ptr, 0, sizeof(T) * count);
-  }
-
-  // Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string.
-  Allocator :: interface {
-    allocate :: fn![T](self*) -> T*;
-    free :: fn![T](self*, ptr: T*);
-    allocate_array :: fn![T](self*, n: u64) -> T*;
-    resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
-    copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T*;
-  }
-
-  // Wrapper for C allocators.
-  Std_Allocator :: struct {}
-
-  impl Allocator for Std_Allocator {
-    allocate :: fn![T](self*) -> T* {
-      return malloc(sizeof(T));
-    }
-    free :: fn![T](self*, ptr: T*) {
-      free(ptr);
-    }
-    allocate_array :: fn![T](self*, n: u64) -> T* {
-      return calloc(sizeof(T) * n);
-    }
-    resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
-      return realloc(ptr, sizeof(T) * new_size);
-    }
-    copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T* {
-      newptr := self.allocate_array![T](n);
-      memcpy(newptr, ptr, n * sizeof(T));
-      return newptr;
-    }
-  }
-
-  impl Std_Allocator {
-    get :: fn() -> #self {
-      #static self: #self;
-      return self;
-    }
+impl Std_Allocator {
+  get :: fn() -> #self {
+    #static self: #self;
+    return self;
   }
 }
 
-#ifdef __ELA_BASICS {
-  #static print :: fn![T](str: T) {
-    printf("%s", $"{str}");
-  }
-  #static println :: fn![T](str: T) {
-    printf("%s\n", $"{str}");
-  }
-  #alias Panic_Handler :: fn *(c_string);
-  panic_handler: Panic_Handler = fn(msg: c_string) {
-    println(msg);
+
+#static print :: fn![T](str: T) {
+  printf("%s", $"{str}");
+}
+#static println :: fn![T](str: T) {
+  printf("%s\n", $"{str}");
+}
+#alias Panic_Handler :: fn *(c_string);
+panic_handler: Panic_Handler = fn(msg: c_string) {
+  println(msg);
+  exit(1);
+}
+#static panic :: fn(msg: c_string) {
+  if !panic_handler {
+    printf("No panic handler set. Exitting\n");
     exit(1);
   }
-  #static panic :: fn(msg: c_string) {
-    if !panic_handler {
-      printf("No panic handler set. Exitting\n");
-      exit(1);
-    }
-    panic_handler(msg);
-  }
-  #alias Error :: c_string;
+  panic_handler(msg);
+}
+#alias Error :: c_string;
+
+// This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
+// Vector nomenclature is strange and ambiguous, so I think it's a good name, just as C# did. 
+// Everyone knows what you mean when you say, I have a list of items etc.
+
+// It's just a contiguous chunk of memory that dynamically resizes to fit any data pushed/popped into and out of it.
+// As any other list, taking a reference to some memory within this array has a very high likelyhood to become invalid, if and when it resizes.
+// If you need a static, unchanging list of items, just use a fixed array such as `T[1024]` or `Type[MAX_BUFFER_LEN]` or whatever.
+
+// A note about this list type: as of the time of writing this, this list will be inherently unsafe when it comes to assignment.
+// A simple assignment such as 'variable := some_list' will pose a very strange problem:
+// The two lists will share MEMORY, but pushing into 'variable' will NOT update the length or capacity of 'some_list'!!!!
+// This is very important, because taking a view is very practical and natural, it just happens. 
+// But, mutating a view, will cause you serious bugs and headaches!!
+
+// If you want to take a deep clone, meaning copying the entire data the list points to, and having a fully detached, new instance of a list
+// that mirrors the original, call '.clone()' when assigning.
+
+// If you want to mutate a list, when passing it into a function or whatever, just pass it by pointer like you would with any other type.
+// There are no magic assignment or copy constructors in this language, nor destructors, so this is just an important thing to be aware of,
+// because it applies to any type you create that holds dynamic memory, and also non-pointer values.
+
+List :: struct![T] {
+  data:     T*;
+  length:   u64;
+  capacity: u64;
 }
 
-#ifdef __ELA_LIST  {
-  // This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
-  // Vector nomenclature is strange and ambiguous, so I think it's a good name, just as C# did. 
-  // Everyone knows what you mean when you say, I have a list of items etc.
+impl![T] List![T] {
+  // You should probably not call this function, and you do not need to for normal push operations.
+  // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
+  // and this will set your length appropriately.
+  resize :: fn(self*, new_capacity: u64) {
+    if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
 
-  // It's just a contiguous chunk of memory that dynamically resizes to fit any data pushed/popped into and out of it.
-  // As any other list, taking a reference to some memory within this array has a very high likelyhood to become invalid, if and when it resizes.
-  // If you need a static, unchanging list of items, just use a fixed array such as `T[1024]` or `Type[MAX_BUFFER_LEN]` or whatever.
-
-  // A note about this list type: as of the time of writing this, this list will be inherently unsafe when it comes to assignment.
-  // A simple assignment such as 'variable := some_list' will pose a very strange problem:
-  // The two lists will share MEMORY, but pushing into 'variable' will NOT update the length or capacity of 'some_list'!!!!
-  // This is very important, because taking a view is very practical and natural, it just happens. 
-  // But, mutating a view, will cause you serious bugs and headaches!!
-
-  // If you want to take a deep clone, meaning copying the entire data the list points to, and having a fully detached, new instance of a list
-  // that mirrors the original, call '.clone()' when assigning.
-  
-  // If you want to mutate a list, when passing it into a function or whatever, just pass it by pointer like you would with any other type.
-  // There are no magic assignment or copy constructors in this language, nor destructors, so this is just an important thing to be aware of,
-  // because it applies to any type you create that holds dynamic memory, and also non-pointer values.
-  
-  List :: struct![T] {
-    data:     T*;
-    length:   u64;
-    capacity: u64;
+    self.capacity = new_capacity;
+    self.data = realloc(self.data, sizeof(T) * self.capacity);
+    if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
   }
 
-  impl![T] List![T] {
-    // You should probably not call this function, and you do not need to for normal push operations.
-    // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
-    // and this will set your length appropriately.
-    resize :: fn(self*, new_capacity: u64) {
-      if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
-
-      self.capacity = new_capacity;
-      self.data = realloc(self.data, sizeof(T) * self.capacity);
-      if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
+  push   :: fn(self*, v: T) {
+    if self.length + 1 >= self.capacity {
+      if self.capacity == 0 then self.capacity = 4;
+      self.resize(self.capacity * 2);
     }
-
-    push   :: fn(self*, v: T) {
-      if self.length + 1 >= self.capacity {
-        if self.capacity == 0 then self.capacity = 4;
-        self.resize(self.capacity * 2);
-      }
-      self.data[self.length] = v;
-      self.length++;
-    }
-
-    pop    :: fn(self*) -> T {
-      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
-      value := self.data[self.length - 1];
-      self.length -= 1;
-      return value;
-    }
-
-    deinit :: fn(self*) {
-      free(self.data);
-      self.data = null;
-      self.length = 0;
-    }
-
-    at :: fn(self*, index: u64) -> T {
-      return self.data[index];
-    }
+    self.data[self.length] = v;
+    self.length++;
   }
 
-  impl![T] Clone for List![T] {
-    clone :: fn(self*) -> #self {
-      new_data := malloc(sizeof(T) * self.capacity);
-      if !new_data then panic("Failed to allocate in List clone");
-      memcpy(new_data, self.data, sizeof(T) * self.length);
-      return {
-        data: new_data,
-        length: self.length,
-        capacity: self.capacity,
-      }
-    } 
+  pop    :: fn(self*) -> T {
+    if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+    value := self.data[self.length - 1];
+    self.length -= 1;
+    return value;
   }
 
-  impl![T] Iterable![T] for List![T] {
-    iter :: fn(self*) -> Iter![T] {
-      return {
-        ptr: self.data,
-        end: (self.data + self.length - 1) as T*,
-      }
-    }
+  deinit :: fn(self*) {
+    free(self.data);
+    self.data = null;
+    self.length = 0;
   }
 
-  impl![T] List![T] {
-    subscript :: fn(self*, idx: s64) -> T {
-      return self.data[idx];
-    }
+  at :: fn(self*, index: u64) -> T {
+    return self.data[index];
   }
-  #ifdef LIST_TESTS {
-    // TODO:
-    // We need to have a way for #import'ed files to purge out their #test functions, and any code behind an #ifdef TESTING {...}
-    // Right now, if you include a library, you inherit all of it's testing, which is garbage. 
-    #test test_List_push_at :: fn() {
-      array : List![s64];
+}
 
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-        assert("Array push failed to meet expected length", array.length == 100);
-        for i in 0..100 {
-          assert("array.at(i) != i", array.at(i) == i);
-        }
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);  
+impl![T] Clone for List![T] {
+  clone :: fn(self*) -> #self {
+    new_data := malloc(sizeof(T) * self.capacity);
+    if !new_data then panic("Failed to allocate in List clone");
+    memcpy(new_data, self.data, sizeof(T) * self.length);
+    return {
+      data: new_data,
+      length: self.length,
+      capacity: self.capacity,
     }
+  } 
+}
 
-    #test test_List_pop :: fn() {
-      array : List![s64];
-
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-        for i in 0..100 {
-          value := array.pop();
-          assert("array.pop() != 99 - i", value == 99 - i);
-        }
-        assert("Array pop failed to meet expected length", array.length == 0);
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
-    }
-
-    #test test_List_resize :: fn() {
-      array : List![s64];
-
-      {
-        defer array.deinit();
-        array.resize(2);
-        assert("Array resize failed to set capacity", array.capacity == 2);
-        for i in 0..2 {
-          array.push(i);
-        }
-        assert("Array resize failed to meet expected length", array.length == 2);
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
-    }
-
-    #test test_List_shrink :: fn() {
-      array : List![s64];
-
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-        assert("Array push failed to meet expected length", array.length == 100);
-
-        array.resize(50);
-        assert("Array shrink failed to meet expected length", array.length == 50);
-        assert("Array shrink failed to set capacity", array.capacity == 50);
-
-        for i in 0..50 {
-          assert("array.at(i) != i", array.at(i) == i);
-        }
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
-    }
-
-    #test test_List_clone :: fn() {
-      array : List![s64];
-      clone : List![s64];
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-
-        clone = array.clone();
-        defer clone.deinit();
-
-
-        assert("Array clone failed to meet expected length", clone.length == 100);
-        for i in 0..100 {
-          assert("lone.at(i) != i", clone.at(i) == i);
-        }
-
-        // Modify the original array and check if the clone does not reflect the changes
-        array.push(100);
-        assert("Clone should not reflect changes in the original array", clone.length == 100);
-        assert("lone.at(100) should not exist", clone.length == 100);
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
-      assert("Clone List failed to deinit", clone.data == null && clone.length == 0);
-    }
-
-    #test test_List_view :: fn() {
-      array : List![s64];
-      view  : List![s64];
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-
-        // Take a view of the array
-        view = array;
-
-        assert("Array view failed to meet expected length", view.length == 100);
-        for i in 0..100 {
-          assert("view.at(i) != i", view.at(i) == i);
-        }
-
-        array.push(100);
-        assert("View should reflect changes in the original array", view.length == 100);
-        assert("view.at(100) != 100", view.at(100) == 100);
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
-    }
-
-    #test test_List_for_loop :: fn() {
-      array : List![s64];
-
-      // ! BUG: 
-      // ! We have to call these explicitly before using a for loop, 
-      // ! Because otherwise the generic impl never gets instantiated.
-      iter := array.iter();
-      iter.current();
-
-      {
-        defer array.deinit();
-        for i in 0..100 {
-          array.push(i);
-        }
-
-        // Test 'for v in array'
-        idx := 0;
-        for v in array {
-          assert("for v in array failed", v == idx);
-          idx++;
-        }
-
-        assert("for v in array failed to iterate correctly", idx == 100);
-
-        // Test 'for *v in array'
-        idx = 0;
-        for *v in array {
-          assert("for *v in array failed", *v == idx);
-          idx++;
-        }
-        assert("for *v in array failed to iterate correctly", idx == 100);
-      }
-
-      assert("List failed to deinit", array.data == null && array.length == 0);
+impl![T] Iterable![T] for List![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: (self.data + self.length - 1) as T*,
     }
   }
 }
 
-#ifdef __ELA_ENV {
-  Env :: struct {
-    m_args: List![c_string];
-  };
+impl![T] List![T] {
+  subscript :: fn(self*, idx: s64) -> T {
+    return self.data[idx];
+  }
+}
 
-  impl Env {
-    current :: fn() -> #self* {
-      #static self: #self;
-      return &self;
-    }
+#ifdef LIST_TESTS {
+  // TODO:
+  // We need to have a way for #import'ed files to purge out their #test functions, and any code behind an #ifdef TESTING {...}
+  // Right now, if you include a library, you inherit all of it's testing, which is garbage. 
+  #test test_List_push_at :: fn() {
+    array : List![s64];
 
-    args :: fn() -> List![c_string] {
-      return #self::current().m_args.clone();
-    }
-
-    initialize :: fn(argc: s32, argv: c_string*) {
-      self := #self::current();
-      for i in 0..argc {
-        self.m_args.push(argv[i]);
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
       }
+      assert("Array push failed to meet expected length", array.length == 100);
+      for i in 0..100 {
+        assert("array.at(i) != i", array.at(i) == i);
+      }
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);  
+  }
+
+  #test test_List_pop :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+      for i in 0..100 {
+        value := array.pop();
+        assert("array.pop() != 99 - i", value == 99 - i);
+      }
+      assert("Array pop failed to meet expected length", array.length == 0);
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+
+  #test test_List_resize :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      array.resize(2);
+      assert("Array resize failed to set capacity", array.capacity == 2);
+      for i in 0..2 {
+        array.push(i);
+      }
+      assert("Array resize failed to meet expected length", array.length == 2);
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+
+  #test test_List_shrink :: fn() {
+    array : List![s64];
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+      assert("Array push failed to meet expected length", array.length == 100);
+
+      array.resize(50);
+      assert("Array shrink failed to meet expected length", array.length == 50);
+      assert("Array shrink failed to set capacity", array.capacity == 50);
+
+      for i in 0..50 {
+        assert("array.at(i) != i", array.at(i) == i);
+      }
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+
+  #test test_List_clone :: fn() {
+    array : List![s64];
+    clone : List![s64];
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+
+      clone = array.clone();
+      defer clone.deinit();
+
+
+      assert("Array clone failed to meet expected length", clone.length == 100);
+      for i in 0..100 {
+        assert("lone.at(i) != i", clone.at(i) == i);
+      }
+
+      // Modify the original array and check if the clone does not reflect the changes
+      array.push(100);
+      assert("Clone should not reflect changes in the original array", clone.length == 100);
+      assert("lone.at(100) should not exist", clone.length == 100);
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+    assert("Clone List failed to deinit", clone.data == null && clone.length == 0);
+  }
+
+  #test test_List_view :: fn() {
+    array : List![s64];
+    view  : List![s64];
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+
+      // Take a view of the array
+      view = array;
+
+      assert("Array view failed to meet expected length", view.length == 100);
+      for i in 0..100 {
+        assert("view.at(i) != i", view.at(i) == i);
+      }
+
+      array.push(100);
+      assert("View should reflect changes in the original array", view.length == 100);
+      assert("view.at(100) != 100", view.at(100) == 100);
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+
+  #test test_List_for_loop :: fn() {
+    array : List![s64];
+
+    // ! BUG: 
+    // ! We have to call these explicitly before using a for loop, 
+    // ! Because otherwise the generic impl never gets instantiated.
+    iter := array.iter();
+    iter.current();
+
+    {
+      defer array.deinit();
+      for i in 0..100 {
+        array.push(i);
+      }
+
+      // Test 'for v in array'
+      idx := 0;
+      for v in array {
+        assert("for v in array failed", v == idx);
+        idx++;
+      }
+
+      assert("for v in array failed to iterate correctly", idx == 100);
+
+      // Test 'for *v in array'
+      idx = 0;
+      for *v in array {
+        assert("for *v in array failed", *v == idx);
+        idx++;
+      }
+      assert("for *v in array failed to iterate correctly", idx == 100);
+    }
+
+    assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+}
+
+
+Env :: struct {
+  m_args: List![c_string];
+};
+
+impl Env {
+  current :: fn() -> #self* {
+    #static self: #self;
+    return &self;
+  }
+
+  args :: fn() -> List![c_string] {
+    return #self::current().m_args.clone();
+  }
+
+  initialize :: fn(argc: s32, argv: c_string*) {
+    self := #self::current();
+    for i in 0..argc {
+      self.m_args.push(argv[i]);
     }
   }
 }
 
-#ifdef __ELA_TO_STRING_IMPL {
-  impl s64 {
-    to_string :: fn(self) -> string {
-      #static table := fn() -> List![c_string] {
-        list: List![c_string]; // We don't have to clone this because it has a static lifetime and is never mutated.
-        list.push("0");
-        list.push("1");
-        list.push("2");
-        list.push("3");
-        list.push("4");
-        list.push("5");
-        list.push("6");
-        list.push("7");
-        list.push("8");
-        list.push("9");
-        return list;
-      }();
 
-      if self < 10 then return string::from(table[self]);
+// Element :: struct;
+// Type :: struct {
+//   id: int;                                                // the integer ID used to identify this type.
+//   name: c_string;                                         // the type's name.
+//   size: u64;                                              // sizeof(T)
+//   flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+//   fields: List![Field*];                                  // get a list of struct fields, enum variants.
+//   elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
+//   element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
+// };
 
-      negative := false;
-      if self < 0 {
-        negative = true;
-        self = -self;
-      }
+// Field :: struct {
+//   name: c_string;
+//   type: Type*;
+//   size: u64;
+//   offset: u64;
+// };
 
-      buffer: char[20];
-      index: int = 0;
+// impl Field {
+//   set :: fn![T, T1](target: T*, data: T1) {
+//     memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
+//   }
+//   get :: fn![T](source: T*) -> s8* {
+//     return (source as u8*) + offset;
+//   }
+// }
 
-      while self > 0 {
-        buffer[index] = '0' + (self % 10);
-        self /= 10;
-        index++;
-      }
+// Element :: struct {
+//   data: c_string;
+//   type: Type*;
+// };
 
-      if negative {
-        buffer[index] = '-';
-        index++;
-      }
+// #export _type_info: Type**;  
 
-      // Reverse the buffer
-      for i in 0..(index / 2) {
-        temp := buffer[i];
-        buffer[i] = buffer[index - i - 1];
-        buffer[index - i - 1] = temp;
-      }
-
-      return string::from_ptr(buffer as c_string, (buffer as c_string) + index);
-    }
-  }
-}
-
-#ifdef __ELA_REFLECTION {
-  Element :: struct;
-  Type :: struct {
-    id: int;                                                // the integer ID used to identify this type.
-    name: c_string;                                         // the type's name.
-    size: u64;                                              // sizeof(T)
-    flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-    fields: List![Field*];                                  // get a list of struct fields, enum variants.
-    elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
-    element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
-  };
-
-  Field :: struct {
-    name: c_string;
-    type: Type*;
-    size: u64;
-    offset: u64;
-  };
-
-  impl Field {
-    set :: fn![T, T1](target: T*, data: T1) {
-      memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
-    }
-    get :: fn![T](source: T*) -> s8* {
-      return (source as u8*) + offset;
-    }
-  }
-
-  Element :: struct {
-    data: c_string;
-    type: Type*;
-  };
-
-  #export _type_info: Type**;  
-}
