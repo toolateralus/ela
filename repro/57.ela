@@ -1,0 +1,25 @@
+Struct :: struct {}
+
+Interface :: interface {
+  generic :: fn![T](self*);
+}
+
+impl Interface for Struct {
+  generic :: fn![T](self*) {
+    printf("Hello\n");
+  }
+}
+
+main :: fn() { 
+  s: Struct;
+  s.generic![int]();
+  /* 
+    Member "generic" not found in type "Struct"
+            at: /home/josh_arch/source/c++/ela/repro/57.ela:16:5
+
+      s: Struct;
+      s.generic![int]();
+    }
+        ^^^^^^^
+  */
+}

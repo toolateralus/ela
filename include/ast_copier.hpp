@@ -4,6 +4,14 @@
 #include "scope.hpp"
 
 struct ASTCopier {
+
+  template<class T>
+  T *copy(T *node) requires std::is_base_of_v<ASTNode, T> {
+    auto new_node = new (ast_alloc<T>()) T(*node);
+    new_node->control_flow.type = -1;
+    return new_node;
+  }
+
   Scope *current_scope = nullptr;
   ASTImpl *copy_impl(ASTImpl* node);
   InterpolatedStringSegment *copy_interp_string_segment(InterpolatedStringSegment* segment);

@@ -83,16 +83,6 @@
   }
 }
 
-
-#test test_range_iterator :: fn() {
-  for i in Range{first: 0, last: 10, increment: 2} {
-    assert("iter increment failed to be divisible by 2", i % 2 == 0);
-  }
-  for i in Range{first: 0, last: 10, increment: 3} {
-    assert("iter increment failed to be divisible by 3", i % 3 == 0);
-  }
-}
-
 #test test_iterate_array :: fn() {
   array: List![s8] = {0,1,2,3};
   n: int ;

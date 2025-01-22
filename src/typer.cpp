@@ -553,11 +553,6 @@ void Typer::visit(ASTBlock *node) {
   for (auto &statement : node->statements) {
     current_block_statement_idx = statement_idx;
     statement->accept(this);
-    ASTNodeType node_type = statement->get_node_type();
-    // TODO: verify that we want to allow all nodes to partake in this? it might be cheaper to not do
-    // a bunch of comparisons, it might be cheaper to not do this for every node.
-    // Probably the latter, since theres much less work to be done, and then there's nothing we have to do
-    // when we want to add more control flow structures, if we do.
     auto &stmnt_cf = statement->control_flow;
     auto &block_cf = node->control_flow;
     block_cf.flags |= stmnt_cf.flags;
@@ -569,7 +564,6 @@ void Typer::visit(ASTBlock *node) {
     }
     statement_idx++;
   }
-
   node->flags = node->control_flow.flags;
   node->return_type = node->control_flow.type == Type::invalid_id ? void_type() : node->control_flow.type;
   ctx.exit_scope();
@@ -1338,6 +1332,10 @@ void Typer::visit(ASTDotExpr *node) {
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
   } else {
+    for (const auto &[name, _]: base_scope->symbols) {
+      std::cout << "symbol: " << name.get_str() << '\n';
+    }
+
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
                 node->source_range);
   }

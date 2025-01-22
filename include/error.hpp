@@ -65,7 +65,7 @@ static std::string format_message(const std::string &message) {
     if (ch == '\n') {
       formatted << '\t';
     }
-    if (width > 50 && message.length() > size + 1 && std::isspace(message[size + 1])) {
+    if (width > 80 && message.length() > size + 1 && std::isspace(message[size + 1])) {
       formatted << "\n\t";
       width = 0;
     }

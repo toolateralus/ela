@@ -1,6 +1,0 @@
-unwrap :: fn![T](tuple: (string, T)) {
-  sizeof(T);
-}
-
-main :: fn() { 
-}
