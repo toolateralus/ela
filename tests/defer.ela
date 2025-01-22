@@ -1,4 +1,4 @@
-;
+#error "This compiles but hangs up when ran."
 
 /* 
  * :: Important :: 
