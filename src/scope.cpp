@@ -55,7 +55,7 @@ Context::Context() {
   // string, env, reflection types. Only if we're compiling with stdlib.
   if (!compile_command.has_flag("freestanding")) {
     // define types used for reflection.
-    {
+    if (true) {
       auto type_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
       auto field_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
       auto element_scope = new (scope_arena.allocate(sizeof(Scope))) Scope();

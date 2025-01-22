@@ -1,9 +1,6 @@
-unwrap :: fn![T](tuple: (string, T)) -> T {
-  a, b := tuple;
-  sizeof(T); // "use of undeclared identifier T", this error leaks into C++. Somehow, this gets emitted as T instead of the instantiated type.
-  return b;
+unwrap :: fn![T](tuple: (string, T)) {
+  sizeof(T);
 }
 
 main :: fn() { 
-  unwrap![int](("Error", 100));
 }

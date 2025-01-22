@@ -129,7 +129,24 @@ void Emitter::visit(ASTAlias *node) { return; }
 void Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
-    node->arguments[i]->accept(this);
+    bool emitted = false;
+
+    // ! This is a terrible hack. 
+    // ! We should have a specific node for functions that take types as arguments
+    // ! sizeof(), typeof(), etc etc.
+    if (node->arguments[i]->get_node_type() == AST_NODE_IDENTIFIER)  {
+      auto iden = static_cast<ASTIdentifier*>(node->arguments[i]);
+      auto type = ctx.scope->find_type_id(iden->value, {});
+      if (type != -1) {
+        emitted = true;
+        (*ss) << to_cpp_string(global_get_type(type));
+      }
+    }
+
+    if (!emitted) {
+      node->arguments[i]->accept(this);
+    }
+    
     if (i != node->arguments.size() - 1) {
       (*ss) << ", ";
     }
@@ -394,6 +411,20 @@ void Emitter::visit(ASTDeclaration *node) {
     }
   };
 
+  auto old = emit_default_init;
+  Defer _([&]{ emit_default_init = old; });
+  if (node->is_extern) {
+    (*ss) << "extern ";
+    emit_default_init = false;
+  } 
+  
+  if (node->is_static) {
+    (*ss) << "static ";
+  } 
+  if (node->is_constexpr) {
+    (*ss) << "static constexpr ";
+  }
+
   if (type->is_kind(TYPE_FUNCTION)) {
     (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     handle_initialization();
@@ -420,11 +451,6 @@ void Emitter::visit(ASTDeclaration *node) {
     return;
   }
 
-  if (node->is_static) {
-    (*ss) << "static ";
-  } else if (node->is_constexpr) {
-    (*ss) << "static constexpr ";
-  }
 
   node->type->accept(this);
   space();

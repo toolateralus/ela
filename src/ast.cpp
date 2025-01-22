@@ -415,16 +415,18 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "export",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
-          auto decl = parser->parse_struct_declaration(name);
+        auto node = parser->parse_statement();
+        if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+          auto struct$ = static_cast<ASTStructDeclaration*>(node);
+          struct$->is_extern = true;
+        } else if (node->get_node_type() == AST_NODE_DECLARATION) {
+          auto decl = static_cast<ASTDeclaration*>(node);
           decl->is_extern = true;
-          return decl;
+        } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+          auto func = static_cast<ASTFunctionDeclaration*>(node);
+          func->flags |= FUNCTION_IS_EXPORTED;
         }
-        auto func_decl = parser->parse_function_declaration(name);
-        func_decl->flags |= FUNCTION_IS_EXPORTED;
-        return func_decl;
+        return node;
     }},
     // #typeid, integer version of #type. can be used to compare types without
     // the pointers.

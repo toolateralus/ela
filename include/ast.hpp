@@ -234,6 +234,8 @@ struct ASTDeclaration : ASTStatement {
   InternedString name;
   InternedString bitsize;
 
+  bool is_extern = false;
+
   // This isn't nullable, even though it can be null for part of compilation.
   // That's because if it ever was null, when it's done typing it will have been created.
   // It creates too much friction later on down the line if it's not.
