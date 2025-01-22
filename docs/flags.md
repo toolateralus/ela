@@ -15,7 +15,6 @@ This is to be reworked
   
 ## --no-compile 
   Transpile to C++ but don't invoke the clang++ compiler automatically. 
-  Note that our boilerplate library requires c++23.
 
 ## --s
 Don't delete the `.hpp` and `.cpp` files used to transpile.

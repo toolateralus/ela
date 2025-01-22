@@ -1218,9 +1218,6 @@ void Typer::visit(ASTUnaryExpr *node) {
   // unary operator overload.
   auto left_ty = global_get_type(operand_ty);
 
-  // * Again, operator overloading once was here.
-  // * We need to wait until we have interfaces to do it properly.
-
   // Convert to boolean if implicitly possible, for ! expressions
   {
     auto conversion_rule =
@@ -1329,6 +1326,9 @@ void Typer::visit(ASTDotExpr *node) {
     throw_error("Internal compiler error: dot expression used on a type that had a null scope", node->source_range);
   }
 
+
+// ! Calling a generic function with this completely fails.
+// ! Not sure why, but a object.method![T]() just always says 'Member not found in type'
   if (auto member = base_scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
   } else {

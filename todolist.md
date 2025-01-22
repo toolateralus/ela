@@ -27,7 +27,6 @@ To search for all info comments in the source just use vscodes regex search with
 
 - we need to instantiate templates for generics where most appropriate, not just when theyre declared.
 
-- we should make it so `boilerplate.hpp` doesn't exist, and use our own language, where applicable.
 - if we have modules, importing C headers as modules would be nice, and allowing renaming of FFI functions. (I wrote a binding generator, it might be fine.)
 
 ## general
@@ -42,9 +41,6 @@ To search for all info comments in the source just use vscodes regex search with
 
 ## things that need to be tidy'd up before we can transpile to c
 
-- (easy) using generics in boilerplate.hpp, we should rewrite _array and map<T> and string in our own language.
-  this kind of depends on transpiling to C, because when using C++ you need obnoxious constructors like copy assignment that we just
-  cannot provide.
 
 - (hard) using std::tuple<T> instead of compiling our own tuple structs per instantition
 

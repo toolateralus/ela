@@ -287,8 +287,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
     }},
     // #foreign
-    // Declare a foreign function, like C's extern. Super janky and bad because
-    // our boilerplate is crap and uses stdlib stuff.
+    // Declare a foreign function, like C's extern.
     {.identifier = "foreign",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {

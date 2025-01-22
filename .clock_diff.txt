@@ -7,7 +7,6 @@ src/typer.cpp                                200             72           1478
 include/ast.hpp                               99             23            709
 src/type.cpp                                  85             50            601
 src/ast_copier.cpp                            15              0            418
-include/boilerplate.hpp                       63              3            402
 include/lex.hpp                               41              4            320
 include/type.hpp                              58             14            245
 include/core.hpp                              26              2            227

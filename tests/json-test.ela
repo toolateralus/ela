@@ -1,7 +1,6 @@
 #import json;
 #import directory;
 
-// #error "This is crashing because we call List![delete] in our string implementation in boilerplate.hpp, but we fill the strings with malloc'd data in string::from";
 
 JsonValueDeleter :: struct {
   vals: List![JsonValue*];

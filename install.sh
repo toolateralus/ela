@@ -29,6 +29,4 @@ sudo mkdir -p /usr/local/lib/ela
 # Move the contents of ./lib to /usr/local/lib/ela
 sudo cp -r ./lib/* /usr/local/lib/ela/
 
-sudo cp ./include/boilerplate.hpp /usr/local/lib/ela/boilerplate.hpp
-
 sudo ln -sf $(pwd)/bin/ela /usr/local/bin/ela

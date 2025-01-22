@@ -34,6 +34,147 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 11;
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 12;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 13;
 
+static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
+#ifdef TESTING
+#define __TEST_RUNNER_MAIN                                                                                             \
+  int main() {                                                                                                         \
+    int failed = 0;                                                                                                    \
+    int passed = 0;                                                                                                    \
+    const char *failed_tests[sizeof(tests) / sizeof(tests[0])];                                                        \
+    int failed_index = 0;                                                                                              \
+    for (const auto &test : tests) {                                                                                   \
+      if (test.run()) {                                                                                                \
+        passed++;                                                                                                      \
+      } else {                                                                                                         \
+        failed_tests[failed_index++] = test.name;                                                                      \
+        failed++;                                                                                                      \
+      }                                                                                                                \
+    }                                                                                                                  \
+    printf("\033[1;31mfailed: %d, \033[1;32mpassed: "                                                                  \
+           "%d\033[0m\n",                                                                                              \
+           failed, passed);                                                                                            \
+    if (failed > 0) {                                                                                                  \
+      for (int i = 0; i < failed_index; ++i) {                                                                         \
+        printf("\033[1;31mfailed \033[0m::(\033[1;35m%s\033[0m)\n", failed_tests[i]);                                  \
+      }                                                                                                                \
+    }                                                                                                                  \
+  }
+
+#endif
+)__";
+
+// This is stuff we just can't really get rid of while using a transpiled backend.
+static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
+
+typedef double float64;
+typedef unsigned long long int u64;
+typedef signed long long int s64;
+
+typedef signed int s32;
+typedef unsigned int u32;
+typedef float float32;
+
+typedef short int s16;
+typedef unsigned short int u16;
+
+typedef signed char s8;
+typedef unsigned char u8;
+#if USE_STD_LIB
+  #include <tuple>
+  #include <initializer_list>
+  #include <stdint.h>
+  #include <unordered_map>
+  #include <errno.h>
+  #undef RAND_MAX
+#endif
+
+#ifdef TESTING
+  extern "C" char *strcpy(char *dest, const char *src);
+  extern "C" int system(const char *);
+  extern "C" void free(void *);
+  extern "C" void *malloc(u64);
+  extern "C" void *calloc(u64, u64);
+  extern "C" void *realloc(void *, u64);
+  extern "C" void *memcpy(void *, void *, u64);
+  extern "C" void *memset(void *, int, u64);
+  extern "C" int memmove(void *, void *, s64);
+  extern "C" int printf(const char *, ...);
+  extern "C" void exit(int);
+  extern "C" int scanf(const char *, ...);
+  extern "C" int getchar();
+  extern "C" void sleep(int);
+  extern "C" void usleep(int);
+  extern "C" const char *strdup(const char *);
+  extern "C" const char *strndup(const char *, u64);
+  extern "C" const char *strerror(int);
+  extern "C" s64 strtol(const char *, char ***, int);
+  extern "C" u64 strtoul(const char *, char ***, int);
+  extern "C" float64 strtod(const char *, char ***);
+  extern "C" const char *strtok(const char *, const char *);
+  extern "C" const char *strchr(const char *, int);
+  extern "C" const char *strrchr(const char *, int);
+  extern "C" const char *strstr(const char *, const char *);
+  extern "C" int strlen(const char *);
+  extern "C" int strcmp(const char *, const char *);
+  extern "C" const char *strcat(const char *, const char *);
+  extern "C" int snprintf(char *, u64, const char *, ...);
+  extern "C" int sprintf(char *, const char *, ...);
+  extern "C" int strncmp(const char *, const char *, int);
+  struct __test_exception {
+    const char *m_what;
+    template <typename... Args> __test_exception(const char *fmt, Args &&...args) {
+      char buf[1024];
+      snprintf(buf, sizeof(buf), fmt, args...);
+      m_what = new char[strlen(buf) + 1];
+      strcpy(const_cast<char *>(m_what), buf);
+    }
+    ~__test_exception() { delete[] m_what; }
+    const char *what() const { return m_what; }
+  };
+  struct __COMPILER_GENERATED_TEST {
+    __COMPILER_GENERATED_TEST() {}
+    __COMPILER_GENERATED_TEST(const char *name, void (*function)()) : name(name), function(function) {}
+    const char *name;
+    void (*function)();
+    bool run() const {
+  #ifdef TEST_VERBOSE
+      printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
+      try {
+        function();
+        printf("\033[1;32m[passed]\033[0m\n");
+        return true;
+      } catch (__test_exception &e) {
+        printf("\033[1;31m[failed]\033[0m\n");
+        printf("%s", e.what());
+        return false;
+      }
+  #else
+      try {
+        function();
+        return true;
+      } catch (__test_exception &e) {
+        printf("%s", e.what());
+        return false;
+      }
+  #endif
+    }
+  };
+
+  #define assert(message, condition)                                                                                     \
+    if (!(condition))                                                                                                    \
+      throw __test_exception("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "        \
+                            "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                         \
+                            #condition, message);
+#else
+  #define assert(message, condition)                                                                                     \
+    if (!(condition)) {                                                                                                  \
+      printf("assertion failed: %s\n " #condition "\n", message);                                                        \
+      exit(1);                                                                                                           \
+    }
+#endif
+
+)__";
+
 void Emitter::visit(ASTWhile *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   emit_condition_block(node, "while", node->condition, node->block);
@@ -70,9 +211,7 @@ void Emitter::visit(ASTFor *node) {
   std::string unique_id = "$_loop_id" + std::to_string(depth);
   depth++;
 
-  Defer _defer([]{
-    depth--;
-  });
+  Defer _defer([] { depth--; });
 
   (*ss) << indent() << "{\n";
   indent_level++;
@@ -95,7 +234,7 @@ void Emitter::visit(ASTFor *node) {
 
   std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
   (*ss) << indent() << identifier_type_str << " ";
-  
+
   node->iden->accept(this);
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
@@ -131,11 +270,11 @@ void Emitter::visit(ASTArguments *node) {
   for (int i = 0; i < node->arguments.size(); ++i) {
     bool emitted = false;
 
-    // ! This is a terrible hack. 
+    // ! This is a terrible hack.
     // ! We should have a specific node for functions that take types as arguments
     // ! sizeof(), typeof(), etc etc.
-    if (node->arguments[i]->get_node_type() == AST_NODE_IDENTIFIER)  {
-      auto iden = static_cast<ASTIdentifier*>(node->arguments[i]);
+    if (node->arguments[i]->get_node_type() == AST_NODE_IDENTIFIER) {
+      auto iden = static_cast<ASTIdentifier *>(node->arguments[i]);
       auto type = ctx.scope->find_type_id(iden->value, {});
       if (type != -1) {
         emitted = true;
@@ -146,7 +285,7 @@ void Emitter::visit(ASTArguments *node) {
     if (!emitted) {
       node->arguments[i]->accept(this);
     }
-    
+
     if (i != node->arguments.size() - 1) {
       (*ss) << ", ";
     }
@@ -331,7 +470,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   }
 
   auto type = global_get_type(left_type);
-  
+
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
   if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
@@ -367,7 +506,7 @@ void Emitter::visit(ASTBinExpr *node) {
     call->source_range = node->source_range;
     return;
   }
-  
+
   auto op_ty = node->op.type;
   (*ss) << "(";
   node->left->accept(this);
@@ -412,15 +551,15 @@ void Emitter::visit(ASTDeclaration *node) {
   };
 
   auto old = emit_default_init;
-  Defer _([&]{ emit_default_init = old; });
+  Defer _([&] { emit_default_init = old; });
   if (node->is_extern) {
     (*ss) << "extern ";
     emit_default_init = false;
-  } 
-  
+  }
+
   if (node->is_static) {
     (*ss) << "static ";
-  } 
+  }
   if (node->is_constexpr) {
     (*ss) << "static constexpr ";
   }
@@ -450,7 +589,6 @@ void Emitter::visit(ASTDeclaration *node) {
     }
     return;
   }
-
 
   node->type->accept(this);
   space();
@@ -675,10 +813,10 @@ void Emitter::visit(ASTProgram *node) {
     std ::cout << "adding TEST_VERBOSE\n";
   }
 
-  code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {
-    code << "extern Type **_type_info;\n";
+    code << "struct Type;\nextern Type **_type_info;\n";
   }
 
   if (testing) {
@@ -696,6 +834,8 @@ void Emitter::visit(ASTProgram *node) {
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
+
+    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
 
     // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
@@ -937,7 +1077,6 @@ void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
   if (type->get_ext().is_pointer())
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
-
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   std::stringstream tss;
@@ -1773,7 +1912,6 @@ void Emitter::visit(ASTLambda *node) {
   // We parenthesize this because if you call it on the spot,
   // it thinks you're trying to do + on whatever this returns.
 
-  
   (*ss) << "(+[]";
   node->params->accept(this);
   (*ss) << " -> ";

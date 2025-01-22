@@ -76,7 +76,6 @@ Iterable :: interface![T] {
   iter :: fn(self*) -> Iter![T];
 }
 
-
 // Binary arithmetic operator overloads.
 Arithmetic :: interface![Right] {
   add       :: fn(self, right: Right) -> #self;   // '+' operator.
