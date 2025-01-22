@@ -284,10 +284,15 @@ struct Type {
   TypeInfo *get_info() const { return info; }
 
   bool implements(const InternedString &interface) {
-    // Is this a reliable way to check this??
-    for (auto id: interfaces) {
+    for (auto id : interfaces) {
       auto iface = global_get_type(id);
-      if (iface->base.get_str().starts_with(interface.get_str())) {
+      std::string iface_base_str = iface->base.get_str();
+      std::string interface_str = interface.get_str();
+      auto pos = iface_base_str.find('$');
+      if (pos != std::string::npos) {
+        iface_base_str = iface_base_str.substr(0, pos);
+      }
+      if (iface_base_str == interface_str) {
         return true;
       }
     }
