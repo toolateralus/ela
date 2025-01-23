@@ -1,0 +1,32 @@
+
+
+
+I think for refactoring tuples to not use C++ generics, we can just emit a struct for them.
+
+So, (s32, s32) would transform into:
+
+struct {
+  s32 $1;
+  s32 $2;
+}
+
+and then we have a problem: To emit this, we need to attach it to AST somehow. And not just that,
+we could just emit them straight out, but there's a bit of a dependency.
+
+if I have 
+
+struct Some ... {}
+struct Another ... {}
+
+(Some, Another)
+
+I need to emit (Some, Another) RIGHT after the 'After' declaration, so there's never a use before declared.
+
+One way we could do this, is by looking at all the types within the tuple, finding the one with the highest ID, meaning it was created last
+and then attaching some stub to it saying "you need to emit this tuple declaration after you're done emitting your type"
+
+That's a pretty good solution probably.
+
+Generated names:
+  (s32, s32), would transform into a grouping of all of it's subtypes. assuming s32 was type_id=0
+  $tuple$0$0 would be the type name, or something like that, something incapable of causing naming collision.
