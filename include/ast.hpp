@@ -486,6 +486,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
   std::vector<ASTImpl *> impls;
+
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }
 };

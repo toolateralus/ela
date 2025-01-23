@@ -475,8 +475,8 @@ int float64_type() {
   static int type = global_create_type(TYPE_SCALAR, "float64", create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
-int int_type() {
-  static int type = global_create_type(TYPE_SCALAR, "int", create_scalar_type_info(TYPE_S32, 4, true));
+int &int_type() {
+  static int type;
   return type;
 }
 int float_type() {
@@ -668,6 +668,14 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   type->set_info(info);
   type->set_ext(ext);
   info->scope = create_child(root_scope);
+
+  // declare this type as a dependant on the eldest dependency from our subtypes.
+  // purely for emit time.
+  if (ext.has_no_extensions()) {
+    int eldest = *std::max_element(types.begin(), types.end());
+    global_get_type(eldest)->tuple_dependants.push_back(type->id);
+  }
+  
   return type->id;
 }
 

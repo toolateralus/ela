@@ -19,9 +19,8 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 
   ptr_arr: List![(int, int)*];
   ptr_arr.push(ptr);
-
   {
-    a, b := *(ptr_arr[0]);
+    a, b := (ptr_arr[0]);
     assert("mallocing into tuple array failed", a == 10 && b == 10);
   }
 

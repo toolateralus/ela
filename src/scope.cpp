@@ -30,6 +30,7 @@ Context::Context() {
   {
     // ** DO NOT REMOVE ***
     scope->types["c_string"] = c_string_type() = charptr_type();
+    scope->types["int"] = int_type() = s32_type();
     // ** ------------- ***
   }
  

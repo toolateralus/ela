@@ -224,7 +224,7 @@ int s8_type();
 int s16_type();
 int s32_type();
 int s64_type();
-int int_type();
+int &int_type();
 int u8_type();
 int u16_type();
 int u32_type();
@@ -271,6 +271,12 @@ struct Type {
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
+
+  // These are for emit time strictly.
+  // it's just saying that when we emit a declaration of this type, whether it's a struct, enum, tagged union, etc.
+  // we need to emit these tuple types as structs RIGHT after our struct declaration, because we are the elder dependency that this
+  // tuple depends on.
+  std::vector<int> tuple_dependants; 
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;

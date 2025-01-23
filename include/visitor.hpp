@@ -125,6 +125,8 @@ struct Emitter : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
 
+  void emit_tuple_dependants(std::vector<int>& types);
+
   Nullable<ASTType> type_context;
 
   Typer &typer;

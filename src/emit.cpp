@@ -661,6 +661,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
         }
       }
       instantiation.node->accept(this);
+      emit_tuple_dependants(type->tuple_dependants);
     }
     return;
   }
@@ -676,6 +677,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
+
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   auto type_tag = node->is_union ? " union " : " struct ";
@@ -723,6 +725,9 @@ void Emitter::visit(ASTStructDeclaration *node) {
   }
 
   (*ss) << "};\n";
+
+  emit_tuple_dependants(type->tuple_dependants);
+
   indent_level--;
 
   bool has_default_ctor = false;
@@ -821,6 +826,12 @@ void Emitter::visit(ASTProgram *node) {
 
   if (testing) {
     code << "#define TESTING\n";
+  }
+
+  for (auto &type: type_table) {
+    if (type.is_kind(TYPE_SCALAR) && type.get_ext().has_no_extensions()) {
+      emit_tuple_dependants(type.tuple_dependants);
+    }
   }
 
   for (const auto &statement : node->statements) {
@@ -1033,13 +1044,17 @@ void Emitter::visit(ASTSwitch *node) {
   return;
 }
 void Emitter::visit(ASTTuple *node) {
-  (*ss) << "std::tuple(";
-  for (const auto &value : node->values) {
+  auto type = global_get_type(node->resolved_type);
+  auto name = to_cpp_string(type);
+  (*ss) << name << " {";
+  for (int i = 0; i < node->values.size(); ++i) {
+    auto &value = node->values[i];
+    (*ss) << ".$" << std::to_string(i) << " = ";
     value->accept(this);
-    if (value != node->values.back())
+    if (i != node->values.size() - 1)
       (*ss) << ", ";
   }
-  (*ss) << ")";
+  (*ss) << "}";
   return;
 }
 void Emitter::visit(ASTTupleDeconstruction *node) {
@@ -1090,7 +1105,8 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
 
     return get_function_pointer_type_string(type, &identifier);
   }
-  tss << type->get_base().get_str();
+  auto base = type->get_base().get_str();;
+  tss << to_cpp_string(global_get_type(type->get_element_type()));
   if (!type->get_ext().is_fixed_sized_array()) {
     tss << name << ' ';
   }
@@ -1529,18 +1545,11 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 
 std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
-
   // TODO: we need to fix the emitting of 'c_string' as const char*,
   // right now it's fricked up.
   ss << base;
-
   for (const auto ext : extensions.extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
-      std::string current = ss.str();
-      ss.str("");
-      ss.clear();
-      ss << "_array<" << current << ">";
-    } else if (ext.type == TYPE_EXT_ARRAY) {
       ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER) {
       ss << "*";
@@ -1582,14 +1591,13 @@ std::string Emitter::to_cpp_string(Type *type) {
     }
     case TYPE_TUPLE: {
       auto info = (type->get_info()->as<TupleTypeInfo>());
-      output = "std::tuple<";
+      output = "$tuple";
       for (int i = 0; i < info->types.size(); ++i) {
-        output += to_cpp_string(global_get_type(info->types[i]));
+        output += std::to_string(info->types[i]);
         if (i != info->types.size() - 1) {
-          output += ", ";
+          output += "$";
         }
       }
-      output += ">";
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
@@ -1917,4 +1925,29 @@ void Emitter::visit(ASTWhere *node) {
   throw_error("Internal compiler error: 'where' expression was visited in the emitter", node->source_range);
 }
 
+void Emitter::emit_tuple_dependants(std::vector<int> &types) {
+  std::unordered_set<int> emitted_tuples;
 
+  while (!types.empty()) {
+    auto type_id = types.back();
+
+    if (emitted_tuples.contains(type_id)) {
+      continue;
+    }
+    emitted_tuples.insert(type_id);
+
+    types.pop_back();
+    auto type = global_get_type(type_id);
+    auto name = to_cpp_string(type);
+    (*ss) << "typedef struct {";
+    auto info = type->get_info()->as<TupleTypeInfo>();
+    for (int i = 0; i < info->types.size(); ++i) {
+      auto type = info->types[i];
+      auto name = to_cpp_string(global_get_type(type));
+      (*ss) << name << " $" << std::to_string(i) << ";\n";
+    }
+    (*ss) << "} " << name << ";\n";
+    // We have to do this recursively for nested tuples.
+    emit_tuple_dependants(type->tuple_dependants);
+  }
+}
