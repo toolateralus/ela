@@ -1,0 +1,10 @@
+//! Type error in binary expression: cannot convert between s64 and float
+//!   i : s64 = 5;
+//!   char_x := i * (5 as float);
+//! }
+//!                       ^^^^^
+
+main :: fn() {
+  i : s64 = 5;
+  char_x := i * (5 as float);
+}
