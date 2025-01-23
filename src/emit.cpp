@@ -651,11 +651,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
     return;
   }
 
-  if (node->name == "Env") {
-    int n = 0;
-    std::cout << "";
-  }
-
   if (!node->generic_parameters.empty()) {
     for (auto &instantiation : node->generic_instantiations) {
       auto type = global_get_type(instantiation.node->resolved_type);
@@ -683,6 +678,8 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
+
+
 
   auto info = (type->get_info()->as<StructTypeInfo>());
 

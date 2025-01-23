@@ -319,6 +319,7 @@ std::string Type::to_string() const {
 }
 
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
+  std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
   type_table.emplace_back(type_table.size(), TYPE_INTERFACE);
   Type *type = &type_table.back();
   type->set_base(name);
@@ -330,6 +331,7 @@ int global_create_interface_type(const InternedString &name, Scope *scope, std::
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
+  std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
   type_table.emplace_back(type_table.size(), TYPE_STRUCT);
   Type *type = &type_table.back();
   std::string base = name.get_str();
@@ -345,6 +347,7 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 }
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
+  std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
   type_table.emplace_back(type_table.size(), TYPE_TAGGED_UNION);
   Type *type = &type_table.back();
   type->set_base(name);
@@ -355,6 +358,7 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
 }
 
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
+  std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
   type_table.emplace_back(type_table.size(), TYPE_ENUM);
   Type *type = &type_table.back();
   type->set_base(name);
@@ -366,6 +370,7 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
 }
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
+  std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
   auto &type = type_table.emplace_back(type_table.size(), kind);
   type.base_id = base_id;
   type.set_ext(extensions);

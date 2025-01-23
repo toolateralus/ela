@@ -101,13 +101,9 @@ ASTStatement *find_generic_instance(std::vector<GenericInstance> instantiations,
 
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
-  if (node->name == "Env") {
-    int n = 0;
-    std::cout << "";
-  }
-
-
   auto type = global_get_type(node->resolved_type);
+
+
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
@@ -127,6 +123,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
+
+
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
@@ -145,6 +143,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   ctx.set_scope(old_scope);
   node->resolved_type = type->id;
+  
+  if (type->is_kind(TYPE_SCALAR)) {
+    throw_error("struct declaration was a scalar???", node->source_range);
+  } 
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
