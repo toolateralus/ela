@@ -13,16 +13,17 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   ptr : (int, int)* = malloc(32) as (int, int)*;
   *ptr = (10, 10);
   {
-    a, b := *ptr;
+    a, b := *ptr; 
     assert("mallocing with tuple failed", a == 10 && b == 10);
   }
 
+  #error "I don't know what's going on here but (...)* gets emitted really oddly";
   ptr_arr: List![(int, int)*];
   ptr_arr.push(ptr);
   {
-    a, b := (ptr_arr[0]);
+    a, b := *(ptr_arr[0]);
     assert("mallocing into tuple array failed", a == 10 && b == 10);
-  }
+  }   
 
   free(ptr);
 }
