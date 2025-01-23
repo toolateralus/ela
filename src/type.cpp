@@ -57,7 +57,7 @@ std::string FunctionTypeInfo::to_string() const {
 }
 
 Type *global_get_type(const int id) {
-  [[unlikely]] if (id < 0)
+  if (id < 0 || id > type_table.size())
     return nullptr;
   return &type_table[id];
 }

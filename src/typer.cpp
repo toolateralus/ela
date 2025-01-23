@@ -101,10 +101,17 @@ ASTStatement *find_generic_instance(std::vector<GenericInstance> instantiations,
 
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
+  if (node->name == "Env") {
+    int n = 0;
+    std::cout << "";
+  }
+
+
   auto type = global_get_type(node->resolved_type);
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
+    node->resolved_type = type->id;
     return;
   }
 
@@ -125,7 +132,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   }
 
   type->declaring_node = node;
-  ctx.scope->insert("this", type->take_pointer_to(), node);
 
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->fields) {
@@ -421,7 +427,6 @@ void Typer::visit(ASTStructDeclaration *node) {
     ctx.scope->insert(node->name, Type::invalid_id, node, SYMBOL_IS_VARIABLE);
     return;
   }
-  // TODO: verify this is correct for generic instantiations?
   visit_struct_declaration(node, false);
 }
 
@@ -431,7 +436,6 @@ void Typer::visit(ASTEnumDeclaration *node) {
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
   auto info = enum_type->get_info()->as<EnumTypeInfo>();
 
-  // TODO: why is value still nullable? we don't even check if it exists before we use it.
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
@@ -1794,5 +1798,5 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
 
 void Typer::visit(ASTSize_Of *node) {
   node->target_type->accept(this);
-  node->resolved_type = s64_type();
+  node->resolved_type = u64_type();
 }
