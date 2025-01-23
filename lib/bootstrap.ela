@@ -589,37 +589,37 @@ impl Env {
 }
 
 
-// Element :: struct;
-// Type :: struct {
-//   id: int;                                                // the integer ID used to identify this type.
-//   name: c_string;                                         // the type's name.
-//   size: u64;                                              // sizeof(T)
-//   flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-//   fields: List![Field*];                                  // get a list of struct fields, enum variants.
-//   elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
-//   element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
-// };
+Element :: struct;
+Type :: struct {
+  id: int;                                                // the integer ID used to identify this type.
+  name: c_string;                                         // the type's name.
+  size: u64;                                              // sizeof(T)
+  flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+  fields: List![Field*];                                  // get a list of struct fields, enum variants.
+  elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
+  element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
+};
 
-// Field :: struct {
-//   name: c_string;
-//   type: Type*;
-//   size: u64;
-//   offset: u64;
-// };
+Field :: struct {
+  name: c_string;
+  type: Type*;
+  size: u64;
+  offset: u64;
+};
 
-// impl Field {
-//   set :: fn![T, T1](target: T*, data: T1) {
-//     memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
-//   }
-//   get :: fn![T](source: T*) -> s8* {
-//     return (source as u8*) + offset;
-//   }
-// }
+impl Field {
+  set :: fn![T, T1](target: T*, data: T1) {
+    memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
+  }
+  get :: fn![T](source: T*) -> s8* {
+    return (source as u8*) + offset;
+  }
+}
 
-// Element :: struct {
-//   data: c_string;
-//   type: Type*;
-// };
+Element :: struct {
+  data: c_string;
+  type: Type*;
+};
 
-// #export _type_info: Type**;  
+#export _type_info: Type**;  
 
