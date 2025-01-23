@@ -273,8 +273,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   node->target->accept(this);
-  auto type = global_get_type(node->target->resolved_type);
-  if (!type) {
+  auto target_ty = global_get_type(node->target->resolved_type);
+  if (!target_ty) {
     throw_error("use of undeclared type", node->target->source_range);
   }
 
@@ -289,7 +289,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     interface_ty = global_get_type(type_id);
   }
 
-  auto type_scope = type->get_info()->scope;
+  auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
     if (!method->generic_parameters.empty()) {
@@ -318,6 +318,12 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto info = global_get_type(func_ty_id)->get_info()->as<FunctionTypeInfo>();
     visit_function_body(method, info->return_type);
   }
+
+  // This is here because calling adding types tot eh type type or calling
+  // acccept on a node that may create types might reallocate the tytpe table
+  // so we have to get a pointer tot eh type again so that were adjusting the 
+  // correct interfaces vector
+  target_ty = global_get_type(node->target->resolved_type);
 
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
@@ -363,10 +369,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
                     impl_sym.declaring_node.get()->source_range);
       }
     }
-    type->interfaces.push_back(interface_ty->id);
+    target_ty->interfaces.push_back(interface_ty->id);
   }
 
-  node->resolved_type = type->id;
+  node->resolved_type = target_ty->id;
 }
 
 void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
@@ -677,6 +683,7 @@ void Typer::visit(ASTFor *node) {
 
   auto iden = static_cast<ASTIdentifier *>(node->iden);
   node->range->accept(this);
+  // auto range_node_ty = node->range->get_node_type();
   int range_type_id = node->range->resolved_type;
   Type *range_type = global_get_type(range_type_id);
   node->range_type = range_type->id;
