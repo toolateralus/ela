@@ -47,6 +47,12 @@ struct ASTCopier {
   ASTTuple *copy_tuple(ASTTuple *node);
   ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
   ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
+  ASTAlias *copy_alias(ASTAlias *node);
+  ASTSize_Of *copy_sizeof(ASTSize_Of *node);
+  ASTDefer *copy_defer(ASTDefer *node);
+  ASTLambda *copy_lambda(ASTLambda *node);
+  ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
+  ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
   ASTWhere *copy_where(ASTWhere *node);

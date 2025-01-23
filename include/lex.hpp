@@ -104,6 +104,7 @@ enum struct TType {
   Interface,      // interface
   Where,
   Is,
+  Size_Of,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -112,6 +113,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Size_Of);
     TTYPE_CASE(Interface);
     TTYPE_CASE(Where);
     TTYPE_CASE(Defer);
@@ -263,7 +265,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"in", TType::In},
     {"where", TType::Where},
     {"is", TType::Is},
-    
+    {"sizeof", TType::Size_Of},
     {"fn", TType::Fn},
     {"switch", TType::Switch},
     {"then", TType::Then},

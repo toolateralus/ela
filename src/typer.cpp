@@ -1791,3 +1791,8 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
   }
   return global_find_type_id(instantiation->resolved_type, {});
 }
+
+void Typer::visit(ASTSize_Of *node) {
+  node->target_type->accept(this);
+  node->resolved_type = s64_type();
+}

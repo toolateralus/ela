@@ -818,6 +818,14 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Size_Of: {
+      NODE_ALLOC(ASTSize_Of, node, range, _, this);
+      eat();
+      expect(TType::LParen);
+      node->target_type = parse_type();
+      expect(TType::RParen);
+      return node;
+    }
     case TType::Fn: {
       return parse_lambda();
     }
@@ -981,7 +989,7 @@ ASTExpr *Parser::parse_primary() {
       eat();
       end_node(expr, range);
 
-      if (expr->get_node_type() == AST_NODE_TYPE || expr->get_node_type() == AST_NODE_SELF_TYPE) {
+      if (expr->get_node_type() == AST_NODE_TYPE) {
         throw_error("using (TYPE)expr style casts are deprecated. use `expr as TYPE` syntax", range);
       }
 
@@ -1019,7 +1027,7 @@ ASTType *Parser::parse_type() {
   if (peek().type == TType::Directive) {
     auto range = begin_node();
     auto expr = try_parse_directive_expr().get();
-    if (expr->get_node_type() != AST_NODE_TYPE && expr->get_node_type() != AST_NODE_SELF_TYPE) {
+    if (expr->get_node_type() != AST_NODE_TYPE) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
                   range);

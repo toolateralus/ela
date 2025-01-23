@@ -56,6 +56,7 @@ struct Typer : VisitorBase {
   void visit(ASTType *node) override;
   void visit(ASTScopeResolution *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTSize_Of *node) override;
 
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
@@ -235,6 +236,7 @@ struct Emitter : VisitorBase {
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTSize_Of *node) override;
   void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;

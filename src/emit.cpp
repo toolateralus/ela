@@ -1951,3 +1951,9 @@ void Emitter::emit_tuple_dependants(std::vector<int> &types) {
     emit_tuple_dependants(type->tuple_dependants);
   }
 }
+
+void Emitter::visit(ASTSize_Of *node) {
+  (*ss) << "sizeof(";
+  node->target_type->accept(this);
+  (*ss) << ")";
+}
