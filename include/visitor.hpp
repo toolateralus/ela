@@ -37,6 +37,9 @@ struct Typer : VisitorBase {
   Nullable<Symbol> get_symbol(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
+
+  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args, const SourceRange &source_range);
+
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTFunctionDeclaration *node) override;
@@ -64,7 +67,7 @@ struct Typer : VisitorBase {
                               std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
-  void visit_function_body(ASTFunctionDeclaration *node, int return_type);
+  void visit_function_body(ASTFunctionDeclaration *node);
 
   int get_self_type();
 

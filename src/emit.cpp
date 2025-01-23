@@ -1447,10 +1447,6 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
   type_cache[id] = true;
 
-  // TODO:
-  // ! This needs serious improvement to be really really useful. It's a great
-  // starting point, ! but it could be far better.
-
   std::stringstream fields_ss;
   if (type->kind == TYPE_STRUCT) {
     auto info = type->get_info();
@@ -1631,8 +1627,7 @@ void Emitter::visit(ASTScopeResolution *node) {
   if (!emitted) {
     node->base->accept(this);
   }
-  auto op = "_"; // ! this may cause issues, but this is going to be a permanent change. we obviously can't lower to C,
-                 // when we use C++ features like `::`
+  auto op = "_";
   (*ss) << op << node->member_name.get_str();
   return;
 }
@@ -1651,9 +1646,6 @@ void Emitter::visit(ASTImpl *node) {
     return;
   }
 
-  // !! If we visit this here, we get 'use of undeclared identifier T'
-  // !! if we just use the resolved type, we get Type::invalid_id.
-  // !! it's a lose lose, what is causing this?
   auto target = global_get_type(node->target->resolved_type);
 
   if (!target) {
@@ -1924,3 +1916,5 @@ void Emitter::visit(ASTLambda *node) {
 void Emitter::visit(ASTWhere *node) {
   throw_error("Internal compiler error: 'where' expression was visited in the emitter", node->source_range);
 }
+
+

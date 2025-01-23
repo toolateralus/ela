@@ -660,10 +660,6 @@ std::string TypeExtensions::to_string() const {
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
   type_table.emplace_back(type_table.size(), TYPE_TUPLE);
   Type *type = &type_table.back();
-
-  //! BUG: we should allow nested tuples;
-  //! see some of the repros ("repro/14.ela" i think?)
-
   type->set_base(get_tuple_type_name(types));
 
   auto info = type_info_alloc<TupleTypeInfo>();

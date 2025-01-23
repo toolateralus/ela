@@ -113,7 +113,30 @@ Bitwise :: interface![Right] {
   and       :: fn(self, right: Right) -> #self;   //  '&' operator.
 }
 
+/* 
+  The compiler will construct this object when you do something like:
+  list := {0, 1, 2, 3, 4};
 
+  If you want your types to be constructible from these, implement the interface 'From![Collection_Initializer]`
+  You do not have to free anything, it will always be stack allocated memory. 
+  freeing the 'data' field of this will certainly crash your program.
+
+  As was said, this is basically a wrapper for a stack allocated array of homogenous-typed values.
+  Do not store a reference to this anywhere, it should only be used for constructing types that represent sequences.
+*/
+Collection_Initializer :: struct![T] {
+  data:   T*;
+  length: u64;
+}
+
+impl![T] Iterable![T] for Collection_Initializer![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: data,
+      end: data + length,
+    }
+  }
+}
 
 #foreign system :: fn(cmd: c_string) -> int;
 
@@ -229,6 +252,9 @@ impl string {
     free(self.data);
     self.length = 0;
   }
+  subscript :: fn(self*, idx: s64) -> char {
+    return self.data[idx];
+  }
 }
 
 impl Iterable![char] for string { 
@@ -283,18 +309,25 @@ impl Std_Allocator {
   }
 }
 
-
 #static print :: fn![T](str: T) {
-  printf("%s", $"{str}");
+  s := $"{str}";
+  printf("%s", s);
+  free(s);
 }
+
 #static println :: fn![T](str: T) {
-  printf("%s\n", $"{str}");
+  s := $"{str}";
+  printf("%s\n", s);
+  free(s);
 }
+
 #alias Panic_Handler :: fn *(c_string);
+
 panic_handler: Panic_Handler = fn(msg: c_string) {
   println(msg);
   exit(1);
 }
+
 #static panic :: fn(msg: c_string) {
   if !panic_handler {
     printf("No panic handler set. Exitting\n");
@@ -302,6 +335,7 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
   }
   panic_handler(msg);
 }
+
 #alias Error :: c_string;
 
 // This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
@@ -398,6 +432,8 @@ impl![T] List![T] {
   }
 }
 
+
+#def LIST_TESTS
 #ifdef LIST_TESTS {
   // TODO:
   // We need to have a way for #import'ed files to purge out their #test functions, and any code behind an #ifdef TESTING {...}
@@ -565,6 +601,20 @@ impl![T] List![T] {
   }
 }
 
+// ! This is completely broken. There is some serious issue with generics.
+// ! See `repro/59.ela`
+#ifdef COLLECTION_INITIALIZER {
+  impl![T] From![Collection_Initializer![T]] for List![T] {
+    from :: fn(init: Collection_Initializer![T]) -> #self {
+      self: #self;
+      for idx in 0..init.length {
+        self.push(init.data[idx]); // ! For some reason we can't find 'push' here??
+      }
+      return self;
+    }
+  }
+}
+
 
 Env :: struct {
   m_args: List![c_string];
@@ -588,38 +638,37 @@ impl Env {
   }
 }
 
+// Element :: struct;
+// Type :: struct {
+//   id: int;                                                // the integer ID used to identify this type.
+//   name: c_string;                                         // the type's name.
+//   size: u64;                                              // sizeof(T)
+//   flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+//   fields: List![Field*];                                  // get a list of struct fields, enum variants.
+//   elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
+//   element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
+// };
 
-Element :: struct;
-Type :: struct {
-  id: int;                                                // the integer ID used to identify this type.
-  name: c_string;                                         // the type's name.
-  size: u64;                                              // sizeof(T)
-  flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-  fields: List![Field*];                                  // get a list of struct fields, enum variants.
-  elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
-  element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
-};
+// Field :: struct {
+//   name: c_string;
+//   type: Type*;
+//   size: u64;
+//   offset: u64;
+// };
 
-Field :: struct {
-  name: c_string;
-  type: Type*;
-  size: u64;
-  offset: u64;
-};
+// impl Field {
+//   set :: fn![T, T1](target: T*, data: T1) {
+//     memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
+//   }
+//   get :: fn![T](source: T*) -> s8* {
+//     return (source as u8*) + offset;
+//   }
+// }
 
-impl Field {
-  set :: fn![T, T1](target: T*, data: T1) {
-    memcpy((target as u8*) + offset, (&data as u8*), sizeof(T1));
-  }
-  get :: fn![T](source: T*) -> s8* {
-    return (source as u8*) + offset;
-  }
-}
+// Element :: struct {
+//   data: c_string;
+//   type: Type*;
+// };
 
-Element :: struct {
-  data: c_string;
-  type: Type*;
-};
-
-#export _type_info: Type**;  
+// #export _type_info: Type**;  
 

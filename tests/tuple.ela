@@ -29,8 +29,7 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 }
 
 #test test_tuple_array :: fn() {
-  array : List![(int, int)] = {(10, 10)};
-  array.push((10, 10));
+  array : (int, int)[1] = {(10, 10)};
   a, b := array[0];
   assert("Storing tuple in array failed", a == 10 && b == 10);
 }

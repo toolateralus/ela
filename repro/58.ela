@@ -6,5 +6,5 @@
 
 main :: fn() {
   i : s64 = 5;
-  char_x := i * (5 as float);
+  char_x := i * (5.0 as s64);
 }

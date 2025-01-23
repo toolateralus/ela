@@ -1958,6 +1958,7 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
 }
 
 std::vector<ASTType *> Parser::parse_generic_arguments() {
+  auto range = begin_node();
   expect(TType::GenericBrace);
   std::vector<ASTType *> params;
   while (peek().type != TType::RBrace) {
@@ -1966,10 +1967,15 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
       expect(TType::Comma);
   }
   expect(TType::RBrace);
+  end_node(nullptr, range);
+  if (params.empty()) {
+    throw_error("![] generic arguments cannot be empty!", range);;
+  }
   return params;
 }
 
 std::vector<GenericParameter> Parser::parse_generic_parameters() {
+  auto range = begin_node();
   expect(TType::GenericBrace);
   std::vector<GenericParameter> params;
   while (peek().type != TType::RBrace) {
@@ -1978,6 +1984,10 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
       expect(TType::Comma);
   }
   expect(TType::RBrace);
+  end_node(nullptr, range);
+  if (params.empty()) {
+    throw_error("![] generic parameters cannot be empty!", range);;
+  }
   return params;
 }
 
@@ -2155,7 +2165,7 @@ Token Parser::peek() const {
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
   auto &state = states.back();
-  state.input = "#import bootstrap;\n" + state.input;
+  state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
   state.input_len = state.input.length();
   fill_buffer_if_needed();
   typer = new Typer(context);

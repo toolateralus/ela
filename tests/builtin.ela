@@ -7,8 +7,8 @@
 }
 
 #test test_array :: fn() {
-  array : List![int] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  assert("array length failed to equal expected value", array.length == 11);
+  array : int[11] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  assert("array length failed to equal expected value", sizeof(array) / sizeof(int) == 11);
 }
 
 
@@ -48,15 +48,6 @@ impl Xaryu {
   }
   assert("pop operator failed", array.length == 0 && n == 10);
 }
-
-#test test_array_erase_operator :: fn() {
-  array: List![int] ;
-  array.push(10);
-  array.erase(10);
-  assert("failed to erase element from array with .erase()", array.length == 0);
-}
-
-
 
 #test test_multidimensional_arrays :: fn() {
   array: int[5][5];

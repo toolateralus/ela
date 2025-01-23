@@ -34,7 +34,7 @@ jiggly_text :: fn(text: string, rect: Rectangle, style: Style) {
   rate := style.jiggle_rate;
 
   for i in 0..length {
-    char_x := rect.x + i * (style.font_size as float);
+    char_x := rect.x + (i * style.font_size) as float;
     char_y := rect.y + intensity * sin(rate * time + (i as float));
     temp : char[2] = { text[i], '\0' };
     DrawText(temp as c_string, char_x as int, char_y as int, style.font_size, style.foreground);
@@ -177,9 +177,10 @@ impl SliderF {
 
     // Draw the slider value
     value_text := $"{*self.value}";
-    value_text.data[self.digits_to_show] = '\0';
+    value_text[self.digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(self.text.data, self.style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    DrawText(value_text, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    free(value_text);
 
     self.adjust_slider_value();
   }
@@ -253,9 +254,10 @@ impl SliderI {
     DrawText(self.text.data, text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
     value_text := $"{*self.value}";
-    value_text.data[self.digits_to_show] = '\0';
+    value_text[self.digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(self.text.data, self.style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text.data, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    DrawText(value_text, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    free(value_text);
 
     self.adjust_slider_value();
   }

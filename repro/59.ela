@@ -1,0 +1,15 @@
+// ! This is completely broken. There is some serious issue with generics.
+impl![T] From![Collection_Initializer![T]] for List![T] {
+  from :: fn(init: Collection_Initializer![T]) -> #self {
+    self: #self;
+    for idx in 0..init.length {
+      self.push(init.data[idx]); // ! For some reason we can't find 'push' here??
+    }
+    return self;
+  }
+}
+
+main :: fn() {
+  list: List![char];
+  list.push('c');
+}
