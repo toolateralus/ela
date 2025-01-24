@@ -1,6 +1,7 @@
 
 #include <cassert>
 #include <format>
+#include <iostream>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -1300,6 +1301,11 @@ void Typer::visit(ASTLiteral *node) {
       node->resolved_type = bool_type();
       return;
     case ASTLiteral::Null:
+      // infer pointer type from decl or assign type, else we just use void*, for like n := null;
+      if (declaring_or_assigning_type != -1) {
+        node->resolved_type = declaring_or_assigning_type;
+        return;
+      }
       node->resolved_type = voidptr_type();
       return;
     case ASTLiteral::InterpolatedString: {

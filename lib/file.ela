@@ -1,9 +1,7 @@
-;
-
 _IO_FILE :: struct;
-
 #alias FILE :: _IO_FILE;
-EOF := -1;
+
+EOF :: -1;
 
 SeekPosition :: enum {
   // Seek from beginning of file.
@@ -26,6 +24,8 @@ SeekPosition :: enum {
 #foreign fprintf :: fn(stream: FILE *, format: char *, ...) -> int;
 #foreign fflush :: fn(f: FILE *);
 
+#alias FileError :: c_string;
+
 // TODO: add a way to do Binary stuff.
 #flags FileOpenFlags :: enum {
   Read,
@@ -37,11 +37,6 @@ File :: struct {
 }
 
 impl File {
-  // TODO: fix me
-  // #dtor :: fn(self*) {
-  //   if fd then close();
-  // }
-
   flush :: fn(self*) {
     fflush(self.fd);
   }
@@ -59,27 +54,29 @@ impl File {
     return len as u32;
   }
 
-  read_all :: fn(filename: string) -> (Error, string) {
-    file := fopen(filename.data, "r");
+  read_all :: fn(filename: char*) -> (FileError, c_string) {
+    file := fopen(filename, "r");
 
-    if !file then return ($"Couldn't open file {filename}", {});
+    if !file then return ($"Couldn't open file {filename}", null);
     
-    str: string;
+    str: char*;
+    length := 0;
     c: char;
     while ((c = fgetc(file)) != EOF) {
-      if str.length != 0 { 
+      if length != 0 { 
         str = $"{str}{c}";
       }
       else {
         str = $"{c}";
-      } 
+      }
+      length = strlen(str);
     }
     fclose(file);
-    return ({}, str);
+    return (null, str);
   }
 
-  read_bytes :: fn(filename: string) -> List![u8] {
-    file := fopen(filename.data, "r");
+  read_bytes :: fn(filename: c_string) -> List![u8] {
+    file := fopen(filename, "r");
     if !file then return {};
     result: List![u8];
     c: char;
@@ -90,35 +87,23 @@ impl File {
     return result;
   }
 
-  write_all :: fn(filename: string, data: string) -> Error {
-    file := fopen(filename.data, "w");
-    if !file then return $"Unable to open file {filename}";
-    fwrite(data.data, sizeof(char), data.length, file);
+  write_all :: fn(filename: c_string, data: c_string) -> FileError {
+    file := fopen(filename, "w");
+    if !file {
+      return $"Unable to open file {filename}";
+    }
+    fwrite(data, sizeof(char), strlen(data), file);
     fclose(file);
-    return string::empty();
+    return null;
   }
 
   // Used to convert our flag enum to a string for fopen/fclose etc.
-  flags_to_string :: fn(flags: int) -> string {
-    s : string;
+  flags_to_string :: fn(flags: int) -> c_string {
+    s: c_string = null;
     if (flags & FileOpenFlags::Read != 0) 
       then s = "r";
     if (flags & FileOpenFlags::Write != 0)
       then s = $"{s}w";
     return s;
-  }
-
-  open :: fn(filename: string, flags: int = FileOpenFlags::Read | FileOpenFlags::Write) -> File {
-    return File{
-      fd: fopen(filename.data, File::flags_to_string(flags).data)
-    };
-  }
-
-  read :: fn(self*, buffer: u8*, size: u64) -> u64 {
-    return fread(buffer, 1, size, self.fd);
-  }
-
-  write :: fn(self*, buffer: u8*, size: u64) -> u64 {
-    return fwrite(buffer, 1, size, self.fd);
   }
 }
