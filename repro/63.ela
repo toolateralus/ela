@@ -1,0 +1,11 @@
+func_takes_ptr :: fn![T](fn_ptr: fn * (T*) -> void, v: T*) {
+  // ! Wrong number of arguments to function, expected fn(T*, T*) -> void; ????
+  // What teh fudge
+  fn_ptr(v);
+}
+
+main :: fn() { 
+  func_takes_ptr![u32](fn(v: u32*) {
+    println(v);
+  }, null);
+}
