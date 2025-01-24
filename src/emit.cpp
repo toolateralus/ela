@@ -679,8 +679,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
 
-
-
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   auto type_tag = node->is_union ? " union " : " struct ";
@@ -832,8 +830,8 @@ void Emitter::visit(ASTProgram *node) {
   }
 
   for (auto &type: type_table) {
-    if (type.is_kind(TYPE_SCALAR) && type.get_ext().has_no_extensions()) {
-      emit_tuple_dependants(type.tuple_dependants);
+    if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions()) {
+      emit_tuple_dependants(type->tuple_dependants);
     }
   }
 

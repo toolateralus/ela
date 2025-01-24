@@ -49,10 +49,10 @@ Context::Context() {
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i].get_info()->scope) {
-      type_table[i].get_info()->scope->parent = root_scope;
+    if (type_table[i]->get_info()->scope) {
+      type_table[i]->get_info()->scope->parent = root_scope;
     }
-    root_scope->types.insert({type_table[i].get_base(), i});
+    root_scope->types.insert({type_table[i]->get_base(), i});
   }
 }
 

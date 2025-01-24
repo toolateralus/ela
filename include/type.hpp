@@ -20,7 +20,7 @@ struct ASTDeclaration;
 struct Scope;
 struct Context;
 
-extern std::vector<Type> type_table;
+extern std::vector<Type*> type_table;
 extern jstl::Arena type_info_arena;
 
 enum ConversionRule {

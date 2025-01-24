@@ -59,14 +59,14 @@ std::string FunctionTypeInfo::to_string() const {
 Type *global_get_type(const int id) {
   if (id < 0 || id > type_table.size())
     return nullptr;
-  return &type_table[id];
+  return type_table[id];
 }
 
 int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i].kind != TYPE_FUNCTION)
+    if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
-    const Type *type = &type_table[i];
+    const Type *type = type_table[i];
     if (type->type_info_equals(&info, TYPE_FUNCTION) && type->get_ext() == type_extensions) {
       return type->id;
     }
@@ -110,7 +110,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
-    auto type = &type_table[i];
+    auto type = type_table[i];
 
     if (!type->is_kind(TYPE_TUPLE))
       continue;
@@ -319,9 +319,11 @@ std::string Type::to_string() const {
 }
 
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-  std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-  type_table.emplace_back(type_table.size(), TYPE_INTERFACE);
-  Type *type = &type_table.back();
+  #ifdef PRINT_TYPE_INFO
+   std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
+  #endif
+  type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
+  Type *type = type_table.back();
   type->set_base(name);
   type->generic_args = generic_args;
   InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
@@ -331,9 +333,11 @@ int global_create_interface_type(const InternedString &name, Scope *scope, std::
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-  std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-  type_table.emplace_back(type_table.size(), TYPE_STRUCT);
-  Type *type = &type_table.back();
+  #ifdef PRINT_TYPE_INFO
+   std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
+  #endif
+  type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
+  Type *type = type_table.back();
   std::string base = name.get_str();
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
@@ -347,9 +351,11 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 }
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
-  std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-  type_table.emplace_back(type_table.size(), TYPE_TAGGED_UNION);
-  Type *type = &type_table.back();
+  #ifdef PRINT_TYPE_INFO
+   std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
+  #endif
+  type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
+  Type *type = type_table.back();
   type->set_base(name);
   TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
   info->scope = scope;
@@ -358,9 +364,11 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
 }
 
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
-  std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-  type_table.emplace_back(type_table.size(), TYPE_ENUM);
-  Type *type = &type_table.back();
+  #ifdef PRINT_TYPE_INFO
+   std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
+  #endif
+  type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
+  Type *type = type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
@@ -370,16 +378,19 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
 }
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
-  std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-  auto &type = type_table.emplace_back(type_table.size(), kind);
-  type.base_id = base_id;
-  type.set_ext(extensions);
-  type.set_base(name);
-  type.set_info(info);
+  #ifdef PRINT_TYPE_INFO
+   std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
+  #endif
+  type_table.push_back(new Type(type_table.size(), kind));
+  auto type = type_table.back();
+  type->base_id = base_id;
+  type->set_ext(extensions);
+  type->set_base(name);
+  type->set_info(info);
   if (!info->scope) {
     info->scope = create_child(root_scope);
   }
-  return type.id;
+  return type->id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
@@ -663,8 +674,8 @@ std::string TypeExtensions::to_string() const {
 }
 
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
-  type_table.emplace_back(type_table.size(), TYPE_TUPLE);
-  Type *type = &type_table.back();
+  type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
+  Type *type = type_table.back();
   type->set_base(get_tuple_type_name(types));
 
   auto info = type_info_alloc<TupleTypeInfo>();

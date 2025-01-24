@@ -30,7 +30,7 @@ jstl::Arena scope_arena{MB(333)};
 // the same for this
 jstl::Arena ast_arena{MB(333)};
 
-std::vector<Type> type_table{};
+std::vector<Type*> type_table{};
 
 
 // TODO: remove me, we want file scopes.
