@@ -1323,6 +1323,7 @@ void Typer::visit(ASTDotExpr *node) {
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
 
+
   if (!base_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
                 "expression?",
@@ -1330,6 +1331,12 @@ void Typer::visit(ASTDotExpr *node) {
   }
 
   Scope *base_scope = base_ty->get_info()->scope;
+
+  // Implicit dereference, we look at the base scope.
+  if (base_ty->get_ext().is_pointer()) {
+    base_ty = global_get_type(base_ty_id = base_ty->get_element_type());
+    base_scope = base_ty->get_info()->scope;
+  }
 
   if (!base_scope) {
     throw_error("Internal compiler error: dot expression used on a type that had a null scope", node->source_range);

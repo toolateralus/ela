@@ -81,15 +81,15 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 }
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
-  if (base < 0) {
+  if (base < 0) 
     return Type::invalid_id;
-  }
-
-  if (!type_extensions.has_extensions()) {
+  
+  if (!type_extensions.has_extensions())
     return base;
-  }
+  
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
+
   while (base_t && base_t->base_id != Type::invalid_id) {
     ext = base_t->get_ext().append(ext);
     base_t = global_get_type(base_t->base_id);
@@ -105,6 +105,11 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     if (type->equals(base_t->id, ext))
       return type->id;
   }
+  
+  // Base types have a seperate scope from the extended types now.
+  auto info = new (type_info_alloc<TypeInfo>()) TypeInfo(*base_t->get_info());
+  info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  
   return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
 }
 
