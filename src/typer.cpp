@@ -103,7 +103,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
                                      std::vector<int> generic_args) {
   auto type = global_get_type(node->resolved_type);
 
-
   auto info = (type->get_info()->as<StructTypeInfo>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
@@ -123,8 +122,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
-
-
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
@@ -143,10 +140,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   ctx.set_scope(old_scope);
   node->resolved_type = type->id;
-  
+
   if (type->is_kind(TYPE_SCALAR)) {
     throw_error("struct declaration was a scalar???", node->source_range);
-  } 
+  }
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
@@ -163,9 +160,6 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
     throw_error("Internal Compiler Error: attempting to visit body of function forward declaration.",
                 node->source_range);
   }
-  node->return_type->resolved_type = -1;
-  node->return_type->accept(this);
-  node->params->accept(this);
   block->accept(this);
   auto control_flow = block->control_flow;
   if (control_flow.type == Type::invalid_id)
@@ -327,12 +321,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     visit_function_body(method);
   }
 
-  // This is here because calling adding types tot eh type type or calling
-  // acccept on a node that may create types might reallocate the tytpe table
-  // so we have to get a pointer tot eh type again so that were adjusting the
-  // correct interfaces vector
-  target_ty = global_get_type(node->target->resolved_type);
-
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
@@ -477,6 +465,21 @@ void Typer::visit(ASTFunctionDeclaration *node) {
   visit_function_body(node);
 }
 
+bool expr_is_literal(ASTExpr *expr) {
+  switch (expr->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin_expr = static_cast<ASTBinExpr *>(expr);
+      return expr_is_literal(bin_expr->left) && expr_is_literal(bin_expr->right);
+    }
+    case AST_NODE_UNARY_EXPR:
+      return expr_is_literal(static_cast<ASTUnaryExpr *>(expr)->operand);
+    case AST_NODE_LITERAL:
+      return true;
+    default:
+      return false;
+  }
+}
+
 void Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
@@ -499,7 +502,7 @@ void Typer::visit(ASTDeclaration *node) {
     node->resolved_type = value_ty;
 
     // TODO: so, we just don't set the type if it can't be assigned to int??? what?
-    if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions()) {
+    if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions() && expr_is_literal(node->value.get())) {
       auto info = (type->get_info()->as<ScalarTypeInfo>());
       auto rule = type_conversion_rule(type, global_get_type(int_type()), node->source_range);
       if (info->is_integral && rule != CONVERT_PROHIBITED && rule != CONVERT_EXPLICIT) {
@@ -1761,7 +1764,7 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
     return -1; // Probably not a generic type?
   }
   auto declaring_node = symbol->declaring_node.get();
-  
+
   auto decl_node_type = declaring_node->get_node_type();
   switch (decl_node_type) {
     case AST_NODE_STRUCT_DECLARATION:
