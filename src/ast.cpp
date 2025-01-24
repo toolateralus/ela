@@ -702,7 +702,12 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
       dot->base = left;
-      dot->member_name = expect(TType::Identifier).value;
+      if (peek().type == TType::Integer || peek().type == TType::Identifier) {
+        dot->member_name = eat().value;
+      } else {
+        end_node(left, range);
+        throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
+      }
       left = dot;
     } else if (peek().type == TType::DoubleColon) {
       eat();
@@ -2015,7 +2020,7 @@ std::vector<ASTType *> Parser::parse_parameter_types() {
   return param_types;
 }
 
-void Parser::append_type_extensions(ASTType *node) {
+void Parser::append_type_extensions(ASTType *&node) {
   while (true) {
     if (peek().type == TType::LBrace) {
       expect(TType::LBrace);
@@ -2023,7 +2028,14 @@ void Parser::append_type_extensions(ASTType *node) {
         auto expression = parse_expr();
         node->extensions.push_back({TYPE_EXT_ARRAY, expression});
       } else {
-        throw_error("Expected a size to an array type [..]. Use List![T] for a dynamic array, for now.", node->source_range);
+        // Syntactic sugar for doing int[] instead of List![int];
+        auto type = ast_alloc<ASTType>();
+        auto iden = ast_alloc<ASTIdentifier>();
+        iden->value = "List";
+        type->kind = ASTType::NORMAL;
+        type->normal.base = iden;
+        type->normal.generic_arguments.push_back(node);
+        node = type;
       }
       expect(TType::RBrace);
     } else if (peek().type == TType::Mul) {

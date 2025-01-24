@@ -1,0 +1,20 @@
+/* 
+  * For some reason, we just cannot call methods in generic impls.
+*/
+impl![T] List![T] {
+  concat :: fn(self*, other: #self) -> #self {
+    result : #self;
+    result.resize(self.length + other.length + 1);
+    for v in *self {
+      result.push(v);
+    }
+    for v in other {
+      result.push(v);
+    }
+    return result;
+  }
+}
+
+main :: fn() { 
+  list: int[];
+}

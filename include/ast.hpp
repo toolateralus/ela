@@ -381,6 +381,7 @@ struct ASTCall : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
 struct ASTDotExpr : ASTExpr {
+
   ASTExpr *base;
   InternedString member_name;
   void accept(VisitorBase *visitor) override;
@@ -783,7 +784,7 @@ struct Parser {
   // ASTType* parsing routines
   ASTType *parse_type();
   std::vector<ASTType *> parse_parameter_types();
-  void append_type_extensions(ASTType *type);
+  void append_type_extensions(ASTType *&type);
 
   ASTType *parse_function_type();
 

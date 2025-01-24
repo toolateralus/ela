@@ -922,8 +922,11 @@ void Emitter::visit(ASTDotExpr *node) {
     op = "->";
   }
   node->base->accept(this);
-  (*ss) << op << node->member_name.get_str();
-
+  (*ss) << op;
+  if (base_ty->is_kind(TYPE_TUPLE)) {
+    (*ss) << "$";
+  }
+  (*ss) << node->member_name.get_str();
   return;
 }
 
@@ -1133,7 +1136,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
 
   if (type->is_kind(TYPE_TUPLE)) {
     auto info = type->get_info()->as<TupleTypeInfo>();
-    std::string format_str = "<";
+    std::string format_str = "(";
     int i = 0;
     for (const auto &t : info->types) {
       format_str += get_format_str(t, node);
@@ -1142,7 +1145,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
       }
       ++i;
     }
-    format_str += ">";
+    format_str += ")";
     return format_str;
   }
 
@@ -1254,9 +1257,9 @@ void Emitter::interpolate_string(ASTLiteral *node) {
       } else if (type->is_kind(TYPE_TUPLE)) {
         auto info = type->get_info()->as<TupleTypeInfo>();
         for (int i = 0; i < info->types.size(); ++i) {
-          (*ss) << "std::get<" << std::to_string(i) << ">(";
           current->expression->accept(this);
-          (*ss) << ")";
+          (*ss) << ".$" << std::to_string(i);
+
           if (i != info->types.size() - 1) {
             (*ss) << ", ";
           }

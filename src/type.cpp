@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <ranges>
 #include <sstream>
 #include <vector>
 
@@ -695,6 +696,11 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   if (ext.has_no_extensions()) {
     int eldest = *std::max_element(types.begin(), types.end());
     global_get_type(eldest)->tuple_dependants.push_back(type->id);
+  }
+
+  // We do this for dot expressions that do tuple.1 etc.
+  for (const auto [i, type]: types | std::ranges::views::enumerate) {
+    info->scope->insert(std::to_string(i), type, nullptr);
   }
   
   return type->id;
