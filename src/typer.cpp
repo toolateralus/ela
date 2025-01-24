@@ -933,8 +933,8 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   auto args_ct = node->arguments.size();
   // TODO: rewrite this. this is so hard tor read.
   if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len - info->default_params) {
-    throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}",
-                            info->params_len, args_ct),
+    throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
+                            info->params_len, args_ct, info->to_string()),
                 node->source_range);
   }
 

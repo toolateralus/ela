@@ -1011,7 +1011,6 @@ void Emitter::visit(ASTSwitch *node) {
     auto type = global_get_type(node->return_type);
     (*ss) << to_cpp_string(type);
     (*ss) << "{\n";
-    ;
   }
 
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
@@ -1039,9 +1038,8 @@ void Emitter::visit(ASTSwitch *node) {
     (*ss) << "else {";
 
     auto type = global_get_type(node->return_type);
-    (*ss) << "return " << to_cpp_string(type) << "{};";
+    (*ss) << "return " << "{};";
     (*ss) << "\n}\n";
-
     (*ss) << "}()";
   }
 
