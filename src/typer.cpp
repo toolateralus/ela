@@ -91,15 +91,6 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args
   return generic_args;
 }
 
-ASTStatement *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<int> &gen_args) {
-  for (auto &instantiation : instantiations) {
-    if (instantiation.arguments == gen_args) {
-      return instantiation.node;
-    }
-  }
-  return nullptr;
-}
-
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
   auto type = global_get_type(node->resolved_type);
@@ -297,7 +288,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
     if (!method->generic_parameters.empty()) {
-      impl_scope.insert(method->name, Type::invalid_id, method, SYMBOL_IS_FUNCTION);
+      type_scope->insert(method->name, Type::invalid_id, method, SYMBOL_IS_FUNCTION);
+      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
     visit_function_signature(method, false);
@@ -845,19 +837,39 @@ void Typer::visit(ASTWhile *node) {
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
   ASTFunctionDeclaration *declaring_function_node = nullptr;
+  node->function->accept(this);
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
   if (auto symbol = get_symbol(node->function).get()) {
-    if (!type)
+    // doing this so self will get the right type when we call generic methods
+    auto old_type = type_context;
+    Defer _([&] { type_context = old_type; });
+    auto func_node_ty = node->function->get_node_type();
+    if (func_node_ty == AST_NODE_DOT_EXPR) {
+      auto func_as_dot = static_cast<ASTDotExpr*>(node->function);
+      ASTType type_ast;
+      type_ast.resolved_type = func_as_dot->base->resolved_type;
+      type_context = &type_ast;
+    } else if (func_node_ty == AST_NODE_SCOPE_RESOLUTION) {
+      auto func_as_scope_res = static_cast<ASTScopeResolution*>(node->function);
+      ASTType type_ast;
+      type_ast.resolved_type = func_as_scope_res->base->resolved_type;
+      type_context = &type_ast;
+    }
+
+    // idk why this is here
+    if (!type) {
       type = global_get_type(symbol->type_id);
+    }
 
     if (symbol->declaring_node && symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       declaring_function_node = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
       // resolve a generic call.
       if (!node->generic_arguments.empty() ||
           (declaring_function_node && !declaring_function_node->generic_parameters.empty())) {
-        declaring_function_node = resolve_generic_function_call(node, type, declaring_function_node);
+        declaring_function_node = resolve_generic_function_call(node, declaring_function_node);
+        type = global_get_type(declaring_function_node->resolved_type);
       }
     } else {
       // ! Why does this just go unchecked? do the errors handle this case later on?
@@ -865,7 +877,6 @@ void Typer::visit(ASTCall *node) {
   } else {
     // Somehow this just fails half the time, for impls. How do impls know they need to get instantiated
     // when we can't even find the type via the names of function becuase it's not yet instantiated?
-    node->function->accept(this);
     type = global_get_type(node->function->resolved_type);
   }
 
@@ -950,7 +961,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   }
 }
 
-ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func) {
+ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
@@ -969,7 +980,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, Type
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", node->source_range);
   }
-  type = global_get_type(instantiation->resolved_type);
   instantiation->generic_arguments = generic_args;
   visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation));
   return instantiation;
@@ -1008,7 +1018,7 @@ template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T de
   if (definition->generic_parameters.size() != args.size()) {
     return nullptr;
   }
-  auto instantiation = static_cast<T>(find_generic_instance(definition->generic_instantiations, args));
+  auto instantiation = find_generic_instance(definition->generic_instantiations, args);
   if (!instantiation) {
     instantiation = static_cast<T>(deep_copy_ast(definition));
     definition->generic_instantiations.push_back({args, instantiation});

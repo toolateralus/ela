@@ -343,9 +343,10 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
+template <typename T>
 struct GenericInstance {
   std::vector<int> arguments;
-  ASTStatement *node;
+  T *node;
 };
 
 struct ASTWhere;
@@ -355,7 +356,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   bool has_defer = false;
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
+  std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   ASTParamsDecl *params;
@@ -480,7 +481,7 @@ struct ASTStructDeclaration : ASTStatement {
   std::vector<ASTDeclaration *> fields;
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
+  std::vector<GenericInstance<ASTStructDeclaration>> generic_instantiations;
   std::vector<ASTImpl *> impls;
 
   void accept(VisitorBase *visitor) override;
@@ -498,7 +499,7 @@ struct ASTInterfaceDeclaration : ASTStatement {
   InternedString name;
   Scope *scope;
   std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
+  std::vector<GenericInstance<ASTInterfaceDeclaration>> generic_instantiations;
   std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
   void accept(VisitorBase *visitor) override;
@@ -517,7 +518,7 @@ struct ASTTaggedUnionDeclaration : ASTStatement {
   InternedString name;
   Scope *scope;
   std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
+  std::vector<GenericInstance<ASTTaggedUnionDeclaration>> generic_instantiations;
   std::vector<ASTNode *> members;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
@@ -589,7 +590,7 @@ struct ASTImpl : ASTStatement {
   ASTType *target;
   Nullable<ASTType> interface;
   std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance> generic_instantiations;
+  std::vector<GenericInstance<ASTImpl>> generic_instantiations;
   Scope *scope;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
@@ -827,6 +828,16 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   auto node = new (ast_arena.allocate(sizeof(T) * n)) T();
   node->declaring_block = Parser::current_block;
   return node;
+}
+
+template <typename T>
+T *find_generic_instance(std::vector<GenericInstance<T>> instantiations, const std::vector<int> &gen_args) {
+  for (auto &instantiation : instantiations) {
+    if (instantiation.arguments == gen_args) {
+      return instantiation.node;
+    }
+  }
+  return nullptr;
 }
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \

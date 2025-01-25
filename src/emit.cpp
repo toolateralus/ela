@@ -365,21 +365,27 @@ void Emitter::visit(ASTCall *node) {
       throw_error("cannot call a static method from an instance", node->source_range);
     }
 
-    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
-    Type *function_type = global_get_type(base_symbol.get()->type_id);
-    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
     auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
     if (!base_type) {
       throw_error("Internal compiler error: unable to find method call", node->source_range);
     }
-    (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
+    (*ss) << base_type->get_base().get_str() << "_" << symbol->name.get_str();
     (*ss) << mangled_type_args(generic_args);
     (*ss) << "(";
 
+    Type *function_type = global_get_type(symbol->type_id);
+    // if generic function
+    if (!function_type) {
+      auto instance = find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
+      function_type = global_get_type(instance->resolved_type);
+    }
+    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
     if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
       // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
       (*ss) << "&";
     }
+
+    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
     base->accept(this);
     if (node->arguments->arguments.size() > 0) {
       (*ss) << ", ";
