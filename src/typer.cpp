@@ -933,9 +933,10 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   auto args_ct = node->arguments.size();
   // TODO: rewrite this. this is so hard tor read.
   if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len - info->default_params) {
-    throw_error(std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
-                            info->params_len, args_ct, info->to_string()),
-                node->source_range);
+    throw_error(
+        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
+                    info->params_len, args_ct, info->to_string()),
+        node->source_range);
   }
 
   for (int i = 0; i < args_ct; ++i) {
@@ -1095,6 +1096,9 @@ void Typer::visit(ASTType *node) {
         auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
         for (auto impl : struct_decl->impls) {
           if (impl->resolved_type == Type::invalid_id) {
+            // setting target resolved_type so that when target's visited it won't try to
+            // instatiate the impls again. otherwise, it visits them in reverse order.
+            impl->target->resolved_type = instantiation->resolved_type;
             visit_generic(&Typer::visit_impl_declaration, impl, generic_args);
           }
         }
@@ -1328,7 +1332,6 @@ void Typer::visit(ASTDotExpr *node) {
   node->base->accept(this);
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
-
 
   if (!base_ty) {
     throw_error("Internal Compiler Error: un-typed variable on lhs of dot "

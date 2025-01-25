@@ -132,8 +132,8 @@ Collection_Initializer :: struct![T] {
 impl![T] Iterable![T] for Collection_Initializer![T] {
   iter :: fn(self*) -> Iter![T] {
     return {
-      ptr: data,
-      end: data + length,
+      ptr: self.data,
+      end: self.data + self.length,
     }
   }
 }
@@ -601,17 +601,13 @@ impl![T] List![T] {
   }
 }
 
-// ! This is completely broken. There is some serious issue with generics.
-// ! See `repro/59.ela`
-#ifdef COLLECTION_INITIALIZER {
-  impl![T] From![Collection_Initializer![T]] for List![T] {
-    from :: fn(init: Collection_Initializer![T]) -> #self {
-      self: #self;
-      for idx in 0..init.length {
-        self.push(init.data[idx]); // ! For some reason we can't find 'push' here??
-      }
-      return self;
+impl![T] From![Collection_Initializer![T]] for List![T] {
+  from :: fn(init: Collection_Initializer![T]) -> #self {
+    self: #self;
+    for idx in 0..init.length {
+      self.push(init.data[idx]);
     }
+    return self;
   }
 }
 
