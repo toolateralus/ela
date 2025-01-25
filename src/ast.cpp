@@ -386,7 +386,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     },
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
         type->kind = ASTType::SELF;

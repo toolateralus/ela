@@ -10,6 +10,4 @@ main :: fn() {
   for i in 0..1024 {
     str = $"{str}{str}";
   }
-
-  n := .{ x: 10, y: 20 };
 }

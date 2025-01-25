@@ -9,7 +9,7 @@ impl Struct {
     // We need to check if it's a static method in the same impl block, so we don't have to do
     // Struct::static_method() 
     // everywhere;
-    static_method();
+    #self::static_method();
   }
 }
 
