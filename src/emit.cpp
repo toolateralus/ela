@@ -174,8 +174,7 @@ typedef unsigned char u8;
 
 )__";
 
-template <typename T>
-void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
+template <typename T> void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
   for (auto &instantiation : instantiations) {
     auto type = global_get_type(instantiation.node->resolved_type);
     for (auto type_id : instantiation.arguments) {
@@ -241,12 +240,12 @@ void Emitter::visit(ASTFor *node) {
   std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
   (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
   if (node->is_enumerable) {
-    (*ss) << range_type_str << "_enumerator(&" << range_unique_id << ");\n";
+    (*ss) << "$" + std::to_string(node->range_type) << "_enumerator(&" << range_unique_id << ");\n";
   } else {
-    (*ss) << range_type_str << "_iter(&" << range_unique_id << ");\n";
+    (*ss) << "$" + std::to_string(node->range_type) << "_iter(&" << range_unique_id << ");\n";
   }
 
-  (*ss) << indent() << "while (!" << iterable_type_str << "_done(&" << unique_id << ")) {\n";
+  (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(&" << unique_id << ")) {\n";
   indent_level++;
 
   std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
@@ -254,16 +253,17 @@ void Emitter::visit(ASTFor *node) {
 
   node->iden->accept(this);
   (*ss) << " = ";
+  auto iterable_method_str = "$" + std::to_string(node->iterable_type);
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << iterable_type_str << "_current(&" << unique_id << ");\n";
+    (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
   } else if (node->is_enumerable) { // Enumerables don't use the * value semantic.
-    (*ss) << iterable_type_str << "_current(&" << unique_id << ");\n";
+    (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
   } else {
-    (*ss) << "*" << iterable_type_str << "_current(&" << unique_id << ");\n";
+    (*ss) << "*" << iterable_method_str << "_current(&" << unique_id << ");\n";
   }
 
   // this MUST happen before the block or continue will cause a permanent hangup!!!
-  (*ss) << indent() << iterable_type_str << "_next(&" << unique_id << ");\n";
+  (*ss) << indent() << iterable_method_str << "_next(&" << unique_id << ");\n";
 
   node->block->accept(this);
 
@@ -386,7 +386,9 @@ void Emitter::visit(ASTCall *node) {
     if (!base_type) {
       throw_error("Internal compiler error: unable to find method call", node->source_range);
     }
-    (*ss) << base_type->get_base().get_str() << "_" << symbol->name.get_str();
+
+    (*ss) << "$" << std::to_string(base_type->base_id == -1 ? base_type->id : base_type->base_id) << "_"
+          << symbol->name.get_str();
     (*ss) << mangled_type_args(generic_args);
     (*ss) << "(";
 
@@ -678,7 +680,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
     emit_generic_instantiations(node->generic_instantiations);
     return;
   }
-  
+
   node->is_emitted = true;
 
   for (auto field : node->fields) {
@@ -690,7 +692,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
       type->declaring_node.get()->accept(this);
     }
   }
-
 
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
@@ -872,12 +873,12 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-      code << R"__(
-int main (int argc, char** argv) {
-  Env_initialize(argc, argv);
+      code << std::format(R"__(
+int main (int argc, char** argv) {{
+  ${}_initialize(argc, argv);
   __ela_main_();
-}
-)__";
+}}
+)__", ctx.scope->find_type_id("Env", {}));
     } // C calls main() for freestanding
   }
 
@@ -1643,13 +1644,17 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 
 void Emitter::visit(ASTScopeResolution *node) {
   bool emitted = false;
-  if (node->base->get_node_type() == AST_NODE_TYPE) {
-    auto t = static_cast<ASTType *>(node->base);
-    auto type = global_get_type(t->resolved_type);
+  // TODO: Why is this even neccesary now??
+  // I am pretty sure this would work just fine without this hack
+  auto type = global_get_type(node->base->resolved_type);
+  // for static function aclls and enum access, but this probably encompasses all of the usage.
+  if (node->base->get_node_type() == AST_NODE_IDENTIFIER || node->base->get_node_type() == AST_NODE_TYPE) {
     if (type->is_kind(TYPE_ENUM)) {
       (*ss) << type->get_base().get_str();
-      emitted = true;
+    } else {
+      (*ss) << "$" + std::to_string(type->id);
     }
+    emitted = true;
   }
   if (!emitted) {
     node->base->accept(this);
@@ -1803,8 +1808,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
     std::string name;
     if (type_context) {
-      auto type = global_get_type(type_context.get()->resolved_type);
-      name += to_cpp_string(type) + "_";
+      name += "$" + std::to_string(type_context.get()->resolved_type) + "_";
     }
     name += node->name.get_str();
     if (!node->generic_arguments.empty()) {
