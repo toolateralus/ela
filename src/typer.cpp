@@ -59,13 +59,13 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       dotnode->base->accept(this);
       auto type = global_get_type(dotnode->base->resolved_type);
-      auto scope = type->get_info()->scope;
+      auto symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
       // Implicit dereference, we look at the base scope.
-      if (type->get_ext().is_pointer()) {
+      if (!symbol && type->get_ext().is_pointer()) {
         type = global_get_type(type->get_element_type());
-        scope = type->get_info()->scope;
+        symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
       }
-      return scope->local_lookup(dotnode->member_name);
+      return symbol;
     } break;
     case AST_NODE_SCOPE_RESOLUTION: {
       auto srnode = static_cast<ASTScopeResolution *>(node);
@@ -842,43 +842,43 @@ void Typer::visit(ASTWhile *node) {
 
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
-  ASTFunctionDeclaration *declaring_function_node = nullptr;
+  ASTFunctionDeclaration *func_decl = nullptr;
   node->function->accept(this);
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
   if (auto symbol = get_symbol(node->function).get()) {
-    // doing this so self will get the right type when we call generic methods
-    auto old_type = type_context;
-    Defer _([&] { type_context = old_type; });
-    auto func_node_ty = node->function->get_node_type();
-    if (func_node_ty == AST_NODE_DOT_EXPR) {
-      auto func_as_dot = static_cast<ASTDotExpr*>(node->function);
-      ASTType type_ast;
-      type_ast.resolved_type = func_as_dot->base->resolved_type;
-      type_context = &type_ast;
-    } else if (func_node_ty == AST_NODE_SCOPE_RESOLUTION) {
-      auto func_as_scope_res = static_cast<ASTScopeResolution*>(node->function);
-      ASTType type_ast;
-      type_ast.resolved_type = func_as_scope_res->base->resolved_type;
-      type_context = &type_ast;
-    }
-
-    // idk why this is here
     if (!type) {
       type = global_get_type(symbol->type_id);
     }
 
     if (symbol->declaring_node && symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      declaring_function_node = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+      func_decl = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+
       // resolve a generic call.
-      if (!node->generic_arguments.empty() ||
-          (declaring_function_node && !declaring_function_node->generic_parameters.empty())) {
-        declaring_function_node = resolve_generic_function_call(node, declaring_function_node);
-        type = global_get_type(declaring_function_node->resolved_type);
+      if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
+        // doing this so self will get the right type when we call generic methods
+        auto old_type = type_context;
+        Defer _([&] { type_context = old_type; });
+        auto func_node_ty = node->function->get_node_type();
+        ASTType type_ast;
+        if (func_node_ty == AST_NODE_DOT_EXPR) {
+          auto func_as_dot = static_cast<ASTDotExpr *>(node->function);
+          auto type = global_get_type(func_as_dot->base->resolved_type);
+          if (!type->get_info()->scope->local_lookup(func_as_dot->member_name) && type->get_ext().is_pointer()) {
+            type = global_get_type(type->get_element_type());
+          }
+          type_ast.resolved_type = type->id;
+          type_context = &type_ast;
+        } else if (func_node_ty == AST_NODE_SCOPE_RESOLUTION) {
+          auto func_as_scope_res = static_cast<ASTScopeResolution *>(node->function);
+          type_ast.resolved_type = func_as_scope_res->base->resolved_type;
+          type_context = &type_ast;
+        }
+
+        func_decl = resolve_generic_function_call(node, func_decl);
       }
-    } else {
-      // ! Why does this just go unchecked? do the errors handle this case later on?
+      type = global_get_type(func_decl->resolved_type);
     }
   } else {
     // Somehow this just fails half the time, for impls. How do impls know they need to get instantiated
@@ -897,15 +897,15 @@ void Typer::visit(ASTCall *node) {
 
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
-  if (declaring_function_node) {
+  if (func_decl) {
     bool skip_first = false;
     if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-      if (!declaring_function_node->params->has_self) {
+      if (!func_decl->params->has_self) {
         throw_error("Calling static methods with instance not allowed", node->source_range);
       }
       skip_first = true;
     }
-    type_check_args_from_params(node->arguments, declaring_function_node->params, skip_first);
+    type_check_args_from_params(node->arguments, func_decl->params, skip_first);
   } else {
     type_check_args_from_info(node->arguments, info);
   }
