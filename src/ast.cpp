@@ -1598,10 +1598,10 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   // check for definition.
   {
     auto sym = ctx.scope->local_lookup(name.value);
-    if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) != 0) {
+    if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
       end_node(nullptr, range);
       throw_error(std::format("Redefinition of function {}", name.value), range);
-    };
+    }
   }
 
   ctx.scope->insert(name.value, Type::invalid_id, function, SYMBOL_IS_FUNCTION);
@@ -1613,14 +1613,13 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     function->return_type = parse_type();
   }
 
-
   if (peek().type == TType::Where) {
     function->where_clause = parse_where_clause();
   }
 
-
   if (peek().type == TType::Semi) {
     function->flags |= FUNCTION_IS_FORWARD_DECLARED;
+    auto sym = ctx.scope->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
     end_node(function, range);
     current_func_decl = last_func_decl;
     return function;
@@ -1730,7 +1729,6 @@ ASTImpl *Parser::parse_impl() {
     node->generic_parameters = parse_generic_parameters();
   }
 
-
   current_impl_decl = node;
   auto target = parse_type();
 
@@ -1758,7 +1756,7 @@ ASTImpl *Parser::parse_impl() {
   }
   auto block = parse_block(node->scope);
   end_node(node, range);
-  
+
   // TODO: maybe do this differently
   // this is just so you can't call methods directly from within an impl without self
   node->scope->symbols.clear();
@@ -1799,7 +1797,6 @@ ASTWhere *Parser::parse_where_clause() {
   }
   return node;
 }
-
 
 void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
   for (const auto &statement : statements) {
@@ -1911,7 +1908,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->scope->types[param] = -2;
   }
 
-  // TODO: 
+  // TODO:
   //  I think struct fields should just be comma seperated.
   //  Having semicolons makes little sense and is very unintuitive:
   //  I always have to correct myself when I place semi's in there.
@@ -1986,7 +1983,8 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
   expect(TType::RBrace);
   end_node(nullptr, range);
   if (params.empty()) {
-    throw_error("![] generic arguments cannot be empty!", range);;
+    throw_error("![] generic arguments cannot be empty!", range);
+    ;
   }
   return params;
 }
@@ -2003,7 +2001,8 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   expect(TType::RBrace);
   end_node(nullptr, range);
   if (params.empty()) {
-    throw_error("![] generic parameters cannot be empty!", range);;
+    throw_error("![] generic parameters cannot be empty!", range);
+    ;
   }
   return params;
 }

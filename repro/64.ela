@@ -1,0 +1,4 @@
+func :: fn() {}
+func :: fn() {}
+
+main :: fn() { }
