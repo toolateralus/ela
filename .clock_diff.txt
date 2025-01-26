@@ -1,11 +1,11 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  226            115           1859
-src/emit.cpp                                 232             60           1674
-src/typer.cpp                                210             70           1553
+src/ast.cpp                                  222            115           1862
+src/emit.cpp                                 232             63           1672
+src/typer.cpp                                210             72           1557
 include/ast.hpp                               97             23            735
-src/type.cpp                                  97             61            675
+src/type.cpp                                 100             61            699
 src/ast_copier.cpp                            21              0            474
 include/lex.hpp                               41              4            319
 include/type.hpp                              59             18            285
@@ -19,11 +19,11 @@ include/scope.hpp                             27              4            129
 src/constexpr.cpp                              2              0            101
 src/main.cpp                                  25             14             83
 src/scope.cpp                                 12              2             71
+include/interned_string.hpp                   11              0             69
 include/ast_copier.hpp                         5              0             57
-include/interned_string.hpp                   10              0             57
 src/visitor.cpp                                7             14             46
 include/strings.hpp                           10              1             43
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1254            416           9349
+SUM:                                        1254            421           9390
 -----------------------------------------------------------------------------------------

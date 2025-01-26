@@ -1643,20 +1643,17 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 }
 
 void Emitter::visit(ASTScopeResolution *node) {
-  bool emitted = false;
-  // TODO: Why is this even neccesary now??
-  // I am pretty sure this would work just fine without this hack
   auto type = global_get_type(node->base->resolved_type);
   // for static function aclls and enum access, but this probably encompasses all of the usage.
+  // The reason we check here, is because the left of this may be another Scope Resolution node.
+  // This should probably be a lot more robust
   if (node->base->get_node_type() == AST_NODE_IDENTIFIER || node->base->get_node_type() == AST_NODE_TYPE) {
     if (type->is_kind(TYPE_ENUM)) {
       (*ss) << type->get_base().get_str();
     } else {
       (*ss) << "$" + std::to_string(type->id);
     }
-    emitted = true;
-  }
-  if (!emitted) {
+  } else {
     node->base->accept(this);
   }
   auto op = "_";
