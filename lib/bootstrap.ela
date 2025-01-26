@@ -431,8 +431,76 @@ impl![T] List![T] {
   }
 }
 
+impl![T] From![Collection_Initializer![T]] for List![T] {
+  from :: fn(init: Collection_Initializer![T]) -> #self {
+    self: #self;
+    for idx in 0..init.length {
+      self.push(init.data[idx]);
+    }
+    return self;
+  }
+}
 
-#def LIST_TESTS
+Env :: struct {
+  m_args: List![c_string];
+};
+
+impl Env {
+  current :: fn() -> #self* {
+    #static self: #self;
+    return &self;
+  }
+
+  args :: fn() -> List![c_string] {
+    return #self::current().m_args.clone();
+  }
+
+  initialize :: fn(argc: s32, argv: c_string*) {
+    self := #self::current();
+    for i in 0..argc {
+      self.m_args.push(argv[i]);
+    }
+  }
+}
+
+// Element :: struct;
+// Type :: struct;
+
+// Field :: struct {
+//   name: c_string;
+//   type: Type*;
+//   size: u64;
+//   offset: u64;
+// };
+
+// Type :: struct {
+//   id: int;                                                // the integer ID used to identify this type.
+//   name: c_string;                                         // the type's name.
+//   size: u64;                                              // sizeof(T)
+//   flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+//   // ! Doing Field* here makes it so the generic instantiation fails.
+//   fields: List![Field*];                                  // get a list of struct fields, enum variants.
+//   elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
+//   element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
+// };
+
+// impl Field {
+//   set :: fn![T, T1](self*, target: T*, data: T1) {
+//     memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
+//   }
+//   get :: fn![T](self*, source: T*) -> u8* {
+//     return (source as u8*) + self.offset;
+//   }
+// }
+
+// Element :: struct {
+//   data: c_string;
+//   type: Type*;
+// };
+
+// #export _type_info: Type**;  
+
+
 #ifdef LIST_TESTS {
   // TODO:
   // We need to have a way for #import'ed files to purge out their #test functions, and any code behind an #ifdef TESTING {...}
@@ -599,74 +667,3 @@ impl![T] List![T] {
     assert("List failed to deinit", array.data == null && array.length == 0);
   }
 }
-
-impl![T] From![Collection_Initializer![T]] for List![T] {
-  from :: fn(init: Collection_Initializer![T]) -> #self {
-    self: #self;
-    for idx in 0..init.length {
-      self.push(init.data[idx]);
-    }
-    return self;
-  }
-}
-
-
-Env :: struct {
-  m_args: List![c_string];
-};
-
-impl Env {
-  current :: fn() -> #self* {
-    #static self: #self;
-    return &self;
-  }
-
-  args :: fn() -> List![c_string] {
-    return #self::current().m_args.clone();
-  }
-
-  initialize :: fn(argc: s32, argv: c_string*) {
-    self := #self::current();
-    for i in 0..argc {
-      self.m_args.push(argv[i]);
-    }
-  }
-}
-
-// Element :: struct;
-// Type :: struct;
-
-// Field :: struct {
-//   name: c_string;
-//   type: Type*;
-//   size: u64;
-//   offset: u64;
-// };
-
-// Type :: struct {
-//   id: int;                                                // the integer ID used to identify this type.
-//   name: c_string;                                         // the type's name.
-//   size: u64;                                              // sizeof(T)
-//   flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-//   // ! Doing Field* here makes it so the generic instantiation fails.
-//   fields: List![Field*];                                  // get a list of struct fields, enum variants.
-//   elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
-//   element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
-// };
-
-// impl Field {
-//   set :: fn![T, T1](self*, target: T*, data: T1) {
-//     memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
-//   }
-//   get :: fn![T](self*, source: T*) -> u8* {
-//     return (source as u8*) + self.offset;
-//   }
-// }
-
-// Element :: struct {
-//   data: c_string;
-//   type: Type*;
-// };
-
-// #export _type_info: Type**;  
-
