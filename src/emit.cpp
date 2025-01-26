@@ -1,4 +1,3 @@
-
 #include <functional>
 #include <ostream>
 #include <sstream>
@@ -174,6 +173,24 @@ typedef unsigned char u8;
 #endif
 
 )__";
+
+template <typename T>
+void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
+  for (auto &instantiation : instantiations) {
+    auto type = global_get_type(instantiation.node->resolved_type);
+    for (auto type_id : instantiation.arguments) {
+      auto type = global_get_type(type_id);
+      if (type->base_id != Type::invalid_id) {
+        type = global_get_type(type->base_id);
+      }
+      if (type->declaring_node) {
+        type->declaring_node.get()->accept(this);
+      }
+    }
+    instantiation.node->accept(this);
+    emit_tuple_dependants(type->tuple_dependants);
+  }
+}
 
 void Emitter::visit(ASTWhile *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
@@ -658,23 +675,15 @@ void Emitter::visit(ASTStructDeclaration *node) {
   }
 
   if (!node->generic_parameters.empty()) {
-    for (auto &instantiation : node->generic_instantiations) {
-      auto type = global_get_type(instantiation.node->resolved_type);
-      static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
-      for (auto type_id : instantiation.arguments) {
-        auto type = global_get_type(type_id);
-        if (type->declaring_node) {
-          type->declaring_node.get()->accept(this);
-        }
-      }
-      instantiation.node->accept(this);
-      emit_tuple_dependants(type->tuple_dependants);
-    }
+    emit_generic_instantiations(node->generic_instantiations);
     return;
   }
 
   for (auto field : node->fields) {
     auto type = global_get_type(field->type->resolved_type);
+    if (type->base_id != Type::invalid_id) {
+      type = global_get_type(type->base_id);
+    }
     if (type->declaring_node) {
       type->declaring_node.get()->accept(this);
     }
@@ -1651,15 +1660,7 @@ void Emitter::visit(ASTScopeResolution *node) {
 
 void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
-    for (auto &instantiation : node->generic_instantiations) {
-      for (auto type_id : instantiation.arguments) {
-        auto type = global_get_type(type_id);
-        if (type->declaring_node) {
-          type->declaring_node.get()->accept(this);
-        }
-      }
-      instantiation.node->accept(this);
-    }
+    emit_generic_instantiations(node->generic_instantiations);
     return;
   }
 
@@ -1774,15 +1775,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
-      for (auto &instantiation : node->generic_instantiations) {
-        for (auto type_id : instantiation.arguments) {
-          auto type = global_get_type(type_id);
-          if (type->declaring_node) {
-            type->declaring_node.get()->accept(this);
-          }
-        }
-        instantiation.node->accept(this);
-      }
+      emit_generic_instantiations(node->generic_instantiations);
       return;
     }
     auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;

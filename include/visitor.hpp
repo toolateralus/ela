@@ -21,16 +21,12 @@ struct VisitorBase {
 };
 
 struct Typer : VisitorBase {
-
   Nullable<ASTType> type_context = nullptr;
   int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
 
-  template <typename T>
-  using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
-  template <typename T>
-  T visit_generic(VisitorMethod<T> visit_method, T declaring_node,
-                    std::vector<int> args);
+  template <typename T> using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
+  template <typename T> T visit_generic(VisitorMethod<T> visit_method, T declaring_node, std::vector<int> args);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
@@ -38,7 +34,8 @@ struct Typer : VisitorBase {
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
 
-  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args, const SourceRange &source_range);
+  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
+                           const SourceRange &source_range);
 
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
@@ -61,11 +58,10 @@ struct Typer : VisitorBase {
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
   void visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
-                                 std::vector<int> generic_args = {});
+                                std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
-                               std::vector<int> generic_args = {});
-  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
-                              std::vector<int> generic_args = {});
+                                std::vector<int> generic_args = {});
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node);
@@ -119,14 +115,15 @@ struct DeferBlock {
 };
 
 struct Emitter : VisitorBase {
+  template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
   void emit_deferred_statements(DeferBlockType type);
-  static constexpr const char * defer_return_value_key = "$defer$return$value";
+  static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_args = false;
   int num_tests = 0;
 
-  void emit_tuple_dependants(std::vector<int>& types);
+  void emit_tuple_dependants(std::vector<int> &types);
 
   Nullable<ASTType> type_context;
 
@@ -136,9 +133,9 @@ struct Emitter : VisitorBase {
   bool emitting_function_with_defer = false;
 
   // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
-  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
-  std::deque<DeferBlock> defer_blocks {};
-
+  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched
+  // into that block.
+  std::deque<DeferBlock> defer_blocks{};
 
   std::stringstream code{};
   std::stringstream *ss{};
@@ -203,7 +200,7 @@ struct Emitter : VisitorBase {
 
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
-  
+
   int get_expr_left_type_sr_dot(ASTNode *node);
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
