@@ -1758,6 +1758,10 @@ ASTImpl *Parser::parse_impl() {
   }
   auto block = parse_block(node->scope);
   end_node(node, range);
+  
+  // TODO: maybe do this differently
+  // this is just so you can't call methods directly from within an impl without self
+  node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
