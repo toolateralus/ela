@@ -376,7 +376,8 @@ void Emitter::visit(ASTCall *node) {
     Type *function_type = global_get_type(symbol->type_id);
     // if generic function
     if (!function_type) {
-      auto instance = find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
+      auto instance =
+          find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
       function_type = global_get_type(instance->resolved_type);
     }
     auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
@@ -562,7 +563,6 @@ void Emitter::visit(ASTDeclaration *node) {
     (*ss) << "extern ";
     emit_default_init = false;
   }
-
   if (node->is_static) {
     (*ss) << "static ";
   }
@@ -835,8 +835,8 @@ void Emitter::visit(ASTProgram *node) {
     code << "#define TESTING\n";
   }
 
-  for (auto &type: type_table) {
-    if (type->is_kind(TYPE_SCALAR)) {
+  for (auto &type : type_table) {
+    if (type->is_kind(TYPE_SCALAR) || type->is_kind(TYPE_FUNCTION)) {
       emit_tuple_dependants(type->tuple_dependants);
     }
   }
@@ -1065,33 +1065,33 @@ void Emitter::visit(ASTTuple *node) {
   (*ss) << "}";
   return;
 }
+
 void Emitter::visit(ASTTupleDeconstruction *node) {
   emit_line_directive(node);
-  if (node->op == TType::ColonEquals) {
-    (*ss) << "auto [";
-    for (auto &iden : node->idens) {
-      (*ss) << iden->value.get_str();
-      if (iden != node->idens.back()) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << "] = ";
-    node->right->accept(this);
-    (*ss) << ";\n";
-  } else {
-    (*ss) << "std::tie(";
-    for (auto &iden : node->idens) {
-      (*ss) << iden->value.get_str();
-      if (iden != node->idens.back()) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << ") = ";
-    node->right->accept(this);
-    (*ss) << ";\n";
+
+  auto block = node->declaring_block;
+  if (!block) {
+    throw_error("Internal compiler error: couldn't generate temporary variable because declaring block was null",
+                node->source_range);
   }
-  return;
-};
+  auto id = block.get()->temp_iden_idx++;
+  std::string temp_id = "$temp_tuple$" + std::to_string(id++);
+  (*ss) << "auto " << temp_id << " = ";
+  node->right->accept(this);
+  (*ss) << ";\n";
+
+  if (node->op == TType::ColonEquals) {
+    for (size_t i = 0; i < node->idens.size(); ++i) {
+      (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
+      (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+    }
+  } else {
+    for (size_t i = 0; i < node->idens.size(); ++i) {
+      (*ss) << node->idens[i]->value.get_str() << " = ";
+      (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+    }
+  }
+}
 
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*/u8*
@@ -1113,7 +1113,8 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
 
     return get_function_pointer_type_string(type, &identifier);
   }
-  auto base = type->get_base().get_str();;
+  auto base = type->get_base().get_str();
+  ;
   tss << to_cpp_string(global_get_type(type->get_element_type()));
   if (!type->get_ext().is_fixed_sized_array()) {
     tss << name << ' ';
@@ -1950,9 +1951,13 @@ void Emitter::emit_tuple_dependants(std::vector<int> &types) {
     (*ss) << "typedef struct {";
     auto info = type->get_info()->as<TupleTypeInfo>();
     for (int i = 0; i < info->types.size(); ++i) {
-      auto type = info->types[i];
-      auto name = to_cpp_string(global_get_type(type));
-      (*ss) << name << " $" << std::to_string(i) << ";\n";
+      auto type = global_get_type(info->types[i]);
+      if (type->is_kind(TYPE_FUNCTION)) {
+        (*ss) << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+      } else {
+        auto name = to_cpp_string(type);
+        (*ss) << name << " $" << std::to_string(i) << ";\n";
+      }
     }
     (*ss) << "} " << name << ";\n";
     // We have to do this recursively for nested tuples.

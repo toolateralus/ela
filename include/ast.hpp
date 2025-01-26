@@ -139,6 +139,7 @@ inline static std::string block_flags_to_string(int flags) {
 }
 
 struct ASTBlock : ASTStatement {
+  size_t temp_iden_idx = 0;
   ASTNode *parent;
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
