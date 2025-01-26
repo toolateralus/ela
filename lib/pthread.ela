@@ -135,7 +135,7 @@ impl Thread {
   start :: fn(start_function: ThreadFunction, arg: void*) -> #self {
     self: #self;
     // this memory gets deleted in start_thread();
-    parameters : (ThreadFunction, void*)* = malloc(#type((ThreadFunction, void*)).size);
+    parameters : (ThreadFunction, void*)* = malloc(sizeof((ThreadFunction, void*)));
     *parameters = (start_function, arg);
     pthread_create(&self.handle, null, &start_thread, parameters);
     return self;
