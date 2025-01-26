@@ -108,10 +108,37 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   }
   
   // Base types have a seperate scope from the extended types now.
-  auto info = new (type_info_alloc<TypeInfo>()) TypeInfo(*base_t->get_info());
+
+  TypeInfo *info= nullptr;
+  switch (base_t->kind) {
+    case TYPE_SCALAR:{
+      info = new (type_info_alloc<ScalarTypeInfo>()) ScalarTypeInfo(*base_t->get_info()->as<ScalarTypeInfo>());
+    } break;
+    case TYPE_FUNCTION:{
+      info = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(*base_t->get_info()->as<FunctionTypeInfo>());
+    } break;
+    case TYPE_STRUCT:{
+      info = new (type_info_alloc<StructTypeInfo>()) StructTypeInfo(*base_t->get_info()->as<StructTypeInfo>());
+    } break;
+    case TYPE_ENUM:{
+      info = new (type_info_alloc<EnumTypeInfo>()) EnumTypeInfo(*base_t->get_info()->as<EnumTypeInfo>());
+    } break;
+    case TYPE_TUPLE:{
+      info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
+    } break;
+    case TYPE_TAGGED_UNION:{
+      info = new (type_info_alloc<TaggedUnionTypeInfo>()) TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
+    } break;
+    case TYPE_INTERFACE:{
+      info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
+    } break;
+  }
+  
+  assert(info && "Copying type info for extended type failed");
+  
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   
-  return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
+  return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions) {

@@ -89,7 +89,7 @@ impl Xaryu {
 
 #test test_range_var :: fn() {
   r : Range = 0..10;
-  assert("range variable failed", r.first == 0 && r.last == 10);
+  assert("range variable failed", r.begin == 0 && r.end == 10);
 
   i: int;
   for z in r {

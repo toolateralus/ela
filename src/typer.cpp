@@ -60,6 +60,11 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
       dotnode->base->accept(this);
       auto type = global_get_type(dotnode->base->resolved_type);
       auto scope = type->get_info()->scope;
+      // Implicit dereference, we look at the base scope.
+      if (type->get_ext().is_pointer()) {
+        type = global_get_type(type->get_element_type());
+        scope = type->get_info()->scope;
+      }
       return scope->local_lookup(dotnode->member_name);
     } break;
     case AST_NODE_SCOPE_RESOLUTION: {
