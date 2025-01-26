@@ -678,6 +678,8 @@ void Emitter::visit(ASTStructDeclaration *node) {
     emit_generic_instantiations(node->generic_instantiations);
     return;
   }
+  
+  node->is_emitted = true;
 
   for (auto field : node->fields) {
     auto type = global_get_type(field->type->resolved_type);
@@ -689,7 +691,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
     }
   }
 
-  node->is_emitted = true;
 
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
