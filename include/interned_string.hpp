@@ -10,7 +10,10 @@
 
 struct InternedString {
   size_t hash;
-  std::string *str_ptr; // TODO: Remove this once we're done debugging the compiler!!
+
+#ifdef DEBUG
+  std::string *str_ptr; // TODO: Remove this once we're done debugging the compiler
+#endif
   using InternedStringTable = std::unordered_map<size_t, std::unique_ptr<std::string>>;
 
   InternedString() = default;
@@ -20,7 +23,13 @@ struct InternedString {
     return table;
   }
 
-  std::string get_str() const { return *str_ptr; }
+  std::string get_str() const { 
+  #ifdef DEBUG
+    return *str_ptr;
+  #else 
+    return *table()[hash];
+  #endif
+  }
 
   inline void insert_or_set(const std::string &value) {
     hash = std::hash<std::string>()(value);
@@ -28,9 +37,13 @@ struct InternedString {
     auto it = tbl.find(hash);
     if (it == tbl.end()) {
       auto [new_it, inserted] = tbl.emplace(hash, std::make_unique<std::string>(value));
+      #ifdef DEBUG
       str_ptr = new_it->second.get();
+      #endif
     } else {
+      #ifdef DEBUG
       str_ptr = it->second.get();
+      #endif
     }
   }
 

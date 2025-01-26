@@ -7,7 +7,6 @@
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
-#include "string_builder.hpp"
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
