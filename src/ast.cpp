@@ -1939,6 +1939,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   }
   auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr));
   auto scope = create_child(ctx.scope);
+  ctx.set_scope(scope);
 
   expect(TType::LCurly);
 
@@ -1972,7 +1973,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       expect(TType::Comma);
   }
   node->name = name.value;
-  node->scope = scope;
+  node->scope = ctx.exit_scope();
   type->get_info()->scope = scope;
   node->resolved_type = type->id;
   expect(TType::RCurly);

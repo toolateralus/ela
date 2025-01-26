@@ -60,6 +60,8 @@ struct Typer : VisitorBase {
                                 std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
+  void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
+                                      std::vector<int> generic_args = {});
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});

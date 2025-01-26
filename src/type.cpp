@@ -383,13 +383,14 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
   return type->id;
 }
 
-int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
+int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
   #ifdef PRINT_TYPE_INFO
    std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
   #endif
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
-  type->set_base(name);
+  type->set_base(name.get_str() + mangled_type_args(generic_args));
+  type->generic_args = generic_args;
   TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
   info->scope = scope;
   type->set_info(info);

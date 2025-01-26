@@ -526,7 +526,7 @@ struct ASTTaggedUnionVariant {
 
 struct ASTTaggedUnionDeclaration : ASTStatement {
   InternedString name;
-  ASTWhere *where_clause;
+  Nullable<ASTWhere> where_clause;
   Scope *scope;
   std::vector<ASTTaggedUnionVariant> variants;
   std::vector<GenericParameter> generic_parameters;
