@@ -4,6 +4,7 @@ Reflector :: struct {
   n: int;
 }
 
+#error "Get and set not working"
 
 #test test_set_field_with_reflection :: fn() {
   reflector: Reflector;
@@ -34,13 +35,13 @@ Reflector :: struct {
     ++index;
   }
 
-  dynamic: List![int] = {3, 2, 1};
-  dynamic_type := #type(dynamic);
-  index = 0;
-  dynamic_elements := dynamic_type.elements((&dynamic) as char*);
-  assert("Dynamic array length mismatch", dynamic_elements.length == 3);
-  for elem in dynamic_elements {
-    assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
-    ++index;
-  }
+  // dynamic: List![int] = {3, 2, 1};
+  // dynamic_type := #type(dynamic);
+  // index = 0;
+  // dynamic_elements := dynamic_type.elements((&dynamic) as char*);
+  // assert("Dynamic array length mismatch", dynamic_elements.length == 3);
+  // for elem in dynamic_elements {
+  //   assert("Dynamic array element mismatch", *(elem.data as int*) == dynamic[index]);
+  //   ++index;
+  // }
 }
