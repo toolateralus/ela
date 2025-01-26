@@ -1934,21 +1934,49 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
+  if (peek().type == TType::Where) {
+    node->where_clause = parse_where_clause();
+  }
   auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr));
   auto scope = create_child(ctx.scope);
-  auto block = parse_block(scope);
-  for (const auto &stmt : block->statements) {
-    if (stmt->get_node_type() == AST_NODE_STRUCT_DECLARATION || stmt->get_node_type() == AST_NODE_DECLARATION) {
-      node->members.push_back(stmt);
+
+  expect(TType::LCurly);
+
+  while (peek().type != TType::RCurly) {
+    ASTTaggedUnionVariant variant;
+    variant.name = expect(TType::Identifier).value;
+    if (peek().type == TType::Comma || peek().type == TType::RCurly) {
+      variant.kind = ASTTaggedUnionVariant::NORMAL;
+      node->variants.push_back(variant);
+    } else if (peek().type == TType::LCurly) {
+      variant.kind = ASTTaggedUnionVariant::STRUCT;
+      eat();
+      while (peek().type != TType::RCurly) {
+        variant.struct_declarations.push_back(parse_declaration());
+        if (peek().type == TType::Comma) {
+          eat();
+        }
+      }
+      expect(TType::RCurly);
+      node->variants.push_back(variant);
+    } else if (peek().type == TType::LParen) {
+      variant.kind = ASTTaggedUnionVariant::TUPLE;
+      variant.tuple = parse_type();
+      assert(variant.tuple->kind == ASTType::TUPLE);
+      node->variants.push_back(variant);
     } else {
-      throw_error("invalid node type in tagged union: only struct-like and field-like variants allowed.",
-                  stmt->source_range);
+      end_node(node, range);
+      throw_error("Unexpected token in tagged union declaration", node->source_range);
     }
+    if (peek().type != TType::RCurly)
+      expect(TType::Comma);
   }
   node->name = name.value;
   node->scope = scope;
   type->get_info()->scope = scope;
   node->resolved_type = type->id;
+  expect(TType::RCurly);
+  end_node(node, range);
   return node;
 }
 

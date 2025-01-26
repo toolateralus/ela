@@ -344,8 +344,7 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
-template <typename T>
-struct GenericInstance {
+template <typename T> struct GenericInstance {
   std::vector<int> arguments;
   T *node;
 };
@@ -383,7 +382,6 @@ struct ASTCall : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
 struct ASTDotExpr : ASTExpr {
-
   ASTExpr *base;
   InternedString member_name;
   void accept(VisitorBase *visitor) override;
@@ -515,12 +513,24 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
+struct ASTTaggedUnionVariant {
+  enum Kind {
+    NORMAL,
+    TUPLE,
+    STRUCT,
+  } kind;
+  ASTType *tuple;
+  std::vector<ASTDeclaration *> struct_declarations;
+  InternedString name;
+};
+
 struct ASTTaggedUnionDeclaration : ASTStatement {
   InternedString name;
+  ASTWhere *where_clause;
   Scope *scope;
+  std::vector<ASTTaggedUnionVariant> variants;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTTaggedUnionDeclaration>> generic_instantiations;
-  std::vector<ASTNode *> members;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
 };

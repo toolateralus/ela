@@ -477,9 +477,25 @@ ASTTaggedUnionDeclaration *ASTCopier::copy_tagged_union_declaration(ASTTaggedUni
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  new_node->members.clear();
-  for (auto member : node->members) {
-    new_node->members.push_back(copy_node(member));
+  new_node->variants.clear();
+  for (const auto &variant : node->variants) {
+    ASTTaggedUnionVariant new_variant;
+    new_variant.kind = variant.kind;
+    new_variant.name = variant.name;
+    switch (variant.kind) {
+      case ASTTaggedUnionVariant::NORMAL:
+        break;
+      case ASTTaggedUnionVariant::TUPLE:
+        new_variant.tuple = static_cast<ASTType *>(copy_node(variant.tuple));
+        break;
+      case ASTTaggedUnionVariant::STRUCT:
+        new_variant.struct_declarations.clear();
+        for (auto field : variant.struct_declarations) {
+          new_variant.struct_declarations.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
+        }
+        break;
+    }
+    new_node->variants.push_back(std::move(new_variant));
   }
   current_scope = old_scope;
   return new_node;

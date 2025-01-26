@@ -878,7 +878,8 @@ int main (int argc, char** argv) {{
   ${}_initialize(argc, argv);
   __ela_main_();
 }}
-)__", ctx.scope->find_type_id("Env", {}));
+)__",
+                          ctx.scope->find_type_id("Env", {}));
     } // C calls main() for freestanding
   }
 
@@ -1691,48 +1692,53 @@ void Emitter::visit(ASTCast *node) {
 }
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
-
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+  if (node->is_emitted) {
+    return;
+  }
+
+  node->is_emitted = true;
+
+  emit_line_directive(node);
+
   (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
   auto name = node->name.get_str();
-  for (const auto &member : node->members) {
-    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      auto subtype_name = name + "_" + struct_node->name.get_str();
-      (*ss) << "typedef struct " << subtype_name << "{\n";
-      for (const auto &field : struct_node->fields) {
+
+  for (const auto &variant : node->variants) {
+    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "typedef struct " << subtype_name << " {\n";
+      for (const auto &field : variant.struct_declarations) {
         field->accept(this);
         (*ss) << ";\n";
       }
-      for (const auto &$union : struct_node->subtypes) {
-        $union->accept(this);
-      }
       (*ss) << "} " << subtype_name << ";\n";
-    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration *>(member);
-      auto subtype_name = name + "_" + declaration_node->name.get_str();
-
+    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+      auto subtype_name = name + "_" + variant.name.get_str();
       (*ss) << "typedef ";
-      declaration_node->type->accept(this);
+      variant.tuple->accept(this);
       (*ss) << " " << subtype_name << ";\n";
     }
   }
 
-  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
+  (*ss) << "typedef struct " << node->name.get_str() << " {\n";
+  (*ss) << "  int index;\n";
+  (*ss) << "  union {\n";
 
   int n = 0;
-  for (const auto &member : node->members) {
-    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      (*ss) << name + "_" + struct_node->name.get_str() << " $index_" << std::to_string(n) << ";\n";
-    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration *>(member);
-      auto alias = name + "_" + declaration_node->name.get_str();
-      (*ss) << alias << " $index_" << std::to_string(n) << ";\n";
+  for (const auto &variant : node->variants) {
+    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
+    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
     }
     n++;
   }
-  (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
+
+  (*ss) << "  };\n";
+  (*ss) << "} " << node->name.get_str() << ";\n";
   return;
 }
 

@@ -397,16 +397,28 @@ void Typer::visit(ASTTaggedUnionDeclaration *node) {
   auto type = global_get_type(node->resolved_type);
   auto info = type->get_info()->as<TaggedUnionTypeInfo>();
   ctx.set_scope(node->scope);
-  for (const auto &member : node->members) {
-    member->accept(this);
-    auto type = member->resolved_type;
-    InternedString name;
-    if (member->get_node_type() == AST_NODE_DECLARATION) {
-      name = static_cast<ASTDeclaration *>(member)->name;
-    } else if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      name = static_cast<ASTStructDeclaration *>(member)->name;
+  for (const auto &variant : node->variants) {
+    switch (variant.kind) {
+      case ASTTaggedUnionVariant::NORMAL: {
+        // TODO: is this how we want to do this?
+        info->variants.push_back({variant.name, void_type()});
+      } break;
+      case ASTTaggedUnionVariant::TUPLE: {
+        variant.tuple->accept(this);
+        auto type = variant.tuple->resolved_type;
+        info->variants.push_back({variant.name, type});
+      } break;
+      case ASTTaggedUnionVariant::STRUCT: {
+        auto scope = create_child(ctx.scope);
+        ctx.set_scope(scope);
+        for (const auto &field : variant.struct_declarations) {
+          field->accept(this);
+        }
+        ctx.exit_scope();
+        auto type = global_create_struct_type(variant.name, scope);
+        info->variants.push_back({variant.name, type});
+      } break;
     }
-    info->variants.push_back(TaggedUnionVariant{name, type});
   }
   ctx.exit_scope();
 }
