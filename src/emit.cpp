@@ -494,6 +494,21 @@ void Emitter::visit(ASTUnaryExpr *node) {
   return;
 }
 void Emitter::visit(ASTBinExpr *node) {
+  if (node->op.type == TType::Assign &&
+      (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->right->accept(this);
+    node->left->accept(this);
+    (*ss) << " = " << str;
+    return;
+  }
+
   auto left_ty = global_get_type(node->left->resolved_type);
 
   if (left_ty && node->is_operator_overload) {
@@ -541,6 +556,21 @@ void Emitter::visit(ASTExprStatement *node) {
 
 void Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->value &&
+      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->value.get()->accept(this);
+    (*ss) << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << node->name.get_str() << " = " << str;
+    return;
+  }
 
   if (node->type->resolved_type == Type::invalid_id) {
     throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
@@ -715,9 +745,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   auto previous = ctx.scope;
   ctx.set_scope(info->scope);
-  Defer _defer2([&]{
-    ctx.set_scope(previous);
-  });
+  Defer _defer2([&] { ctx.set_scope(previous); });
 
   if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
     (*ss) << (node->is_union ? "union " : "struct ");
@@ -1052,14 +1080,8 @@ void Emitter::visit(ASTRange *node) {
   (*ss) << "}";
   return;
 }
-void Emitter::visit(ASTSwitch *node) {
-  if (!node->is_statement) {
-    (*ss) << "[&] ->";
-    auto type = global_get_type(node->return_type);
-    (*ss) << to_cpp_string(type);
-    (*ss) << "{\n";
-  }
 
+void Emitter::visit(ASTSwitch *node) {
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
     if (!first) {
       (*ss) << " else ";
@@ -1073,24 +1095,11 @@ void Emitter::visit(ASTSwitch *node) {
     emit_line_directive(_case.block);
     _case.block->accept(this);
   };
-
   bool first = true;
-
   for (const auto &_case : node->cases) {
     emit_switch_case(node->target, _case, first);
     first = false;
   }
-
-  if (!node->is_statement) {
-    (*ss) << "else {";
-
-    auto type = global_get_type(node->return_type);
-    (*ss) << "return " << "{};";
-    (*ss) << "\n}\n";
-    (*ss) << "}()";
-  }
-
-  return;
 }
 void Emitter::visit(ASTTuple *node) {
   auto type = global_get_type(node->resolved_type);
@@ -1514,7 +1523,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
   }();
 
   if (type_cache[id]) {
-    return std::format("_type_info[{}]", id);
+    return std::format("_type_info.data[{}]", id);
   }
 
   type_cache[id] = true;
@@ -1888,6 +1897,30 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
 void Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->expression &&
+      (node->expression.get()->get_node_type() == AST_NODE_SWITCH || node->expression.get()->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->expression.get()->accept(this);
+
+    if (emitting_function_with_defer ||
+        (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+      (*ss) << "return " << defer_return_value_key << ";\n";
+    } else {
+      (*ss) << "return " << str << ";\n";
+    }
+    return;
+  }
+
   if (emitting_function_with_defer ||
       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
@@ -1902,12 +1935,16 @@ void Emitter::visit(ASTReturn *node) {
       (*ss) << " " << defer_return_value_key;
     }
     (*ss) << ";\n";
-  } else {
+  } else if (cf_expr_return_register.is_null() || node->expression.is_null()) {
     indented("return");
     if (node->expression.is_not_null()) {
       space();
       node->expression.get()->accept(this);
     }
+    (*ss) << ";\n";
+  } else {
+    (*ss) << *cf_expr_return_register.get() << " = ";
+    node->expression.get()->accept(this);
     (*ss) << ";\n";
   }
   return;

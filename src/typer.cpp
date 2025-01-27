@@ -450,8 +450,6 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   node->resolved_type = type->id;
 }
 
-
-
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     ctx.scope->insert(node->name, Type::invalid_id, node, SYMBOL_IS_VARIABLE);
@@ -1024,6 +1022,13 @@ void Typer::visit(ASTArguments *node) {
   }
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
+
+    if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
+      throw_error(
+          "cannot use 'switch' or 'if' expressions in binary expressions, only `=`, `:=` and `return` statements",
+          node->source_range);
+    }
+
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -1203,6 +1208,11 @@ void Typer::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     declaring_or_assigning_type = left;
+  } else if (node->left->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_SWITCH ||
+             node->right->get_node_type() == AST_NODE_IF || node->left->get_node_type() == AST_NODE_IF) {
+    throw_error("cannot use 'switch' or 'if' expressions in function arguments, they're only valid in `=`, `:=` and "
+                "`return` statements",
+                node->source_range);
   }
 
   node->right->accept(this);
@@ -1246,6 +1256,12 @@ void Typer::visit(ASTBinExpr *node) {
 }
 
 void Typer::visit(ASTUnaryExpr *node) {
+  if (node->operand->get_node_type() == AST_NODE_SWITCH || node->operand->get_node_type() == AST_NODE_IF) {
+    throw_error("cannot use 'switch' or 'if' expressions in unary expressions. they're only valid in `=`, `:=` and "
+                "`return` statements",
+                node->source_range);
+  }
+
   node->operand->accept(this);
   auto operand_ty = node->operand->resolved_type;
 

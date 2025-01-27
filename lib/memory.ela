@@ -56,12 +56,11 @@ impl Arena {
 // Super basic arena allocator, with a constructor that allocates a big block,
 // an allocate method that returns u8*, and a destructor that frees the block.
 ArenaOf :: struct![T] {
-  count: u64;
-  size: u64;
-  memory: T*;
+  count: u64,
+  size: u64,
+  memory: T*,
 }
 
-! This crashes.
 impl![T] ArenaOf![T] {
   create :: fn(size: u64) -> #self {
     self: #self;

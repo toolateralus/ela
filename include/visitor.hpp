@@ -128,6 +128,9 @@ struct Emitter : VisitorBase {
 
   void emit_tuple_dependants(std::vector<int> &types);
 
+  int cf_expr_return_id = 0;
+  Nullable<std::string> cf_expr_return_register;
+
   Nullable<ASTType> type_context;
 
   Typer &typer;

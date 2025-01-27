@@ -4,8 +4,6 @@ Reflector :: struct {
   n: int,
 }
 
-#error "_array needs replaced in emitter"
-
 #test test_set_field_with_reflection :: fn() {
   reflector: Reflector;
   type := #type(Reflector);

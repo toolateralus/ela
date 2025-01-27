@@ -237,11 +237,11 @@ impl![T] Slider![T] {
 }
 
 CheckButton :: struct {
-  value: bool;
-  rect: Rectangle;
-  style: Style;
-  text: c_string;
-  allow_hold : bool;
+  value: bool,
+  rect: Rectangle,
+  style: Style,
+  text: c_string,
+  allow_hold : bool,
 }
 
 impl CheckButton {
@@ -282,15 +282,15 @@ impl CheckButton {
 }
 
 DropDown :: struct {
-  options: c_string[];
-  rect: Rectangle;
-  style: Style;
+  options: c_string[],
+  rect: Rectangle,
+  style: Style,
   selected_index: int,
   is_open: bool,
   on_selected: fn*(int),
   on_open: fn*(),
-  label: c_string;
-  show_selected_option: bool;
+  label: c_string,
+  show_selected_option: bool,
 }
 
 impl DropDown {
