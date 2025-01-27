@@ -538,7 +538,7 @@ Type :: struct {
   name: c_string,                                         // the type's name.
   size: u64,                                              // sizeof(T)
   flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-  fields: List![Field*],                                  // get a list of struct fields, enum variants.
+  fields: List![Field],                                   // get a list of struct fields, enum variants.
   elements: fn*(c_string) -> List![Element],              // get a list of the Elements, which can be used to reflect on arrays.
   element_type: Type*,                                    // the type this type has a pointer to, is an array of, etc.
 };

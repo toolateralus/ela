@@ -68,44 +68,17 @@ typedef unsigned char u8;
 #endif
 
 #ifdef TESTING
-  char *strcpy(char *dest, const char *src);
-  int system(const char *);
-  void free(void *);
-  void *malloc(u64);
-  void *calloc(u64, u64);
-  void *realloc(void *, u64);
-  void *memcpy(void *, void *, u64);
-  void *memset(void *, int, u64);
-  int memmove(void *, void *, s64);
   int printf(const char *, ...);
   void exit(int);
-  int scanf(const char *, ...);
-  int getchar();
-  void sleep(int);
-  void usleep(int);
-  const char *strdup(const char *);
-  const char *strndup(const char *, u64);
-  const char *strerror(int);
-  s64 strtol(const char *, char ***, int);
-  u64 strtoul(const char *, char ***, int);
-  float64 strtod(const char *, char ***);
-  const char *strtok(const char *, const char *);
-  const char *strchr(const char *, int);
-  const char *strrchr(const char *, int);
-  const char *strstr(const char *, const char *);
-  int strlen(const char *);
-  int strcmp(const char *, const char *);
-  const char *strcat(const char *, const char *);
-  int snprintf(char *, u64, const char *, ...);
-  int sprintf(char *, const char *, ...);
-  int strncmp(const char *, const char *, int);
   
   typedef struct {
     const char *name;
     void (*function)();
   } __COMPILER_GENERATED_TEST;
   static void __COMPILER_GENERATED_TEST_RUN(__COMPILER_GENERATED_TEST *test) {
-    printf("running %s\n", test->name);
+    #if TEST_VERBOSE 
+      printf("running %s\n", test->name);
+    #endif
     test->function();
   }
 
@@ -1374,7 +1347,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
   std::stringstream ss;
-  ss << "Field { " << std::format(".name = \"{}\", ", name)
+  ss << "(Field) { " << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
@@ -1387,7 +1360,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 }
 
 std::string Emitter::get_elements_function(Type *type) {
-  // TODO: need
+  //! We have to remove these lambdas so we can compile down to C.
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
@@ -1486,6 +1459,10 @@ std::string get_type_flags(Type *type) {
 std::string Emitter::get_type_struct(Type *type, int id, Context &context, const std::string &fields) {
   std::stringstream ss;
 
+  if (!type) {
+    throw_error("Internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
+  }
+
   auto kind = 0;
 
   ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
@@ -1495,12 +1472,12 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   if (!type->is_kind(TYPE_ENUM))
     ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
 
-  ss << get_type_flags(type) << ",\n"
-     << ".fields = " << fields << ",\n";
+  ss << get_type_flags(type) << ",\n";
 
-  if (type->get_ext().is_fixed_sized_array()) {
-    ss << get_elements_function(type) << ",\n";
-  }
+  // ! We can't use this either: it uses a lambda.
+  //   if (type->get_ext().is_fixed_sized_array()) {
+  //     ss << get_elements_function(type) << ",\n";
+  //   }
 
   if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
@@ -1509,6 +1486,68 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   }
 
   ss << " };";
+
+  auto get_fields_init_statements = [&] {
+    std::stringstream fields_ss;
+    if (type->kind == TYPE_STRUCT) {
+      auto info = type->get_info();
+      if (info->scope->symbols.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info->scope->symbols.size();
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &tuple : info->scope->symbols) {
+        auto &[name, sym] = tuple;
+
+        if (name == "this")
+          continue;
+
+        auto t = global_get_type(sym.type_id);
+        // TODO: handle methods separately
+        if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+          continue;
+
+        if (!t)
+          throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(name.get_str(), t, type, context) << ";\n";
+        ++it;
+      }
+    } else if (type->kind == TYPE_ENUM) {
+      // TODO: we have to fix this!.
+      auto info = type->get_info();
+      if (info->scope->ordered_symbols.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info->scope->ordered_symbols.size();
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &field : info->scope->ordered_symbols) {
+        auto t = global_get_type(s32_type());
+
+        if (!t) {
+          throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+        }
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(field.get_str(), t, type, context) << ";\n";
+        ++it;
+      }
+    } 
+    return fields_ss.str();
+  };
+
+  ss << get_fields_init_statements();
   context.type_info_strings.push_back(ss.str());
   return std::format("_type_info.data[{}]", id);
 }
@@ -1528,66 +1567,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
   type_cache[id] = true;
 
-  std::stringstream fields_ss;
-  if (type->kind == TYPE_STRUCT) {
-    auto info = type->get_info();
-    if (info->scope->symbols.empty()) {
-      return get_type_struct(type, id, context, "{}");
-    }
-    fields_ss << "{";
-    int count = info->scope->symbols.size();
-    int it = 0;
-    for (const auto &tuple : info->scope->symbols) {
-      auto &[name, sym] = tuple;
-
-      if (name == "this")
-        continue;
-
-      auto t = global_get_type(sym.type_id);
-      // TODO: handle methods separately
-      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
-        continue;
-
-      if (!t)
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      fields_ss << get_field_struct(name.get_str(), t, type, context);
-      ++it;
-      if (it < count) {
-        fields_ss << ", ";
-      }
-    }
-    fields_ss << "}";
-  } else if (type->kind == TYPE_ENUM) {
-    // TODO: we have to fix this!.
-    auto info = type->get_info();
-    if (info->scope->ordered_symbols.empty()) {
-      return get_type_struct(type, id, context, "{}");
-    }
-    fields_ss << "{";
-    for (const auto &field : info->scope->ordered_symbols) {
-      auto t = global_get_type(s32_type());
-
-      if (!t) {
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      }
-
-      fields_ss << get_field_struct(field.get_str(), t, type, context);
-
-      if (field != info->scope->ordered_symbols.back()) {
-        fields_ss << ",\n";
-      }
-    }
-
-    fields_ss << "}";
-  } else {
-    return get_type_struct(type, id, context, "{}");
-  }
-
-  return get_type_struct(type, id, context, fields_ss.str());
+  return get_type_struct(type, id, context, "{}");
 }
 
 bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
@@ -1899,8 +1879,8 @@ void Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
 
   // Emit switch / if expressions.
-  if (node->expression &&
-      (node->expression.get()->get_node_type() == AST_NODE_SWITCH || node->expression.get()->get_node_type() == AST_NODE_IF)) {
+  if (node->expression && (node->expression.get()->get_node_type() == AST_NODE_SWITCH ||
+                           node->expression.get()->get_node_type() == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
     auto type = global_get_type(node->resolved_type);
