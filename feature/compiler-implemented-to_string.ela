@@ -1,9 +1,9 @@
 
 
 Strukt :: struct {
-  a: int;
-  b: int;
-  c: string;
+  a: int,
+  b: int,
+  c: string,
 } 
 
 

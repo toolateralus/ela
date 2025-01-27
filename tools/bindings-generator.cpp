@@ -14,14 +14,14 @@
 #include <vector>
 #include <print>
 
-// TODO: 
+// TODO:
 /*
   Fix anonymous struct declarations being emitted after the type that depends on them
 
   Fix weird type bugs with emitting unsigned u8 * etc.
 
-  Have an option to either expand, or not expand all dependent headers. We don't always need to include everything, right now you have to 
-  parse out and remove stuff like stdint etc.
+  Have an option to either expand, or not expand all dependent headers. We don't always need to include everything,
+  right now you have to parse out and remove stuff like stdint etc.
 */
 
 // used for anonymous structs etc.
@@ -199,7 +199,6 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
     data->output << "type " << typeName << ";\n";
   }
 }
-
 // Helper function to visit the children of a struct, union, or enum declaration
 static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitData *data, const char *kind) {
   CXString name = clang_getCursorSpelling(cursor);
@@ -243,7 +242,7 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
                           << " {\n";
               wrapgen_visit_struct_union_enum(c, data,
                                               clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
-              temp_output << "  };\n";
+              temp_output << "  },\n";
             }
           } else {
             if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
@@ -253,9 +252,9 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
               wrapgen_visit_struct_union_enum(c, data,
                                               clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
               anon_output << "};\n";
-              temp_output << "  " << fieldNameStr << " : " << anonTypeName << ";\n";
+              temp_output << "  " << fieldNameStr << " : " << anonTypeName << ",\n";
             } else {
-              temp_output << "  " << fieldNameStr << " : " << fieldTypeName << ";\n";
+              temp_output << "  " << fieldNameStr << ": " << fieldTypeName << ",\n";
             }
           }
         } else if (clang_getCursorKind(c) == CXCursor_EnumConstantDecl) {

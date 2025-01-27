@@ -1,5 +1,3 @@
-;
-
 #flags TypeFlags :: enum {
   INTEGER,
   FLOAT,
@@ -78,15 +76,15 @@ impl Type  {
     return self.flags & TypeFlags::POINTER != 0;
   }
 
-  get_field :: fn(self*, name: string) -> Field* {
+  get_field :: fn(self*, name: string) -> Field {
     for field in self.fields {
       if strcmp(field.name, name.data) == 0 {
         return field;
       }
     }
-    return null;
+    return {};
   }
 
-  // implemented externally. TODO: remove.
+  // implemented externally. TODO: remove, or implement in language, now that we have access ot it.
   find_type :: fn(name: string) -> Type *;
 }

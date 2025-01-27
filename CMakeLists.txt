@@ -47,13 +47,3 @@ endif()
 if(CMAKE_BUILD_TYPE STREQUAL "Debug")
   target_compile_definitions(ela PRIVATE DEBUG DEBUG=1)
 endif()
-
-# Use bear on Linux
-if (UNIX AND NOT APPLE)
-    add_custom_target(bear_build
-        COMMAND bear -- make -j${CMAKE_BUILD_PARALLEL_LEVEL}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Running bear to generate compilation database"
-    )
-    add_dependencies(bear_build ela)
-endif()

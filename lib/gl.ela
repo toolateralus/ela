@@ -804,12 +804,12 @@ check_error :: fn(location: c_string) {
 }
 
 Vec4 :: union {
-  values: float[4];
+  values: float[4],
   #anon :: struct {
-    x: float;
-    y: float;
-    z: float;
-    w: float;
+    x: float,
+    y: float,
+    z: float,
+    w: float,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -862,11 +862,11 @@ impl Vec4 {
 }
 
 Vec3 :: union {
-  values: float[3];
+  values: float[3],
   #anon :: struct {
-    x: float;
-    y: float;
-    z: float;
+    x: float,
+    y: float,
+    z: float,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -917,10 +917,10 @@ impl Vec3 {
 }
 
 Vec2 :: union {
-  values: float[2];
+  values: float[2],
   #anon :: struct {
-    x: float;
-    y: float;
+    x: float,
+    y: float,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -965,24 +965,24 @@ impl Vec2 {
 }
 
 Mat4 :: union {
-  values: float[16];
+  values: float[16],
   #anon :: struct {
-    M00: float;
-    M01: float;
-    M02: float;
-    M03: float;
-    M10: float;
-    M11: float;
-    M12: float;
-    M13: float;
-    M20: float;
-    M21: float;
-    M22: float;
-    M23: float;
-    M30: float;
-    M31: float;
-    M32: float;
-    M33: float;
+    M00: float,
+    M01: float,
+    M02: float,
+    M03: float,
+    M10: float,
+    M11: float,
+    M12: float,
+    M13: float,
+    M20: float,
+    M21: float,
+    M22: float,
+    M23: float,
+    M30: float,
+    M31: float,
+    M32: float,
+    M33: float,
   };
   // #operator(*) :: fn(self, other: #self) -> #self {
   //   matrix: #self;
@@ -1062,7 +1062,7 @@ impl Mat4 {
 }
 
 Shader :: struct {
-  handle: u32;
+  handle: u32
 }
 
 impl Shader {
@@ -1121,7 +1121,7 @@ impl Shader {
 }
 
 Window :: struct {
-  handle: GLFWwindow*;
+  handle: GLFWwindow*
 }
 
 impl Window {

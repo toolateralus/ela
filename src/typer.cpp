@@ -134,13 +134,14 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   type->declaring_node = node;
 
   for (auto subunion : node->subtypes) {
-    for (const auto &field : subunion->fields) {
-      field->accept(this);
-      node->scope->insert(field->name, field->type->resolved_type, field);
+    for (const auto &field : subunion->members) {
+      field.type->accept(this);
+      node->scope->insert(field.name, field.type->resolved_type, nullptr);
     }
   }
-  for (auto decl : node->fields) {
-    decl->accept(this);
+  for (auto decl : node->members) {
+    decl.type->accept(this);
+    ctx.scope->insert(decl.name, decl.type->resolved_type, node);
   }
 
   ctx.set_scope(old_scope);
@@ -286,9 +287,6 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
-      if (normal.default_value.is_not_null()) {
-        info.default_params++;
-      }
       ctx.scope->insert(normal.name, param->resolved_type, param);
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
@@ -452,8 +450,6 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   node->resolved_type = type->id;
 }
 
-
-
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     ctx.scope->insert(node->name, Type::invalid_id, node, SYMBOL_IS_VARIABLE);
@@ -585,13 +581,16 @@ void Typer::visit(ASTDeclaration *node) {
   }
 
   if (node->is_constexpr) {
-    auto type = global_get_type(node->type->resolved_type);
-    if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
-      throw_error(std::format("Can only use scalar types (integers, floats, "
-                              "bools) as constant expressions, got {}",
-                              type->to_string()),
-                  node->value.get()->source_range);
-    }
+    // TODO: we should probably improve this.
+    // Our interpreter can't handle structs, but we want structs.
+    
+    // auto type = global_get_type(node->type->resolved_type);
+    // if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
+    //   throw_error(std::format("Can only use scalar types (integers, floats, "
+    //                           "bools) as constant expressions, got {}",
+    //                           type->to_string()),
+    //               node->value.get()->source_range);
+    // }
   }
 }
 
@@ -656,10 +655,6 @@ void Typer::visit(ASTParamDecl *node) {
                     "casts the length information off and gets passed as as "
                     "pointer. Consider using a dynamic array",
                     node->source_range);
-      if (node->normal.default_value.is_not_null()) {
-        throw_error("Cannot currently use default parameters for fixed buffer pointers.", node->source_range);
-      }
-
       // cast off the fixed size array and add a pointer to it,
       // for s8[] to s8*
       {
@@ -671,15 +666,6 @@ void Typer::visit(ASTParamDecl *node) {
     auto old_ty = declaring_or_assigning_type;
     declaring_or_assigning_type = id;
     Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-
-    if (node->normal.default_value.is_not_null()) {
-      node->normal.default_value.get()->accept(this);
-      auto expr_type = node->normal.default_value.get()->resolved_type;
-      assert_types_can_cast_or_equal(
-          expr_type, node->resolved_type, node->source_range,
-          std::format("default parameter's expression type did not match the declared parameter type. parameter: {}",
-                      node->normal.name));
-    }
   }
 }
 
@@ -964,9 +950,6 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   int param_index = skip_first ? 1 : 0;
   for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
-      if (arg_index >= args_ct && !params->params[param_index]->normal.default_value) {
-        throw_error("Too few arguments to function", node->source_range);
-      }
       if (arg_index < args_ct) {
         declaring_or_assigning_type = params->params[param_index]->resolved_type;
         node->arguments[arg_index]->accept(this);
@@ -992,7 +975,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   Defer _([&]() { declaring_or_assigning_type = old_type; });
   auto args_ct = node->arguments.size();
   // TODO: rewrite this. this is so hard tor read.
-  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len - info->default_params) {
+  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
     throw_error(
         std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
                     info->params_len, args_ct, info->to_string()),
@@ -1042,6 +1025,13 @@ void Typer::visit(ASTArguments *node) {
   }
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
+
+    if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
+      throw_error(
+          "cannot use 'switch' or 'if' expressions in binary expressions, only `=`, `:=` and `return` statements",
+          node->source_range);
+    }
+
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -1171,7 +1161,7 @@ void Typer::visit(ASTType *node) {
       normal_ty.base->accept(this);
       auto base_ty = global_get_type(normal_ty.base->resolved_type);
       if (!base_ty) {
-        throw_error(std::format("use of undeclared type"), node->source_range);
+        throw_error(std::format("use of undeclared type", normal_ty.base->resolved_type), node->source_range);
       }
       node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }
@@ -1221,6 +1211,11 @@ void Typer::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     declaring_or_assigning_type = left;
+  } else if (node->left->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_SWITCH ||
+             node->right->get_node_type() == AST_NODE_IF || node->left->get_node_type() == AST_NODE_IF) {
+    throw_error("cannot use 'switch' or 'if' expressions in function arguments, they're only valid in `=`, `:=` and "
+                "`return` statements",
+                node->source_range);
   }
 
   node->right->accept(this);
@@ -1264,6 +1259,12 @@ void Typer::visit(ASTBinExpr *node) {
 }
 
 void Typer::visit(ASTUnaryExpr *node) {
+  if (node->operand->get_node_type() == AST_NODE_SWITCH || node->operand->get_node_type() == AST_NODE_IF) {
+    throw_error("cannot use 'switch' or 'if' expressions in unary expressions. they're only valid in `=`, `:=` and "
+                "`return` statements",
+                node->source_range);
+  }
+
   node->operand->accept(this);
   auto operand_ty = node->operand->resolved_type;
 

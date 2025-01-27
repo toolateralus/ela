@@ -9,9 +9,9 @@
 #foreign cos :: fn(f: float64) -> float64;
 #foreign sin :: fn(f: float64) -> float64;
 
-Random :: struct {
-  Max :: 2147483647; // !BUG: can't use constants for structs. Emitting it is just empty
-}
+
+// We use this struct for namespacing.
+Random :: struct;
 
 impl Random {
   next :: fn(max: float32) -> float {

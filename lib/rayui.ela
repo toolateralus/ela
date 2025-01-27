@@ -4,13 +4,13 @@
 
 // * Style struct used for UI styling.
 Style :: struct {
-  foreground: Color;
-  background: Color;
-  highlighted: Color;
-  font_size: int;
-  use_jiggly_text: bool = true;
-  jiggle_intensity : float = 10.0;
-  jiggle_rate : float = 4.0;
+  foreground: Color,
+  background: Color,
+  highlighted: Color,
+  font_size: int,
+  use_jiggly_text: bool,
+  jiggle_intensity : float,
+  jiggle_rate : float,
 }
 
 // * Measure the width of a jiggly text of 'text' and 'style'
@@ -139,9 +139,9 @@ button_pro :: fn(text: c_string, rect: Rectangle, style: Style, callback: fn* (v
 // ? A simple timer that can be used in update loops to get a tick every N seconds.
 // * interval: float = seconds between each tick.
 Timer :: struct {
-  interval : float = 0.5;
-  // Returns true if the timer has exceeded the interval time relative to the last tick time.
-  last_tick_time: float;
+  interval : float,
+  // Returns true if the timer has exceeded the interval time relative to the last tick time,
+  last_tick_time: float,
 }
 
 impl Timer {
@@ -160,14 +160,14 @@ impl Timer {
 }
 
 Slider :: struct![T] {
-  text: c_string;
-  rect: Rectangle;
-  style: Style;
-  min_value: T;
-  max_value: T;
-  value: T*;
-  held : bool;
-  digits_to_show: int = 5;
+  text: c_string,
+  rect: Rectangle,
+  style: Style,
+  min_value: T,
+  max_value: T,
+  value: T*,
+  held : bool,
+  digits_to_show: int,
 }
 
 impl![T] Slider![T] {
@@ -237,11 +237,11 @@ impl![T] Slider![T] {
 }
 
 CheckButton :: struct {
-  value: bool = false;
-  rect: Rectangle;
-  style: Style;
-  text: c_string;
-  allow_hold : bool;
+  value: bool,
+  rect: Rectangle,
+  style: Style,
+  text: c_string,
+  allow_hold : bool,
 }
 
 impl CheckButton {
@@ -282,15 +282,15 @@ impl CheckButton {
 }
 
 DropDown :: struct {
-  options: c_string[];
-  rect: Rectangle;
-  style: Style;
-  selected_index: int = -1;
-  is_open: bool = false;
-  on_selected: fn*(int) = null;
-  on_open: fn*() = null;
-  label: c_string;
-  show_selected_option := false;
+  options: c_string[],
+  rect: Rectangle,
+  style: Style,
+  selected_index: int,
+  is_open: bool,
+  on_selected: fn*(int),
+  on_open: fn*(),
+  label: c_string,
+  show_selected_option: bool,
 }
 
 impl DropDown {

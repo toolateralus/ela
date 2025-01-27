@@ -751,6 +751,11 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   // purely for emit time.
   if (ext.has_no_extensions()) {
     int eldest = *std::max_element(dependencies.begin(), dependencies.end());
+    auto eldest_t = global_get_type(eldest);
+    if(eldest_t->base_id != Type::invalid_id) {
+      eldest = eldest_t->base_id;
+    }
+
     global_get_type(eldest)->tuple_dependants.push_back(type->id);
   }
 

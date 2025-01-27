@@ -183,7 +183,6 @@ struct FunctionTypeInfo : TypeInfo {
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
-  int default_params = 0; // number of default params, always trailing.
   bool is_varargs = false;
   // defined in cpp file
   virtual std::string to_string() const override;

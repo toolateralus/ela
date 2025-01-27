@@ -122,10 +122,14 @@ struct Emitter : VisitorBase {
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
+  bool emit_default_value = true;
   bool emit_default_args = false;
   int num_tests = 0;
 
   void emit_tuple_dependants(std::vector<int> &types);
+
+  int cf_expr_return_id = 0;
+  Nullable<std::string> cf_expr_return_register;
 
   Nullable<ASTType> type_context;
 
@@ -146,6 +150,7 @@ struct Emitter : VisitorBase {
   int indent_level = 0;
   Context &ctx;
 
+  int type_list_id = -1;
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
                                compile_command.compilation_flags.contains("-nostdlib");
 

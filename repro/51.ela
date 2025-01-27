@@ -1,7 +1,0 @@
-Strukt :: struct {
-  CONSTANT :: 0;
-}
-
-main :: fn() {
-  n := Strukt::CONSTANT; // Cannot use a type as a value.
-}

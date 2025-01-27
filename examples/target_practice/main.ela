@@ -27,14 +27,12 @@ Scene :: enum {
   button_style : Style = {
     foreground: WHITE,
     background: CLEAR,
-    highlighted: CYAN.with_alpha(24),
     font_size: 20
   };
 
   jiggly_text_style : Style = {
     foreground: WHITE,
     background: CLEAR,
-    highlighted: CYAN.with_alpha(24),
     font_size: 40
   };
 
@@ -83,7 +81,7 @@ Scene :: enum {
 
   background_rect : Rectangle;
 
-  format_buffer: char* = malloc(sizeof(char) * 1024);
+  format_buffer: char*;
 
   game_music: Music;
   menu_music: Music;
@@ -109,8 +107,8 @@ ParticleKind :: enum {
 }
 
 RenderInfo :: struct {
-  texture: Texture2D;
-  tex_rect : Rectangle;
+  texture: Texture2D,
+  tex_rect : Rectangle,
 }
 
 impl RenderInfo {
@@ -130,35 +128,35 @@ impl RenderInfo {
 }
 
 Particle :: struct {
-  render_info: RenderInfo*;
-  velocity: Vector2;
-  spawn_time: float;
-  lifetime: float;
-  kind: int;
-  position: Vector2;
-  scale: Vector2;
-  color: Color;
+  render_info: RenderInfo*,
+  velocity: Vector2,
+  spawn_time: float,
+  lifetime: float,
+  kind: int,
+  position: Vector2,
+  scale: Vector2,
+  color: Color,
 }
 
 Character :: struct {
-  texture: Texture2D;
-  rect: Rectangle;
-  tex_rect : Rectangle;
-  horizontal_velocity: float;
-  speed: float = 2.25;
-  origin: Vector2;
-  cannon_idx: int;
-  rotation: float;
+  texture: Texture2D,
+  rect: Rectangle,
+  tex_rect : Rectangle,
+  horizontal_velocity: float,
+  speed: float,
+  origin: Vector2,
+  cannon_idx: int,
+  rotation: float,
 }
 
 Bullet :: struct {
-  velocity: Vector2;
-  speed: float = 2.25;
-  rotation: float;
-  dead : bool = false;
-  render_info: RenderInfo*;
-  origin: Vector2;
-  rect: Rectangle;
+  velocity: Vector2,
+  speed: float,
+  rotation: float,
+  dead : bool,
+  render_info: RenderInfo*,
+  origin: Vector2,
+  rect: Rectangle,
 }
 
 impl Bullet {
@@ -174,14 +172,14 @@ impl Bullet {
 }
 
 Enemy :: struct {
-  id: int;
-  dead: bool = false;
-  rect: Rectangle;
-  origin: Vector2;
-  render_info : RenderInfo*;
-  target: Vector2;
-  rotation: float;
-  speed: float;
+  id: int,
+  dead: bool,
+  rect: Rectangle,
+  origin: Vector2,
+  render_info : RenderInfo*,
+  target: Vector2,
+  rotation: float,
+  speed: float,
 };
 
 impl Enemy {
@@ -195,12 +193,12 @@ impl Enemy {
 }
 
 TextParticle :: struct {
-  position: Vector2;
-  font_size : int;
-  text: string;
-  spawn_time: float;
-  lifetime: float;
-  color: Color;
+  position: Vector2,
+  font_size : int,
+  text: string,
+  spawn_time: float,
+  lifetime: float,
+  color: Color,
 }
 
 #region Global Variables {
@@ -246,12 +244,11 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
 }
 
 // great function name
-get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
+get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float) -> Color {
   gray_value : u8 = clamp(GetRandomValue(0, 1) * 255.0, 0, 255) as u8;
-  variance :: fn() -> u8 { return (GetRandomValue(0, 1) * _variance) as u8; };
-  r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
+  r : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
+  g : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
+  b : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   return {r: r, g: g, b: b, a: 255 as u8};
 }
 
@@ -455,9 +452,9 @@ draw_game :: fn() {
 }
 
 BulletRoutine :: struct {
-  count : int = 0;
-  timer: Timer;
-  interval: float = 0.1;
+  count : int,
+  timer: Timer,
+  interval: float,
 }
 
 impl BulletRoutine {
@@ -903,6 +900,10 @@ draw_game_menu :: fn() {
 }
 
 main :: fn() {
+  jiggly_text_style.highlighted = CYAN.with_alpha(24);
+  button_style.highlighted = CYAN.with_alpha(24);
+  format_buffer = malloc(sizeof(char) * 1024);
+
   InitWindow(800, 600, "target practice");
   SetTargetFPS(60);
 
@@ -930,7 +931,7 @@ main :: fn() {
         draw_game();
         draw_game_menu();
       }
-      DrawText("This game is totally broken right now!!\n fix me please\n Raylib bindings are the source of\n the problem, they changed\n And the previous bindings,\n were totally wrong\n\n It's mostly the Timer object I think\n and the Camera.", 0, 120, 32, RED);
+      // DrawText("This game is totally broken right now!!\n fix me please\n Raylib bindings are the source of\n the problem, they changed\n And the previous bindings,\n were totally wrong\n\n It's mostly the Timer object I think\n and the Camera.", 0, 120, 32, RED);
     // EndMode2D();
     EndDrawing();
   }

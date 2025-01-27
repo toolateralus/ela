@@ -3,8 +3,8 @@
 #import reflection;
 
 JsonError :: struct {
-  message: string;
-  has_value : bool = false;
+  message: string,
+  has_value: bool,
 }
 impl JsonError {
   Error :: fn(msg: string) -> JsonError {
@@ -39,10 +39,10 @@ JsonTokenType :: enum {
 }
 
 JsonToken :: struct {
-  type : int = JsonTokenType::Invalid;
-  value : string;
-  line: int;
-  column: int;
+  type : int,
+  value : string,
+  line: int,
+  column: int,
 }
 
 impl JsonToken {
@@ -52,30 +52,30 @@ impl JsonToken {
   }
 }
 
-JsonLexer :: struct {
-  tokenTypeNames : List![string] = {
-    "Invalid",
-    "True",
-    "False",
-    "Null",
-    "Eof",
-    "Colon",
-    "Number",
-    "String",
-    "LCurly",
-    "RCurly",
-    "LBracket",
-    "RBracket",
-    "Comma",
-  };
+#static tokenTypeNames : List![string] = {
+  "Invalid",
+  "True",
+  "False",
+  "Null",
+  "Eof",
+  "Colon",
+  "Number",
+  "String",
+  "LCurly",
+  "RCurly",
+  "LBracket",
+  "RBracket",
+  "Comma",
+};
 
-  file: string;
-  line_start: int;
-  cur_line: int;
-  position: int;
-  length: u32;
-  input: string;
-  lookahead_buffer : List![JsonToken];
+JsonLexer :: struct {
+  file: string,
+  line_start: int,
+  cur_line: int,
+  position: int,
+  length: u32,
+  input: string,
+  lookahead_buffer : List![JsonToken],
 }
 
 impl JsonLexer {
@@ -245,13 +245,13 @@ impl JsonLexer {
     for type in types {
       if token.type == type then return (JsonError::Ok(), token);
       if i == 0 {
-        types_string = self.tokenTypeNames[type];
+        types_string = tokenTypeNames[type];
         i++;
       } else {
-        types_string = $"{types_string} | {self.tokenTypeNames[type]}";
+        types_string = $"{types_string} | {tokenTypeNames[type]}";
       }
     }
-    return self.err(token, $"Expected {types_string}, got {self.tokenTypeNames[token.type]} :: {token.value}");
+    return self.err(token, $"Expected {types_string}, got {tokenTypeNames[token.type]} :: {token.value}");
   }
 
   expect_type :: fn(self*, type: s32) -> (JsonError, JsonToken) {
@@ -278,22 +278,21 @@ JsonValue :: struct;
 #alias JsonArray  :: List![JsonValue*];
 
 JsonKeyValuePair :: struct {
-  key: string;
-  value: JsonValue*;
+  key: string,
+  value: JsonValue*,
 }
 
 JsonValueUnion :: union {
-  number: float64;
-  boolean: bool;
-  _string: string;
-  object: List![JsonKeyValuePair];
-  array: JsonArray;
+  number: float64,
+  boolean: bool,
+  _string: string,
+  object: List![JsonKeyValuePair],
+  array: JsonArray,
 }
 
 JsonValue :: struct {
-  data: JsonValueUnion;
-  type : int = JsonValueType::Invalid;
-
+  data: JsonValueUnion,
+  type : int,
 }
 
 impl JsonValue {

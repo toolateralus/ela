@@ -1,6 +1,6 @@
 GenericStruct :: struct![T] {
-  a: T;
-  b: T;
+  a: T,
+  b: T,
 }
 
 impl![T] GenericStruct![T] {
@@ -17,8 +17,8 @@ impl![T] GenericStruct![T] {
 }
 
 GenericUnion :: union![T, T1] {
-  a: T;
-  b: T1;
+  a: T,
+  b: T1,
 }
 
 #test test_generic_union :: fn() {

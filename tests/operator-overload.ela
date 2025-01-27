@@ -1,6 +1,6 @@
 Vec2 :: struct {
-  x: float;
-  y: float;
+  x: float,
+  y: float,
 }
 
 Add :: interface![Right, Result] {

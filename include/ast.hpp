@@ -323,7 +323,6 @@ struct ASTParamDecl : ASTNode {
   union {
     struct {
       ASTType *type;
-      Nullable<ASTExpr> default_value;
       InternedString name;
     } normal;
     struct {
@@ -470,6 +469,14 @@ struct ASTSubscript : ASTExpr {
 
 struct ASTImpl;
 struct ASTWhere;
+
+struct ASTStructMember {
+  bool is_bitfield = false;
+  InternedString bitsize;
+  InternedString name;
+  ASTType* type;
+};
+
 struct ASTStructDeclaration : ASTStatement {
   Nullable<ASTWhere> where_clause;
   Scope *scope;
@@ -477,8 +484,10 @@ struct ASTStructDeclaration : ASTStatement {
   bool is_fwd_decl = false;
   bool is_extern = false;
   bool is_union = false;
-  std::vector<ASTDeclaration *> fields;
+
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
+  std::vector<ASTStructMember> members;
+
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTStructDeclaration>> generic_instantiations;
   std::vector<ASTImpl *> impls;
@@ -780,7 +789,6 @@ struct Parser {
   std::vector<ASTType *> parse_generic_arguments();
   ASTTaggedUnionDeclaration *parse_tagged_union_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
-  void visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements);
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);

@@ -3,7 +3,7 @@
 
 
 InternedString :: struct {
-  id: s64;
+  id: s64,
 };
 
 impl InternedString {

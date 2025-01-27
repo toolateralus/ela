@@ -6,8 +6,8 @@
 }
 
 XarBarInitListTestStruct :: struct {
-  x: float;
-  y: float;
+  x: float,
+  y: float,
 }
 
 New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
@@ -22,13 +22,13 @@ New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 }
 
 InitListTest :: struct {
-  n : int;
+  n : int
 }
 
 InitListStruct :: struct {
-  a: int;
-  b: int;
-  c: int;
+  a: int,
+  b: int,
+  c: int,
 }
 
 returns_an_init_list  :: fn() -> InitListTest {

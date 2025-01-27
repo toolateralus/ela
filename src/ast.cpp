@@ -1107,7 +1107,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier) {
+      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly && lookahead_buf()[3].type != TType::LParen) {
     NODE_ALLOC(ASTExprStatement, expr, range, _, this)
     expr->expression = parse_expr();
     end_node(expr, range);
@@ -1274,6 +1274,7 @@ ASTStatement *Parser::parse_statement() {
     NODE_ALLOC(ASTDeclaration, decl, range, _, this);
     decl->name = tok.value;
     decl->value = parse_expr();
+    decl->is_constexpr = true;
 
     if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id || keywords.contains(tok.value.get_str()) ||
         reserved.contains(tok.value.get_str())) {
@@ -1559,8 +1560,8 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     param->normal.name = name;
 
     if (peek().type == TType::Assign) {
-      eat();
-      param->normal.default_value = parse_expr();
+      end_node(nullptr, range);
+      throw_error("Ela does not support default parameters.", range);
     }
 
     params->params.push_back(param);
@@ -1798,35 +1799,6 @@ ASTWhere *Parser::parse_where_clause() {
   return node;
 }
 
-void Parser::visit_struct_statements(ASTStructDeclaration *decl, const std::vector<ASTNode *> &statements) {
-  for (const auto &statement : statements) {
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
-      decl->fields.push_back(static_cast<ASTDeclaration *>(statement));
-    } else if (statement->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto union_decl = static_cast<ASTStructDeclaration *>(statement);
-      auto type = global_get_type(union_decl->resolved_type);
-      auto info = (type->get_info()->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) == 0) {
-        throw_error("can only use '#anon :: union // #anon :: struct' declarations within struct types.",
-                    decl->source_range);
-      }
-      decl->subtypes.push_back(union_decl);
-      for (const auto &field : union_decl->fields) {
-        decl->scope->insert(field->name, field->type->resolved_type, field);
-      }
-    } else if (statement->get_node_type() == AST_NODE_STATEMENT_LIST) {
-      visit_struct_statements(decl, static_cast<ASTStatementList *>(statement)->statements);
-    } else if (statement->get_node_type() != AST_NODE_NOOP) {
-      throw_error("Non-field declaration not allowed in struct.", statement->source_range);
-    }
-  }
-}
-// TODO:
-// We need to clean up the struct & union parsing, make it more consistent.
-// Maybe use a generic function, they're strangely different.
-// Also, we need to declare generic parameters types here with like -2 so
-// casting and T:: works and shtuff.
-
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   expect(TType::Interface);
   auto previous = current_interface_decl;
@@ -1908,15 +1880,41 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->scope->types[param] = -2;
   }
 
-  // TODO:
-  //  I think struct fields should just be comma seperated.
-  //  Having semicolons makes little sense and is very unintuitive:
-  //  I always have to correct myself when I place semi's in there.
-
   if (!semicolon()) {
-    auto block = parse_block(node->scope);
-    visit_struct_statements(node, block->statements);
-    node->scope = block->scope;
+    auto scope = info->scope;
+    expect(TType::LCurly);
+    std::vector<ASTNode*> directives;
+    while (peek().type != TType::RCurly) {
+      if (peek().type == TType::Directive) {
+        eat();
+        auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
+        if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+          node->subtypes.push_back(static_cast<ASTStructDeclaration*>(directive.get()));
+        } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
+          ASTStructMember member{};
+          auto _node = static_cast<ASTDeclaration*>(directive.get());
+          member.name = _node->name;
+          member.is_bitfield = true;
+          member.bitsize = _node->bitsize;
+          member.type = _node->type;
+          node->members.push_back(member);
+        } else {
+          end_node(node, range);
+          throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the only thing allowed in structs, besides member declarations.", node->source_range);
+        }
+      } else if (peek().type == TType::Identifier) {
+        ASTStructMember member{};
+        member.name = eat().value;
+        expect(TType::Colon);
+        member.type = parse_type();
+        node->members.push_back(member);
+      } 
+      if (peek().type != TType::RCurly) {
+        expect(TType::Comma);
+      }
+    }
+    expect(TType::RCurly);
+    node->scope = scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
     info->scope = node->scope;
   } else {

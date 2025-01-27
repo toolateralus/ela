@@ -33,9 +33,9 @@ memcpy :: fn(dest: char**, src: char*, len: u32) {
 // A simple linear allocator (aka arena) 
 // for a freestanding environment without allocations.
 Allocator :: struct {
-  mem : char[1024 * 24];
-  ptr : u32;
-  size: u32;
+  mem : char[1024 * 24],
+  ptr : u32,
+  size: u32,
 }
 
 impl Allocator {
@@ -62,8 +62,8 @@ impl Allocator {
 allocator := Allocator::create();
 
 Vector2 :: struct {
-  x: float;
-  y: float;
+  x: float,
+  y: float,
 }
 
 // declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.

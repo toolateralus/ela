@@ -137,13 +137,13 @@ get_sequencer_style :: fn(style: Style) -> Style {
 }
 
 SequenceChannel :: struct {
-  check_buttons: List![CheckButton];
-  sound: Sound;
-  active: bool;
-  style: Style;
-  volume : int = 50;
-  old_volume : int = 50;
-  volume_slider: Slider![int];
+  check_buttons: List![CheckButton],
+  sound: Sound,
+  active: bool,
+  style: Style,
+  volume : int,
+  old_volume : int,
+  volume_slider: Slider![int],
 }
 
 impl SequenceChannel {

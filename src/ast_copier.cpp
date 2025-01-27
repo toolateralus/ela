@@ -65,8 +65,6 @@ ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = copy(node);
   if (new_node->tag == ASTParamDecl::Normal) {
     new_node->normal.type = static_cast<ASTType *>(copy_node(node->normal.type));
-    if (node->normal.default_value)
-      new_node->normal.default_value = static_cast<ASTExpr *>(copy_node(node->normal.default_value.get()));
   } else {
     new_node->self.is_pointer = node->self.is_pointer;
   }
@@ -249,12 +247,15 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  new_node->fields.clear();
+  new_node->members.clear();
   if (node->where_clause) {
     new_node->where_clause = (ASTWhere *)copy_node(node->where_clause.get());
   }
-  for (auto field : node->fields) {
-    new_node->fields.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
+  for (auto &member : node->members) {
+    new_node->members.push_back({.is_bitfield = member.is_bitfield,
+                                 .bitsize = member.bitsize,
+                                 .name = member.name,
+                                 .type = static_cast<ASTType *>(copy_node(member.type))});
   }
   new_node->subtypes.clear();
   for (auto subtype : node->subtypes) {

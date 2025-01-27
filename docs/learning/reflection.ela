@@ -4,8 +4,8 @@
 // Define a simple vector structure.
 Vector2 :: struct {
   // with 2 float fields.
-  x: float = 0;
-  y: float = 0;
+  x: float,
+  y: float
 }
 
 impl Vector2 {

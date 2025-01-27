@@ -52,7 +52,7 @@ int CompileCommand::compile() {
 
     std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-    auto compilation_string = std::format("clang++ -std=c++23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
+    auto compilation_string = std::format("clang -std=c23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
                                           output_path.string(), output_flag, extra_flags);
 
     if (compile_command.has_flag("x"))
@@ -140,9 +140,9 @@ CompileCommand::CompileCommand(int argc, char *argv[]) {
     std::string filename = input_fs_path.filename().string();
     size_t pos = filename.rfind(".ela");
     if (pos != std::string::npos) {
-      filename.replace(pos, 4, ".cpp");
+      filename.replace(pos, 4, ".c");
     } else {
-      filename += ".cpp";
+      filename += ".c";
     }
     output_path = filename;
   }

@@ -9,24 +9,6 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
   return (a + 10, b + 10);
 }
 
-#test test_tuple_ptr :: fn () {
-  ptr : (int, int)* = malloc(32) as (int, int)*;
-  *ptr = (10, 10);
-  {
-    a, b := *ptr; 
-    assert("mallocing with tuple failed", a == 10 && b == 10);
-  }
-
-  #error "I don't know what's going on here but (...)* gets emitted really oddly";
-  ptr_arr: List![(int, int)*];
-  ptr_arr.push(ptr);
-  {
-    a, b := *(ptr_arr[0]);
-    assert("mallocing into tuple array failed", a == 10 && b == 10);
-  }   
-
-  free(ptr);
-}
 
 #test test_tuple_array :: fn() {
   array : (int, int)[1] = {(10, 10)};
@@ -66,4 +48,29 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
     a,b,c,d := t2;
     assert("Destructuring inferred tuple failed.", a == 3 && b == 2 && c == 1 && d == 0);
   }
+}
+
+
+/* 
+  TODO: Fix this!!
+  Having pointers to tuples completely breaks the emitters.
+*/
+#test test_tuple_ptr :: fn () {
+  assert("Tuple pointers have a big bug where we emit 'typedef struct ... * {}' where there's a pointer ina struct declaration. I have no idea why", false);
+  // #error "Something is wrong here with the eldest type dependency system, we're declaring a struct called 'typedef struct tuple *'";
+  // ptr : (int, int)* = malloc(32) as (int, int)*;
+  // *ptr = (10, 10);
+  // {
+  //   a, b := *ptr; 
+  //   assert("mallocing with tuple failed", a == 10 && b == 10);
+  // }
+
+  // ptr_arr: List![(int, int)*];
+  // ptr_arr.push(ptr);
+  // {
+  //   a, b := *(ptr_arr[0]);
+  //   assert("mallocing into tuple array failed", a == 10 && b == 10);
+  // }   
+
+  // free(ptr);
 }

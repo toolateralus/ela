@@ -1,120 +1,118 @@
-;
-
 __bind_gen__anon_D0 :: struct {
-  __low : u32;
-  __high : u32;
+  __low : u32,
+  __high : u32,
 };
 
 __atomic_wide_counter :: union {
-  __value64 : u64;
-  __value32 : __bind_gen__anon_D0;
+  __value64 : u64,
+  __value32 : __bind_gen__anon_D0,
 };
 
 __pthread_internal_list :: struct {
-  __prev : __pthread_internal_list *;
-  __next : __pthread_internal_list *;
+  __prev : __pthread_internal_list *,
+  __next : __pthread_internal_list *,
 };
 #alias __pthread_list_t :: __pthread_internal_list;
 
 __pthread_internal_slist :: struct {
-  __next : __pthread_internal_slist *;
+  __next : __pthread_internal_slist *
 };
 #alias __pthread_slist_t :: __pthread_internal_slist;
 
 __pthread_mutex_s :: struct {
-  __lock : s32;
-  __count : u32;
-  __owner : s32;
-  __nusers : u32;
-  __kind : s32;
-  __spins : s16;
-  __elision : s16;
-  __list : __pthread_list_t;
+  __lock : s32,
+  __count : u32,
+  __owner : s32,
+  __nusers : u32,
+  __kind : s32,
+  __spins : s16,
+  __elision : s16,
+  __list : __pthread_list_t,
 };
 
 __pthread_rwlock_arch_t :: struct {
-  __readers : u32;
-  __writers : u32;
-  __wrphase_futex : u32;
-  __writers_futex : u32;
-  __pad3 : u32;
-  __pad4 : u32;
-  __cur_writer : s32;
-  __shared : s32;
-  __rwelision : s8;
-  __pad1 : u8[7];
-  __pad2 : u64;
-  __flags : u32;
+  __readers : u32,
+  __writers : u32,
+  __wrphase_futex : u32,
+  __writers_futex : u32,
+  __pad3 : u32,
+  __pad4 : u32,
+  __cur_writer : s32,
+  __shared : s32,
+  __rwelision : s8,
+  __pad1 : u8[7],
+  __pad2 : u64,
+  __flags : u32,
 };
 
 __pthread_cond_s :: struct {
-  __wseq : __atomic_wide_counter;
-  __g1_start : __atomic_wide_counter;
-  __g_refs : u32[2];
-  __g_size : u32[2];
-  __g1_orig_size : u32;
-  __wrefs : u32;
-  __g_signals : u32[2];
+  __wseq : __atomic_wide_counter,
+  __g1_start : __atomic_wide_counter,
+  __g_refs : u32[2],
+  __g_size : u32[2],
+  __g1_orig_size : u32,
+  __wrefs : u32,
+  __g_signals : u32[2],
 };
 
 #alias __tss_t :: u32;
 #alias __thrd_t :: u64;
 __once_flag :: struct {
-  __data : s32;
+  __data : s32
 };
 #alias pthread_t :: u64;
 
 pthread_mutexattr_t :: union {
-  __size : u8[4];
-  __align : s32;
+  __size : u8[4],
+  __align : s32,
 };
 
 pthread_condattr_t :: union {
-  __size : u8[4];
-  __align : s32;
+  __size : u8[4],
+  __align : s32,
 };
 
 #alias pthread_key_t :: u32;
 #alias pthread_once_t :: s32;
 
 pthread_attr_t :: union {
-  __size : u8[56];
-  __align : s64;
+  __size : u8[56],
+  __align : s64,
 };
 
 pthread_mutex_t :: union {
-  __data : __pthread_mutex_s;
-  __size : u8[40];
-  __align : s64;
+  __data : __pthread_mutex_s,
+  __size : u8[40],
+  __align : s64,
 };
 
 pthread_cond_t :: union {
-  __data : __pthread_cond_s;
+  __data : __pthread_cond_s,
   __size : u8[48];
   __align : s64;
 };
 
 pthread_rwlock_t :: union {
-  __data : __pthread_rwlock_arch_t;
-  __size : u8[56];
-  __align : s64;
+  __data : __pthread_rwlock_arch_t,
+  __size : u8[56],
+  __align : s64,
 };
 
 pthread_rwlockattr_t :: union {
-  __size : u8[8];
-  __align : s64;
+  __size : u8[8],
+  __align : s64,
 };
 
 #alias pthread_spinlock_t :: int;
 
 pthread_barrier_t :: union {
-  __size : u8[32];
-  __align : s64;
+  __size : u8[32],
+  __align : s64,
 };
 
 pthread_barrierattr_t :: union {
-  __size : u8[4];
-  __align : s32;
+  __size : u8[4],
+  __align : s32,
 };
 
 #alias ThreadFunction :: fn*(void*);
@@ -128,7 +126,7 @@ start_thread :: fn(arg: void*) -> void*;
 
 /* Simple thread struct */
 Thread :: struct {
-  handle: pthread_t;
+  handle: pthread_t
 }
 
 impl Thread {    
@@ -163,7 +161,7 @@ start_thread :: fn(arg: void*) -> void* {
 
 /* Simple mutex */
 Mutex :: struct {
-  handle: pthread_mutex_t;
+  handle: pthread_mutex_t
 }
 
 impl Mutex {
