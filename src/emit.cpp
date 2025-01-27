@@ -174,19 +174,50 @@ typedef unsigned char u8;
 
 )__";
 
+void Emitter::forward_decl_type(Type* type) {
+  switch (type->kind) {
+    case TYPE_STRUCT: {
+      auto info = type->get_info()->template as<StructTypeInfo>();
+      std::string kw = "struct ";
+      if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
+        kw = "union ";
+      (*ss) << kw << type->get_base().get_str() << ";\n";
+    } break;
+    case TYPE_TUPLE:
+    case TYPE_TAGGED_UNION: {
+      (*ss) << "struct " << to_cpp_string(type) << ";\n";
+    } break;
+    case TYPE_FUNCTION: {
+      auto info = type->get_info()->template as<FunctionTypeInfo>();
+      for (int index = 0; index < info->params_len; index++) {
+        auto param_ty = info->parameter_types[index];
+        forward_decl_type(global_get_type(param_ty));
+      }
+      forward_decl_type(global_get_type(info->return_type));
+    } break;
+    case TYPE_SCALAR:
+      break;
+    case TYPE_ENUM:
+    case TYPE_INTERFACE:
+      throw_error(std::format("Internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
+                  {});
+      break;
+  }
+}
+
 template <typename T> void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
   for (auto &instantiation : instantiations) {
-    auto type = global_get_type(instantiation.node->resolved_type);
     for (auto type_id : instantiation.arguments) {
       auto type = global_get_type(type_id);
       if (type->base_id != Type::invalid_id) {
         type = global_get_type(type->base_id);
-      }
-      if (type->declaring_node) {
+        forward_decl_type(type);
+      } else if (type->declaring_node) {
         type->declaring_node.get()->accept(this);
       }
     }
     instantiation.node->accept(this);
+    auto type = global_get_type(instantiation.node->resolved_type);
     emit_tuple_dependants(type->tuple_dependants);
   }
 }
@@ -687,8 +718,8 @@ void Emitter::visit(ASTStructDeclaration *node) {
     auto type = global_get_type(field->type->resolved_type);
     if (type->base_id != Type::invalid_id) {
       type = global_get_type(type->base_id);
-    }
-    if (type->declaring_node) {
+      forward_decl_type(type);
+    } else if (type->declaring_node) {
       type->declaring_node.get()->accept(this);
     }
   }
@@ -1345,6 +1376,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 }
 
 std::string Emitter::get_elements_function(Type *type) {
+  // TODO: need 
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
