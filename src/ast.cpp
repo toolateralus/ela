@@ -1105,9 +1105,9 @@ ASTStatement *Parser::parse_statement() {
   if (peek().type == TType::Impl) {
     return parse_impl();
   }
-
+  
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly && lookahead_buf()[3].type != TType::LParen) {
+      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly) {
     NODE_ALLOC(ASTExprStatement, expr, range, _, this)
     expr->expression = parse_expr();
     end_node(expr, range);

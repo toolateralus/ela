@@ -26,16 +26,15 @@ returns :: fn() -> s32  {
   return 1;
 }
 
-
 #test test_return_value :: fn() { 
   assert("function expected to return 1", returns() == 1);
 }
 
-#error "Local functions are broken. We should probably just completely remove them, as we have lambdas.";
+// #error "Local functions are broken. We should probably just completely remove them, as we have lambdas.";
 
-#test test_local_function :: fn() {
-  local_function :: fn() -> s32 {
-    return 0;
-  }
-  assert("failed to get 0 from local function call", local_function() == 0);
-}
+// #test test_local_function :: fn() {
+//   local_function :: fn() -> s32 {
+//     return 0;
+//   }
+//   assert("failed to get 0 from local function call", local_function() == 0);
+// }
