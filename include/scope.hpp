@@ -88,7 +88,7 @@ struct Scope {
   void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
   int create_tagged_union(const InternedString &name, Scope *scope) {
-    auto id = global_create_tagged_union_type(name, scope);
+    auto id = global_create_tagged_union_type(name, scope, {});
     types[name] = id;
     return id;
   }

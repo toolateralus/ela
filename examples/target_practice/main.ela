@@ -1,4 +1,22 @@
 #import rayui;
+#import raylib;
+#import file;
+
+list_erase :: fn![T](list: List![T], value: T) -> bool {
+  if list.length == 0 {
+    return false;
+  }
+  for i in 0..list.length {
+    if list.data[i] == value {
+      for j in i..list.length - 1 {
+        list.data[j] = list.data[j + 1];
+      }
+      list.length--;
+      return true;
+    }
+  }
+  return false;
+}
 
 Scene :: enum {
   MainMenu,
@@ -119,7 +137,7 @@ Particle :: struct {
   kind: int;
   position: Vector2;
   scale: Vector2;
-  color: Color = WHITE;
+  color: Color;
 }
 
 Character :: struct {
@@ -182,7 +200,7 @@ TextParticle :: struct {
   text: string;
   spawn_time: float;
   lifetime: float;
-  color: Color = WHITE;
+  color: Color;
 }
 
 #region Global Variables {
@@ -405,10 +423,12 @@ draw_game :: fn() {
   for bullet in bullets {
     DrawTexturePro(bullet.render_info.texture, bullet.render_info.tex_rect, bullet.rect, bullet.origin, bullet.rotation, WHITE);
   }
+
   for enemy in enemies {
     // println($"{enemy.render_info.tex_rect.x}, {enemy.render_info.tex_rect.y}, {enemy.render_info.tex_rect.width}, {enemy.render_info.tex_rect.height}")
     DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);
   }
+
   for particle in particles {
     rect : Rectangle = {
       x: particle.position.x,
@@ -499,7 +519,9 @@ update_game :: fn() {
     if round_finish_start_time == -1.0 { round_finish_start_time = GetTime(); }
     now : float = GetTime() as float;
     if now - round_finish_start_time < 2.0 {
-      text : string = $"Round: {round_index + 1}...";
+      text := $"Round: {round_index + 1}...";
+      defer free(text);
+
       style := jiggly_text_style;
       style.foreground = Color::lerp(GREEN, CYAN, 0.5);
       style.font_size = 18;
@@ -582,7 +604,6 @@ update_game :: fn() {
   for enemy in enemies {
     enemy_move_towards_or_get_new_target(enemy);
     enemy.rotation += enemy_rotation_speed;
-
     if enemy.rotation >= 360.0 {
       enemy.rotation = 0.0;
     }
@@ -638,19 +659,20 @@ update_game :: fn() {
         amount : int = (distance * round_index) as int;
         score += amount
         ui_text_color.a = 255 as u8;
-        make_text_particle($"+{amount}", 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as float) as float);
+        
+        make_text_particle(string::from($"+{amount}"), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as float) as float);
         break;
       }
     }
   }
 
   for bullet in dead_bullets {
-    bullets.erase(bullet);
+    list_erase![Bullet*](bullets, bullet);
     free(bullet);
   }
 
   for enemy in dead_enemies {
-    enemies.erase(enemy);
+    list_erase![Enemy*](enemies, enemy);
     free(enemy);
   }
 
@@ -661,7 +683,7 @@ update_game :: fn() {
   }
 
   for particle in dead_particles {
-    particles.erase(particle);
+    list_erase![Particle*](particles, particle);
     free(particle);
   }
 
@@ -676,7 +698,7 @@ update_game :: fn() {
   }
 
   for particle in dead_text_particles {
-    text_particles.erase(particle);
+    //list_erase![TextParticle*](text_particles, particle);
     free(particle);
   }
 
@@ -777,6 +799,7 @@ reset_game_state :: fn() {
   }
   while text_particles.length > 0 {
     n := text_particles.pop();
+    n.text.deinit();
   }
 }
 
@@ -790,24 +813,25 @@ swap_music :: fn() {
   PlayMusicStream(*current_music);
 }
 
-start_game_callback :: fn() {
-  scene = !scene;
-  game_start_time = GetTime();
-  reset_game_state();
-  bg_color = BLACK;
-  round_index = 0;
-  round_failed = false;
-}
-
 draw_main_menu :: fn() {
   width : float = 72;
   height : float = 48;
-  draw_button("Start game", {
-    x: screen_width / 2 - (width / 2),
-    y: screen_height / 1.2 - (height / 2),
-    width: width, 
-    height: height},
-  button_style, &start_game_callback);
+
+  start_button_rect := Rectangle {
+    x: screen_width / 2 - (width / 2), 
+    y: screen_height / 1.2 - (height / 2), 
+    width: width,
+    height: height
+  }
+  
+  if button("Start game", start_button_rect, button_style) {
+    scene = !scene;
+    game_start_time = GetTime();
+    reset_game_state();
+    bg_color = BLACK;
+    round_index = 0;
+    round_failed = false;
+  }
 
   rect : Rectangle = {
     x: screen_width / 7,
@@ -843,27 +867,7 @@ draw_main_menu :: fn() {
   }
 }
 
-switch_music_callback :: fn() {
-  StopMusicStream(*current_music);
-  if current_music == &game_music {
-    current_music = &menu_music;
-  } else {
-    current_music = &game_music;
-  }
-  PlayMusicStream(*current_music);
-
-}
-
 music_muted := false;
-mute_music_callback :: fn() {
-  if music_muted {
-    PlayMusicStream(*current_music);
-    music_muted = false;
-  } else {
-    music_muted = true;
-    StopMusicStream(*current_music);
-  }
-}
 
 draw_game_menu :: fn() {
   width : float = 72 / 3;
@@ -871,14 +875,31 @@ draw_game_menu :: fn() {
 
   style := button_style;
   style.use_jiggly_text = false;
-  draw_button("swap music", {x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height}, style, &switch_music_callback);
+  swap_rect := Rectangle {x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height};
+
+  if button("swap music", swap_rect, style) {
+    StopMusicStream(*current_music);
+    if current_music == &game_music {
+      current_music = &menu_music;
+    } else {
+      current_music = &game_music;
+    }
+    PlayMusicStream(*current_music);
+  }
 
   style = button_style;
   style.use_jiggly_text = false;
-  draw_button("mute music", {x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height}, style, &mute_music_callback);
+  mute_rect := Rectangle {x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height};
 
-
-
+  if button("mute music", mute_rect, style) {
+    if music_muted {
+      PlayMusicStream(*current_music);
+      music_muted = false;
+    } else {
+      music_muted = true;
+      StopMusicStream(*current_music);
+    }
+  }
 }
 
 main :: fn() {

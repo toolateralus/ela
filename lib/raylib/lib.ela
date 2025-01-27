@@ -33,73 +33,10 @@ impl Color {
       a: (a.a + (b.a - a.a) * t) as u8,
     };
   }
-
   to_string :: fn(self*) -> c_string {
     return $"Color(r: {self.r}, g: {self.g}, b: {self.b}, a: {self.a})";
   }
 }
-
-CLEAR: Color;
-WHITE: Color = { r: 255 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
-BLACK: Color = { r: 0 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
-RED: Color = { r: 255 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
-GREEN: Color = { r: 0 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
-BLUE: Color = { r: 0 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
-YELLOW: Color = { r: 255 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
-PURPLE: Color = { r: 255 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
-ORANGE: Color = { r: 255 as u8, g: 165 as u8, b: 0 as u8, a: 255 as u8 };
-GRAY: Color = { r: 128 as u8, g: 128 as u8, b: 128 as u8, a: 255 as u8 };
-DARKGRAY: Color = { r: 80 as u8, g: 80 as u8, b: 80 as u8, a: 255 as u8 };
-LIGHTGRAY: Color = { r: 200 as u8, g: 200 as u8, b: 200 as u8, a: 255 as u8 };
-BROWN: Color = { r: 165 as u8, g: 42 as u8, b: 42 as u8, a: 255 as u8 };
-PINK: Color = { r: 255 as u8, g: 192 as u8, b: 203 as u8, a: 255 as u8 };
-LIME: Color = { r: 0 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
-DARKGREEN: Color = { r: 0 as u8, g: 100 as u8, b: 0 as u8, a: 255 as u8 };
-SKYBLUE: Color = { r: 135 as u8, g: 206 as u8, b: 235 as u8, a: 255 as u8 };
-VIOLET: Color = { r: 238 as u8, g: 130 as u8, b: 238 as u8, a: 255 as u8 };
-GOLD: Color = { r: 255 as u8, g: 215 as u8, b: 0 as u8, a: 255 as u8 };
-BEIGE: Color = { r: 245 as u8, g: 245 as u8, b: 220 as u8, a: 255 as u8 };
-MAGENTA: Color = { r: 255 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
-MAROON: Color = { r: 128 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
-DARKBLUE: Color = { r: 0 as u8, g: 0 as u8, b: 139 as u8, a: 255 as u8 };
-DARKPURPLE: Color = { r: 139 as u8, g: 0 as u8, b: 139 as u8, a: 255 as u8 };
-DARKBROWN: Color = { r: 101 as u8, g: 67 as u8, b: 33 as u8, a: 255 as u8 };
-CYAN: Color = { r: 0 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
-DARKCYAN: Color = { r: 0 as u8, g: 139 as u8, b: 139 as u8, a: 255 as u8 };
-LIGHTCYAN: Color = { r: 224 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
-
-// Exclude black and white.
-All_Colors := fn() -> List![Color] {
-  list : List![Color];
-  list.push(WHITE);
-  list.push(RED);
-  list.push(GREEN);
-  list.push(BLUE);
-  list.push(YELLOW);
-  list.push(PURPLE);
-  list.push(ORANGE);
-  list.push(GRAY);
-  list.push(DARKGRAY);
-  list.push(LIGHTGRAY);
-  list.push(BROWN);
-  list.push(PINK);
-  list.push(LIME);
-  list.push(DARKGREEN);
-  list.push(SKYBLUE);
-  list.push(VIOLET);
-  list.push(GOLD);
-  list.push(BEIGE);
-  list.push(MAGENTA);
-  list.push(MAROON);
-  list.push(DARKBLUE);
-  list.push(DARKPURPLE);
-  list.push(DARKBROWN);
-  list.push(CYAN);
-  list.push(DARKCYAN);
-  list.push(LIGHTCYAN);
-  return list;
-}();
-
 
 impl Rectangle {
   to_string :: fn(self*) -> c_string {
@@ -302,6 +239,68 @@ impl Vector4 {
     return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z) + (self.w - other.w) * (self.w - other.w)) as float32;
   }
 }
+
+CLEAR: Color;
+WHITE: Color = { r: 255 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
+BLACK: Color = { r: 0 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
+RED: Color = { r: 255 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
+GREEN: Color = { r: 0 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
+BLUE: Color = { r: 0 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
+YELLOW: Color = { r: 255 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
+PURPLE: Color = { r: 255 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
+ORANGE: Color = { r: 255 as u8, g: 165 as u8, b: 0 as u8, a: 255 as u8 };
+GRAY: Color = { r: 128 as u8, g: 128 as u8, b: 128 as u8, a: 255 as u8 };
+DARKGRAY: Color = { r: 80 as u8, g: 80 as u8, b: 80 as u8, a: 255 as u8 };
+LIGHTGRAY: Color = { r: 200 as u8, g: 200 as u8, b: 200 as u8, a: 255 as u8 };
+BROWN: Color = { r: 165 as u8, g: 42 as u8, b: 42 as u8, a: 255 as u8 };
+PINK: Color = { r: 255 as u8, g: 192 as u8, b: 203 as u8, a: 255 as u8 };
+LIME: Color = { r: 0 as u8, g: 255 as u8, b: 0 as u8, a: 255 as u8 };
+DARKGREEN: Color = { r: 0 as u8, g: 100 as u8, b: 0 as u8, a: 255 as u8 };
+SKYBLUE: Color = { r: 135 as u8, g: 206 as u8, b: 235 as u8, a: 255 as u8 };
+VIOLET: Color = { r: 238 as u8, g: 130 as u8, b: 238 as u8, a: 255 as u8 };
+GOLD: Color = { r: 255 as u8, g: 215 as u8, b: 0 as u8, a: 255 as u8 };
+BEIGE: Color = { r: 245 as u8, g: 245 as u8, b: 220 as u8, a: 255 as u8 };
+MAGENTA: Color = { r: 255 as u8, g: 0 as u8, b: 255 as u8, a: 255 as u8 };
+MAROON: Color = { r: 128 as u8, g: 0 as u8, b: 0 as u8, a: 255 as u8 };
+DARKBLUE: Color = { r: 0 as u8, g: 0 as u8, b: 139 as u8, a: 255 as u8 };
+DARKPURPLE: Color = { r: 139 as u8, g: 0 as u8, b: 139 as u8, a: 255 as u8 };
+DARKBROWN: Color = { r: 101 as u8, g: 67 as u8, b: 33 as u8, a: 255 as u8 };
+CYAN: Color = { r: 0 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
+DARKCYAN: Color = { r: 0 as u8, g: 139 as u8, b: 139 as u8, a: 255 as u8 };
+LIGHTCYAN: Color = { r: 224 as u8, g: 255 as u8, b: 255 as u8, a: 255 as u8 };
+
+// Exclude black and white.
+All_Colors := fn() -> List![Color] {
+  list : List![Color];
+  list.push(WHITE);
+  list.push(RED);
+  list.push(GREEN);
+  list.push(BLUE);
+  list.push(YELLOW);
+  list.push(PURPLE);
+  list.push(ORANGE);
+  list.push(GRAY);
+  list.push(DARKGRAY);
+  list.push(LIGHTGRAY);
+  list.push(BROWN);
+  list.push(PINK);
+  list.push(LIME);
+  list.push(DARKGREEN);
+  list.push(SKYBLUE);
+  list.push(VIOLET);
+  list.push(GOLD);
+  list.push(BEIGE);
+  list.push(MAGENTA);
+  list.push(MAROON);
+  list.push(DARKBLUE);
+  list.push(DARKPURPLE);
+  list.push(DARKBROWN);
+  list.push(CYAN);
+  list.push(DARKCYAN);
+  list.push(LIGHTCYAN);
+  return list;
+}();
+
 
 impl Color {
   random :: fn(max: u8) -> #self {
