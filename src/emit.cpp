@@ -37,28 +37,10 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
 #ifdef TESTING
 #define __TEST_RUNNER_MAIN                                                                                             \
   int main() {                                                                                                         \
-    int failed = 0;                                                                                                    \
-    int passed = 0;                                                                                                    \
-    const char *failed_tests[sizeof(tests) / sizeof(tests[0])];                                                        \
-    int failed_index = 0;                                                                                              \
-    for (const auto &test : tests) {                                                                                   \
-      if (test.run()) {                                                                                                \
-        passed++;                                                                                                      \
-      } else {                                                                                                         \
-        failed_tests[failed_index++] = test.name;                                                                      \
-        failed++;                                                                                                      \
-      }                                                                                                                \
+    for (int i = 0; i < sizeof(tests) / sizeof(__COMPILER_GENERATED_TEST); i++) {                                      \
+      __COMPILER_GENERATED_TEST_RUN(&tests[i]);                                                                        \
     }                                                                                                                  \
-    printf("\033[1;31mfailed: %d, \033[1;32mpassed: "                                                                  \
-           "%d\033[0m\n",                                                                                              \
-           failed, passed);                                                                                            \
-    if (failed > 0) {                                                                                                  \
-      for (int i = 0; i < failed_index; ++i) {                                                                         \
-        printf("\033[1;31mfailed \033[0m::(\033[1;35m%s\033[0m)\n", failed_tests[i]);                                  \
-      }                                                                                                                \
-    }                                                                                                                  \
-  }
-
+  }                                                                                                                     
 #endif
 )__";
 
@@ -79,91 +61,59 @@ typedef unsigned short int u16;
 typedef signed char s8;
 typedef unsigned char u8;
 #if USE_STD_LIB
-  #include <tuple>
-  #include <initializer_list>
+  #include <stddef.h>
   #include <stdint.h>
-  #include <unordered_map>
   #include <errno.h>
   #undef RAND_MAX
 #endif
 
 #ifdef TESTING
-  extern "C" char *strcpy(char *dest, const char *src);
-  extern "C" int system(const char *);
-  extern "C" void free(void *);
-  extern "C" void *malloc(u64);
-  extern "C" void *calloc(u64, u64);
-  extern "C" void *realloc(void *, u64);
-  extern "C" void *memcpy(void *, void *, u64);
-  extern "C" void *memset(void *, int, u64);
-  extern "C" int memmove(void *, void *, s64);
-  extern "C" int printf(const char *, ...);
-  extern "C" void exit(int);
-  extern "C" int scanf(const char *, ...);
-  extern "C" int getchar();
-  extern "C" void sleep(int);
-  extern "C" void usleep(int);
-  extern "C" const char *strdup(const char *);
-  extern "C" const char *strndup(const char *, u64);
-  extern "C" const char *strerror(int);
-  extern "C" s64 strtol(const char *, char ***, int);
-  extern "C" u64 strtoul(const char *, char ***, int);
-  extern "C" float64 strtod(const char *, char ***);
-  extern "C" const char *strtok(const char *, const char *);
-  extern "C" const char *strchr(const char *, int);
-  extern "C" const char *strrchr(const char *, int);
-  extern "C" const char *strstr(const char *, const char *);
-  extern "C" int strlen(const char *);
-  extern "C" int strcmp(const char *, const char *);
-  extern "C" const char *strcat(const char *, const char *);
-  extern "C" int snprintf(char *, u64, const char *, ...);
-  extern "C" int sprintf(char *, const char *, ...);
-  extern "C" int strncmp(const char *, const char *, int);
-  struct __test_exception {
-    const char *m_what;
-    template <typename... Args> __test_exception(const char *fmt, Args &&...args) {
-      char buf[1024];
-      snprintf(buf, sizeof(buf), fmt, args...);
-      m_what = new char[strlen(buf) + 1];
-      strcpy(const_cast<char *>(m_what), buf);
-    }
-    ~__test_exception() { delete[] m_what; }
-    const char *what() const { return m_what; }
-  };
-  struct __COMPILER_GENERATED_TEST {
-    __COMPILER_GENERATED_TEST() {}
-    __COMPILER_GENERATED_TEST(const char *name, void (*function)()) : name(name), function(function) {}
+  char *strcpy(char *dest, const char *src);
+  int system(const char *);
+  void free(void *);
+  void *malloc(u64);
+  void *calloc(u64, u64);
+  void *realloc(void *, u64);
+  void *memcpy(void *, void *, u64);
+  void *memset(void *, int, u64);
+  int memmove(void *, void *, s64);
+  int printf(const char *, ...);
+  void exit(int);
+  int scanf(const char *, ...);
+  int getchar();
+  void sleep(int);
+  void usleep(int);
+  const char *strdup(const char *);
+  const char *strndup(const char *, u64);
+  const char *strerror(int);
+  s64 strtol(const char *, char ***, int);
+  u64 strtoul(const char *, char ***, int);
+  float64 strtod(const char *, char ***);
+  const char *strtok(const char *, const char *);
+  const char *strchr(const char *, int);
+  const char *strrchr(const char *, int);
+  const char *strstr(const char *, const char *);
+  int strlen(const char *);
+  int strcmp(const char *, const char *);
+  const char *strcat(const char *, const char *);
+  int snprintf(char *, u64, const char *, ...);
+  int sprintf(char *, const char *, ...);
+  int strncmp(const char *, const char *, int);
+  
+  typedef struct {
     const char *name;
     void (*function)();
-    bool run() const {
-  #ifdef TEST_VERBOSE
-      printf("\033[1;33mtesting \033[1;37m...\033[1;36m%-40s", name);
-      try {
-        function();
-        printf("\033[1;32m[passed]\033[0m\n");
-        return true;
-      } catch (__test_exception &e) {
-        printf("\033[1;31m[failed]\033[0m\n");
-        printf("%s", e.what());
-        return false;
-      }
-  #else
-      try {
-        function();
-        return true;
-      } catch (__test_exception &e) {
-        printf("%s", e.what());
-        return false;
-      }
-  #endif
-    }
-  };
+  } __COMPILER_GENERATED_TEST;
+  static void __COMPILER_GENERATED_TEST_RUN(__COMPILER_GENERATED_TEST *test) {
+    printf("running %s\n", test->name);
+    test->function();
+  }
 
   #define assert(message, condition)                                                                                     \
-    if (!(condition))                                                                                                    \
-      throw __test_exception("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "        \
-                            "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                         \
-                            #condition, message);
+  printf("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "                          \
+         "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                                           \
+         #condition, message);                                                                                         \
+  exit(1);
 #else
   #define assert(message, condition)                                                                                     \
     if (!(condition)) {                                                                                                  \
@@ -171,17 +121,16 @@ typedef unsigned char u8;
       exit(1);                                                                                                           \
     }
 #endif
-
 )__";
 
-void Emitter::forward_decl_type(Type* type) {
+void Emitter::forward_decl_type(Type *type) {
   switch (type->kind) {
     case TYPE_STRUCT: {
       auto info = type->get_info()->template as<StructTypeInfo>();
-      std::string kw = "struct ";
+      std::string kw = "typedef struct ";
       if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
-        kw = "union ";
-      (*ss) << kw << type->get_base().get_str() << ";\n";
+        kw = "typedef union ";
+      (*ss) << kw << type->get_base().get_str() << " " << type->get_base().get_str() << ";\n";
     } break;
     case TYPE_TUPLE:
     case TYPE_TAGGED_UNION: {
@@ -199,8 +148,9 @@ void Emitter::forward_decl_type(Type* type) {
       break;
     case TYPE_ENUM:
     case TYPE_INTERFACE:
-      throw_error(std::format("Internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
-                  {});
+      throw_error(
+          std::format("Internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
+          {});
       break;
   }
 }
@@ -467,7 +417,7 @@ void Emitter::visit(ASTLiteral *node) {
       return;
     }
     case ASTLiteral::Null:
-      (*ss) << "nullptr";
+      (*ss) << "NULL";
       return;
     case ASTLiteral::String:
       output = std::format("\"{}\"", node->value);
@@ -598,12 +548,17 @@ void Emitter::visit(ASTDeclaration *node) {
   auto symbol = ctx.scope->local_lookup(node->name);
 
   auto handle_initialization = [&]() {
-    if (node->value.is_not_null()) {
+    if (node->value.is_not_null() && emit_default_value) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
       node->value.get()->accept(this);
     } else if (emit_default_init) {
-      (*ss) << "{}";
+      auto type = global_get_type(node->type->resolved_type);
+      if (type->is_kind(TYPE_STRUCT)) {
+        (*ss) << "= (" + to_cpp_string(type) + ") {}";
+      } else {
+        (*ss) << "= (" + to_cpp_string(type) + ") {0}";
+      }
     }
   };
 
@@ -639,9 +594,10 @@ void Emitter::visit(ASTDeclaration *node) {
   if (type->get_ext().is_fixed_sized_array()) {
     (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     if (node->value.is_not_null()) {
+      (*ss) << " = ";
       node->value.get()->accept(this);
     } else if (emit_default_init) {
-      (*ss) << "{}";
+      (*ss) << "= {0}";
     }
     return;
   }
@@ -658,7 +614,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   emit_default_args = true;
 
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-    (*ss) << "extern \"C\" ";
+    (*ss) << "extern  ";
   }
 
   node->return_type->accept(this);
@@ -668,23 +624,26 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   emit_default_args = false;
 }
 void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
-  // Right now we just always do a closure on local lambda functions.
-  // This probably isn't desirable for simple in-out functions
-  (*ss) << indent() << "auto " << node->name.get_str() << " = [&]";
-  node->params->accept(this);
-  (*ss) << " -> ";
-  node->return_type->accept(this);
-  if (node->block.is_null()) {
-    throw_error("local function cannot be #foreign", node->source_range);
-  }
-  node->block.get()->accept(this);
+  //! We cannot do this kind of lambda when transpiling to C.
+  //! We need to figure out how to place a function above us at the global scope with the correct dependencies.
+
+  // // Right now we just always do a closure on local lambda functions.
+  // // This probably isn't desirable for simple in-out functions
+  // (*ss) << indent() << "auto " << node->name.get_str() << " = [&]";
+  // node->params->accept(this);
+  // (*ss) << " -> ";
+  // node->return_type->accept(this);
+  // if (node->block.is_null()) {
+  //   throw_error("local function cannot be #foreign", node->source_range);
+  // }
+  // node->block.get()->accept(this);
 }
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
-  (*ss) << "extern \"C\" ";
+  (*ss) << "extern ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
   (*ss) << node->name.get_str() << '(';
@@ -714,6 +673,17 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   node->is_emitted = true;
 
+  auto old_init = emit_default_init;
+  auto old_default_val = emit_default_value;
+
+  Defer _defer([&] {
+    emit_default_init = old_init;
+    emit_default_value = old_default_val;
+  });
+
+  emit_default_init = false;
+  emit_default_value = false;
+
   for (auto field : node->fields) {
     auto type = global_get_type(field->type->resolved_type);
     if (type->base_id != Type::invalid_id) {
@@ -729,33 +699,34 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   auto info = (type->get_info()->as<StructTypeInfo>());
 
-  auto type_tag = node->is_union ? " union " : " struct ";
+  std::string type_name = type->get_base().get_str();
+  ;
+  std::string type_tag = (node->is_union ? "typedef union " : "typedef struct ");
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
-      (*ss) << "extern \"C\" ";
+      (*ss) << "extern ";
     }
-    (*ss) << type_tag << type->get_base().get_str() << ";\n";
+    (*ss) << type_tag << " " << type_name << " " << type_name << ";\n";
     return;
   }
 
   ctx.set_scope(node->scope);
 
   if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
-    (*ss) << type_tag;
+    (*ss) << (node->is_union ? "union " : "struct ");
     (*ss) << "{\n";
   } else {
     if (node->is_extern) {
-      (*ss) << "extern \"C\" ";
+      (*ss) << "extern ";
     }
-    (*ss) << type_tag;
-    (*ss) << type->get_base().get_str() << "{\n";
+    (*ss) << type_tag << " " << type_name << "{\n";
   }
   indent_level++;
 
   auto old = emit_default_init;
-  if (node->is_union)
-    emit_default_init = false;
+
+  emit_default_init = false;
 
   Defer _defer1([&] { emit_default_init = old; });
 
@@ -773,7 +744,12 @@ void Emitter::visit(ASTStructDeclaration *node) {
     newline();
   }
 
-  (*ss) << "};\n";
+  // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
+  if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+    (*ss) << "};\n";
+  } else {
+    (*ss) << "} " << type_name << ";\n";
+  }
 
   emit_tuple_dependants(type->tuple_dependants);
 
@@ -789,7 +765,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   auto type_name = node->name.get_str();
   int n = 0;
-  (*ss) << "enum " << type_name << " {\n";
+  (*ss) << "typedef enum {\n";
   for (const auto &[key, value] : node->key_values) {
     (*ss) << type_name << "_" << key.get_str();
     if (node->is_flags) {
@@ -804,7 +780,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     }
     n++;
   }
-  (*ss) << "};\n";
+  (*ss) << "} " << type_name << ";\n";
   return;
 }
 
@@ -817,10 +793,6 @@ void Emitter::visit(ASTParamDecl *node) {
     } else {
       node->normal.type->accept(this);
       (*ss) << ' ' << node->normal.name.get_str();
-    }
-    if (node->normal.default_value.is_not_null() && emit_default_args) {
-      (*ss) << " = ";
-      node->normal.default_value.get()->accept(this);
     }
   } else {
     (*ss) << ' ' << to_cpp_string(type) << " self";
@@ -870,7 +842,7 @@ void Emitter::visit(ASTProgram *node) {
   code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {
-    code << "struct Type;\nextern Type **_type_info;\n";
+    code << "typedef struct Type Type;\nextern Type **_type_info;\n";
   }
 
   if (testing) {
@@ -896,7 +868,6 @@ void Emitter::visit(ASTProgram *node) {
     }
 
     code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
-
     // deploy the array of test struct wrappers.
     code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
 
@@ -1011,13 +982,13 @@ void Emitter::visit(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
 
   if (!type->get_ext().is_fixed_sized_array()) {
-    (*ss) << to_cpp_string(type);
+    (*ss) << "(" + to_cpp_string(type) + ")";
   }
   (*ss) << " {";
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
-      (*ss) << "}";
+      (*ss) << "0}";
       return;
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
@@ -1047,7 +1018,7 @@ void Emitter::visit(ASTInitializerList *node) {
 
 void Emitter::visit(ASTRange *node) {
   // TODO: fix this dog crap casting and lack of calculating the span of the range.
-  (*ss) << "Range{.begin = (s64)";
+  (*ss) << "(Range) {.begin = (s64)";
   node->left->accept(this);
   (*ss) << ", .end = (s64)";
   node->right->accept(this);
@@ -1096,7 +1067,7 @@ void Emitter::visit(ASTSwitch *node) {
 }
 void Emitter::visit(ASTTuple *node) {
   auto type = global_get_type(node->resolved_type);
-  auto name = to_cpp_string(type);
+  auto name = "(" + to_cpp_string(type) + ")";
   (*ss) << name << " {";
   for (int i = 0; i < node->values.size(); ++i) {
     auto &value = node->values[i];
@@ -1237,6 +1208,10 @@ std::string get_format_str(int type_id, ASTNode *node) {
 // TODO: This needs a lot of work, front to back.
 // Parsing, lexing, and emitting.
 void Emitter::interpolate_string(ASTLiteral *node) {
+  // TODO: we should remove interpolated strings, and replace with a variadic template system with statement unfolding.
+  (*ss) << "NULL";
+  return;
+
   emit_line_directive(node);
 
   std::string str;
@@ -1376,7 +1351,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 }
 
 std::string Emitter::get_elements_function(Type *type) {
-  // TODO: need 
+  // TODO: need
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
@@ -1585,8 +1560,8 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   }
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.get_str() << "\", " << node->name.get_str()
-                            << "),";
+    visitor->test_functions << "(__COMPILER_GENERATED_TEST){.name = \"" << node->name.get_str() << "\", .function = &"
+                            << node->name.get_str() << "},";
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
@@ -1838,7 +1813,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
 
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-      (*ss) << "extern \"C\" ";
+      (*ss) << "extern  ";
     }
 
     std::string name;
@@ -1950,16 +1925,19 @@ void Emitter::visit(ASTBlock *node) {
   ctx.exit_scope();
   return;
 }
+
 void Emitter::visit(ASTLambda *node) {
   // We parenthesize this because if you call it on the spot,
   // it thinks you're trying to do + on whatever this returns.
 
-  (*ss) << "(+[]";
-  node->params->accept(this);
-  (*ss) << " -> ";
-  node->return_type->accept(this);
-  node->block->accept(this);
-  (*ss) << ")";
+  // ! Transpiling lambdas to C will require more thought than this.
+  // (*ss) << "(+[]";
+  // node->params->accept(this);
+  // (*ss) << " -> ";
+  // node->return_type->accept(this);
+  // node->block->accept(this);
+  // (*ss) << ")";
+  (*ss) << "NULL";
 }
 
 // This should never get hit.

@@ -323,7 +323,6 @@ struct ASTParamDecl : ASTNode {
   union {
     struct {
       ASTType *type;
-      Nullable<ASTExpr> default_value;
       InternedString name;
     } normal;
     struct {

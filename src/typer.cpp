@@ -286,9 +286,6 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
-      if (normal.default_value.is_not_null()) {
-        info.default_params++;
-      }
       ctx.scope->insert(normal.name, param->resolved_type, param);
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
@@ -656,10 +653,6 @@ void Typer::visit(ASTParamDecl *node) {
                     "casts the length information off and gets passed as as "
                     "pointer. Consider using a dynamic array",
                     node->source_range);
-      if (node->normal.default_value.is_not_null()) {
-        throw_error("Cannot currently use default parameters for fixed buffer pointers.", node->source_range);
-      }
-
       // cast off the fixed size array and add a pointer to it,
       // for s8[] to s8*
       {
@@ -671,15 +664,6 @@ void Typer::visit(ASTParamDecl *node) {
     auto old_ty = declaring_or_assigning_type;
     declaring_or_assigning_type = id;
     Defer _defer([&] { declaring_or_assigning_type = old_ty; });
-
-    if (node->normal.default_value.is_not_null()) {
-      node->normal.default_value.get()->accept(this);
-      auto expr_type = node->normal.default_value.get()->resolved_type;
-      assert_types_can_cast_or_equal(
-          expr_type, node->resolved_type, node->source_range,
-          std::format("default parameter's expression type did not match the declared parameter type. parameter: {}",
-                      node->normal.name));
-    }
   }
 }
 
@@ -964,9 +948,6 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   int param_index = skip_first ? 1 : 0;
   for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
-      if (arg_index >= args_ct && !params->params[param_index]->normal.default_value) {
-        throw_error("Too few arguments to function", node->source_range);
-      }
       if (arg_index < args_ct) {
         declaring_or_assigning_type = params->params[param_index]->resolved_type;
         node->arguments[arg_index]->accept(this);
@@ -992,7 +973,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   Defer _([&]() { declaring_or_assigning_type = old_type; });
   auto args_ct = node->arguments.size();
   // TODO: rewrite this. this is so hard tor read.
-  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len - info->default_params) {
+  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
     throw_error(
         std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
                     info->params_len, args_ct, info->to_string()),

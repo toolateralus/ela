@@ -26,13 +26,6 @@ returns :: fn() -> s32  {
   return 1;
 }
 
-has_default_args :: fn(n : int = 0) -> int {
-  return n;
-} 
-
-#test test_default_args :: fn() {
-  assert("default args failed", has_default_args() == 0);
-}
 
 #test test_return_value :: fn() { 
   assert("function expected to return 1", returns() == 1);

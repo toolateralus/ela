@@ -65,8 +65,6 @@ ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   auto new_node = copy(node);
   if (new_node->tag == ASTParamDecl::Normal) {
     new_node->normal.type = static_cast<ASTType *>(copy_node(node->normal.type));
-    if (node->normal.default_value)
-      new_node->normal.default_value = static_cast<ASTExpr *>(copy_node(node->normal.default_value.get()));
   } else {
     new_node->self.is_pointer = node->self.is_pointer;
   }

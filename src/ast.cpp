@@ -1559,8 +1559,8 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     param->normal.name = name;
 
     if (peek().type == TType::Assign) {
-      eat();
-      param->normal.default_value = parse_expr();
+      end_node(nullptr, range);
+      throw_error("Ela does not support default parameters.", range);
     }
 
     params->params.push_back(param);

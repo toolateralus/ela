@@ -317,7 +317,7 @@ impl Iterable![char] for string {
   }
 }
 
-mem_zero :: fn![T](ptr: T*, count: u64 = 1) {
+mem_zero :: fn![T](ptr: T*, count: u64) {
   memset(ptr, 0, sizeof(T) * count);
 }
 
@@ -327,7 +327,7 @@ Allocator :: interface {
   free :: fn![T](self*, ptr: T*);
   allocate_array :: fn![T](self*, n: u64) -> T*;
   resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
-  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T*;
+  copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
 }
 
 Std_Allocator :: struct {}
@@ -345,7 +345,7 @@ impl Allocator for Std_Allocator {
   resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
     return realloc(ptr, sizeof(T) * new_size) as T*;
   }
-  copy :: fn![T](self*, ptr: T*, n: u64 = 1) -> T* {
+  copy :: fn![T](self*, ptr: T*, n: u64) -> T* {
     newptr : T* = self.allocate_array![T](n);
     memcpy(newptr, ptr, n * sizeof(T));
     return newptr;

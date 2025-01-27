@@ -2,7 +2,7 @@
   This is not going to be in the near future if at all.
 */
 
-#coroutine run_socket :: fn(ip: s64 = 8080) -> List![u8] {
+#coroutine run_socket :: fn(ip: s64) -> List![u8] {
   
   socket := Socket::open(ip);
 

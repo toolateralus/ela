@@ -246,12 +246,11 @@ make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifeti
 }
 
 // great function name
-get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float = 50.0) -> Color {
+get_random_grayscale_color_with_per_channel_variance :: fn(_variance: float) -> Color {
   gray_value : u8 = clamp(GetRandomValue(0, 1) * 255.0, 0, 255) as u8;
-  variance :: fn() -> u8 { return (GetRandomValue(0, 1) * _variance) as u8; };
-  r : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  g : u8 = clamp(gray_value + variance(), 0, 255) as u8;
-  b : u8 = clamp(gray_value + variance(), 0, 255) as u8;
+  r : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
+  g : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
+  b : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   return {r: r, g: g, b: b, a: 255 as u8};
 }
 
