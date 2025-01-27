@@ -1495,7 +1495,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
         return std::string("{}");
       }
 
-      int count = info->scope->symbols.size();
+      int count = info->scope->fields_count();
       fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
       fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
       fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";

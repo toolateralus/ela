@@ -17,6 +17,7 @@ main :: fn() {
   
   a: any = any::from![int](&n); //! Use of undeclared type??
                                 //! It's not the #type(), it's somehow the generic argument.
+                                
   // a: any = any::from(&n) // this works.
   // println![int](0)       // this works.
 
