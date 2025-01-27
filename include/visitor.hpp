@@ -147,6 +147,7 @@ struct Emitter : VisitorBase {
   int indent_level = 0;
   Context &ctx;
 
+  int type_list_id = -1;
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
                                compile_command.compilation_flags.contains("-nostdlib");
 

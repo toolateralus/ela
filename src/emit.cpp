@@ -853,7 +853,10 @@ void Emitter::visit(ASTProgram *node) {
   code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {
-    code << "typedef struct Type Type;\nextern Type **_type_info;\n";
+    code << "typedef struct Type Type;\n";
+    auto type_ptr_id = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
+                        type_ptr_id);
   }
 
   if (testing) {
@@ -872,30 +875,6 @@ void Emitter::visit(ASTProgram *node) {
     newline();
   }
 
-  if (testing) {
-    auto test_init = test_functions.str();
-    if (test_init.ends_with(',')) {
-      test_init.pop_back();
-    }
-
-    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
-    // deploy the array of test struct wrappers.
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
-
-    // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
-  } else {
-    if (has_user_defined_main && !is_freestanding) {
-      code << std::format(R"__(
-int main (int argc, char** argv) {{
-  ${}_initialize(argc, argv);
-  __ela_main_();
-}}
-)__",
-                          ctx.scope->find_type_id("Env", {}));
-    } // C calls main() for freestanding
-  }
-
   // Emit runtime reflection type info for requested types, only when we have
   // actually requested runtime type information.
   if (!ctx.type_info_strings.empty() && !is_freestanding) {
@@ -903,17 +882,26 @@ int main (int argc, char** argv) {{
     for (const auto &str : ctx.type_info_strings) {
       type_info << str.get_str() << ";\n";
     }
-    code << std::format("Type **_type_info = new Type*[{}];\n"
-                        "auto __ts_init_func_result__ = []{{\n"
-                        "  {};\n"
-                        "  return 0;\n"
-                        "}}();\n",
-                        type_table.size(), type_info.str());
+
+    code << "void $initialize_reflection_system() {\n";
+    {
+      // we don't bother doing pushes into type info, it's easier for us to do it this way.
+      code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
+      code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
+      code << type_info.str() << ";\n";
+    }
+    code << "}\n";
+
+    // code << std::format("auto __ts_init_func_result__ = []{{\n"
+    //                     "  {};\n"
+    //                     "  return 0;\n"
+    //                     "}}();\n",
+    //                     type_table.size(), type_info.str());
 
     code << std::format(R"_(
 Type *find_type(string name) {{
   for (size_t i = 0; i < {}; ++i) {{
-    Type *type = _type_info[i];
+    Type *type = _type_info.data[i];
     const char *type_name = type->name;
     const char *name_data = name.data;
     bool match = true;
@@ -929,10 +917,33 @@ Type *find_type(string name) {{
       return type;
     }}
   }}
-  return nullptr; // Return nullptr if the type is not found
+  return NULL; // Return nullptr if the type is not found
 }}
 )_",
                         type_table.size());
+  }
+
+  if (testing) {
+    auto test_init = test_functions.str();
+    if (test_init.ends_with(',')) {
+      test_init.pop_back();
+    }
+
+    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
+    // deploy the array of test struct wrappers.
+    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
+
+    // use the test runner main macro.
+    code << "__TEST_RUNNER_MAIN;";
+  } else {
+    if (has_user_defined_main && !is_freestanding) {
+#define FORMAT_STR "int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n"
+
+      // I made that macro because the formatting goes CRAZY with a raw string as an arg
+      code << std::format(FORMAT_STR, ctx.scope->find_type_id("Env", {}),
+                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();\n"
+                                                            : "{/* no reflection present in module */};\n");
+    } // C calls main() for freestanding
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for #type().
@@ -1349,7 +1360,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
   std::stringstream ss;
-  ss << "new Field { " << std::format(".name = \"{}\", ", name)
+  ss << "Field { " << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
@@ -1463,7 +1474,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   auto kind = 0;
 
-  ss << "_type_info[" << id << "] = new Type {" << ".id = " << id << ", "
+  ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
+  ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
 
   if (!type->is_kind(TYPE_ENUM))
@@ -1479,12 +1491,12 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
-    ss << ".element_type = nullptr,\n";
+    ss << ".element_type = NULL,\n";
   }
 
   ss << " };";
   context.type_info_strings.push_back(ss.str());
-  return std::format("_type_info[{}]", id);
+  return std::format("_type_info.data[{}]", id);
 }
 
 std::string Emitter::to_type_struct(Type *type, Context &context) {

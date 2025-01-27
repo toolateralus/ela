@@ -1,0 +1,24 @@
+any :: struct {
+  ptr: void*,
+  type: Type*,
+}
+
+impl any {
+  from :: fn![T](t: T*) -> #self {
+    return {
+      ptr: t,
+      // type: #type(T)
+    };
+  }
+}
+
+main :: fn() {
+  n := 10;
+  
+  a: any = any::from![int](&n); //! Use of undeclared type??
+                                //! It's not the #type(), it's somehow the generic argument.
+  // a: any = any::from(&n) // this works.
+  // println![int](0)       // this works.
+
+  printf("%s\n", a.type.name)
+}

@@ -1153,7 +1153,7 @@ void Typer::visit(ASTType *node) {
       normal_ty.base->accept(this);
       auto base_ty = global_get_type(normal_ty.base->resolved_type);
       if (!base_ty) {
-        throw_error(std::format("use of undeclared type"), node->source_range);
+        throw_error(std::format("use of undeclared type", normal_ty.base->resolved_type), node->source_range);
       }
       node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }

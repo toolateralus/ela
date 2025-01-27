@@ -557,7 +557,7 @@ Element :: struct {
   type: Type*,
 };
 
-#export _type_info: Type**;  
+_type_info: Type*[];  
 
 
 #ifdef LIST_TESTS {
