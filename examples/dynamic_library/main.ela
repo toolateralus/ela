@@ -26,7 +26,7 @@ main :: fn() -> int {
 
   while !WindowShouldClose() {
     for key in 0..256 {
-      ctx.inputState[key] = IsKeyDown(key);
+      ctx.inputState[key] = IsKeyDown(key as s32);
     }
     BeginDrawing();
       ClearBackground(BLACK);
