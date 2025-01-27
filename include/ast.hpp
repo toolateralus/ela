@@ -471,6 +471,8 @@ struct ASTImpl;
 struct ASTWhere;
 
 struct ASTStructMember {
+  bool is_bitfield = false;
+  InternedString bitsize;
   InternedString name;
   ASTType* type;
 };

@@ -11,7 +11,8 @@ Vector3 :: struct {
 }
 
 #test test_struct_single_level :: fn() {
-  v: Vector2;
+  v: Vector2 = {};
+  printf("vector2.x = %f, vector2.y = %f\n", v.x, v.y);
   assert("v.x != 0.0", v.x == 0.0);
   assert("v.y != 0.0", v.y == 0.0);
 }
@@ -61,12 +62,12 @@ something :: fn(f: float32) -> float32 {
 
 
 BitfieldTest :: struct {
-  #bitfield(1) i: u32;
-  #bitfield(2) z: u32;
+  #bitfield(1) i: u32,
+  #bitfield(2) z: u32,
 }
 
 #test test_bitfield_in_struct :: fn() {
-  test: BitfieldTest {
+  test: BitfieldTest = {
     i: 0,
     z: 3
   }

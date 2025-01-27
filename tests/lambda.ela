@@ -1,4 +1,4 @@
-;
+#error "Lambdas are broken right now, we just emit NULL for them";
 
 #alias Lambda :: fn*(int, int) -> int;
 

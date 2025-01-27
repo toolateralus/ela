@@ -1879,11 +1879,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->scope->types[param] = -2;
   }
 
-  // TODO:
-  //  I think struct fields should just be comma seperated.
-  //  Having semicolons makes little sense and is very unintuitive:
-  //  I always have to correct myself when I place semi's in there.
-
   if (!semicolon()) {
     auto scope = info->scope;
     expect(TType::LCurly);
@@ -1891,10 +1886,20 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     while (peek().type != TType::RCurly) {
       if (peek().type == TType::Directive) {
         eat();
-        auto directive = process_directive(DIRECTIVE_KIND_DONT_CARE, expect(TType::Identifier).value);
-        if (!directive || directive.get()->get_node_type() != AST_NODE_STRUCT_DECLARATION) {
+        auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
+        if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+          node->subtypes.push_back(static_cast<ASTStructDeclaration*>(directive.get()));
+        } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
+          ASTStructMember member{};
+          auto _node = static_cast<ASTDeclaration*>(directive.get());
+          member.name = _node->name;
+          member.is_bitfield = true;
+          member.bitsize = _node->bitsize;
+          member.type = _node->type;
+          node->members.push_back(member);
+        } else {
           end_node(node, range);
-          throw_error("right now, only `#anon :: struct/union` definitions are the only thing allowed in structs, besides member declarations.", node->source_range);
+          throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the only thing allowed in structs, besides member declarations.", node->source_range);
         }
       } else if (peek().type == TType::Identifier) {
         ASTStructMember member{};

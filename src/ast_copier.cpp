@@ -252,7 +252,10 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
     new_node->where_clause = (ASTWhere *)copy_node(node->where_clause.get());
   }
   for (auto &member : node->members) {
-    new_node->members.push_back({member.name, static_cast<ASTType *>(copy_node(member.type))});
+    new_node->members.push_back({.is_bitfield = member.is_bitfield,
+                                 .bitsize = member.bitsize,
+                                 .name = member.name,
+                                 .type = static_cast<ASTType *>(copy_node(member.type))});
   }
   new_node->subtypes.clear();
   for (auto subtype : node->subtypes) {

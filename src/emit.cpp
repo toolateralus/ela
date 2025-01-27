@@ -110,10 +110,12 @@ typedef unsigned char u8;
   }
 
   #define assert(message, condition)                                                                                     \
-  printf("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "                          \
-         "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                                           \
-         #condition, message);                                                                                         \
-  exit(1);
+  if (!(condition)) {                                                                                                    \
+    printf("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "                          \
+           "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                                           \
+           #condition, message);                                                                                         \
+    exit(1);                                                                                                             \
+  }
 #else
   #define assert(message, condition)                                                                                     \
     if (!(condition)) {                                                                                                  \
@@ -711,7 +713,11 @@ void Emitter::visit(ASTStructDeclaration *node) {
     return;
   }
 
-  ctx.set_scope(node->scope);
+  auto previous = ctx.scope;
+  ctx.set_scope(info->scope);
+  Defer _defer2([&]{
+    ctx.set_scope(previous);
+  });
 
   if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
     (*ss) << (node->is_union ? "union " : "struct ");
@@ -769,7 +775,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
   bool has_default_ctor = false;
   bool has_dtor = false;
 
-  ctx.exit_scope();
   return;
 }
 void Emitter::visit(ASTEnumDeclaration *node) {
