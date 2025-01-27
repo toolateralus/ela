@@ -3,7 +3,7 @@
 
 
 JsonValueDeleter :: struct {
-  vals: List![JsonValue*];
+  vals: List![JsonValue*],
 }
 
 impl JsonValueDeleter {
@@ -131,8 +131,8 @@ impl JsonValueDeleter {
 }
 
 MyJsonStruct :: struct {
-  n: s64;
-  b: float32;
+  n: s64,
+  b: float32,
 }
 impl MyJsonStruct {
   to_string ::fn(self*) -> string {

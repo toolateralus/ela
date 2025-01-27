@@ -1,13 +1,13 @@
 ;
 
 Vector2 :: struct {
-  x: float32;
-  y: float32;
+  x: float32,
+  y: float32,
 }
 
 Vector3 :: struct {
-  vec2: Vector2;
-  z: float32;
+  vec2: Vector2,
+  z: float32,
 }
 
 #test test_struct_single_level :: fn() {
@@ -61,12 +61,15 @@ something :: fn(f: float32) -> float32 {
 
 
 BitfieldTest :: struct {
-  #bitfield(1) i : u32 = 0;
-  #bitfield(2) z: u32 = 3;
+  #bitfield(1) i: u32;
+  #bitfield(2) z: u32;
 }
 
 #test test_bitfield_in_struct :: fn() {
-  test: BitfieldTest;
+  test: BitfieldTest {
+    i: 0,
+    z: 3
+  }
   assert("bitfield failed to equal 0", test.i == 0);
   assert("bitfield z failed to equal 3", test.z == 3);
 }

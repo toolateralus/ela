@@ -684,8 +684,8 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_default_init = false;
   emit_default_value = false;
 
-  for (auto field : node->fields) {
-    auto type = global_get_type(field->type->resolved_type);
+  for (auto member : node->members) {
+    auto type = global_get_type(member.type->resolved_type);
     if (type->base_id != Type::invalid_id) {
       type = global_get_type(type->base_id);
       forward_decl_type(type);
@@ -737,9 +737,11 @@ void Emitter::visit(ASTStructDeclaration *node) {
     newline();
   }
 
-  for (const auto &decl : node->fields) {
+  for (const auto &member : node->members) {
     indented("");
-    decl->accept(this);
+    member.type->accept(this);
+    space();
+    (*ss) << member.name.get_str();
     semicolon();
     newline();
   }

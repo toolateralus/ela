@@ -14,14 +14,14 @@
 #include <vector>
 #include <print>
 
-// TODO: 
+// TODO:
 /*
   Fix anonymous struct declarations being emitted after the type that depends on them
 
   Fix weird type bugs with emitting unsigned u8 * etc.
 
-  Have an option to either expand, or not expand all dependent headers. We don't always need to include everything, right now you have to 
-  parse out and remove stuff like stdint etc.
+  Have an option to either expand, or not expand all dependent headers. We don't always need to include everything,
+  right now you have to parse out and remove stuff like stdint etc.
 */
 
 // used for anonymous structs etc.

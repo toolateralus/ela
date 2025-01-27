@@ -2,13 +2,13 @@
 #import raylib;
 
 DrawCommand :: struct {
-  rect: Rectangle;
-  color: Color;
+  rect: Rectangle,
+  color: Color,
 }
 
 DrawContext :: struct {
-  commands: List![DrawCommand];
-  inputState: bool[256];
+  commands: List![DrawCommand],
+  inputState: bool[256],
 }
 impl DrawContext {
    draw :: fn(self*) {

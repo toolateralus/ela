@@ -115,11 +115,11 @@
 }
 
 Node :: struct {
-  next: Node*;
+  next: Node*
 }
 
 Array :: struct {
-  ptr: Node[10];
+  ptr: Node[10]
 }
 
 #test test_chained_dot_subscript :: fn() {
@@ -159,7 +159,7 @@ Array :: struct {
 }
 
 XaryuStruct :: struct {
-  f: float ;
+  f: float
 }
 
 #test test_comp_assign_non_iden :: fn() {

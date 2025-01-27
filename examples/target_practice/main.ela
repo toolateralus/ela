@@ -109,8 +109,8 @@ ParticleKind :: enum {
 }
 
 RenderInfo :: struct {
-  texture: Texture2D;
-  tex_rect : Rectangle;
+  texture: Texture2D,
+  tex_rect : Rectangle,
 }
 
 impl RenderInfo {
@@ -130,35 +130,35 @@ impl RenderInfo {
 }
 
 Particle :: struct {
-  render_info: RenderInfo*;
-  velocity: Vector2;
-  spawn_time: float;
-  lifetime: float;
-  kind: int;
-  position: Vector2;
-  scale: Vector2;
-  color: Color;
+  render_info: RenderInfo*,
+  velocity: Vector2,
+  spawn_time: float,
+  lifetime: float,
+  kind: int,
+  position: Vector2,
+  scale: Vector2,
+  color: Color,
 }
 
 Character :: struct {
-  texture: Texture2D;
-  rect: Rectangle;
-  tex_rect : Rectangle;
-  horizontal_velocity: float;
-  speed: float = 2.25;
-  origin: Vector2;
-  cannon_idx: int;
-  rotation: float;
+  texture: Texture2D,
+  rect: Rectangle,
+  tex_rect : Rectangle,
+  horizontal_velocity: float,
+  speed: float = 2.25,
+  origin: Vector2,
+  cannon_idx: int,
+  rotation: float,
 }
 
 Bullet :: struct {
-  velocity: Vector2;
-  speed: float = 2.25;
-  rotation: float;
-  dead : bool = false;
-  render_info: RenderInfo*;
-  origin: Vector2;
-  rect: Rectangle;
+  velocity: Vector2,
+  speed: float = 2.25,
+  rotation: float,
+  dead : bool = false,
+  render_info: RenderInfo*,
+  origin: Vector2,
+  rect: Rectangle,
 }
 
 impl Bullet {
@@ -174,14 +174,14 @@ impl Bullet {
 }
 
 Enemy :: struct {
-  id: int;
-  dead: bool = false;
-  rect: Rectangle;
-  origin: Vector2;
-  render_info : RenderInfo*;
-  target: Vector2;
-  rotation: float;
-  speed: float;
+  id: int,
+  dead: bool = false,
+  rect: Rectangle,
+  origin: Vector2,
+  render_info : RenderInfo*,
+  target: Vector2,
+  rotation: float,
+  speed: float,
 };
 
 impl Enemy {
@@ -195,12 +195,12 @@ impl Enemy {
 }
 
 TextParticle :: struct {
-  position: Vector2;
-  font_size : int;
-  text: string;
-  spawn_time: float;
-  lifetime: float;
-  color: Color;
+  position: Vector2,
+  font_size : int,
+  text: string,
+  spawn_time: float,
+  lifetime: float,
+  color: Color,
 }
 
 #region Global Variables {
@@ -454,9 +454,9 @@ draw_game :: fn() {
 }
 
 BulletRoutine :: struct {
-  count : int = 0;
-  timer: Timer;
-  interval: float = 0.1;
+  count : int = 0,
+  timer: Timer,
+  interval: float = 0.1,
 }
 
 impl BulletRoutine {

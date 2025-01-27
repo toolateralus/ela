@@ -69,8 +69,8 @@ Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] {
 // It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
 // represented by a chunk of memory that can be trivially traversed.
 Iter :: struct![T] {
-  ptr: T*;  // Pointer to the current element in the collection.
-  end: T*;  // Pointer to the end of the collection.
+  ptr: T*,  // Pointer to the current element in the collection.
+  end: T*,  // Pointer to the end of the collection.
 }
 
 impl![T] Iter![T] {
@@ -125,8 +125,8 @@ Bitwise :: interface![Right] {
   Do not store a reference to this anywhere, it should only be used for constructing types that represent sequences.
 */
 Collection_Initializer :: struct![T] {
-  data:   T*;
-  length: u64;
+  data:   T*,
+  length: u64,
 }
 
 impl![T] Iterable![T] for Collection_Initializer![T] {
@@ -188,14 +188,14 @@ impl![T] Iterable![T] for Collection_Initializer![T] {
 #foreign atof :: fn(v: c_string) -> float64;
 
 Range :: struct {
-  begin: s64;
-  end:   s64;
+  begin: s64,
+  end:   s64,
 }
 
 Range_Enumerator :: struct {
-  begin: s64;
-  end:   s64;
-  idx:   s64;
+  begin: s64,
+  end:   s64,
+  idx:   s64,
 }
 
 impl Enumerator![s64] for Range_Enumerator {
@@ -221,8 +221,8 @@ impl Enumerable![Range_Enumerator, s64] for Range {
 }
 
 string :: struct {
-  data:    char*;
-  length:  s32;
+  data:    char*,
+  length:  s32,
 }
 
 // TODO: reimplement all the helper functions we used to have.
@@ -410,9 +410,9 @@ panic_handler: Panic_Handler = fn(msg: c_string) {
 // because it applies to any type you create that holds dynamic memory, and also non-pointer values.
 
 List :: struct![T] {
-  data:     T*;
-  length:   u64;
-  capacity: u64;
+  data:     T*,
+  length:   u64,
+  capacity: u64,
 }
 
 impl![T] List![T] {
@@ -502,7 +502,7 @@ impl![T] From![Collection_Initializer![T]] for List![T] {
 }
 
 Env :: struct {
-  m_args: List![c_string];
+  m_args: List![c_string],
 };
 
 impl Env {
@@ -527,21 +527,20 @@ Element :: struct;
 Type :: struct;
 
 Field :: struct {
-  name: c_string;
-  type: Type*;
-  size: u64;
-  offset: u64;
+  name: c_string,
+  type: Type*,
+  size: u64,
+  offset: u64,
 };
 
 Type :: struct {
-  id: int;                                                // the integer ID used to identify this type.
-  name: c_string;                                         // the type's name.
-  size: u64;                                              // sizeof(T)
-  flags: u64;                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-  // ! Doing Field* here makes it so the generic instantiation fails.
-  fields: List![Field*];                                  // get a list of struct fields, enum variants.
-  elements: fn*(c_string) -> List![Element];              // get a list of the Elements, which can be used to reflect on arrays.
-  element_type: Type*;                                    // the type this type has a pointer to, is an array of, etc.
+  id: int,                                                // the integer ID used to identify this type.
+  name: c_string,                                         // the type's name.
+  size: u64,                                              // sizeof(T)
+  flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+  fields: List![Field*],                                  // get a list of struct fields, enum variants.
+  elements: fn*(c_string) -> List![Element],              // get a list of the Elements, which can be used to reflect on arrays.
+  element_type: Type*,                                    // the type this type has a pointer to, is an array of, etc.
 };
 
 impl Field {
@@ -554,8 +553,8 @@ impl Field {
 }
 
 Element :: struct {
-  data: c_string;
-  type: Type*;
+  data: u8*,
+  type: Type*,
 };
 
 #export _type_info: Type**;  

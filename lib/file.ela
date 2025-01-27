@@ -33,7 +33,7 @@ SeekPosition :: enum {
 }
 
 File :: struct {
-  fd: FILE*;
+  fd: FILE*,
 }
 
 impl File {

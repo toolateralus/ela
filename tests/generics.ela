@@ -17,7 +17,7 @@ generic_return :: fn![T]() -> T {
 }
 
 Generic :: struct![T] {
-  t: T;
+  t: T
 }
 
 generic_fn :: fn![T]() {}
@@ -32,7 +32,7 @@ impl![T] Generic![T] {
 }
 
 My_Struct :: struct {
-  a: Other;
+  a: Other
 }
 
 #test test_generic_dependencies :: fn() {

@@ -134,13 +134,14 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   type->declaring_node = node;
 
   for (auto subunion : node->subtypes) {
-    for (const auto &field : subunion->fields) {
-      field->accept(this);
-      node->scope->insert(field->name, field->type->resolved_type, field);
+    for (const auto &field : subunion->members) {
+      field.type->accept(this);
+      node->scope->insert(field.name, field.type->resolved_type, nullptr);
     }
   }
-  for (auto decl : node->fields) {
-    decl->accept(this);
+  for (auto decl : node->members) {
+    decl.type->accept(this);
+    ctx.scope->insert(decl.name, decl.type->resolved_type, node);
   }
 
   ctx.set_scope(old_scope);

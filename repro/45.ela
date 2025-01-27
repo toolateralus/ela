@@ -1,6 +1,6 @@
 
 Struct :: struct {
-  fd: int;
+  fd: int
 }
 
 #foreign read :: fn(fd: int, buffer: void*, len: int) -> s32;

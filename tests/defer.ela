@@ -47,7 +47,7 @@ early_return_defer_test :: fn() -> int {
 }
 
 DeferCleanup :: struct {
-  ptr : void*;
+  ptr : void*
 }
 
 // Return statements are evaluated BEFORE the defer, so

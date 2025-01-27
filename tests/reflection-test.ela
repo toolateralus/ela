@@ -1,7 +1,7 @@
 #import reflection;
 
 Reflector :: struct {
-  n: int;
+  n: int,
 }
 
 #error "_array needs replaced in emitter"

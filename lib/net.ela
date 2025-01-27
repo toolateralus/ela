@@ -82,8 +82,8 @@
 #alias uint64_t :: __uint64_t;
 #alias size_t :: u64;
 iovec :: struct {
-  iov_base : void *;
-  iov_len : u64;
+  iov_base : void *,
+  iov_len : u64,
 };
 #alias u_char :: __u_char;
 #alias u_short :: __u_short;
@@ -129,24 +129,24 @@ iovec :: struct {
 #foreign __uint64_identity :: fn(__x: __uint64_t) -> __uint64_t;
 
 __sigset_t :: struct {
-  __val : u64[16];
+  __val : u64[16],
 };
 #alias sigset_t :: __sigset_t;
 
 timeval :: struct {
-  tv_sec : __time_t;
-  tv_usec : __suseconds_t;
+  tv_sec : __time_t,
+  tv_usec : __suseconds_t,
 };
 timespec :: struct {
-  tv_sec : __time_t;
-  tv_nsec : __syscall_slong_t;
+  tv_sec : __time_t,
+  tv_nsec : __syscall_slong_t,
 };
 
 #alias suseconds_t :: __suseconds_t;
 #alias __fd_mask :: s64;
 
 fd_set :: struct {
-  __fds_bits : __fd_mask[16];
+  __fds_bits : __fd_mask[16],
 };
 
 #alias fd_mask :: __fd_mask;
@@ -171,13 +171,13 @@ __socket_type :: enum {
 };
 #alias sa_family_t :: u16;
 sockaddr :: struct {
-  sa_family : sa_family_t;
-  sa_data : u8[14];
+  sa_family : sa_family_t,
+  sa_data : u8[14],
 };
 sockaddr_storage :: struct {
-  ss_family : sa_family_t;
-  __ss_padding : u8[118];
-  __ss_align : u64;
+  ss_family : sa_family_t,
+  __ss_padding : u8[118],
+  __ss_align : u64,
 };
 
 MSG_OOB :: 1;
@@ -203,26 +203,26 @@ MSG_FASTOPEN :: 536870912;
 MSG_CMSG_CLOEXEC :: 1073741824;
 
 msghdr :: struct {
-  msg_name : void *;
-  msg_namelen : socklen_t;
-  msg_iov : iovec *;
-  msg_iovlen : u64;
-  msg_control : void *;
-  msg_controllen : u64;
-  msg_flags : s32;
+  msg_name : void *,
+  msg_namelen : socklen_t,
+  msg_iov : iovec *,
+  msg_iovlen : u64,
+  msg_control : void *,
+  msg_controllen : u64,
+  msg_flags : s32,
 };
 cmsghdr :: struct {
-  cmsg_len : u64;
-  cmsg_level : s32;
-  cmsg_type : s32;
-  __cmsg_data : List![char];
+  cmsg_len : u64,
+  cmsg_level : s32,
+  cmsg_type : s32,
+  __cmsg_data : List![char],
 };
 #foreign __cmsg_nxthdr :: fn(__mhdr: msghdr *, __cmsg: cmsghdr *) -> cmsghdr *;
 
 SCM_RIGHTS :: 1;
 
 __kernel_fd_set :: struct {
-  fds_bits : u64[16];
+  fds_bits : u64[16],
 };
 #alias __kernel_sighandler_t :: fn*(s32) -> void;
 #alias __kernel_key_t :: s32;
@@ -246,7 +246,7 @@ __kernel_fd_set :: struct {
 #alias __kernel_ssize_t :: __kernel_long_t;
 #alias __kernel_ptrdiff_t :: __kernel_long_t;
 __kernel_fsid_t :: struct {
-  val : s32[2];
+  val : s32[2],
 };
 #alias __kernel_off_t :: __kernel_long_t;
 #alias __kernel_loff_t :: s64;
@@ -260,12 +260,12 @@ __kernel_fsid_t :: struct {
 #alias __kernel_uid16_t :: u16;
 #alias __kernel_gid16_t :: u16;
 linger :: struct {
-  l_onoff : s32;
-  l_linger : s32;
+  l_onoff : s32,
+  l_linger : s32,
 };
 osockaddr :: struct {
-  sa_family : u16;
-  sa_data : u8[14];
+  sa_family : u16,
+  sa_data : u8[14],
 };
 
 SHUT_RD :: 0;
@@ -294,16 +294,16 @@ SHUT_RDWR :: 2;
 #foreign isfdtype :: fn(__fd: s32, __fdtype: s32) -> s32;
 #alias in_addr_t :: u32;
 in_addr :: struct {
-  s_addr : in_addr_t;
+  s_addr : in_addr_t,
 };
 ip_opts :: struct {
-  ip_dst : in_addr;
-  opts : u8[40];
+  ip_dst : in_addr,
+  opts : u8[40],
 };
 in_pktinfo :: struct {
-  ipi_ifindex : s32;
-  ipi_spec_dst : in_addr;
-  ipi_addr : in_addr;
+  ipi_ifindex : s32,
+  ipi_spec_dst : in_addr,
+  ipi_addr : in_addr,
 };
   IPPROTO_IP :: 0;
   IPPROTO_ICMP :: 1;
@@ -373,9 +373,9 @@ IPPORT_RESERVED :: 1024;
 IPPORT_USERRESERVED :: 5000;
 
 __bind_gen__anon_D10 :: union {
-  __u6_addr8 : u8[16];
-  __u6_addr16 : u16[8];
-  __u6_addr32 : u32[4];
+  __u6_addr8 : u8[16],
+  __u6_addr16 : u16[8],
+  __u6_addr32 : u32[4],
 };
 
 in6_addr :: struct {
@@ -386,58 +386,58 @@ in6_addr :: struct {
 in6addr_any: in6_addr;
 in6addr_loopback: in6_addr;
 sockaddr_in :: struct {
-  sin_family : sa_family_t;
-  sin_port : in_port_t;
-  sin_addr : in_addr;
-  sin_zero : u8[8];
+  sin_family : sa_family_t,
+  sin_port : in_port_t,
+  sin_addr : in_addr,
+  sin_zero : u8[8],
 };
 sockaddr_in6 :: struct {
-  sin6_family : sa_family_t;
-  sin6_port : in_port_t;
-  sin6_flowinfo : u32;
-  sin6_addr : in6_addr;
-  sin6_scope_id : u32;
+  sin6_family : sa_family_t,
+  sin6_port : in_port_t,
+  sin6_flowinfo : u32,
+  sin6_addr : in6_addr,
+  sin6_scope_id : u32,
 };
 ip_mreq :: struct {
-  imr_multiaddr : in_addr;
-  imr_interface : in_addr;
+  imr_multiaddr : in_addr,
+  imr_interface : in_addr,
 };
 ip_mreqn :: struct {
-  imr_multiaddr : in_addr;
-  imr_address : in_addr;
-  imr_ifindex : s32;
+  imr_multiaddr : in_addr,
+  imr_address : in_addr,
+  imr_ifindex : s32,
 };
 ip_mreq_source :: struct {
-  imr_multiaddr : in_addr;
-  imr_interface : in_addr;
-  imr_sourceaddr : in_addr;
+  imr_multiaddr : in_addr,
+  imr_interface : in_addr,
+  imr_sourceaddr : in_addr,
 };
 ipv6_mreq :: struct {
-  ipv6mr_multiaddr : in6_addr;
-  ipv6mr_interface : u32;
+  ipv6mr_multiaddr : in6_addr,
+  ipv6mr_interface : u32,
 };
 group_req :: struct {
-  gr_interface : u32;
-  gr_group : sockaddr_storage;
+  gr_interface : u32,
+  gr_group : sockaddr_storage,
 };
 group_source_req :: struct {
-  gsr_interface : u32;
-  gsr_group : sockaddr_storage;
-  gsr_source : sockaddr_storage;
+  gsr_interface : u32,
+  gsr_group : sockaddr_storage,
+  gsr_source : sockaddr_storage,
 };
 ip_msfilter :: struct {
-  imsf_multiaddr : in_addr;
-  imsf_interface : in_addr;
-  imsf_fmode : u32;
-  imsf_numsrc : u32;
-  imsf_slist : in_addr[1];
+  imsf_multiaddr : in_addr,
+  imsf_interface : in_addr,
+  imsf_fmode : u32,
+  imsf_numsrc : u32,
+  imsf_slist : in_addr[1],
 };
 group_filter :: struct {
-  gf_interface : u32;
-  gf_group : sockaddr_storage;
-  gf_fmode : u32;
-  gf_numsrc : u32;
-  gf_slist : sockaddr_storage[1];
+  gf_interface : u32,
+  gf_group : sockaddr_storage,
+  gf_fmode : u32,
+  gf_numsrc : u32,
+  gf_slist : sockaddr_storage[1],
 };
 #foreign ntohl :: fn(__netlong: u32) -> u32;
 #foreign ntohs :: fn(__netshort: u16) -> u16;

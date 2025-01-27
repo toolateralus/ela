@@ -2,9 +2,9 @@
 #region basic_struct {
 
   Struct :: struct {
-    a := 0;
-    b := 0.0;
-    c := false;
+    a: int,
+    b: float,
+    c: bool,
   }
 
   Basic :: interface {
@@ -53,9 +53,9 @@
   }
 
   Struct1 :: struct {
-    a := 0;
-    b := 0.0;
-    c := false;
+    a: int,
+    b: float,
+    c: bool,
   }
 
   impl GenericInterface![int] for Struct1 {
@@ -88,7 +88,7 @@
 
 #region generic interface generic struct {
   Struct2 :: struct![T] {
-    n: T;
+    n: T
   }  
 
   impl![T] GenericInterface![T] for Struct2![T] {

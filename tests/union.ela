@@ -1,9 +1,9 @@
 ;
 
 Union :: union {
-  a: int = -1;
-  b: int;
-  c: int;
+  a: int,
+  b: int,
+  c: int,
 }
 
 impl Union {
@@ -14,11 +14,11 @@ impl Union {
 
 _Vec2 :: union {
   #anon :: struct {
-    x: int;
-    y: int;
-    z: int;
-  };
-  values: int[3];
+    x: int,
+    y: int,
+    z: int,
+  },
+  values: int[3],
 }
 
 impl _Vec2 {
@@ -48,7 +48,7 @@ impl _Vec2 {
 
 AnonSubUnion :: struct {
   #anon :: union {
-    a: int;
+    a: int,
   }
 }
 

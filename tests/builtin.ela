@@ -13,7 +13,7 @@
 
 
 Xaryu :: struct {
-  value: int;
+  value: int
 }
 
 impl Xaryu {
