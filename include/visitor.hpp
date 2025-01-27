@@ -116,6 +116,7 @@ struct DeferBlock {
 };
 
 struct Emitter : VisitorBase {
+  void forward_decl_type(Type* type);
   template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
   void emit_deferred_statements(DeferBlockType type);
   static constexpr const char *defer_return_value_key = "$defer$return$value";
