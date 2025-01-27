@@ -3,6 +3,8 @@
 #import directory;
 #import file;
 
+#c_flags  " -fsanitize=address,leak,undefined "
+
 playing := false;
 timer: Timer;
 bpm : float = 120;
@@ -232,7 +234,8 @@ main :: fn() {
   bg_color.g -= 175;
   bg_color.b -= 175;
 
-  dir := Directory::open(string::from("."));
+  dir := Directory::open(".");
+  defer dir.deinit();
 
   InitAudioDevice();
   InitWindow(800, 600, "Sequencer");
@@ -240,11 +243,20 @@ main :: fn() {
   SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);
 
-  for file in dir.files {
-    if strncmp(file.data + file.length - 4, ".wav", 4) == 0 || 
-       strncmp(file.data + file.length - 4, ".mp3", 4) == 0 || 
-       strncmp(file.data + file.length - 4, ".ogg", 4) == 0 {
-      file_dropdown.options.push(file.data);
+  for file in dir.files { 
+    if file.length <= 4 then continue;
+    #static extensions: string[3] = {
+      string::from(".wav"),
+      string::from(".mp3"),
+      string::from(".ogg"),
+    }
+    
+    for idx in 0..3 {
+      println($"{extensions[idx].data}, {file.data}");
+      if extensions[idx] == file {
+        file_dropdown.options.push(file.data);
+        break;
+      }
     }
   }
 

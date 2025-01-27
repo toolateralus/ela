@@ -1,17 +1,17 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  222            115           1862
-src/emit.cpp                                 232             63           1672
-src/typer.cpp                                210             72           1557
-include/ast.hpp                               97             23            735
-src/type.cpp                                 100             61            699
-src/ast_copier.cpp                            21              0            474
+src/ast.cpp                                  224            115           1889
+src/emit.cpp                                 235             63           1675
+src/typer.cpp                                220             71           1595
+include/ast.hpp                               97             23            745
+src/type.cpp                                 103             64            722
+src/ast_copier.cpp                            21              0            490
 include/lex.hpp                               41              4            319
 include/type.hpp                              59             18            285
 src/lex.cpp                                   19              2            225
 include/constexpr.hpp                         28              0            219
-include/visitor.hpp                           37             10            207
+include/visitor.hpp                           37             10            209
 include/error.hpp                             33              4            192
 include/core.hpp                              20              2            164
 src/command.cpp                               27              0            150
@@ -25,5 +25,5 @@ src/visitor.cpp                                7             14             46
 include/strings.hpp                           10              1             43
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1254            421           9390
+SUM:                                        1272            423           9509
 -----------------------------------------------------------------------------------------

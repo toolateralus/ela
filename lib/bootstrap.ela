@@ -28,7 +28,7 @@ Drop        :: interface {
 
 // Allow an object to be converted to a string
 ToString    :: interface {
-  // convert self to string.
+  // convert self to string::
   to_string :: fn(self*) -> c_string;
 }
 
@@ -234,10 +234,15 @@ impl string {
     return {};
   }
   from :: fn(data: c_string) -> #self{
-    len := strlen(data);
-    str: string;
-    str.data = strdup(data);
-    str.length = len;
+    if !data then return {};
+
+    str: string {
+      length: strlen(data)
+    };
+
+    if str.length > 0 then
+      str.data = strdup(data);
+
     return str;
   }
   from_ptr :: fn(begin: c_string, end: c_string) -> string {
@@ -255,6 +260,52 @@ impl string {
   subscript :: fn(self*, idx: s64) -> char {
     return self.data[idx];
   }
+  eq :: fn(self*, other: #self) -> bool {
+    if self.length != other.length then return false;
+    for idx in 0..self.length {
+      if (*self)[idx] != other[idx] then return false;
+    }
+    return true;
+  }
+  starts_with :: fn(self*, prefix: c_string) -> bool {
+    prefix_len := strlen(prefix);
+    if self.length < prefix_len then return false;
+    for i in 0..prefix_len {
+      if self.data[i] != prefix[i] then return false;
+    }
+    return true;
+  }
+  ends_with :: fn(self*, suffix: c_string) -> bool {
+    suffix_len := strlen(suffix);
+    if self.length < suffix_len then return false;
+    for i in 0..suffix_len {
+      if self.data[self.length - suffix_len + i] != suffix[i] then return false;
+    }
+    return true;
+  }
+  replace :: fn(self*, old: c_string, replacement: c_string) -> string {
+    old_len := strlen(old);
+    new_len := strlen(replacement);
+    result := string::empty();
+    for i in 0..self.length {
+      if strncmp(self.data + i, old, old_len) == 0 {
+        result.data = realloc(result.data, result.length + new_len + 1);
+        memcpy(result.data + result.length, replacement, new_len);
+        result.length += new_len;
+        i += old_len - 1;
+      } else {
+        result.data = realloc(result.data, result.length + 1 + 1);
+        result.data[result.length] = self.data[i];
+        result.length++;
+      }
+    }
+    result.data[result.length] = 0;
+    return result;
+  }
+  substr :: fn(self*, start: s64, length: s64) -> string {
+    if start < 0 || length < 0 || start + length > self.length then return string::empty();
+    return string::from_ptr(self.data + start, self.data + start + length);
+  }
 }
 
 impl Iterable![char] for string { 
@@ -270,7 +321,7 @@ mem_zero :: fn![T](ptr: T*, count: u64 = 1) {
   memset(ptr, 0, sizeof(T) * count);
 }
 
-// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string.
+// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string::
 Allocator :: interface {
   allocate :: fn![T](self*) -> T*;
   free :: fn![T](self*, ptr: T*);
@@ -392,6 +443,15 @@ impl![T] List![T] {
     return value;
   }
 
+  // This does not actually deinit any of members in the list.
+  // We should have some compile time way to have alternatives based on a specializiation
+  // like #if T: Deinit { } .. else {}
+
+  // that causes an odd problem, though. Not really a problem, just an oddity:
+  // some specializations would have functions where others would not.
+  // you may expect a Type![T] to have a function and depending on a hidden where condition,
+  // it may just not have it, and that would probably be a really confusing issue, where you call a known function on one generic
+  // instantiation, but another jsut doesn't have it. We could have nice descriptive errors to combat this?
   deinit :: fn(self*) {
     free(self.data);
     self.data = null;

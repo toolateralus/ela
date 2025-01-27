@@ -1,8 +1,4 @@
-;
-
 #export DIR :: struct;
-
-
 #foreign getcwd :: fn(buf: c_string, size: u64) -> c_string;
 
 dirent :: struct {
@@ -23,16 +19,17 @@ Directory :: struct {
 }
 
 impl Directory {
-  current :: fn() -> string {
+  current :: fn() -> c_string {
     buffer: char[256];
     getcwd(buffer, 256);
-    return string::from(buffer);
+    return strdup(buffer) as c_string;
   }
 
-  open :: fn(path: string) -> Directory {
-    dir := opendir(path.data);
+  open :: fn(path: c_string) -> Directory {
+    dir := opendir(path);
+
     if !dir then return { 
-      path: path,
+      path: string::from(path),
       files : {}
     };
 
@@ -42,7 +39,16 @@ impl Directory {
       ent : dirent* = entry;
       files.push(string::from(ent.d_name as c_string));
     }
+
     closedir(dir);
-    return {path: path, files: files};
+    return {path: string::from(path), files: files};
+  }
+
+  deinit :: fn(self*) {
+    self.path.deinit();
+    for path in self.files {
+      path.deinit();
+    }
+    self.files.deinit();
   }
 }
