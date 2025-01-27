@@ -739,9 +739,18 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   for (const auto &member : node->members) {
     indented("");
-    member.type->accept(this);
-    space();
-    (*ss) << member.name.get_str();
+    auto type = global_get_type(member.type->resolved_type);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      auto name = member.name.get_str();
+      auto name_nullable = Nullable(&name);
+      (*ss) << get_function_pointer_type_string(type, name_nullable);
+    } else if (type->get_ext().is_fixed_sized_array()) {
+      (*ss) << get_declaration_type_signature_and_identifier(member.name.get_str(), type);
+    } else {
+      member.type->accept(this);
+      space();
+      (*ss) << member.name.get_str();
+    }
     semicolon();
     newline();
   }
