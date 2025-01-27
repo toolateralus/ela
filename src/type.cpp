@@ -13,6 +13,28 @@
 #include "lex.hpp"
 #include "scope.hpp"
 
+std::vector<int> expand_function_types(std::vector<int> type_ids) {
+  std::vector<int> output;
+  for (auto type_id : type_ids) {
+    auto type = global_get_type(type_id);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      std::vector<int> fun_tys;
+      auto info = type->get_info()->as<FunctionTypeInfo>();
+      fun_tys.insert(fun_tys.end(), info->parameter_types, info->parameter_types + info->params_len);
+      fun_tys.push_back(info->return_type);
+      fun_tys = expand_function_types(fun_tys);
+      output.insert(output.end(), fun_tys.begin(), fun_tys.end());
+    } else {
+      auto type = global_get_type(type_id);
+      if (type->base_id != Type::invalid_id) {
+        type = global_get_type(type->base_id);
+      }
+      output.push_back(type_id);
+    }
+  }
+  return output;
+}
+
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   std::stringstream ss;
   ss << "fn ";
@@ -35,6 +57,7 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
 
   return ss.str();
 }
+
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
   ss << "fn ";
@@ -719,10 +742,15 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   type->set_ext(ext);
   info->scope = create_child(root_scope);
 
+  // getting all types within a function type because some function types
+  // arent associated with any existing funcitons and  whose parameters or return
+  // types might not be built-in
+  auto dependencies = expand_function_types(types);
+
   // declare this type as a dependant on the eldest dependency from our subtypes.
   // purely for emit time.
   if (ext.has_no_extensions()) {
-    int eldest = *std::max_element(types.begin(), types.end());
+    int eldest = *std::max_element(dependencies.begin(), dependencies.end());
     global_get_type(eldest)->tuple_dependants.push_back(type->id);
   }
 
