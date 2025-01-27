@@ -581,13 +581,16 @@ void Typer::visit(ASTDeclaration *node) {
   }
 
   if (node->is_constexpr) {
-    auto type = global_get_type(node->type->resolved_type);
-    if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
-      throw_error(std::format("Can only use scalar types (integers, floats, "
-                              "bools) as constant expressions, got {}",
-                              type->to_string()),
-                  node->value.get()->source_range);
-    }
+    // TODO: we should probably improve this.
+    // Our interpreter can't handle structs, but we want structs.
+    
+    // auto type = global_get_type(node->type->resolved_type);
+    // if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
+    //   throw_error(std::format("Can only use scalar types (integers, floats, "
+    //                           "bools) as constant expressions, got {}",
+    //                           type->to_string()),
+    //               node->value.get()->source_range);
+    // }
   }
 }
 

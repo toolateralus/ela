@@ -8,9 +8,9 @@
 
   "files.exclude": {
     "**/.clock_diff.txt": true,
-    "**/compile_commands.json": true,
+    // "**/compile_commands.json": true,
     "**/bin": true,
-    "**/build": true,
+    // "**/build": true,
     "**/objs": true,
   
     // For windows users, remove these.

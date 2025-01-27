@@ -129,14 +129,14 @@ Collection_Initializer :: struct![T] {
   length: u64,
 }
 
-impl![T] Iterable![T] for Collection_Initializer![T] {
-  iter :: fn(self*) -> Iter![T] {
-    return {
-      ptr: self.data,
-      end: self.data + self.length,
-    }
-  }
-}
+// impl![T] Iterable![T] for Collection_Initializer![T] {
+//   iter :: fn(self*) -> Iter![T] {
+//     return {
+//       ptr: self.data,
+//       end: self.data + self.length,
+//     }
+//   }
+// }
 
 #foreign system :: fn(cmd: c_string) -> int;
 

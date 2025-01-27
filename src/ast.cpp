@@ -1107,7 +1107,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier) {
+      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly && lookahead_buf()[3].type != TType::LParen) {
     NODE_ALLOC(ASTExprStatement, expr, range, _, this)
     expr->expression = parse_expr();
     end_node(expr, range);
@@ -1274,6 +1274,7 @@ ASTStatement *Parser::parse_statement() {
     NODE_ALLOC(ASTDeclaration, decl, range, _, this);
     decl->name = tok.value;
     decl->value = parse_expr();
+    decl->is_constexpr = true;
 
     if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id || keywords.contains(tok.value.get_str()) ||
         reserved.contains(tok.value.get_str())) {
