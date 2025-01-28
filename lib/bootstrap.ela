@@ -111,6 +111,9 @@ Collection_Initializer :: struct![T] {
   length: u64,
 }
 
+Init :: interface![T] {
+  init :: fn(init: Collection_Initializer![T]) -> #self;
+}
 
 // Obviously LIBC is only available when not in a freestanding environment.
 #ifndef FREESTANDING {
@@ -492,8 +495,8 @@ panic :: fn(msg: c_string) {
     }
   }
 
-  impl![T] From![Collection_Initializer![T]] for List![T] {
-    from :: fn(init: Collection_Initializer![T]) -> #self {
+  impl![T] Init![T] for List![T] {
+    init :: fn(init: Collection_Initializer![T]) -> #self {
       self: #self;
       for idx in 0..init.length {
         self.push(init.data[idx]);

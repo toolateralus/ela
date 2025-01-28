@@ -1626,6 +1626,11 @@ void Typer::visit(ASTInitializerList *node) {
             "Failed to assign element type from value passed into collection-style initializer list");
         node->resolved_type = target_type->id;
       } else {
+
+        if (!target_type->implements("Init") && !target_type->get_base().get_str().contains("Collection_Initializer$")) {
+          throw_error("Unable to use 'collection style' initalizer lists on non fixed array types that don't implement Init![T] interface", node->source_range);
+        }
+
         auto &values = node->values;
         // * How on earth will we infer this?
         // * I think we'll have to look at the target type,
