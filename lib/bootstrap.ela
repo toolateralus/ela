@@ -1,23 +1,3 @@
-/* 
-We use these defines because porting the boilerplate.hpp
-to this file has been a monumental source of bugs.
-*/
-
-#def __ELA_INTERFACES
-#def __ELA_LIBC_FORWARD
-#def __ELA_RANGE
-#def __ELA_STRING
-#def __ELA_MEMORY
-#def __ELA_BASICS
-#def __ELA_LIST
-#def __ELA_ENV
-
-// * Somehow these cause a bunch of bugs.
-// #def __ELA_TO_STRING_IMPL
-// #def __ELA_REFLECTION
-
-
-
 string :: struct;
 // Run a cleanup procedure implicitly when an object goes out of scope.
 // Absolutely equivalent to a C++ Destructor.
@@ -123,69 +103,66 @@ Bitwise :: interface![Right] {
 
   As was said, this is basically a wrapper for a stack allocated array of homogenous-typed values.
   Do not store a reference to this anywhere, it should only be used for constructing types that represent sequences.
+
+  ! This is not really implemented ! 
 */
 Collection_Initializer :: struct![T] {
   data:   T*,
   length: u64,
 }
 
-// impl![T] Iterable![T] for Collection_Initializer![T] {
-//   iter :: fn(self*) -> Iter![T] {
-//     return {
-//       ptr: self.data,
-//       end: self.data + self.length,
-//     }
-//   }
-// }
 
-#foreign system :: fn(cmd: c_string) -> int;
+// Obviously LIBC is only available when not in a freestanding environment.
+#ifndef FREESTANDING {
+  #foreign system :: fn(cmd: c_string) -> int;
 
-#foreign free :: fn(ptr: void*) -> void;
-#foreign malloc :: fn(nbytes: u64) -> void*;
-#foreign calloc :: fn(num: u64, size: u64) -> void*;
-#foreign realloc :: fn(ptr: void*, size: u64) -> void*;
+  #foreign free :: fn(ptr: void*) -> void;
+  #foreign malloc :: fn(nbytes: u64) -> void*;
+  #foreign calloc :: fn(num: u64, size: u64) -> void*;
+  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;
 
-#foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
-#foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
-#foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+  #foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
+  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
 
-#foreign printf :: fn(format: c_string, ...) -> int;
-#foreign exit :: fn(code: int);
+  #foreign printf :: fn(format: c_string, ...) -> int;
+  #foreign exit :: fn(code: int);
 
-#foreign scanf :: fn(format: c_string, ...) -> int;
-#foreign getchar :: fn() -> int;
+  #foreign scanf :: fn(format: c_string, ...) -> int;
+  #foreign getchar :: fn() -> int;
 
-#foreign sleep :: fn(seconds: int);
-#foreign usleep :: fn(c: int);
+  #foreign sleep :: fn(seconds: int);
+  #foreign usleep :: fn(c: int);
 
-#foreign strdup :: fn(str: c_string) -> c_string;
-#foreign strndup :: fn(str: c_string, n: u64) -> c_string;
-#foreign strerror :: fn(errnum: int) -> c_string;
-#foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
-#foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
-#foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
-#foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
-#foreign strchr :: fn(str: c_string, c: int) -> c_string;
-#foreign strrchr :: fn(str: c_string, c: int) -> c_string;
-#foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
-#foreign strlen :: fn(str: c_string) -> int;
-#foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
-#foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
-#foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
-#foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
-#foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
+  #foreign strdup :: fn(str: c_string) -> c_string;
+  #foreign strndup :: fn(str: c_string, n: u64) -> c_string;
+  #foreign strerror :: fn(errnum: int) -> c_string;
+  #foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
+  #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
+  #foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
+  #foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
+  #foreign strchr :: fn(str: c_string, c: int) -> c_string;
+  #foreign strrchr :: fn(str: c_string, c: int) -> c_string;
+  #foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
+  #foreign strlen :: fn(str: c_string) -> int;
+  #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
+  #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
+  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
+  #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
+  #foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
 
-#foreign isalnum :: fn(c: int) -> int;
-#foreign isalpha :: fn(c: int) -> int;
-#foreign isspace :: fn(c: int) -> int;
-#foreign isdigit :: fn(c: int) -> int;
-#foreign islower :: fn(c: int) -> int;
-#foreign isupper :: fn(c: int) -> int;
-#foreign isprint :: fn(c: int) -> int;
-#foreign ispunct :: fn(c: int) -> int;
+  #foreign isalnum :: fn(c: int) -> int;
+  #foreign isalpha :: fn(c: int) -> int;
+  #foreign isspace :: fn(c: int) -> int;
+  #foreign isdigit :: fn(c: int) -> int;
+  #foreign islower :: fn(c: int) -> int;
+  #foreign isupper :: fn(c: int) -> int;
+  #foreign isprint :: fn(c: int) -> int;
+  #foreign ispunct :: fn(c: int) -> int;
 
-#foreign atoi :: fn(v: c_string) -> int;
-#foreign atof :: fn(v: c_string) -> float64;
+  #foreign atoi :: fn(v: c_string) -> int;
+  #foreign atof :: fn(v: c_string) -> float64;
+}
 
 Range :: struct {
   begin: s64,
@@ -220,9 +197,6 @@ impl Enumerable![Range_Enumerator, s64] for Range {
   }
 }
 
-mem_zero :: fn![T](ptr: T*, count: u64) {
-  memset(ptr, 0, sizeof(T) * count);
-}
 
 // Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string::
 Allocator :: interface {
@@ -233,32 +207,38 @@ Allocator :: interface {
   copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
 }
 
-Std_Allocator :: struct {}
+// The standard allocator is only available when not in a freestanding environement.
+#ifndef FREESTANDING  {
+  mem_zero :: fn![T](ptr: T*, count: u64) {
+    memset(ptr, 0, sizeof(T) * count);
+  }
+  Std_Allocator :: struct {}
 
-impl Allocator for Std_Allocator {
-  allocate :: fn![T](self*) -> T* {
-    return malloc(sizeof(T)) as T*;
+  impl Allocator for Std_Allocator {
+    allocate :: fn![T](self*) -> T* {
+      return malloc(sizeof(T)) as T*;
+    }
+    free :: fn![T](self*, ptr: T*) {
+      free(ptr);
+    }
+    allocate_array :: fn![T](self*, n: u64) -> T* {
+      return calloc(sizeof(T) * n) as T*;
+    }
+    resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
+      return realloc(ptr, sizeof(T) * new_size) as T*;
+    }
+    copy :: fn![T](self*, ptr: T*, n: u64) -> T* {
+      newptr : T* = self.allocate_array![T](n);
+      memcpy(newptr, ptr, n * sizeof(T));
+      return newptr;
+    }
   }
-  free :: fn![T](self*, ptr: T*) {
-    free(ptr);
-  }
-  allocate_array :: fn![T](self*, n: u64) -> T* {
-    return calloc(sizeof(T) * n) as T*;
-  }
-  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
-    return realloc(ptr, sizeof(T) * new_size) as T*;
-  }
-  copy :: fn![T](self*, ptr: T*, n: u64) -> T* {
-    newptr : T* = self.allocate_array![T](n);
-    memcpy(newptr, ptr, n * sizeof(T));
-    return newptr;
-  }
-}
 
-impl Std_Allocator {
-  get :: fn() -> #self {
-    #static self: #self;
-    return self;
+  impl Std_Allocator {
+    get :: fn() -> #self {
+      #static self: #self;
+      return self;
+    }
   }
 }
 
@@ -267,86 +247,88 @@ string :: struct {
   length:  s32,
 }
 
-// TODO: reimplement all the helper functions we used to have.
-// Also, we should make this not null terminated, rather controlled by length.
-// Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
-// So we'll have to rewrite them all for that.
-impl string {
-  empty :: fn() -> #self {
-    return {};
-  }
-  from :: fn(data: c_string) -> #self{
-    if !data then return {};
-
-    str: string {
-      length: strlen(data)
-    };
-
-    if str.length > 0 then
-      str.data = strdup(data);
-
-    return str;
-  }
-  from_ptr :: fn(begin: c_string, end: c_string) -> string {
-    str: string;
-    str.length = end - begin;
-    str.data = malloc(str.length + 1);
-    memcpy(str.data, begin, str.length);
-    str.data[str.length] = 0;
-    return str;
-  }
-  deinit :: fn(self*) {
-    free(self.data);
-    self.length = 0;
-  }
-  subscript :: fn(self*, idx: s64) -> char {
-    return self.data[idx];
-  }
-  eq :: fn(self*, other: #self) -> bool {
-    if self.length != other.length then return false;
-    for idx in 0..self.length {
-      if (*self)[idx] != other[idx] then return false;
+#ifndef FREESTANDING {
+  // TODO: reimplement all the helper functions we used to have.
+  // Also, we should make this not null terminated, rather controlled by length.
+  // Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
+  // So we'll have to rewrite them all for that.
+  impl string {
+    empty :: fn() -> #self {
+      return {};
     }
-    return true;
-  }
-  starts_with :: fn(self*, prefix: c_string) -> bool {
-    prefix_len := strlen(prefix);
-    if self.length < prefix_len then return false;
-    for i in 0..prefix_len {
-      if self.data[i] != prefix[i] then return false;
+    from :: fn(data: c_string) -> #self{
+      if !data then return {};
+
+      str: string {
+        length: strlen(data)
+      };
+
+      if str.length > 0 then
+        str.data = strdup(data);
+
+      return str;
     }
-    return true;
-  }
-  ends_with :: fn(self*, suffix: c_string) -> bool {
-    suffix_len := strlen(suffix);
-    if self.length < suffix_len then return false;
-    for i in 0..suffix_len {
-      if self.data[self.length - suffix_len + i] != suffix[i] then return false;
+    from_ptr :: fn(begin: c_string, end: c_string) -> string {
+      str: string;
+      str.length = end - begin;
+      str.data = malloc(str.length + 1);
+      memcpy(str.data, begin, str.length);
+      str.data[str.length] = 0;
+      return str;
     }
-    return true;
-  }
-  replace :: fn(self*, old: c_string, replacement: c_string) -> string {
-    old_len := strlen(old);
-    new_len := strlen(replacement);
-    result := string::empty();
-    for i in 0..self.length {
-      if strncmp(self.data + i, old, old_len) == 0 {
-        result.data = realloc(result.data, result.length + new_len + 1);
-        memcpy(result.data + result.length, replacement, new_len);
-        result.length += new_len;
-        i += old_len - 1;
-      } else {
-        result.data = realloc(result.data, result.length + 1 + 1);
-        result.data[result.length] = self.data[i];
-        result.length++;
+    deinit :: fn(self*) {
+      free(self.data);
+      self.length = 0;
+    }
+    subscript :: fn(self*, idx: s64) -> char {
+      return self.data[idx];
+    }
+    eq :: fn(self*, other: #self) -> bool {
+      if self.length != other.length then return false;
+      for idx in 0..self.length {
+        if (*self)[idx] != other[idx] then return false;
       }
+      return true;
     }
-    result.data[result.length] = 0;
-    return result;
-  }
-  substr :: fn(self*, start: s64, length: s64) -> string {
-    if start < 0 || length < 0 || start + length > self.length then return string::empty();
-    return string::from_ptr(self.data + start, self.data + start + length);
+    starts_with :: fn(self*, prefix: c_string) -> bool {
+      prefix_len := strlen(prefix);
+      if self.length < prefix_len then return false;
+      for i in 0..prefix_len {
+        if self.data[i] != prefix[i] then return false;
+      }
+      return true;
+    }
+    ends_with :: fn(self*, suffix: c_string) -> bool {
+      suffix_len := strlen(suffix);
+      if self.length < suffix_len then return false;
+      for i in 0..suffix_len {
+        if self.data[self.length - suffix_len + i] != suffix[i] then return false;
+      }
+      return true;
+    }
+    replace :: fn(self*, old: c_string, replacement: c_string) -> string {
+      old_len := strlen(old);
+      new_len := strlen(replacement);
+      result := string::empty();
+      for i in 0..self.length {
+        if strncmp(self.data + i, old, old_len) == 0 {
+          result.data = realloc(result.data, result.length + new_len + 1);
+          memcpy(result.data + result.length, replacement, new_len);
+          result.length += new_len;
+          i += old_len - 1;
+        } else {
+          result.data = realloc(result.data, result.length + 1 + 1);
+          result.data[result.length] = self.data[i];
+          result.length++;
+        }
+      }
+      result.data[result.length] = 0;
+      return result;
+    }
+    substr :: fn(self*, start: s64, length: s64) -> string {
+      if start < 0 || length < 0 || start + length > self.length then return string::empty();
+      return string::from_ptr(self.data + start, self.data + start + length);
+    }
   }
 }
 
@@ -359,17 +341,18 @@ impl Iterable![char] for string {
   }
 }
 
+#ifndef FREESTANDING {
+  #static print :: fn![T](str: T) {
+    s := $"{str}";
+    printf("%s", s);
+    free(s);
+  }
 
-#static print :: fn![T](str: T) {
-  s := $"{str}";
-  printf("%s", s);
-  free(s);
-}
-
-#static println :: fn![T](str: T) {
-  s := $"{str}";
-  printf("%s\n", s);
-  free(s);
+  #static println :: fn![T](str: T) {
+    s := $"{str}";
+    printf("%s\n", s);
+    free(s);
+  }
 }
 
 #alias Panic_Handler :: fn *(c_string);
@@ -386,15 +369,21 @@ set_panic_handler :: fn(handler: Panic_Handler) {
 // We do this because we're restricted to not using lambdas in the global scope, currently. Perhaps in the future we will improve this.
 panic :: fn(msg: c_string) {
   if !panic_handler {
-    panic_handler = fn(msg: c_string) {
-      printf("panic(): %s\n", msg);
-      exit(1);
-    };
+    #ifndef FREESTANDING {
+      panic_handler = fn(msg: c_string) {
+        printf("panic(): %s\n", msg);
+        exit(1);
+      };
+    } else {
+      panic_handler = fn(msg: c_string) {
+        // idk, segfault on panic?
+        n : int * = null;
+        *n = 10;
+      }
+    }
   }
   panic_handler(msg);
 }
-
-#alias Error :: c_string;
 
 // This list type, (not to be confused with a linked list) is a dynamic array, Similar to C++/Rust 'std::vector/Vec'.
 // Vector nomenclature is strange and ambiguous, so I think it's a good name, just as C# did. 
@@ -417,156 +406,209 @@ panic :: fn(msg: c_string) {
 // There are no magic assignment or copy constructors in this language, nor destructors, so this is just an important thing to be aware of,
 // because it applies to any type you create that holds dynamic memory, and also non-pointer values.
 
-List :: struct![T] {
-  data:     T*,
-  length:   u64,
-  capacity: u64,
-}
-
-impl![T] List![T] {
-  // You should probably not call this function, and you do not need to for normal push operations.
-  // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
-  // and this will set your length appropriately.
-  resize :: fn(self*, new_capacity: u64) {
-    if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
-
-    self.capacity = new_capacity;
-    self.data = realloc(self.data, sizeof(T) * self.capacity);
-    if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
+#ifndef FREESTANDING {
+  List :: struct![T] {
+    data:     T*,
+    length:   u64,
+    capacity: u64,
   }
 
-  push   :: fn(self*, v: T) {
-    if self.length + 1 >= self.capacity {
-      if self.capacity == 0 then self.capacity = 4;
-      self.resize(self.capacity * 2);
+  impl![T] List![T] {
+    // You should probably not call this function, and you do not need to for normal push operations.
+    // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
+    // and this will set your length appropriately.
+    resize :: fn(self*, new_capacity: u64) {
+      if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
+
+      self.capacity = new_capacity;
+      self.data = realloc(self.data, sizeof(T) * self.capacity);
+      if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
     }
-    self.data[self.length] = v;
-    self.length++;
-  }
 
-  pop    :: fn(self*) -> T {
-    if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
-    value := self.data[self.length - 1];
-    self.length -= 1;
-    return value;
-  }
-
-  // This does not actually deinit any of members in the list.
-  // We should have some compile time way to have alternatives based on a specializiation
-  // like #if T: Deinit { } .. else {}
-
-  // that causes an odd problem, though. Not really a problem, just an oddity:
-  // some specializations would have functions where others would not.
-  // you may expect a Type![T] to have a function and depending on a hidden where condition,
-  // it may just not have it, and that would probably be a really confusing issue, where you call a known function on one generic
-  // instantiation, but another jsut doesn't have it. We could have nice descriptive errors to combat this?
-  deinit :: fn(self*) {
-    free(self.data);
-    self.data = null;
-    self.length = 0;
-  }
-
-  at :: fn(self*, index: u64) -> T {
-    return self.data[index];
-  }
-}
-
-impl![T] Clone for List![T] {
-  clone :: fn(self*) -> #self {
-    new_data := malloc(sizeof(T) * self.capacity);
-    if !new_data then panic("Failed to allocate in List clone");
-    memcpy(new_data, self.data, sizeof(T) * self.length);
-    return {
-      data: new_data,
-      length: self.length,
-      capacity: self.capacity,
+    push   :: fn(self*, v: T) {
+      if self.length + 1 >= self.capacity {
+        if self.capacity == 0 then self.capacity = 4;
+        self.resize(self.capacity * 2);
+      }
+      self.data[self.length] = v;
+      self.length++;
     }
-  } 
-}
 
-impl![T] Iterable![T] for List![T] {
-  iter :: fn(self*) -> Iter![T] {
-    return {
-      ptr: self.data,
-      end: (self.data + self.length) as T*,
+    pop    :: fn(self*) -> T {
+      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+      value := self.data[self.length - 1];
+      self.length -= 1;
+      return value;
+    }
+
+    // This does not actually deinit any of members in the list.
+    // We should have some compile time way to have alternatives based on a specializiation
+    // like #if T: Deinit { } .. else {}
+
+    // that causes an odd problem, though. Not really a problem, just an oddity:
+    // some specializations would have functions where others would not.
+    // you may expect a Type![T] to have a function and depending on a hidden where condition,
+    // it may just not have it, and that would probably be a really confusing issue, where you call a known function on one generic
+    // instantiation, but another jsut doesn't have it. We could have nice descriptive errors to combat this?
+    deinit :: fn(self*) {
+      free(self.data);
+      self.data = null;
+      self.length = 0;
+    }
+
+    at :: fn(self*, index: u64) -> T {
+      return self.data[index];
     }
   }
-}
 
-impl![T] List![T] {
-  subscript :: fn(self*, idx: s64) -> T {
-    return self.data[idx];
+  impl![T] Clone for List![T] {
+    clone :: fn(self*) -> #self {
+      new_data := malloc(sizeof(T) * self.capacity);
+      if !new_data then panic("Failed to allocate in List clone");
+      memcpy(new_data, self.data, sizeof(T) * self.length);
+      return {
+        data: new_data,
+        length: self.length,
+        capacity: self.capacity,
+      }
+    } 
   }
-}
 
-impl![T] From![Collection_Initializer![T]] for List![T] {
-  from :: fn(init: Collection_Initializer![T]) -> #self {
-    self: #self;
-    for idx in 0..init.length {
-      self.push(init.data[idx]);
+  impl![T] Iterable![T] for List![T] {
+    iter :: fn(self*) -> Iter![T] {
+      return {
+        ptr: self.data,
+        end: (self.data + self.length) as T*,
+      }
     }
-    return self;
-  }
-}
-
-Env :: struct {
-  m_args: List![c_string],
-};
-
-impl Env {
-  current :: fn() -> #self* {
-    #static self: #self;
-    return &self;
   }
 
-  args :: fn() -> List![c_string] {
-    return #self::current().m_args.clone();
+  impl![T] List![T] {
+    subscript :: fn(self*, idx: s64) -> T {
+      return self.data[idx];
+    }
   }
 
-  initialize :: fn(argc: s32, argv: c_string*) {
-    self := #self::current();
-    for i in 0..argc {
-      self.m_args.push(argv[i]);
+  impl![T] From![Collection_Initializer![T]] for List![T] {
+    from :: fn(init: Collection_Initializer![T]) -> #self {
+      self: #self;
+      for idx in 0..init.length {
+        self.push(init.data[idx]);
+      }
+      return self;
     }
   }
 }
 
-Element :: struct;
-Type :: struct;
 
-Field :: struct {
-  name: c_string,
-  type: Type*,
-  size: u64,
-  offset: u64,
-};
-
-Type :: struct {
-  id: int,                                                // the integer ID used to identify this type.
-  name: c_string,                                         // the type's name.
-  size: u64,                                              // sizeof(T)
-  flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
-  fields: List![Field],                                   // get a list of struct fields, enum variants.
-  elements: fn*(c_string) -> List![Element],              // get a list of the Elements, which can be used to reflect on arrays.
-  element_type: Type*,                                    // the type this type has a pointer to, is an array of, etc.
-};
-
-impl Field {
-  set :: fn![T, T1](self*, target: T, data: T1) {
-    memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
+#ifdef FREESTANDING  {
+  Env :: struct {
+    m_args: c_string*,
+    length: u64,
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn(self*) -> (c_string*, u64) {
+      return (self.m_args, self.length);
+    }
+    initialize :: fn(argc: s32, argv: c_string*) {
+      self := #self::current();
+      self.m_args = argv;
+      self.length = argc;
+    }
   }
-  get :: fn![T](self*, source: T) -> u8* {
-    return ((&source) as u8*) + self.offset;
+} else {
+  Env :: struct {
+    m_args: c_string[],
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn() -> c_string[] {
+      return #self::current().m_args.clone();
+    }
+    initialize :: fn(argc: s32, argv: c_string*) {
+      self := #self::current();
+      for i in 0..argc {
+        self.m_args.push(argv[i]);
+      }
+    }
   }
 }
 
-Element :: struct {
-  data: u8*,
-  type: Type*,
-};
+#ifndef FREESTANDING {
+  any :: struct {
+    ptr: void*,
+    type: Type*
+  };
 
-_type_info: Type*[];  
+  impl any {
+    new :: fn![T](t: T*) -> #self {
+      #static type: Type*;
+      if !type then type = #type(T);
+      return {
+        ptr: t,
+        type: type,
+      }
+    }
 
+    // return the pointer behind this any, or if the type isn't matched,
+    // return null.
+    cast :: fn![T](self*) -> T* {
+      #static type: Type*;
+      if !type then type = #type(T);
+      if type != self.type then return null;
+      return self.ptr as T*;
+    }
+
+    // an unchecked version of the 'cast' method.
+    // this will return junk data, or worse, if you pass in the wrong type to cast to.
+    // use cast anywhere you can, it's much more type safe.
+    unwrap :: fn![T](self*) -> T {
+      return *(self.ptr as T*);
+    }
+  }
+  Element :: struct;
+  Type :: struct;
+
+  Field :: struct {
+    name: c_string,
+    type: Type*,
+    size: u64,
+    offset: u64,
+  };
+
+  Type :: struct {
+    id: int,                                                // the integer ID used to identify this type.
+    name: c_string,                                         // the type's name.
+    size: u64,                                              // sizeof(T)
+    flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+    fields: List![Field],                                   // get a list of struct fields, enum variants.
+    elements: fn*(c_string) -> List![Element],              // get a list of the Elements, which can be used to reflect on arrays.
+    element_type: Type*,                                    // the type this type has a pointer to, is an array of, etc.
+  };
+
+  impl Field {
+    set :: fn![T, T1](self*, target: T, data: T1) {
+      memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
+    }
+    get :: fn![T](self*, source: T) -> u8* {
+      return ((&source) as u8*) + self.offset;
+    }
+  }
+
+  Element :: struct {
+    data: u8*,
+    type: Type*,
+  };
+
+  _type_info: Type*[];  
+}
 
 #ifdef LIST_TESTS {
   // TODO:
@@ -738,35 +780,3 @@ _type_info: Type*[];
 /* 
   * `any` is unfinished, it's just experimental.
 */
-
-any :: struct {
-  ptr: void*,
-  type: Type*
-};
-
-impl any {
-  new :: fn![T](t: T*) -> #self {
-    #static type: Type*;
-    if !type then type = #type(T);
-    return {
-      ptr: t,
-      type: type,
-    }
-  }
-
-  // return the pointer behind this any, or if the type isn't matched,
-  // return null.
-  cast :: fn![T](self*) -> T* {
-    #static type: Type*;
-    if !type then type = #type(T);
-    if type != self.type then return null;
-    return self.ptr as T*;
-  }
-
-  // an unchecked version of the 'cast' method.
-  // this will return junk data, or worse, if you pass in the wrong type to cast to.
-  // use cast anywhere you can, it's much more type safe.
-  unwrap :: fn![T](self*) -> T {
-    return *(self.ptr as T*);
-  }
-}

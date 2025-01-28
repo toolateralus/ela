@@ -435,6 +435,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
+
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -445,6 +446,17 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
 
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
+  }
+
+  auto id = ctx.scope->find_type_id(node->name, {});
+  if (id != -1) {
+    auto type = global_get_type(id);
+    if (type->is_kind(TYPE_INTERFACE)) {
+      if (!generic_instantiation)
+        throw_error("re-definition of interface type.", node->source_range);
+    } else {
+      throw_error("re-definition of a type", node->source_range);
+    }
   }
 
   auto type = global_get_type(global_create_interface_type(node->name, node->scope, generic_args));

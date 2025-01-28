@@ -1,27 +1,30 @@
 // assert that --freestanding was used in compiler invocation.
-#ifndef FREESTANDING { #error "This is only supposed to be used freestanding " }
+#ifndef FREESTANDING { #error "This is only supposed to be used freestanding. don't use `ela r`, use `run.sh`!" }
 
-// compile in a freestanding environment and compile to an object file.
-#c_flags "-fPIC -c -m64 -fno-stack-protector -o main.o"
-
-
+// specify 
+// -fPIC  :: position independent code,
+// -c for :: compiling to object files.
+// -m64   :: 64 bit architecture
+#c_flags "-fPIC -c -m64 -o main.o"
 
 // our function declared in print.s
 #foreign print :: fn(f: char *);
 #foreign exit :: fn(code: int);
 
-memset :: fn(p: char *, value: u32, len: u32) {
+memset :: fn(p: char *, value: u64, len: u64) {
   for i in 0..len {
     p[i] = value;
   }
 }
 
-memcpy :: fn(dest: char**, src: char*, len: u32) {
+memcpy :: fn(dest: char**, src: char*, len: u64) {
   for i in 0..len {
     (*dest)[i] = src[i];
   }
 }
 
+// used from 'print' in print.s
+// just easier to write in ela.
 #export strlen :: fn(s: char*) -> int {
   i: int;
   while s[i] != '\0' {
@@ -32,13 +35,13 @@ memcpy :: fn(dest: char**, src: char*, len: u32) {
 
 // A simple linear allocator (aka arena) 
 // for a freestanding environment without allocations.
-Allocator :: struct {
+LinearAlloc :: struct {
   mem : char[1024 * 24],
-  ptr : u32,
-  size: u32,
+  ptr : u64,
+  size: u64,
 }
 
-impl Allocator {
+impl LinearAlloc {
   create :: fn() -> #self {
     self: #self;
     self.size = 1024 * 24;
@@ -46,7 +49,7 @@ impl Allocator {
     return self;
   }
 
-  alloc :: fn(self*, size: u32) -> char* {
+  alloc :: fn(self*, size: u64) -> char* {
     data := &self.mem[self.ptr];
     self.ptr += size;
     
@@ -59,8 +62,6 @@ impl Allocator {
   }
 }
 
-allocator := Allocator::create();
-
 Vector2 :: struct {
   x: float,
   y: float,
@@ -69,17 +70,24 @@ Vector2 :: struct {
 // declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
 // and 'export' is declaring an externally visible symbol.
-#export main :: fn() -> int {
+
+// Unlike a normal Ela program, 'main' always has to return an int in a freestanding environment.
+// Also, `Env::args()` and other utilities are not immediately available, because of the complete lack of our
+// runtime. instead, you may just take `argc` and `argv` in your main, as if it's a C main function.
+#export main :: fn(argc: int, argv: c_string*) -> int {
+
+  // create our 'linear allocator' which is just a piece of memory sitting on the stack.
+  allocator := LinearAlloc::create();
+
+  // say hello!
   print("\e[1;4;32mHello (free-standing) World!\e[0m\n");
   
+  // example of getting a 'dynamically allocated' struct.
+  // intentionally run the allocator out of memory, so we can 'panic' with exit(1);
   while {
-
-    // example of getting a 'dynamically allocated' struct.
     v: Vector2* = allocator.alloc(sizeof(Vector2));
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
     memcpy((&v1) as char**, v as char*, sizeof(Vector2));
-    // we do this in a loop to show that our exit(1) call works to 
-    // 'panic' on an error.
   }
   
   return 0;

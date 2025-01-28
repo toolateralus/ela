@@ -60,8 +60,9 @@ typedef unsigned short int u16;
 
 typedef signed char s8;
 typedef unsigned char u8;
+#include <stddef.h>
+
 #if USE_STD_LIB
-  #include <stddef.h>
   #include <stdint.h>
   #include <errno.h>
   #undef RAND_MAX
