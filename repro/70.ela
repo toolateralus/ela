@@ -1,0 +1,12 @@
+
+generic :: fn![T]() {
+  /* 
+    * internal compiler error: ASTType* resolved to null in emitter.
+    *    at: /home/josh_arch/source/c++/ela/repro/70.ela:5:30
+  */
+  lambda := fn() -> c_string { 
+    return "alloo"; 
+  }
+}
+
+main :: fn() { }

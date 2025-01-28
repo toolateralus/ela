@@ -797,14 +797,13 @@ panic :: fn(msg: c_string) {
     if type.is_integral() {
       format = "%lld";
     } else if type.is_float() {
-      format = "%.2f";
+      format = "%.2lf";               //  * using to_string has a trade off of less control for slight convenience. Oh well! use snprintf instead.
     } else if type.is_string() {
       format = "%s";
     } else if type.is_pointer() {
       format = "%p";
     } else {
-      // ! do we throw an error here? format = null?
-      format = "(unsupported type)";
+      format = "(unsupported type)";  // * do we throw an error here? format = null?
     }
 
     snprintf(buffer, sizeof(buffer), format, value);
