@@ -1,0 +1,17 @@
+
+Struct :: struct {
+  a: int,
+  b: int,
+  c: Struct*,
+};
+
+error: Struct = {
+  a: 0,
+  b: 0,
+  c: malloc(sizeof(Struct)), // C doesn't have non-constant static initializers.
+}
+
+main :: fn() { 
+
+}
+

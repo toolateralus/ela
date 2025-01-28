@@ -65,6 +65,11 @@ impl Speak for Dog {
   }
 }
 
+dyn Speak {
+  void* self;
+  void(*speak)(void* self);
+}
+
 impl Speak for Cat {
   greet :: fn(self*) {
     println("meow");
@@ -91,7 +96,6 @@ main :: fn () {
   //             No dynamic dispatch needed for these 2 calls: just call the function.
   dog.speak();                     // print "woof";  
   cat.speak();                     // print "meow";
-
 
   // dynamic dispatch & storing variables:
   speaker: dyn(Speak);

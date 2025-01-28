@@ -247,6 +247,8 @@ string :: struct {
   length:  s32,
 }
 
+
+
 #ifndef FREESTANDING {
   // TODO: reimplement all the helper functions we used to have.
   // Also, we should make this not null terminated, rather controlled by length.
@@ -365,6 +367,7 @@ set_panic_handler :: fn(handler: Panic_Handler) {
 
 // if you set the panic handler to null, we will set it to it's default. If you want to do nothing for a panic
 // just set it to an empty function
+
 
 // We do this because we're restricted to not using lambdas in the global scope, currently. Perhaps in the future we will improve this.
 panic :: fn(msg: c_string) {

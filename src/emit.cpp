@@ -1043,12 +1043,16 @@ void Emitter::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
+      auto element_type = type->generic_args[0];
+      (*ss) << " .data = ";
+      (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
       for (const auto &expr : node->values) {
         expr->accept(this);
         if (expr != node->values.back()) {
           (*ss) << ", ";
         }
       }
+      (*ss) << "}, .length = " << std::to_string(node->values.size());
     } break;
   }
   (*ss) << "}";
@@ -1864,7 +1868,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
   };
 
   // Emit all the lambdas that this function depends on.
-  for (const auto &lambda: node->lambdas) {
+  for (const auto &lambda : node->lambdas) {
     emit_line_directive(lambda);
     lambda->return_type->accept(this);
     (*ss) << ' ' << lambda->unique_identifier.get_str() << ' ';
@@ -1992,9 +1996,7 @@ void Emitter::visit(ASTBlock *node) {
   return;
 }
 
-void Emitter::visit(ASTLambda *node) {
-  (*ss) << node->unique_identifier.get_str();
-}
+void Emitter::visit(ASTLambda *node) { (*ss) << node->unique_identifier.get_str(); }
 
 // This should never get hit.
 void Emitter::visit(ASTWhere *node) {

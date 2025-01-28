@@ -435,7 +435,6 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
-
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -597,7 +596,7 @@ void Typer::visit(ASTDeclaration *node) {
   if (node->is_constexpr) {
     // TODO: we should probably improve this.
     // Our interpreter can't handle structs, but we want structs.
-    
+
     // auto type = global_get_type(node->type->resolved_type);
     // if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
     //   throw_error(std::format("Can only use scalar types (integers, floats, "
@@ -904,7 +903,7 @@ void Typer::visit(ASTCall *node) {
         Defer _([&] { type_context = old_type; });
         auto func = node->function;
         if (func->get_node_type() == AST_NODE_TYPE) {
-          auto ast_type = static_cast<ASTType*>(func);
+          auto ast_type = static_cast<ASTType *>(func);
           if (ast_type->kind == ASTType::NORMAL) {
             if (!ast_type->normal.generic_arguments.empty()) {
               throw_error("Internal compiler error: generic args atached to wrong ast", func->source_range);
@@ -1576,68 +1575,88 @@ void Typer::visit(ASTInitializerList *node) {
       // TODO:
       // We can support these types of initializer lists, by creating something in-language like
       // Init_List :: struct![T] {  ptr: T*; length: u64; } and passing this 'dynamic' array to a special function
-
-      if (!target_type->get_ext().is_fixed_sized_array()) {
-        throw_error(std::format("Collection-style initializer lists like '{{0, 1, 2, ..}} or {{{{key, value}}, {{key, "
-                                "value}}}}' can only be used with arrays and fixed arrays. Got {}",
-                                target_type->to_string()),
-                    node->source_range);
-      }
-      auto &values = node->values;
-
-      // Zero init construction. Pretty redundant.
-      if (values.empty()) {
-        node->resolved_type = target_type->id;
-        return;
-      }
-
-      auto target_element_type = target_type->get_element_type();
-      values[0]->accept(this);
-      auto element_type = values[0]->resolved_type;
-      for (int i = 1; i < values.size(); ++i) {
-        int type = Type::invalid_id;
-        if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
-          auto old = declaring_or_assigning_type;
-          Defer _([&] { declaring_or_assigning_type = old; });
-          declaring_or_assigning_type = target_element_type;
-          values[i]->accept(this);
-          type = values[i]->resolved_type;
-        } else {
-          values[i]->accept(this);
-          type = values[i]->resolved_type;
-        }
-        assert_types_can_cast_or_equal(
-            type, element_type, values[i]->source_range,
-            "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
-
-        values[i]->resolved_type =
-            target_element_type; // We do this here to avoid casting problems with C/C++ init lists.
-      }
-
-      auto element_ty_ptr = global_get_type(element_type);
-      auto target_element_ty_ptr = global_get_type(target_element_type);
-
-      if (element_ty_ptr->is_kind(TYPE_SCALAR) && element_ty_ptr->get_ext().has_no_extensions() &&
-          target_element_ty_ptr->is_kind(TYPE_SCALAR) && target_element_ty_ptr->get_ext().has_no_extensions()) {
-        auto target_info = target_element_ty_ptr->get_info()->as<ScalarTypeInfo>();
-        auto elem_info = element_ty_ptr->get_info()->as<ScalarTypeInfo>();
-
-        // We allow implicit downcasting/ sign casting, just to prevent annoyances.
-        if (target_info->is_integral && elem_info->is_integral) {
+      if (target_type->get_ext().is_fixed_sized_array()) {
+        auto &values = node->values;
+        // Zero init construction. Pretty redundant.
+        if (values.empty()) {
           node->resolved_type = target_type->id;
           return;
         }
+
+        auto target_element_type = target_type->get_element_type();
+        values[0]->accept(this);
+        auto element_type = values[0]->resolved_type;
+        for (int i = 1; i < values.size(); ++i) {
+          int type = Type::invalid_id;
+          if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+            auto old = declaring_or_assigning_type;
+            Defer _([&] { declaring_or_assigning_type = old; });
+            declaring_or_assigning_type = target_element_type;
+            values[i]->accept(this);
+            type = values[i]->resolved_type;
+          } else {
+            values[i]->accept(this);
+            type = values[i]->resolved_type;
+          }
+          assert_types_can_cast_or_equal(
+              type, element_type, values[i]->source_range,
+              "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
+
+          values[i]->resolved_type =
+              target_element_type; // We do this here to avoid casting problems with C/C++ init lists.
+        }
+
+        auto element_ty_ptr = global_get_type(element_type);
+        auto target_element_ty_ptr = global_get_type(target_element_type);
+
+        if (element_ty_ptr->is_kind(TYPE_SCALAR) && element_ty_ptr->get_ext().has_no_extensions() &&
+            target_element_ty_ptr->is_kind(TYPE_SCALAR) && target_element_ty_ptr->get_ext().has_no_extensions()) {
+          auto target_info = target_element_ty_ptr->get_info()->as<ScalarTypeInfo>();
+          auto elem_info = element_ty_ptr->get_info()->as<ScalarTypeInfo>();
+
+          // We allow implicit downcasting/ sign casting, just to prevent annoyances.
+          if (target_info->is_integral && elem_info->is_integral) {
+            node->resolved_type = target_type->id;
+            return;
+          }
+        }
+
+        assert_types_can_cast_or_equal(
+            element_type, target_element_type, node->source_range,
+            "Failed to assign element type from value passed into collection-style initializer list");
+        node->resolved_type = target_type->id;
+      } else {
+        auto &values = node->values;
+        // * How on earth will we infer this?
+        // * I think we'll have to look at the target type,
+        // * search for the init_list() function, check if it's generic,
+        // * if it's not, use the concrete type argument for the Collection_Initializer![T] argument,
+        // * otherwise if it is generic,
+        // * we just allow any homogenous collection of values?
+        // For now, we just do the latter - allow any collection of values.
+        values[0]->accept(this);
+        auto target_element_type = values[0]->resolved_type;
+        for (int i = 1; i < values.size(); ++i) {
+          int type = Type::invalid_id;
+          if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+            auto old = declaring_or_assigning_type;
+            Defer _([&] { declaring_or_assigning_type = old; });
+            declaring_or_assigning_type = target_element_type;
+            values[i]->accept(this);
+            type = values[i]->resolved_type;
+          } else {
+            values[i]->accept(this);
+            type = values[i]->resolved_type;
+          }
+          assert_types_can_cast_or_equal(
+              type, target_element_type, values[i]->source_range,
+              "Found inconsistent types in a collection-style initializer list. These types must be homogenous");
+
+          values[i]->resolved_type = target_element_type;
+        }
+        node->resolved_type = find_generic_type_of("Collection_Initializer", {target_element_type}, node->source_range);
+        return;
       }
-
-      assert_types_can_cast_or_equal(
-          element_type, target_element_type, node->source_range,
-          "Failed to assign element type from value passed into collection-style initializer list");
-
-      // Perhaps we don't even want to do this?
-      // find_generic_type_of("Collection_Initializer", {element_type}, node->source_range);
-
-      node->resolved_type = target_type->id;
-      return;
     } break;
     case ASTInitializerList::INIT_LIST_EMPTY:
       node->resolved_type = target_type->id;

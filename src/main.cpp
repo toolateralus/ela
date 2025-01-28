@@ -9,7 +9,6 @@
 #include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
-#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include "strings.hpp"
@@ -32,13 +31,10 @@ jstl::Arena ast_arena{MB(333)};
 
 std::vector<Type*> type_table{};
 
-
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
 
 CompileCommand compile_command;
-
-std::vector<Token> all_tokens;
 
 std::unordered_set<InternedString> import_set;
 /*
