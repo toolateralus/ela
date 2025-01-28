@@ -15,7 +15,7 @@ int CompileCommand::compile() {
   parse.begin();
   Parser parser(input_path.string(), context);
   ASTProgram *root = parser.parse();
-  parse.end(std::format("Parsed {} tokens", all_tokens.size()));
+  parse.end("parsing done.");
 
   lower.begin();
   Typer type_visitor{context};

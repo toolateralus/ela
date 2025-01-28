@@ -405,7 +405,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
           return decl;
         } else {
-          throw_error("Expected struct or union after #anon ::...", SourceRange{(int64_t)tok.location.line});
+          auto range = parser->begin_node();
+          parser->eat();
+          parser->end_node(nullptr, range);
+          throw_error("Expected struct or union after #anon ::...", range);
         }
     }},
     // #export, for exporting a non-mangled name to a dll or C library
@@ -989,7 +992,10 @@ ASTExpr *Parser::parse_primary() {
         return tuple;
       }
       if (peek().type != TType::RParen) {
-        throw_error("Expected ')'", SourceRange{token_idx, token_idx + 1});
+        auto range = begin_node();
+        eat();
+        end_node(nullptr, range);
+        throw_error("Expected ')'", range);
       }
       eat();
       end_node(expr, range);
@@ -1003,7 +1009,7 @@ ASTExpr *Parser::parse_primary() {
     default: {
       throw_error(
           std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
-          {token_idx, token_idx + 1});
+          range);
       return nullptr;
     }
   }
@@ -1105,7 +1111,7 @@ ASTStatement *Parser::parse_statement() {
   if (peek().type == TType::Impl) {
     return parse_impl();
   }
-  
+
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
       lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly) {
     NODE_ALLOC(ASTExprStatement, expr, range, _, this)
@@ -1883,16 +1889,16 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   if (!semicolon()) {
     auto scope = info->scope;
     expect(TType::LCurly);
-    std::vector<ASTNode*> directives;
+    std::vector<ASTNode *> directives;
     while (peek().type != TType::RCurly) {
       if (peek().type == TType::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
         if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-          node->subtypes.push_back(static_cast<ASTStructDeclaration*>(directive.get()));
+          node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
         } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
           ASTStructMember member{};
-          auto _node = static_cast<ASTDeclaration*>(directive.get());
+          auto _node = static_cast<ASTDeclaration *>(directive.get());
           member.name = _node->name;
           member.is_bitfield = true;
           member.bitsize = _node->bitsize;
@@ -1900,7 +1906,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           node->members.push_back(member);
         } else {
           end_node(node, range);
-          throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the only thing allowed in structs, besides member declarations.", node->source_range);
+          throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the "
+                      "only thing allowed in structs, besides member declarations.",
+                      node->source_range);
         }
       } else if (peek().type == TType::Identifier) {
         ASTStructMember member{};
@@ -1908,7 +1916,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
         expect(TType::Colon);
         member.type = parse_type();
         node->members.push_back(member);
-      } 
+      }
       if (peek().type != TType::RCurly) {
         expect(TType::Comma);
       }
@@ -1989,10 +1997,13 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
     if (expr.is_not_null()) {
       return expr;
     } else {
+      auto range = begin_node();
+      eat();
+      end_node(nullptr, range);
       throw_error("Invalid directive in expression: directives in "
                   "expressions must return a value.",
 
-                  {std::max(token_idx - 5, int64_t()), std::max(token_idx + 5, int64_t())});
+                  range);
     }
   }
   return nullptr;
@@ -2146,7 +2157,6 @@ ASTType *ASTType::get_void() {
 }
 
 Token Parser::eat() {
-  all_tokens.push_back(peek());
   token_idx++;
   fill_buffer_if_needed();
   if (peek().is_eof() && states.size() > 1) {
@@ -2170,19 +2180,33 @@ void Parser::fill_buffer_if_needed() {
 Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
-    SourceRange range = {std::max(token_idx - 5, int64_t()), token_idx + 5};
+    SourceRange range = {
+        .begin_location = peek().location,
+        .end_location = peek().location,
+        .begin = std::max(token_idx - 5, int64_t()),
+        .end = token_idx + 5,
+    };
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
   }
   return eat();
 }
 
-SourceRange Parser::begin_node() { return SourceRange{.begin = token_idx, .begin_loc = (int64_t)peek().location.line}; }
+SourceRange Parser::begin_node() { 
+  auto location = peek().location;
+  return SourceRange{
+    .begin_location = location,
+    .begin = token_idx,
+    .begin_loc = (int64_t)location.line,
+  };
+}
 
 void Parser::end_node(ASTNode *node, SourceRange &range) {
   range.end = token_idx;
-  if (node)
+  range.end_location = peek().location; // This may be inaccurate.
+  if (node) {
     node->source_range = range;
+  }
 }
 
 ASTLambda *Parser::parse_lambda() {

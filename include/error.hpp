@@ -78,8 +78,6 @@ static std::string format_source_location(const SourceRange &source_range, Error
   const char *color = "";
   const char *code_color = "";
 
-  auto span = source_range.get_tokens();
-
   if (terminal_supports_color) {
     switch (severity) {
       case ERROR_INFO:
@@ -97,19 +95,15 @@ static std::string format_source_location(const SourceRange &source_range, Error
     }
   }
 
-  if (span.empty()) {
-    return "Error: No tokens in source range\n";
-  }
-
   std::stringstream ss;
-  ss << color << span.front().location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
+  ss << color << source_range.begin_location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
   ss << '\n';
 
   // Read the source file
-  auto first = span.front();
-  auto last = span.back();
+  auto first = source_range.begin_location;
+  auto last = source_range.end_location;
+  std::ifstream src_file(SourceLocation::files()[first.file]);
 
-  std::ifstream src_file(SourceLocation::files()[first.location.file]);
   if (!src_file.is_open()) {
     return "Error: Unable to open source file\n";
   }
@@ -133,16 +127,16 @@ static std::string format_source_location(const SourceRange &source_range, Error
   for (size_t i = 0; i < file_content.size(); ++i) {
     if (file_content[i] == '\n') {
       current_line++;
-      if (current_line == first.location.line - 2) {
+      if (current_line == first.line - 2) {
         context_start = i + 1;
       }
-      if (current_line == first.location.line) {
+      if (current_line == first.line) {
         error_line_start = i + 1;
       }
-      if (current_line == first.location.line + 1) {
+      if (current_line == first.line + 1) {
         error_line_end = i;
       }
-      if (current_line == first.location.line + 3) {
+      if (current_line == first.line + 3) {
         context_end = i;
         break;
       }
@@ -159,8 +153,8 @@ static std::string format_source_location(const SourceRange &source_range, Error
   // Generate the caret indicator
   size_t caret_line_start = error_line_start - context_start;
   std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
-  caret_indicator = std::string(first.location.column - 1, ' ');
-  caret_indicator += std::string(std::max((size_t)3, first.value.get_str().length()), '^');
+  caret_indicator = std::string(first.column - 1, ' ');
+  caret_indicator += "^^^";
 
   if (terminal_supports_color)
     ss << "\033[90;3m";

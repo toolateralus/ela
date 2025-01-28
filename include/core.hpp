@@ -3,10 +3,8 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
 #include <iostream>
-#include <sstream>
 #include <unordered_map>
 
 #include "lex.hpp"
@@ -89,33 +87,16 @@ struct CompileCommand {
 };
 
 extern CompileCommand compile_command;
-extern std::vector<Token> all_tokens;
 
 struct SourceRange {
-  inline bool empty() const {
-    return begin < 0 || end < 0 || begin > end || begin == end || begin > all_tokens.size() || end > all_tokens.size();
-  }
+  SourceLocation begin_location;
+  SourceLocation end_location;
   int64_t begin, end;
   int64_t begin_loc;
-  std::vector<Token> get_tokens() const {
-    int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
-    int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
-    if (valid_end - valid_begin == 0) {
-      valid_begin = std::max(int64_t(0), valid_begin - 2);
-      valid_end = std::min(int64_t(all_tokens.size()), valid_end + 3);
-    }
-    return std::vector<Token>(all_tokens.begin() + valid_begin, all_tokens.begin() + valid_end);
-  }
 };
 
 static std::string get_source_filename(const SourceRange &range) {
-  auto tokens = range.get_tokens();
-  if (tokens.empty()) {
-    return "";
-  }
-  auto token = tokens[0];
-  auto location = token.location;
-  return location.files()[location.file];
+  return SourceLocation::files()[range.begin_location.file];
 }
 
 struct Defer {
