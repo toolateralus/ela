@@ -148,6 +148,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->fill_buffer_if_needed();
         return nullptr;
     }},
+
     // #import
     // Imports from usr/local/lib/ela by identifier and no file ext.
     {.identifier = "import",
@@ -189,6 +190,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
     }},
 
+    // This is only used for debugging the compiler in rare cases.
     {.identifier = "print",
      .kind = DIRECTIVE_KIND_STATEMENT,
      .run = [](Parser *parser) -> Nullable<ASTNode> {
@@ -197,29 +199,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
      }
     },
-
-    // #raw
-    // string literals delimited by #raw and can span multiple lines.
-    // u8 *string = #raw string literal goes here #raw
-    {.identifier = "raw",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        InternedString string;
-        while (parser->not_eof()) {
-          if (parser->peek().type == TType::Directive &&
-              parser->states.back().lookahead_buffer[1].value == "raw") {
-            parser->eat();
-            parser->eat();
-            break;
-          }
-          string = {string.get_str() += parser->eat().value.get_str()};
-        }
-        NODE_ALLOC(ASTLiteral, literal, range, _, parser)
-        literal->tag = ASTLiteral::RawString;
-        literal->value = string;
-        return literal;
-      },
-    },
+    
     // #read
     // Read a file into a string at compile time. Nice for embedding resources
     // into your program.
@@ -244,7 +224,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         parser->expect(TType::RParen);
         NODE_ALLOC(ASTLiteral, string, range, _, parser)
-        string->tag = ASTLiteral::RawString;
+        string->tag = ASTLiteral::String;
         std::stringstream ss;
         if (mode == "binary") {
           std::ifstream isftr(filename.get_str(), std::ios::binary);
@@ -753,69 +733,6 @@ ASTExpr *Parser::parse_postfix() {
   return left;
 }
 
-ASTExpr *Parser::parse_interpolated_string() {
-  eat();
-  auto str = expect(TType::String);
-  NODE_ALLOC(ASTLiteral, node, range, _, this)
-  node->tag = ASTLiteral::InterpolatedString;
-  std::string value = str.value.get_str();
-  InterpolatedStringSegment *current = nullptr;
-  std::string prefix;
-  size_t pos = 0;
-
-  while (pos < value.length()) {
-    size_t start = value.find('{', pos);
-    if (start == std::string::npos) {
-      prefix += value.substr(pos);
-      break;
-    }
-
-    prefix += value.substr(pos, start - pos);
-
-    size_t end = value.find('}', start);
-    if (end == std::string::npos) {
-      end_node(nullptr, range);
-      throw_error("Unmatched '{' in interpolated string", range);
-    }
-
-    std::string expr_text = value.substr(start + 1, end - start - 1);
-
-    if (expr_text.empty()) {
-      throw_error("Interpolated string expression block '{}' was empty, which is not valid.", node->source_range);
-    }
-
-    auto state = Lexer::State::from_string(expr_text);
-    states.push_back(state);
-    fill_buffer_if_needed();
-    auto expr = parse_expr();
-    states.pop_back();
-
-    if (!prefix.empty() || expr) {
-      InterpolatedStringSegment *segment = new InterpolatedStringSegment{prefix, expr, nullptr};
-      if (!current) {
-        node->interpolated_string_root = segment;
-      } else {
-        current->next = segment;
-      }
-      current = segment;
-      prefix.clear();
-    }
-    pos = end + 1;
-  }
-
-  if (!prefix.empty()) {
-    InterpolatedStringSegment *segment = new InterpolatedStringSegment{prefix, nullptr, nullptr};
-    if (!current) {
-      node->interpolated_string_root = segment;
-    } else {
-      current->next = segment;
-    }
-  }
-
-  end_node(node, range);
-  return node;
-}
-
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
   auto range = begin_node();
@@ -869,9 +786,6 @@ ASTExpr *Parser::parse_primary() {
       end_node(node, range);
       return node;
     }
-    case TType::Dollar: {
-      return parse_interpolated_string();
-    }
     case TType::LCurly: {
       eat();
       NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
@@ -900,7 +814,6 @@ ASTExpr *Parser::parse_primary() {
       end_node(init_list, range);
       return init_list;
     }
-
     case TType::Identifier: {
       if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
         auto type = parse_type();
@@ -967,10 +880,6 @@ ASTExpr *Parser::parse_primary() {
       literal->tag = ASTLiteral::String;
       literal->value = tok.value;
       end_node(literal, range);
-      if (peek().type == TType::Identifier && peek().value == "c") {
-        eat();
-        literal->is_c_string = true;
-      }
       return literal;
     }
     case TType::LParen: {

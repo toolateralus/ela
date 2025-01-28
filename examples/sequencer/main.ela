@@ -252,7 +252,6 @@ main :: fn() {
     }
     
     for idx in 0..3 {
-      println($"{extensions[idx].data}, {file.data}");
       if extensions[idx] == file {
         file_dropdown.options.push(file.data);
         break;

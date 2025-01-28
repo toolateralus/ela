@@ -398,18 +398,11 @@ void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
   std::string output;
   switch (node->tag) {
-    case ASTLiteral::InterpolatedString: {
-      interpolate_string(node);
-      return;
-    }
     case ASTLiteral::Null:
       (*ss) << "NULL";
       return;
     case ASTLiteral::String:
       output = std::format("\"{}\"", node->value);
-      break;
-    case ASTLiteral::RawString:
-      output = std::format("R\"__({})__\"", node->value);
       break;
     case ASTLiteral::Float:
       if (node->resolved_type != float64_type()) {
@@ -1239,102 +1232,6 @@ std::string get_format_str(int type_id, ASTNode *node) {
               node->source_range);
 }
 
-// TODO: This needs a lot of work, front to back.
-// Parsing, lexing, and emitting.
-void Emitter::interpolate_string(ASTLiteral *node) {
-  // TODO: we should remove interpolated strings, and replace with a variadic template system with statement unfolding.
-  (*ss) << "NULL";
-  return;
-
-  emit_line_directive(node);
-
-  std::string str;
-  auto current = node->interpolated_string_root;
-  std::stringstream interp_ss;
-
-  while (current) {
-    interp_ss << current->prefix.get_str();
-    if (current->expression) {
-      auto type_id = current->expression->resolved_type;
-      interp_ss << get_format_str(type_id, node);
-    }
-    current = current->next;
-  }
-
-  // ! ! I refactored string interpolation to return char* for now until we build our string back in to it's full glory,
-  // ! ! Or replace this garbage string interpolation with a format!() function or macro or something.
-  // ! ! However, it leaks like a siev now.
-  (*ss) << "[&] -> char* { char* buf = (char*)malloc(1024); memset(buf, 0, 1024);\nsprintf(buf, \"" << interp_ss.str()
-        << "\",";
-
-  current = node->interpolated_string_root;
-  while (current) {
-    if (current->expression) {
-      auto type_id = current->expression->resolved_type;
-      auto type = global_get_type(type_id);
-
-      const auto interpolate_to_string_struct_union = [&](Scope *scope) {
-        auto sym = scope->lookup("to_string");
-
-        if (!sym)
-          throw_error("Cannot use a struct in an interpolated string without defining a "
-                      "`to_string` function that returns either a char* or a string",
-                      current->expression->source_range);
-
-        auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
-        auto return_ty = global_get_type(sym_ty->return_type);
-        auto param_0 = global_get_type(sym_ty->parameter_types[0]);
-        auto takes_pointer = param_0->get_ext().is_pointer();
-        auto &extensions = type->get_ext();
-        auto name = type->get_base();
-
-        if (extensions.back_type() == TYPE_EXT_POINTER) {
-          (*ss) << name.get_str() << "_to_string(";
-          if (!takes_pointer) {
-            (*ss) << "*";
-          }
-          current->expression->accept(this);
-          (*ss) << ")";
-        } else {
-          (*ss) << name.get_str() << "_to_string(";
-          if (takes_pointer) {
-            (*ss) << "&";
-          }
-          current->expression->accept(this);
-          (*ss) << ")";
-        }
-      };
-
-      if (type->id == bool_type()) {
-        current->expression->accept(this);
-        (*ss) << " ? \"true\" : \"false\"";
-      } else if (type->is_kind(TYPE_STRUCT)) {
-        auto info = (type->get_info()->as<StructTypeInfo>());
-        interpolate_to_string_struct_union(info->scope);
-      } else if (type->is_kind(TYPE_TUPLE)) {
-        auto info = type->get_info()->as<TupleTypeInfo>();
-        for (int i = 0; i < info->types.size(); ++i) {
-          current->expression->accept(this);
-          (*ss) << ".$" << std::to_string(i);
-
-          if (i != info->types.size() - 1) {
-            (*ss) << ", ";
-          }
-        }
-      } else {
-        current->expression->accept(this);
-      }
-      if (current->next && current->next->expression) {
-        (*ss) << ", ";
-      }
-    }
-    current = current->next;
-  }
-
-  (*ss) << ");\n "
-           " return buf; }()";
-}
-
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
 std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
@@ -1419,6 +1316,9 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
+  if (type->id == c_string_type() || type->id == charptr_type()) {
+    return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
+  }
   switch (type->kind) {
     case TYPE_SCALAR: {
       auto sint = type->id == int_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||

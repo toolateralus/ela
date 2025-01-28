@@ -98,25 +98,9 @@ ASTIdentifier *ASTCopier::copy_identifier(ASTIdentifier *node) {
   return new (ast_alloc<ASTIdentifier>()) ASTIdentifier(*node);
 }
 
-InterpolatedStringSegment *ASTCopier::copy_interp_string_segment(InterpolatedStringSegment *segment) {
-  if (!segment) {
-    return nullptr;
-  }
-  auto new_segment = new InterpolatedStringSegment(*segment);
-  if (segment->expression) {
-    new_segment->expression = static_cast<ASTExpr *>(copy_node(segment->expression));
-  }
-  new_segment->next = copy_interp_string_segment(segment->next);
-  return new_segment;
-}
-
 ASTLiteral *ASTCopier::copy_literal(ASTLiteral *node) {
   auto new_node = copy(node);
-
-  if (node->tag == ASTLiteral::InterpolatedString) {
-    new_node->interpolated_string_root = copy_interp_string_segment(node->interpolated_string_root);
-  }
-
+  // do anything here?
   return new_node;
 }
 ASTType *ASTCopier::copy_type(ASTType *node) {

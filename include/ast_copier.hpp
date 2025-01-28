@@ -14,7 +14,6 @@ struct ASTCopier {
 
   Scope *current_scope = nullptr;
   ASTImpl *copy_impl(ASTImpl* node);
-  InterpolatedStringSegment *copy_interp_string_segment(InterpolatedStringSegment* segment);
   Scope *copy_scope(Scope *old);
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);

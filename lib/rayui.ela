@@ -231,7 +231,7 @@ impl![T] Slider![T] {
     text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
     DrawText(self.text, text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
 
-    value_text := $"{*self.value}";
+    value_text := to_string(*self.value);
     value_text[self.digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(self.text, self.style.font_size) + 10; // 10 pixels padding
     DrawText(value_text, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);

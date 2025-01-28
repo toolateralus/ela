@@ -1395,7 +1395,6 @@ void Typer::visit(ASTLiteral *node) {
     case ASTLiteral::Float:
       node->resolved_type = float32_type();
       return;
-    case ASTLiteral::RawString:
     case ASTLiteral::String: {
       node->resolved_type = c_string_type();
       return;
@@ -1411,16 +1410,6 @@ void Typer::visit(ASTLiteral *node) {
       }
       node->resolved_type = voidptr_type();
       return;
-    case ASTLiteral::InterpolatedString: {
-      auto current = node->interpolated_string_root;
-      while (current) {
-        if (current->expression)
-          current->expression->accept(this);
-        current = current->next;
-      }
-      node->resolved_type = c_string_type();
-      return;
-    }
     case ASTLiteral::Char:
       node->resolved_type = char_type();
       return;

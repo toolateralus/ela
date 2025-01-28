@@ -22,15 +22,6 @@ impl Xaryu {
   }
 }
 
-#test test_string_interpolation :: fn() {
-  xarbar: Xaryu;
-  interp: string = string::from($"{xarbar}");
-  assert("unexpected interpolated string value", strcmp(interp.data, "XarBar") == 0);
-  interp = string::from($"{(1 + 1) * 2}");
-  assert("unexpected interpolated string value", strcmp(interp.data, "4") == 0);
-}
-
-
 #test test_array_concat_operator :: fn() {
   array: List![int];
   array.push(10);

@@ -16,14 +16,6 @@ impl Add![Vec2, Vec2] for Vec2 {
   }
 }
 
-impl Vec2 {
-  to_string :: fn(self*) -> char* {
-    return $"x: {self.x}, y: {self.y}";
-  }
-}
-
-;
-
 #test test_main :: fn() {
   a, b := (Vec2{x: 1, y: 1}, Vec2{x: 1, y: 1});
   

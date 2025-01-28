@@ -270,32 +270,17 @@ struct ASTIdentifier : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 };
 
-struct InterpolatedStringSegment {
-  InternedString prefix;
-  ASTExpr *expression;
-  InterpolatedStringSegment *next = nullptr;
-};
 
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
     Float,
     String,
-    RawString,
-    InterpolatedString,
     Char,
     Bool,
     Null,
   } tag;
-
-  ~ASTLiteral() {
-    if (tag == InterpolatedString) {
-      delete (interpolated_string_root);
-    }
-  }
-  InterpolatedStringSegment *interpolated_string_root;
   InternedString value;
-  bool is_c_string = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
@@ -798,7 +783,6 @@ struct Parser {
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
-  ASTExpr *parse_interpolated_string();
   ASTExpr *parse_primary();
   ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();

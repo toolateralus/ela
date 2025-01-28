@@ -1,3 +1,5 @@
+
+
 string :: struct;
 // Run a cleanup procedure implicitly when an object goes out of scope.
 // Absolutely equivalent to a C++ Destructor.
@@ -346,19 +348,7 @@ impl Iterable![char] for string {
   }
 }
 
-#ifndef FREESTANDING {
-  #static print :: fn![T](str: T) {
-    s := $"{str}";
-    printf("%s", s);
-    free(s);
-  }
 
-  #static println :: fn![T](str: T) {
-    s := $"{str}";
-    printf("%s\n", s);
-    free(s);
-  }
-}
 
 #alias Panic_Handler :: fn *(c_string);
 
@@ -786,3 +776,66 @@ panic :: fn(msg: c_string) {
 /* 
   * `any` is unfinished, it's just experimental.
 */
+
+#import reflection;
+#ifndef FREESTANDING {
+  // TODO: expand this, add support for other stuff.
+  // This is only for numerical types, bools, and strings / any pointer.
+  to_string :: fn![T](value: T) -> c_string {
+    #static buffer: char[64];
+    #static type: Type*;
+    #static format : c_string;
+    #static return_early : bool;
+
+    if !type {
+      type = #type(T);
+      if type.is_integral() {
+        format = "%lld";
+      } else if type.is_float() {
+        format = "%.2f";
+      } else if type.is_string() {
+        format = "%s";
+      } else if type.is_pointer() {
+        format = "%p";
+      } else {
+        // ! do we throw an error here? format = null?
+        format = "(unsupported type)";
+      }
+    }
+
+    if type.is_bool() {
+      if value {
+        return strdup("true");
+      } else {
+        return strdup("false");
+      }
+    }
+
+    snprintf(buffer, sizeof(buffer), format, value);
+    return strdup(buffer) as c_string;
+  } 
+
+
+  // TODO: remove this.
+  string_concat :: fn(a: c_string, b: c_string) -> c_string {
+    len_a := strlen(a);
+    len_b := strlen(b);
+    result := malloc(len_a + len_b + 1) as char*;
+    memcpy(result, a, len_a);
+    memcpy(result + len_a, b, len_b);
+    result[len_a + len_b] = '\0';
+    return result as c_string;
+  }
+
+  #static print :: fn![T](str: T) {
+    s := to_string(str);
+    printf("%s", s);
+    free(s);
+  }
+
+  #static println :: fn![T](str: T) {
+    s := to_string(str)
+    printf("%s\n", s);
+    free(s);
+  }
+}
