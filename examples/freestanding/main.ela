@@ -67,14 +67,15 @@ Vector2 :: struct {
   y: float,
 }
 
-// declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.
+// declare main as 'export' (equivalent to 'extern' in C) so our assembly program can find it.
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
-// and 'export' is declaring an externally visible symbol.
+// and 'export' is declaring an externally visible symbol, or a external dependency that's a field / global variable.
+
+// perhaps in the future we'll just have a #extern.
 
 // Unlike a normal Ela program, 'main' always has to return an int in a freestanding environment.
-// Also, `Env::args()` and other utilities are not immediately available, because of the complete lack of our
-// runtime. instead, you may just take `argc` and `argv` in your main, as if it's a C main function.
-#export main :: fn(argc: int, argv: c_string*) -> int {
+// additionally, it's up to you to call main with whatever you want for arguments, argc and argv will not be provided automatically.
+#export main :: fn() -> int {
 
   // create our 'linear allocator' which is just a piece of memory sitting on the stack.
   allocator := LinearAlloc::create();
@@ -91,4 +92,8 @@ Vector2 :: struct {
   }
   
   return 0;
+}
+
+#export _start :: fn() {
+  main();
 }
