@@ -319,7 +319,6 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 }
 
 void Emitter::visit(ASTCall *node) {
-  auto node_type = node->function->get_node_type();
   auto base_symbol = typer.get_symbol(node->function);
 
   std::vector<int> generic_args;
@@ -328,7 +327,7 @@ void Emitter::visit(ASTCall *node) {
   }
 
   auto symbol = base_symbol.get();
-  if (base_symbol && node_type == AST_NODE_DOT_EXPR && symbol->declaring_node.is_not_null() &&
+  if (node->function->get_node_type() == AST_NODE_DOT_EXPR && base_symbol && symbol->declaring_node.is_not_null() &&
       symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
     auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
@@ -375,8 +374,19 @@ void Emitter::visit(ASTCall *node) {
     }
     (*ss) << ")";
   } else {
+    auto func = node->function;
+    if (func->get_node_type() == AST_NODE_TYPE) {
+      auto ast_type = static_cast<ASTType *>(func);
+      if (ast_type->kind != ASTType::NORMAL) {
+        throw_error("Cannot call a tuple or function type", node->source_range);
+      }
+      if (!ast_type->normal.generic_arguments.empty()) {
+        throw_error("internal compiler error: generic args to call put on base", node->source_range);
+      }
+      func = ast_type->normal.base;
+    }
     // normal function call, or a static method.
-    node->function->accept(this);
+    func->accept(this);
     (*ss) << mangled_type_args(generic_args);
     node->arguments->accept(this);
   }
@@ -1543,7 +1553,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
         fields_ss << get_field_struct(field.get_str(), t, type, context) << ";\n";
         ++it;
       }
-    } 
+    }
     return fields_ss.str();
   };
 

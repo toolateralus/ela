@@ -872,7 +872,6 @@ void Typer::visit(ASTWhile *node) {
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
-  node->function->accept(this);
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
@@ -889,10 +888,23 @@ void Typer::visit(ASTCall *node) {
         // doing this so self will get the right type when we call generic methods
         auto old_type = type_context;
         Defer _([&] { type_context = old_type; });
-        auto func_node_ty = node->function->get_node_type();
+        auto func = node->function;
+        if (func->get_node_type() == AST_NODE_TYPE) {
+          auto ast_type = static_cast<ASTType*>(func);
+          if (ast_type->kind == ASTType::NORMAL) {
+            if (!ast_type->normal.generic_arguments.empty()) {
+              throw_error("Internal compiler error: generic args atached to wrong ast", func->source_range);
+            }
+            func = ast_type->normal.base;
+          } else {
+            throw_error("Cannot call method of function or tuple type", func->source_range);
+          }
+        }
+        auto func_node_ty = func->get_node_type();
         ASTType type_ast;
         if (func_node_ty == AST_NODE_DOT_EXPR) {
-          auto func_as_dot = static_cast<ASTDotExpr *>(node->function);
+          auto func_as_dot = static_cast<ASTDotExpr *>(func);
+          func_as_dot->base->accept(this);
           auto type = global_get_type(func_as_dot->base->resolved_type);
           if (!type->get_info()->scope->local_lookup(func_as_dot->member_name) && type->get_ext().is_pointer()) {
             type = global_get_type(type->get_element_type());
@@ -900,7 +912,8 @@ void Typer::visit(ASTCall *node) {
           type_ast.resolved_type = type->id;
           type_context = &type_ast;
         } else if (func_node_ty == AST_NODE_SCOPE_RESOLUTION) {
-          auto func_as_scope_res = static_cast<ASTScopeResolution *>(node->function);
+          auto func_as_scope_res = static_cast<ASTScopeResolution *>(func);
+          func_as_scope_res->base->accept(this);
           type_ast.resolved_type = func_as_scope_res->base->resolved_type;
           type_context = &type_ast;
         }
@@ -910,8 +923,7 @@ void Typer::visit(ASTCall *node) {
       type = global_get_type(func_decl->resolved_type);
     }
   } else {
-    // Somehow this just fails half the time, for impls. How do impls know they need to get instantiated
-    // when we can't even find the type via the names of function becuase it's not yet instantiated?
+    node->function->accept(this);
     type = global_get_type(node->function->resolved_type);
   }
 
