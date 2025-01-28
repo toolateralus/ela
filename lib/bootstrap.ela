@@ -782,26 +782,9 @@ panic :: fn(msg: c_string) {
   // TODO: expand this, add support for other stuff.
   // This is only for numerical types, bools, and strings / any pointer.
   to_string :: fn![T](value: T) -> c_string {
-    #static buffer: char[64];
-    #static type: Type*;
-    #static format : c_string;
-    #static return_early : bool;
-
-    if !type {
-      type = #type(T);
-      if type.is_integral() {
-        format = "%lld";
-      } else if type.is_float() {
-        format = "%.2f";
-      } else if type.is_string() {
-        format = "%s";
-      } else if type.is_pointer() {
-        format = "%p";
-      } else {
-        // ! do we throw an error here? format = null?
-        format = "(unsupported type)";
-      }
-    }
+    buffer: char[64];
+    type := #type(T);
+    format : c_string;
 
     if type.is_bool() {
       if value {
@@ -809,6 +792,19 @@ panic :: fn(msg: c_string) {
       } else {
         return strdup("false");
       }
+    }
+
+    if type.is_integral() {
+      format = "%lld";
+    } else if type.is_float() {
+      format = "%.2f";
+    } else if type.is_string() {
+      format = "%s";
+    } else if type.is_pointer() {
+      format = "%p";
+    } else {
+      // ! do we throw an error here? format = null?
+      format = "(unsupported type)";
     }
 
     snprintf(buffer, sizeof(buffer), format, value);
