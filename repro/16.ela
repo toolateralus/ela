@@ -1,4 +1,4 @@
-main :: fn() {
+#error "wrong" main :: fn() {
   str := "This is a string\n";
 // Heap buffer overflow,
 // our interplator for strings is sprintf'ing into a 1024 char buffer.
