@@ -1,1 +1,0 @@
-sudo cp ./lib/* /usr/local/lib/ela/

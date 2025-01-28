@@ -1043,16 +1043,26 @@ void Emitter::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      auto element_type = type->generic_args[0];
-      (*ss) << " .data = ";
-      (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
-      for (const auto &expr : node->values) {
-        expr->accept(this);
-        if (expr != node->values.back()) {
-          (*ss) << ", ";
+      if (type->get_base().get_str().starts_with("Collection_Initializer$")) {
+        auto element_type = type->generic_args[0];
+        (*ss) << " .data = ";
+        (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
+        for (const auto &expr : node->values) {
+          expr->accept(this);
+          if (expr != node->values.back()) {
+            (*ss) << ", ";
+          }
+        }
+        (*ss) << "}, .length = " << std::to_string(node->values.size());
+      } else {
+        for (const auto &expr : node->values) {
+          expr->accept(this);
+          if (expr != node->values.back()) {
+            (*ss) << ", ";
+          }
         }
       }
-      (*ss) << "}, .length = " << std::to_string(node->values.size());
+
     } break;
   }
   (*ss) << "}";

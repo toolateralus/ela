@@ -99,12 +99,12 @@ impl Xaryu {
 }
 
 #test test_slicing_array :: fn() {
-  arr := List![s64] {
+  arr := List![s32]::init({
     0, 0, 0,
     0, 0, 0,
     0, 0, 0,
     0, 0,
-  };
+  });
   
   assert("Length", arr.length == 11);
 

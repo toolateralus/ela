@@ -52,21 +52,21 @@ impl JsonToken {
   }
 }
 
-#static tokenTypeNames : List![string] = {
-  "Invalid",
-  "True",
-  "False",
-  "Null",
-  "Eof",
-  "Colon",
-  "Number",
-  "String",
-  "LCurly",
-  "RCurly",
-  "LBracket",
-  "RBracket",
-  "Comma",
-};
+tokenTypeNames := List![string]::init({
+  string::from("Invalid"),
+  string::from("True"),
+  string::from("False"),
+  string::from("Null"),
+  string::from("Eof"),
+  string::from("Colon"),
+  string::from("Number"),
+  string::from("String"),
+  string::from("LCurly"),
+  string::from("RCurly"),
+  string::from("LBracket"),
+  string::from("RBracket"),
+  string::from("Comma"),
+});
 
 JsonLexer :: struct {
   file: string,

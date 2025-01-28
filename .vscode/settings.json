@@ -8,16 +8,14 @@
 
   "files.exclude": {
     "**/.clock_diff.txt": true,
-    // "**/compile_commands.json": true,
+    // we hide these cause they're ugly.
     "**/bin": true,
-    // "**/build": true,
     "**/objs": true,
   
-    // For windows users, remove these.
+    // For windows users, you may want to remove these.
     "**/*vcxproj": true,
     "**/*vcxproj.filters": true,
     "**/*vcxproj.user": true,
-    "**/*.bat": true,
     "**/*.sln": true,
     "**/*.cache": true
   }
