@@ -232,6 +232,8 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
 }
 
 void Typer::visit(ASTLambda *node) {
+  static size_t n = 0;
+  node->unique_identifier = "$lambda$" + std::to_string(n++);
   node->params->accept(this);
   node->return_type->accept(this);
   std::vector<int> param_types;

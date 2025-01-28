@@ -374,17 +374,22 @@ impl Iterable![char] for string {
 
 #alias Panic_Handler :: fn *(c_string);
 
-panic_handler: Panic_Handler = fn(msg: c_string) {
-  println(msg);
-  exit(1);
-}
+// impl Panic_Handler {
+//   get :: fn() -> #self* {
+//     static panic_handler: Panic_Handler = fn(msg: c_string) {
+//       println(msg);
+//       exit(1);
+//     }
+//   }
+// }
+
 
 #static panic :: fn(msg: c_string) {
-  if !panic_handler {
+  // if !panic_handler {
     printf("No panic handler set. Exitting\n");
     exit(1);
-  }
-  panic_handler(msg);
+  // }
+  // panic_handler(msg);
 }
 
 #alias Error :: c_string;
@@ -725,5 +730,41 @@ _type_info: Type*[];
     }
 
     assert("List failed to deinit", array.data == null && array.length == 0);
+  }
+}
+
+/* 
+  * `any` is unfinished, it's just experimental.
+*/
+
+any :: struct {
+  ptr: void*,
+  type: Type*
+};
+
+impl any {
+  new :: fn![T](t: T*) -> #self {
+    #static type: Type*;
+    if !type then type = #type(T);
+    return {
+      ptr: t,
+      type: type,
+    }
+  }
+
+  // return the pointer behind this any, or if the type isn't matched,
+  // return null.
+  cast :: fn![T](self*) -> T* {
+    #static type: Type*;
+    if !type then type = #type(T);
+    if type != self.type then return null;
+    return self.ptr as T*;
+  }
+
+  // an unchecked version of the 'cast' method.
+  // this will return junk data, or worse, if you pass in the wrong type to cast to.
+  // use cast anywhere you can, it's much more type safe.
+  unwrap :: fn![T](self*) -> T {
+    return *(self.ptr as T*);
   }
 }

@@ -2196,6 +2196,12 @@ ASTLambda *Parser::parse_lambda() {
     node->return_type = ASTType::get_void();
   }
   node->block = parse_block();
+
+  if (current_func_decl.is_null()) {
+    end_node(nullptr, range);
+    throw_error("temporarily, lambda functions cannot be used at a global level, only within functions", range);
+  }
+  current_func_decl.get()->lambdas.push_back(node);
   return node;
 }
 

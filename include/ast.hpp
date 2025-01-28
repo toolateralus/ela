@@ -349,6 +349,7 @@ template <typename T> struct GenericInstance {
 };
 
 struct ASTWhere;
+struct ASTLambda;
 
 struct ASTFunctionDeclaration : ASTStatement {
   size_t flags = 0;
@@ -356,6 +357,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
+  std::vector<ASTLambda* > lambdas;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   ASTParamsDecl *params;
@@ -633,6 +635,7 @@ struct ASTCast : ASTExpr {
 
 // These do not support closures!!
 struct ASTLambda : ASTExpr {
+  InternedString unique_identifier;
   ASTParamsDecl *params;
   ASTType *return_type;
   ASTBlock *block;

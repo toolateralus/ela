@@ -1862,6 +1862,16 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
   };
 
+  // Emit all the lambdas that this function depends on.
+  for (const auto &lambda: node->lambdas) {
+    emit_line_directive(lambda);
+    lambda->return_type->accept(this);
+    (*ss) << ' ' << lambda->unique_identifier.get_str() << ' ';
+    lambda->params->accept(this);
+    lambda->block->accept(this);
+    newline();
+  }
+
   emit_line_directive(node);
 
   auto test_flag = compile_command.has_flag("test");
@@ -1982,17 +1992,7 @@ void Emitter::visit(ASTBlock *node) {
 }
 
 void Emitter::visit(ASTLambda *node) {
-  // We parenthesize this because if you call it on the spot,
-  // it thinks you're trying to do + on whatever this returns.
-
-  // ! Transpiling lambdas to C will require more thought than this.
-  // (*ss) << "(+[]";
-  // node->params->accept(this);
-  // (*ss) << " -> ";
-  // node->return_type->accept(this);
-  // node->block->accept(this);
-  // (*ss) << ")";
-  (*ss) << "NULL";
+  (*ss) << node->unique_identifier.get_str();
 }
 
 // This should never get hit.
