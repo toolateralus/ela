@@ -82,7 +82,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
     auto value = evaluate_constexpr(condition, parser->ctx);
     executed = value.is_truthy();
   } else {
-    throw_error("INTERNAL COMPILER ERROR: Invalid #if/#ifdef/#ifndef, "
+    throw_error("internal compiler error: Invalid #if/#ifdef/#ifndef, "
                 "unrecognized kind.",
                 {});
   }

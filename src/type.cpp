@@ -196,7 +196,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
-    throw_error("Internal Compiler Error: type was null when checking type "
+    throw_error("internal compiler error: type was null when checking type "
                 "conversion rules",
                 source_range);
   }
@@ -468,7 +468,7 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 int Type::get_element_type() const {
   if (!extensions.is_pointer() && !extensions.is_fixed_sized_array()) {
     throw_error(
-        std::format("Internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
+        std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
                     to_string()),
         {});
   }
@@ -723,7 +723,7 @@ std::string TypeExtensions::to_string() const {
         ss << "[]";
         break;
       case TYPE_EXT_INVALID:
-        throw_error("Internal compiler error: extension type invalid", {});
+        throw_error("internal compiler error: extension type invalid", {});
         break;
     }
   }

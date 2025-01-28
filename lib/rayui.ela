@@ -15,6 +15,7 @@ Style :: struct {
 
 // * Measure the width of a jiggly text of 'text' and 'style'
 measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
+  if !text then return 0.0;
   length := strlen(text);
   total_width: float = 0.0;
   for i in 0..length {
@@ -25,8 +26,12 @@ measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
 
 // * Draw wavy jiggly text.
 jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
+  
   time: float = GetTime() as float;
-  length := strlen(text);
+
+  length := 0;
+  if text then length = strlen(text);
+
   intensity := style.jiggle_intensity;
   rate := style.jiggle_rate;
 

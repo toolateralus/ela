@@ -124,7 +124,7 @@ void Emitter::forward_decl_type(Type *type) {
     case TYPE_ENUM:
     case TYPE_INTERFACE:
       throw_error(
-          std::format("Internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
+          std::format("internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
           {});
       break;
   }
@@ -311,7 +311,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
       return srnode->base->resolved_type;
     } break;
     default:
-      throw_error(std::format("Internal Compiler Error: 'get_dot_left_type' encountered an unexpected node, kind {}",
+      throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
                               (int)node->get_node_type()),
                   node->source_range);
   }
@@ -340,7 +340,7 @@ void Emitter::visit(ASTCall *node) {
 
     auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
     if (!base_type) {
-      throw_error("Internal compiler error: unable to find method call", node->source_range);
+      throw_error("internal compiler error: unable to find method call", node->source_range);
     }
 
     (*ss) << "$" << std::to_string(base_type->base_id == -1 ? base_type->id : base_type->base_id) << "_"
@@ -546,7 +546,7 @@ void Emitter::visit(ASTDeclaration *node) {
   }
 
   if (node->type->resolved_type == Type::invalid_id) {
-    throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
+    throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
   auto type = global_get_type(node->type->resolved_type);
@@ -1094,7 +1094,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
 
   auto block = node->declaring_block;
   if (!block) {
-    throw_error("Internal compiler error: couldn't generate temporary variable because declaring block was null",
+    throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
                 node->source_range);
   }
   auto id = block.get()->temp_iden_idx++;
@@ -1316,7 +1316,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   auto type_prefix = std::string{"*"};
 
   if (!type->is_kind(TYPE_FUNCTION)) {
-    throw_error("Internal compiler error: tried to get a function pointer from "
+    throw_error("internal compiler error: tried to get a function pointer from "
                 "a non-function type",
                 {});
   }
@@ -1449,7 +1449,7 @@ std::string get_type_flags(Type *type) {
         kind_flags |= TYPE_FLAGS_ARRAY;
         break;
       case TYPE_EXT_INVALID:
-        throw_error("Internal Compiler Error: Extension type not set.", {});
+        throw_error("internal compiler error: Extension type not set.", {});
         break;
     }
   }
@@ -1460,7 +1460,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   std::stringstream ss;
 
   if (!type) {
-    throw_error("Internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
+    throw_error("internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
   }
 
   auto kind = 0;
@@ -1513,7 +1513,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
           continue;
 
         if (!t)
-          throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
 
         fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
         fields_ss << get_field_struct(name.get_str(), t, type, context) << ";\n";
@@ -1536,7 +1536,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
         auto t = global_get_type(s32_type());
 
         if (!t) {
-          throw_error("Internal Compiler Error: Type was null in reflection 'to_type_struct()'", {});
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
         }
 
         fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
@@ -1771,7 +1771,7 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
   auto defer_block = defer_blocks.rbegin();
   while (defer_block->type != type) {
     if (defer_block == defer_blocks.rend()) {
-      throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+      throw_error("internal compiler error: could not find defer block type in stack", {});
     }
     for (auto defer : defer_block->defers) {
       defer->statement->accept(this);
@@ -1781,7 +1781,7 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
     defer_block++;
   }
   if (defer_block == defer_blocks.rend()) {
-    throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+    throw_error("internal compiler error: could not find defer block type in stack", {});
   }
   for (auto defer : defer_block->defers) {
     defer->statement->accept(this);
@@ -1987,7 +1987,7 @@ void Emitter::visit(ASTLambda *node) {
 
 // This should never get hit.
 void Emitter::visit(ASTWhere *node) {
-  throw_error("Internal compiler error: 'where' expression was visited in the emitter", node->source_range);
+  throw_error("internal compiler error: 'where' expression was visited in the emitter", node->source_range);
 }
 
 void Emitter::emit_tuple_dependants(std::vector<int> &types) {

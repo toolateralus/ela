@@ -214,7 +214,7 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   declaring_or_assigning_type = node->return_type->resolved_type;
   auto block = node->block.get();
   if (!block) {
-    throw_error("Internal Compiler Error: attempting to visit body of function forward declaration.",
+    throw_error("internal compiler error: attempting to visit body of function forward declaration.",
                 node->source_range);
   }
   block->accept(this);
@@ -302,7 +302,7 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
   }
 
   if (info.return_type == -2) {
-    throw_error("Internal Compiler error: unresolved generic return type.", node->source_range);
+    throw_error("internal compiler error: unresolved generic return type.", node->source_range);
   }
   node->resolved_type = global_find_function_type_id(info, {});
 }
@@ -342,7 +342,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     node->interface.get()->accept(this);
     auto type_id = node->interface.get()->resolved_type;
     if (type_id == Type::invalid_id) {
-      throw_error("Internal compiler error: type of impl interface was invalid", node->source_range);
+      throw_error("internal compiler error: type of impl interface was invalid", node->source_range);
     }
     interface_ty = global_get_type(type_id);
   }
@@ -737,7 +737,7 @@ void Typer::visit(ASTFor *node) {
 
     auto symbol = scope->local_lookup("iter");
     if (!symbol || !symbol->is_function()) {
-      throw_error("Internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
+      throw_error("internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'iter'",
                   node->source_range);
     }
@@ -751,7 +751,7 @@ void Typer::visit(ASTFor *node) {
 
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
-      throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
@@ -762,7 +762,7 @@ void Typer::visit(ASTFor *node) {
 
     auto symbol = scope->local_lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
-      throw_error("Internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
+      throw_error("internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
                   "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
                   node->source_range);
     }
@@ -775,7 +775,7 @@ void Typer::visit(ASTFor *node) {
 
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
-      throw_error("Internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
@@ -1198,7 +1198,7 @@ void Typer::visit(ASTType *node) {
     }
     node->resolved_type = global_find_function_type_id(info, extensions);
   } else {
-    throw_error("Internal Compiler Error: Invalid type kind", node->source_range);
+    throw_error("internal compiler error: Invalid type kind", node->source_range);
   }
 }
 
@@ -1398,7 +1398,7 @@ void Typer::visit(ASTDotExpr *node) {
   auto base_ty = global_get_type(base_ty_id);
 
   if (!base_ty) {
-    throw_error("Internal Compiler Error: un-typed variable on lhs of dot "
+    throw_error("internal compiler error: un-typed variable on lhs of dot "
                 "expression?",
                 node->source_range);
   }
@@ -1412,7 +1412,7 @@ void Typer::visit(ASTDotExpr *node) {
   }
 
   if (!base_scope) {
-    throw_error("Internal compiler error: dot expression used on a type that had a null scope", node->source_range);
+    throw_error("internal compiler error: dot expression used on a type that had a null scope", node->source_range);
   }
 
   if (auto member = base_scope->local_lookup(node->member_name)) {
@@ -1433,7 +1433,7 @@ void Typer::visit(ASTScopeResolution *node) {
   auto base_ty = global_get_type(id);
   Scope *scope = base_ty->get_info()->scope;
   if (!scope) {
-    throw_error("Internal Compiler Error: scope is null for scope resolution", node->source_range);
+    throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
   }
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;

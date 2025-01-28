@@ -149,7 +149,7 @@ struct Context {
   }
   inline Scope *exit_scope() {
     if (scope == root_scope) {
-      throw_error("Internal Compiler Error: attempted to exit the global scope.", {});
+      throw_error("internal compiler error: attempted to exit the global scope.", {});
     }
     auto old_scope = scope;
     if (scope) {
