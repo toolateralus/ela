@@ -35,29 +35,27 @@ memcpy :: fn(dest: char**, src: char*, len: u64) {
 
 // A simple linear allocator (aka arena) 
 // for a freestanding environment without allocations.
+
+LINEAR_ALLOCATOR_SIZE :: 1024 * 24;
+
 LinearAlloc :: struct {
-  mem : char[1024 * 24],
+  mem : char[LINEAR_ALLOCATOR_SIZE],
   ptr : u64,
-  size: u64,
 }
 
 impl LinearAlloc {
   create :: fn() -> #self {
     self: #self;
-    self.size = 1024 * 24;
-    memset(self.mem as char*, 0, self.size);
+    memset(self.mem as char*, 0, LINEAR_ALLOCATOR_SIZE);
     return self;
   }
-
   alloc :: fn(self*, size: u64) -> char* {
     data := &self.mem[self.ptr];
     self.ptr += size;
-    
-    if (self.ptr > self.size) {
+    if (self.ptr > LINEAR_ALLOCATOR_SIZE) {
       print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n");
       exit(1);
     }
-
     return data;
   }
 }
@@ -73,10 +71,11 @@ Vector2 :: struct {
 
 // perhaps in the future we'll just have a #extern.
 
-// Unlike a normal Ela program, 'main' always has to return an int in a freestanding environment.
-// additionally, it's up to you to call main with whatever you want for arguments, argc and argv will not be provided automatically.
-#export main :: fn() -> int {
-
+// unlike a normal Ela program, or C for that matter,
+// you have to define your own _start() and (optionally) main()
+// these can have whatever signature you want.
+// We make main here just for an example, but all of this could be put into _start.
+#export main :: fn() {
   // create our 'linear allocator' which is just a piece of memory sitting on the stack.
   allocator := LinearAlloc::create();
 
@@ -90,8 +89,6 @@ Vector2 :: struct {
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
     memcpy((&v1) as char**, v as char*, sizeof(Vector2));
   }
-  
-  return 0;
 }
 
 #export _start :: fn() {

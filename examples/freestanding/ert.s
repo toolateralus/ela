@@ -9,6 +9,5 @@ exit:
   mov rdi, rdi ; status: argument passed in rdi
   syscall
   
-
 global _start
 extern main
