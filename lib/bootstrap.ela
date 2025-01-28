@@ -549,7 +549,7 @@ impl Field {
     memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
   }
   get :: fn![T](self*, source: T) -> u8* {
-    return (source as u8*) + self.offset;
+    return ((&source) as u8*) + self.offset;
   }
 }
 

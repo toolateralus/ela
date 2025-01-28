@@ -1010,10 +1010,20 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
     generic_args = node->arguments->resolved_argument_types;
+    auto index = 0;
     for (auto generic_arg : generic_args) {
       auto type = ast_alloc<ASTType>();
-      type->resolved_type = generic_arg;
+      type->source_range = node->source_range;
+      auto gen_t = global_get_type(generic_arg);
+      // if we have a T[] or T** etc, we deference it once so that T is the actual type behind the pointer.
+      // This may seem strange, but most generic inference algorithms do this, and it's nice and smooth to use.
+      if (gen_t->get_ext().is_pointer() && !func->params->params[index]->normal.type->extensions.empty()) {
+        type->resolved_type = gen_t->get_element_type();
+      } else {
+        type->resolved_type = generic_arg;
+      }
       node->generic_arguments.push_back(type);
+      index++;
     }
   } else {
     generic_args = get_generic_arg_types(node->generic_arguments);
