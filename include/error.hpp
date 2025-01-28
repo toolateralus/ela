@@ -153,7 +153,12 @@ static std::string format_source_location(const SourceRange &source_range, Error
   // Generate the caret indicator
   size_t caret_line_start = error_line_start - context_start;
   std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
-  caret_indicator = std::string(first.column - 1, ' ');
+
+  if (first.column <= 1) {
+    caret_indicator = "";
+  } else {
+    caret_indicator = std::string(std::max(1ul, first.column - 1), ' ');
+  }
   caret_indicator += "^^^";
 
   if (terminal_supports_color)

@@ -374,22 +374,24 @@ impl Iterable![char] for string {
 
 #alias Panic_Handler :: fn *(c_string);
 
-// impl Panic_Handler {
-//   get :: fn() -> #self* {
-//     static panic_handler: Panic_Handler = fn(msg: c_string) {
-//       println(msg);
-//       exit(1);
-//     }
-//   }
-// }
+panic_handler: Panic_Handler;
 
+set_panic_handler :: fn(handler: Panic_Handler) {
+  panic_handler = handler;
+}
 
-#static panic :: fn(msg: c_string) {
-  // if !panic_handler {
-    printf("No panic handler set. Exitting\n");
-    exit(1);
-  // }
-  // panic_handler(msg);
+// if you set the panic handler to null, we will set it to it's default. If you want to do nothing for a panic
+// just set it to an empty function
+
+// We do this because we're restricted to not using lambdas in the global scope, currently. Perhaps in the future we will improve this.
+panic :: fn(msg: c_string) {
+  if !panic_handler {
+    panic_handler = fn(msg: c_string) {
+      printf("panic(): %s\n", msg);
+      exit(1);
+    };
+  }
+  panic_handler(msg);
 }
 
 #alias Error :: c_string;
