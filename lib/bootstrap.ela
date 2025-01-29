@@ -152,6 +152,7 @@ Init :: interface![T] {
   #foreign strlen :: fn(str: c_string) -> int;
   #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
   #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
+  #foreign strncat :: fn(dest: c_string, src: c_string, n: u64) -> c_string;
   #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
   #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
   #foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
