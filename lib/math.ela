@@ -1,21 +1,21 @@
 #foreign rand :: fn() -> s32;
 #foreign srand :: fn(seed: u32);
-#foreign fmod :: fn(l: float, r: float) -> float;
-#foreign fabs :: fn(f: float64) -> float64;
-#foreign isinf :: fn(arg: float64) -> bool;
-#foreign isnan :: fn(arg: float64) -> bool;
-#foreign pow :: fn(base: float64, exponent: float64) -> float64;
-#foreign sqrt :: fn(f: float64) -> float64;
-#foreign cos :: fn(f: float64) -> float64;
-#foreign sin :: fn(f: float64) -> float64;
+#foreign fmod :: fn(l: f32, r: f32) -> f32;
+#foreign fabs :: fn(f: f64) -> f64;
+#foreign isinf :: fn(arg: f64) -> bool;
+#foreign isnan :: fn(arg: f64) -> bool;
+#foreign pow :: fn(base: f64, exponent: f64) -> f64;
+#foreign sqrt :: fn(f: f64) -> f64;
+#foreign cos :: fn(f: f64) -> f64;
+#foreign sin :: fn(f: f64) -> f64;
 
 
 // We use this struct for namespacing.
 Random :: struct;
 
 impl Random {
-  next :: fn(max: float32) -> float {
-    return (rand() as float) / (2147483647 as float) * max; // ! HACK:: replace this magic number with Random::Max when we fix that problen.
+  next :: fn(max: f32) -> f32 {
+    return (rand() as f32) / (2147483647 as f32) * max; // ! HACK:: replace this magic number with Random::Max when we fix that problen.
   }
 }
 
@@ -36,12 +36,12 @@ max :: fn![T](a: T, b: T) -> T {
   return b;
 }
 
-clamp :: fn(v: float64, min, max) -> float64 {
+clamp :: fn(v: f64, min, max) -> f64 {
   if v < min then return min;
   if v > max then return max;
   return v;
 }
 
-lerp :: fn(a: float, b, t) -> float {
+lerp :: fn(a: f32, b, t) -> f32 {
   return (a * (1.0 - t)) + (b * t);
 }

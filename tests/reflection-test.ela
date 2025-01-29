@@ -26,7 +26,7 @@ Reflector :: struct {
   fixed: s32[3] = {1, 2, 3};
   fixed_type := #type(fixed);
   index: s32 = 0;
-  fixed_elements := fixed_type.elements((&fixed) as char*);
+  fixed_elements := fixed_type.elements((&fixed) as u8*);
   assert("Fixed array length mismatch", fixed_elements.length == 3);
   for elem in fixed_elements {
     assert("Fixed array element mismatch", *(elem.data as s32*) == fixed[index]);
@@ -36,7 +36,7 @@ Reflector :: struct {
   dynamic := List![s32]::init({3, 2, 1});
   dynamic_type := #type(dynamic);
   index = 0;
-  dynamic_elements := dynamic_type.elements((&dynamic) as char*);
+  dynamic_elements := dynamic_type.elements((&dynamic) as u8*);
   assert("Dynamic array length mismatch", dynamic_elements.length == 3);
   for elem in dynamic_elements {
     assert("Dynamic array element mismatch", *(elem.data as s32*) == dynamic[index]);

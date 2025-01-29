@@ -541,31 +541,24 @@ int s8_type() {
   static int type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
   return type;
 }
-int float32_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float32", create_scalar_type_info(TYPE_FLOAT, 4));
+int f32_type() {
+  static int type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
   return type;
 }
-int float64_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float64", create_scalar_type_info(TYPE_DOUBLE, 8));
+int f64_type() {
+  static int type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
-int float_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float", create_scalar_type_info(TYPE_FLOAT, 4));
-  return type;
-}
+
 int voidptr_type() {
   static int type = global_find_type_id(void_type(), {.extensions = {{TYPE_EXT_POINTER}}});
-  return type;
-}
-int charptr_type() {
-  static int type = global_find_type_id(char_type(), {.extensions = {{TYPE_EXT_POINTER}}});
   return type;
 }
 
 int range_type() { return root_scope->find_type_id("Range", {}); }
 
-int &c_string_type() {
-  static int type;
+int c_string_type() {
+  static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});
   return type;
 }
 
@@ -664,8 +657,8 @@ void init_type_system() {
 
   // Floats
   {
-    float64_type();
-    float32_type();
+    f64_type();
+    f32_type();
   }
 
   // Other
@@ -673,16 +666,15 @@ void init_type_system() {
     char_type();
     bool_type();
     void_type();
-    float_type();
   }
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == char_type() || t->id == float_type() || t->id == s32_type() || t->id == s8_type() ||
+  return t->id == char_type() || t->id == s32_type() || t->id == s8_type() ||
          t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
-         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == float32_type() ||
-         t->id == float64_type();
+         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == f32_type() ||
+         t->id == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {

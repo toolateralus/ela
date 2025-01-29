@@ -6,7 +6,7 @@
 #foreign dlopen :: fn(filename: c_string, flags: s32) -> void*;
 #foreign dlclose :: fn(handle: void*) -> s32;
 #foreign dlsym :: fn(handle: void*, symbol: c_string) -> void*;
-#foreign dlerror :: fn() -> char *;
+#foreign dlerror :: fn() -> u8 *;
 
 // Flags for 'dlopen'
 // Of course the later flags are completely arbitrary, so we can't use #flags.

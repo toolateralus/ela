@@ -50,7 +50,7 @@ main :: fn() {
 
   // To specify explicitly
   generic![s32](10);
-  generic![s32, float](10, 10.0);
+  generic![s32, f32](10, 10.0);
 }
 
 

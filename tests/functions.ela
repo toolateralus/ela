@@ -9,11 +9,11 @@
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: fn(a: float32, b, c, d) -> float32 {
+many_params :: fn(a: f32, b, c, d) -> f32 {
   return a * b * c * d;
 }
 
-mul_params :: fn(n: float32, f) -> float32 {
+mul_params :: fn(n: f32, f) -> f32 {
   return n * f;
 }
 
@@ -30,11 +30,3 @@ returns :: fn() -> s32  {
   assert("function expected to return 1", returns() == 1);
 }
 
-#error "Local functions are broken. We should probably just completely remove them, as we have lambdas.";
-
-#test test_local_function :: fn() {
-  local_function :: fn() -> s32 {
-    return 0;
-  }
-  assert("failed to get 0 from local function call", local_function() == 0);
-}

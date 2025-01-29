@@ -1,9 +1,9 @@
 
 MyStruct :: struct {
   // normal field declaration:
-  field: float;
+  field: f32;
   // field with a default value:
-  field1: float = 100.0;
+  field1: f32 = 100.0;
   // pointer to self (linked list):
   // see docs/directives to understand #self.
   field2: #self *;
@@ -17,11 +17,11 @@ impl MyStruct {
   // method, since it takes 'self'
   // you can take self by value, or by a pointer.
   // the most common case would be by pointer.
-  my_method :: fn(self) -> float {
+  my_method :: fn(self) -> f32 {
     return self.field;
   }
 
-  my_method_by_ptr :: fn(self*) -> float {
+  my_method_by_ptr :: fn(self*) -> f32 {
     return self.field;
   }
   

@@ -6,8 +6,8 @@
 }
 
 XarBarInitListTestStruct :: struct {
-  x: float,
-  y: float,
+  x: f32,
+  y: f32,
 }
 
 New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {

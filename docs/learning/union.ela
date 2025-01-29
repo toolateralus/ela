@@ -3,7 +3,7 @@
 // C style union
 MyUnion :: union {
   a: s32;
-  b: float;
+  b: f32;
 }
 
 // unions can use initializer lists, but only one value can ever be provided.
@@ -21,7 +21,7 @@ NonTrivialWrapper :: struct {
   // but the field names will be accesible within the parent struct.
   #anon :: union {
     a: s32;
-    b: float;
+    b: f32;
     c: string; 
   };
 }

@@ -1,5 +1,6 @@
 #import json;
 #import directory;
+#error "This thing is totally broken. Workin on it!"
 
 
 JsonValueDeleter :: struct {
@@ -132,7 +133,7 @@ impl JsonValueDeleter {
 
 // MyJsonStruct :: struct {
 //   n: s64,
-//   b: float32,
+//   b: f32,
 // }
 // impl MyJsonStruct {
 //   to_string ::fn(self*) -> string {

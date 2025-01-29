@@ -108,5 +108,5 @@ impl Xaryu {
 // #test subscript_string :: fn() {
 //   s: string = string::from("0,1,2,3");
 //   s[0] = 10;
-//   assert("subscript assign string failed", s[0] == (10 as char));
+//   assert("subscript assign string failed", s[0] == (10 as u8));
 // }

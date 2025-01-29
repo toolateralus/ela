@@ -1564,7 +1564,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   for (const auto &stmt : function->block.get()->statements) {
     if (stmt->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      static_cast<ASTFunctionDeclaration *>(stmt)->flags |= FUNCTION_IS_LOCAL;
+      throw_error("local functions are not allowed", stmt->source_range);
     }
   }
 

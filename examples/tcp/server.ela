@@ -5,16 +5,16 @@
 PORT : u16 = 8080;
 
 chatting :: fn(connfd: s32) {
-  buff : char[80];
+  buff : u8[80];
   while true {
     memset(buff, 0, 80);
     read(connfd, buff, 80);
-    println($"From client: {buff as char*}   To client : ");
+    println($"From client: {buff as u8*}   To client : ");
     memset(buff, 0, 80);
     n: s32;
-    while n < 80 && ((buff[n++] = getchar()) != '\n') {}
+    while n < 80 && ((buff[n++] = getu8()) != '\n') {}
     write(connfd, buff, 80);
-    if (strncmp("exit", buff as char*, 4) == 0) {
+    if (strncmp("exit", buff as u8*, 4) == 0) {
       printf("Server Exit...\n");
       break;
     }

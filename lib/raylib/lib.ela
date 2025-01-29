@@ -9,11 +9,11 @@
 
 
 impl Color {
-  scaled_rgb :: fn(self, scale: float32) -> #self {
+  scaled_rgb :: fn(self, scale: f32) -> #self {
     return {
-      r: clamp((self.r as float32) * scale as u8, 0, 255) as u8,
-      g: clamp((self.g as float32) * scale as u8, 0, 255) as u8,
-      b: clamp((self.b as float32) * scale as u8, 0, 255) as u8,
+      r: clamp((self.r as f32) * scale as u8, 0, 255) as u8,
+      g: clamp((self.g as f32) * scale as u8, 0, 255) as u8,
+      b: clamp((self.b as f32) * scale as u8, 0, 255) as u8,
       a: self.a,
     };
   }
@@ -25,7 +25,7 @@ impl Color {
       a: a,
     };
   }
-  lerp :: fn(a: #self, b: #self, t: float32) -> #self {
+  lerp :: fn(a: #self, b: #self, t: f32) -> #self {
     return {
       r: (a.r + (b.r - a.r) * t) as u8,
       g: (a.g + (b.g - a.g) * t) as u8,
@@ -44,7 +44,7 @@ impl Vector2 {
     return { x: 1.0, y: 1.0 };
   }
 
-  scalar :: fn(value: float32) -> #self {
+  scalar :: fn(value: f32) -> #self {
     return { x: value, y: value };
   }
 
@@ -56,19 +56,19 @@ impl Vector2 {
     return { x: self.x - other.x, y: self.y - other.y };
   }
 
-  mul :: fn(self, scalar: float32) -> #self {
+  mul :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar };
   }
 
-  div :: fn(self, scalar: float32) -> #self {
+  div :: fn(self, scalar: f32) -> #self {
     return { x: self.x / scalar, y: self.y / scalar };
   }
 
-  length :: fn(self) -> float32 {
-    return sqrt(self.x * self.x + self.y * self.y) as float32;
+  length :: fn(self) -> f32 {
+    return sqrt(self.x * self.x + self.y * self.y) as f32;
   }
 
-  length_sqr :: fn(self) -> float32 {
+  length_sqr :: fn(self) -> f32 {
     return self.x * self.x + self.y * self.y;
   }
 
@@ -77,11 +77,11 @@ impl Vector2 {
     return { x: self.x / len, y: self.y / len };
   }
 
-  dot :: fn(self, other: #self) -> float32 {
+  dot :: fn(self, other: #self) -> f32 {
     return self.x * other.x + self.y * other.y;
   }
 
-  scale :: fn(self, scalar: float32) -> #self {
+  scale :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar };
   }
 
@@ -89,8 +89,8 @@ impl Vector2 {
     return self.x == other.x && self.y == other.y;
   }
 
-  distance :: fn(self, other: #self) -> float32 {
-    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y)) as float32;
+  distance :: fn(self, other: #self) -> f32 {
+    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y)) as f32;
   }
 }
 
@@ -103,7 +103,7 @@ impl Vector3 {
     return { x: 1.0, y: 1.0, z: 1.0 };
   }
 
-  scalar :: fn(value: float32) -> #self {
+  scalar :: fn(value: f32) -> #self {
     return { x: value, y: value, z: value };
   }
 
@@ -115,19 +115,19 @@ impl Vector3 {
     return { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z };
   }
 
-  mul :: fn(self, scalar: float32) -> #self {
+  mul :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar };
   }
 
-  div :: fn(self, scalar: float32) -> #self {
+  div :: fn(self, scalar: f32) -> #self {
     return { x: self.x / scalar, y: self.y / scalar, z: self.z / scalar };
   }
 
-  length :: fn(self) -> float32 {
-    return sqrt(self.x * self.x + self.y * self.y + self.z * self.z) as float32;
+  length :: fn(self) -> f32 {
+    return sqrt(self.x * self.x + self.y * self.y + self.z * self.z) as f32;
   }
 
-  length_sqr :: fn(self) -> float32 {
+  length_sqr :: fn(self) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z;
   }
 
@@ -137,7 +137,7 @@ impl Vector3 {
     return { x: self.x / len, y: self.y / len, z: self.z / len };
   }
 
-  dot :: fn(self, other: #self) -> float32 {
+  dot :: fn(self, other: #self) -> f32 {
     return self.x * other.x + self.y * other.y + self.z * other.z;
   }
 
@@ -149,7 +149,7 @@ impl Vector3 {
     };
   }
 
-  scale :: fn(self, scalar: float32) -> #self {
+  scale :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar };
   }
 
@@ -157,8 +157,8 @@ impl Vector3 {
     return self.x == other.x && self.y == other.y && self.z == other.z;
   }
 
-  distance :: fn(self, other: #self) -> float32 {
-    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z)) as float32;
+  distance :: fn(self, other: #self) -> f32 {
+    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z)) as f32;
   }
 }
 
@@ -171,7 +171,7 @@ impl Vector4 {
     return { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
   }
 
-  scalar :: fn(value: float32) -> #self {
+  scalar :: fn(value: f32) -> #self {
     return { x: value, y: value, z: value, w: value };
   }
 
@@ -183,19 +183,19 @@ impl Vector4 {
     return { x: self.x - other.x, y: self.y - other.y, z: self.z - other.z, w: self.w - other.w };
   }
 
-  mul :: fn(self, scalar: float32) -> #self {
+  mul :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar, w: self.w * scalar };
   }
 
-  div :: fn(self, scalar: float32) -> #self {
+  div :: fn(self, scalar: f32) -> #self {
     return { x: self.x / scalar, y: self.y / scalar, z: self.z / scalar, w: self.w / scalar };
   }
 
-  length :: fn(self) -> float32 {
-    return sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w) as float32;
+  length :: fn(self) -> f32 {
+    return sqrt(self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w) as f32;
   }
 
-  length_sqr :: fn(self) -> float32 {
+  length_sqr :: fn(self) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
   }
 
@@ -204,11 +204,11 @@ impl Vector4 {
     return { x: self.x / len, y: self.y / len, z: self.z / len, w: self.w / len };
   }
 
-  dot :: fn(self, other: #self) -> float32 {
+  dot :: fn(self, other: #self) -> f32 {
     return self.x * other.x + self.y * other.y + self.z * other.z + self.w * other.w;
   }
 
-  scale :: fn(self, scalar: float32) -> #self {
+  scale :: fn(self, scalar: f32) -> #self {
     return { x: self.x * scalar, y: self.y * scalar, z: self.z * scalar, w: self.w * scalar };
   }
 
@@ -216,8 +216,8 @@ impl Vector4 {
     return self.x == other.x && self.y == other.y && self.z == other.z && self.w == other.w;
   }
 
-  distance :: fn(self, other: #self) -> float32 {
-    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z) + (self.w - other.w) * (self.w - other.w)) as float32;
+  distance :: fn(self, other: #self) -> f32 {
+    return sqrt((self.x - other.x) * (self.x - other.x) + (self.y - other.y) * (self.y - other.y) + (self.z - other.z) * (self.z - other.z) + (self.w - other.w) * (self.w - other.w)) as f32;
   }
 }
 

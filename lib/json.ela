@@ -103,7 +103,7 @@ impl JsonLexer {
       token.type = JsonTokenType::Eof;
       return (JsonError::SUCCESS, token);
     }
-    c : char = self.input[self.position];
+    c : u8 = self.input[self.position];
 
     // whitespace
     while self.position < self.length {
@@ -128,11 +128,11 @@ impl JsonLexer {
     if c == '/' {
       self.position++;
       if self.position >= self.length {
-        return self.err(token, format("Unexpected character %", {any::new(&c)}));
+        return self.err(token, format("Unexpected u8acter %", {any::new(&c)}));
       }
       c = self.input[self.position];
       if c != '/' {
-        return self.err(token, format("Unexpected character: %", {any::new(&c)}));
+        return self.err(token, format("Unexpected u8acter: %", {any::new(&c)}));
       }
       while c != '\n' && c != '\r' {
         self.position++;
@@ -296,7 +296,7 @@ JsonKeyValuePair :: struct {
 }
 
 JsonValueUnion :: union {
-  number: float64,
+  number: f64,
   boolean: bool,
   _string: c_string,
   object: List![JsonKeyValuePair],
@@ -316,24 +316,24 @@ impl JsonValue {
     if self.type == JsonValueType::Object {
       obj := self.data.object;
       len := obj.length;
-      builder.append_char('{');
+      builder.append_u8('{');
   
       for i in 0..len {
         kvp := obj[i];
         if i > 0 {
           builder.append(", ");
         }
-        builder.append_char('\"');
+        builder.append_u8('\"');
         builder.append(kvp.key);
         builder.append("\": ");
         builder.append_then_free(kvp.value.to_string());
       }
   
-      builder.append_char('}');
+      builder.append_u8('}');
     } else if self.type == JsonValueType::Array {
       arr := self.data.array;
       len := arr.length;
-      builder.append_char('[');
+      builder.append_u8('[');
   
       for i in 0..len {
         val := arr[i];
@@ -343,7 +343,7 @@ impl JsonValue {
         builder.append_then_free(val.to_string());
       }
   
-      builder.append_char(']');
+      builder.append_u8(']');
     } else if self.type == JsonValueType::Number {
       builder.append_then_free(to_string(self.data.number));
     } else if self.type == JsonValueType::String {
@@ -419,7 +419,7 @@ impl JsonValue {
   is_null :: fn(self*) -> bool {
     return self.type == JsonValueType::Null;
   }
-  as_number :: fn(self*) -> float64 {
+  as_number :: fn(self*) -> f64 {
     if self.type == JsonValueType::Number {
       return self.data.number;
     }
@@ -549,9 +549,9 @@ json_serialize_scalar :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   if Type::is_float(type) {
     val.type = JsonValueType::Number;
     if type.size == 8 {
-      val.data.number = *(object as float64*);
+      val.data.number = *(object as f64*);
     } else {
-      val.data.number = *(object as float32*);
+      val.data.number = *(object as f32*);
     }
     return (JsonError::SUCCESS, val);
   } else if Type::is_integral(type) {
@@ -659,7 +659,7 @@ json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> Jso
     if err {
       return err;
     }
-    memcpy(object as char* + (i * type.element_type.size), ptr, type.element_type.size);
+    memcpy(object as u8* + (i * type.element_type.size), ptr, type.element_type.size);
     ++i;
   }
   free(ptr);
@@ -676,9 +676,9 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
     *(object as bool*) = val.as_boolean();
   } else if (Type::is_float(type)) {
     if (type.size == 8) {
-      *(object as float64*) = val.as_number();
+      *(object as f64*) = val.as_number();
     } else {
-      *(object as float32*) = val.as_number() as float32;
+      *(object as f32*) = val.as_number() as f32;
     }
   } else if (Type::is_integral(type)) {
     is_signed := Type::is_signed(type);

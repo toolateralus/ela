@@ -7,12 +7,12 @@
 
 playing := false;
 timer: Timer;
-bpm : float = 120;
+bpm : f32 = 120;
 subdivisions: s32 = 1;
 beats: s32 = 4;
 total_notes: s32 = 4;
 
-bpm_slider : Slider![float] = {
+bpm_slider : Slider![f32] = {
   text: "bpm", 
   rect: {x: 0, y: 0, width: 150, height: 40}, 
   style: Style { 
@@ -160,10 +160,10 @@ impl SequenceChannel {
     };
     return self;
   }
-  draw :: fn(self*, x: float, y: float) {
+  draw :: fn(self*, x: f32, y: f32) {
     if total_notes != self.check_buttons.length {
       while total_notes > self.check_buttons.length {
-        _x : float = x + 150 + ((self.check_buttons.length * 40) as float) + 2;
+        _x : f32 = x + 150 + ((self.check_buttons.length * 40) as f32) + 2;
         self.check_buttons.push({
           value:      false,
           rect:       Rectangle{x: _x, y: y, width: 36, height: 36},
@@ -191,7 +191,7 @@ impl SequenceChannel {
   update :: fn(self*, index: s32) {
     if self.volume != self.old_volume {
       self.old_volume = self.volume;
-      SetSoundVolume(self.sound, (self.volume as float) / 100.0);
+      SetSoundVolume(self.sound, (self.volume as f32) / 100.0);
     }
     if self.check_buttons[index].value {
       PlaySound(self.sound);
@@ -272,7 +272,7 @@ main :: fn() {
       seq_x := 0.0;
 
       for note in 0..total_notes {
-        label_x := seq_x + 150.0 + (note as float) * 40.0;
+        label_x := seq_x + 150.0 + (note as f32) * 40.0;
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
         str := $"{beat}.{subdiv}";
@@ -287,7 +287,7 @@ main :: fn() {
 
       sequencer();
       bpm_slider.draw();
-      bpm = (bpm as s32) as float;
+      bpm = (bpm as s32) as f32;
 
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 
@@ -296,7 +296,7 @@ main :: fn() {
       subdivision_slider.draw();
       beats_slider.draw();
 
-      if button("reset (no undo)", {x: (GetScreenWidth() as float) - 210.0, y: 10, width: 200, height: 40}, reset_button_style) {
+      if button("reset (no undo)", {x: (GetScreenWidth() as f32) - 210.0, y: 10, width: 200, height: 40}, reset_button_style) {
         while channels.length > 0 {
           channels.pop();
         }

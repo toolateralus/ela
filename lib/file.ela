@@ -17,11 +17,11 @@ SeekPosition :: enum {
 #foreign fseek :: fn(stream: FILE *, offset: s64, origin: s32) -> s32;
 #foreign ftell :: fn(stream: FILE *) -> s64;
 #foreign rewind :: fn(stream: FILE *) -> void;
-#foreign fopen :: fn(fname: char *, flags: char *) -> FILE *;
+#foreign fopen :: fn(fname: u8 *, flags: u8 *) -> FILE *;
 #foreign fclose :: fn(file: FILE *) -> void;
 #foreign fgetc :: fn(file: FILE *) -> u8;
 #foreign putc :: fn(ch: u8, file: FILE *) -> void;
-#foreign fprintf :: fn(stream: FILE *, format: char *, ...) -> s32;
+#foreign fprintf :: fn(stream: FILE *, format: u8 *, ...) -> s32;
 #foreign fflush :: fn(f: FILE *);
 
 #alias FileError :: c_string;
@@ -55,13 +55,13 @@ impl File {
     return len as u32;
   }
 
-  read_all :: fn(filename: char*) -> (FileError, c_string) {
+  read_all :: fn(filename: c_string) -> (FileError, c_string) {
     file := fopen(filename, "r");
     if !file then return ("Couldn't open file", null);
     length := File::length(file);
-    str: char* = malloc(length + 1);
+    str: c_string = malloc(length + 1);
     memset(str, 0, length + 1);
-    c: char;
+    c: u8;
     for i in 0..length {
       str[i] = fgetc(file);
     }
@@ -75,7 +75,7 @@ impl File {
     result: List![u8];
     length := File::length(file);
     result.resize(length);
-    c: char;
+    c: u8;
     for i in 0..length {
       result.push(c as u8);
     }
@@ -88,7 +88,7 @@ impl File {
     if !file {
       return "Unable to open file";
     }
-    fwrite(data, sizeof(char), strlen(data), file);
+    fwrite(data, sizeof(u8), strlen(data), file);
     fclose(file);
     return null;
   }

@@ -47,13 +47,14 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
 // This is stuff we just can't really get rid of while using a transpiled backend.
 static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
 
-typedef double float64;
 typedef unsigned long long int u64;
 typedef signed long long int s64;
 
 typedef signed int s32;
 typedef unsigned int u32;
-typedef float float32;
+
+typedef double f64;
+typedef float f32;
 
 typedef short int s16;
 typedef unsigned short int u16;
@@ -408,7 +409,7 @@ void Emitter::visit(ASTLiteral *node) {
       output = std::format("\"{}\"", node->value);
       break;
     case ASTLiteral::Float:
-      if (node->resolved_type != float64_type()) {
+      if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";
       } else {
         output = node->value.get_str();
@@ -634,21 +635,6 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   node->params->accept(this);
   (*ss) << ";\n";
   emit_default_args = false;
-}
-void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
-  //! We cannot do this kind of lambda when transpiling to C.
-  //! We need to figure out how to place a function above us at the global scope with the correct dependencies.
-
-  // // Right now we just always do a closure on local lambda functions.
-  // // This probably isn't desirable for simple in-out functions
-  // (*ss) << indent() << "auto " << node->name.get_str() << " = [&]";
-  // node->params->accept(this);
-  // (*ss) << " -> ";
-  // node->return_type->accept(this);
-  // if (node->block.is_null()) {
-  //   throw_error("local function cannot be #foreign", node->source_range);
-  // }
-  // node->block.get()->accept(this);
 }
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name == "main") {
@@ -1183,63 +1169,6 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   return tss.str();
 }
 
-std::string get_format_str(int type_id, ASTNode *node) {
-  auto type = global_get_type(type_id);
-  // We just assume that the type-checker has validated that this struct has a
-  // to_string() function
-
-  if (type->is_kind(TYPE_TUPLE)) {
-    auto info = type->get_info()->as<TupleTypeInfo>();
-    std::string format_str = "(";
-    int i = 0;
-    for (const auto &t : info->types) {
-      format_str += get_format_str(t, node);
-      if (i != info->types.size() - 1) {
-        format_str += ", ";
-      }
-      ++i;
-    }
-    format_str += ")";
-    return format_str;
-  }
-
-  if (type->is_kind(TYPE_STRUCT)) {
-    return "%s";
-  }
-  if (type->id == charptr_type()) {
-    return "%s";
-  }
-  if (type->get_ext().is_pointer()) {
-    return "%p";
-  }
-  if (type->id == bool_type()) {
-    return "%s";
-  }
-  if (type->is_kind(TYPE_SCALAR)) {
-    if (type->id == char_type()) {
-      return "%c";
-    } else if (type->id == s8_type() || type->id == s16_type() || type->id == s32_type() || type->id == u8_type() ||
-               type->id == u16_type() || type->id == u32_type() || type->id == s32_type()) {
-      return "%d";
-    } else if (type->id == s64_type() || type->id == u64_type()) {
-      return "%ld";
-    } else if (type->id == float_type() || type->id == float32_type()) {
-      return "%f";
-    } else if (type->id == float64_type()) {
-      return "%lf";
-    } else if (type->id == bool_type()) {
-      return "%d";
-    }
-  }
-  if (type->is_kind(TYPE_ENUM)) {
-    return "%d";
-  }
-  throw_error(std::format("Cannot deduce a format specifier for interpolated "
-                          "string. type: {}",
-                          type->to_string()),
-              node->source_range);
-}
-
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
 std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
@@ -1324,7 +1253,7 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
-  if (type->id == c_string_type() || type->id == charptr_type()) {
+  if (type->id == c_string_type()) {
     return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
   }
   switch (type->kind) {
@@ -1334,7 +1263,7 @@ std::string get_type_flags(Type *type) {
 
       auto uint = type->id == u8_type() || type->id == u16_type() || type->id == u32_type() || type->id == u64_type();
 
-      auto floating_pt = type->id == float32_type() || type->id == float64_type() || type->id == float_type();
+      auto floating_pt = type->id == f32_type() || type->id == f64_type();
       if (sint) {
         kind_flags |= TYPE_FLAGS_SIGNED;
       } else if (uint) {
@@ -1542,8 +1471,6 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 
   if (id == c_string_type()) {
     name = "const char";
-  } else if (type->get_base() == "u8" && type->get_ext().is_pointer()) {
-    name = "char";
   } else {
     return to_cpp_string(type);
   }
@@ -1744,9 +1671,8 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       emit_generic_instantiations(node->generic_instantiations);
       return;
     }
-    auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
 
-    if (node->name != "main" && !is_local) {
+    if (node->name != "main") {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
@@ -1754,12 +1680,6 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
         emit_forward_declaration(node);
         return;
       }
-    }
-
-    // local function
-    if (is_local) {
-      emit_local_function(node);
-      return;
     }
 
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {

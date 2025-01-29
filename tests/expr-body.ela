@@ -1,13 +1,7 @@
-
 getter :: fn() -> s32 => 100;
 
 #test test_expr_body_fn :: fn() {
   assert("expr body != 100", getter() == 100);
-}
-
-#test test_expr_body_local_fn :: fn() {
-  local_func :: fn() -> s32 => 150;
-  assert("expr body w/ local func failed", local_func() == 150);
 }
 
 #test test_expr_body_switch :: fn() {

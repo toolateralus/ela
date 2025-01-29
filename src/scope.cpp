@@ -29,14 +29,14 @@ Context::Context() {
 
   {
     // ** DO NOT REMOVE ***
-    scope->types["c_string"] = c_string_type() = charptr_type();
+    scope->types["c_string"] = c_string_type();
     // ** ------------- ***
   }
  
   {
     FunctionTypeInfo assert_info{};
     assert_info.return_type = void_type();
-    assert_info.parameter_types[0] = charptr_type();
+    assert_info.parameter_types[0] = c_string_type();
     assert_info.parameter_types[1] = bool_type();
     assert_info.params_len = 2;
     scope->insert("assert", global_find_function_type_id(assert_info, {}), nullptr, SYMBOL_IS_FUNCTION);

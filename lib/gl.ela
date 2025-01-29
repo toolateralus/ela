@@ -23,7 +23,7 @@ GLFWwindow :: struct;
 #foreign glEnableVertexAttribArray :: fn(index: s32);
 #foreign glVertexAttribPointer :: fn(index: s32, size: s64, type: s32, normalized: bool, stride: s64, pointer: void*);
 #foreign glDrawArrays :: fn(mode: u32, first, count);
-#foreign glClearColor :: fn(red: float, green: float, blue: float, alpha: float);
+#foreign glClearColor :: fn(red: f32, green: f32, blue: f32, alpha: f32);
 #foreign glClear :: fn(mask: u32);
 #foreign glGetError :: fn() -> s32;
 #foreign glCreateShader :: fn(type: u32) -> u32;
@@ -43,16 +43,16 @@ GLFWwindow :: struct;
 
 #foreign glfwGetKey :: fn(window: GLFWwindow*, key: s32) -> u32;
 #foreign glfwGetMouseButton :: fn(window: GLFWwindow*, button: s32) -> u32;
-#foreign glfwGetCursorPos :: fn(window: GLFWwindow*, xpos: float*, ypos);
-#foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: float, ypos);
+#foreign glfwGetCursorPos :: fn(window: GLFWwindow*, xpos: f32*, ypos);
+#foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: f32, ypos);
 #foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: s32, value);
 
 #foreign glGetUniformLocation :: fn(program: u32, name: c_string) -> s32;
-#foreign glUniform4fv :: fn(location: s32, count, value: float*);
-#foreign glUniform3fv :: fn(location: s32, count, value: float*);
-#foreign glUniform2fv :: fn(location: s32, count, value: float*);
-#foreign glUniform1f :: fn(location: s32, v0: float);
-#foreign glUniformMatrix4fv :: fn(location: s32, count, transpose: bool, value: float*);
+#foreign glUniform4fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform3fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform2fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform1f :: fn(location: s32, v0: f32);
+#foreign glUniformMatrix4fv :: fn(location: s32, count, transpose: bool, value: f32*);
 #foreign glfwSwapInterval :: fn(interval: s32);
 
 #foreign glEnable :: fn(cap: s32);
@@ -804,12 +804,12 @@ check_error :: fn(location: c_string) {
 }
 
 Vec4 :: union {
-  values: float[4],
+  values: f32[4],
   #anon :: struct {
-    x: float,
-    y: float,
-    z: float,
-    w: float,
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -850,7 +850,7 @@ Vec4 :: union {
 }
 
 impl Vec4 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
   }
   one :: fn() -> #self {
@@ -862,11 +862,11 @@ impl Vec4 {
 }
 
 Vec3 :: union {
-  values: float[3],
+  values: f32[3],
   #anon :: struct {
-    x: float,
-    y: float,
-    z: float,
+    x: f32,
+    y: f32,
+    z: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -905,7 +905,7 @@ Vec3 :: union {
 }
 
 impl Vec3 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z;
   }
   one :: fn() -> #self {
@@ -917,10 +917,10 @@ impl Vec3 {
 }
 
 Vec2 :: union {
-  values: float[2],
+  values: f32[2],
   #anon :: struct {
-    x: float,
-    y: float,
+    x: f32,
+    y: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -953,7 +953,7 @@ Vec2 :: union {
 }
 
 impl Vec2 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y;
   }
   one :: fn() -> #self {
@@ -965,24 +965,24 @@ impl Vec2 {
 }
 
 Mat4 :: union {
-  values: float[16],
+  values: f32[16],
   #anon :: struct {
-    M00: float,
-    M01: float,
-    M02: float,
-    M03: float,
-    M10: float,
-    M11: float,
-    M12: float,
-    M13: float,
-    M20: float,
-    M21: float,
-    M22: float,
-    M23: float,
-    M30: float,
-    M31: float,
-    M32: float,
-    M33: float,
+    M00: f32,
+    M01: f32,
+    M02: f32,
+    M03: f32,
+    M10: f32,
+    M11: f32,
+    M12: f32,
+    M13: f32,
+    M20: f32,
+    M21: f32,
+    M22: f32,
+    M23: f32,
+    M30: f32,
+    M31: f32,
+    M32: f32,
+    M33: f32,
   };
   // #operator(*) :: fn(self, other: #self) -> #self {
   //   matrix: #self;
@@ -1010,7 +1010,7 @@ Mat4 :: union {
 }
 
 impl Mat4 {
-  scale :: fn(self*, factor: float) -> #self {
+  scale :: fn(self*, factor: f32) -> #self {
     matrix: #self;
     matrix.M00 = self.M00 * factor;
     matrix.M01 = self.M01 * factor;
@@ -1031,11 +1031,11 @@ impl Mat4 {
     return matrix;
   }
 
-  determinant :: fn(self*) -> float {
-    r0: float = self.M00 * (self.M11 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M21 * self.M33 - self.M23 * self.M31) + self.M13 * (self.M21 * self.M32 - self.M22 * self.M31));
-    r1: float = self.M01 * (self.M10 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M32 - self.M22 * self.M30));
-    r2: float = self.M02 * (self.M10 * (self.M21 * self.M33 - self.M23 * self.M31) - self.M11 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M31 - self.M21 * self.M30));
-    r3: float = self.M03 * (self.M10 * (self.M21 * self.M32 - self.M22 * self.M31) - self.M11 * (self.M20 * self.M32 - self.M22 * self.M30) + self.M12 * (self.M20 * self.M31 - self.M21 * self.M30));
+  determinant :: fn(self*) -> f32 {
+    r0: f32 = self.M00 * (self.M11 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M21 * self.M33 - self.M23 * self.M31) + self.M13 * (self.M21 * self.M32 - self.M22 * self.M31));
+    r1: f32 = self.M01 * (self.M10 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M32 - self.M22 * self.M30));
+    r2: f32 = self.M02 * (self.M10 * (self.M21 * self.M33 - self.M23 * self.M31) - self.M11 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M31 - self.M21 * self.M30));
+    r3: f32 = self.M03 * (self.M10 * (self.M21 * self.M32 - self.M22 * self.M31) - self.M11 * (self.M20 * self.M32 - self.M22 * self.M30) + self.M12 * (self.M20 * self.M31 - self.M21 * self.M30));
     return r0 - r1 + r2 - r3;
   }
 
@@ -1081,7 +1081,7 @@ impl Shader {
   set_Mat4 :: fn(self*, name: c_string, v: Mat4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniformMatrix4fv(index, 1, false, v.values as float*);
+      glUniformMatrix4fv(index, 1, false, v.values as f32*);
     } else {
       printf("failed to get uniform : %s\n", name);
     }
@@ -1089,7 +1089,7 @@ impl Shader {
   set_Vec4 :: fn(self*, name: c_string, v: Vec4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform4fv(index, 1, v.values as float*);
+      glUniform4fv(index, 1, v.values as f32*);
     } else {
       printf("failed to get uniform : %s\n", name);
     }
@@ -1097,7 +1097,7 @@ impl Shader {
   set_Vec3 :: fn(self*, name: c_string, v: Vec3*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform3fv(index, 1, v.values as float*);
+      glUniform3fv(index, 1, v.values as f32*);
     } else {
       printf("failed to get uniform : %s\n", name);
     }
@@ -1105,12 +1105,12 @@ impl Shader {
   set_Vec2 :: fn(self*, name: c_string, v: Vec2*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform2fv(index, 1, v.values as float*);
+      glUniform2fv(index, 1, v.values as f32*);
     } else {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_float :: fn(self*, name: c_string, v: float) {
+  set_float :: fn(self*, name: c_string, v: f32) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform1f(index, v);

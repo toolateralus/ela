@@ -8,16 +8,16 @@
 #c_flags "-fPIC -c -m64 -o main.o"
 
 // our function declared in print.s
-#foreign print :: fn(f: char *);
+#foreign print :: fn(f: u8 *);
 #foreign exit :: fn(code: s32);
 
-memset :: fn(p: char *, value: u64, len: u64) {
+memset :: fn(p: u8 *, value: u64, len: u64) {
   for i in 0..len {
     p[i] = value;
   }
 }
 
-memcpy :: fn(dest: char**, src: char*, len: u64) {
+memcpy :: fn(dest: u8**, src: u8*, len: u64) {
   for i in 0..len {
     (*dest)[i] = src[i];
   }
@@ -25,7 +25,7 @@ memcpy :: fn(dest: char**, src: char*, len: u64) {
 
 // used from 'print' in print.s
 // just easier to write in ela.
-#export strlen :: fn(s: char*) -> s32 {
+#export strlen :: fn(s: u8*) -> s32 {
   i: s32;
   while s[i] != '\0' {
     ++i;
@@ -39,17 +39,17 @@ memcpy :: fn(dest: char**, src: char*, len: u64) {
 LINEAR_ALLOCATOR_SIZE :: 1024 * 24;
 
 LinearAlloc :: struct {
-  mem : char[LINEAR_ALLOCATOR_SIZE],
+  mem : u8[LINEAR_ALLOCATOR_SIZE],
   ptr : u64,
 }
 
 impl LinearAlloc {
   create :: fn() -> #self {
     self: #self;
-    memset(self.mem as char*, 0, LINEAR_ALLOCATOR_SIZE);
+    memset(self.mem as u8*, 0, LINEAR_ALLOCATOR_SIZE);
     return self;
   }
-  alloc :: fn(self*, size: u64) -> char* {
+  alloc :: fn(self*, size: u64) -> u8* {
     data := &self.mem[self.ptr];
     self.ptr += size;
     if (self.ptr > LINEAR_ALLOCATOR_SIZE) {
@@ -61,8 +61,8 @@ impl LinearAlloc {
 }
 
 Vector2 :: struct {
-  x: float,
-  y: float,
+  x: f32,
+  y: f32,
 }
 
 // declare main as 'export' (equivalent to 'extern' in C) so our assembly program can find it.
@@ -87,7 +87,7 @@ Vector2 :: struct {
   while {
     v: Vector2* = allocator.alloc(sizeof(Vector2));
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
-    memcpy((&v1) as char**, v as char*, sizeof(Vector2));
+    memcpy((&v1) as u8**, v as u8*, sizeof(Vector2));
   }
 }
 

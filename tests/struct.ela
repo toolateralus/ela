@@ -1,13 +1,13 @@
 ;
 
 Vector2 :: struct {
-  x: float32,
-  y: float32,
+  x: f32,
+  y: f32,
 }
 
 Vector3 :: struct {
   vec2: Vector2,
-  z: float32,
+  z: f32,
 }
 
 #test test_struct_single_level :: fn() {
@@ -41,7 +41,7 @@ Vector3 :: struct {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: fn(v: Vector2)  -> float32 {
+struct_as_param :: fn(v: Vector2)  -> f32 {
   return v.x;
 }
 
@@ -50,7 +50,7 @@ struct_as_param :: fn(v: Vector2)  -> float32 {
   assert("", struct_as_param(v) == 0.0);
 }
 
-something :: fn(f: float32) -> float32 {
+something :: fn(f: f32) -> f32 {
   return f;
 }
 

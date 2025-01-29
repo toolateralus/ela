@@ -13,14 +13,14 @@ y16: u16;
 y32: u32;
 y64: u64;
 
-f32: float32; ffloat: float; // f32 is the same as 'float'
-f64: float64;
+f32: f32; ffloat: f32; // f32 is the same as 'f32'
+f64: f64;
 
 b: bool;
 
 
 /* 
-  * you can safely up cast integer/ float types but down casting or casting between integers and floats 
+  * you can safely up cast integer/ f32 types but down casting or casting between integers and floats 
   * requires an explicit cast.
 */
 
@@ -36,10 +36,10 @@ main :: fn() {
 
   x32 = f32 as s32;
   x32 = f64 as s32;
-  f32 = x32 as float32;
-  f32 = x64 as float32;
-  f32 = x16 as float32;
-  f32 = x8 as float32;
+  f32 = x32 as f32;
+  f32 = x64 as f32;
+  f32 = x16 as f32;
+  f32 = x8 as f32;
 
   // * c-style character literals
   c : char = 'c';

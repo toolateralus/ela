@@ -9,15 +9,15 @@ Style :: struct {
   highlighted: Color,
   font_size: s32,
   use_jiggly_text: bool,
-  jiggle_intensity : float,
-  jiggle_rate : float,
+  jiggle_intensity : f32,
+  jiggle_rate : f32,
 }
 
 // * Measure the width of a jiggly text of 'text' and 'style'
-measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
+measure_jiggly_text :: fn(text: c_string, style: Style) -> f32 {
   if !text then return 0.0;
   length := strlen(text);
-  total_width: float = 0.0;
+  total_width: f32 = 0.0;
   for i in 0..length {
     total_width += style.font_size;
   }
@@ -27,7 +27,7 @@ measure_jiggly_text :: fn(text: c_string, style: Style) -> float {
 // * Draw wavy jiggly text.
 jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
   
-  time: float = GetTime() as float;
+  time: f32 = GetTime() as f32;
 
   length := 0;
   if text then length = strlen(text);
@@ -36,10 +36,10 @@ jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
   rate := style.jiggle_rate;
 
   for i in 0..length {
-    char_x := rect.x + (i * style.font_size) as float;
-    char_y := rect.y + intensity * sin(rate * time + (i as float));
-    temp : char[2] = { text[i], '\0' };
-    DrawText(temp as c_string, char_x as s32, char_y as s32, style.font_size, style.foreground);
+    u8_x := rect.x + (i * style.font_size) as f32;
+    u8_y := rect.y + intensity * sin(rate * time + (i as f32));
+    temp : u8[2] = { text[i], '\0' };
+    DrawText(temp as c_string, u8_x as s32, u8_y as s32, style.font_size, style.foreground);
   }
 }
 
@@ -48,14 +48,14 @@ button :: fn(text: c_string, rect: Rectangle, style: Style) -> bool {
   position: Vector2 = { x: rect.x, y: rect.y};
   size: Vector2 = { x: rect.width, y: rect.height};
 
-  text_width : float;
+  text_width : f32;
   if style.use_jiggly_text {
     text_width = measure_jiggly_text(text, style);
   } else {
     text_width = MeasureText(text, style.font_size);
   }
 
-  text_height : float = style.font_size;
+  text_height : f32 = style.font_size;
 
   if text_width > rect.width {
     size.x = text_width;
@@ -100,14 +100,14 @@ button_pro :: fn(text: c_string, rect: Rectangle, style: Style, callback: fn* (v
   position: Vector2 = { x: rect.x, y: rect.y};
   size: Vector2 = { x: rect.width, y: rect.height};
 
-  text_width : float;
+  text_width : f32;
   if style.use_jiggly_text {
     text_width = measure_jiggly_text(text, style);
   } else {
     text_width = MeasureText(text, style.font_size);
   }
 
-  text_height : float = style.font_size;
+  text_height : f32 = style.font_size;
 
   if text_width > rect.width {
     size.x = text_width;
@@ -142,11 +142,11 @@ button_pro :: fn(text: c_string, rect: Rectangle, style: Style, callback: fn* (v
 
 // *########### END BUILTIN UI HELPERS ############### */
 // ? A simple timer that can be used in update loops to get a tick every N seconds.
-// * interval: float = seconds between each tick.
+// * interval: f32 = seconds between each tick.
 Timer :: struct {
-  interval : float,
+  interval : f32,
   // Returns true if the timer has exceeded the interval time relative to the last tick time,
-  last_tick_time: float,
+  last_tick_time: f32,
 }
 
 impl Timer {
@@ -210,11 +210,11 @@ impl![T] Slider![T] {
   draw :: fn(self*) {
     DrawRectangleV(Vector2{ x: self.rect.x, y: self.rect.y}, Vector2{ x: self.rect.width, y: self.rect.height}, self.style.background);
 
-    v_f := (*self.value) as float;
-    min_f := self.min_value as float;
-    max_f := self.max_value as float;
+    v_f := (*self.value) as f32;
+    min_f := self.min_value as f32;
+    max_f := self.max_value as f32;
 
-    slider_width : float = self.rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
+    slider_width : f32 = self.rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
 
     slider_rect : Rectangle = {
       x: self.rect.x,

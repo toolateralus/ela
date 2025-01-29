@@ -134,7 +134,7 @@ Init :: interface![T] {
   #foreign exit :: fn(code: s32);
 
   #foreign scanf :: fn(format: c_string, ...) -> s32;
-  #foreign getchar :: fn() -> s32;
+  #foreign getu8 :: fn() -> s32;
 
   #foreign sleep :: fn(seconds: s32);
   #foreign usleep :: fn(c: s32);
@@ -144,7 +144,7 @@ Init :: interface![T] {
   #foreign strerror :: fn(errnum: s32) -> c_string;
   #foreign strtol :: fn(str: c_string, endptr: c_string**, base: s32) -> s64;
   #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: s32) -> u64;
-  #foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
+  #foreign strtod :: fn(str: c_string, endptr: c_string**) -> f64;
   #foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
   #foreign strchr :: fn(str: c_string, c: s32) -> c_string;
   #foreign strrchr :: fn(str: c_string, c: s32) -> c_string;
@@ -167,7 +167,7 @@ Init :: interface![T] {
   #foreign ispunct :: fn(c: s32) -> s32;
 
   #foreign atoi :: fn(v: c_string) -> s32;
-  #foreign atof :: fn(v: c_string) -> float64;
+  #foreign atof :: fn(v: c_string) -> f64;
 }
 
 Range :: struct {
@@ -249,7 +249,7 @@ Allocator :: interface {
 }
 
 string :: struct {
-  data:    char*,
+  data:    u8*,
   length:  s32,
 }
 
@@ -283,7 +283,7 @@ string :: struct {
       free(self.data);
       self.length = 0;
     }
-    subscript :: fn(self*, idx: s64) -> char {
+    subscript :: fn(self*, idx: s64) -> u8 {
       return self.data[idx];
     }
     eq :: fn(self*, other: #self) -> bool {
@@ -335,8 +335,8 @@ string :: struct {
   }
 }
 
-impl Iterable![char] for string { 
-  iter :: fn(self*) -> Iter![char] {
+impl Iterable![u8] for string { 
+  iter :: fn(self*) -> Iter![u8] {
     return {
       ptr: self.data,
       end: self.data + self.length,
@@ -805,7 +805,7 @@ panic :: fn(msg: c_string) {
   // TODO: expand this, add support for other stuff.
   // This is only for numerical types, bools, and strings / any pointer.
   to_string :: fn![T](value: T) -> c_string {
-    buffer: char[64];
+    buffer: u8[64];
     type := #type(T);
     format : c_string;
 
@@ -825,7 +825,7 @@ panic :: fn(msg: c_string) {
       format = "%s";
     } else if type.is_pointer() {
       format = "%p";
-    } else if type == #type(char) || type == #type(u8) {
+    } else if type == #type(u8) || type == #type(u8) {
       format = "%c";
     } else {
       format = "(unsupported type)";  // * do we throw an error here? format = null?
@@ -840,7 +840,7 @@ panic :: fn(msg: c_string) {
   string_concat :: fn(a: c_string, b: c_string) -> c_string {
     len_a := strlen(a);
     len_b := strlen(b);
-    result := malloc(len_a + len_b + 1) as char*;
+    result := malloc(len_a + len_b + 1) as u8*;
     memcpy(result, a, len_a);
     memcpy(result + len_a, b, len_b);
     result[len_a + len_b] = '\0';
@@ -977,7 +977,7 @@ panic :: fn(msg: c_string) {
         if free_list.data[i] then free(list.data[i]);
       }
     }
-    append_char :: fn(self*, ch: char) {
+    append_u8 :: fn(self*, ch: u8) {
       if !self.root { 
         self.root = String_Builder_Block::new();
         self.current = self.root;
@@ -1015,7 +1015,7 @@ panic :: fn(msg: c_string) {
 
     while *fmt {
       if (*fmt) == '%' && *(fmt + 1) == '%' {
-        builder.append_char('%');
+        builder.append_u8('%');
         fmt += 2;
         continue;
       }
@@ -1024,8 +1024,8 @@ panic :: fn(msg: c_string) {
         value := list.data[value_index];
         if value.ptr == null {
           builder.append("null");
-        } else if value.type == #type(char*) { 
-          builder.append(value.unwrap![char*]()); 
+        } else if value.type == #type(u8*) { 
+          builder.append(value.unwrap![u8*]()); 
         } else if value.type.is_pointer() {
           builder.append_then_free(to_string(value.ptr));
         } else if value.type.is_enum() {
@@ -1044,18 +1044,18 @@ panic :: fn(msg: c_string) {
 
             #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
 
-            #type(float):    { builder.append_then_free(to_string(value.unwrap![float]()));    }
-            #type(float32):  { builder.append_then_free(to_string(value.unwrap![float32]()));  }
-            #type(float64):  { builder.append_then_free(to_string(value.unwrap![float64]()));  }
+            #type(f32):    { builder.append_then_free(to_string(value.unwrap![f32]()));    }
+            #type(f32):  { builder.append_then_free(to_string(value.unwrap![f32]()));  }
+            #type(f64):  { builder.append_then_free(to_string(value.unwrap![f64]()));  }
 
             #type(bool): { builder.append_then_free(to_string(value.unwrap![bool]())); }
             
-            #type(char): { builder.append_then_free(to_string(value.unwrap![char]())); }
+            #type(u8): { builder.append_then_free(to_string(value.unwrap![u8]())); }
           }
         }
         value_index++;
       } else {
-        builder.append_char(*fmt);
+        builder.append_u8(*fmt);
       }
       fmt++;
     }

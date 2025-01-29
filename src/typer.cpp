@@ -1397,7 +1397,7 @@ void Typer::visit(ASTLiteral *node) {
       return;
     }
     case ASTLiteral::Float:
-      node->resolved_type = float32_type();
+      node->resolved_type = f32_type();
       return;
     case ASTLiteral::String: {
       node->resolved_type = c_string_type();

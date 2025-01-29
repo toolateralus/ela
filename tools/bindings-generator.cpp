@@ -61,9 +61,9 @@ struct ClangVisitData {
 };
 
 static std::vector<std::pair<std::string, std::string>> type_map = {{"char", "u8"},
-                                                                    {"float", "float32"},
-                                                                    {"double", "float64"},
-                                                                    {"long double", "float64"},
+                                                                    {"float", "f32"},
+                                                                    {"double", "f64"},
+                                                                    {"long double", "f64"},
                                                                     {"_Bool", "bool"},
                                                                     {"usize", "u64"},
                                                                     {"signed char", "s8"},

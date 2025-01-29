@@ -2,7 +2,7 @@
 
 AST :: enum(union) {
   Identifier :: string;
-  Float :: float64;
+  Float :: f64;
   Integer :: s64;
   Binary :: struct {
     left: AST*,
@@ -23,7 +23,7 @@ c: {
     s32 index;
     union {
       string _Identifier;       // index0
-      float _Float;             // index1
+      f32 _Float;             // index1
       int64_t _Integer;         // index2
       struct {  
         AST *left;

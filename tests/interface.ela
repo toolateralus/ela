@@ -3,7 +3,7 @@
 
   Struct :: struct {
     a: s32,
-    b: float,
+    b: f32,
     c: bool,
   }
 
@@ -54,7 +54,7 @@
 
   Struct1 :: struct {
     a: s32,
-    b: float,
+    b: f32,
     c: bool,
   }
 

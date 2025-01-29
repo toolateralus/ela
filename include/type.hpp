@@ -73,8 +73,7 @@ enum FunctionInstanceFlags : size_t {
   FUNCTION_IS_EXPORTED = 1 << 4,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
   FUNCTION_IS_STATIC = 1 << 6,
-  FUNCTION_IS_LOCAL = 1 << 7,
-  FUNCTION_IS_FOREIGN = 1 << 8,
+  FUNCTION_IS_FOREIGN = 1 << 7,
 };
 
 enum StructTypeFlags {
@@ -229,12 +228,11 @@ int u8_type();
 int u16_type();
 int u32_type();
 int u64_type();
-int float64_type();
-int float_type();
-int float32_type();
+int f64_type();
+int f32_type();
 
 // These 3 type getters are assigned by the Context constructor.
-int &c_string_type();
+int c_string_type();
 int range_type();
 
 Type *global_get_type(const int id);
@@ -251,7 +249,6 @@ int global_create_enum_type(const InternedString &, Scope *, bool = false, size_
 int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
-int charptr_type();
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions);
 int global_find_type_id(const int, const TypeExtensions &);

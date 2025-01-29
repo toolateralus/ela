@@ -1,6 +1,6 @@
 Vec2 :: struct {
-  x: float,
-  y: float,
+  x: f32,
+  y: f32,
 }
 
 Add :: interface![Right, Result] {
@@ -50,7 +50,7 @@ impl Neg![Vec2] for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(self*, index: s32) -> float {
+  subscript :: fn(self*, index: s32) -> f32 {
     if index == 0 {
         return self.x;
     } else {

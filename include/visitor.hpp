@@ -187,7 +187,7 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
   inline void space() { (*ss) << ' '; }
-  void emit_local_function(ASTFunctionDeclaration *node);
+  
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
