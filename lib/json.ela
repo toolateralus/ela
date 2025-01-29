@@ -1,15 +1,16 @@
-;
+#import string_builder;
 #import file;
 #import reflection;
 
+// this is so that we can easily just do if err { ... }
 JsonError :: enum {
-  SUCCESS = 0,
-  ERROR   = 1
+  ERROR   = 0
+  SUCCESS = 1,
 }
 
 #static _json_last_error: c_string;
 
-set_json_error :: fn(error: c_string) -> c_string {
+set_json_error :: fn(error: c_string) {
   _json_last_error = error;
 }
 
@@ -79,12 +80,12 @@ impl JsonLexer {
     if get_json_error() {
       free(get_json_error());
     }
-    
-    // probably over allocated.
-    buffer_length := strlen(msg) + 36 * 8;
+    // probably over allocated, no integers are going to be 36 characters long lol.
+    buffer_length := strlen(msg) + 36 * 2 + strlen(self.file);
     buffer: char* = malloc(); 
+    snprintf(buffer, buffer_length, "[%s:%d:%d] :: %s", self.file, token.line, token.column, msg);
+    set_json_error(buffer);
 
-    set_json_error(snprintf(buffer, buffer_length, "[%s:%d:%d] :: %s", self.file, token.line, token.column, msg));
     return (JsonError::ERROR, token);
   }
 
@@ -92,7 +93,7 @@ impl JsonLexer {
     return {
       file: _file,
       input: _input,
-      length: _input.length
+      length: strlen(_input.length)
     };
   }
 
@@ -129,15 +130,20 @@ impl JsonLexer {
       return (JsonError::SUCCESS, token);
     }
 
+    // for snprintfing unexpected character errors.
+    buffer: char[128];
+
     // comments
     if c == '/' {
       self.position++;
       if self.position >= self.length {
-        return self.err(token, "Unexpected character: {c}");
+        snprintf(buffer, 128, "Unexpected character: %c", c);
+        return self.err(token, buffer);
       }
       c = self.input[self.position];
       if c != '/' {
-        return self.err(token, "Unexpected character: {c}");
+        snprintf(buffer, 128, "Unexpected character: %c", c);
+        return self.err(token, buffer);
       }
       while c != '\n' && c != '\r' {
         self.position++;
@@ -164,32 +170,32 @@ impl JsonLexer {
       return (JsonError::SUCCESS, token);
       // operators
     } else if c == ':' {
-      token.value = ":";
+      token.value = strdup(":");
       token.type = JsonTokenType::Colon;
       self.position++;
       return (JsonError::SUCCESS, token);
     } else if c == '{' {
-      token.value = "{";
+      token.value = strdup("{");
       token.type = JsonTokenType::LCurly;
       self.position++;
       return (JsonError::SUCCESS, token);
     } else if c == '}' {
-      token.value = "}";
+      token.value = strdup("}");
       token.type = JsonTokenType::RCurly;
       self.position++;
       return (JsonError::SUCCESS, token);
     } else if c == '[' {
-      token.value = "[";
+      token.value = strdup("[");
       token.type = JsonTokenType::LBracket;
       self.position++;
       return (JsonError::SUCCESS, token);
     } else if c == ']' {
-      token.value = "]";
+      token.value = strdup("]");
       token.type = JsonTokenType::RBracket;
       self.position++;
       return (JsonError::SUCCESS, token);
     } else if c == ',' {
-      token.value = ",";
+      token.value = strdup(",");
       token.type = JsonTokenType::Comma;
       self.position++;
       return (JsonError::SUCCESS, token);
@@ -208,21 +214,25 @@ impl JsonLexer {
         c = self.input[self.position];
       }
       self.position++;
-      token.value = c_string::from_ptr(&self.input[start], &self.input[start] + len);
+      token.value = malloc(sizeof(u8) * len);
+      memcpy(token.value, &self.input[start], len);
       token.type = JsonTokenType::String;
       return (JsonError::SUCCESS, token);
     } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "true", 4) == 0 {
-      token.value = "true";
+      // ? For this and the other cases where we strdup a literal: it's better for su to make this micro allocation, 
+      // ? than it is for us to have to figure out which tokens need to have their values freed.
+      // TODO: we can certainly optimize this later, by doing just that, and also storing the length of the token's value or something, but for now -- this is the simplest.
+      token.value = strdup("true"); 
       token.type = JsonTokenType::True;
       self.position += 4;
       return (JsonError::SUCCESS, token);
     } else if self.position + 5 <= self.length && strncmp(&self.input[self.position], "false", 5) == 0 {
-      token.value = "false";
+      token.value = strdup("false");
       token.type = JsonTokenType::False;
       self.position += 5;
       return (JsonError::SUCCESS, token);
     } else if self.position + 4 <= self.length && strncmp(&self.input[self.position], "null", 4) == 0 {
-      token.value = "null";
+      token.value = strdup("null");
       token.type = JsonTokenType::Null;
       self.position += 4;
       return (JsonError::SUCCESS, token);
@@ -316,50 +326,57 @@ JsonValue :: struct {
 
 impl JsonValue {
   to_string :: fn(self*) -> c_string {
+    builder: String_Builder;
+    defer builder.deinit();
+  
     if self.type == JsonValueType::Object {
       obj := self.data.object;
       len := obj.length;
-      rBrack := "}";
-      str := "{";
-
+      builder.append_char('{');
+  
       for i in 0..len {
         kvp := obj[i];
-        if i == 0 {
-          str = $"{str}\"{kvp.key}\": {kvp.value}";
-        } else {
-          str = $"{str}, \"{kvp.key}\": {kvp.value}";
+        if i > 0 {
+          builder.append(", ");
         }
+        builder.append_char('\"');
+        builder.append(kvp.key);
+        builder.append("\": ");
+        builder.append_then_free(kvp.value.to_string());
       }
-      return $"{str}{rBrack}";
+  
+      builder.append_char('}');
     } else if self.type == JsonValueType::Array {
       arr := self.data.array;
       len := arr.length;
-      str := "[";
-
+      builder.append_char('[');
+  
       for i in 0..len {
         val := arr[i];
-        if i == 0 {
-          str = $"[{val}";
-        } else {
-          str = $"{str}, {val}";
+        if i > 0 {
+          builder.append(", ");
         }
+        builder.append_then_free(val.to_string());
       }
-      return $"{str}]";
+  
+      builder.append_char(']');
     } else if self.type == JsonValueType::Number {
-      return $"{self.data.number}";
+      builder.append_then_free(to_string(self.data.number));
     } else if self.type == JsonValueType::String {
-      return $"\"{self.data._string}\"";
+      builder.append_concat_then_free({"\"", self.data._string, "\""}, {false, true, false});
     } else if self.type == JsonValueType::Boolean {
       if self.data.boolean == true {
-        return "true";
+        builder.append("true");
       } else {
-        return "false";
+        builder.append("false");
       }
     } else if self.type == JsonValueType::Null {
-      return "null";
+      builder.append("null");
     } else {
       return c_string::empty();
     }
+  
+    return builder.get_string();
   }
   destroy :: fn(self*) {
     if self.type == JsonValueType::Object {

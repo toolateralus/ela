@@ -1,9 +1,9 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/ast.cpp                                  213            104           1848
-src/typer.cpp                                221             85           1631
+src/ast.cpp                                  213            106           1848
 src/emit.cpp                                 241             82           1630
+src/typer.cpp                                222             87           1630
 include/ast.hpp                              103             23            738
 src/type.cpp                                 104             64            725
 src/ast_copier.cpp                            19              1            482
@@ -15,7 +15,7 @@ include/visitor.hpp                           38             10            213
 include/error.hpp                             32              4            192
 src/command.cpp                               27              0            150
 include/core.hpp                              20              2            145
-include/scope.hpp                             27              4            129
+include/scope.hpp                             27              6            128
 src/constexpr.cpp                              2              0            101
 src/main.cpp                                  23             14             86
 src/scope.cpp                                 12              2             71
@@ -25,5 +25,5 @@ src/visitor.cpp                                7             14             46
 include/strings.hpp                           12              8             43
 include/arena.hpp                              9             12             31
 -----------------------------------------------------------------------------------------
-SUM:                                        1270            453           9466
+SUM:                                        1271            459           9464
 -----------------------------------------------------------------------------------------

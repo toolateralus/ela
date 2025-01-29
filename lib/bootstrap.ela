@@ -591,6 +591,7 @@ panic :: fn(msg: c_string) {
       return *(self.ptr as T*);
     }
   }
+
   Element :: struct;
   Type :: struct;
 
@@ -855,4 +856,182 @@ panic :: fn(msg: c_string) {
     printf("%s\n", s);
     free(s);
   }
+  // This seems pretty chunky,
+  // it might be more performant for building large strings,
+  // but perhaps this is a setting we can have the user pass in.
+  STRING_BUILDER_BLOCK_MAX_LEN :: 8192;
+
+  String_Builder_Block :: struct {
+    data: u8*,
+    length: u64,
+    next: String_Builder_Block*,
+  }
+
+  impl String_Builder_Block {
+    new :: fn() -> #self* {
+      self : #self* =  malloc(sizeof(String_Builder_Block));
+      self.data = calloc(sizeof(u8), STRING_BUILDER_BLOCK_MAX_LEN);
+      return self;
+    }
+    deinit :: fn(self*) {
+      if self.data then free(self.data);
+      if self.next then self.next.deinit();
+    } 
+  }
+
+  String_Builder :: struct {
+    root: String_Builder_Block*,
+    current: String_Builder_Block*,
+  }
+
+  impl String_Builder {
+    deinit :: fn(self*) {
+      if self.root then self.root.deinit();
+    }
+
+    length :: fn(self*) -> u64 {
+      if !self.root then return 0;
+      current := self.root;
+      len: u64;
+      while current {
+        len += current.length;
+        current = current.next;
+      }
+      return len;
+    }
+
+    get_string :: fn(self*) -> c_string {
+      length := self.length();
+      data : u8* = malloc(length + 1);
+      data[length] = '\0'; // Null-terminate the final string
+      current := self.root;
+      offset := 0;
+      while current {
+        memcpy(data + offset, current.data, current.length);
+        offset += current.length;
+        current = current.next;
+      }
+      return data;
+    }
+
+    append :: fn(self*, str: c_string) {
+      if !str then return;
+      if !self.root { 
+        self.root = String_Builder_Block::new();
+        self.current = self.root;
+      }
+      length := strlen(str);
+      remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+      while length > 0 {
+        // Simple append, no overflow
+        if length <= remaining {
+          memcpy(self.current.data + self.current.length, str, length);
+          self.current.length += length;
+          break;
+        } else { // Append with overflow
+          memcpy(self.current.data + self.current.length, str, remaining);
+          self.current.length += remaining;
+          str += remaining;
+          length -= remaining;
+
+          self.current.next = String_Builder_Block::new();
+          self.current = self.current.next;
+          remaining = STRING_BUILDER_BLOCK_MAX_LEN;
+        }
+      }
+    }
+
+    append_then_free :: fn(self*, str: c_string) {
+      self.append(str);
+      free(str);
+    }
+
+    append_concat :: fn(self*, list: Collection_Initializer![c_string]) {
+      for i in 0..list.length {
+        self.append(list.data[i]);
+      }
+    }
+
+    append_concat_then_free :: fn(self*, list: Collection_Initializer![c_string], free_list: Collection_Initializer![bool]) {
+      if free_list.length != list.length {
+        printf("append_concat_then_free() requires that the string initializer and the free_list are the same length\n");
+        exit(1); // we shouldn't have to panic here, but whatever.
+      }
+      for i in 0..list.length {
+        self.append(list.data[i]);
+        if free_list.data[i] then free(list.data[i]);
+      }
+    }
+    append_char :: fn(self*, ch: char) {
+      if !self.root { 
+        self.root = String_Builder_Block::new();
+        self.current = self.root;
+      }
+      remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+      if remaining > 0 {
+        self.current.data[self.current.length] = ch;
+        self.current.length += 1;
+      } else {
+        self.current.next = String_Builder_Block::new();
+        self.current = self.current.next;
+        self.current.data[0] = ch;
+        self.current.length = 1;
+      }
+    }
+
+    
+  }
+
+  format :: fn(fmt : c_string, list: Collection_Initializer![any]) -> c_string {
+    if !fmt {
+      return null;
+    }
+
+    builder: String_Builder;
+    value_index := 0;
+
+    while *fmt {
+      if (*fmt) == '%' {
+        value := list.data[value_index];
+        if value.ptr == null {
+          builder.append("null");
+        } else if value.type == #type(char*) { 
+          builder.append(value.unwrap![char*]()); 
+        } else if value.type.is_pointer() {
+          builder.append_then_free(to_string(value.ptr));
+        } else if value.type.is_enum() {
+          builder.append_then_free(to_string(value.unwrap![s32]()));
+        } else {
+          switch value.type {
+            #type(u8):  { builder.append_then_free(to_string(value.unwrap![u8]()));  }
+            #type(u16): { builder.append_then_free(to_string(value.unwrap![u16]())); }
+            #type(u32): { builder.append_then_free(to_string(value.unwrap![u32]())); }
+            #type(u64): { builder.append_then_free(to_string(value.unwrap![u64]())); }
+
+            #type(s8):  { builder.append_then_free(to_string(value.unwrap![s8]()));  }
+            #type(s16): { builder.append_then_free(to_string(value.unwrap![s16]())); }
+            #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
+            #type(s64): { builder.append_then_free(to_string(value.unwrap![s64]())); }
+
+            #type(int): { builder.append_then_free(to_string(value.unwrap![int]())); }
+
+            #type(float):    { builder.append_then_free(to_string(value.unwrap![float]()));    }
+            #type(float32):  { builder.append_then_free(to_string(value.unwrap![float32]()));  }
+            #type(float64):  { builder.append_then_free(to_string(value.unwrap![float64]()));  }
+
+            #type(bool): { builder.append_then_free(to_string(value.unwrap![bool]())); }
+            
+            #type(char): { builder.append_then_free(to_string(value.unwrap![char]())); }
+          }
+        }
+        value_index++;
+      } else {
+        builder.append_char(*fmt);
+      }
+      fmt++;
+    }
+
+    return builder.get_string();
+  }
 }
+
