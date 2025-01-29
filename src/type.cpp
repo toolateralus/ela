@@ -105,12 +105,12 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 }
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
-  if (base < 0) 
+  if (base < 0)
     return Type::invalid_id;
-  
+
   if (!type_extensions.has_extensions())
     return base;
-  
+
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
 
@@ -129,38 +129,39 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     if (type->equals(base_t->id, ext))
       return type->id;
   }
-  
+
   // Base types have a seperate scope from the extended types now.
 
-  TypeInfo *info= nullptr;
+  TypeInfo *info = nullptr;
   switch (base_t->kind) {
-    case TYPE_SCALAR:{
+    case TYPE_SCALAR: {
       info = new (type_info_alloc<ScalarTypeInfo>()) ScalarTypeInfo(*base_t->get_info()->as<ScalarTypeInfo>());
     } break;
-    case TYPE_FUNCTION:{
+    case TYPE_FUNCTION: {
       info = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(*base_t->get_info()->as<FunctionTypeInfo>());
     } break;
-    case TYPE_STRUCT:{
+    case TYPE_STRUCT: {
       info = new (type_info_alloc<StructTypeInfo>()) StructTypeInfo(*base_t->get_info()->as<StructTypeInfo>());
     } break;
-    case TYPE_ENUM:{
+    case TYPE_ENUM: {
       info = new (type_info_alloc<EnumTypeInfo>()) EnumTypeInfo(*base_t->get_info()->as<EnumTypeInfo>());
     } break;
-    case TYPE_TUPLE:{
+    case TYPE_TUPLE: {
       info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
     } break;
-    case TYPE_TAGGED_UNION:{
-      info = new (type_info_alloc<TaggedUnionTypeInfo>()) TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
+    case TYPE_TAGGED_UNION: {
+      info = new (type_info_alloc<TaggedUnionTypeInfo>())
+          TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
     } break;
-    case TYPE_INTERFACE:{
+    case TYPE_INTERFACE: {
       info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
     } break;
   }
-  
+
   assert(info && "Copying type info for extended type failed");
-  
+
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-  
+
   return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
 
@@ -246,7 +247,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
   const auto from_is_scalar_ptr = from->get_ext().is_pointer();
   const auto to_is_non_ptr_number = type_is_numerical(to) && to->get_ext().has_no_extensions();
-  
+
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
     return CONVERT_IMPLICIT;
   }
@@ -375,9 +376,9 @@ std::string Type::to_string() const {
 }
 
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-  #ifdef PRINT_TYPE_INFO
-   std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
-  #endif
+#ifdef PRINT_TYPE_INFO
+  std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
+#endif
   type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
   Type *type = type_table.back();
   type->set_base(name);
@@ -389,9 +390,9 @@ int global_create_interface_type(const InternedString &name, Scope *scope, std::
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-  #ifdef PRINT_TYPE_INFO
-   std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
-  #endif
+#ifdef PRINT_TYPE_INFO
+  std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
+#endif
   type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
   Type *type = type_table.back();
   std::string base = name.get_str();
@@ -407,9 +408,9 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 }
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
-  #ifdef PRINT_TYPE_INFO
-   std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
-  #endif
+#ifdef PRINT_TYPE_INFO
+  std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
+#endif
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
   type->set_base(name.get_str() + mangled_type_args(generic_args));
@@ -421,9 +422,9 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope, co
 }
 
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
-  #ifdef PRINT_TYPE_INFO
-   std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
-  #endif
+#ifdef PRINT_TYPE_INFO
+  std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
+#endif
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);
@@ -435,9 +436,9 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
 }
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
-  #ifdef PRINT_TYPE_INFO
-   std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n'; 
-  #endif
+#ifdef PRINT_TYPE_INFO
+  std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
+#endif
   type_table.push_back(new Type(type_table.size(), kind));
   auto type = type_table.back();
   type->base_id = base_id;
@@ -741,28 +742,32 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   type->set_ext(ext);
   info->scope = create_child(root_scope);
 
-  // getting all types within a function type because some function types
-  // arent associated with any existing funcitons and  whose parameters or return
-  // types might not be built-in
-  auto dependencies = expand_function_types(types);
+  
+  if (type->get_ext().has_no_extensions()) {
+    std::cout << "creating tuple base type :: " << type->to_string() << '\n';
+    // getting all types within a function type because some function types
+    // arent associated with any existing funcitons and  whose parameters or return
+    // types might not be built-in
+    auto dependencies = expand_function_types(types);
 
-  // declare this type as a dependant on the eldest dependency from our subtypes.
-  // purely for emit time.
-  if (ext.has_no_extensions()) {
+    // declare this type as a dependant on the eldest dependency from our subtypes.
+    // purely for emit time.
     int eldest = *std::max_element(dependencies.begin(), dependencies.end());
     auto eldest_t = global_get_type(eldest);
-    if(eldest_t->base_id != Type::invalid_id) {
+    if (eldest_t->base_id != Type::invalid_id) {
       eldest = eldest_t->base_id;
     }
 
+    std::cout << "attaching " << type->to_string() << " as a dependant to " << global_get_type(eldest)->to_string() << '\n';
     global_get_type(eldest)->tuple_dependants.push_back(type->id);
+
+    // We do this for dot expressions that do tuple.1 etc.
+    // Only in the base type.
+    for (const auto [i, type] : types | std::ranges::views::enumerate) {
+      info->scope->insert(std::to_string(i), type, nullptr);
+    }
   }
 
-  // We do this for dot expressions that do tuple.1 etc.
-  for (const auto [i, type]: types | std::ranges::views::enumerate) {
-    info->scope->insert(std::to_string(i), type, nullptr);
-  }
-  
   return type->id;
 }
 

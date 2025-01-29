@@ -807,6 +807,9 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     n++;
   }
   (*ss) << "} " << type_name << ";\n";
+
+  auto type = global_get_type(node->resolved_type);
+  emit_tuple_dependants(type->tuple_dependants);
   return;
 }
 
@@ -1921,19 +1924,20 @@ void Emitter::visit(ASTWhere *node) {
 }
 
 void Emitter::emit_tuple_dependants(std::vector<int> &types) {
-  std::unordered_set<int> emitted_tuples;
+  static std::unordered_set<int> emitted_tuples;
 
   while (!types.empty()) {
     auto type_id = types.back();
+    types.pop_back();
 
     if (emitted_tuples.contains(type_id)) {
       continue;
     }
     emitted_tuples.insert(type_id);
 
-    types.pop_back();
     auto type = global_get_type(type_id);
     auto name = to_cpp_string(type);
+    
     (*ss) << "typedef struct {";
     auto info = type->get_info()->as<TupleTypeInfo>();
     for (int i = 0; i < info->types.size(); ++i) {

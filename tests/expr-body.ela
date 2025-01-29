@@ -6,8 +6,8 @@ getter :: fn() -> int => 100;
 }
 
 #test test_expr_body_local_fn :: fn() {
-  // local_func :: fn() -> int => 150;
-  // assert("expr body w/ local func failed", local_func() == 150);
+  local_func :: fn() -> int => 150;
+  assert("expr body w/ local func failed", local_func() == 150);
 }
 
 #test test_expr_body_switch :: fn() {

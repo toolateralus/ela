@@ -1,7 +1,7 @@
-// #test test_string :: fn() {
-//   my_string := string::from("Xaryu Baryu");
-//   assert("string length failed to equal expected value", my_string.length == 11);
-// }
+#test test_string :: fn() {
+  my_string := string::from("Xaryu Baryu");
+  assert("string length failed to equal expected value", my_string.length == 11);
+}
 
 #test test_array :: fn() {
   array : int[11] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};

@@ -1,0 +1,5 @@
+main :: fn() { 
+  list: int[];
+  // subscript assignment via the operator overload is just totally broken.
+  list[10] = 0;
+}

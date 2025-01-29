@@ -150,8 +150,6 @@ Array :: struct {
   free(node.next);
 }
 
-// This whole directive, #make() needs to be removed.
-// it's noisy and unneccesary.
 #test test_cast :: fn() {
   big:  u16 = 65365 as u16;
   small: u8 = big as u8;

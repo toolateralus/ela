@@ -1,0 +1,15 @@
+main :: fn() { 
+  // We aren't applyign the operator overload for == on struct here,
+  // we just try to use C's == operator. that's clearly messed up.
+  switch string::from("blah") {
+    string::from("blooh"): {}
+  }
+
+  // Again, range needs a == or .contains function applied for switches.
+  switch 0 {
+    0..10: {
+    }
+    10..20: {
+    }
+  }
+}

@@ -1,0 +1,13 @@
+
+// use of undeclared identifier local_func
+// really, there's not much use to having local functions when we have quick lambdas.
+// I guess for some really tight loop where you don't want a forced indirection??
+// Nah, it's not neccesary.
+test_expr_body_local_fn :: fn() {
+  local_func :: fn() -> int => 150;
+  n := local_func();
+}
+
+main :: fn() { 
+
+}

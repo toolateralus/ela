@@ -1,0 +1,7 @@
+test_array_reflection :: fn() {
+  
+}
+
+main :: fn() { 
+  test_array_reflection();
+}
