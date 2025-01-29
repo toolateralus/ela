@@ -585,7 +585,7 @@ ASTProgram *Parser::parse() {
       case AST_NODE_IMPL:
         break;
       default:
-        err:
+      err:
         throw_error("Statement not allowed at the top-level of a program", statement->source_range);
     }
 
@@ -1021,8 +1021,6 @@ ASTStatement *Parser::parse_statement() {
     return parse_impl();
   }
 
- 
-
   // * Tuple destructure.
   if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
     return parse_multiple_asssignment();
@@ -1112,9 +1110,8 @@ ASTStatement *Parser::parse_statement() {
       return node;
     }
 
-
-// TODO: we should handle the 'then' statement more gracefully.
-// Also, => is super fricken janky, and is really poorly implemented.
+    // TODO: we should handle the 'then' statement more gracefully.
+    // Also, => is super fricken janky, and is really poorly implemented.
     if (tok.type == TType::If) {
       eat();
       NODE_ALLOC(ASTIf, node, range, _, this)
@@ -1152,6 +1149,15 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
+  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
+        lookahead_buf()[2].type == TType::Identifier &&
+        (lookahead_buf()[3].type == TType::GenericBrace || lookahead_buf()[3].type == TType::LParen)) {
+      NODE_ALLOC(ASTExprStatement, expr, range, _, this)
+      expr->expression = parse_expr();
+      end_node(expr, range);
+      return expr;
+    }
+    
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1204,14 +1210,6 @@ ASTStatement *Parser::parse_statement() {
     ctx.scope->insert(tok.value, Type::invalid_id, decl->value.get());
 
     return decl;
-  }
-
-  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly) {
-    NODE_ALLOC(ASTExprStatement, expr, range, _, this)
-    expr->expression = parse_expr();
-    end_node(expr, range);
-    return expr;
   }
 
   // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
