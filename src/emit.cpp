@@ -714,7 +714,9 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
-      (*ss) << "extern ";
+      // (*ss) << "extern ";
+      // I do not believe this is ever neccesary in C, you can alwasy just define an 
+      // opaque struct and link against it, or redefine it: it doesn't matter.
     }
     (*ss) << type_tag << " " << type_name << " " << type_name << ";\n";
     return;

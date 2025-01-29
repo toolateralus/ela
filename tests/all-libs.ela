@@ -4,13 +4,12 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-// #import pthread;
-// #import directory;
-// #import dlfcn;
-// #import file;
-// #import net;
-// #import reflection;
-// #import interned_string;
+#import pthread;
+#import directory;
+#import dlfcn;
+#import file;
+#import net;
+#import reflection;
 
 
 #import memory;

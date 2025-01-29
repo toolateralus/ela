@@ -585,6 +585,7 @@ ASTProgram *Parser::parse() {
       case AST_NODE_IMPL:
         break;
       default:
+        err:
         throw_error("Statement not allowed at the top-level of a program", statement->source_range);
     }
 
@@ -1020,13 +1021,7 @@ ASTStatement *Parser::parse_statement() {
     return parse_impl();
   }
 
-  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly) {
-    NODE_ALLOC(ASTExprStatement, expr, range, _, this)
-    expr->expression = parse_expr();
-    end_node(expr, range);
-    return expr;
-  }
+ 
 
   // * Tuple destructure.
   if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
@@ -1209,6 +1204,14 @@ ASTStatement *Parser::parse_statement() {
     ctx.scope->insert(tok.value, Type::invalid_id, decl->value.get());
 
     return decl;
+  }
+
+  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
+      lookahead_buf()[2].type == TType::Identifier && lookahead_buf()[3].type != TType::LCurly) {
+    NODE_ALLOC(ASTExprStatement, expr, range, _, this)
+    expr->expression = parse_expr();
+    end_node(expr, range);
+    return expr;
   }
 
   // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.

@@ -88,8 +88,8 @@ pthread_mutex_t :: union {
 
 pthread_cond_t :: union {
   __data : __pthread_cond_s,
-  __size : u8[48];
-  __align : s64;
+  __size : u8[48],
+  __align : s64,
 };
 
 pthread_rwlock_t :: union {
