@@ -410,6 +410,32 @@ panic :: fn(msg: c_string) {
   }
 
   impl![T] List![T] {
+    slice :: fn(self*, range: Range) -> #self {
+      if range.begin < 0 || range.end > self.length || range.begin > range.end {
+        return {};
+      }
+      len := range.end - range.begin;
+      slice_data: T* = malloc(sizeof(T) * len);
+      memcpy(slice_data, self.data + range.begin, len);
+      return {
+        data: slice_data,
+        length: len,
+        capacity: len
+      }
+    }
+
+    view :: fn(self*, range: Range) -> #self {
+      if range.begin < 0 || range.end > self.length || range.begin > range.end {
+        return {};
+      }
+      len := range.end - range.begin;
+      return {
+        data: self.data + range.begin,
+        length: len,
+        capacity: len
+      }
+    }
+
     // You should probably not call this function, and you do not need to for normal push operations.
     // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
     // and this will set your length appropriately.

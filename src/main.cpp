@@ -29,7 +29,8 @@ jstl::Arena scope_arena{MB(333)};
 // the same for this
 jstl::Arena ast_arena{MB(333)};
 
-std::vector<Type*> type_table{};
+std::vector<Type *> type_table{};
+size_t LAMBDA_UNIQUE_ID = 0;
 
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
@@ -55,13 +56,16 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  if (const char* env_p = std::getenv("ELA_LIB_PATH")) {
+  if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     if (terminal_supports_color) {
-      std::cout << "\033[1;34mnote\033[0m: environment variable 'ELA_LIB_PATH' is set, loading #import libraries from='\033[1;32m" << env_p << "\033[0m'\n";
+      std::cout << "\033[1;34mnote\033[0m: environment variable 'ELA_LIB_PATH' is set, loading #import libraries "
+                   "from='\033[1;32m"
+                << env_p << "\033[0m'\n";
     } else {
-      std::cout << "note: environment variable 'ELA_LIB_PATH' is set, loading #import libraries from='" << env_p << "'\n";
+      std::cout << "note: environment variable 'ELA_LIB_PATH' is set, loading #import libraries from='" << env_p
+                << "'\n";
     }
-  } 
+  }
 
   vector<string> original_args(argv + (argc >= 2 ? 2 : 1), argv + argc);
 
@@ -93,8 +97,9 @@ int main(int argc, char *argv[]) {
   if (compile_command.has_flag("freestanding")) {
     compile_command.compilation_flags += " -ffreestanding -nostdlib ";
   }
-  
-  if (compile_command.has_flag("x")) compile_command.print();
+
+  if (compile_command.has_flag("x"))
+    compile_command.print();
 
   compile_command.setup_ignored_warnings();
 

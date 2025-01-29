@@ -221,7 +221,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
         
-
         parser->expect(TType::RParen);
         NODE_ALLOC(ASTLiteral, string, range, _, parser)
         string->tag = ASTLiteral::String;
@@ -1118,6 +1117,9 @@ ASTStatement *Parser::parse_statement() {
       return node;
     }
 
+
+// TODO: we should handle the 'then' statement more gracefully.
+// Also, => is super fricken janky, and is really poorly implemented.
     if (tok.type == TType::If) {
       eat();
       NODE_ALLOC(ASTIf, node, range, _, this)
@@ -2101,12 +2103,12 @@ Token Parser::expect(TType type) {
   return eat();
 }
 
-SourceRange Parser::begin_node() { 
+SourceRange Parser::begin_node() {
   auto location = peek().location;
   return SourceRange{
-    .begin_location = location,
-    .begin = token_idx,
-    .begin_loc = (int64_t)location.line,
+      .begin_location = location,
+      .begin = token_idx,
+      .begin_loc = (int64_t)location.line,
   };
 }
 

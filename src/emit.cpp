@@ -1777,14 +1777,16 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
   };
 
-  // Emit all the lambdas that this function depends on.
-  for (const auto &lambda : node->lambdas) {
-    emit_line_directive(lambda);
-    lambda->return_type->accept(this);
-    (*ss) << ' ' << lambda->unique_identifier.get_str() << ' ';
-    lambda->params->accept(this);
-    lambda->block->accept(this);
-    newline();
+  if (node->generic_instantiations.empty()) {
+    // Emit all the lambdas that this function depends on.
+    for (const auto &lambda : node->lambdas) {
+      emit_line_directive(lambda);
+      lambda->return_type->accept(this);
+      (*ss) << ' ' << lambda->unique_identifier.get_str() << ' ';
+      lambda->params->accept(this);
+      lambda->block->accept(this);
+      newline();
+    }
   }
 
   emit_line_directive(node);

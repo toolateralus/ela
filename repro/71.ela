@@ -1,0 +1,4 @@
+main :: fn() { 
+  my_string := string::from("Xaryu Baryu");
+  assert("string length failed to equal expected value", my_string.length == 11);
+}

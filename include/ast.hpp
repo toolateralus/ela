@@ -1,5 +1,7 @@
 #pragma once
 
+
+
 #include <cstdint>
 #include <cstdio>
 #include <deque>
@@ -12,6 +14,8 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+
+extern size_t LAMBDA_UNIQUE_ID;
 
 extern jstl::Arena ast_arena;
 

@@ -36,6 +36,12 @@ ASTFunctionDeclaration *ASTCopier::copy_function_declaration(ASTFunctionDeclarat
   new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
   new_node->generic_instantiations.clear();
 
+  new_node->lambdas.clear();
+  for (const auto &lambda: node->lambdas) {
+    new_node->lambdas.push_back(copy_lambda(lambda));
+    new_node->lambdas.back()->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);
+  }
+
   auto old_scope = current_scope;
   if (node->scope) {
     new_node->scope = copy_scope(node->scope);

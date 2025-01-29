@@ -232,10 +232,13 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
 }
 
 void Typer::visit(ASTLambda *node) {
-  static size_t n = 0;
-  node->unique_identifier = "$lambda$" + std::to_string(n++);
+  node->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);
   node->params->accept(this);
   node->return_type->accept(this);
+
+  // ! for debugging repro 70.ela 
+  // ! std::cout << "lambda return type " << node->return_type->resolved_type << '\n';
+
   std::vector<int> param_types;
   FunctionTypeInfo info;
   // TODO:
