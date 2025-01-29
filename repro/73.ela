@@ -10,6 +10,9 @@ Lexer :: struct {
   // ! buut it's dependencies do not get emitted.
 
   // ! So, when Lexer_State gets emitted early as a dependency, Token is still a forward declaration.
+
+  // ! We need to always emit all subtypes of a struct as dependencies, just like we do with generics.
+  // ! It's weird, but neccesary, and also, this will give way even more to allowing us to do out of order compilation.
   state_stack: Lexer_State[],
 }
 
