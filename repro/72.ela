@@ -1,0 +1,7 @@
+main :: fn() { 
+  // this is an insane example of how broken the freaking parser is in accordance to types
+  // as well as the typer not caring whether a symbol is a type or not.
+  str: string {
+    data: strdup; // we inherit the type from this symbol?
+  }
+}

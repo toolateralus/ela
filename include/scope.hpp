@@ -14,8 +14,10 @@ extern jstl::Arena scope_arena;
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_IS_METHOD = 1 << 4,
-  SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
+  SYMBOL_IS_METHOD = 1 << 2,
+  SYMBOL_IS_FORWARD_DECLARED = 1 << 3,
+  // ! TODO:
+  // !!! Add a SYMBOL_IS_TYPE  !!!
 };
 
 struct ASTNode;
@@ -33,11 +35,10 @@ struct ASTFunctionDeclaration;
 struct ASTInterfaceDeclaration;
 extern Scope *root_scope;
 struct Scope {
-  bool is_struct_scope = false; // TODO: do we need this anymore?
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::unordered_map<InternedString, int> types;
-
+  
   static std::unordered_set<InternedString> &defines() {
     static std::unordered_set<InternedString> defines;
     return defines;

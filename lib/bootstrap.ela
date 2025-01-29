@@ -265,15 +265,10 @@ string :: struct {
     }
     from :: fn(data: c_string) -> #self{
       if !data then return {};
-
-      str: string {
-        length: strlen(data)
+      return {
+        length: strlen(data),
+        data: strdup(data),
       };
-
-      if str.length > 0 then
-        str.data = strdup(data);
-
-      return str;
     }
     from_ptr :: fn(begin: c_string, end: c_string) -> string {
       str: string;
