@@ -1036,7 +1036,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
       // This may seem strange, but most generic inference algorithms do this, and it's nice and smooth to use.
       if (gen_t->get_ext().is_pointer() && !func->params->params[index]->normal.type->extensions.empty()) {
         type->resolved_type = gen_t->get_element_type();
-        std::cout << "pointer generic arg corrected in type inference from :: " << gen_t->to_string() << " to :: " << global_get_type(type->resolved_type)->to_string() << "\n";
       } else {
         type->resolved_type = generic_arg;
       }

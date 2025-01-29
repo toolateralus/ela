@@ -825,9 +825,11 @@ panic :: fn(msg: c_string) {
       format = "%s";
     } else if type.is_pointer() {
       format = "%p";
+    } else if type == #type(char) || type == #type(u8) {
+      format = "%c";
     } else {
       format = "(unsupported type)";  // * do we throw an error here? format = null?
-    }
+    } 
 
     snprintf(buffer, sizeof(buffer), format, value);
     return strdup(buffer) as c_string;
@@ -1004,6 +1006,12 @@ panic :: fn(msg: c_string) {
     value_index := 0;
 
     while *fmt {
+      if (*fmt) == '%' && *(fmt + 1) == '%' {
+        builder.append_char('%');
+        fmt += 2;
+        continue;
+      }
+
       if (*fmt) == '%' {
         value := list.data[value_index];
         if value.ptr == null {
