@@ -1,8 +1,8 @@
 ;
 
 #test test_initializer_lists :: fn() {
-  scalar: int;
-  fixed: int[3] = {0, 1, 2};
+  scalar: s32;
+  fixed: s32[3] = {0, 1, 2};
 }
 
 XarBarInitListTestStruct :: struct {
@@ -22,13 +22,13 @@ New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 }
 
 InitListTest :: struct {
-  n : int
+  n : s32
 }
 
 InitListStruct :: struct {
-  a: int,
-  b: int,
-  c: int,
+  a: s32,
+  b: s32,
+  c: s32,
 }
 
 returns_an_init_list  :: fn() -> InitListTest {

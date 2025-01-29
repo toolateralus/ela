@@ -1,7 +1,7 @@
 
 Struct :: struct {
-  a: int,
-  b: int,
+  a: s32,
+  b: s32,
   c: Struct*,
 };
 

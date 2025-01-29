@@ -1219,7 +1219,7 @@ std::string get_format_str(int type_id, ASTNode *node) {
     if (type->id == char_type()) {
       return "%c";
     } else if (type->id == s8_type() || type->id == s16_type() || type->id == s32_type() || type->id == u8_type() ||
-               type->id == u16_type() || type->id == u32_type() || type->id == int_type()) {
+               type->id == u16_type() || type->id == u32_type() || type->id == s32_type()) {
       return "%d";
     } else if (type->id == s64_type() || type->id == u64_type()) {
       return "%ld";
@@ -1329,7 +1329,7 @@ std::string get_type_flags(Type *type) {
   }
   switch (type->kind) {
     case TYPE_SCALAR: {
-      auto sint = type->id == int_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
+      auto sint = type->id == s32_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
                   type->id == s64_type();
 
       auto uint = type->id == u8_type() || type->id == u16_type() || type->id == u32_type() || type->id == u64_type();
@@ -1937,7 +1937,7 @@ void Emitter::emit_tuple_dependants(std::vector<int> &types) {
 
     auto type = global_get_type(type_id);
     auto name = to_cpp_string(type);
-    
+
     (*ss) << "typedef struct {";
     auto info = type->get_info()->as<TupleTypeInfo>();
     for (int i = 0; i < info->types.size(); ++i) {

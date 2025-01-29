@@ -558,9 +558,9 @@ void Typer::visit(ASTDeclaration *node) {
     // TODO: so, we just don't set the type if it can't be assigned to int??? what?
     if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions() && expr_is_literal(node->value.get())) {
       auto info = (type->get_info()->as<ScalarTypeInfo>());
-      auto rule = type_conversion_rule(type, global_get_type(int_type()), node->source_range);
+      auto rule = type_conversion_rule(type, global_get_type(s32_type()), node->source_range);
       if (info->is_integral && rule != CONVERT_PROHIBITED && rule != CONVERT_EXPLICIT) {
-        node->type->resolved_type = int_type();
+        node->type->resolved_type = s32_type();
       }
     }
   }

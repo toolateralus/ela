@@ -1,6 +1,6 @@
 Struct :: struct;
 impl Struct {
-  static_method :: fn() -> int {
+  static_method :: fn() -> s32 {
     return 0;
   }
   other_method :: fn() {

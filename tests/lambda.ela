@@ -1,28 +1,28 @@
-#alias Lambda :: fn*(int, int) -> int;
+#alias Lambda :: fn*(s32, s32) -> s32;
 
-takes_lambda :: fn(lambda: Lambda, a: int, b: int) -> int{
+takes_lambda :: fn(lambda: Lambda, a: s32, b: s32) -> s32{
   return lambda(a, b);
 }
 
 
 #test test_lambda :: fn() {
-  n := fn(a: int, b: int) -> int {
+  n := fn(a: s32, b: s32) -> s32 {
     return a + b;
   }
   {
     assert("lambda add failed", n(1, 2) == 3);
     assert("inline lambda failed", 
-        fn(a: int, b: int) -> int { return a + b; }(1, 2) == 3
+        fn(a: s32, b: s32) -> s32 { return a + b; }(1, 2) == 3
     );
   }
   {
     assert("lambda arg failed", takes_lambda(n, 1, 2) == 3);
-    assert("lambda inline arg failed", takes_lambda(fn(a: int, b: int) -> int { return a + b; }, 1, 2) == 3);
+    assert("lambda inline arg failed", takes_lambda(fn(a: s32, b: s32) -> s32 { return a + b; }, 1, 2) == 3);
   }
     
   {
-    lambda_expr_body := fn() -> int => 3;
+    lambda_expr_body := fn() -> s32 => 3;
     assert("lambda expr body failed", lambda_expr_body() == 3);
-    assert("lambda expr body inline failed", (fn() -> int => 3)() == 3);
+    assert("lambda expr body inline failed", (fn() -> s32 => 3)() == 3);
   }
 }

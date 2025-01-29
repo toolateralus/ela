@@ -7,7 +7,7 @@ Style :: struct {
   foreground: Color,
   background: Color,
   highlighted: Color,
-  font_size: int,
+  font_size: s32,
   use_jiggly_text: bool,
   jiggle_intensity : float,
   jiggle_rate : float,
@@ -39,7 +39,7 @@ jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
     char_x := rect.x + (i * style.font_size) as float;
     char_y := rect.y + intensity * sin(rate * time + (i as float));
     temp : char[2] = { text[i], '\0' };
-    DrawText(temp as c_string, char_x as int, char_y as int, style.font_size, style.foreground);
+    DrawText(temp as c_string, char_x as s32, char_y as s32, style.font_size, style.foreground);
   }
 }
 
@@ -80,7 +80,7 @@ button :: fn(text: c_string, rect: Rectangle, style: Style) -> bool {
   }
 
   if !style.use_jiggly_text {
-    DrawText(text, text_x as int, text_y as int, style.font_size, style.foreground);
+    DrawText(text, text_x as s32, text_y as s32, style.font_size, style.foreground);
   } else {
     jiggly_text(text, { x: text_x, y: text_y, width: new_rect.width, height: new_rect.height}, style);
   }
@@ -132,7 +132,7 @@ button_pro :: fn(text: c_string, rect: Rectangle, style: Style, callback: fn* (v
   }
 
   if !style.use_jiggly_text {
-    DrawText(text, text_x as int, text_y as int, style.font_size, style.foreground);
+    DrawText(text, text_x as s32, text_y as s32, style.font_size, style.foreground);
   } else {
     jiggly_text(text, { x: text_x, y: text_y, width: new_rect.width, height: new_rect.height}, style);
   }
@@ -172,7 +172,7 @@ Slider :: struct![T] {
   max_value: T,
   value: T*,
   held : bool,
-  digits_to_show: int,
+  digits_to_show: s32,
 }
 
 impl![T] Slider![T] {
@@ -225,16 +225,16 @@ impl![T] Slider![T] {
 
     DrawRectangleV(Vector2{ x: slider_rect.x, y: slider_rect.y}, Vector2{ x: slider_rect.width, y: slider_rect.height}, self.style.foreground);
 
-    DrawRectangleLines(self.rect.x as int, self.rect.y as int, self.rect.width as int, self.rect.height as int, self.style.highlighted);
+    DrawRectangleLines(self.rect.x as s32, self.rect.y as s32, self.rect.width as s32, self.rect.height as s32, self.style.highlighted);
 
     text_x := self.rect.x + (self.rect.width - MeasureText(self.text, self.style.font_size)) / 2;
     text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
-    DrawText(self.text, text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    DrawText(self.text, text_x as s32, text_y as s32, self.style.font_size, self.style.highlighted);
 
     value_text := to_string(*self.value);
     value_text[self.digits_to_show] = '\0';
     value_text_x := text_x + MeasureText(self.text, self.style.font_size) + 10; // 10 pixels padding
-    DrawText(value_text, value_text_x as int, text_y as int, self.style.font_size, self.style.highlighted);
+    DrawText(value_text, value_text_x as s32, text_y as s32, self.style.font_size, self.style.highlighted);
     free(value_text);
 
     self.adjust_slider_value();
@@ -260,13 +260,13 @@ impl CheckButton {
     if self.text {
       text_x := self.rect.x + (self.rect.width - MeasureText(self.text, self.style.font_size)) / 2;
       text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
-      DrawText(self.text, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+      DrawText(self.text, text_x as s32, text_y as s32, self.style.font_size, self.style.foreground);
     }
 
     hit := CheckCollisionPointRec(GetMousePosition(), self.rect);
 
     if hit {
-      DrawRectangleLines(self.rect.x as int, self.rect.y as int, self.rect.width as int, self.rect.height as int, ORANGE);
+      DrawRectangleLines(self.rect.x as s32, self.rect.y as s32, self.rect.width as s32, self.rect.height as s32, ORANGE);
     }
 
     left := false;
@@ -290,9 +290,9 @@ DropDown :: struct {
   options: c_string[],
   rect: Rectangle,
   style: Style,
-  selected_index: int,
+  selected_index: s32,
   is_open: bool,
-  on_selected: fn*(int),
+  on_selected: fn*(s32),
   on_open: fn*(),
   label: c_string,
   show_selected_option: bool,
@@ -307,12 +307,12 @@ impl DropDown {
       // Draw the selected option
       text_x := self.rect.x + (self.rect.width - MeasureText(self.options[self.selected_index], self.style.font_size)) / 2;
       text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
-      DrawText(self.options[self.selected_index], text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+      DrawText(self.options[self.selected_index], text_x as s32, text_y as s32, self.style.font_size, self.style.foreground);
     } else {
       // Draw the label
       text_x := self.rect.x + (self.rect.width - MeasureText(self.label, self.style.font_size)) / 2;
       text_y := self.rect.y + (self.rect.height - self.style.font_size) / 2;
-      DrawText(self.label, text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+      DrawText(self.label, text_x as s32, text_y as s32, self.style.font_size, self.style.foreground);
     }
 
     hit := CheckCollisionPointRec(GetMousePosition(), self.rect);
@@ -336,7 +336,7 @@ impl DropDown {
         DrawRectangleV(Vector2{ x: option_rect.x, y: option_rect.y}, Vector2{ x: option_rect.width, y: option_rect.height}, option_color);
         text_x := option_rect.x + (option_rect.width - MeasureText(self.options[i], self.style.font_size)) / 2;
         text_y := option_rect.y + (option_rect.height - self.style.font_size) / 2;
-        DrawText(self.options[i], text_x as int, text_y as int, self.style.font_size, self.style.foreground);
+        DrawText(self.options[i], text_x as s32, text_y as s32, self.style.font_size, self.style.foreground);
 
         if CheckCollisionPointRec(GetMousePosition(), option_rect) && IsMouseButtonPressed(MouseButton::MOUSE_BUTTON_LEFT) {
           self.selected_index = i;

@@ -1,3 +1,4 @@
 main :: fn() { 
-  f: (int, int)*;
+  // emitting these is toootally messed up.
+  f: (s32, s32)*;
 }

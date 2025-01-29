@@ -588,26 +588,26 @@ INADDR_NONE       : in_addr_t	=	0xffffffff;
 INADDR_DUMMY      :	in_addr_t =	0xc000000;
 
 // Close the file descriptor FD.
-#foreign close :: fn(__fd: int) ->  int;
+#foreign close :: fn(__fd: s32) ->  s32;
 
 // Read NBYTES into BUF from FD.  Return the number read, -1 for errors or 0 for EOF.
-#foreign read :: fn(__fd: int, __buf: void*, __nbytes: u64) -> u64;
+#foreign read :: fn(__fd: s32, __buf: void*, __nbytes: u64) -> u64;
 
 // Write N bytes of BUF to FD.  Return the number written, or -1.
-#foreign write :: fn(__fd: int, __buf: void*, __n: u64) -> u64;
+#foreign write :: fn(__fd: s32, __buf: void*, __n: u64) -> u64;
 
 /* Create a new socket of type TYPE in domain DOMAIN, using
    protocol PROTOCOL.  If PROTOCOL is zero, one is chosen automatically.
    Returns a file descriptor for the new socket, or -1 for errors.  */
-#foreign socket :: fn(__domain: int, __type: int, __protocol: int ) -> int;
+#foreign socket :: fn(__domain: s32, __type: s32, __protocol: s32 ) -> s32;
 
 /* Give the socket FD the local address ADDR (which is LEN bytes long).  */
-#foreign bind :: fn(__fd: int, __addr: sockaddr*, __len: socklen_t) -> int;
+#foreign bind :: fn(__fd: s32, __addr: sockaddr*, __len: socklen_t) -> s32;
 
 /* Prepare to accept connections on socket FD.
    N connection requests will be queued before further requests are refused.
    Returns 0 on success, -1 for errors.  */
-#foreign listen :: fn(__fd: int, __n: int) -> int;
+#foreign listen :: fn(__fd: s32, __n: s32) -> s32;
 
 /* Await a connection on socket FD.
    When a connection arrives, open a new socket to communicate with it,
@@ -615,7 +615,7 @@ INADDR_DUMMY      :	in_addr_t =	0xc000000;
    peer and *ADDR_LEN to the address's actual length, and return the
    new socket's descriptor, or -1 for errors.
 */
-#foreign accept :: fn(__fd: int, __addr: sockaddr*, __addr_len: socklen_t*) -> int;
+#foreign accept :: fn(__fd: s32, __addr: sockaddr*, __addr_len: socklen_t*) -> s32;
 
 /* Open a connection on socket FD to peer at ADDR (which LEN bytes long).
    For connectionless socket types, just set the default address to send to
@@ -624,4 +624,4 @@ INADDR_DUMMY      :	in_addr_t =	0xc000000;
 
    This function is a cancellation point and therefore not marked with
    __THROW.  */
-#foreign connect :: fn(__fd: int, __addr: sockaddr*, __len: socklen_t ) -> int;
+#foreign connect :: fn(__fd: s32, __addr: sockaddr*, __len: socklen_t ) -> s32;

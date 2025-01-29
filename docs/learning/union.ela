@@ -2,7 +2,7 @@
 
 // C style union
 MyUnion :: union {
-  a: int;
+  a: s32;
   b: float;
 }
 
@@ -20,7 +20,7 @@ NonTrivialWrapper :: struct {
   // you can define an anonymous union, which behaves like a normal union,
   // but the field names will be accesible within the parent struct.
   #anon :: union {
-    a: int;
+    a: s32;
     b: float;
     c: string; 
   };

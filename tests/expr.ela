@@ -136,7 +136,7 @@ Array :: struct {
   arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
-  n: int;
+  n: s32;
   ++n;
 }
 
@@ -173,6 +173,6 @@ XaryuStruct :: struct {
 }
 
 #test test_underscores_in_number_literals :: fn() {
-  n: int = 1_000_000;
+  n: s32 = 1_000_000;
   assert("number literal with underscores failed to equal expected value", n == 1000000)
 }

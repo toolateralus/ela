@@ -20,7 +20,7 @@ AST :: enum(union) {
 
 c: {
   typedef struct AST {
-    int index;
+    s32 index;
     union {
       string _Identifier;       // index0
       float _Float;             // index1

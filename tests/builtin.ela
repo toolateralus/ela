@@ -4,13 +4,13 @@
 }
 
 #test test_array :: fn() {
-  array : int[11] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  assert("array length failed to equal expected value", sizeof(array) / sizeof(int) == 11);
+  array : s32[11] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  assert("array length failed to equal expected value", sizeof(array) / sizeof(s32) == 11);
 }
 
 
 Xaryu :: struct {
-  value: int
+  value: s32
 }
 
 impl Xaryu {
@@ -20,17 +20,17 @@ impl Xaryu {
 }
 
 #test test_array_concat_operator :: fn() {
-  array: List![int];
+  array: List![s32];
   array.push(10);
   assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
-  array: List![int];
+  array: List![s32];
   for i in 0..100 {
     array.push(10);
   }
-  n: int;
+  n: s32;
   for i in 0..100 {
     n = array.pop();
   }
@@ -42,7 +42,7 @@ impl Xaryu {
   r : Range = 0..10;
   assert("range variable failed", r.begin == 0 && r.end == 10);
 
-  i: int;
+  i: s32;
   for z in r {
     assert("range iteration failed", i == z);
     i++;
@@ -75,7 +75,7 @@ impl Xaryu {
 
 
 // #test test_multidimensional_arrays :: fn() {
-//   array: int[5][5];
+//   array: s32[5][5];
 //   for x in 0..5 {
 //     for y in 0..5 {
 //       array[x][y] = x * y;

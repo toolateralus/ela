@@ -50,7 +50,7 @@ impl Neg![Vec2] for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(self*, index: int) -> float {
+  subscript :: fn(self*, index: s32) -> float {
     if index == 0 {
         return self.x;
     } else {

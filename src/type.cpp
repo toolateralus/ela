@@ -549,10 +549,6 @@ int float64_type() {
   static int type = global_create_type(TYPE_SCALAR, "float64", create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
-int &int_type() {
-  static int type;
-  return type;
-}
 int float_type() {
   static int type = global_create_type(TYPE_SCALAR, "float", create_scalar_type_info(TYPE_FLOAT, 4));
   return type;
@@ -677,21 +673,13 @@ void init_type_system() {
     char_type();
     bool_type();
     void_type();
-
-    // Other
-    // CLEANUP: alias these, don't generate new types.
-    int_type();
     float_type();
-
-    // TODO: declare type alias here.
-    // auto id = charptr_type();
-    // global_create_type_alias(id, "c_string");
   }
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == char_type() || t->id == float_type() || t->id == int_type() || t->id == s8_type() ||
+  return t->id == char_type() || t->id == float_type() || t->id == s32_type() || t->id == s8_type() ||
          t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
          t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == float32_type() ||
          t->id == float64_type();
@@ -744,7 +732,7 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
 
   
   if (type->get_ext().has_no_extensions()) {
-    std::cout << "creating tuple base type :: " << type->to_string() << '\n';
+    // ! std::cout << "creating tuple base type :: " << type->to_string() << '\n';
     // getting all types within a function type because some function types
     // arent associated with any existing funcitons and  whose parameters or return
     // types might not be built-in
@@ -758,7 +746,7 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
       eldest = eldest_t->base_id;
     }
 
-    std::cout << "attaching " << type->to_string() << " as a dependant to " << global_get_type(eldest)->to_string() << '\n';
+    // ! std::cout << "attaching " << type->to_string() << " as a dependant to " << global_get_type(eldest)->to_string() << '\n';
     global_get_type(eldest)->tuple_dependants.push_back(type->id);
 
     // We do this for dot expressions that do tuple.1 etc.

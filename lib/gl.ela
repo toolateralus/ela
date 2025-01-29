@@ -9,55 +9,55 @@ GLFWwindow :: struct;
 
 #foreign glfwInit :: fn() -> bool;
 #foreign glfwTerminate :: fn();
-#foreign glfwCreateWindow :: fn(w: int, h: int, t: c_string, v: void*, v1: void*) -> GLFWwindow*;
+#foreign glfwCreateWindow :: fn(w: s32, h: s32, t: c_string, v: void*, v1: void*) -> GLFWwindow*;
 #foreign glfwMakeContextCurrent :: fn(ctx: void*);
 #foreign glfwWindowShouldClose :: fn(window: GLFWwindow*) -> bool;
 #foreign glfwPollEvents :: fn();
 #foreign glfwSwapBuffers :: fn(window: GLFWwindow*);
 #foreign glewInit :: fn() -> bool;
-#foreign glGenVertexArrays :: fn(n: int, arrays: u32*);
-#foreign glBindVertexArray :: fn(array: int);
-#foreign glGenBuffers :: fn(n_buf: int, buf: u32*);
-#foreign glBindBuffer :: fn(type: int, buf: u32);
-#foreign glBufferData :: fn(target: int, size: s64, data: void*, usage: int);
-#foreign glEnableVertexAttribArray :: fn(index: int);
-#foreign glVertexAttribPointer :: fn(index: int, size: s64, type: int, normalized: bool, stride: s64, pointer: void*);
+#foreign glGenVertexArrays :: fn(n: s32, arrays: u32*);
+#foreign glBindVertexArray :: fn(array: s32);
+#foreign glGenBuffers :: fn(n_buf: s32, buf: u32*);
+#foreign glBindBuffer :: fn(type: s32, buf: u32);
+#foreign glBufferData :: fn(target: s32, size: s64, data: void*, usage: s32);
+#foreign glEnableVertexAttribArray :: fn(index: s32);
+#foreign glVertexAttribPointer :: fn(index: s32, size: s64, type: s32, normalized: bool, stride: s64, pointer: void*);
 #foreign glDrawArrays :: fn(mode: u32, first, count);
 #foreign glClearColor :: fn(red: float, green: float, blue: float, alpha: float);
 #foreign glClear :: fn(mask: u32);
-#foreign glGetError :: fn() -> int;
+#foreign glGetError :: fn() -> s32;
 #foreign glCreateShader :: fn(type: u32) -> u32;
-#foreign glShaderSource :: fn(shader: u32, count: int, string: c_string*, length: int*);
+#foreign glShaderSource :: fn(shader: u32, count: s32, string: c_string*, length: s32*);
 #foreign glCompileShader :: fn(shader: u32);
-#foreign glGetShaderiv :: fn(shader: u32, pname, params: int*);
-#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: int, length: int*, infoLog: c_string);
+#foreign glGetShaderiv :: fn(shader: u32, pname, params: s32*);
+#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: s32, length: s32*, infoLog: c_string);
 #foreign glCreateProgram :: fn() -> u32;
 #foreign glAttachShader :: fn(program: u32, shader);
 #foreign glLinkProgram :: fn(program: u32);
-#foreign glGetProgramiv :: fn(program: u32, pname, params: int*);
-#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: int, length: int*, infoLog: c_string);
+#foreign glGetProgramiv :: fn(program: u32, pname, params: s32*);
+#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: s32, length: s32*, infoLog: c_string);
 #foreign glUseProgram :: fn(program: u32);
 #foreign glDeleteShader :: fn(shader: s32);
 #foreign glDeleteProgram :: fn(shader: s32);
-#foreign glViewport :: fn(x: int, y: int, width: int, height: int);
+#foreign glViewport :: fn(x: s32, y: s32, width: s32, height: s32);
 
-#foreign glfwGetKey :: fn(window: GLFWwindow*, key: int) -> u32;
-#foreign glfwGetMouseButton :: fn(window: GLFWwindow*, button: int) -> u32;
+#foreign glfwGetKey :: fn(window: GLFWwindow*, key: s32) -> u32;
+#foreign glfwGetMouseButton :: fn(window: GLFWwindow*, button: s32) -> u32;
 #foreign glfwGetCursorPos :: fn(window: GLFWwindow*, xpos: float*, ypos);
 #foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: float, ypos);
-#foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: int, value);
+#foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: s32, value);
 
-#foreign glGetUniformLocation :: fn(program: u32, name: c_string) -> int;
-#foreign glUniform4fv :: fn(location: int, count, value: float*);
-#foreign glUniform3fv :: fn(location: int, count, value: float*);
-#foreign glUniform2fv :: fn(location: int, count, value: float*);
-#foreign glUniform1f :: fn(location: int, v0: float);
-#foreign glUniformMatrix4fv :: fn(location: int, count, transpose: bool, value: float*);
-#foreign glfwSwapInterval :: fn(interval: int);
+#foreign glGetUniformLocation :: fn(program: u32, name: c_string) -> s32;
+#foreign glUniform4fv :: fn(location: s32, count, value: float*);
+#foreign glUniform3fv :: fn(location: s32, count, value: float*);
+#foreign glUniform2fv :: fn(location: s32, count, value: float*);
+#foreign glUniform1f :: fn(location: s32, v0: float);
+#foreign glUniformMatrix4fv :: fn(location: s32, count, transpose: bool, value: float*);
+#foreign glfwSwapInterval :: fn(interval: s32);
 
-#foreign glEnable :: fn(cap: int);
-#foreign glDisable :: fn(cap: int);
-#foreign glIsEnabled :: fn(cap: int) -> bool;
+#foreign glEnable :: fn(cap: s32);
+#foreign glDisable :: fn(cap: s32);
+#foreign glIsEnabled :: fn(cap: s32) -> bool;
 
 GL :: enum {
  STATIC_DRAW = 35044,
@@ -739,10 +739,10 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
   glShaderSource(shader, 1, &source, null);
   glCompileShader(shader);
 
-  success: int;
+  success: s32;
   glGetShaderiv(shader, GL::COMPILE_STATUS, &success);
   if success == 0 {
-    length: int;
+    length: s32;
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
@@ -766,10 +766,10 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
 
-  success: int;
+  success: s32;
   glGetProgramiv(program, GL::LINK_STATUS, &success);
   if success == 0 {
-    length: int;
+    length: s32;
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
     info_log: c_string = malloc(sizeof(c_string) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
@@ -785,7 +785,7 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
 }
 
 check_error :: fn(location: c_string) {
-  err: int = glGetError();
+  err: s32 = glGetError();
   if err == GL::INVALID_ENUM {
     printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
   } else if err == GL::INVALID_VALUE {
@@ -1125,7 +1125,7 @@ Window :: struct {
 }
 
 impl Window {
-  create :: fn(width: int, height: int, title: c_string) -> #self {
+  create :: fn(width: s32, height: s32, title: c_string) -> #self {
     self: #self;
     if !glfwInit() {
       printf("Failed to initialize glfw\n");

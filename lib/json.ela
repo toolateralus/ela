@@ -34,10 +34,10 @@ JsonTokenType :: enum {
 }
 
 JsonToken :: struct {
-  type : int,
+  type : s32,
   value : c_string,
-  line: int,
-  column: int,
+  line: s32,
+  column: s32,
 }
 
 impl JsonToken {
@@ -64,9 +64,9 @@ tokenTypeNames := List![c_string]::init({
 });
 
 JsonLexer :: struct {
-  line_start: int,
-  cur_line: int,
-  position: int,
+  line_start: s32,
+  cur_line: s32,
+  position: s32,
   length: u32,
 
   file: c_string,
@@ -157,8 +157,8 @@ impl JsonLexer {
 
     if isdigit(c) {
       // numbers
-      len : int;
-      start : int = self.position;
+      len : s32;
+      start : s32 = self.position;
       while (isdigit(c) || c == '.') && self.position < self.length {
         len++;
         self.position++;
@@ -201,8 +201,8 @@ impl JsonLexer {
     } else if c == '\"' {
       self.position++;
       c = self.input[self.position];
-      len : int;
-      start : int = self.position;
+      len : s32;
+      start : s32 = self.position;
       while c != '\"' && self.position < self.length {
         if c == '\n' || c == '\r' {
           self.line_start = self.position;
@@ -320,7 +320,7 @@ JsonValueUnion :: union {
 
 JsonValue :: struct {
   data: JsonValueUnion,
-  type : int,
+  type : s32,
 }
 
 impl JsonValue {
@@ -405,7 +405,7 @@ impl JsonValue {
     return null;
   }
 
-  at :: fn(self*, index: int) -> JsonValue* {
+  at :: fn(self*, index: s32) -> JsonValue* {
     if self.type != JsonValueType::Array {
       return null;
     }

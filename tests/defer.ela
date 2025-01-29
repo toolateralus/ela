@@ -7,7 +7,7 @@
 */
 
 
-nested_defer_test :: fn() -> int {
+nested_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   if (true) {
@@ -20,7 +20,7 @@ nested_defer_test :: fn() -> int {
   assert("nested defer failed", nested_defer_test() == 2);
 }
 
-loop_defer_test :: fn() -> int {
+loop_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += i;
@@ -32,7 +32,7 @@ loop_defer_test :: fn() -> int {
   assert("loop defer failed", loop_defer_test() == 3);
 }
 
-early_return_defer_test :: fn() -> int {
+early_return_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   if (true) {
@@ -78,7 +78,7 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
 
 // Additional comprehensive tests
 
-continue_defer_test :: fn() -> int {
+continue_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -94,7 +94,7 @@ continue_defer_test :: fn() -> int {
   assert("ontinue defer failed", continue_defer_test() == 7);
 }
 
-break_defer_test :: fn() -> int {
+break_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -110,7 +110,7 @@ break_defer_test :: fn() -> int {
   assert("break defer failed", break_defer_test() == 4);
 }
 
-multiple_defer_test :: fn() -> int {
+multiple_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   defer x += 2;
@@ -121,7 +121,7 @@ multiple_defer_test :: fn() -> int {
   assert("multiple defer failed", multiple_defer_test() == 0);
 }
 
-nested_control_flow_defer_test :: fn() -> int {
+nested_control_flow_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;

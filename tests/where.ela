@@ -10,31 +10,31 @@ impl TestInterface for TestStruct2 {}
 
 TestStruct3 :: struct![T] where T is TestInterface | TestInterface1 {}
 
-TestStruct4 :: struct![T] where T is int | float {}
+TestStruct4 :: struct![T] where T is s32 | float {}
 
-TestFn :: fn![T]() where T is int | float {
+TestFn :: fn![T]() where T is s32 | float {
 }
 
-TestFn1 :: fn![T]() -> T where T is int | float {
+TestFn1 :: fn![T]() -> T where T is s32 | float {
   return {};
 }
 
-TestStruct5 :: struct![T] where T is int | float {}
+TestStruct5 :: struct![T] where T is s32 | float {}
 
-TestInterface2 :: interface![T] where T is int | float {}
+TestInterface2 :: interface![T] where T is s32 | float {}
 
-impl TestInterface2![int] for TestStruct {}
+impl TestInterface2![s32] for TestStruct {}
 
-impl![T] TestInterface2![T] for TestStruct5![T] where T is int | float {}
+impl![T] TestInterface2![T] for TestStruct5![T] where T is s32 | float {}
 
 #test test_instantiation_of_wheres :: fn() {
   s1: TestStruct1![TestStruct];
   s2: TestStruct3![TestStruct];
   s3: TestStruct3![TestStruct2];
-  s4: TestStruct4![int];
+  s4: TestStruct4![s32];
   s5: TestStruct4![float];
-  TestFn![int]();
+  TestFn![s32]();
   TestFn![float]();
-  s6: TestStruct5![int];
+  s6: TestStruct5![s32];
   s7: TestStruct5![float];
 }

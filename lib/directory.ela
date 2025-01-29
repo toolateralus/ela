@@ -11,7 +11,7 @@ dirent :: struct {
 
 #foreign opendir :: fn(name: char *) -> DIR*;
 #foreign readdir :: fn(dir: DIR*) -> dirent*;
-#foreign closedir :: fn(dir: void*) -> int;
+#foreign closedir :: fn(dir: void*) -> s32;
 
 Directory :: struct {
   path: string,

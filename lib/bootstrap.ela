@@ -119,7 +119,7 @@ Init :: interface![T] {
 
 // Obviously LIBC is only available when not in a freestanding environment.
 #ifndef FREESTANDING {
-  #foreign system :: fn(cmd: c_string) -> int;
+  #foreign system :: fn(cmd: c_string) -> s32;
 
   #foreign free :: fn(ptr: void*) -> void;
   #foreign malloc :: fn(nbytes: u64) -> void*;
@@ -127,46 +127,46 @@ Init :: interface![T] {
   #foreign realloc :: fn(ptr: void*, size: u64) -> void*;
 
   #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
-  #foreign memset :: fn(dest: void*, c: int, n: u64) -> void*;
-  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> int;
+  #foreign memset :: fn(dest: void*, c: s32, n: u64) -> void*;
+  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> s32;
 
-  #foreign printf :: fn(format: c_string, ...) -> int;
-  #foreign exit :: fn(code: int);
+  #foreign printf :: fn(format: c_string, ...) -> s32;
+  #foreign exit :: fn(code: s32);
 
-  #foreign scanf :: fn(format: c_string, ...) -> int;
-  #foreign getchar :: fn() -> int;
+  #foreign scanf :: fn(format: c_string, ...) -> s32;
+  #foreign getchar :: fn() -> s32;
 
-  #foreign sleep :: fn(seconds: int);
-  #foreign usleep :: fn(c: int);
+  #foreign sleep :: fn(seconds: s32);
+  #foreign usleep :: fn(c: s32);
 
   #foreign strdup :: fn(str: c_string) -> c_string;
   #foreign strndup :: fn(str: c_string, n: u64) -> c_string;
-  #foreign strerror :: fn(errnum: int) -> c_string;
-  #foreign strtol :: fn(str: c_string, endptr: c_string**, base: int) -> s64;
-  #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: int) -> u64;
+  #foreign strerror :: fn(errnum: s32) -> c_string;
+  #foreign strtol :: fn(str: c_string, endptr: c_string**, base: s32) -> s64;
+  #foreign strtoul :: fn(str: c_string, endptr: c_string**, base: s32) -> u64;
   #foreign strtod :: fn(str: c_string, endptr: c_string**) -> float64;
   #foreign strtok :: fn(str: c_string, delim: c_string) -> c_string;
-  #foreign strchr :: fn(str: c_string, c: int) -> c_string;
-  #foreign strrchr :: fn(str: c_string, c: int) -> c_string;
+  #foreign strchr :: fn(str: c_string, c: s32) -> c_string;
+  #foreign strrchr :: fn(str: c_string, c: s32) -> c_string;
   #foreign strstr :: fn(haystack: c_string, needle: c_string) -> c_string;
-  #foreign strlen :: fn(str: c_string) -> int;
-  #foreign strcmp :: fn(str1: c_string, str2: c_string) -> int;
+  #foreign strlen :: fn(str: c_string) -> s32;
+  #foreign strcmp :: fn(str1: c_string, str2: c_string) -> s32;
   #foreign strcat :: fn(dest: c_string, src: c_string) -> c_string;
   #foreign strncat :: fn(dest: c_string, src: c_string, n: u64) -> c_string;
-  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> int;
-  #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> int;
-  #foreign strncmp :: fn(str: c_string, str2: c_string, len: int) -> int;
+  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: c_string, ...) -> s32;
+  #foreign sprintf :: fn(buffer: u8*, format: c_string, ...) -> s32;
+  #foreign strncmp :: fn(str: c_string, str2: c_string, len: s32) -> s32;
 
-  #foreign isalnum :: fn(c: int) -> int;
-  #foreign isalpha :: fn(c: int) -> int;
-  #foreign isspace :: fn(c: int) -> int;
-  #foreign isdigit :: fn(c: int) -> int;
-  #foreign islower :: fn(c: int) -> int;
-  #foreign isupper :: fn(c: int) -> int;
-  #foreign isprint :: fn(c: int) -> int;
-  #foreign ispunct :: fn(c: int) -> int;
+  #foreign isalnum :: fn(c: s32) -> s32;
+  #foreign isalpha :: fn(c: s32) -> s32;
+  #foreign isspace :: fn(c: s32) -> s32;
+  #foreign isdigit :: fn(c: s32) -> s32;
+  #foreign islower :: fn(c: s32) -> s32;
+  #foreign isupper :: fn(c: s32) -> s32;
+  #foreign isprint :: fn(c: s32) -> s32;
+  #foreign ispunct :: fn(c: s32) -> s32;
 
-  #foreign atoi :: fn(v: c_string) -> int;
+  #foreign atoi :: fn(v: c_string) -> s32;
   #foreign atof :: fn(v: c_string) -> float64;
 }
 
@@ -369,7 +369,7 @@ panic :: fn(msg: c_string) {
     } else {
       panic_handler = fn(msg: c_string) {
         // idk, segfault on panic?
-        n : int * = null;
+        n : s32 * = null;
         *n = 10;
       }
     }
@@ -603,7 +603,7 @@ panic :: fn(msg: c_string) {
   };
 
   Type :: struct {
-    id: int,                                                // the integer ID used to identify this type.
+    id: s32,                                                // the integer ID used to identify this type.
     name: c_string,                                         // the type's name.
     size: u64,                                              // sizeof(T)
     flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
@@ -1013,7 +1013,7 @@ panic :: fn(msg: c_string) {
             #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
             #type(s64): { builder.append_then_free(to_string(value.unwrap![s64]())); }
 
-            #type(int): { builder.append_then_free(to_string(value.unwrap![int]())); }
+            #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
 
             #type(float):    { builder.append_then_free(to_string(value.unwrap![float]()));    }
             #type(float32):  { builder.append_then_free(to_string(value.unwrap![float32]()));  }

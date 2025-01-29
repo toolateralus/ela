@@ -1,22 +1,22 @@
 
-#foreign time :: fn(value: void*) -> int;
+#foreign time :: fn(value: void*) -> s32;
 timespec_t :: struct {
   tv_sec: s64,
   tv_nsec: s64,
 }
 
-#foreign clock_gettime :: fn(clock_id: int, tp: timespec_t*) -> int;
+#foreign clock_gettime :: fn(clock_id: s32, tp: timespec_t*) -> s32;
 
 tm_t :: struct {
-  tm_sec: int,
-  tm_min: int,
-  tm_hour: int,
-  tm_mday: int,
-  tm_mon: int,
-  tm_year: int,
-  tm_wday: int,
-  tm_yday: int,
-  tm_isdst: int,
+  tm_sec: s32,
+  tm_min: s32,
+  tm_hour: s32,
+  tm_mday: s32,
+  tm_mon: s32,
+  tm_year: s32,
+  tm_wday: s32,
+  tm_yday: s32,
+  tm_isdst: s32,
 }
 
 #foreign localtime_r :: fn(timep: s64*, result: tm_t*) -> tm_t*;

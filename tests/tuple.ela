@@ -1,17 +1,17 @@
 ;
 
-func_returns_tuple :: fn() -> (int, int) {
+func_returns_tuple :: fn() -> (s32, s32) {
   return (10, 10);
 }
 
-func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
+func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
   a, b := tuple;
   return (a + 10, b + 10);
 }
 
 
 #test test_tuple_array :: fn() {
-  array : (int, int)[1] = {(10, 10)};
+  array : (s32, s32)[1] = {(10, 10)};
   a, b := array[0];
   assert("Storing tuple in array failed", a == 10 && b == 10);
 }
@@ -37,7 +37,7 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 }
 
 #test test_tuples :: fn() {
-  t1 : (int, int, int) = (0, 1, 2);
+  t1 : (s32, s32, s32) = (0, 1, 2);
   {
     a,b,c := t1;
     assert("Declaring typed tuple failed.", a == 0 && b == 1 && c == 2);
@@ -58,14 +58,14 @@ func_takes_tuple_arg :: fn(tuple: (int, int)) -> (int, int) {
 #test test_tuple_ptr :: fn () {
   assert("Tuple pointers have a big bug where we emit 'typedef struct ... * {}' where there's a pointer ina struct declaration. I have no idea why", false);
   // #error "Something is wrong here with the eldest type dependency system, we're declaring a struct called 'typedef struct tuple *'";
-  // ptr : (int, int)* = malloc(32) as (int, int)*;
+  // ptr : (s32, s32)* = malloc(32) as (s32, s32)*;
   // *ptr = (10, 10);
   // {
   //   a, b := *ptr; 
   //   assert("mallocing with tuple failed", a == 10 && b == 10);
   // }
 
-  // ptr_arr: List![(int, int)*];
+  // ptr_arr: List![(s32, s32)*];
   // ptr_arr.push(ptr);
   // {
   //   a, b := *(ptr_arr[0]);

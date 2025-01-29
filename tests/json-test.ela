@@ -116,18 +116,18 @@ impl JsonValueDeleter {
 }
 
 #test test_scalar_deserialization :: fn() {
-  n : int = 100;
-  err, json := json_serialize(&n, #type(int));
+  n : s32 = 100;
+  err, json := json_serialize(&n, #type(s32));
   if err.has_value {
-    assert($"{err.message} serialize int".data, false);
+    assert($"{err.message} serialize s32".data, false);
   }
   deleter: JsonValueDeleter;
   deleter.add(json);
   n = 0;
   assert("json serialize scalar", json.is_number());
-  err = json_deserialize_scalar(json, &n, #type(int));
+  err = json_deserialize_scalar(json, &n, #type(s32));
   assert($"json error {err}".data, !err.has_value);
-  assert("json deserialize scalar, int", n == 100);
+  assert("json deserialize scalar, s32", n == 100);
 }
 
 MyJsonStruct :: struct {

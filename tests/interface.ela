@@ -2,27 +2,27 @@
 #region basic_struct {
 
   Struct :: struct {
-    a: int,
+    a: s32,
     b: float,
     c: bool,
   }
 
   Basic :: interface {
-    static_get :: fn() -> int;
-    method_get :: fn(self) -> int;
-    method_get_ptr :: fn(self*) -> int;
+    static_get :: fn() -> s32;
+    method_get :: fn(self) -> s32;
+    method_get_ptr :: fn(self*) -> s32;
     method_get_self :: fn(self*) -> #self;
     static_get_self :: fn() -> #self;
   }
 
   impl Basic for Struct {
-    static_get :: fn() -> int {
+    static_get :: fn() -> s32 {
       return 0;
     }
-    method_get :: fn(self) -> int {
+    method_get :: fn(self) -> s32 {
       return self.a;
     }
-    method_get_ptr :: fn(self*) -> int {
+    method_get_ptr :: fn(self*) -> s32 {
       return self.a
     }
     method_get_self :: fn(self*) -> #self {
@@ -53,19 +53,19 @@
   }
 
   Struct1 :: struct {
-    a: int,
+    a: s32,
     b: float,
     c: bool,
   }
 
-  impl GenericInterface![int] for Struct1 {
-    static_get :: fn() -> int {
+  impl GenericInterface![s32] for Struct1 {
+    static_get :: fn() -> s32 {
       return 0;
     }
-    method_get :: fn(self) -> int {
+    method_get :: fn(self) -> s32 {
       return self.a;
     }
-    method_get_ptr :: fn(self*) -> int {
+    method_get_ptr :: fn(self*) -> s32 {
       return self.a
     }
     method_get_self :: fn(self*) -> #self {
@@ -116,9 +116,9 @@
 }
 
 #test generic_struct_generic_interface :: fn() {
-  assert("interface failed", Struct2![int]::static_get() == 0);
-  assert("interface failed", Struct2![int]::static_get_self().n == 0);
-  instance: Struct2![int];
+  assert("interface failed", Struct2![s32]::static_get() == 0);
+  assert("interface failed", Struct2![s32]::static_get_self().n == 0);
+  instance: Struct2![s32];
   assert("interface failed", instance.method_get() == 0);
   assert("interface failed", instance.method_get_ptr() == 0);
   assert("interface failed", instance.method_get_self().n == 0);

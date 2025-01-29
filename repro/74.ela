@@ -5,7 +5,7 @@ Token_Type :: enum {
 // Uncommenting this causes the latter code to compile. Obviously, this should not be neccesary.
 // f : (Token_Type, c_string)
 
-find_keyword_type :: fn(str: c_string) -> int {
+find_keyword_type :: fn(str: c_string) -> s32 {
   // this is also broken, in a different way
   // I guess the dependancy doesn't get attached to the eldest subtype when the tuple is only used with extensions?
   map: (Token_Type, c_string)[79 + 50];

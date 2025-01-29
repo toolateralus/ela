@@ -9,7 +9,7 @@
 
 // our function declared in print.s
 #foreign print :: fn(f: char *);
-#foreign exit :: fn(code: int);
+#foreign exit :: fn(code: s32);
 
 memset :: fn(p: char *, value: u64, len: u64) {
   for i in 0..len {
@@ -25,8 +25,8 @@ memcpy :: fn(dest: char**, src: char*, len: u64) {
 
 // used from 'print' in print.s
 // just easier to write in ela.
-#export strlen :: fn(s: char*) -> int {
-  i: int;
+#export strlen :: fn(s: char*) -> s32 {
+  i: s32;
   while s[i] != '\0' {
     ++i;
   }

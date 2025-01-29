@@ -36,11 +36,11 @@ Scene :: enum {
     font_size: 40
   };
 
-  round_base_num_enemies_to_advance: int = 6;
-  round_index : int = 1;
+  round_base_num_enemies_to_advance: s32 = 6;
+  round_index : s32 = 1;
   round_failed := false;
   camera: Camera2D;
-  scene: int = Scene::MainMenu;
+  scene: s32 = Scene::MainMenu;
 
   max_tilt : float = 16;
   screen_width : float;
@@ -58,12 +58,12 @@ Scene :: enum {
   enemy_rotation_speed := 13.0;
   enemy_max_speed := 1.0;
 
-  score : int  = 0;
-  targets_destroyed : int = 0;
-  num_enemies_spawned : int = 0;
+  score : s32  = 0;
+  targets_destroyed : s32 = 0;
+  num_enemies_spawned : s32 = 0;
   can_burst := true;
 
-  bullet_max_burst: int = 3;
+  bullet_max_burst: s32 = 3;
 
   smoke_particle_init_scale : Vector2 = {x: 15, y: 15};
   smoke_particle_max_burst := 6;
@@ -132,7 +132,7 @@ Particle :: struct {
   velocity: Vector2,
   spawn_time: float,
   lifetime: float,
-  kind: int,
+  kind: s32,
   position: Vector2,
   scale: Vector2,
   color: Color,
@@ -145,7 +145,7 @@ Character :: struct {
   horizontal_velocity: float,
   speed: float,
   origin: Vector2,
-  cannon_idx: int,
+  cannon_idx: s32,
   rotation: float,
 }
 
@@ -172,7 +172,7 @@ impl Bullet {
 }
 
 Enemy :: struct {
-  id: int,
+  id: s32,
   dead: bool,
   rect: Rectangle,
   origin: Vector2,
@@ -194,7 +194,7 @@ impl Enemy {
 
 TextParticle :: struct {
   position: Vector2,
-  font_size : int,
+  font_size : s32,
   text: string,
   spawn_time: float,
   lifetime: float,
@@ -233,7 +233,7 @@ get_center_screen_rect:: fn(width: float, height, offset: Vector2) -> Rectangle 
   };
 }
 
-make_text_particle :: fn(text: string, font_size: int, position: Vector2, lifetime: float) {
+make_text_particle :: fn(text: string, font_size: s32, position: Vector2, lifetime: float) {
   particle : TextParticle* = malloc(sizeof(TextParticle));
   particle.position = position;
   particle.font_size = font_size;
@@ -267,13 +267,13 @@ random_vector2_scalar :: fn(max: float32) -> Vector2 {
   return result;
 }
 
-make_particle :: fn(kind: int, position: Vector2, tint: Color) {
+make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
   particle : Particle* = malloc(sizeof(Particle));
   if kind == ParticleKind::Smoke {
     max_vel := 3.0;
     particle.position = random_vector2(position, {x: 0, y: 0}, {x: max_vel, y: max_vel});
     particle.velocity = random_vector2({x: 0.0, y: 0.0}, {x: -max_vel, y: -1.0}, {x: max_vel, y: max_vel});
-    burst : int = (GetRandomValue(0, 1) * smoke_particle_max_burst) as int;
+    burst : s32 = (GetRandomValue(0, 1) * smoke_particle_max_burst) as s32;
     if can_burst && burst > 1 {
       can_burst = false;
       for _ in 0..burst { make_particle(kind, position, tint); }
@@ -289,7 +289,7 @@ make_particle :: fn(kind: int, position: Vector2, tint: Color) {
     max_spread := 24.0;
     particle.position = random_vector2(position, Vector2::zero(), Vector2::scalar(max_spread));
 
-    burst : int = 24;
+    burst : s32 = 24;
 
     if can_burst && burst > 1 {
       can_burst = false;
@@ -406,7 +406,7 @@ draw_background :: fn() {
   now : float = GetTime() as float; 
   t := (now - game_start_time) / fade_in_length;
   if scene == Scene::Game && t < fade_in_length {
-    DrawRectangle(0, 0, screen_width as int, screen_height as int, Color::lerp(BLACK, CLEAR, t));
+    DrawRectangle(0, 0, screen_width as s32, screen_height as s32, Color::lerp(BLACK, CLEAR, t));
   }
 }
 
@@ -436,7 +436,7 @@ draw_game :: fn() {
     DrawTexturePro(particle.render_info.texture, particle.render_info.tex_rect, rect, zero, 0.0, particle.color);
   }
   for particle in text_particles {
-    DrawText(particle.text.data, particle.position.x as int, particle.position.y as int, particle.font_size, particle.color);
+    DrawText(particle.text.data, particle.position.x as s32, particle.position.y as s32, particle.font_size, particle.color);
   }
 
   DrawTexturePro(character.texture, character.tex_rect, character.rect, character.origin, character.rotation, WHITE);
@@ -452,7 +452,7 @@ draw_game :: fn() {
 }
 
 BulletRoutine :: struct {
-  count : int,
+  count : s32,
   timer: Timer,
   interval: float,
 }
@@ -494,7 +494,7 @@ on_bullet_fizzle :: fn() {
   // }
 }
 
-on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: int) {
+on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: s32) {
   PlaySound(explosion_sound);
   make_particle(ParticleKind::Fire, {x: enemy.rect.x, y: enemy.rect.y}, WHITE);
   for _ in 0..4 {
@@ -631,7 +631,7 @@ update_game :: fn() {
     bullet_rect.width *= 0.5;
     bullet_rect.x += bullet_rect.width;
 
-    n_enemies_killed_this_frame : int = 0;
+    n_enemies_killed_this_frame : s32 = 0;
     for enemy in enemies {
       x_diff := enemy.rect.x + enemy.rect.width / 2 - bullet_rect.x;
       y_diff := enemy.rect.y - enemy.rect.height / 2 - bullet_rect.y;
@@ -653,7 +653,7 @@ update_game :: fn() {
         enemy_pos : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
         character_pos : Vector2 = {x: character.rect.x, y: character.rect.y};
         distance := enemy_pos.distance(character_pos);
-        amount : int = (distance * round_index) as int;
+        amount : s32 = (distance * round_index) as s32;
         score += amount
         ui_text_color.a = 255 as u8;
         

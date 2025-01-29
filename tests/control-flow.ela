@@ -73,7 +73,7 @@
     i = i;
   }
 
-  array: List![int];
+  array: List![s32];
 
   for k in array {
     k = k;
@@ -88,7 +88,7 @@
   for i in 0..4 {
     array.push(i as s8);
   }
-  n: int ;
+  n: s32 ;
   for *v in array {
     assert("", n == *v);
     ++n;
@@ -109,7 +109,7 @@
 }
 
 #test test_range_based_for_loop_exclusive :: fn() {
-  n: int;
+  n: s32;
   ten := 10;
   zero := 0;
 
@@ -137,7 +137,7 @@ SwitchCaseEnum :: enum {
   SwitchVariant1,
 }
 
-switch_helper :: fn() -> int {
+switch_helper :: fn() -> s32 {
   number := 5;
   switch number {
     0: { return 0; }
@@ -149,12 +149,12 @@ switch_helper :: fn() -> int {
 // ! Some stuff is commented out in here.
 // ! There are repros for these items.
 #test test_switch_statements :: fn() {
-  integer: int;
+  integer: s32;
 
   passed := false;
   switch integer {
     0: { passed = true; }
-    1: { assert("Switch on int case failed", false);  }
+    1: { assert("Switch on s32 case failed", false);  }
   }
 
   assert("Failed to hit positive switch case for integer", passed);

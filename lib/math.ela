@@ -1,4 +1,4 @@
-#foreign rand :: fn() -> int;
+#foreign rand :: fn() -> s32;
 #foreign srand :: fn(seed: u32);
 #foreign fmod :: fn(l: float, r: float) -> float;
 #foreign fabs :: fn(f: float64) -> float64;

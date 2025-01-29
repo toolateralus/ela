@@ -12,7 +12,7 @@ Arena :: struct {
   size: u64,
   memory: u8*,
   flags: ArenaFlags,
-  alignment: int,
+  alignment: s32,
 }
 
 impl Arena {

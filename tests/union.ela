@@ -1,28 +1,28 @@
 ;
 
 Union :: union {
-  a: int,
-  b: int,
-  c: int,
+  a: s32,
+  b: s32,
+  c: s32,
 }
 
 impl Union {
-  method :: fn(self*, n: int) {
+  method :: fn(self*, n: s32) {
     assert("union equality check in method failed", n == self.a && n == self.b && n == self.c);
   }
 }
 
 _Vec2 :: union {
   #anon :: struct {
-    x: int,
-    y: int,
-    z: int,
+    x: s32,
+    y: s32,
+    z: s32,
   },
-  values: int[3],
+  values: s32[3],
 }
 
 impl _Vec2 {
-  method :: fn(self*, n: int) {
+  method :: fn(self*, n: s32) {
     assert("union equality check in method failed", n == self.x && n == self.y && n == self.z);
     assert("union equality check in method failed", n == self.values[0] && n == self.values[1] && n == self.values[2]);
   }
@@ -48,7 +48,7 @@ impl _Vec2 {
 
 AnonSubUnion :: struct {
   #anon :: union {
-    a: int,
+    a: s32,
   }
 }
 

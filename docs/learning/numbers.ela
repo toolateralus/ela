@@ -5,7 +5,7 @@
 
 x8 : s8;      xchar: char;  // s8 is same as 'char'
 x16: s16;
-x32: s32;     xint: int;    // s32 is the same as 'int'
+x32: s32;     xint: s32;    // s32 is the same as 's32'
 x64: s64;
 
 y8 : u8;

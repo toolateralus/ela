@@ -36,7 +36,7 @@ generic1 :: fn![T, T1](t: T, t1: T1) -> T {
 // For functions (or control flow) that return perform a single expression, you can use 'expression body'.
 // this is basically an implicit returning body.
 
-getter :: fn() -> int => 10;
+getter :: fn() -> s32 => 10;
 print_something :: fn() => println("swoop");
 
 
@@ -49,8 +49,8 @@ main :: fn() {
   generic(20); // infers.
 
   // To specify explicitly
-  generic![int](10);
-  generic![int, float](10, 10.0);
+  generic![s32](10);
+  generic![s32, float](10, 10.0);
 }
 
 

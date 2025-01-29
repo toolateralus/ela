@@ -14,14 +14,14 @@ SeekPosition :: enum {
 
 #foreign fread :: fn(ptr: void *, size: u64, count: u64, stream: FILE *) -> u64;
 #foreign fwrite :: fn(ptr: void *, size: u64, count: u64, stream: FILE *) -> u64;
-#foreign fseek :: fn(stream: FILE *, offset: s64, origin: s32) -> int;
+#foreign fseek :: fn(stream: FILE *, offset: s64, origin: s32) -> s32;
 #foreign ftell :: fn(stream: FILE *) -> s64;
 #foreign rewind :: fn(stream: FILE *) -> void;
 #foreign fopen :: fn(fname: char *, flags: char *) -> FILE *;
 #foreign fclose :: fn(file: FILE *) -> void;
 #foreign fgetc :: fn(file: FILE *) -> u8;
 #foreign putc :: fn(ch: u8, file: FILE *) -> void;
-#foreign fprintf :: fn(stream: FILE *, format: char *, ...) -> int;
+#foreign fprintf :: fn(stream: FILE *, format: char *, ...) -> s32;
 #foreign fflush :: fn(f: FILE *);
 
 #alias FileError :: c_string;
@@ -94,7 +94,7 @@ impl File {
   }
 
   // Used to convert our flag enum to a string for fopen/fclose etc.
-  flags_to_string :: fn(flags: int) -> c_string {
+  flags_to_string :: fn(flags: s32) -> c_string {
     if flags == FileOpenFlags::Read {
       return "r";
     } else if flags == FileOpenFlags::Write {

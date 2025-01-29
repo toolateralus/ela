@@ -8,9 +8,9 @@
 playing := false;
 timer: Timer;
 bpm : float = 120;
-subdivisions: int = 1;
-beats: int = 4;
-total_notes: int = 4;
+subdivisions: s32 = 1;
+beats: s32 = 4;
+total_notes: s32 = 4;
 
 bpm_slider : Slider![float] = {
   text: "bpm", 
@@ -30,7 +30,7 @@ bpm_slider : Slider![float] = {
   held: false, 
 };
 
-subdivision_slider : Slider![int] = {
+subdivision_slider : Slider![s32] = {
   text: "subdivisions", 
   rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -50,7 +50,7 @@ subdivision_slider : Slider![int] = {
 
 bg_color := LIGHTCYAN;
 
-beats_slider : Slider![int] = {
+beats_slider : Slider![s32] = {
   text: "beats", 
   rect: {x: 150, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -141,9 +141,9 @@ SequenceChannel :: struct {
   sound: Sound,
   active: bool,
   style: Style,
-  volume : int,
-  old_volume : int,
-  volume_slider: Slider![int],
+  volume : s32,
+  old_volume : s32,
+  volume_slider: Slider![s32],
 }
 
 impl SequenceChannel {
@@ -188,7 +188,7 @@ impl SequenceChannel {
       button.draw();
     }
   }
-  update :: fn(self*, index: int) {
+  update :: fn(self*, index: s32) {
     if self.volume != self.old_volume {
       self.old_volume = self.volume;
       SetSoundVolume(self.sound, (self.volume as float) / 100.0);
@@ -201,7 +201,7 @@ impl SequenceChannel {
 
 channels: List![SequenceChannel];
 
-on_file_selected :: fn(index: int);
+on_file_selected :: fn(index: s32);
 
 file_dropdown : DropDown = {
   options: {},
@@ -211,7 +211,7 @@ file_dropdown : DropDown = {
   label: "New Channel"
 };
 
-on_file_selected :: fn(index: int) {
+on_file_selected :: fn(index: s32) {
   fileName := file_dropdown.options[index];
   channels.push(SequenceChannel::create(
     LoadSound(fileName),
@@ -276,18 +276,18 @@ main :: fn() {
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
         str := $"{beat}.{subdiv}";
-        DrawText(str, label_x as int, (seq_y - 40.0) as int, 12, WHITE);
+        DrawText(str, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
         free(str);
       }
 
       if playing {
         cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0
-        DrawRectangleLines(cursor_x as int, seq_y, 40, (channels.length as int) * 40, ORANGE);
+        DrawRectangleLines(cursor_x as s32, seq_y, 40, (channels.length as s32) * 40, ORANGE);
       }
 
       sequencer();
       bpm_slider.draw();
-      bpm = (bpm as int) as float;
+      bpm = (bpm as s32) as float;
 
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 

@@ -223,7 +223,6 @@ int s8_type();
 int s16_type();
 int s32_type();
 int s64_type();
-int &int_type();
 int u8_type();
 int u16_type();
 int u32_type();

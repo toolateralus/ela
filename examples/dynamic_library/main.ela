@@ -6,7 +6,7 @@
 // their "LD_LIBRARY_PATH" env-var
 #c_flags "-Wl,-rpath,.";
 
-main :: fn() -> int {
+main :: fn() -> s32 {
   handle := dlopen("test.so", Rtld::Now);
   
   if !handle {
