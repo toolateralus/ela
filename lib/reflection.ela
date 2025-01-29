@@ -76,15 +76,12 @@ impl Type  {
     return self.flags & TypeFlags::POINTER != 0;
   }
 
-  get_field :: fn(self*, name: string) -> Field {
-    for field in self.fields {
-      if strcmp(field.name, name.data) == 0 {
+  get_field :: fn(self*, name: c_string) -> Field* {
+    for *field in self.fields {
+      if strcmp(field.name, name) == 0 {
         return field;
       }
     }
-    return {};
+    return null;
   }
-
-  // implemented externally. TODO: remove, or implement in language, now that we have access ot it.
-  find_type :: fn(name: string) -> Type *;
 }

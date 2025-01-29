@@ -875,7 +875,13 @@ panic :: fn(msg: c_string) {
     }
     deinit :: fn(self*) {
       if self.data then free(self.data);
-      if self.next then self.next.deinit();
+      if self.next { 
+        self.next.deinit();
+        free(self.next);
+      }
+      self.data = null;
+      self.next = null;
+      self.length = 0;
     } 
   }
 
@@ -887,6 +893,13 @@ panic :: fn(msg: c_string) {
   impl String_Builder {
     deinit :: fn(self*) {
       if self.root then self.root.deinit();
+      self.root = null;
+      self.current = null;
+    }
+
+    // just here for 'clarity' (no pun intended)
+    clear :: fn(self*) {
+      self.deinit();
     }
 
     length :: fn(self*) -> u64 {

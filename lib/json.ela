@@ -47,7 +47,7 @@ impl JsonToken {
   }
 }
 
-tokenTypeNames := List![c_string]::init({
+json_token_type_names := Collection_Initializer![c_string]{
   "Invalid",
   "True",
   "False",
@@ -61,7 +61,7 @@ tokenTypeNames := List![c_string]::init({
   "LBracket",
   "RBracket",
   "Comma",
-});
+};
 
 JsonLexer :: struct {
   line_start: s32,
@@ -75,16 +75,11 @@ JsonLexer :: struct {
 }
 
 impl JsonLexer {
-  err :: fn(self*, token: JsonToken, msg: c_string) -> (JsonError, JsonToken) {
+  err :: fn(self*, token: JsonToken, msg: c_string) -> (s32, JsonToken) {
     if get_json_error() {
       free(get_json_error());
     }
-    // probably over allocated, no integers are going to be 36 characters long lol.
-    buffer_length := strlen(msg) + 36 * 2 + strlen(self.file);
-    buffer: char* = malloc(); 
-    snprintf(buffer, buffer_length, "[%s:%d:%d] :: %s", self.file, token.line, token.column, msg);
-    set_json_error(buffer);
-
+    // set_json_error(format("[%:%d:%] :: %", {any::new(&self.file), any::new(&token.line), any::new(token.column), any::new(&msg)}));
     return (JsonError::ERROR, token);
   }
 
@@ -92,11 +87,11 @@ impl JsonLexer {
     return {
       file: _file,
       input: _input,
-      length: strlen(_input.length)
+      length: strlen(_input)
     };
   }
 
-  get_token :: fn(self*) -> (JsonError, JsonToken) {
+  get_token :: fn(self*) -> (s32, JsonToken) {
     if self.lookahead_buffer.length != 0 {
       token := self.lookahead_buffer.pop();
       return (JsonError::SUCCESS, token);
@@ -129,20 +124,15 @@ impl JsonLexer {
       return (JsonError::SUCCESS, token);
     }
 
-    // for snprintfing unexpected character errors.
-    buffer: char[128];
-
     // comments
     if c == '/' {
       self.position++;
       if self.position >= self.length {
-        snprintf(buffer, 128, "Unexpected character: %c", c);
-        return self.err(token, buffer);
+        return self.err(token, format("Unexpected character %", {any::new(&c)}));
       }
       c = self.input[self.position];
       if c != '/' {
-        snprintf(buffer, 128, "Unexpected character: %c", c);
-        return self.err(token, buffer);
+        return self.err(token, format("Unexpected character: %", {any::new(&c)}));
       }
       while c != '\n' && c != '\r' {
         self.position++;
@@ -164,7 +154,8 @@ impl JsonLexer {
         self.position++;
         c = self.input[self.position];
       }
-      token.value = c_string::from_ptr(&self.input[start], &self.input[start] + len);
+      token.value = malloc(len);
+      token.value = strndup(&self.input[start], len);
       token.type = JsonTokenType::Number;
       return (JsonError::SUCCESS, token);
       // operators
@@ -240,7 +231,7 @@ impl JsonLexer {
     }
   }
 
-  peek_token :: fn(self*) -> (JsonError, JsonToken) {
+  peek_token :: fn(self*) -> (s32, JsonToken) {
     err, token := self.get_token();
     if err {
       return (err, token);
@@ -249,7 +240,7 @@ impl JsonLexer {
     return (JsonError::SUCCESS, token);
   }
 
-  expect_types :: fn(self*, types: List![s32]) -> (JsonError, JsonToken) {
+  expect_types :: fn(self*, types: Collection_Initializer![s32]) -> (s32, JsonToken) {
     err, token := self.get_token();
     if err {
       return (err, token);
@@ -264,25 +255,19 @@ impl JsonLexer {
     defer {
       if types_string then free(types_string);
     }
-
     for i in 0..types.length {
+      type := types.data[i];
       if token.type == type {
         return (JsonError::SUCCESS, token);
       }
-
       temp := string_concat(types_string, " | ");
       defer free(temp);
-      types_string = string_concat(temp, tokenTypeNames[type]);
+      types_string = string_concat(temp, json_token_type_names.data[type]);
     }
-
-    buffer: char[1024];
-    len := snprintf(buffer, 1024, "Unexpected token, expected \"%s\", got \"%s\"", types_string, tokenTypeNames[token.type]);
-    formatted := strndup(buffer, len);
-    defer free(formatted);
-    return self.err(token, formatted);
+    return self.err(token, format("Unexpected token, expected \"%\", got \"%\"", {any::new(&types_string), any::new(&json_token_type_names.data[token.type])}));
   }
 
-  expect_type :: fn(self*, type: s32) -> (JsonError, JsonToken) {
+  expect_type :: fn(self*, type: s32) -> (s32, JsonToken) {
     return self.expect_types({type});
   }
 }
@@ -372,7 +357,7 @@ impl JsonValue {
     } else if self.type == JsonValueType::Null {
       builder.append("null");
     } else {
-      return c_string::empty();
+      return "";
     }
   
     return builder.get_string();
@@ -382,14 +367,14 @@ impl JsonValue {
       for kvp in self.data.object {
         free(kvp.value);
       }
-      destruct(self.data.object);
+      // destruct(self.data.object); // TODO: reimplement memory management
     } else if self.type == JsonValueType::Array {
       for val in self.data.array {
         free(val);
       }
-      destruct(self.data.array);
+      // destruct(self.data.array);   // TODO: reimplement memory management
     } else if self.type == JsonValueType::String {
-      destruct(self.data._string);
+      
     }
   }
 
@@ -444,7 +429,7 @@ impl JsonValue {
     if self.type == JsonValueType::String {
       return self.data._string;
     }
-    return ""; // or handle error
+    return null; // or handle error
   }
   as_object :: fn(self*) -> List![JsonKeyValuePair] {
     if self.type == JsonValueType::Object {
@@ -466,7 +451,7 @@ impl JsonValue {
   }
 }
 
-json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
+json_parse :: fn(lexer: JsonLexer*) -> (s32, JsonValue*) {
   value : JsonValue* = malloc(sizeof(JsonValue));
   err, token := lexer.expect_types({
     JsonTokenType::LBracket,
@@ -509,15 +494,15 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
     }
     while token.type != JsonTokenType::RCurly {
       key_err, key := lexer.expect_type(JsonTokenType::String);
-      if key_err.has_value {
+      if key_err {
         return (key_err, null);
       }
       colon_err, _ := lexer.expect_type(JsonTokenType::Colon);
-      if colon_err.has_value {
+      if colon_err {
         return (colon_err, null);
       }
       parse_err, val := json_parse(lexer);
-      if parse_err.has_value {
+      if parse_err {
         return (parse_err, null);
       }
       value.data.object.push({key: key.value, value: val});
@@ -528,7 +513,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
     }
   } else if token.type == JsonTokenType::Number {
     value.type = JsonValueType::Number;
-    value.data.number = atof(token.value.data);
+    value.data.number = atof(token.value);
   } else if token.type == JsonTokenType::String {
     value.type = JsonValueType::String;
     value.data._string = token.value;
@@ -544,20 +529,22 @@ json_parse :: fn(lexer: JsonLexer*) -> (JsonError, JsonValue*) {
   return (JsonError::SUCCESS, value);
 }
 
-json_parse_file :: fn(file: c_string) -> (JsonError, JsonValue*) {
+json_parse_file :: fn(file: c_string) -> (s32, JsonValue*) {
   err, data := File::read_all(file);
-  if err.length != 0 {
-    return (JsonError::Error(err), null);
+  if err {
+    // file API never allocates for errors, so we just strdup it here.
+    set_json_error(strdup(err));
+    return (JsonError::ERROR, null);
   }
   lexer := JsonLexer::create(file, data);
   return json_parse(&lexer);
 }
 
-json_parse_string :: fn(str: c_string) -> (JsonError, JsonValue*) {
-  lexer := JsonLexer::create("from:c_string", str);
+json_parse_string :: fn(str: c_string) -> (s32, JsonValue*) {
+  lexer := JsonLexer::create(":<loaded from string>:", str);
   return json_parse(&lexer);
 }
-json_serialize_scalar :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
+json_serialize_scalar :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   if Type::is_float(type) {
     val.type = JsonValueType::Number;
@@ -590,18 +577,19 @@ json_serialize_scalar :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
     val.data.boolean = *(object as bool*);
     return (JsonError::SUCCESS, val);
   }
-  return (JsonError::Error($"Unsupported type :: '{type.name}'"), null);
+  set_json_error(format("Unsupported type :: %", {any::new(&type.name)}))
+  return (JsonError::ERROR, null);
 }
 
-json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*);
+json_serialize :: fn(object: void*, type: Type*) -> (s32, JsonValue*);
 
-json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
+json_serialize_struct :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Object;
   val.data.object = List![JsonKeyValuePair]{};
   for field in type.fields {
     field_kvp: JsonKeyValuePair;
-    field_kvp.key = c_string::from(field.name);
+    field_kvp.key = strdup(field.name);
     err, value := json_serialize(object as u8* + field.offset, field.type);
     if err {
       return (err, null);
@@ -612,7 +600,7 @@ json_serialize_struct :: fn(object: void*, type: Type*) -> (JsonError, JsonValue
   return (JsonError::SUCCESS, val);
 }
 
-json_serialize_array :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
+json_serialize_array :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Array;
   val.data.array = JsonArray{};
@@ -626,7 +614,7 @@ json_serialize_array :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*
   return (JsonError::SUCCESS, val);
 }
 
-json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
+json_serialize :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   if Type::has_no_extension(type) {
     if type.id == #typeid(c_string) {
       val : JsonValue* = malloc(sizeof(JsonValue));
@@ -638,10 +626,11 @@ json_serialize :: fn(object: void*, type: Type*) -> (JsonError, JsonValue*) {
     } else if Type::is_struct(type) {
       return json_serialize_struct(object, type);
     }
-  } else if Type::is_array(type) || Type::is_fixed_array(type) {
+  } else if Type::is_array(type) {
     return json_serialize_array(object, type);
   }
-  return (JsonError::Error($"Unsupported type :: '{type.name}'"), null);
+  set_json_error(format("Unsupported type :: '%'", {any::new(&type.name)}));
+  return (JsonError::ERROR, null);
 }
 
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError;
@@ -650,7 +639,8 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
   for json_field in val.data.object {
     struct_field := Type::get_field(type, json_field.key);
     if !struct_field {
-      return JsonError::Error($"Could not find field {json_field.key} in type {type.name}");
+      set_json_error(format("Could not find field % in type %", {any::new(&json_field.key), any::new(&type.name)}))
+      return JsonError::ERROR;
     }
     err := json_deserialize(json_field.value, object as u8* + struct_field.offset, struct_field.type);
     if err {
@@ -663,7 +653,6 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
 json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   i := 0;
   ptr: void* = malloc(type.element_type.size);
-  
   for elem in val.as_array() {
     memset(ptr, 0, type.element_type.size);
     err := json_deserialize(elem, ptr, type.element_type);
@@ -679,7 +668,9 @@ json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> Jso
 
 json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   if (!Type::has_no_extension(type)) {
-    return JsonError::Error("Unable to deserialize into pointer type with 'json_deserialize_scalar'");
+    // strdup this literal because the error handler will free on overwrite.
+    set_json_error(strdup("Unable to deserialize into pointer type with 'json_deserialize_scalar'"));
+    return JsonError::ERROR;
   }
   if Type::is_bool(type) {
     *(object as bool*) = val.as_boolean();
@@ -724,7 +715,8 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
   } else if (Type::is_string(type)) {
     *(object as c_string*) = val.as_string();
   } else {
-    return JsonError::Error($"Unable to deserialize into type {type.name}");
+    set_json_error(format("Unable to deserialize into type %", {any::new(&type.name)}));
+    return JsonError::ERROR;
   }
   return {};
 }
@@ -735,13 +727,15 @@ json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError
       *(object as c_string*) = val.as_string();
       return {};
     } else {
-      return JsonError::Error($"Type mismatch: c_string to {type.name}");
+      set_json_error(format("Type mismatch: c_string to %", {any::new(&type.name)}));
+      return JsonError::ERROR;
     }
   } else if val.is_object() {
     if Type::is_struct(type) {
       return json_deserialize_struct(val, object, type);
     } else {
-      return JsonError::Error($"Type mismatch: object to {type.name}");
+      set_json_error(format("Type mismatch: object to %", {any::new(&type.name)}));
+      return JsonError::ERROR;
     }
   } else if val.is_array() {
     return json_deserialize_array(val, object, type);
