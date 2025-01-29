@@ -130,7 +130,9 @@ struct TypeExtensions {
 
   inline TypeExtensions append(const TypeExtensions &to_append) const {
     auto these = *this;
-    these.extensions.insert(these.extensions.end(), to_append.extensions.begin(), to_append.extensions.end());
+    for (const auto &ext: to_append.extensions) {
+      these.extensions.push_back({ext});
+    }
     return these;
   }
 

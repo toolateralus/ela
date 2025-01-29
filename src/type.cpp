@@ -114,7 +114,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
 
-  while (base_t && base_t->base_id != Type::invalid_id) {
+  if (base_t && base_t->base_id != Type::invalid_id) {
     ext = base_t->get_ext().append(ext);
     base_t = global_get_type(base_t->base_id);
   }
@@ -777,7 +777,7 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
 int Type::take_pointer_to() const {
   auto ext = this->extensions;
   ext.extensions.push_back({TYPE_EXT_POINTER});
-  return global_find_type_id(id, ext);
+  return global_find_type_id(base_id == -1 ? id : base_id, ext);
 }
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
