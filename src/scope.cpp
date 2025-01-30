@@ -33,14 +33,9 @@ Context::Context() {
     // ** ------------- ***
   }
  
-  {
-    FunctionTypeInfo assert_info{};
-    assert_info.return_type = void_type();
-    assert_info.parameter_types[0] = c_string_type();
-    assert_info.parameter_types[1] = bool_type();
-    assert_info.params_len = 2;
-    scope->insert("assert", global_find_function_type_id(assert_info, {}), nullptr, SYMBOL_IS_FUNCTION);
-
+  { // For this compiler intrinsic operator,
+    // We have to do this. However, in the future, we will implement our own sizer,
+    // and we won't have this problem.
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;

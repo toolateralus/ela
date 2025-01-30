@@ -6,6 +6,13 @@
 #include "list.ela";
 #include "string.ela"; // this includes reflection
 
+assert :: fn(message: string, condition: bool) {
+  if (!(condition)) {                                                                                                  
+    printf("assertion failed: %s\n"c, message);                                                        
+    exit(1);                                                                                                           
+  }
+}
+
 #alias Panic_Handler :: fn *(string);
 
 panic_handler: Panic_Handler;

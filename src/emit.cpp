@@ -84,20 +84,6 @@ typedef unsigned char u8;
     #endif
     test->function();
   }
-
-  #define assert(message, condition)                                                                                     \
-  if (!(condition)) {                                                                                                    \
-    printf("\033[31mAssertion failed: \n\t\033[1;31mcondition ::\033[0m(\033[1;34m%s\033[0m), "                          \
-           "\n\t\033[1;31mmessage   ::\033[0m(\033[1;34m%s\033[0m])\033[0m\n",                                           \
-           #condition, message);                                                                                         \
-    exit(1);                                                                                                             \
-  }
-#else
-  #define assert(message, condition)                                                                                     \
-    if (!(condition)) {                                                                                                  \
-      printf("assertion failed: %s\n " #condition "\n", message);                                                        \
-      exit(1);                                                                                                           \
-    }
 #endif
 )__";
 

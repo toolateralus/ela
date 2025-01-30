@@ -1,5 +1,5 @@
 #test test_string :: fn() {
-  my_string := string::from("Xaryu Baryu");
+  my_string := "Xaryu Baryu";
   assert("string length failed to equal expected value", my_string.length == 11);
 }
 
@@ -8,15 +8,8 @@
   assert("array length failed to equal expected value", sizeof(array) / sizeof(s32) == 11);
 }
 
-
 Xaryu :: struct {
   value: s32
-}
-
-impl Xaryu {
-  to_string :: fn(self) -> c_string {
-    return "XarBar";
-  }
 }
 
 #test test_array_concat_operator :: fn() {
