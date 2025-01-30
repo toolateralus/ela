@@ -1,0 +1,25 @@
+
+#alias c_char :: u8;
+#alias char   :: u32;
+
+string :: struct {
+  data:    u32*,
+  length:  u64,
+}
+
+Collection_Initializer :: struct![T] {
+  data:   T*,
+  length: u64,
+}
+
+List :: struct![T] {
+  data:     T*,
+  length:   u64,
+  capacity: u64,
+}
+
+Type :: struct;
+any :: struct {
+  ptr: void*,
+  type: Type*
+};

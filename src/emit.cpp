@@ -411,9 +411,15 @@ void Emitter::visit(ASTLiteral *node) {
     case ASTLiteral::Null:
       (*ss) << "NULL";
       return;
-    case ASTLiteral::String:
-      output = std::format("\"{}\"", node->value);
-      break;
+    case ASTLiteral::String: {
+      output = "(string) { .data = (u32[]){";
+      using converter = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>;
+      std::u16string utf16_str = converter{}.from_bytes(node->value.get_str());
+      for (char16_t c : utf16_str) {
+        output += std::format("0x{:04x}, ", static_cast<uint32_t>(c));
+      }
+      output += "}, .length = " + std::to_string(utf16_str.length()) + " }";
+    }       break;
     case ASTLiteral::Float:
       if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";

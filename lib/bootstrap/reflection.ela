@@ -1,0 +1,152 @@
+Element :: struct;
+Type :: struct;
+
+#ifndef FREESTANDING {
+  Field :: struct {
+    name: c_string,
+    type: Type*,
+    size: u64,
+    offset: u64,
+  };
+
+  Type :: struct {
+    id: s32,                                                // the integer ID used to identify this type.
+    name: c_string,                                         // the type's name.
+    size: u64,                                              // sizeof(T)
+    flags: u64,                                             // defined in reflection.ela and emit.cpp, the values of the flags.
+    fields: List![Field],                                   // get a list of struct fields, enum variants.
+    elements: fn*(c_string) -> List![Element],              // get a list of the Elements, which can be used to reflect on arrays.
+    element_type: Type*,                                    // the type this type has a pointer to, is an array of, etc.
+  };
+
+  impl Field {
+    set :: fn![T, T1](self*, target: T, data: T1) {
+      memcpy((target as u8*) + self.offset, (&data) as u8*, sizeof(T1));
+    }
+    get :: fn![T](self*, source: T) -> u8* {
+      return ((&source) as u8*) + self.offset;
+    }
+  }
+
+  Element :: struct {
+    data: u8*,
+    type: Type*,
+  };
+
+  _type_info: Type*[];  
+}
+
+#flags TypeFlags :: enum {
+  INTEGER,
+  FLOAT,
+  BOOL,
+  STRING,
+  STRUCT,
+  TAGGED_UNION,
+  ENUM,
+  TUPLE,
+  ARRAY,
+  FUNCTION,
+  POINTER,
+  SIGNED,
+  UNSIGNED,
+}
+
+impl Type  {
+  is_signed :: fn(self*) -> bool {
+    return self.flags & TypeFlags::SIGNED != 0;
+  }
+
+  is_unsigned :: fn(self*) -> bool {
+    return self.flags & TypeFlags::UNSIGNED != 0;
+  }
+
+  has_no_extension :: fn(self*) -> bool {
+    return self.flags & TypeFlags::POINTER == 0 &&
+          self.flags & TypeFlags::ARRAY == 0;
+  }
+
+  is_array :: fn(self*) -> bool {
+    return self.flags & TypeFlags::ARRAY != 0;
+  }
+
+  is_string :: fn(self*) -> bool {
+    return self.flags & TypeFlags::STRING != 0;
+  }
+
+  is_scalar :: fn(self*) -> bool {
+    return Type::has_no_extension(self) &&
+          (self.flags & TypeFlags::INTEGER != 0 ||
+            self.flags & TypeFlags::FLOAT != 0   ||
+            self.flags & TypeFlags::BOOL != 0    ||
+            self.flags & TypeFlags::STRING != 0);
+  }
+
+  is_struct :: fn(self*) -> bool {
+    return self.flags & TypeFlags::STRUCT != 0;
+  }
+
+  is_enum :: fn(self*) -> bool {
+    return self.flags & TypeFlags::ENUM != 0;
+  }
+
+  is_integral :: fn(self*) -> bool {
+    return self.flags & TypeFlags::INTEGER != 0;
+  }
+
+  is_float :: fn(self*) -> bool {
+    return self.flags & TypeFlags::FLOAT != 0;
+  }
+
+  is_bool :: fn(self*) -> bool {
+    return self.flags & TypeFlags::BOOL != 0;
+  }
+
+  is_tuple :: fn(self*) -> bool {
+    return self.flags & TypeFlags::TUPLE != 0;
+  }
+
+  is_function :: fn(self*) -> bool {
+    return self.flags & TypeFlags::FUNCTION != 0;
+  }
+
+  is_pointer :: fn(self*) -> bool {
+    return self.flags & TypeFlags::POINTER != 0;
+  }
+
+  get_field :: fn(self*, name: c_string) -> Field* {
+    for *field in self.fields {
+      if strcmp(field.name, name) == 0 {
+        return field;
+      }
+    }
+    return null;
+  }
+}
+
+impl any {
+  new :: fn![T](t: T*) -> #self {
+    #static type: Type*;
+    if !type then type = #type(T);
+    return {
+      ptr: t,
+      type: type,
+    }
+  }
+
+  // return the pointer behind this any, or if the type isn't matched,
+  // return null.
+  cast :: fn![T](self*) -> T* {
+    #static type: Type*;
+    if !type then type = #type(T);
+    if type != self.type then return null;
+    return self.ptr as T*;
+  }
+
+  // an unchecked version of the 'cast' method.
+  // this will return junk data, or worse, if you pass in the wrong type to cast to.
+  // use cast anywhere you can, it's much more type safe.
+  unwrap :: fn![T](self*) -> T {
+    return *(self.ptr as T*);
+  }
+}

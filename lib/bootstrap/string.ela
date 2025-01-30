@@ -1,0 +1,352 @@
+#ifndef FREESTANDING {
+  // TODO: reimplement all the helper functions we used to have.
+  // Also, we should make this not null terminated, rather controlled by length.
+  // Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
+  // So we'll have to rewrite them all for that.
+  impl string {
+    empty :: fn() -> #self {
+      return {};
+    }
+    from :: fn(data: c_string) -> #self{
+      if !data then return {};
+      return {
+        length: strlen(data),
+        data: strdup(data),
+      };
+    }
+    from_ptr :: fn(begin: c_string, end: c_string) -> string {
+      str: string;
+      str.length = end - begin;
+      str.data = malloc(sizeof(u32) * str.length + 1);
+      memcpy(str.data, begin, str.length);
+      str.data[str.length] = 0;
+      return str;
+    }
+    deinit :: fn(self*) {
+      free(self.data);
+      self.length = 0;
+    }
+    subscript :: fn(self*, idx: s64) -> u32 {
+      return self.data[idx];
+    }
+    eq :: fn(self*, other: #self) -> bool {
+      if self.length != other.length then return false;
+      for idx in 0..self.length {
+        if (*self)[idx] != other[idx] then return false;
+      }
+      return true;
+    }
+    starts_with :: fn(self*, prefix: c_string) -> bool {
+      prefix_len := strlen(prefix);
+      if self.length < prefix_len then return false;
+      for i in 0..prefix_len {
+        if self.data[i] != prefix[i] then return false;
+      }
+      return true;
+    }
+    ends_with :: fn(self*, suffix: c_string) -> bool {
+      suffix_len := strlen(suffix);
+      if self.length < suffix_len then return false;
+      for i in 0..suffix_len {
+        if self.data[self.length - suffix_len + i] != suffix[i] then return false;
+      }
+      return true;
+    }
+    replace :: fn(self*, old: c_string, replacement: c_string) -> string {
+      old_len := strlen(old);
+      new_len := strlen(replacement);
+      result := string::empty();
+      for i in 0..self.length {
+        if strncmp(self.data + i, old, old_len) == 0 {
+          result.data = realloc(result.data, result.length + new_len + 1);
+          memcpy(result.data + result.length, replacement, new_len);
+          result.length += new_len;
+          i += old_len - 1;
+        } else {
+          result.data = realloc(result.data, result.length + 1 + 1);
+          result.data[result.length] = self.data[i];
+          result.length++;
+        }
+      }
+      result.data[result.length] = 0;
+      return result;
+    }
+    substr :: fn(self*, start: s64, length: s64) -> string {
+      if start < 0 || length < 0 || start + length > self.length then return string::empty();
+      return string::from_ptr(self.data + start, self.data + start + length);
+    }
+  }
+}
+
+impl Iterable![u32] for string { 
+  iter :: fn(self*) -> Iter![u32] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length,
+    }
+  }
+}
+
+#include "reflection.ela";
+
+#ifndef FREESTANDING {
+  // TODO: expand this, add support for other stuff.
+  // This is only for numerical types, bools, and strings / any pointer.
+  to_string :: fn![T](value: T) -> c_string {
+    buffer: u32[64];
+    type := #type(T);
+    format : c_string;
+
+    if type.is_bool() {
+      if value {
+        return strdup("true");
+      } else {
+        return strdup("false");
+      }
+    }
+
+    if type == #type(u8) || strncmp(type.name, "char", 4)  {
+      format = "%c";
+    } else if type.is_integral() {
+      format = "%lld";
+    } else if type.is_float() {
+      format = "%.2lf";               //  * using to_string has a trade off of less control for slight convenience. Oh well! use snprintf instead.
+    } else if type.is_string() {
+      format = "%s";
+    } else if type.is_pointer() {
+      format = "%p";
+    } else {
+      format = "(unsupported type)";  // * do we throw an error here? format = null?
+    } 
+
+    snprintf(buffer, sizeof(buffer), format, value);
+    return strdup(buffer) as c_string;
+  } 
+
+  // TODO: remove this.
+  string_concat :: fn(a: c_string, b: c_string) -> c_string {
+    len_a := strlen(a);
+    len_b := strlen(b);
+    result := malloc(sizeof(u32) * (len_a + len_b + 1)) as u32*;
+    memcpy(result, a, len_a);
+    memcpy(result + len_a, b, len_b);
+    result[len_a + len_b] = '\0';
+    return result as c_string;
+  }
+
+  #static print :: fn![T](str: T) {
+    s := to_string(str);
+    printf("%s", s);
+    free(s);
+  }
+
+  #static println :: fn![T](str: T) {
+    s := to_string(str)
+    printf("%s\n", s);
+    free(s);
+  }
+  // This seems pretty chunky,
+  // it might be more performant for building large strings,
+  // but perhaps this is a setting we can have the user pass in.
+  STRING_BUILDER_BLOCK_MAX_LEN :: 8192;
+
+  String_Builder_Block :: struct {
+    data: u32*,
+    length: u64,
+    next: String_Builder_Block*,
+  }
+
+  impl String_Builder_Block {
+    new :: fn() -> #self* {
+      self : #self* =  malloc(sizeof(String_Builder_Block));
+      self.data = calloc(sizeof(u32), STRING_BUILDER_BLOCK_MAX_LEN);
+      return self;
+    }
+    deinit :: fn(self*) {
+      if self.data then free(self.data);
+      if self.next { 
+        self.next.deinit();
+        free(self.next);
+      }
+      self.data = null;
+      self.next = null;
+      self.length = 0;
+    } 
+  }
+
+  String_Builder :: struct {
+    root: String_Builder_Block*,
+    current: String_Builder_Block*,
+  }
+
+  impl String_Builder {
+    deinit :: fn(self*) {
+      if self.root then self.root.deinit();
+      self.root = null;
+      self.current = null;
+    }
+
+    // just here for 'clarity' (no pun intended)
+    clear :: fn(self*) {
+      self.deinit();
+    }
+
+    length :: fn(self*) -> u64 {
+      if !self.root then return 0;
+      current := self.root;
+      len: u64;
+      while current {
+        len += current.length;
+        current = current.next;
+      }
+      return len;
+    }
+
+    get_string :: fn(self*) -> c_string {
+      length := self.length();
+      data : u32* = malloc(sizeof(u32) * length + 1);
+      data[length] = '\0'; // Null-terminate the final string
+      current := self.root;
+      offset := 0;
+      while current {
+        memcpy(data + offset, current.data, current.length);
+        offset += current.length;
+        current = current.next;
+      }
+      return data;
+    }
+
+    append :: fn(self*, str: c_string) {
+      if !str then return;
+      if !self.root { 
+        self.root = String_Builder_Block::new();
+        self.current = self.root;
+      }
+      length := strlen(str);
+      remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+      while length > 0 {
+        // Simple append, no overflow
+        if length <= remaining {
+          memcpy(self.current.data + self.current.length, str, length);
+          self.current.length += length;
+          break;
+        } else { // Append with overflow
+          memcpy(self.current.data + self.current.length, str, remaining);
+          self.current.length += remaining;
+          str += remaining;
+          length -= remaining;
+
+          self.current.next = String_Builder_Block::new();
+          self.current = self.current.next;
+          remaining = STRING_BUILDER_BLOCK_MAX_LEN;
+        }
+      }
+    }
+
+    append_then_free :: fn(self*, str: c_string) {
+      self.append(str);
+      free(str);
+    }
+
+    append_concat :: fn(self*, list: Collection_Initializer![c_string]) {
+      for i in 0..list.length {
+        self.append(list.data[i]);
+      }
+    }
+
+    append_concat_then_free :: fn(self*, list: Collection_Initializer![c_string], free_list: Collection_Initializer![bool]) {
+      if free_list.length != list.length {
+        printf("append_concat_then_free() requires that the string initializer and the free_list are the same length\n");
+        exit(1); // we shouldn't have to panic here, but whatever.
+      }
+      for i in 0..list.length {
+        self.append(list.data[i]);
+        if free_list.data[i] then free(list.data[i]);
+      }
+    }
+    append_u32 :: fn(self*, ch: u32) {
+      if !self.root { 
+        self.root = String_Builder_Block::new();
+        self.current = self.root;
+      }
+      remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+      if remaining > 0 {
+        self.current.data[self.current.length] = ch;
+        self.current.length += 1;
+      } else {
+        self.current.next = String_Builder_Block::new();
+        self.current = self.current.next;
+        self.current.data[0] = ch;
+        self.current.length = 1;
+      }
+    }
+
+    
+  }
+
+  // TODO: improve the Collection_Initializer![any] so we can implicitly take any...
+  // and just have it automatically do that for us.
+  // Also, doing any::new(&value) is obnoxious, we should be able to implicitly cast anything
+  // to any, even literals. see any-cast.idea.c in the root of the project for how we'd
+  // compile that.
+
+  // Additionally, it would be nice to have a compile time version of this,
+  // where we have a ![T...] var arg list, so we don't have to recalculate the format string every call.
+  format :: fn(fmt : c_string, list: Collection_Initializer![any]) -> c_string {
+    if !fmt {
+      return null;
+    }
+
+    builder: String_Builder;
+    value_index := 0;
+
+    while *fmt {
+      if (*fmt) == '%' && *(fmt + 1) == '%' {
+        builder.append_u32('%');
+        fmt += 2;
+        continue;
+      }
+
+      if (*fmt) == '%' {
+        value := list.data[value_index];
+        if value.ptr == null {
+          builder.append("null");
+        } else if value.type == #type(u32*) { 
+          builder.append(value.unwrap![u32*]()); 
+        } else if value.type.is_pointer() {
+          builder.append_then_free(to_string(value.ptr));
+        } else if value.type.is_enum() {
+          builder.append_then_free(to_string(value.unwrap![s32]()));
+        } else {
+          switch value.type {
+            #type(u8):  { builder.append_then_free(to_string(value.unwrap![u8]()));  }
+            #type(u16): { builder.append_then_free(to_string(value.unwrap![u16]())); }
+            #type(u32): { builder.append_then_free(to_string(value.unwrap![u32]())); }
+            #type(u64): { builder.append_then_free(to_string(value.unwrap![u64]())); }
+
+            #type(s8):  { builder.append_then_free(to_string(value.unwrap![s8]()));  }
+            #type(s16): { builder.append_then_free(to_string(value.unwrap![s16]())); }
+            #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
+            #type(s64): { builder.append_then_free(to_string(value.unwrap![s64]())); }
+
+            #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
+
+            #type(f32):    { builder.append_then_free(to_string(value.unwrap![f32]()));    }
+            #type(f32):  { builder.append_then_free(to_string(value.unwrap![f32]()));  }
+            #type(f64):  { builder.append_then_free(to_string(value.unwrap![f64]()));  }
+
+            #type(bool): { builder.append_then_free(to_string(value.unwrap![bool]())); }
+
+          }
+        }
+        value_index++;
+      } else {
+        builder.append_u32(*fmt);
+      }
+      fmt++;
+    }
+
+    return builder.get_string();
+  }
+}
+

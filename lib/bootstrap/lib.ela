@@ -1,0 +1,75 @@
+#include "typedef.ela"
+#include "interfaces.ela";
+#include "libc.ela";
+#include "range.ela";
+#include "memory.ela";
+#include "list.ela";
+#include "string.ela";
+
+#alias Panic_Handler :: fn *(c_string);
+
+panic_handler: Panic_Handler;
+
+set_panic_handler :: fn(handler: Panic_Handler) {
+  panic_handler = handler;
+}
+
+panic :: fn(msg: c_string) {
+  if !panic_handler {
+    #ifndef FREESTANDING {
+      panic_handler = fn(msg: c_string) {
+        printf("panic(): %s\n", msg);
+        exit(1);
+      };
+    } else {
+      panic_handler = fn(msg: c_string) {
+        // idk, segfault on panic?
+        n : s32 * = null;
+        *n = 10;
+      }
+    }
+  }
+  panic_handler(msg);
+}
+
+#ifdef FREESTANDING  {
+  Env :: struct {
+    m_args: c_string*,
+    length: u64,
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn(self*) -> (c_string*, u64) {
+      return (self.m_args, self.length);
+    }
+    initialize :: fn(argc: s32, argv: c_string*) {
+      self := #self::current();
+      self.m_args = argv;
+      self.length = argc;
+    }
+  }
+} else {
+  Env :: struct {
+    m_args: c_string[],
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn() -> c_string[] {
+      return #self::current().m_args.clone();
+    }
+    initialize :: fn(argc: s32, argv: c_string*) {
+      self := #self::current();
+      for i in 0..argc {
+        self.m_args.push(argv[i]);
+      }
+    }
+  }
+}
+
+

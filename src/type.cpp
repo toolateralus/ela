@@ -498,10 +498,6 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_in
   return info;
 }
 
-int char_type() {
-  static int type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
-  return type;
-}
 int bool_type() {
   static int type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
   return type;
@@ -664,7 +660,6 @@ void init_type_system() {
 
   // Other
   {
-    char_type();
     bool_type();
     void_type();
   }
@@ -672,7 +667,7 @@ void init_type_system() {
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == char_type() || t->id == s32_type() || t->id == s8_type() ||
+  return t->id == s32_type() || t->id == s8_type() ||
          t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
          t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == f32_type() ||
          t->id == f64_type();

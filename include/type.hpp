@@ -214,7 +214,6 @@ struct TupleTypeInfo : TypeInfo {
 
 // helpers to get scalar types for fast comparison
 int voidptr_type();
-int char_type();
 int bool_type();
 int void_type();
 int s8_type();

@@ -1415,7 +1415,7 @@ void Typer::visit(ASTLiteral *node) {
       node->resolved_type = voidptr_type();
       return;
     case ASTLiteral::Char:
-      node->resolved_type = char_type();
+      node->resolved_type = u32_type();
       return;
   }
 }

@@ -1,0 +1,33 @@
+
+Range :: struct {
+  begin: s64,
+  end:   s64,
+}
+
+Range_Enumerator :: struct {
+  begin: s64,
+  end:   s64,
+  idx:   s64,
+}
+
+impl Enumerator![s64] for Range_Enumerator {
+  current   :: fn(self*) -> s64 {
+    return self.idx;
+  }
+  next      :: fn(self*) {
+    self.idx++;
+  };
+  done      :: fn(self*) -> bool {
+    return self.idx >= self.end;
+  }
+}
+
+impl Enumerable![Range_Enumerator, s64] for Range {
+  enumerator :: fn(self*) -> Range_Enumerator {
+    return {
+      begin: self.begin,
+      end:   self.end,
+      idx:          0,
+    };
+  }
+}
