@@ -3,7 +3,7 @@
   "lldb.dereferencePointers": true,
   "lldb.consoleMode": "commands",
   "files.associations": {
-      "*.ela": "jai",
+    "*.ela": "ela"
   },
 
   "files.exclude": {
