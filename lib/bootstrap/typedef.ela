@@ -1,9 +1,8 @@
 
-#alias c_char :: u8;
-#alias char   :: u32;
+#alias char :: u32; // this represents a single UTF-8 scalar.
 
 string :: struct {
-  data:    u32*,
+  data:    u8*,
   length:  u64,
 }
 

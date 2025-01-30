@@ -4,9 +4,9 @@
 #include "range.ela";
 #include "memory.ela";
 #include "list.ela";
-#include "string.ela";
+#include "string.ela"; // this includes reflection
 
-#alias Panic_Handler :: fn *(c_string);
+#alias Panic_Handler :: fn *(string);
 
 panic_handler: Panic_Handler;
 
@@ -14,15 +14,15 @@ set_panic_handler :: fn(handler: Panic_Handler) {
   panic_handler = handler;
 }
 
-panic :: fn(msg: c_string) {
+panic :: fn(msg: string) {
   if !panic_handler {
     #ifndef FREESTANDING {
-      panic_handler = fn(msg: c_string) {
-        printf("panic(): %s\n", msg);
+      panic_handler = fn(msg: string) {
+        printf("panic(): %s\n"c, msg.data);
         exit(1);
       };
     } else {
-      panic_handler = fn(msg: c_string) {
+      panic_handler = fn(msg: string) {
         // idk, segfault on panic?
         n : s32 * = null;
         *n = 10;
@@ -34,7 +34,7 @@ panic :: fn(msg: c_string) {
 
 #ifdef FREESTANDING  {
   Env :: struct {
-    m_args: c_string*,
+    m_args: string*,
     length: u64,
   };
   impl Env {
@@ -42,10 +42,10 @@ panic :: fn(msg: c_string) {
       #static self: #self;
       return &self;
     }
-    args :: fn(self*) -> (c_string*, u64) {
+    args :: fn(self*) -> (string*, u64) {
       return (self.m_args, self.length);
     }
-    initialize :: fn(argc: s32, argv: c_string*) {
+    initialize :: fn(argc: s32, argv: string*) {
       self := #self::current();
       self.m_args = argv;
       self.length = argc;
@@ -53,17 +53,17 @@ panic :: fn(msg: c_string) {
   }
 } else {
   Env :: struct {
-    m_args: c_string[],
+    m_args: string[],
   };
   impl Env {
     current :: fn() -> #self* {
       #static self: #self;
       return &self;
     }
-    args :: fn() -> c_string[] {
+    args :: fn() -> string[] {
       return #self::current().m_args.clone();
     }
-    initialize :: fn(argc: s32, argv: c_string*) {
+    initialize :: fn(argc: s32, argv: string*) {
       self := #self::current();
       for i in 0..argc {
         self.m_args.push(argv[i]);

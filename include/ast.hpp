@@ -284,6 +284,7 @@ struct ASTLiteral : ASTExpr {
     Bool,
     Null,
   } tag;
+  bool is_c_string = false;
   InternedString value;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }

@@ -1,7 +1,7 @@
 #ifndef FREESTANDING {
   // TODO: reimplement all the helper functions we used to have.
   // Also, we should make this not null terminated, rather controlled by length.
-  // Another thing: We should use u32 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
+  // Another thing: We should use u8 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
   // So we'll have to rewrite them all for that.
   impl string {
     empty :: fn() -> #self {
@@ -17,7 +17,7 @@
     from_ptr :: fn(begin: c_string, end: c_string) -> string {
       str: string;
       str.length = end - begin;
-      str.data = malloc(sizeof(u32) * str.length + 1);
+      str.data = malloc(sizeof(u8) * str.length + 1);
       memcpy(str.data, begin, str.length);
       str.data[str.length] = 0;
       return str;
@@ -26,7 +26,7 @@
       free(self.data);
       self.length = 0;
     }
-    subscript :: fn(self*, idx: s64) -> u32 {
+    subscript :: fn(self*, idx: s64) -> u8 {
       return self.data[idx];
     }
     eq :: fn(self*, other: #self) -> bool {
@@ -78,8 +78,8 @@
   }
 }
 
-impl Iterable![u32] for string { 
-  iter :: fn(self*) -> Iter![u32] {
+impl Iterable![u8] for string { 
+  iter :: fn(self*) -> Iter![u8] {
     return {
       ptr: self.data,
       end: self.data + self.length,
@@ -92,20 +92,20 @@ impl Iterable![u32] for string {
 #ifndef FREESTANDING {
   // TODO: expand this, add support for other stuff.
   // This is only for numerical types, bools, and strings / any pointer.
-  to_string :: fn![T](value: T) -> c_string {
-    buffer: u32[64];
+  to_string :: fn![T](value: T) -> string {
+    buffer: u8[64];
     type := #type(T);
-    format : c_string;
+    format : string;
 
     if type.is_bool() {
       if value {
-        return strdup("true");
+        return "true";
       } else {
-        return strdup("false");
+        return "false";
       }
     }
 
-    if type == #type(u8) || strncmp(type.name, "char", 4)  {
+    if type == #type(u8) {
       format = "%c";
     } else if type.is_integral() {
       format = "%lld";
@@ -119,15 +119,15 @@ impl Iterable![u32] for string {
       format = "(unsupported type)";  // * do we throw an error here? format = null?
     } 
 
-    snprintf(buffer, sizeof(buffer), format, value);
-    return strdup(buffer) as c_string;
+    snprintf(buffer, sizeof(buffer), format.data, value);
+    return string::from(strdup(buffer));
   } 
 
   // TODO: remove this.
   string_concat :: fn(a: c_string, b: c_string) -> c_string {
     len_a := strlen(a);
     len_b := strlen(b);
-    result := malloc(sizeof(u32) * (len_a + len_b + 1)) as u32*;
+    result := malloc(sizeof(u8) * (len_a + len_b + 1)) as u8*;
     memcpy(result, a, len_a);
     memcpy(result + len_a, b, len_b);
     result[len_a + len_b] = '\0';
@@ -151,7 +151,7 @@ impl Iterable![u32] for string {
   STRING_BUILDER_BLOCK_MAX_LEN :: 8192;
 
   String_Builder_Block :: struct {
-    data: u32*,
+    data: u8*,
     length: u64,
     next: String_Builder_Block*,
   }
@@ -159,7 +159,7 @@ impl Iterable![u32] for string {
   impl String_Builder_Block {
     new :: fn() -> #self* {
       self : #self* =  malloc(sizeof(String_Builder_Block));
-      self.data = calloc(sizeof(u32), STRING_BUILDER_BLOCK_MAX_LEN);
+      self.data = calloc(sizeof(u8), STRING_BUILDER_BLOCK_MAX_LEN);
       return self;
     }
     deinit :: fn(self*) {
@@ -202,9 +202,9 @@ impl Iterable![u32] for string {
       return len;
     }
 
-    get_string :: fn(self*) -> c_string {
+    get_string :: fn(self*) -> string {
       length := self.length();
-      data : u32* = malloc(sizeof(u32) * length + 1);
+      data : u8* = malloc(sizeof(u8) * length + 1);
       data[length] = '\0'; // Null-terminate the final string
       current := self.root;
       offset := 0;
@@ -213,29 +213,32 @@ impl Iterable![u32] for string {
         offset += current.length;
         current = current.next;
       }
-      return data;
+      return {
+        data: data,
+        length: length,
+      };
     }
 
-    append :: fn(self*, str: c_string) {
-      if !str then return;
+    append :: fn(self*, str: string) {
+      if str.length == 0 then return;
       if !self.root { 
         self.root = String_Builder_Block::new();
         self.current = self.root;
       }
-      length := strlen(str);
+      str_idx := 0;
+      length := str.length;
       remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
       while length > 0 {
         // Simple append, no overflow
         if length <= remaining {
-          memcpy(self.current.data + self.current.length, str, length);
+          memcpy(self.current.data + self.current.length, str.data + str_idx, length);
           self.current.length += length;
           break;
         } else { // Append with overflow
-          memcpy(self.current.data + self.current.length, str, remaining);
+          memcpy(self.current.data + self.current.length, str.data + str_idx, remaining);
           self.current.length += remaining;
-          str += remaining;
+          str_idx += remaining;
           length -= remaining;
-
           self.current.next = String_Builder_Block::new();
           self.current = self.current.next;
           remaining = STRING_BUILDER_BLOCK_MAX_LEN;
@@ -243,28 +246,29 @@ impl Iterable![u32] for string {
       }
     }
 
-    append_then_free :: fn(self*, str: c_string) {
+    append_then_free :: fn(self*, str: string) {
       self.append(str);
-      free(str);
+      str.deinit();
     }
 
-    append_concat :: fn(self*, list: Collection_Initializer![c_string]) {
+    append_concat :: fn(self*, list: Collection_Initializer![string]) {
       for i in 0..list.length {
         self.append(list.data[i]);
       }
     }
 
-    append_concat_then_free :: fn(self*, list: Collection_Initializer![c_string], free_list: Collection_Initializer![bool]) {
+    append_concat_then_free :: fn(self*, list: Collection_Initializer![string], free_list: Collection_Initializer![bool]) {
       if free_list.length != list.length {
-        printf("append_concat_then_free() requires that the string initializer and the free_list are the same length\n");
+        printf("append_concat_then_free() requires that the string initializer and the free_list are the same length\n"c);
         exit(1); // we shouldn't have to panic here, but whatever.
       }
       for i in 0..list.length {
         self.append(list.data[i]);
-        if free_list.data[i] then free(list.data[i]);
+        if free_list.data[i] then list.data[i].deinit();
       }
     }
-    append_u32 :: fn(self*, ch: u32) {
+
+    append_char :: fn(self*, ch: char) {
       if !self.root { 
         self.root = String_Builder_Block::new();
         self.current = self.root;
@@ -280,8 +284,6 @@ impl Iterable![u32] for string {
         self.current.length = 1;
       }
     }
-
-    
   }
 
   // TODO: improve the Collection_Initializer![any] so we can implicitly take any...
@@ -292,9 +294,9 @@ impl Iterable![u32] for string {
 
   // Additionally, it would be nice to have a compile time version of this,
   // where we have a ![T...] var arg list, so we don't have to recalculate the format string every call.
-  format :: fn(fmt : c_string, list: Collection_Initializer![any]) -> c_string {
+  format :: fn(fmt : c_string, list: Collection_Initializer![any]) -> string {
     if !fmt {
-      return null;
+      return {};
     }
 
     builder: String_Builder;
@@ -302,7 +304,7 @@ impl Iterable![u32] for string {
 
     while *fmt {
       if (*fmt) == '%' && *(fmt + 1) == '%' {
-        builder.append_u32('%');
+        builder.append_char('%');
         fmt += 2;
         continue;
       }
@@ -311,8 +313,8 @@ impl Iterable![u32] for string {
         value := list.data[value_index];
         if value.ptr == null {
           builder.append("null");
-        } else if value.type == #type(u32*) { 
-          builder.append(value.unwrap![u32*]()); 
+        } else if value.type == #type(u8*) { 
+          builder.append(string::from(value.unwrap![u8*]())); 
         } else if value.type.is_pointer() {
           builder.append_then_free(to_string(value.ptr));
         } else if value.type.is_enum() {
@@ -341,7 +343,7 @@ impl Iterable![u32] for string {
         }
         value_index++;
       } else {
-        builder.append_u32(*fmt);
+        builder.append_char(*fmt);
       }
       fmt++;
     }

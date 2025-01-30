@@ -879,6 +879,10 @@ ASTExpr *Parser::parse_primary() {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       literal->tag = ASTLiteral::String;
       literal->value = tok.value;
+      if (peek().type == TType::Identifier && peek().value == "c") {
+        literal->is_c_string = true;
+        eat();
+      }
       end_node(literal, range);
       return literal;
     }

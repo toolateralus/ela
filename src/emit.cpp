@@ -1,4 +1,5 @@
 #include <functional>
+#include <iterator>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -132,7 +133,7 @@ void Emitter::forward_decl_type(Type *type) {
   }
 }
 
-void Emitter::emit_type_or_fwd_decl(Type* type) {
+void Emitter::emit_type_or_fwd_decl(Type *type) {
   if (type->base_id != Type::invalid_id) {
     for (auto ext : type->get_ext().extensions) {
       if (ext.type != TYPE_EXT_ARRAY) {
@@ -404,6 +405,7 @@ void Emitter::visit(ASTCall *node) {
 
   return;
 }
+
 void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
   std::string output;
@@ -412,14 +414,22 @@ void Emitter::visit(ASTLiteral *node) {
       (*ss) << "NULL";
       return;
     case ASTLiteral::String: {
-      output = "(string) { .data = (u32[]){";
-      using converter = std::wstring_convert<std::codecvt_utf8_utf16<char16_t>, char16_t>;
-      std::u16string utf16_str = converter{}.from_bytes(node->value.get_str());
-      for (char16_t c : utf16_str) {
-        output += std::format("0x{:04x}, ", static_cast<uint32_t>(c));
+      if (node->is_c_string) {
+        output = std::format("\"{}\"", node->value.get_str());
+      } else {
+        // TODO: 
+        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of bytes,
+        // then all of our string literals are stack allocated.
+        // If we make them static, then there's a chance that the user mutates the string literal, and it will change it's meaning
+        // for the rest of the program
+
+        // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
+        // we will keep the null terminated strings until we have a solution for this.
+        auto str = node->value.get_str();
+        (*ss) << std::format("(string) {{ .data = \"{}\", .length = {} }}", str, str.length());
+        return;
       }
-      output += "}, .length = " + std::to_string(utf16_str.length()) + " }";
-    }       break;
+    } break;
     case ASTLiteral::Float:
       if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";
@@ -440,6 +450,7 @@ void Emitter::visit(ASTLiteral *node) {
   (*ss) << '(' << type << ')' << output;
   return;
 }
+
 void Emitter::visit(ASTIdentifier *node) {
   (*ss) << node->value.get_str();
   return;
@@ -710,7 +721,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
       // (*ss) << "extern ";
-      // I do not believe this is ever neccesary in C, you can alwasy just define an 
+      // I do not believe this is ever neccesary in C, you can alwasy just define an
       // opaque struct and link against it, or redefine it: it doesn't matter.
     }
     (*ss) << type_tag << " " << type_name << " " << type_name << ";\n";
@@ -901,36 +912,6 @@ void Emitter::visit(ASTProgram *node) {
       code << type_info.str() << ";\n";
     }
     code << "}\n";
-
-    // code << std::format("auto __ts_init_func_result__ = []{{\n"
-    //                     "  {};\n"
-    //                     "  return 0;\n"
-    //                     "}}();\n",
-    //                     type_table.size(), type_info.str());
-
-    code << std::format(R"_(
-Type *find_type(string name) {{
-  for (size_t i = 0; i < {}; ++i) {{
-    Type *type = _type_info.data[i];
-    const char *type_name = type->name;
-    const char *name_data = name.data;
-    bool match = true;
-    while (*type_name && *name_data) {{
-      if (*type_name != *name_data) {{
-        match = false;
-        break;
-      }}
-      ++type_name;
-      ++name_data;
-    }}
-    if (match && *type_name == '\\0' && *name_data == '\\0') {{
-      return type;
-    }}
-  }}
-  return NULL; // Return nullptr if the type is not found
-}}
-)_",
-                        type_table.size());
   }
 
   if (testing) {
@@ -948,11 +929,10 @@ Type *find_type(string name) {{
   } else {
     if (has_user_defined_main && !is_freestanding) {
 #define FORMAT_STR "int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n"
-
       // I made that macro because the formatting goes CRAZY with a raw string as an arg
       code << std::format(FORMAT_STR, ctx.scope->find_type_id("Env", {}),
-                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();\n"
-                                                            : "{/* no reflection present in module */};\n");
+                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
+                                                            : "{/* no reflection present in module */};");
     } // C calls main() for freestanding
   }
 

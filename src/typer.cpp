@@ -1400,7 +1400,13 @@ void Typer::visit(ASTLiteral *node) {
       node->resolved_type = f32_type();
       return;
     case ASTLiteral::String: {
-      node->resolved_type = c_string_type();
+      if (node->is_c_string) { 
+        node->resolved_type = c_string_type();
+      }
+      else {
+        static size_t uid_idx =0;
+        node->resolved_type = ctx.scope->find_type_id("string", {});
+      }
       return;
     }
     case ASTLiteral::Bool:
