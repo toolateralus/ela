@@ -243,7 +243,7 @@ int global_create_interface_type(const InternedString &name, Scope *scope,
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args);
 int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
-int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
+int global_create_tuple_type(const std::vector<int> &types);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
