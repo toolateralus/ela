@@ -1,7 +1,7 @@
 
 #alias char :: u32; // this represents a single UTF-8 scalar.
 
-string :: struct {
+str :: struct {
   data:    u8*,
   length:  u64,
 }

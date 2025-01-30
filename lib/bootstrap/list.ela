@@ -1,6 +1,6 @@
 
 // forward declare panic.
-panic :: fn(msg: string);
+panic :: fn(msg: str);
 
 #ifndef FREESTANDING {
   impl![T] List![T] {

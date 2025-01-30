@@ -1,8 +1,8 @@
 main :: fn() { 
   // We aren't applyign the operator overload for == on struct here,
   // we just try to use C's == operator. that's clearly messed up.
-  switch string::from("blah") {
-    string::from("blooh"): {}
+  switch str::from("blah") {
+    str::from("blooh"): {}
   }
 
   // Again, range needs a == or .contains function applied for switches.

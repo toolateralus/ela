@@ -540,8 +540,8 @@ json_parse_file :: fn(file: c_string) -> (s32, JsonValue*) {
   return json_parse(&lexer);
 }
 
-json_parse_string :: fn(str: c_string) -> (s32, JsonValue*) {
-  lexer := JsonLexer::create(":<loaded from string>:", str);
+json_parse_string :: fn(s: str) -> (s32, JsonValue*) {
+  lexer := JsonLexer::create(":<loaded from string>:", s);
   return json_parse(&lexer);
 }
 json_serialize_scalar :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {

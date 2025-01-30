@@ -10,15 +10,15 @@ Struct :: struct {
   // each method has to be implemented or compiler errors.
   Format :: interface![T] {
     to_string :: fn(self*) -> c_string;
-    parse     :: fn(input: string) -> #self;
+    parse     :: fn(input: str) -> #self;
   }
 
   // impl generic Format interface for Struct.
   impl Format![Struct] for Struct {
-    to_string :: fn(self*)         -> string {
+    to_string :: fn(self*)         -> str {
       return $"Struct {{x: {self.x}, y: {self.y}}}";
     }
-    parse     :: fn(input: string) -> #self {
+    parse     :: fn(input: str) -> #self {
       // omitted for simplicity.
       self: #self;
       return self;

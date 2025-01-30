@@ -158,14 +158,14 @@ switch_helper :: fn() -> s32 {
   }
 
   assert("Failed to hit positive switch case for integer", passed);
-  // str: string = string::from("Hello!");
+  // s: s = str::from("Hello!");
 
   // passed = false;
-  // switch str {
-  //   string::from("Hello"): { assert("Switch case on string failed", false); }
-  //   string::from("Hello!"): { passed = true; }
+  // switch s {
+  //   str::from("Hello"): { assert("Switch case on str failed", false); }
+  //   str::from("Hello!"): { passed = true; }
   // }
-  // assert("Failed to hit positive switch case for string", passed);
+  // assert("Failed to hit positive switch case for str", passed);
 
   passed = false;
   switch SwitchCaseEnum::SwitchVariant0 {

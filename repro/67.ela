@@ -2,10 +2,10 @@ main :: fn() {
   // we need to handle operator overloads in switch statements.
   // should be relatively straightforward, just have an ASTBinExpr on the stack in the emitter & typer.
   // boom.
-  str: string = string::from("Hello!");
+  s: str = "Hello!";
   passed = false;
-  switch str {
-    string::from("Hello"): { assert("Switch case on string failed", false); }
-    string::from("Hello!"): { passed = true; }
+  switch s {
+    str::from("Hello"): { assert("Switch case on str failed", false); }
+    str::from("Hello!"): { passed = true; }
   }
 }

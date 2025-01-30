@@ -38,7 +38,7 @@ jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
   for i in 0..length {
     u8_x := rect.x + (i * style.font_size) as f32;
     u8_y := rect.y + intensity * sin(rate * time + (i as f32));
-    temp : u8[2] = { text[i], '\0' };
+    temp : u8[2] = { text[i], '\0' as u8 };
     DrawText(temp as c_string, u8_x as s32, u8_y as s32, style.font_size, style.foreground);
   }
 }

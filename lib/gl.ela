@@ -27,7 +27,7 @@ GLFWwindow :: struct;
 #foreign glClear :: fn(mask: u32);
 #foreign glGetError :: fn() -> s32;
 #foreign glCreateShader :: fn(type: u32) -> u32;
-#foreign glShaderSource :: fn(shader: u32, count: s32, string: c_string*, length: s32*);
+#foreign glShaderSource :: fn(shader: u32, count: s32, s: c_string*, length: s32*);
 #foreign glCompileShader :: fn(shader: u32);
 #foreign glGetShaderiv :: fn(shader: u32, pname, params: s32*);
 #foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: s32, length: s32*, infoLog: c_string);

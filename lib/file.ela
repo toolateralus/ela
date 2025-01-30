@@ -24,7 +24,7 @@ SeekPosition :: enum {
 #foreign fprintf :: fn(stream: FILE *, format: u8 *, ...) -> s32;
 #foreign fflush :: fn(f: FILE *);
 
-#alias FileError :: c_string;
+#alias FileError :: str;
 
 // TODO: add a way to do Binary stuff.
 #flags FileOpenFlags :: enum {
@@ -55,22 +55,22 @@ impl File {
     return len as u32;
   }
 
-  read_all :: fn(filename: c_string) -> (FileError, c_string) {
-    file := fopen(filename, "r");
-    if !file then return ("Couldn't open file", null);
+  read_all :: fn(filename: str) -> (FileError, str) {
+    file := fopen(filename.data, "r"c);
+    if !file then return ("Couldn't open file", {});
     length := File::length(file);
-    str: c_string = malloc(length + 1);
-    memset(str, 0, length + 1);
+    s: c_string = malloc(length + 1);
+    memset(s, 0, length + 1);
     c: u8;
     for i in 0..length {
-      str[i] = fgetc(file);
+      s[i] = fgetc(file);
     }
     fclose(file);
-    return (null, str);
+    return ({}, str::from(s));
   }
 
-  read_bytes :: fn(filename: c_string) -> List![u8] {
-    file := fopen(filename, "r");
+  read_bytes :: fn(filename: str) -> List![u8] {
+    file := fopen(filename.data, "r"c);
     if !file then return {};
     result: List![u8];
     length := File::length(file);
@@ -83,18 +83,18 @@ impl File {
     return result;
   }
 
-  write_all :: fn(filename: c_string, data: c_string) -> FileError {
-    file := fopen(filename, "w");
+  write_all :: fn(filename: str, data: str) -> FileError {
+    file := fopen(filename.data, "w"c);
     if !file {
       return "Unable to open file";
     }
-    fwrite(data, sizeof(u8), strlen(data), file);
+    fwrite(data.data, sizeof(u8), data.length, file);
     fclose(file);
-    return null;
+    return {};
   }
 
-  // Used to convert our flag enum to a string for fopen/fclose etc.
-  flags_to_string :: fn(flags: s32) -> c_string {
+  // Used to convert our flag enum to a str for fopen/fclose etc.
+  flags_to_string :: fn(flags: s32) -> str {
     if flags == FileOpenFlags::Read {
       return "r";
     } else if flags == FileOpenFlags::Write {
@@ -103,7 +103,7 @@ impl File {
       return "rw";
     } else {
       panic("unexpected file flags passed to a file api function");
-      return null;
+      return {};
     }
   }
 }

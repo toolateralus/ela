@@ -6,14 +6,14 @@
 #include "list.ela";
 #include "string.ela"; // this includes reflection
 
-assert :: fn(message: string, condition: bool) {
+assert :: fn(message: str, condition: bool) {
   if (!(condition)) {                                                                                                  
     printf("assertion failed: %s\n"c, message);                                                        
     exit(1);                                                                                                           
   }
 }
 
-#alias Panic_Handler :: fn *(string);
+#alias Panic_Handler :: fn *(str);
 
 panic_handler: Panic_Handler;
 
@@ -21,15 +21,15 @@ set_panic_handler :: fn(handler: Panic_Handler) {
   panic_handler = handler;
 }
 
-panic :: fn(msg: string) {
+panic :: fn(msg: str) {
   if !panic_handler {
     #ifndef FREESTANDING {
-      panic_handler = fn(msg: string) {
+      panic_handler = fn(msg: str) {
         printf("panic(): %s\n"c, msg.data);
         exit(1);
       };
     } else {
-      panic_handler = fn(msg: string) {
+      panic_handler = fn(msg: str) {
         // idk, segfault on panic?
         n : s32 * = null;
         *n = 10;
@@ -41,7 +41,7 @@ panic :: fn(msg: string) {
 
 #ifdef FREESTANDING  {
   Env :: struct {
-    m_args: string*,
+    m_args: str*,
     length: u64,
   };
   impl Env {
@@ -49,10 +49,10 @@ panic :: fn(msg: string) {
       #static self: #self;
       return &self;
     }
-    args :: fn(self*) -> (string*, u64) {
+    args :: fn(self*) -> (str*, u64) {
       return (self.m_args, self.length);
     }
-    initialize :: fn(argc: s32, argv: string*) {
+    initialize :: fn(argc: s32, argv: str*) {
       self := #self::current();
       self.m_args = argv;
       self.length = argc;
@@ -60,17 +60,17 @@ panic :: fn(msg: string) {
   }
 } else {
   Env :: struct {
-    m_args: string[],
+    m_args: str[],
   };
   impl Env {
     current :: fn() -> #self* {
       #static self: #self;
       return &self;
     }
-    args :: fn() -> string[] {
+    args :: fn() -> str[] {
       return #self::current().m_args.clone();
     }
-    initialize :: fn(argc: s32, argv: string*) {
+    initialize :: fn(argc: s32, argv: str*) {
       self := #self::current();
       for i in 0..argc {
         self.m_args.push(argv[i]);

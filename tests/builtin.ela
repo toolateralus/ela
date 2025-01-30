@@ -1,6 +1,6 @@
 #test test_string :: fn() {
   my_string := "Xaryu Baryu";
-  assert("string length failed to equal expected value", my_string.length == 11);
+  assert("str length failed to equal expected value", my_string.length == 11);
 }
 
 #test test_array :: fn() {
@@ -99,7 +99,7 @@ Xaryu :: struct {
 // }
 
 // #test subscript_string :: fn() {
-//   s: string = string::from("0,1,2,3");
+//   s: str = str::from("0,1,2,3");
 //   s[0] = 10;
-//   assert("subscript assign string failed", s[0] == (10 as u8));
+//   assert("subscript assign str failed", s[0] == (10 as u8));
 // }

@@ -195,7 +195,7 @@ impl Enemy {
 TextParticle :: struct {
   position: Vector2,
   font_size : s32,
-  text: string,
+  text: str,
   spawn_time: f32,
   lifetime: f32,
   color: Color,
@@ -233,7 +233,7 @@ get_center_screen_rect:: fn(width: f32, height, offset: Vector2) -> Rectangle {
   };
 }
 
-make_text_particle :: fn(text: string, font_size: s32, position: Vector2, lifetime: f32) {
+make_text_particle :: fn(text: str, font_size: s32, position: Vector2, lifetime: f32) {
   particle : TextParticle* = malloc(sizeof(TextParticle));
   particle.position = position;
   particle.font_size = font_size;
@@ -657,7 +657,7 @@ update_game :: fn() {
         score += amount
         ui_text_color.a = 255 as u8;
         
-        make_text_particle(string::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        make_text_particle(str::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
         break;
       }
     }

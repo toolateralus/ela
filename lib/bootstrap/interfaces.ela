@@ -5,10 +5,10 @@ Drop        :: interface {
   drop      :: fn(self*);
 }
 
-// Allow an object to be converted to a string
+// Allow an object to be converted to a str
 ToString    :: interface {
-  // convert self to string::
-  to_string :: fn(self*) -> string;
+  // convert self to str::
+  to_string :: fn(self*) -> str;
 }
 
 // equivalent to an explicit cast operator overload in C++,
@@ -97,7 +97,7 @@ Bitwise :: interface![Right] {
 }
 
 
-// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and string::
+// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and str::
 Allocator :: interface {
   allocate :: fn![T](self*) -> T*;
   free :: fn![T](self*, ptr: T*);

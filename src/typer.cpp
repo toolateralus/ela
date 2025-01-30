@@ -1405,7 +1405,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       else {
         static size_t uid_idx =0;
-        node->resolved_type = ctx.scope->find_type_id("string", {});
+        node->resolved_type = ctx.scope->find_type_id("str", {});
       }
       return;
     }

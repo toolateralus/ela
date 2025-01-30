@@ -1,7 +1,7 @@
 
 
 AST :: enum(union) {
-  Identifier :: string;
+  Identifier :: str;
   Float :: f64;
   Integer :: s64;
   Binary :: struct {
@@ -22,7 +22,7 @@ c: {
   typedef struct AST {
     s32 index;
     union {
-      string _Identifier;       // index0
+      str _Identifier;       // index0
       f32 _Float;             // index1
       int64_t _Integer;         // index2
       struct {  

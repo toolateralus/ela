@@ -14,8 +14,8 @@ dirent :: struct {
 #foreign closedir :: fn(dir: void*) -> s32;
 
 Directory :: struct {
-  path: string,
-  files: List![string],
+  path: str,
+  files: List![str],
 }
 
 impl Directory {
@@ -29,19 +29,19 @@ impl Directory {
     dir := opendir(path);
 
     if !dir then return { 
-      path: string::from(path),
+      path: str::from(path),
       files : {}
     };
 
-    files: List![string];
+    files: List![str];
     entry: void*;
     while entry = readdir(dir) {
       ent : dirent* = entry;
-      files.push(string::from(ent.d_name as c_string));
+      files.push(str::from(ent.d_name as c_string));
     }
 
     closedir(dir);
-    return {path: string::from(path), files: files};
+    return {path: str::from(path), files: files};
   }
 
   deinit :: fn(self*) {

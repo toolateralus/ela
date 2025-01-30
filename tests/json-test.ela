@@ -45,14 +45,14 @@ impl JsonValueDeleter {
 
 //   err, val = json_parse_string("\"hello\"");
 //   if err.has_value {
-//     assert($"{err.message} failed to parse string".data, false);
+//     assert($"{err.message} failed to parse str".data, false);
 //   }
 //   deleter.add(val);
-//   assert("string", val.is_string());
+//   assert("str", val.is_string());
 
 //   err, val = json_parse_string("[1, 2, 3]");
 //   if err.has_value {
-//     assert($"{err.message} json parse string, [1,2,3]".data, false);
+//     assert($"{err.message} json parse str, [1,2,3]".data, false);
 //   }
 //   deleter.add(val);
 //   assert("array", val.is_array());
@@ -66,7 +66,7 @@ impl JsonValueDeleter {
 
 //   err, val = json_parse_string("null");
 //   if err.has_value {
-//     assert($"{err.message} json parse string null".data, false);
+//     assert($"{err.message} json parse str null".data, false);
 //   }
 //   deleter.add(val);
 //   assert("null", val.is_null());
@@ -96,7 +96,7 @@ impl JsonValueDeleter {
 //     assert($"{err.message} json_parse_string \"hello\"".data, false);
 //   }
 //   deleter.add(val);
-//   assert("string", val.as_string() == "hello");
+//   assert("str", val.as_string() == "hello");
 
 //   err, val = json_parse_string("[1, 2, 3]");
 //   if err.has_value {
@@ -136,7 +136,7 @@ impl JsonValueDeleter {
 //   b: f32,
 // }
 // impl MyJsonStruct {
-//   to_string ::fn(self*) -> string {
+//   to_string ::fn(self*) -> str {
 //     return $"MyJsonStruct [n: {self.n}, b: {self.b}]";
 //   }
 // }
@@ -170,7 +170,7 @@ impl JsonValueDeleter {
 //   }
 
 //   deleter.add(val);
-//   assert("string", val.get("string").as_string() == "Hello, World!");
+//   assert("str", val.get("str").as_string() == "Hello, World!");
 //   assert("number", val.get("number").as_number() == 42);
 //   assert("boolean", val.get("boolean").as_boolean() == true);
 //   assert("null_value", val.get("null_value").is_null());

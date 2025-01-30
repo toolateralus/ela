@@ -412,7 +412,7 @@ void Emitter::visit(ASTLiteral *node) {
         // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
         // we will keep the null terminated strings until we have a solution for this.
         auto str = node->value.get_str();
-        (*ss) << std::format("(string) {{ .data = \"{}\", .length = {} }}", str, str.length());
+        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, str.length());
         return;
       }
     } break;

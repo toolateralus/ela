@@ -245,10 +245,10 @@ main :: fn() {
 
   for file in dir.files { 
     if file.length <= 4 then continue;
-    #static extensions: string[3] = {
-      string::from(".wav"),
-      string::from(".mp3"),
-      string::from(".ogg"),
+    #static extensions: str[3] = {
+      str::from(".wav"),
+      str::from(".mp3"),
+      str::from(".ogg"),
     }
     
     for idx in 0..3 {
@@ -275,9 +275,9 @@ main :: fn() {
         label_x := seq_x + 150.0 + (note as f32) * 40.0;
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
-        str := $"{beat}.{subdiv}";
-        DrawText(str, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
-        free(str);
+        text := $"{beat}.{subdiv}";
+        DrawText(text, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
+        free(text);
       }
 
       if playing {
