@@ -17,7 +17,6 @@
     "contributes": {
         "languages": [{
             "id": "ela",
-            "aliases": ["ela", "ela"],
             "extensions": [".ela"],
             "configuration": "./language-configuration.json"
         }],
