@@ -6,4 +6,3 @@ main :: fn() {
   // it works if we pass the .name, but still what.
   println(#type(c_string**));
 }
-
