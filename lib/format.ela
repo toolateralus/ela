@@ -112,7 +112,7 @@ format :: fn(fmt : u8*, list: Collection_Initializer![any]) -> String {
       }
       value_index++;
     } else {
-      builder.append_char(*fmt);
+      builder.append(*fmt);
     }
     fmt++;
   }
