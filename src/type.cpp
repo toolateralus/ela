@@ -554,11 +554,6 @@ int voidptr_type() {
 
 int range_type() { return root_scope->find_type_id("Range", {}); }
 
-int c_string_type() {
-  static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});
-  return type;
-}
-
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   out.clear();
   if (!type->is_kind(TYPE_FUNCTION)) {

@@ -123,6 +123,7 @@
     }
    
   }
+
   impl Deinit for String {
     deinit :: fn(self*) {
       free(self.data);
@@ -140,7 +141,6 @@ impl Iterable![u8] for str {
     }
   }
 }
-
 
 impl As_Char_Slice![String] for String {
   as_char_slice :: fn(self) -> Slice![u32] {

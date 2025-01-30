@@ -4,8 +4,7 @@
 // This is a string literal type. "..." will return this type. 
 // It's meant to be an immutable constant string.
 
-// to get a 'u8*' literal, use `"..."c` the little `c` postfix.
-//                                   ^
+// to get a 'u8*' literal, use `"..."c` the little `c` postfix.                              ^
 str :: struct {
   data:    u8*,
   length:  u64,
@@ -32,6 +31,7 @@ List :: struct![T] {
 }
 
 Type :: struct;
+
 any :: struct {
   ptr: void*,
   type: Type*

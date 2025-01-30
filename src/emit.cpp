@@ -71,8 +71,8 @@ typedef unsigned char u8;
 #endif
 
 #ifdef TESTING
-  int printf(const char *, ...);
-  void exit(int);
+  int printf(u8 *, ...);
+  void exit(s32);
   
   typedef struct {
     const char *name;
@@ -1225,7 +1225,10 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
-  if (type->id == c_string_type()) {
+  // TODO: refactor this for new String/str types? 
+  // And C string.
+  // For now we'll just say it's c_string only.
+  if (type->id == root_scope->find_type_id("u8", {{{TYPE_EXT_POINTER}}})) {
     return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
   }
   switch (type->kind) {
@@ -1424,8 +1427,6 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 
 std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
-  // TODO: we need to fix the emitting of 'c_string' as const char*,
-  // right now it's fricked up.
   ss << base;
   for (const auto ext : extensions.extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
@@ -1441,11 +1442,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
 
-  if (id == c_string_type()) {
-    name = "const char";
-  } else {
-    return to_cpp_string(type);
-  }
+  return to_cpp_string(type);
 
   if (type->get_ext().has_no_extensions()) {
     return name;

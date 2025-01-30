@@ -27,12 +27,6 @@ Context::Context() {
     root_scope->add_def("TESTING");
   }
 
-  {
-    // ** DO NOT REMOVE ***
-    scope->types["c_string"] = c_string_type();
-    // ** ------------- ***
-  }
- 
   { // For this compiler intrinsic operator,
     // We have to do this. However, in the future, we will implement our own sizer,
     // and we won't have this problem.

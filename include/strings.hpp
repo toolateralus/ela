@@ -52,7 +52,7 @@ main :: fn() {
 
 constexpr auto MAIN_INIT_CODE = R"__(
 main :: fn() {
-  // 'Env::args()' returns a `c_string[]` of the C runtime's arguments
+  // 'Env::args()' returns a `u8*[]` of the C runtime's arguments
   // We do this instead of taking `(int argc, char** argv)` in the main function, main _CANNOT_ take args.
   i := 0;
   for arg in Env::args() {

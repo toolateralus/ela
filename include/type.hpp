@@ -226,9 +226,6 @@ int u32_type();
 int u64_type();
 int f64_type();
 int f32_type();
-
-// These 3 type getters are assigned by the Context constructor.
-int c_string_type();
 int range_type();
 
 Type *global_get_type(const int id);
