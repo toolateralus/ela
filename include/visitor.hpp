@@ -116,9 +116,6 @@ struct DeferBlock {
 };
 
 struct Emitter : VisitorBase {
-  void forward_decl_type(Type* type);
-  template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
-  void emit_deferred_statements(DeferBlockType type);
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
@@ -177,6 +174,11 @@ struct Emitter : VisitorBase {
       last_loc = loc;
     }
   }
+  
+  void emit_type_or_fwd_decl(Type* type);
+  void forward_decl_type(Type* type);
+  template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
+  void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type, Context &context);
   inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }

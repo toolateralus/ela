@@ -88,10 +88,7 @@ std::string mangled_type_args(const std::vector<int> &args);
 
 struct TypeExtension {
   TypeExtEnum type;
-  union {
-    size_t array_size;
-    int key_type;
-  };
+  size_t array_size;
   bool operator==(const TypeExtension &other) const {
     if (type != other.type)
       return false;
