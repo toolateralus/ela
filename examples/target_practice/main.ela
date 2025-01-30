@@ -411,7 +411,6 @@ draw_background :: fn() {
 }
 
 draw_game :: fn() {
-  // println($"Drawing game. enemies: {enemies.length}, bullets: {bullets.length}, particles: {particles.length}, text_particles: {text_particles.length}" );
 
   if IsWindowResized() {
     u8acter.rect.y = screen_height / 1.2;
@@ -422,7 +421,6 @@ draw_game :: fn() {
   }
 
   for enemy in enemies {
-    // println($"{enemy.render_info.tex_rect.x}, {enemy.render_info.tex_rect.y}, {enemy.render_info.tex_rect.width}, {enemy.render_info.tex_rect.height}")
     DrawTexturePro(enemy.render_info.texture, enemy.render_info.tex_rect, enemy.rect, enemy.origin, enemy.rotation, WHITE);
   }
 
@@ -516,7 +514,8 @@ update_game :: fn() {
     if round_finish_start_time == -1.0 { round_finish_start_time = GetTime(); }
     now : f32 = GetTime() as f32;
     if now - round_finish_start_time < 2.0 {
-      text := $"Round: {round_index + 1}...";
+      v := round_index + 1;
+      text := format("Round: %...", {any::new(&v)});
       defer free(text);
 
       style := jiggly_text_style;
@@ -528,7 +527,8 @@ update_game :: fn() {
       text_w := measure_jiggly_text(text, style) / 4.0;
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
 
-      text = $"Requires {round_base_num_enemies_to_advance * round_index} enemies to pass.";
+      v = round_base_num_enemies_to_advance * round_index;
+      text = format("Requires % enemies to pass.", {any::new(&v)});
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
 
     } else {
@@ -657,7 +657,7 @@ update_game :: fn() {
         score += amount
         ui_text_color.a = 255 as u8;
         
-        make_text_particle(string::from($"+{amount}"), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        make_text_particle(string::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
         break;
       }
     }
@@ -855,12 +855,17 @@ draw_main_menu :: fn() {
     style.foreground = CYAN;
     style.jiggle_intensity = 3.0;
     style.jiggle_rate = 1.0;
-    jiggly_text($"reached round {round_index},", rect, style);
+    text := format("reached round %,", {any::new(&round_index)});
+    jiggly_text(text, rect, style);
+    free(text);
     rect.y += 64;
-    jiggly_text($"{targets_destroyed} targets taken down", rect, style);
+    text = format("% targets taken down", {any::new(&targets_destroyed)});
+    jiggly_text(text, rect, style);
+    free(text);
     rect.y += 64;
-    jiggly_text($"scored {score} points", rect, style);
-
+    text = format("scored % points", {any::new(&score)});
+    jiggly_text(text, rect, style);
+    free(text);
   }
 }
 
