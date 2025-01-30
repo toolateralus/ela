@@ -1,14 +1,14 @@
-<?xml version="1.0" encjaig="UTF-8"?>
+<?xml version="1.0" encelag="UTF-8"?>
 <!DOCTYPE plist PUBLIC "-//Apple Computer//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
 	<key>name</key>
-	<string>Jai</string>
+	<string>ela</string>
 	<key>scopeName</key>
-	<string>source.jai</string>
+	<string>source.ela</string>
 	<key>fileTypes</key>
 	<array>
-		<string>jai</string>
+		<string>ela</string>
 	</array>
 	<key>patterns</key>
 	<array>
@@ -42,7 +42,7 @@
 		<key>block_comment</key>
 		<dict>
 			<key>name</key>
-			<string>comment.block.jai</string>
+			<string>comment.block.ela</string>
 			<key>begin</key>
 			<string>/\*</string>
 			<key>end</key>
@@ -53,7 +53,7 @@
 					<key>include</key>
 					<string>#block_comment</string>
 					<key>name</key>
-					<string>comment.block.jai</string>
+					<string>comment.block.ela</string>
 				</dict>
 			</array>
 		</dict>
@@ -66,7 +66,7 @@
 				<key>1</key>
 				<dict>
 					<key>name</key>
-					<string>punctuation.whitespace.comment.leading.jai</string>
+					<string>punctuation.whitespace.comment.leading.ela</string>
 				</dict>
 			</dict>
 			<key>end</key>
@@ -81,20 +81,20 @@
 						<key>0</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.definition.comment.jai</string>
+							<string>punctuation.definition.comment.ela</string>
 						</dict>
 					</dict>
 					<key>end</key>
 					<string>\n</string>
 					<key>name</key>
-					<string>comment.line.double-slash.jai</string>
+					<string>comment.line.double-slash.ela</string>
 					<key>patterns</key>
 					<array>
 						<dict>
 							<key>match</key>
 							<string>(?&gt;\\\s*\n)</string>
 							<key>name</key>
-							<string>punctuation.separator.continuation.jai</string>
+							<string>punctuation.separator.continuation.ela</string>
 						</dict>
 					</array>
 				</dict>
@@ -106,20 +106,20 @@
 						<key>0</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.definition.comment.jai</string>
+							<string>punctuation.definition.comment.ela</string>
 						</dict>
 					</dict>
 					<key>end</key>
 					<string>\n</string>
 					<key>name</key>
-					<string>comment.line.double-slash.jai</string>
+					<string>comment.line.double-slash.ela</string>
 					<key>patterns</key>
 					<array>
 						<dict>
 							<key>match</key>
 							<string>(?&gt;\\\s*\n)</string>
 							<key>name</key>
-							<string>punctuation.separator.continuation.jai</string>
+							<string>punctuation.separator.continuation.ela</string>
 						</dict>
 					</array>
 				</dict>
@@ -137,7 +137,7 @@
 					<key>match</key>
 					<string>\*/.*\n</string>
 					<key>name</key>
-					<string>invalid.illegal.stray-comment-end.jai</string>
+					<string>invalid.illegal.stray-comment-end.ela</string>
 				</dict>
 
 				<dict>
@@ -154,67 +154,67 @@
 					<key>match</key>
 					<string>\b(if|then|else|for|while|defer|return|switch)\b</string>
 					<key>name</key>
-					<string>keyword.control.jai</string>
+					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(break|continue|remove|case)\b</string>
 					<key>name</key>
-					<string>keyword.control.jai</string>
+					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
           <key>match</key>
           <string>\b(self)\b</string>
           <key>name</key>
-          <string>variable.language.jai</string>
+          <string>variable.language.ela</string>
         </dict>
 				<dict>
 					<key>match</key>
 					<string>\b(null|true|false)\b</string>
 					<key>name</key>
-					<string>constant.language.jai</string>
+					<string>constant.language.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(\d(\d|_)*(.\d(\d|_)*)?)((e|E)(\+|-)?\d+)?[ijk]?\b</string>
 					<key>name</key>
-					<string>constant.numeric.jai</string>
+					<string>constant.numeric.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b((0b(0|1|_)+)|(0o(\d|_)+)|(0d(\d|_)+)|(0[xXh](\h|_)+))[ijk]?\b</string>
 					<key>name</key>
-					<string>constant.numeric.jai</string>
+					<string>constant.numeric.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>---</string>
 					<key>name</key>
-					<string>constant.numeric.jai</string>
+					<string>constant.numeric.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(struct|enum|fn|union)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(as|in|is)\b</string>
 					<key>name</key>
-					<string>keyword.function.jai</string>
+					<string>keyword.function.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>([#]\s*\b([[:alpha:]_]+[[:alnum:]_]*)\b)</string>
 					<key>name</key>
-					<string>keyword.tag.jai</string>
+					<string>keyword.tag.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>@[^\s;]+</string>
 					<key>name</key>
-					<string>keyword.tag.jai</string>
+					<string>keyword.tag.ela</string>
 				</dict>
 			</array>
 		</dict>
@@ -226,50 +226,50 @@
 					<key>match</key>
 					<string>\b(struct|enum|union|interface|impl)\b(?:(\{)(\}))?</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\$\s*(\b([[:alpha:]_]+[[:alnum:]_]*)\b)</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<!-- Basic Types -->
 				<dict>
 					<key>match</key>
 					<string>\b(s8|s16|s32|s64)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(u8|u16|u32|u64)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(f32|f64)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(bool)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(str|String)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\b(void)\b</string>
 					<key>name</key>
-					<string>storage.type.jai</string>
+					<string>storage.type.ela</string>
 				</dict>
 			</array>
 		</dict>
@@ -285,7 +285,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>keyword.function.jai</string>
+							<string>keyword.function.ela</string>
 						</dict>
 					</dict>
 				</dict>
@@ -297,7 +297,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>support.function.jai</string>
+							<string>support.function.ela</string>
 						</dict>
 					</dict>
 				</dict>
@@ -309,12 +309,12 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>meta.type.jai entity.name.type.jai</string>
+							<string>meta.type.ela entity.name.type.ela</string>
 						</dict>
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>storage.type.jai</string>
+							<string>storage.type.ela</string>
 						</dict>
 					</dict>
 				</dict>
@@ -326,12 +326,12 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>meta.type.jai entity.name.type.jai</string>
+							<string>meta.type.ela entity.name.type.ela</string>
 						</dict>
 						<key>2</key>
 						<dict>
 							<key>name</key>
-							<string>keyword.tag.jai</string>
+							<string>keyword.tag.ela</string>
 						</dict>
 					</dict>
 				</dict>
@@ -343,7 +343,7 @@
 						<key>1</key>
 						<dict>
 							<key>name</key>
-							<string>meta.constant.jai entity.name.type.jai</string>
+							<string>meta.constant.ela entity.name.type.ela</string>
 						</dict>
 					</dict>
 				</dict>
@@ -357,13 +357,13 @@
 					<key>match</key>
 					<string>\\(\\|[abefnrut"0]|x[0-9a-fA-F]{2}|u[0-9a-fA-F]{4}|U[0-9a-fA-F]{8}|[0-7]{3})</string>
 					<key>name</key>
-					<string>constant.character.escape.jai</string>
+					<string>constant.character.escape.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
 					<string>\\.</string>
 					<key>name</key>
-					<string>invalid.illegal.unknown-escape.jai</string>
+					<string>invalid.illegal.unknown-escape.ela</string>
 				</dict>
 			</array>
 		</dict>
@@ -379,7 +379,7 @@
 						<key>0</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.definition.string.begin.jai</string>
+							<string>punctuation.definition.string.begin.ela</string>
 						</dict>
 					</dict>
 					<key>end</key>
@@ -389,11 +389,11 @@
 						<key>0</key>
 						<dict>
 							<key>name</key>
-							<string>punctuation.definition.string.end.jai</string>
+							<string>punctuation.definition.string.end.ela</string>
 						</dict>
 					</dict>
 					<key>name</key>
-					<string>string.quoted.double.jai</string>
+					<string>string.quoted.double.ela</string>
 					<key>patterns</key>
 					<array>
 						<dict>

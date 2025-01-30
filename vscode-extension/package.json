@@ -1,12 +1,12 @@
 {
-    "name": "jai",
-    "displayName": "Jai",
-    "description": "Jai syntax highlighting.",
+    "name": "ela",
+    "displayName": "Ela",
+    "description": "Ela syntax highlighting.",
     "version": "0.0.1",
-    "publisher": "ostef",
+    "publisher": "toolateralus",
     "repository": {
         "type": "git",
-        "url": "https://github.com/ostef/vscode-jai.git"
+        "url": "https://github.com/toolateralus/ela.git"
     },
     "engines": {
         "vscode": "^1.42.0"
@@ -16,15 +16,15 @@
     ],
     "contributes": {
         "languages": [{
-            "id": "jai",
-            "aliases": ["Jai", "jai"],
-            "extensions": [".jai"],
+            "id": "ela",
+            "aliases": ["ela", "ela"],
+            "extensions": [".ela"],
             "configuration": "./language-configuration.json"
         }],
         "grammars": [{
-            "language": "jai",
-            "scopeName": "source.jai",
-            "path": "./syntaxes/jai.tmLanguage"
+            "language": "ela",
+            "scopeName": "source.ela",
+            "path": "./syntaxes/ela.tmLanguage"
         }]
     }
 }
