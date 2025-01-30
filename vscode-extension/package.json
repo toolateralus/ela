@@ -1,0 +1,30 @@
+{
+    "name": "jai",
+    "displayName": "Jai",
+    "description": "Jai syntax highlighting.",
+    "version": "0.0.1",
+    "publisher": "ostef",
+    "repository": {
+        "type": "git",
+        "url": "https://github.com/ostef/vscode-jai.git"
+    },
+    "engines": {
+        "vscode": "^1.42.0"
+    },
+    "categories": [
+        "Programming Languages"
+    ],
+    "contributes": {
+        "languages": [{
+            "id": "jai",
+            "aliases": ["Jai", "jai"],
+            "extensions": [".jai"],
+            "configuration": "./language-configuration.json"
+        }],
+        "grammars": [{
+            "language": "jai",
+            "scopeName": "source.jai",
+            "path": "./syntaxes/jai.tmLanguage"
+        }]
+    }
+}
