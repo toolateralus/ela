@@ -132,19 +132,25 @@ void Emitter::forward_decl_type(Type *type) {
   }
 }
 
+void Emitter::emit_type_or_fwd_decl(Type* type) {
+  if (type->base_id != Type::invalid_id) {
+    for (auto ext : type->get_ext().extensions) {
+      if (ext.type != TYPE_EXT_ARRAY) {
+        forward_decl_type(global_get_type(type->base_id));
+        return;
+      }
+    }
+    type = global_get_type(type->base_id);
+  }
+  if (type->declaring_node) {
+    type->declaring_node.get()->accept(this);
+  }
+}
+
 template <typename T> void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
   for (auto &instantiation : instantiations) {
     for (auto type_id : instantiation.arguments) {
-      auto type = global_get_type(type_id);
-      // ! We cannot just forward declare and emit these types here. Types ALWAYS need to
-      // ! recursively emit their subtypes declrations.
-      // ! @Cooper-Pilot repro/ela.73
-      if (type->base_id != Type::invalid_id) {
-        type = global_get_type(type->base_id);
-        forward_decl_type(type); 
-      } else if (type->declaring_node) {
-        type->declaring_node.get()->accept(this);
-      } 
+      emit_type_or_fwd_decl(global_get_type(type_id));
     }
     instantiation.node->accept(this);
     auto type = global_get_type(instantiation.node->resolved_type);
@@ -683,13 +689,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_default_value = false;
 
   for (auto member : node->members) {
-    auto type = global_get_type(member.type->resolved_type);
-    if (type->base_id != Type::invalid_id) {
-      type = global_get_type(type->base_id);
-      forward_decl_type(type);
-    } else if (type->declaring_node) {
-      type->declaring_node.get()->accept(this);
-    }
+    emit_type_or_fwd_decl(global_get_type(member.type->resolved_type));
   }
 
   emit_line_directive(node);

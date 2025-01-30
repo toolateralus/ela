@@ -110,8 +110,8 @@ struct Scope {
     return id;
   }
 
-  int create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
-    auto id = global_create_tuple_type(types, ext);
+  int create_tuple_type(const std::vector<int> &types) {
+    auto id = global_create_tuple_type(types);
     this->types[get_tuple_type_name(types)] = id;
     return id;
   }

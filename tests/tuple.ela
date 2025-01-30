@@ -1,5 +1,3 @@
-;
-
 func_returns_tuple :: fn() -> (s32, s32) {
   return (10, 10);
 }
@@ -56,21 +54,19 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
   Having pointers to tuples completely breaks the emitters.
 */
 #test test_tuple_ptr :: fn () {
-  assert("Tuple pointers have a big bug where we emit 'typedef struct ... * {}' where there's a pointer ina struct declaration. I have no idea why", false);
-  // #error "Something is wrong here with the eldest type dependency system, we're declaring a struct called 'typedef struct tuple *'";
-  // ptr : (s32, s32)* = malloc(32) as (s32, s32)*;
-  // *ptr = (10, 10);
-  // {
-  //   a, b := *ptr; 
-  //   assert("mallocing with tuple failed", a == 10 && b == 10);
-  // }
+  ptr : (s32, s32)* = malloc(32) as (s32, s32)*;
+  *ptr = (10, 10);
+  {
+    a, b := *ptr; 
+    assert("mallocing with tuple failed", a == 10 && b == 10);
+  }
 
-  // ptr_arr: List![(s32, s32)*];
-  // ptr_arr.push(ptr);
-  // {
-  //   a, b := *(ptr_arr[0]);
-  //   assert("mallocing into tuple array failed", a == 10 && b == 10);
-  // }   
+  ptr_arr: List![(s32, s32)*];
+  ptr_arr.push(ptr);
+  {
+    a, b := *(ptr_arr[0]);
+    assert("mallocing into tuple array failed", a == 10 && b == 10);
+  }   
 
-  // free(ptr);
+  free(ptr);
 }

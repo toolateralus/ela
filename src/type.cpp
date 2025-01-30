@@ -174,24 +174,25 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
 
     auto info = (type->get_info()->as<TupleTypeInfo>());
 
-    if (info->types.size() != tuple_types.size())
+    if (info->types != tuple_types) {
       continue;
-
-    for (int i = 0; i < info->types.size(); ++i)
-      if (info->types[i] != tuple_types[i])
-        goto end_of_loop;
+    }
 
     if (type->get_ext() == type_extensions) {
       // Found a matching type with the same extensions. Return it.
       return type->id;
+    } else {
+      if (type->base_id != Type::invalid_id) {
+        return global_find_type_id(type->base_id, type_extensions);
+      } else {
+        return global_find_type_id(type->id, type_extensions);
+      }
     }
-  end_of_loop:
-    do {
-    } while (false); // This line just prevents a MSVC syntax error. Silly.
   }
 
   // We didn't find the tuple type. Return a new one.
-  return global_create_tuple_type(tuple_types, type_extensions);
+  auto base_id =  global_create_tuple_type(tuple_types);
+  return global_find_type_id(base_id, type_extensions);
 }
 
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
@@ -710,7 +711,7 @@ std::string TypeExtensions::to_string() const {
   return ss.str();
 }
 
-int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
+int global_create_tuple_type(const std::vector<int> &types) {
   type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
   Type *type = type_table.back();
   type->set_base(get_tuple_type_name(types));
@@ -719,33 +720,27 @@ int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions
   info->types = types;
 
   type->set_info(info);
-  type->set_ext(ext);
   info->scope = create_child(root_scope);
 
-  
-  if (type->get_ext().has_no_extensions()) {
-    // ! std::cout << "creating tuple base type :: " << type->to_string() << '\n';
-    // getting all types within a function type because some function types
-    // arent associated with any existing funcitons and  whose parameters or return
-    // types might not be built-in
-    auto dependencies = expand_function_types(types);
+  // getting all types within a function type because some function types
+  // arent associated with any existing funcitons and  whose parameters or return
+  // types might not be built-in
+  auto dependencies = expand_function_types(types);
 
-    // declare this type as a dependant on the eldest dependency from our subtypes.
-    // purely for emit time.
-    int eldest = *std::max_element(dependencies.begin(), dependencies.end());
-    auto eldest_t = global_get_type(eldest);
-    if (eldest_t->base_id != Type::invalid_id) {
-      eldest = eldest_t->base_id;
-    }
+  // declare this type as a dependant on the eldest dependency from our subtypes.
+  // purely for emit time.
+  int eldest = *std::max_element(dependencies.begin(), dependencies.end());
+  auto eldest_t = global_get_type(eldest);
+  if (eldest_t->base_id != Type::invalid_id) {
+    eldest = eldest_t->base_id;
+  }
 
-    // ! std::cout << "attaching " << type->to_string() << " as a dependant to " << global_get_type(eldest)->to_string() << '\n';
-    global_get_type(eldest)->tuple_dependants.push_back(type->id);
+  global_get_type(eldest)->tuple_dependants.push_back(type->id);
 
-    // We do this for dot expressions that do tuple.1 etc.
-    // Only in the base type.
-    for (const auto [i, type] : types | std::ranges::views::enumerate) {
-      info->scope->insert(std::to_string(i), type, nullptr);
-    }
+  // We do this for dot expressions that do tuple.1 etc.
+  // Only in the base type.
+  for (const auto [i, type] : types | std::ranges::views::enumerate) {
+    info->scope->insert(std::to_string(i), type, nullptr);
   }
 
   return type->id;
