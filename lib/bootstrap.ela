@@ -134,7 +134,7 @@ Init :: interface![T] {
   #foreign exit :: fn(code: s32);
 
   #foreign scanf :: fn(format: c_string, ...) -> s32;
-  #foreign getu8 :: fn() -> s32;
+  #foreign getchar :: fn() -> s32;
 
   #foreign sleep :: fn(seconds: s32);
   #foreign usleep :: fn(c: s32);
