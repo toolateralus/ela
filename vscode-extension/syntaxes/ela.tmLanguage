@@ -158,7 +158,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(break|continue|remove|case)\b</string>
+					<string>\b(break|continue)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
