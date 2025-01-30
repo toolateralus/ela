@@ -657,7 +657,7 @@ update_game :: fn() {
         score += amount
         ui_text_color.a = 255 as u8;
         
-        make_text_particle(str::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        make_text_particle(String::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
         break;
       }
     }

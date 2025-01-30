@@ -9,7 +9,7 @@ GLFWwindow :: struct;
 
 #foreign glfwInit :: fn() -> bool;
 #foreign glfwTerminate :: fn();
-#foreign glfwCreateWindow :: fn(w: s32, h: s32, t: c_string, v: void*, v1: void*) -> GLFWwindow*;
+#foreign glfwCreateWindow :: fn(w: s32, h: s32, t: u8*, v: void*, v1: void*) -> GLFWwindow*;
 #foreign glfwMakeContextCurrent :: fn(ctx: void*);
 #foreign glfwWindowShouldClose :: fn(window: GLFWwindow*) -> bool;
 #foreign glfwPollEvents :: fn();
@@ -27,15 +27,15 @@ GLFWwindow :: struct;
 #foreign glClear :: fn(mask: u32);
 #foreign glGetError :: fn() -> s32;
 #foreign glCreateShader :: fn(type: u32) -> u32;
-#foreign glShaderSource :: fn(shader: u32, count: s32, s: c_string*, length: s32*);
+#foreign glShaderSource :: fn(shader: u32, count: s32, s: u8**, length: s32*);
 #foreign glCompileShader :: fn(shader: u32);
 #foreign glGetShaderiv :: fn(shader: u32, pname, params: s32*);
-#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: s32, length: s32*, infoLog: c_string);
+#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: s32, length: s32*, infoLog: u8*);
 #foreign glCreateProgram :: fn() -> u32;
 #foreign glAttachShader :: fn(program: u32, shader);
 #foreign glLinkProgram :: fn(program: u32);
 #foreign glGetProgramiv :: fn(program: u32, pname, params: s32*);
-#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: s32, length: s32*, infoLog: c_string);
+#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: s32, length: s32*, infoLog: u8*);
 #foreign glUseProgram :: fn(program: u32);
 #foreign glDeleteShader :: fn(shader: s32);
 #foreign glDeleteProgram :: fn(shader: s32);
@@ -47,7 +47,7 @@ GLFWwindow :: struct;
 #foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: f32, ypos);
 #foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: s32, value);
 
-#foreign glGetUniformLocation :: fn(program: u32, name: c_string) -> s32;
+#foreign glGetUniformLocation :: fn(program: u32, name: u8*) -> s32;
 #foreign glUniform4fv :: fn(location: s32, count, value: f32*);
 #foreign glUniform3fv :: fn(location: s32, count, value: f32*);
 #foreign glUniform2fv :: fn(location: s32, count, value: f32*);
@@ -734,7 +734,7 @@ GLKey :: enum {
   LAST = 348,
 }
 
-compile_shader :: fn(kind: u32, source: c_string) -> u32 {
+compile_shader :: fn(kind: u32, source: u8*) -> u32 {
   shader: u32 = glCreateShader(kind);
   glShaderSource(shader, 1, &source, null);
   glCompileShader(shader);
@@ -744,7 +744,7 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
   if success == 0 {
     length: s32;
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
-    info_log: c_string = malloc(sizeof(c_string) * length);
+    info_log: u8* = malloc(sizeof(u8*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n", info_log);
     free(info_log);
@@ -753,7 +753,7 @@ compile_shader :: fn(kind: u32, source: c_string) -> u32 {
   return shader;
 }
 
-create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
+create_program :: fn(vert_source: u8*, frag_source: u8*) -> u32 {
   vertex_shader: u32 = compile_shader(GL::VERTEX_SHADER, vert_source);
   fragment_shader: u32 = compile_shader(GL::FRAGMENT_SHADER, frag_source);
 
@@ -771,7 +771,7 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   if success == 0 {
     length: s32;
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
-    info_log: c_string = malloc(sizeof(c_string) * length);
+    info_log: u8* = malloc(sizeof(u8*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
     printf("Program linking failed: %s\n", info_log);
     free(info_log);
@@ -784,7 +784,7 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   return program;
 }
 
-check_error :: fn(location: c_string) {
+check_error :: fn(location: u8*) {
   err: s32 = glGetError();
   if err == GL::INVALID_ENUM {
     printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
@@ -1073,12 +1073,12 @@ impl Shader {
   use :: fn(self*) {
     glUseProgram(self.handle);
   }
-  create :: fn(vertexSource: c_string, fragSource: c_string) -> #self {
+  create :: fn(vertexSource: u8*, fragSource: u8*) -> #self {
     v: #self;
     v.handle = create_program(vertexSource, fragSource);
     return v;
   }
-  set_Mat4 :: fn(self*, name: c_string, v: Mat4*) {
+  set_Mat4 :: fn(self*, name: u8*, v: Mat4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, v.values as f32*);
@@ -1086,7 +1086,7 @@ impl Shader {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec4 :: fn(self*, name: c_string, v: Vec4*) {
+  set_Vec4 :: fn(self*, name: u8*, v: Vec4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform4fv(index, 1, v.values as f32*);
@@ -1094,7 +1094,7 @@ impl Shader {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec3 :: fn(self*, name: c_string, v: Vec3*) {
+  set_Vec3 :: fn(self*, name: u8*, v: Vec3*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform3fv(index, 1, v.values as f32*);
@@ -1102,7 +1102,7 @@ impl Shader {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec2 :: fn(self*, name: c_string, v: Vec2*) {
+  set_Vec2 :: fn(self*, name: u8*, v: Vec2*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform2fv(index, 1, v.values as f32*);
@@ -1110,7 +1110,7 @@ impl Shader {
       printf("failed to get uniform : %s\n", name);
     }
   }
-  set_float :: fn(self*, name: c_string, v: f32) {
+  set_float :: fn(self*, name: u8*, v: f32) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform1f(index, v);
@@ -1125,7 +1125,7 @@ Window :: struct {
 }
 
 impl Window {
-  create :: fn(width: s32, height: s32, title: c_string) -> #self {
+  create :: fn(width: s32, height: s32, title: u8*) -> #self {
     self: #self;
     if !glfwInit() {
       printf("Failed to initialize glfw\n");

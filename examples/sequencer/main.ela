@@ -147,7 +147,7 @@ SequenceChannel :: struct {
 }
 
 impl SequenceChannel {
-  create :: fn(_sound: Sound, _style: Style, name: c_string) -> #self {
+  create :: fn(_sound: Sound, _style: Style, name: u8*) -> #self {
     self: #self;
     self.sound = _sound;
     self.style = _style;
@@ -245,10 +245,10 @@ main :: fn() {
 
   for file in dir.files { 
     if file.length <= 4 then continue;
-    #static extensions: str[3] = {
-      str::from(".wav"),
-      str::from(".mp3"),
-      str::from(".ogg"),
+    #static extensions: String[3] = {
+      String::from(".wav"),
+      String::from(".mp3"),
+      String::from(".ogg"),
     }
     
     for idx in 0..3 {

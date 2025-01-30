@@ -106,3 +106,10 @@ Allocator :: interface {
   copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
 }
 
+As_Char_Slice :: interface![T] {
+  as_char_slice :: fn(v: T) -> Slice![u32];
+}
+
+Deinit :: interface {
+  deinit :: fn(self*);
+}

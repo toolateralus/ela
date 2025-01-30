@@ -1,5 +1,5 @@
 #export DIR :: struct;
-#foreign getcwd :: fn(buf: c_string, size: u64) -> c_string;
+#foreign getcwd :: fn(buf: u8*, size: u64) -> u8*;
 
 dirent :: struct {
   d_ino: u64,
@@ -14,34 +14,34 @@ dirent :: struct {
 #foreign closedir :: fn(dir: void*) -> s32;
 
 Directory :: struct {
-  path: str,
-  files: List![str],
+  path: String,
+  files: List![String],
 }
 
 impl Directory {
-  current :: fn() -> c_string {
+  current :: fn() -> u8* {
     buffer: u8[256];
     getcwd(buffer, 256);
-    return strdup(buffer) as c_string;
+    return strdup(buffer) as u8*;
   }
 
-  open :: fn(path: c_string) -> Directory {
+  open :: fn(path: u8*) -> Directory {
     dir := opendir(path);
 
     if !dir then return { 
-      path: str::from(path),
+      path: String::from(path),
       files : {}
     };
 
-    files: List![str];
+    files: List![String];
     entry: void*;
     while entry = readdir(dir) {
       ent : dirent* = entry;
-      files.push(str::from(ent.d_name as c_string));
+      files.push(String::from(ent.d_name as u8*));
     }
 
     closedir(dir);
-    return {path: str::from(path), files: files};
+    return {path: String::from(path), files: files};
   }
 
   deinit :: fn(self*) {

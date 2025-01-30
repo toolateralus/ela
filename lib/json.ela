@@ -7,13 +7,13 @@ JsonError :: enum {
   SUCCESS = 1,
 }
 
-#static _json_last_error: c_string;
+#static _json_last_error: u8*;
 
-set_json_error :: fn(error: c_string) {
+set_json_error :: fn(error: u8*) {
   _json_last_error = error;
 }
 
-get_json_error :: fn() -> c_string {
+get_json_error :: fn() -> u8* {
   return _json_last_error;
 }
 
@@ -35,7 +35,7 @@ JsonTokenType :: enum {
 
 JsonToken :: struct {
   type : s32,
-  value : c_string,
+  value : u8*,
   line: s32,
   column: s32,
 }
@@ -47,7 +47,7 @@ impl JsonToken {
   }
 }
 
-json_token_type_names := Collection_Initializer![c_string]{
+json_token_type_names := Collection_Initializer![u8*]{
   "Invalid",
   "True",
   "False",
@@ -69,13 +69,13 @@ JsonLexer :: struct {
   position: s32,
   length: u32,
 
-  file: c_string,
-  input: c_string,
+  file: u8*,
+  input: u8*,
   lookahead_buffer : List![JsonToken],
 }
 
 impl JsonLexer {
-  err :: fn(self*, token: JsonToken, msg: c_string) -> (s32, JsonToken) {
+  err :: fn(self*, token: JsonToken, msg: u8*) -> (s32, JsonToken) {
     if get_json_error() {
       free(get_json_error());
     }
@@ -83,7 +83,7 @@ impl JsonLexer {
     return (JsonError::ERROR, token);
   }
 
-  create :: fn(_file: c_string, _input: c_string) -> #self {
+  create :: fn(_file: u8*, _input: u8*) -> #self {
     return {
       file: _file,
       input: _input,
@@ -251,7 +251,7 @@ impl JsonLexer {
       return (JsonError::ERROR, token);
     }
 
-    types_string: c_string;
+    types_string: u8*;
     defer {
       if types_string then free(types_string);
     }
@@ -291,14 +291,14 @@ JsonValue :: struct;
 #alias JsonArray  :: List![JsonValue*];
 
 JsonKeyValuePair :: struct {
-  key: c_string,
+  key: u8*,
   value: JsonValue*,
 }
 
 JsonValueUnion :: union {
   number: f64,
   boolean: bool,
-  _string: c_string,
+  _string: u8*,
   object: List![JsonKeyValuePair],
   array: JsonArray,
 }
@@ -309,7 +309,7 @@ JsonValue :: struct {
 }
 
 impl JsonValue {
-  to_string :: fn(self*) -> c_string {
+  to_string :: fn(self*) -> u8* {
     builder: String_Builder;
     defer builder.deinit();
   
@@ -378,7 +378,7 @@ impl JsonValue {
     }
   }
 
-  get :: fn(self*, key: c_string) -> JsonValue* {
+  get :: fn(self*, key: u8*) -> JsonValue* {
     if self.type != JsonValueType::Object {
       return null;
     }
@@ -425,7 +425,7 @@ impl JsonValue {
     }
     return 0.0; // or handle error
   }
-  as_string :: fn(self*) -> c_string {
+  as_string :: fn(self*) -> u8* {
     if self.type == JsonValueType::String {
       return self.data._string;
     }
@@ -529,7 +529,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (s32, JsonValue*) {
   return (JsonError::SUCCESS, value);
 }
 
-json_parse_file :: fn(file: c_string) -> (s32, JsonValue*) {
+json_parse_file :: fn(file: u8*) -> (s32, JsonValue*) {
   err, data := File::read_all(file);
   if err {
     // file API never allocates for errors, so we just strdup it here.
@@ -604,7 +604,7 @@ json_serialize_array :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   val : JsonValue* = malloc(sizeof(JsonValue));
   val.type = JsonValueType::Array;
   val.data.array = JsonArray{};
-  for elem in type.elements(object as c_string) {
+  for elem in type.elements(object as u8*) {
     err, elem_val := json_serialize(elem.data, elem.type);
     if err {
       return (err, null);
@@ -616,10 +616,10 @@ json_serialize_array :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
 
 json_serialize :: fn(object: void*, type: Type*) -> (s32, JsonValue*) {
   if Type::has_no_extension(type) {
-    if type.id == #typeid(c_string) {
+    if type.id == #typeid(u8*) {
       val : JsonValue* = malloc(sizeof(JsonValue));
       val.type = JsonValueType::String;
-      val.data._string = *(object as c_string*);
+      val.data._string = *(object as u8**);
       return (JsonError::SUCCESS, val);
     } else if Type::is_scalar(type) {
       return json_serialize_scalar(object, type);
@@ -713,7 +713,7 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
         }
     }
   } else if (Type::is_string(type)) {
-    *(object as c_string*) = val.as_string();
+    *(object as u8**) = val.as_string();
   } else {
     set_json_error(format("Unable to deserialize into type %", {any::new(&type.name)}));
     return JsonError::ERROR;
@@ -723,11 +723,11 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
 
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   if val.is_string() {
-    if type.id == #typeid(c_string) {
-      *(object as c_string*) = val.as_string();
+    if type.id == #typeid(u8*) {
+      *(object as u8**) = val.as_string();
       return {};
     } else {
-      set_json_error(format("Type mismatch: c_string to %", {any::new(&type.name)}));
+      set_json_error(format("Type mismatch: u8* to %", {any::new(&type.name)}));
       return JsonError::ERROR;
     }
   } else if val.is_object() {

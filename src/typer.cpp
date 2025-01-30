@@ -38,7 +38,7 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
   if (return_type == Type::invalid_id) {
     return_type = new_type;
   } else if (new_type != Type::invalid_id && new_type != return_type) {
-    assert_types_can_cast_or_equal(new_type, return_type, node->source_range, "Inconsistent return types in block.");
+    assert_types_can_cast_or_equal(return_type, new_type, node->source_range, "Inconsistent return types in block.");
   }
 };
 

@@ -8,7 +8,7 @@ Enum :: enum {
   C
 }
 
-some_stuff :: fn() -> (Enum, c_string) {
+some_stuff :: fn() -> (Enum, u8*) {
   /* 
   * i guess our type system is treating all of our enum types as 
   * just straight integers?

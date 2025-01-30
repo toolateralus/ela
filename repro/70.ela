@@ -4,9 +4,9 @@ generic :: fn![T]() {
     * internal compiler error: ASTType* resolved to null in emitter.
     *    at: /home/josh_arch/source/c++/ela/repro/70.ela:5:30
 
-    * this error occurs on `c_string` ?? 
+    * this error occurs on `u8*` ?? 
   */
-  lambda := fn() -> c_string { 
+  lambda := fn() -> u8* { 
     printf("%s\n", "alloo"); 
     return null;
   }

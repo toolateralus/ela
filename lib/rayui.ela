@@ -14,7 +14,7 @@ Style :: struct {
 }
 
 // * Measure the width of a jiggly text of 'text' and 'style'
-measure_jiggly_text :: fn(text: c_string, style: Style) -> f32 {
+measure_jiggly_text :: fn(text: u8*, style: Style) -> f32 {
   if !text then return 0.0;
   length := strlen(text);
   total_width: f32 = 0.0;
@@ -25,7 +25,7 @@ measure_jiggly_text :: fn(text: c_string, style: Style) -> f32 {
 }
 
 // * Draw wavy jiggly text.
-jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
+jiggly_text :: fn(text: u8*, rect: Rectangle, style: Style) {
   
   time: f32 = GetTime() as f32;
 
@@ -39,12 +39,12 @@ jiggly_text :: fn(text: c_string, rect: Rectangle, style: Style) {
     u8_x := rect.x + (i * style.font_size) as f32;
     u8_y := rect.y + intensity * sin(rate * time + (i as f32));
     temp : u8[2] = { text[i], '\0' as u8 };
-    DrawText(temp as c_string, u8_x as s32, u8_y as s32, style.font_size, style.foreground);
+    DrawText(temp as u8*, u8_x as s32, u8_y as s32, style.font_size, style.foreground);
   }
 }
 
 // * Draw a button with that returns true for clicked, false for not clicked.
-button :: fn(text: c_string, rect: Rectangle, style: Style) -> bool {
+button :: fn(text: u8*, rect: Rectangle, style: Style) -> bool {
   position: Vector2 = { x: rect.x, y: rect.y};
   size: Vector2 = { x: rect.width, y: rect.height};
 
@@ -95,7 +95,7 @@ button :: fn(text: c_string, rect: Rectangle, style: Style) -> bool {
 
 //! TODO: once we fix repro 63,
 //! make this generic, and take fn*(T*) so we don'thave to void cast our data in our callback
-button_pro :: fn(text: c_string, rect: Rectangle, style: Style, callback: fn* (void*) -> void, user_data : void*) -> bool {
+button_pro :: fn(text: u8*, rect: Rectangle, style: Style, callback: fn* (void*) -> void, user_data : void*) -> bool {
   
   position: Vector2 = { x: rect.x, y: rect.y};
   size: Vector2 = { x: rect.width, y: rect.height};
@@ -165,7 +165,7 @@ impl Timer {
 }
 
 Slider :: struct![T] {
-  text: c_string,
+  text: u8*,
   rect: Rectangle,
   style: Style,
   min_value: T,
@@ -245,7 +245,7 @@ CheckButton :: struct {
   value: bool,
   rect: Rectangle,
   style: Style,
-  text: c_string,
+  text: u8*,
   allow_hold : bool,
 }
 
@@ -287,14 +287,14 @@ impl CheckButton {
 }
 
 DropDown :: struct {
-  options: c_string[],
+  options: u8*[],
   rect: Rectangle,
   style: Style,
   selected_index: s32,
   is_open: bool,
   on_selected: fn*(s32),
   on_open: fn*(),
-  label: c_string,
+  label: u8*,
   show_selected_option: bool,
 }
 

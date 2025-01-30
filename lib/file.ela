@@ -55,18 +55,18 @@ impl File {
     return len as u32;
   }
 
-  read_all :: fn(filename: str) -> (FileError, str) {
+  read_all :: fn(filename: str) -> (FileError, String) {
     file := fopen(filename.data, "r"c);
     if !file then return ("Couldn't open file", {});
     length := File::length(file);
-    s: c_string = malloc(length + 1);
+    s: u8* = malloc(length + 1);
     memset(s, 0, length + 1);
     c: u8;
     for i in 0..length {
       s[i] = fgetc(file);
     }
     fclose(file);
-    return ({}, str::from(s));
+    return ({}, String::from(s));
   }
 
   read_bytes :: fn(filename: str) -> List![u8] {
