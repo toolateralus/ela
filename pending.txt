@@ -16,3 +16,9 @@
   Where we might want `from(int)` but also `from(float)` on the same type
   and right now that's not possible.
 ::::::::::::::::::::::::::::::::
+
+
+::: IMPLICIT CASTING ROUTINES :::
+  We should be able to do some routine on an implicit cast, say from Init_List![T] to whatever takes it,
+  or implicitly cast any value to any without calling any::new(&value)
+:::::::::::::::::::::::::::::::::

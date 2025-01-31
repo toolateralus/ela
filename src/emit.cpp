@@ -392,6 +392,54 @@ void Emitter::visit(ASTCall *node) {
   return;
 }
 
+size_t calculate_actual_length(const std::string_view &str_view) {
+  size_t length = 0;
+  for (size_t i = 0; i < str_view.size(); ++i) {
+    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+      switch (str_view[i + 1]) {
+        case 'n':
+        case 't':
+        case 'r':
+        case '\\':
+        case '"':
+          ++i; // Skip the escape character
+          break;
+        case 'x': // Hexadecimal escape sequence
+          i += 2; // Skip \x and the next two hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'u': // Unicode escape sequence
+          i += 4; // Skip \u and the next four hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'U': // Unicode escape sequence
+          i += 8; // Skip \U and the next eight hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        default:
+          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') { // Octal escape sequence
+            ++i;                                                  // Skip the first digit
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the second digit
+            }
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the third digit
+            }
+          }
+          break;
+      }
+    }
+    ++length;
+  }
+  return length;
+}
+
 void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
   std::string output;
@@ -403,16 +451,16 @@ void Emitter::visit(ASTLiteral *node) {
       if (node->is_c_string) {
         output = std::format("\"{}\"", node->value.get_str());
       } else {
-        // TODO: 
-        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of bytes,
-        // then all of our string literals are stack allocated.
-        // If we make them static, then there's a chance that the user mutates the string literal, and it will change it's meaning
-        // for the rest of the program
+        // TODO:
+        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of
+        // bytes, then all of our string literals are stack allocated. If we make them static, then there's a chance
+        // that the user mutates the string literal, and it will change it's meaning for the rest of the program
 
         // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
         // we will keep the null terminated strings until we have a solution for this.
         auto str = node->value.get_str();
-        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, str.length());
+        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str,
+                             calculate_actual_length(str));
         return;
       }
     } break;
@@ -1225,7 +1273,7 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
-  // TODO: refactor this for new String/str types? 
+  // TODO: refactor this for new String/str types?
   // And C string.
   // For now we'll just say it's c_string only.
   if (type->id == root_scope->find_type_id("u8", {{{TYPE_EXT_POINTER}}})) {

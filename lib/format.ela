@@ -1,11 +1,13 @@
+#import builder;
 // TODO: expand this, add support for other stuff.
 // This is only for numerical types, bools, and strings / any pointer.
 // We kinda need generic specialization to do more with this.
+
 to_string :: fn![T](value: T) -> String {
   buffer: u8[64];
   type := #type(T);
   format : str;
-
+  
   if type.is_bool() {
     if value {
       return "true".as_string();
@@ -32,17 +34,6 @@ to_string :: fn![T](value: T) -> String {
   return String::from(strdup(buffer));
 } 
 
-// TODO: remove this.
-string_concat :: fn(a: u8*, b: u8*) -> u8* {
-  len_a := strlen(a);
-  len_b := strlen(b);
-  result := malloc(sizeof(u8) * (len_a + len_b + 1)) as u8*;
-  memcpy(result, a, len_a);
-  memcpy(result + len_a, b, len_b);
-  result[len_a + len_b] = '\0';
-  return result as u8*;
-}
-
 #static print :: fn![T](str: T) {
   s := to_string(str);
   printf("%s", s);
@@ -55,14 +46,6 @@ string_concat :: fn(a: u8*, b: u8*) -> u8* {
   free(s);
 }
 
-// TODO: improve the Collection_Initializer![any] so we can implicitly take any...
-// and just have it automatically do that for us.
-// Also, doing any::new(&value) is obnoxious, we should be able to implicitly cast anything
-// to any, even literals. see any-cast.idea.c in the root of the project for how we'd
-// compile that.
-
-// Additionally, it would be nice to have a compile time version of this,
-// where we have a ![T...] var arg list, so we don't have to recalculate the format str every call.
 format :: fn(fmt : u8*, list: Collection_Initializer![any]) -> String {
   if !fmt {
     return {};
@@ -112,7 +95,7 @@ format :: fn(fmt : u8*, list: Collection_Initializer![any]) -> String {
       }
       value_index++;
     } else {
-      builder.append(*fmt);
+      builder.append((*fmt) as u32);
     }
     fmt++;
   }
