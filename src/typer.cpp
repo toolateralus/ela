@@ -236,7 +236,7 @@ void Typer::visit(ASTLambda *node) {
   node->params->accept(this);
   node->return_type->accept(this);
 
-  // ! for debugging repro 70.ela 
+  // ! for debugging repro 70.ela
   // ! std::cout << "lambda return type " << node->return_type->resolved_type << '\n';
 
   std::vector<int> param_types;
@@ -1033,10 +1033,26 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
       type->source_range = node->source_range;
       auto gen_t = global_get_type(generic_arg);
 
-      // if we have a T[] or T** etc, we deference it once so that T is the actual type behind the pointer.
-      // This may seem strange, but most generic inference algorithms do this, and it's nice and smooth to use.
-      if (gen_t->get_ext().is_pointer() && !func->params->params[index]->normal.type->extensions.empty()) {
-        type->resolved_type = gen_t->get_element_type();
+      /*
+        * This is auto dereferencing an inferred generic argument when you have a parameter such as T*
+        * We do this because it's strange to pass T as s32* if i do func(&s32);
+        * it makes it hard to do certain things, and if you wanted to take T as s32*, you'd just not give it a T* in
+        your
+        * parameter signature.
+
+        * I tried to mke it safer, not sure if i did.
+      */
+
+      if (gen_t->get_ext().is_pointer() && !func->params->params.empty()) {
+        // if it == 1, then we skip zero. works out.
+        int param_infer_index = func->params->params[0]->tag == ASTParamDecl::Self;
+        if (param_infer_index < func->params->params.size() &&
+            func->params->params[param_infer_index]->normal.type != nullptr &&
+            !func->params->params[param_infer_index]->normal.type->extensions.empty()) {
+          type->resolved_type = gen_t->get_element_type();
+        } else {
+          type->resolved_type = generic_arg;
+        }
       } else {
         type->resolved_type = generic_arg;
       }
@@ -1145,6 +1161,7 @@ void Typer::visit(ASTType *node) {
     return;
   }
 
+  // ! I have to check if the base is null because for some reason it's just null sometimes.
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
     auto symbol = get_symbol(normal_ty.base).get();
