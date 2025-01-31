@@ -17,6 +17,24 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
+void handle_generic_error_if_failed(GenericInstantiationErrorUserData *data, const SourceRange &range) {
+  reset_panic_handler();
+  if (data->failed) {
+    throw_error(std::format("Error at definition: {}\nerror: {}",
+                            format_source_location(data->definition_range, ERROR_FAILURE, 3),
+                            format_error_message(data->message)),
+                range);
+    exit(1);
+  }
+}
+
+auto generic_instantiation_panic_handler(auto msg, auto range, auto void_data) {
+  auto data = (GenericInstantiationErrorUserData *)(void_data);
+  data->failed = true;
+  data->definition_range = range;
+  data->message = msg;
+};
+
 // TODO: add a statement in the .accept() function of ASTNode base type
 // TODO: where we return the if the resolved type is already calculated?
 
@@ -935,7 +953,11 @@ void Typer::visit(ASTCall *node) {
           type_context = &type_ast;
         }
 
+        GenericInstantiationErrorUserData data;
+        set_panic_handler(generic_instantiation_panic_handler);
+        set_error_user_data(&data);
         func_decl = resolve_generic_function_call(node, func_decl);
+        handle_generic_error_if_failed(&data, node->source_range);
       }
       type = global_get_type(func_decl->resolved_type);
     }
@@ -1062,9 +1084,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   } else {
     generic_args = get_generic_arg_types(node->generic_arguments);
   }
-
   auto instantiation = visit_generic(&Typer::visit_function_signature, func, generic_args);
-
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", node->source_range);
   }
@@ -1081,13 +1101,11 @@ void Typer::visit(ASTArguments *node) {
   }
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
-
     if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
       throw_error(
           "cannot use 'switch' or 'if' expressions in binary expressions, only `=`, `:=` and `return` statements",
           node->source_range);
     }
-
     if (!info) {
       arg->accept(this);
       node->resolved_argument_types.push_back(arg->resolved_type);
@@ -1100,6 +1118,8 @@ void Typer::visit(ASTArguments *node) {
     node->resolved_argument_types.push_back(arg->resolved_type);
   }
 }
+
+
 
 void Typer::visit(ASTExprStatement *node) {
   node->expression->accept(this);
@@ -1174,6 +1194,14 @@ void Typer::visit(ASTType *node) {
       }
       ASTStatement *instantiation = nullptr;
       auto decl_node_type = declaring_node->get_node_type();
+
+      GenericInstantiationErrorUserData data{
+          .failed = false,
+      };
+
+      set_error_user_data(&data);
+      set_panic_handler(generic_instantiation_panic_handler);
+
       switch (decl_node_type) {
         case AST_NODE_STRUCT_DECLARATION:
           instantiation =
@@ -1195,9 +1223,22 @@ void Typer::visit(ASTType *node) {
           throw_error("Invalid target to generic args", node->source_range);
           break;
       }
+
+      handle_generic_error_if_failed(&data, node->source_range);
+
       if (!instantiation) {
         throw_error("Template instantiation argument count mismatch", node->source_range);
       }
+
+      data = {};
+      set_panic_handler(generic_instantiation_panic_handler);
+      set_error_user_data(&data);
+
+      Defer _defer([&] {
+        reset_panic_handler();
+        handle_generic_error_if_failed(&data, node->source_range);
+      });
+
       if (decl_node_type == AST_NODE_FUNCTION_DECLARATION) {
         auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
         func->generic_arguments = generic_args;
@@ -1214,6 +1255,7 @@ void Typer::visit(ASTType *node) {
         }
       }
       node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
+
     } else {
       normal_ty.base->accept(this);
       auto base_ty = global_get_type(normal_ty.base->resolved_type);
@@ -1829,6 +1871,13 @@ void Typer::visit(ASTImpl *node) {
     }
     auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
     node_as_struct->impls.push_back(node);
+
+    GenericInstantiationErrorUserData data;
+    set_panic_handler(generic_instantiation_panic_handler);
+    set_error_user_data(&data);
+    Defer _defer([&]{
+      handle_generic_error_if_failed(&data, node->source_range);
+    });
     for (auto instantiations : node_as_struct->generic_instantiations) {
       visit_generic(&Typer::visit_impl_declaration, node, instantiations.arguments);
     }
@@ -1922,6 +1971,10 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
   }
   auto declaring_node = symbol->declaring_node.get();
 
+  GenericInstantiationErrorUserData data;
+  set_error_user_data(&data);
+  set_panic_handler(generic_instantiation_panic_handler);
+
   auto decl_node_type = declaring_node->get_node_type();
   switch (decl_node_type) {
     case AST_NODE_STRUCT_DECLARATION:
@@ -1940,9 +1993,16 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
       throw_error("Invalid target to generic args", source_range);
       break;
   }
+
+  handle_generic_error_if_failed(&data, source_range);
+
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", source_range);
   }
+
+  set_error_user_data(&data);
+  set_panic_handler(generic_instantiation_panic_handler);
+
   if (decl_node_type == AST_NODE_FUNCTION_DECLARATION) {
     auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
     func->generic_arguments = generic_args;
@@ -1955,6 +2015,7 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
       }
     }
   }
+  handle_generic_error_if_failed(&data, source_range);
   return global_find_type_id(instantiation->resolved_type, {});
 }
 

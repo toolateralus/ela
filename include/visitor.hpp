@@ -261,3 +261,9 @@ struct Emitter : VisitorBase {
     return;
   };
 };
+
+struct GenericInstantiationErrorUserData {
+  bool failed = false;
+  std::string message = "";
+  SourceRange definition_range = {};
+};

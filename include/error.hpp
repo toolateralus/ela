@@ -56,25 +56,69 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
-static std::string format_message(const std::string &message) {
+static std::string format_error_message(const std::string &message, int max_width = 128) {
   std::stringstream formatted;
+  formatted << "\033[1;31m";
   int width = 0;
-  int size = 0;
   for (char ch : message) {
     formatted << ch;
     if (ch == '\n') {
-      formatted << '\t';
+      width = 0; // Reset width on newline
+    } else {
+      width++;
+      if (width > max_width && std::isspace(ch)) {
+        formatted << '\n';
+        width = 0; // Reset width after line break
+      }
     }
-    if (width > 80 && message.length() > size + 1 && std::isspace(message[size + 1])) {
-      formatted << "\n\t";
-      width = 0;
-    }
-    size++;
-    width++;
   }
+  formatted << "\033[0m";
   return formatted.str();
 }
-static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity) {
+
+static std::string get_text_representation_of_source_range(const SourceRange &source_range,
+                                                           int num_lines_of_source_to_show) {
+  std::stringstream ss;
+  if (num_lines_of_source_to_show > 0) {
+    ss << '\n';
+    auto first = source_range.begin_location;
+    std::ifstream src_file(SourceLocation::files()[first.file]);
+
+    if (!src_file.is_open()) {
+      return "Error: Unable to open source file\n";
+    }
+
+    std::string line;
+    size_t line_index = 0;
+    size_t start_line = (first.line > num_lines_of_source_to_show) ? first.line - num_lines_of_source_to_show : 0;
+    size_t end_line = first.line + num_lines_of_source_to_show;
+
+    while (std::getline(src_file, line)) {
+      if (line_index >= start_line && line_index <= end_line) {
+        ss << line << '\n';
+        if (line_index == first.line - 2) {
+          std::string caret_indicator = std::string(std::max(1ul, first.column ), ' ') + "^^^";
+          if (terminal_supports_color) {
+            ss << "\033[90;3m";
+          }
+          ss << caret_indicator << '\n';
+          if (terminal_supports_color) {
+            ss << "\033[0m";
+          }
+        }
+      }
+      if (line_index > end_line) {
+        break;
+      }
+      line_index++;
+    }
+    src_file.close();
+  }
+  return ss.str();
+}
+
+static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity,
+                                          int num_lines_of_source_to_show = 5) {
   const char *color = "";
   const char *code_color = "";
 
@@ -96,85 +140,8 @@ static std::string format_source_location(const SourceRange &source_range, Error
   }
 
   std::stringstream ss;
-  ss << color << source_range.begin_location.ToString() << (terminal_supports_color ? "\033[0m\n" : "\n");
-  ss << '\n';
-
-  // Read the source file
-  auto first = source_range.begin_location;
-  auto last = source_range.end_location;
-  std::ifstream src_file(SourceLocation::files()[first.file]);
-
-  if (!src_file.is_open()) {
-    return "Error: Unable to open source file\n";
-  }
-
-  std::string file_content((std::istreambuf_iterator<char>(src_file)), std::istreambuf_iterator<char>());
-  src_file.close();
-
-  std::stringstream source_code;
-  std::string caret_indicator;
-
-  size_t line_start = 0;
-  size_t line_end = 0;
-  size_t current_line = 1;
-
-  // Find the start and end positions for the lines around the error
-  size_t error_line_start = 0;
-  size_t error_line_end = 0;
-  size_t context_start = 0;
-  size_t context_end = 0;
-
-  for (size_t i = 0; i < file_content.size(); ++i) {
-    if (file_content[i] == '\n') {
-      current_line++;
-      if (current_line == first.line - 2) {
-        context_start = i + 1;
-      }
-      if (current_line == first.line) {
-        error_line_start = i + 1;
-      }
-      if (current_line == first.line + 1) {
-        error_line_end = i;
-      }
-      if (current_line == first.line + 3) {
-        context_end = i;
-        break;
-      }
-    }
-  }
-
-  if (context_end == 0) {
-    context_end = file_content.size();
-  }
-
-  std::string context = file_content.substr(context_start, context_end - context_start);
-  source_code << context << '\n';
-
-  // Generate the caret indicator
-  size_t caret_line_start = error_line_start - context_start;
-  std::string caret_line = file_content.substr(error_line_start, error_line_end - error_line_start);
-
-  if (first.column <= 1) {
-    caret_indicator = "";
-  } else {
-    caret_indicator = std::string(std::max(1ul, first.column - 1), ' ');
-  }
-  caret_indicator += "^^^";
-
-  if (terminal_supports_color)
-    ss << "\033[90;3m";
-
-  // Insert the context lines
-  std::istringstream context_stream(context);
-  std::string line;
-  size_t line_count = 0;
-  while (std::getline(context_stream, line)) {
-    ss << line << '\n';
-    line_count++;
-    if (line_count == 3) { // Insert caret indicator after the error line
-      ss << caret_indicator << '\n';
-    }
-  }
+  ss << color << source_range.begin_location.ToString() << (terminal_supports_color ? "\033[0m" : "");
+  ss << get_text_representation_of_source_range(source_range, num_lines_of_source_to_show);
 
   if (terminal_supports_color)
     ss << "\033[0m";
@@ -195,12 +162,12 @@ enum WarningFlags {
 
 extern int ignored_warnings;
 
-using PanicHandler = void(*)(const std::string &, const SourceRange &);
+using PanicHandler = void (*)(const std::string &, const SourceRange &, void *);
 
 extern PanicHandler panic_handler;
 
 static PanicHandler get_default_panic_handler() {
-  return [] [[noreturn]] (auto message, auto source_range) {
+  return [] [[noreturn]] (auto message, auto source_range, [[gnu::unused]] auto unused) {
     std::stringstream ss;
 
     std::string lower_message = message;
@@ -212,13 +179,17 @@ static PanicHandler get_default_panic_handler() {
                        "included in this mode";
     }
 
-    ss << "\033[1;31m" << format_message(message) << "\033[0m";
+    ss << format_error_message(message);
     ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
     const auto err = ss.str();
     printf("%s\n", err.c_str());
     exit(1);
   };
 }
+
+static void set_panic_handler(PanicHandler handler) { panic_handler = handler; }
+
+static void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
 static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
   if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
@@ -227,7 +198,7 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
   std::stringstream ss;
   if (terminal_supports_color)
     ss << "\033[36m";
-  ss << "Warning:\n\t" << format_message(message);
+  ss << "Warning:\n\t" << format_error_message(message);
   if (terminal_supports_color)
     ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_WARNING);
@@ -235,9 +206,19 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
   std::cerr << token_str << std::endl;
 }
 
+extern void *error_user_data;
+
+static void set_error_user_data(void *data) { error_user_data = data; }
+
+template <class T> T *get_error_user_data_as() {
+  if (!error_user_data)
+    return nullptr;
+  return (T *)error_user_data;
+}
+
 static void throw_error(const std::string &message, const SourceRange &source_range) {
   if (!panic_handler) {
-    get_default_panic_handler()(message, source_range);
+    get_default_panic_handler()(message, source_range, error_user_data);
   }
-  panic_handler(message, source_range);
+  panic_handler(message, source_range, error_user_data);
 }
