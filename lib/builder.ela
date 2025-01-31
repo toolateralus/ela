@@ -73,30 +73,38 @@ impl String_Builder {
   }
 
   append :: fn![T](self*, value: T) where T is As_Char_Slice![T] {
-    s := value.as_char_slice();
-    if s.length == 0 then return;
+    slice := value.as_char_slice();
+
+    if slice.length == 0 
+              then return;
+    
     if !self.root { 
       self.root = String_Builder_Block::new();
       self.current = self.root;
     }
-    s_idx := 0;
-    length := s.length;
+    
+    slice_index := 0;
+    length := slice.length;
+    printf("slice length: %d, slice data: %s\n"c, slice.length, slice.data);
+
     remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+
     while length > 0 {
       // Simple append, no overflow
       if length <= remaining {
-        memcpy(self.current.data + self.current.length, s.data + s_idx, length);
+        memcpy(self.current.data + self.current.length, slice.data + slice_index, length);
         self.current.length += length;
         break;
-      } else { // Append with overflow
-        memcpy(self.current.data + self.current.length, s.data + s_idx, remaining);
-        self.current.length += remaining;
-        s_idx += remaining;
-        length -= remaining;
-        self.current.next = String_Builder_Block::new();
-        self.current = self.current.next;
-        remaining = STRING_BUILDER_BLOCK_MAX_LEN;
-      }
+      } 
+
+      // Append with overflow
+      memcpy(self.current.data + self.current.length, slice.data + slice_index, remaining);
+      self.current.length += remaining;
+      slice_index += remaining;
+      length -= remaining;
+      self.current.next = String_Builder_Block::new();
+      self.current = self.current.next;
+      remaining = STRING_BUILDER_BLOCK_MAX_LEN;
     }
   }
 

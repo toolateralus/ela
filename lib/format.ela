@@ -1,8 +1,8 @@
 #import builder;
+
 // TODO: expand this, add support for other stuff.
 // This is only for numerical types, bools, and strings / any pointer.
 // We kinda need generic specialization to do more with this.
-
 to_string :: fn![T](value: T) -> String {
   buffer: u8[64];
   type := #type(T);
@@ -34,34 +34,35 @@ to_string :: fn![T](value: T) -> String {
   return String::from(strdup(buffer));
 } 
 
-#static print :: fn![T](str: T) {
-  s := to_string(str);
-  printf("%s", s);
-  free(s);
+#static print :: fn![T](message: T) {
+  formatted := to_string(message);
+  printf("%s"c, formatted.data);
+  formatted.deinit();
 }
 
-#static println :: fn![T](str: T) {
-  s := to_string(str)
-  printf("%s\n", s);
-  free(s);
+#static println :: fn![T](message: T) {
+  formatted := to_string(message)
+  printf("%s\n"c, formatted.data);
+  formatted.deinit();
 }
 
-format :: fn(fmt : u8*, list: Init_List![any]) -> String {
-  if !fmt {
+
+format :: fn(fmt : str, list: Init_List![any]) -> String {
+  if fmt.length == 0 {
     return {};
   }
 
   builder: String_Builder;
   value_index := 0;
 
-  while *fmt {
-    if (*fmt) == '%' && *(fmt + 1) == '%' {
+  while *fmt.data {
+    if (*fmt.data) == '%' && *(fmt.data + 1) == '%' {
       builder.append![u32]('%');
-      fmt += 2;
+      fmt.data += 2;
       continue;
     }
 
-    if (*fmt) == '%' {
+    if (*fmt.data) == '%' {
       value := list.data[value_index];
       if value.ptr == null {
         builder.append("null");
@@ -95,9 +96,9 @@ format :: fn(fmt : u8*, list: Init_List![any]) -> String {
       }
       value_index++;
     } else {
-      builder.append((*fmt) as u32);
+      builder.append((*fmt.data) as u32);
     }
-    fmt++;
+    fmt.data++;
   }
 
   return builder.get_string();

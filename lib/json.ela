@@ -1,4 +1,6 @@
 #import file;
+#import format;
+#import builder;
 #import reflection;
 
 // this is so that we can easily just do if err { ... }
@@ -9,8 +11,9 @@ JsonError :: enum {
 
 #static _json_last_error: u8*;
 
-set_json_error :: fn(error: u8*) {
-  _json_last_error = error;
+set_json_error :: fn![T](error: T) where T is As_Char_Slice![T] {
+  slice := error.as_char_slice().clone().data;
+  _json_last_error = slice;
 }
 
 get_json_error :: fn() -> u8* {
@@ -79,7 +82,7 @@ impl JsonLexer {
     if get_json_error() {
       free(get_json_error());
     }
-    // set_json_error(format("[%:%d:%] :: %", {any::new(&self.file), any::new(&token.line), any::new(token.column), any::new(&msg)}));
+    set_json_error(format("[%:%d:%] :: %", {any::new(&self.file), any::new(&token.line), any::new(&token.column), any::new(&msg)}));
     return (JsonError::ERROR, token);
   }
 
@@ -128,11 +131,11 @@ impl JsonLexer {
     if c == '/' {
       self.position++;
       if self.position >= self.length {
-        return self.err(token, format("Unexpected u8acter %", {any::new(&c)}));
+        return self.err(token, format("Unexpected character %", {any::new(&c)}));
       }
       c = self.input[self.position];
       if c != '/' {
-        return self.err(token, format("Unexpected u8acter: %", {any::new(&c)}));
+        return self.err(token, format("Unexpected character: %", {any::new(&c)}));
       }
       while c != '\n' && c != '\r' {
         self.position++;

@@ -97,6 +97,21 @@ Bitwise :: interface![Right] {
 }
 
 
+// TODO:  We should tidy up operator overloads, where we can automatically use + as += etc.
+SelfEq :: interface {
+  eq :: fn(self, right: #self) -> bool;
+  neq :: fn(self, right: #self) -> bool;
+}
+
+Compare :: interface![Right] {
+  lt  :: fn(self, right: Right) -> bool;  // '<' operator.
+  gt  :: fn(self, right: Right) -> bool;  // '>' operator.
+
+  lte :: fn(self, right: Right) -> bool;  // '<=' operator.
+  gte :: fn(self, right: Right) -> bool;  // '>=' operator.
+}
+
+
 // Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and str::
 Allocator :: interface {
   allocate :: fn![T](self*) -> T*;

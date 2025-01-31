@@ -142,6 +142,19 @@ impl Iterable![u8] for str {
   }
 }
 
+// This iterator is over the bytes.
+// TODO: we need a chars() and bytes() function on both str and string,
+// TODO: then we need to support taking an Enumerable![T]/Iter![T] directly in the for loop,
+// TODO: cause right now we just look for it on the type
+impl Iterable![u8] for String { 
+  iter :: fn(self*) -> Iter![u8] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length,
+    }
+  }
+}
+
 impl As_Char_Slice![String] for String {
   as_char_slice :: fn(self) -> Slice![u32] {
     return {

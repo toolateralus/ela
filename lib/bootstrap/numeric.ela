@@ -1,0 +1,35 @@
+/* 
+  * Marker interfaces for numerical type constraints.
+*/
+
+Is_Numeric :: interface {}
+
+impl Is_Numeric for u8 {}
+impl Is_Numeric for u16 {}
+impl Is_Numeric for u32 {}
+impl Is_Numeric for u64 {}
+
+impl Is_Numeric for s8 {}
+impl Is_Numeric for s16 {}
+impl Is_Numeric for s32 {}
+impl Is_Numeric for s64 {}
+
+impl Is_Numeric for f32 {}
+impl Is_Numeric for f64 {}
+
+Is_Float :: interface {}
+
+impl Is_Float for f32 {}
+impl Is_Float for f64 {}
+
+Is_Integer :: interface {}
+
+impl Is_Integer for u8 {}
+impl Is_Integer for u16 {}
+impl Is_Integer for u32 {}
+impl Is_Integer for u64 {}
+
+impl Is_Integer for s8 {}
+impl Is_Integer for s16 {}
+impl Is_Integer for s32 {}
+impl Is_Integer for s64 {}

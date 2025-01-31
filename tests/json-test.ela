@@ -1,6 +1,5 @@
 #import json;
 #import directory;
-#error "This thing is totally broken. Workin on it!"
 
 
 JsonValueDeleter :: struct {
