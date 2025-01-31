@@ -106,7 +106,7 @@ panic :: fn(msg: str);
   }
 
   impl![T] Init![T] for List![T] {
-    init :: fn(init: Collection_Initializer![T]) -> #self {
+    init :: fn(init: Init_List![T]) -> #self {
       self: #self;
       for idx in 0..init.length {
         self.push(init.data[idx]);

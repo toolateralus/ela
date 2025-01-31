@@ -207,26 +207,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
-  // ! We can cast tuples as long as their interior types are castable?
-  // ! this seems like nonsense. Why?
-  if (from->is_kind(TYPE_TUPLE) && to->is_kind(TYPE_TUPLE)) {
-    auto from_info = (from->get_info()->as<TupleTypeInfo>());
-    auto to_info = (to->get_info()->as<TupleTypeInfo>());
-    if (from_info->types.size() != to_info->types.size()) {
-      return CONVERT_PROHIBITED;
-    }
-    ConversionRule rule;
-    for (int i = 0; i < from_info->types.size(); ++i) {
-      auto from_t = from_info->types[i];
-      auto to_t = to_info->types[i];
-      rule = type_conversion_rule(global_get_type(from_t), global_get_type(to_t), source_range);
-      if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
-        return rule;
-      }
-    }
-    return rule;
-  }
-
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.

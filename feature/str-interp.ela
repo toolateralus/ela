@@ -1,4 +1,4 @@
-find_next_curly_match :: fn(fmt: c_string, last_index: u32*) -> u32 {
+find_next_curly_match :: fn(fmt: u8*, last_index: u32*) -> u32 {
   i := *last_index;
   while fmt[i] != '\0' {
     if fmt[i] == '{' && fmt[i + 1] == '}' {
@@ -10,7 +10,7 @@ find_next_curly_match :: fn(fmt: c_string, last_index: u32*) -> u32 {
   return -1;
 }
 
-format :: fn!<Types...>(fmt: c_string, args: Types) -> c_string where Types is Display {
+format :: fn!<Types...>(fmt: u8*, args: Types) -> u8* where Types is Display {
   stream: Formatter;
   defer stream.deinit();
   fmt_len, index, match_pos := (strlen(fmt), 0 as u32, 0 as u32);

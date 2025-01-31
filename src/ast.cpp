@@ -901,7 +901,6 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::RParen);
         NODE_ALLOC(ASTTuple, tuple, range, _, this)
         tuple->values = exprs;
-        tuple->type = ast_alloc<ASTType>(); // ! why is this here?
         return tuple;
       }
       if (peek().type != TType::RParen) {
@@ -1992,6 +1991,7 @@ void Parser::append_type_extensions(ASTType *&node) {
         type->kind = ASTType::NORMAL;
         type->normal.base = iden;
         type->normal.generic_arguments.push_back(node);
+        type->source_range = node->source_range;
         node = type;
       }
       expect(TType::RBrace);

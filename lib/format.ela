@@ -46,7 +46,7 @@ to_string :: fn![T](value: T) -> String {
   free(s);
 }
 
-format :: fn(fmt : u8*, list: Collection_Initializer![any]) -> String {
+format :: fn(fmt : u8*, list: Init_List![any]) -> String {
   if !fmt {
     return {};
   }

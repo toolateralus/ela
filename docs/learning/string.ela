@@ -2,12 +2,12 @@
   We have a couple ways to represent strings to interop well with c: 
   string literals with `"Hi!"` syntax will compile to a (const char *)
   for interop purposes. You may also use char *, but it will cause problems when
-  writing foreign function declarations, it's best to use c_string for C style strings.
+  writing foreign function declarations, it's best to use u8* for C style strings.
 */
 
-str: c_string = "Hello!";
+str: u8* = "Hello!";
 
-// c_string can implicitly cast to our managed string type.
+// u8* can implicitly cast to our managed string type.
 
 /* 
   `string` owns it's own memory and memcpy's input. It does not need to be explicitly freed,
@@ -15,7 +15,7 @@ str: c_string = "Hello!";
 */
 str1: string = "Hello!";
 
-// * to access the c_string behind the managed string
+// * to access the u8* behind the managed string
 str1_data := str1.data;
 
 // * to access the length of the string (which is also null terminated)
@@ -27,7 +27,7 @@ str1_length := str1.length;
   * for performance reasons, i.e a big string you just malloc'd or something.
 */
 
-data : c_string = "Wow i am a string";
+data : u8* = "Wow i am a string";
 
 // * this will get deleted when the string goes out of scope.
 str : string;
@@ -42,7 +42,7 @@ str.length = 17;
   * The interpolated will be returned as a 'string' type.
   * to insert values, you use {my_value_expression} syntax within the string literal.
   * Any expression may be evaluated in the {}, including arithmetic, etc, unlike rust.
-  * Any struct may be implicitly stringified if it implements a to_string() function that returns either a string or a c_string
+  * Any struct may be implicitly stringified if it implements a to_string() function that returns either a string or a u8*
 */
 
 my_interpolated_string := $"{str}, {data}"
@@ -51,7 +51,7 @@ my_interpolated_string := $"{str}, {data}"
 * The easiest way to concatenate two strings is also to use string interpolation.
 */
 
-a := "Hello "; // c_string 
+a := "Hello "; // u8* 
 b : string = "World!"; // string
 my_concatenated_string := $"{a}{b}";
 

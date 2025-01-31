@@ -47,7 +47,7 @@ impl JsonToken {
   }
 }
 
-json_token_type_names := Collection_Initializer![u8*]{
+json_token_type_names := Init_List![u8*]{
   "Invalid",
   "True",
   "False",
@@ -240,7 +240,7 @@ impl JsonLexer {
     return (JsonError::SUCCESS, token);
   }
 
-  expect_types :: fn(self*, types: Collection_Initializer![s32]) -> (s32, JsonToken) {
+  expect_types :: fn(self*, types: Init_List![s32]) -> (s32, JsonToken) {
     err, token := self.get_token();
     if err {
       return (err, token);

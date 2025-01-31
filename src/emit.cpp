@@ -1050,7 +1050,7 @@ void Emitter::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (type->get_base().get_str().starts_with("Collection_Initializer$")) {
+      if (type->get_base().get_str().starts_with("Init_List$")) {
         auto element_type = type->generic_args[0];
         (*ss) << " .data = ";
         (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
@@ -1275,7 +1275,7 @@ std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   // TODO: refactor this for new String/str types?
   // And C string.
-  // For now we'll just say it's c_string only.
+  // For now we'll just say it's u8* only.
   if (type->id == root_scope->find_type_id("u8", {{{TYPE_EXT_POINTER}}})) {
     return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
   }

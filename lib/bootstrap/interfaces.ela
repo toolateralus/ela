@@ -25,7 +25,7 @@ Clone       :: interface {
 }
 
 Init :: interface![T] {
-  init :: fn(init: Collection_Initializer![T]) -> #self;
+  init :: fn(init: Init_List![T]) -> #self;
 }
 
 // An object used to iterate over a collection of items, or any sequence.

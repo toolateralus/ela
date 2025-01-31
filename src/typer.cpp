@@ -552,6 +552,7 @@ void Typer::visit(ASTDeclaration *node) {
 
     // CLEANUP: This is nonsense.
     node->type = ast_alloc<ASTType>();
+    node->type->source_range = node->source_range;
     node->type->resolved_type = value_ty;
     node->resolved_type = value_ty;
 
@@ -1401,11 +1402,11 @@ void Typer::visit(ASTLiteral *node) {
       return;
     case ASTLiteral::String: {
       if (node->is_c_string) {
-        static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});; 
+        static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});
+        ;
         node->resolved_type = type;
-      }
-      else {
-        static size_t uid_idx =0;
+      } else {
+        static size_t uid_idx = 0;
         static int type = ctx.scope->find_type_id("str", {});
         node->resolved_type = type;
       }
@@ -1627,16 +1628,17 @@ void Typer::visit(ASTInitializerList *node) {
             "Failed to assign element type from value passed into collection-style initializer list");
         node->resolved_type = target_type->id;
       } else {
-
-        if (!target_type->implements("Init") && !target_type->get_base().get_str().contains("Collection_Initializer$")) {
-          throw_error("Unable to use 'collection style' initalizer lists on non fixed array types that don't implement Init![T] interface", node->source_range);
+        if (!target_type->implements("Init") && !target_type->get_base().get_str().contains("Init_List$")) {
+          throw_error("Unable to use 'collection style' initalizer lists on non fixed array types that don't implement "
+                      "Init![T] interface",
+                      node->source_range);
         }
 
         auto &values = node->values;
         // * How on earth will we infer this?
         // * I think we'll have to look at the target type,
         // * search for the init_list() function, check if it's generic,
-        // * if it's not, use the concrete type argument for the Collection_Initializer![T] argument,
+        // * if it's not, use the concrete type argument for the Init_List![T] argument,
         // * otherwise if it is generic,
         // * we just allow any homogenous collection of values?
         // For now, we just do the latter - allow any collection of values.
@@ -1660,7 +1662,7 @@ void Typer::visit(ASTInitializerList *node) {
 
           values[i]->resolved_type = target_element_type;
         }
-        node->resolved_type = find_generic_type_of("Collection_Initializer", {target_element_type}, node->source_range);
+        node->resolved_type = find_generic_type_of("Init_List", {target_element_type}, node->source_range);
         return;
       }
     } break;
@@ -1755,10 +1757,7 @@ void Typer::visit(ASTTuple *node) {
     type_index++;
   }
   TypeExtensions extensions;
-  extensions.extensions = accept_extensions(node->type->extensions);
-  // TODO: remove the node->type, that makes no freaking sense.
-  node->type->resolved_type = global_find_type_id(types, extensions);
-  node->resolved_type = node->type->resolved_type;
+  node->resolved_type = global_find_type_id(types, extensions);
 }
 void Typer::visit(ASTAlias *node) {
   node->type->accept(this);

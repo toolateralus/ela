@@ -1,6 +1,6 @@
 #alias Callback![T] :: fn * (T*);
 
-button :: fn![T](text: c_string, style: Style, callback: Callback![T], user_data: T*) {
+button :: fn![T](text: u8*, style: Style, callback: Callback![T], user_data: T*) {
   if pressed { 
     callback(user_data);
   }

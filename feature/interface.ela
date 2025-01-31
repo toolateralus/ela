@@ -9,7 +9,7 @@ Struct :: struct {
   // abstract interface.
   // each method has to be implemented or compiler errors.
   Format :: interface![T] {
-    to_string :: fn(self*) -> c_string;
+    to_string :: fn(self*) -> u8*;
     parse     :: fn(input: str) -> #self;
   }
 
@@ -28,7 +28,7 @@ Struct :: struct {
 } else if AUTO_INTERFACE {
   // non-abstract interface, can be partially or completely automatically implemented.
   Format :: interface![T] {
-    to_string :: fn(self*) -> c_string {
+    to_string :: fn(self*) -> u8* {
       return $"{*self}";              // omitted for simplicity.
     }
     parse     :: fn(self*) -> #self {

@@ -19,7 +19,7 @@ String :: struct {
   capacity: u64,
 }
 
-Collection_Initializer :: struct![T] {
+Init_List :: struct![T] {
   data:   T*,
   length: u64,
 }

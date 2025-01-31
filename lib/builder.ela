@@ -105,13 +105,13 @@ impl String_Builder {
     value.deinit();
   }
 
-  append_concat :: fn![T](self*, list: Collection_Initializer![T]) {
+  append_concat :: fn![T](self*, list: Init_List![T]) {
     for i in 0..list.length {
       self.append![T](list.data[i]);
     }
   }
 
-  append_concat_then_free :: fn![T](self*, list: Collection_Initializer![T], free_list: Collection_Initializer![bool]) where T is Deinit {
+  append_concat_then_free :: fn![T](self*, list: Init_List![T], free_list: Init_List![bool]) where T is Deinit {
     if free_list.length != list.length {
       printf("append_concat_then_free() requires that the str initializer and the free_list are the same length\n"c);
       exit(1); // we shouldn't have to panic here, but whatever.

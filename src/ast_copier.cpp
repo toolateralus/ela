@@ -288,7 +288,6 @@ ASTSwitch *ASTCopier::copy_switch(ASTSwitch *node) {
 }
 ASTTuple *ASTCopier::copy_tuple(ASTTuple *node) {
   auto new_node = copy(node);
-  new_node->type = static_cast<ASTType *>(copy_node(node->type));
   new_node->values.clear();
   for (auto value : node->values) {
     new_node->values.push_back(static_cast<ASTExpr *>(copy_node(value)));
