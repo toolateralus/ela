@@ -970,6 +970,7 @@ ASTType *Parser::parse_type() {
   NODE_ALLOC(ASTType, node, range, _, this)
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
+  node->normal.base->source_range = range;
 
   if (peek().type == TType::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();

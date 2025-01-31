@@ -1005,7 +1005,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         declaring_or_assigning_type = params->params[param_index]->resolved_type;
         node->arguments[arg_index]->accept(this);
         assert_types_can_cast_or_equal(
-            node->arguments[arg_index]->resolved_type, params->params[param_index]->resolved_type, node->source_range,
+            node->arguments[arg_index]->resolved_type, params->params[param_index]->resolved_type, node->arguments[arg_index]->source_range,
             std::format("unexpected argument type.. parameter #{} of function",
                         arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
       }

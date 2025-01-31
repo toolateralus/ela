@@ -498,21 +498,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   auto left_ty = global_get_type(left_type);
 
   if (left_ty && node->is_operator_overload) {
-    // !! THIS IS A TOTAL HACK!!!
-    // !! JUST TRYING THIS OUT!!!
-    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_UNARY);
-    auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTDotExpr>();
-    auto left_id = ast_alloc<ASTIdentifier>();
-    sr->base = node->operand;
-    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
-    call->function = sr;
-    call->arguments = ast_alloc<ASTArguments>();
-    call->accept(&typer);
-    call->accept(this);
-    sr->source_range = node->source_range;
-    call->arguments->source_range = node->source_range;
-    call->source_range = node->source_range;
+    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op.type, node->operand, node);
     return;
   }
 
@@ -550,22 +536,7 @@ void Emitter::visit(ASTBinExpr *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
 
   if (left_ty && node->is_operator_overload) {
-    // !! THIS IS A TOTAL HACK!!!
-    // !! JUST TRYING THIS OUT!!!
-    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
-    auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTDotExpr>();
-    auto left_id = ast_alloc<ASTIdentifier>();
-    sr->base = node->left;
-    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
-    call->function = sr;
-    call->arguments = ast_alloc<ASTArguments>();
-    call->arguments->arguments = {node->right};
-    call->accept(&typer);
-    call->accept(this);
-    sr->source_range = node->source_range;
-    call->arguments->source_range = node->source_range;
-    call->source_range = node->source_range;
+    call_operator_overload(node->source_range, left_ty, OPERATION_BINARY, node->op.type, node->left, node->right);
     return;
   }
 
@@ -1896,4 +1867,25 @@ void Emitter::visit(ASTSize_Of *node) {
   (*ss) << "sizeof(";
   node->target_type->accept(this);
   (*ss) << ")";
+}
+
+void Emitter::call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op,
+                                     ASTExpr *left, ASTExpr *right) {
+  auto function_type = find_operator_overload(op, left_ty, operation);
+  auto call = ASTCall{};
+  auto sr = ASTDotExpr{};
+  auto left_id = ASTIdentifier{};
+  sr.base = left;
+  sr.member_name = get_operator_overload_name(op, operation);
+  call.function = &sr;
+  auto args = ASTArguments{};
+  if (right) {
+    args.arguments = {right};
+  }
+  call.arguments = &args;
+  call.accept(&typer);
+  call.accept(this);
+  sr.source_range = range;
+  call.arguments->source_range = range;
+  call.source_range = range;
 }

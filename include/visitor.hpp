@@ -7,6 +7,7 @@
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
+#include "type.hpp"
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
@@ -36,6 +37,7 @@ struct Typer : VisitorBase {
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
+ 
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTFunctionDeclaration *node) override;
@@ -174,7 +176,10 @@ struct Emitter : VisitorBase {
       last_loc = loc;
     }
   }
-  
+
+  void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
+                              ASTExpr *right = nullptr);
+
   void emit_type_or_fwd_decl(Type* type);
   void forward_decl_type(Type* type);
   template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
