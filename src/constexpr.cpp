@@ -99,5 +99,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
     } break;
     default:
       throw_error("Invalid node in constant expression", node->source_range);
+      return {};
   }
+  return {};
 }

@@ -35,6 +35,8 @@ size_t LAMBDA_UNIQUE_ID = 0;
 // TODO: remove me, we want file scopes.
 Scope *root_scope;
 
+PanicHandler panic_handler = get_default_panic_handler();
+
 CompileCommand compile_command;
 
 std::unordered_set<InternedString> import_set;

@@ -48,9 +48,9 @@ static bool supports_color() {
   const char *term = getenv("TERM");
   if (term == NULL)
     return false;
-  
-  return strstr(term, "dumb") == nullptr || (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL || strstr(term, "screen") != NULL ||
-         strstr(term, "tmux") != NULL);
+
+  return strstr(term, "dumb") == nullptr || (strstr(term, "color") != NULL || strstr(term, "xterm") != NULL ||
+                                             strstr(term, "screen") != NULL || strstr(term, "tmux") != NULL);
 }
 #endif
 
@@ -195,6 +195,31 @@ enum WarningFlags {
 
 extern int ignored_warnings;
 
+using PanicHandler = void(*)(const std::string &, const SourceRange &);
+
+extern PanicHandler panic_handler;
+
+static PanicHandler get_default_panic_handler() {
+  return [] [[noreturn]] (auto message, auto source_range) {
+    std::stringstream ss;
+
+    std::string lower_message = message;
+    std::transform(lower_message.begin(), lower_message.end(), lower_message.begin(), ::tolower);
+
+    if (lower_message.contains("undeclared") ||
+        lower_message.contains("use of") && compile_command.has_flag("freestanding")) {
+      lower_message += "\n You are in a freestanding environment. Many types that are normally built in, are not "
+                       "included in this mode";
+    }
+
+    ss << "\033[1;31m" << format_message(message) << "\033[0m";
+    ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
+    const auto err = ss.str();
+    printf("%s\n", err.c_str());
+    exit(1);
+  };
+}
+
 static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
   if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
     return;
@@ -210,19 +235,9 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
   std::cerr << token_str << std::endl;
 }
 
-[[noreturn]] static void throw_error(const std::string &message, const SourceRange &source_range) {
-  std::stringstream ss;
-
-  std::string lower_message = message;
-  std::transform(lower_message.begin(), lower_message.end(), lower_message.begin(), ::tolower);
-
-  if (lower_message.contains("undeclared") || lower_message.contains("use of") && compile_command.has_flag("freestanding")) {
-    lower_message += "\n You are in a freestanding environment. Many types that are normally built in, are not included in this mode";
+static void throw_error(const std::string &message, const SourceRange &source_range) {
+  if (!panic_handler) {
+    get_default_panic_handler()(message, source_range);
   }
-
-  ss << "\033[1;31m" << format_message(message) << "\033[0m";
-  ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
-  const auto err = ss.str();
-  printf("%s\n", err.c_str());
-  exit(1);
+  panic_handler(message, source_range);
 }

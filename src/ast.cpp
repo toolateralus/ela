@@ -388,6 +388,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           parser->eat();
           parser->end_node(nullptr, range);
           throw_error("Expected struct or union after #anon ::...", range);
+          return nullptr;
         }
     }},
     // #export, for exporting a non-mangled name to a dll or C library
@@ -533,6 +534,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
                           "routine was used as a statement, or vice versa: {}",
                           identifier),
               range);
+  return nullptr;
 }
 
 ASTProgram *Parser::parse() {
@@ -1287,6 +1289,7 @@ ASTStatement *Parser::parse_statement() {
                             "is likely an undefined type.",
                             tok.value),
                 parent_range);
+    exit(1);
   }
 }
 

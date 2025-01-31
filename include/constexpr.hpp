@@ -57,6 +57,7 @@ struct Value {
       return Value{.tag = FLOATING, .floating = -floating};
     }
     throw_error("Invalid type for unary minus", {});
+    return {};
   }
 
   Value operator!() const {
@@ -64,6 +65,7 @@ struct Value {
       return Value{.tag = BOOLEAN, .boolean = !boolean};
     }
     throw_error("Invalid type for logical not", {});
+    return {};
   }
 
   Value operator~() const {
@@ -71,6 +73,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = ~integer};
     }
     throw_error("Invalid type for bitwise not", {});
+    return {};
   }
 
   Value operator+(const Value &other) const {
@@ -82,6 +85,7 @@ struct Value {
                                (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for addition", {});
+    return {};
   }
 
   Value operator-(const Value &other) const {
@@ -93,6 +97,7 @@ struct Value {
                                (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for subtraction", {});
+    return {};
   }
 
   Value operator*(const Value &other) const {
@@ -104,6 +109,7 @@ struct Value {
                                (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for multiplication", {});
+    return {};
   }
 
   Value operator/(const Value &other) const {
@@ -115,6 +121,7 @@ struct Value {
                                (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for division", {});
+    return {};
   }
 
   Value operator%(const Value &other) const {
@@ -122,6 +129,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer % other.integer};
     }
     throw_error("Invalid types for modulo", {});
+    return {};
   }
 
   Value operator|(const Value &other) const {
@@ -129,6 +137,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer | other.integer};
     }
     throw_error("Invalid types for bitwise or", {});
+    return {};
   }
 
   Value operator&(const Value &other) const {
@@ -136,6 +145,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer & other.integer};
     }
     throw_error("Invalid types for bitwise and", {});
+    return {};
   }
 
   Value operator<<(const Value &other) const {
@@ -143,6 +153,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer << other.integer};
     }
     throw_error("Invalid types for shift left", {});
+    return {};
   }
 
   Value operator>>(const Value &other) const {
@@ -150,6 +161,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer >> other.integer};
     }
     throw_error("Invalid types for shift right", {});
+    return {};
   }
 
   Value operator^(const Value &other) const {
@@ -157,6 +169,7 @@ struct Value {
       return Value{.tag = INTEGER, .integer = integer ^ other.integer};
     }
     throw_error("Invalid types for bitwise xor", {});
+    return {};
   }
 
   Value operator||(const Value &other) const {
@@ -164,6 +177,7 @@ struct Value {
       return Value{.tag = BOOLEAN, .boolean = boolean || other.boolean};
     }
     throw_error("Invalid types for logical or", {});
+    return {};
   }
 
   Value operator&&(const Value &other) const {
@@ -171,6 +185,7 @@ struct Value {
       return Value{.tag = BOOLEAN, .boolean = boolean && other.boolean};
     }
     throw_error("Invalid types for logical and", {});
+    return {};
   }
 
   Value operator<(const Value &other) const {
@@ -182,6 +197,7 @@ struct Value {
                               (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for less than comparison", {});
+    return {};
   }
 
   Value operator>(const Value &other) const {
@@ -193,6 +209,7 @@ struct Value {
                               (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for greater than comparison", {});
+    return {};
   }
 
   Value operator==(const Value &other) const {
@@ -206,6 +223,7 @@ struct Value {
       return Value{.tag = BOOLEAN, .boolean = boolean == other.boolean};
     }
     throw_error("Invalid types for equality comparison", {});
+    return {};
   }
 
   Value operator!=(const Value &other) const {
@@ -219,6 +237,7 @@ struct Value {
       return Value{.tag = BOOLEAN, .boolean = boolean != other.boolean};
     }
     throw_error("Invalid types for inequality comparison", {});
+    return {};
   }
 
   Value operator<=(const Value &other) const {
@@ -230,6 +249,7 @@ struct Value {
                               (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for less than or equal comparison", {});
+    return {};
   }
 
   Value operator>=(const Value &other) const {
@@ -241,6 +261,7 @@ struct Value {
                               (other.tag == FLOATING ? other.floating : other.integer)};
     }
     throw_error("Invalid types for greater than or equal comparison", {});
+    return {};
   }
 };
 
