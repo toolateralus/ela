@@ -1,7 +1,5 @@
 #pragma once
 
-
-
 #include <cstdint>
 #include <cstdio>
 #include <deque>
@@ -274,7 +272,6 @@ struct ASTIdentifier : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
 };
 
-
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
@@ -346,7 +343,7 @@ struct ASTFunctionDeclaration : ASTStatement {
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
-  std::vector<ASTLambda* > lambdas;
+  std::vector<ASTLambda *> lambdas;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   ASTParamsDecl *params;
@@ -412,12 +409,24 @@ struct ASTRange : ASTExpr {
 };
 
 struct ASTFor : ASTStatement {
-  int range_type =
-      Type::invalid_id; // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
-  int iterable_type = Type::invalid_id;   // This is either the type of that implements Enumerator![T], or is Iter![T];
-  int identifier_type = Type::invalid_id; // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
-  bool is_enumerable = false;
+  enum {
+    // implicitly pulled an iter() off a type that implements Iterable![T]
+    ITERABLE,
+    // implicitly pulled an enumerator() off a type that implements Enumerable![T]
+    ENUMERABLE,
+    // got an Enumerator![T] object directly 
+    ENUMERATOR,
+    // got an Iter![T] object directly
+    ITERATOR,
+  } iteration_kind;
 
+  // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
+  int range_type = Type::invalid_id;
+    // This is either the type of that implements Enumerator![T], or is Iter![T];
+  int iterable_type = Type::invalid_id;
+  // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
+  int identifier_type = Type::invalid_id;
+  
   ASTExpr *iden;
   ASTExpr *range;
   ValueSemantic value_semantic;
@@ -465,7 +474,7 @@ struct ASTStructMember {
   bool is_bitfield = false;
   InternedString bitsize;
   InternedString name;
-  ASTType* type;
+  ASTType *type;
 };
 
 struct ASTStructDeclaration : ASTStatement {

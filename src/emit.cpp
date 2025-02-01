@@ -169,7 +169,6 @@ void Emitter::visit(ASTElse *node) {
   }
   return;
 }
-
 void Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
   auto old_scope = ctx.scope;
@@ -187,30 +186,47 @@ void Emitter::visit(ASTFor *node) {
   indent_level++;
 
   std::string range_type_str = to_cpp_string(global_get_type(node->range_type));
-  (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
-  node->range->accept(this);
-  (*ss) << ";\n";
-
   std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
-  (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
-  if (node->is_enumerable) {
-    (*ss) << "$" + std::to_string(node->range_type) << "_enumerator(&" << range_unique_id << ");\n";
-  } else {
-    (*ss) << "$" + std::to_string(node->range_type) << "_iter(&" << range_unique_id << ");\n";
+  std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
+  auto iterable_method_str = "$" + std::to_string(node->iterable_type);
+
+  switch (node->iteration_kind) {
+    case ASTFor::ITERABLE:
+      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type) << "_iter(&" << range_unique_id << ");\n";
+      break;
+
+    case ASTFor::ENUMERABLE:
+      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type) << "_enumerator(&" << range_unique_id << ");\n";
+      break;
+
+    case ASTFor::ENUMERATOR:
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      break;
+
+    case ASTFor::ITERATOR:
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      break;
   }
 
   (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(&" << unique_id << ")) {\n";
   indent_level++;
 
-  std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
   (*ss) << indent() << identifier_type_str << " ";
-
   node->iden->accept(this);
   (*ss) << " = ";
-  auto iterable_method_str = "$" + std::to_string(node->iterable_type);
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
     (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
-  } else if (node->is_enumerable) { // Enumerables don't use the * value semantic.
+  } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
     (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
   } else {
     (*ss) << "*" << iterable_method_str << "_current(&" << unique_id << ");\n";
