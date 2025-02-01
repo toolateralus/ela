@@ -272,7 +272,10 @@ void Emitter::visit(ASTType *node) {
 
   // For reflection
   if (node->kind == ASTType::REFLECTION) {
-    (*ss) << to_type_struct(global_get_type(node->pointing_to.get()->resolved_type), ctx);
+    auto id = node->pointing_to.get()->resolved_type;
+    if (id == -1) throw_error("Invalid type in #type() node", node->source_range);
+    auto type = global_get_type(id);
+    (*ss) << to_type_struct(type, ctx);
     return;
   }
 
@@ -459,8 +462,7 @@ void Emitter::visit(ASTLiteral *node) {
         // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
         // we will keep the null terminated strings until we have a solution for this.
         auto str = node->value.get_str();
-        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str,
-                             calculate_actual_length(str));
+        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
         return;
       }
     } break;
@@ -1095,26 +1097,52 @@ void Emitter::visit(ASTTuple *node) {
 void Emitter::visit(ASTTupleDeconstruction *node) {
   emit_line_directive(node);
 
-  auto block = node->declaring_block;
-  if (!block) {
-    throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
-                node->source_range);
-  }
-  auto id = block.get()->temp_iden_idx++;
-  std::string temp_id = "$temp_tuple$" + std::to_string(id++);
-  (*ss) << "auto " << temp_id << " = ";
-  node->right->accept(this);
-  (*ss) << ";\n";
+  auto type = global_get_type(node->resolved_type);
 
-  if (node->op == TType::ColonEquals) {
-    for (size_t i = 0; i < node->idens.size(); ++i) {
-      (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
-      (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto block = node->declaring_block;
+    if (!block) {
+      throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
+                  node->source_range);
+    }
+    auto id = block.get()->temp_iden_idx++;
+    std::string temp_id = "$temp_tuple$" + std::to_string(id++);
+    (*ss) << "auto " << temp_id << " = ";
+    node->right->accept(this);
+    (*ss) << ";\n";
+
+    if (node->op == TType::ColonEquals) {
+      for (size_t i = 0; i < node->idens.size(); ++i) {
+        (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
+    } else {
+      for (size_t i = 0; i < node->idens.size(); ++i) {
+        (*ss) << node->idens[i]->value.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
     }
   } else {
-    for (size_t i = 0; i < node->idens.size(); ++i) {
-      (*ss) << node->idens[i]->value.get_str() << " = ";
-      (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+    auto scope = type->get_info()->scope;
+    auto index = 0;
+    static int temp_idx = 0;
+    std::string identifier = "$deconstruction$"+ std::to_string(temp_idx++); 
+    (*ss) << to_cpp_string(type) << " " << identifier << " = ";
+    node->right->accept(this);
+    semicolon();
+
+    for (const auto name : scope->ordered_symbols) {
+      auto symbol = scope->local_lookup(name);
+      if (symbol->is_function()) {
+        continue;
+      }
+      if (node->op == TType::ColonEquals) {
+        (*ss) << to_cpp_string(global_get_type(symbol->type_id)) << " " << node->idens[index++]->value.get_str() << " = ";
+        (*ss) << identifier << "." << name.get_str() << ";\n";
+      } else {
+        (*ss) << node->idens[index++]->value.get_str() << " = ";
+        (*ss) << identifier << "." << name.get_str() << ";\n";
+      }
     }
   }
 }
@@ -1409,6 +1437,10 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 }
 
 std::string Emitter::to_type_struct(Type *type, Context &context) {
+  if (!type) {
+    throw_error("internal compiler error: Reflection system got a null type", {});
+  }
+
   auto id = type->id;
 
   static bool *type_cache = [] {
@@ -1869,7 +1901,7 @@ void Emitter::visit(ASTSize_Of *node) {
   (*ss) << ")";
 }
 
-void Emitter::call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op,
+void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
   auto function_type = find_operator_overload(op, left_ty, operation);
   auto call = ASTCall{};

@@ -1005,7 +1005,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         declaring_or_assigning_type = params->params[param_index]->resolved_type;
         node->arguments[arg_index]->accept(this);
         assert_types_can_cast_or_equal(
-            node->arguments[arg_index]->resolved_type, params->params[param_index]->resolved_type, node->arguments[arg_index]->source_range,
+            node->arguments[arg_index]->resolved_type, params->params[param_index]->resolved_type,
+            node->arguments[arg_index]->source_range,
             std::format("unexpected argument type.. parameter #{} of function",
                         arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
       }
@@ -1118,8 +1119,6 @@ void Typer::visit(ASTArguments *node) {
     node->resolved_argument_types.push_back(arg->resolved_type);
   }
 }
-
-
 
 void Typer::visit(ASTExprStatement *node) {
   node->expression->accept(this);
@@ -1835,25 +1834,35 @@ void Typer::visit(ASTAlias *node) {
 
 void Typer::visit(ASTTupleDeconstruction *node) {
   node->right->accept(this);
+  node->resolved_type = node->right->resolved_type;
+  
   auto type = global_get_type(node->right->resolved_type);
 
-  if (!type->is_kind(TYPE_TUPLE)) {
-    throw_error("Cannot currently destruct a non-tuple. Coming soon for structs.", node->source_range);
+  if (type->get_ext().has_extensions()) {
+    throw_error("Cannot destructure pointer or array type.", node->source_range);
   }
 
-  auto info = (type->get_info()->as<TupleTypeInfo>());
-
-  if (node->idens.size() != info->types.size()) {
-    throw_error(std::format("Cannot currently partially deconstruct a tuple. "
-                            "expected {} identifiers to assign, got {}",
-                            info->types.size(), node->idens.size()),
-                node->source_range);
-  }
-
-  for (int i = 0; i < node->idens.size(); ++i) {
-    auto type = info->types[i];
-    auto iden = node->idens[i];
-    ctx.scope->insert(iden->value, type, node);
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto info = (type->get_info()->as<TupleTypeInfo>());
+    if (node->idens.size() != info->types.size()) {
+      throw_error(std::format("Cannot currently partially deconstruct a tuple. "
+                              "expected {} identifiers to assign, got {}",
+                              info->types.size(), node->idens.size()),
+                  node->source_range);
+    }
+    for (int i = 0; i < node->idens.size(); ++i) {
+      auto type = info->types[i];
+      auto iden = node->idens[i];
+      ctx.scope->insert(iden->value, type, node);
+    }
+  } else {
+    auto scope = type->get_info()->scope;
+    for (const auto &[name, symbol] : scope->symbols) {
+      if (symbol.is_function()) {
+        continue;
+      }
+      ctx.scope->insert(name, symbol.type_id, symbol.declaring_node.get());
+    }
   }
 
   return;
@@ -1875,9 +1884,7 @@ void Typer::visit(ASTImpl *node) {
     GenericInstantiationErrorUserData data;
     set_panic_handler(generic_instantiation_panic_handler);
     set_error_user_data(&data);
-    Defer _defer([&]{
-      handle_generic_error_if_failed(&data, node->source_range);
-    });
+    Defer _defer([&] { handle_generic_error_if_failed(&data, node->source_range); });
     for (auto instantiations : node_as_struct->generic_instantiations) {
       visit_generic(&Typer::visit_impl_declaration, node, instantiations.arguments);
     }

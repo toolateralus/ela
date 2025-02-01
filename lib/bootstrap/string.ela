@@ -4,12 +4,15 @@
   // Another thing: We should use u8 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
   // So we'll have to rewrite them all for that.
   impl str {
+  
     empty :: fn() -> #self {
       return {};
     }
+    
     subscript :: fn(self*, idx: s64) -> u8 {
       return self.data[idx];
     }
+    
     eq :: fn(self*, other: #self) -> bool {
       if self.length != other.length then return false;
       for idx in 0..self.length {
@@ -17,6 +20,7 @@
       }
       return true;
     }
+    
     starts_with :: fn(self*, prefix: u8*) -> bool {
       prefix_len := strlen(prefix);
       if self.length < prefix_len then return false;
@@ -25,6 +29,7 @@
       }
       return true;
     }
+    
     ends_with :: fn(self*, suffix: u8*) -> bool {
       suffix_len := strlen(suffix);
       if self.length < suffix_len then return false;
@@ -32,7 +37,8 @@
         if self.data[self.length - suffix_len + i] != suffix[i] then return false;
       }
       return true;
-    }   
+    }
+    
     slice :: fn(self*, range: Range) -> Slice![u8] {
       start, end := (range.begin, range.end);
       length := end - start;
@@ -46,21 +52,26 @@
         length: length,
       };
     }
+    
     as_string :: fn(self) -> String {
       return {
         data: strdup(self.data),
         length: self.length,
       };
     }
+    
   }
 
   impl String {
+  
     empty :: fn() -> #self {
       return {};
     }
+    
     subscript :: fn(self*, idx: s64) -> u8 {
       return self.data[idx];
     }
+    
     eq :: fn(self*, other: #self) -> bool {
       if self.length != other.length then return false;
       for idx in 0..self.length {
@@ -68,6 +79,7 @@
       }
       return true;
     }
+    
     starts_with :: fn(self*, prefix: u8*) -> bool {
       prefix_len := strlen(prefix);
       if self.length < prefix_len then return false;
@@ -103,6 +115,7 @@
       result.data[result.length] = 0;
       return result;
     }
+    
     from :: fn(data: u8*) -> #self{
       if !data then return {};
       len := strlen(data);
@@ -112,6 +125,7 @@
         length: len,
       };
     }
+    
     from_ptr :: fn(begin: u8*, end: u8*) -> #self {
       self: #self;
       self.length = end - begin;
@@ -120,6 +134,29 @@
       memcpy(self.data, begin, self.length);
       self.data[self.length] = 0;
       return self;
+    }
+
+    resize :: fn(self*, new_size: u64) {
+      if new_size < self.length then self.length = new_size;
+      self.capacity = new_size;
+      printf("new size %d\n"c, new_size);
+      self.data = realloc(self.data, new_size * sizeof(u8));
+      printf("done resizing\n"c);
+    }
+    
+    push :: fn(self*, ch: u8) {
+      if self.capacity == 0 then self.capacity = 256 / 3;
+      if self.length + 1 >= self.capacity {
+        self.resize(self.capacity * 3);
+      }
+      self.data[self.length] = ch;
+      self.length++;
+    }
+
+    pop :: fn(self*) -> u8 {
+      if self.length == 0 then return '\0' as u8;
+      ch := self.data[self.length--];
+      return ch;
     }
    
   }

@@ -85,7 +85,6 @@ impl String_Builder {
     
     slice_index := 0;
     length := slice.length;
-    printf("slice length: %d, slice data: %s\n"c, slice.length, slice.data);
 
     remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
 
