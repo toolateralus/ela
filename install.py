@@ -13,9 +13,10 @@ def run_command(command):
     sys.exit(1)
 
 def main():
+
   if os.geteuid() != 0:
-    print("This script requires sudo privileges. Please run with sudo.")
-    sys.exit(1)
+    subprocess.run(['sudo', 'python3'] + sys.argv)
+    sys.exit(0)
 
   build_dir = "build"
   os.makedirs(build_dir, exist_ok=True)

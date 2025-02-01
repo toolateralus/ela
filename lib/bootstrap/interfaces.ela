@@ -125,6 +125,10 @@ As_Char_Slice :: interface![T] {
   as_char_slice :: fn(v: T) -> Slice![u32];
 }
 
+As_Byte_Slice :: interface![T] {
+  as_byte_slice :: fn(v: T) -> Slice![u8];
+}
+
 Deinit :: interface {
   deinit :: fn(self*);
 }

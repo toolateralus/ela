@@ -223,3 +223,21 @@ impl As_Char_Slice![str] for str {
     }
   }
 }
+
+impl As_Byte_Slice![str] for str {
+  as_byte_slice :: fn(self) -> Slice![u8] {
+    return {
+      data: self.data,
+      length: self.length
+    }
+  }
+}
+
+impl As_Byte_Slice![String] for String {
+  as_byte_slice :: fn(self) -> Slice![u8] {
+    return {
+      data: self.data,
+      length: self.length
+    }
+  }
+}

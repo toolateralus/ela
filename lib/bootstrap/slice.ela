@@ -14,11 +14,21 @@ impl![T] Slice![T] {
   subscript :: fn(self*, idx: u32) -> T {
     return self.data[idx];
   }
+  
+  // TODO: do we want to truncate or throw an error when the requested range's length is greater than the amount of 
+  // data available??
   slice :: fn(self, range: Range) -> Slice![T] {
+    if range.begin < 0 then range.begin = 0;
+
+    if range.end == -1 || range.end > self.length {
+      range.end = self.length;  
+    }
+
     length := range.end - range.begin;
     
-    if length < 0 || length > self.length then return {};
-    
+    // TODO: support reverse ranges?
+    if length < 0 then return {};
+
     return {
       data: self.data + range.begin,
       length: length,

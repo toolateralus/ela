@@ -20,10 +20,13 @@ utf8_decode_sequence :: fn(bytes: Slice![u8]) -> (u32, s8) {
   
   sequence_length := utf8_get_sequence_length(bytes.data[0]);
 
-  assert("utf8_decode_sequence(): bad sequence length", bytes.length >= sequence_length);
-
   if sequence_length == -1
     then return (UTF8_ERROR, 1);
+
+  if bytes.length < sequence_length {
+    printf("sequence length: %d, bytes_length: %d\n"c, sequence_length, bytes.length);
+    assert("utf8_decode_sequence(): bad sequence length", false);
+  }
     
   if sequence_length == 1
     then return (bytes.data[0] as u32, 1);
@@ -78,12 +81,12 @@ utf8_decode_sequence :: fn(bytes: Slice![u8]) -> (u32, s8) {
 }
 
 utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice![T] {
-  slice := data.as_char_slice();
+  slice := data.as_byte_slice();
   idx := 0;
   output: u32[];
   while idx < slice.length {
     subslice := slice.slice(idx..idx + 4);
-    ch, advance := utf8_decode_sequence(Slice![u8] {data: subslice.data, length: subslice.length});
+    ch, advance := utf8_decode_sequence(subslice);
     output.push(ch);
     idx += advance;
   }

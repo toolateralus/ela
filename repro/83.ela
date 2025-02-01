@@ -11,7 +11,7 @@ main :: fn() {
   $2 := f(b);
   $3 := $2 * $0;
   $4 := $3 + 1; 
-  a := $4;
+  a  := $4;
 
   // so that we can do things like take the address of any value or whatever.
   // this would also aid us in doing things like initializer lists, and any casting, and other expression-based 
