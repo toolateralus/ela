@@ -67,7 +67,13 @@
   }
 
   impl String {
-  
+    // THIS IS JUST A VIEW OF THE CURRENT STRING, PERFORM A CLONE ON THE STR TO GET AN OWNED COPY.
+    as_str :: fn(self) -> str {
+      return {
+        data: self.data,
+        length: self.length,
+      }
+    }
     empty :: fn() -> #self {
       return {};
     }
