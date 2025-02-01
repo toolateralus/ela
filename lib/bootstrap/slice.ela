@@ -9,3 +9,19 @@ impl![T] Clone for Slice![T] {
     };
   }
 }
+
+impl![T] Slice![T] {
+  subscript :: fn(self*, idx: u32) -> T {
+    return self.data[idx];
+  }
+  slice :: fn(self, range: Range) -> Slice![T] {
+    length := range.end - range.begin;
+    
+    if length < 0 || length > self.length then return {};
+    
+    return {
+      data: self.data + range.begin,
+      length: length,
+    }
+  }
+}

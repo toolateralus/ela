@@ -1,0 +1,8 @@
+main :: fn() {
+  // C error: use of undeclared identifier FF, 
+  range := 0xFF..0xFFFF;
+
+
+  // Valid.
+  range := 0xFF .. 0xFFFF;
+}

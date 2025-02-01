@@ -1,8 +1,12 @@
+// #import utf8;
+
 #ifndef FREESTANDING {
   // TODO: reimplement all the helper functions we used to have.
   // Also, we should make this not null terminated, rather controlled by length.
   // Another thing: We should use u8 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
   // So we'll have to rewrite them all for that.
+
+  
   impl str {
   
     empty :: fn() -> #self {
@@ -158,6 +162,10 @@
       ch := self.data[self.length--];
       return ch;
     }
+
+    // chars :: fn(self) -> u32[] {
+    //   return utf8_decode(self);
+    // }
    
   }
 

@@ -71,21 +71,24 @@ impl File {
     fclose(file);
     return ({}, string);
   }
-
-  read_bytes :: fn(filename: str) -> List![u8] {
+  
+  read_bytes :: fn(filename: str) -> (FileError, u8[]) {
     file := fopen(filename.data, "r"c);
-    if !file then return {};
-    result: List![u8];
-    length := File::length(file);
-    result.resize(length);
-    c: s8;
-    for i in 0..length {
-      result.push(fgetc(file));
-    }
-    fclose(file);
-    return result;
-  }
+    if !file then return ("Couldn't open file", {});
+    
+    bytes: u8[];
+    bytes.resize(1024);
 
+    while {
+      c := fgetc(file);
+      if c == EOF then break;
+      bytes.push(c);
+    }
+    
+    fclose(file);
+    return ({}, bytes);
+  }
+  
   write_all :: fn(filename: str, data: str) -> FileError {
     file := fopen(filename.data, "w"c);
     if !file {

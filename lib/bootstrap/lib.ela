@@ -24,6 +24,13 @@ assert_eq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | SelfEq {
   }
 }
 
+assert_neq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | SelfEq {
+  if a == b {
+    printf("assertion failed: %s\n"c, message.data);
+    exit(1);
+  }
+}
+
 #alias Panic_Handler :: fn *(str);
 
 panic_handler: Panic_Handler;

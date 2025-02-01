@@ -1,7 +1,15 @@
 
+// TODO: add reverse ranges?
+
 Range :: struct {
   begin: s64,
   end:   s64,
+}
+
+impl Range {
+  contains :: fn(self, value: s64) -> bool {
+    return self.begin <= value && self.end >= value;
+  }
 }
 
 Range_Enumerator :: struct {
