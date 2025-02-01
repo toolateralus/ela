@@ -838,7 +838,14 @@ void Typer::visit(ASTFor *node) {
   } else if (range_type->implements("Enumerator")) {
     node->iteration_kind = ASTFor::ENUMERATOR;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
-    iter_ty = range_type->generic_args[0];
+     auto symbol = scope->local_lookup("current");
+
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Enumerator' but no 'current' function was found when "
+                  "attempting to enumerate, or it was a non-function symbol named 'current'",
+                  node->source_range);
+    }
+    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     node->iterable_type = range_type_id;
   } else if (range_type->get_base().get_str().starts_with("Iter$")) {
     node->iteration_kind = ASTFor::ITERATOR;
