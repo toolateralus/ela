@@ -82,9 +82,10 @@ utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice![T] {
   idx := 0;
   output: u32[];
   while idx < slice.length {
-    subslice := slice.slice(idx, idx + 4);
-    ch, advance := utf8_decode_sequence(subslice);
+    subslice := slice.slice(idx..idx + 4);
+    ch, advance := utf8_decode_sequence(Slice![u8] {data: subslice.data, length: subslice.length});
     output.push(ch);
     idx += advance;
   }
+  return output;
 }
