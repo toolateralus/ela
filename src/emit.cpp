@@ -1076,15 +1076,26 @@ void Emitter::visit(ASTRange *node) {
 }
 
 void Emitter::visit(ASTSwitch *node) {
+  auto type = global_get_type(node->target->resolved_type);
+  bool use_eq_operator = true;
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+    use_eq_operator = false;    
+  }
+
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
     if (!first) {
       (*ss) << " else ";
     }
     emit_line_directive(target);
     (*ss) << " if (";
-    target->accept(this);
-    (*ss) << " == ";
-    _case.expression->accept(this);
+    if (use_eq_operator) {
+      target->accept(this);
+      (*ss) << " == ";
+      _case.expression->accept(this);
+    } else {
+      call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
+    }
     (*ss) << ") ";
     emit_line_directive(_case.block);
     _case.block->accept(this);

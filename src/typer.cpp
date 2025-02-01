@@ -838,7 +838,7 @@ void Typer::visit(ASTFor *node) {
   } else if (range_type->implements("Enumerator")) {
     node->iteration_kind = ASTFor::ENUMERATOR;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
-     auto symbol = scope->local_lookup("current");
+    auto symbol = scope->local_lookup("current");
 
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Enumerator' but no 'current' function was found when "
@@ -860,7 +860,8 @@ void Typer::visit(ASTFor *node) {
                 node->source_range);
   }
 
-  auto is_enumerator_or_enumerable = node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
+  auto is_enumerator_or_enumerable =
+      node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
 
   if (is_enumerator_or_enumerable && node->value_semantic == VALUE_SEMANTIC_POINTER) {
     throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
@@ -874,7 +875,8 @@ void Typer::visit(ASTFor *node) {
     // dereference.
     auto type = global_get_type(iter_ty);
     if (!type->get_ext().is_pointer()) {
-      throw_error("internal compiler error: got `for *.. in ...` but the iter() did not return a pointer type?", node->source_range);
+      throw_error("internal compiler error: got `for *.. in ...` but the iter() did not return a pointer type?",
+                  node->source_range);
     }
     iter_ty = type->get_element_type();
   }
@@ -1788,6 +1790,15 @@ void Typer::visit(ASTSwitch *node) {
   node->target->accept(this);
   auto type_id = node->target->resolved_type;
   auto type = global_get_type(type_id);
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+    auto operator_overload = find_operator_overload(TType::EQ, type, OPERATION_BINARY);
+    if (operator_overload == -1) {
+      throw_error(std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
+                  "SelfEq (== operator on self)\ngot type '{}'", type->to_string()),
+                  node->target->source_range);
+    }
+  }
 
   int return_type = void_type();
   int flags = BLOCK_FLAGS_FALL_THROUGH;
