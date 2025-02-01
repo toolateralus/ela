@@ -1,5 +1,6 @@
 #pragma once
 
+#include <csetjmp>
 #include <deque>
 #include <vector>
 
@@ -268,7 +269,7 @@ struct Emitter : VisitorBase {
 };
 
 struct GenericInstantiationErrorUserData {
-  bool failed = false;
   std::string message = "";
   SourceRange definition_range = {};
+  jmp_buf save_state;
 };
