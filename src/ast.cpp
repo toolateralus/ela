@@ -1,6 +1,5 @@
 #include "ast.hpp"
 
-
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
@@ -317,15 +316,14 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "type",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->expect(TType::LParen);
-        auto type = parser->parse_expr();
-        parser->expect(TType::RParen);
         NODE_ALLOC(ASTType, outer, range, _, parser)
+        parser->expect(TType::LParen);
+        outer->pointing_to = parser->parse_expr();
+        parser->expect(TType::RParen);
         
         outer->kind = ASTType::REFLECTION;
         outer->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("Type");
         outer->extensions.push_back({TYPE_EXT_POINTER});
-        outer->pointing_to = type;
         return outer;
     }},
     // #c_flags, for adding stuff like linker options, -g etc from within
@@ -630,9 +628,10 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     Precedence token_precedence = get_operator_precedence(peek());
     if (token_precedence <= precedence)
       break;
+    ASTBinExpr *binexpr = ast_alloc<ASTBinExpr>();
+    binexpr->source_range = left->source_range;
     auto op = eat();
     auto right = parse_expr(token_precedence);
-    NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
     binexpr->left = left;
     binexpr->right = right;
     binexpr->op = op;
@@ -647,9 +646,9 @@ ASTExpr *Parser::parse_unary() {
   if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot ||
       peek().type == TType::Not || peek().type == TType::Increment || peek().type == TType::Decrement ||
       peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::Not) {
+    NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
     auto op = eat();
     auto expr = parse_unary();
-    NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
 
     // TODO: make a more comprehensive rvalue evaluator.
     // We need to use it later for self* method calls
@@ -683,8 +682,8 @@ ASTExpr *Parser::parse_postfix() {
     if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
-      eat();
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
+      eat();
       dot->base = left;
       if (peek().type == TType::Integer || peek().type == TType::Identifier) {
         dot->member_name = eat().value;
@@ -694,36 +693,32 @@ ASTExpr *Parser::parse_postfix() {
       }
       left = dot;
     } else if (peek().type == TType::DoubleColon) {
+      NODE_ALLOC(ASTScopeResolution, scope_resolution, range, _, this)
       eat();
-      NODE_ALLOC(ASTScopeResolution, dot, range, _, this)
-      dot->base = left;
-      dot->member_name = expect(TType::Identifier).value;
-      left = dot;
+      scope_resolution->base = left;
+      scope_resolution->member_name = expect(TType::Identifier).value;
+      left = scope_resolution;
     } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
-      NODE_ALLOC(ASTUnaryExpr, unary, range, _, this)
+      NODE_ALLOC(ASTUnaryExpr, unary, unary_range, _, this)
       unary->operand = left;
-      unary->op = peek();
-      eat();
-      end_node(unary, range);
+      unary->op = eat();
       return unary;
     } else if (peek().type == TType::LBrace) {
-      eat();
-      auto index = parse_expr();
-      expect(TType::RBrace);
       NODE_ALLOC(ASTSubscript, subscript, range, _, this)
       subscript->left = left;
-      subscript->subscript = index;
+      eat();
+      subscript->subscript = parse_expr();
+      expect(TType::RBrace);
       left = subscript;
     } else if (peek().type == TType::Range) {
-      eat();
-      auto right = parse_expr();
       NODE_ALLOC(ASTRange, node, range, _, this)
+      eat();
+      node->right = parse_expr();
       node->left = left;
-      node->right = right;
       return node;
     } else if (peek().type == TType::As) {
-      eat();
       NODE_ALLOC(ASTCast, node, range, _, this)
+      eat();
       node->target_type = parse_type();
       node->expression = left;
       left = node;
@@ -736,7 +731,6 @@ ASTExpr *Parser::parse_postfix() {
 
 ASTExpr *Parser::parse_primary() {
   auto tok = peek();
-  auto range = begin_node();
 
   // if theres a #... that returns a value, use that.
   if (auto directive_expr = try_parse_directive_expr()) {
@@ -756,40 +750,37 @@ ASTExpr *Parser::parse_primary() {
       return parse_lambda();
     }
     case TType::Switch: {
+      NODE_ALLOC(ASTSwitch, node, range, _, this)
       expect(TType::Switch);
-      auto expr = parse_expr();
+      node->target = parse_expr();
       expect(TType::LCurly);
-      std::vector<SwitchCase> cases;
       while (peek().type != TType::RCurly) {
-        SwitchCase _case;
-        _case.expression = parse_expr();
+        SwitchCase _case{
+            .expression = parse_expr(),
+        };
         if (peek().type != TType::ExpressionBody) {
           expect(TType::Colon);
         }
         _case.block = parse_block();
-        cases.push_back(_case);
+        node->cases.push_back(_case);
         if (peek().type == TType::Comma) {
           eat();
         }
       }
       expect(TType::RCurly);
-      NODE_ALLOC(ASTSwitch, node, range, _, this)
-      node->cases = cases;
-      node->target = expr;
-      end_node(node, range);
       return node;
     }
     case TType::Char: {
-      eat();
       NODE_ALLOC(ASTLiteral, node, range, _, this)
+      eat();
       node->tag = ASTLiteral::Char;
       node->value = tok.value;
       end_node(node, range);
       return node;
     }
     case TType::LCurly: {
-      eat();
       NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
+      eat();
       if (peek().type == TType::RCurly) {
         init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
       } else if (lookahead_buf()[1].type != TType::Colon) {
@@ -829,55 +820,55 @@ ASTExpr *Parser::parse_primary() {
         }
         return type;
       }
-      eat();
       NODE_ALLOC(ASTIdentifier, iden, range, _, this)
+      eat();
       iden->value = tok.value;
       end_node(iden, range);
       return iden;
     }
     case TType::Null: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::Null;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
     }
     case TType::True: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::Bool;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
     }
     case TType::False: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::Bool;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
     }
     case TType::Integer: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::Integer;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
     }
     case TType::Float: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::Float;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
     }
     case TType::String: {
-      eat();
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
+      eat();
       literal->tag = ASTLiteral::String;
       literal->value = tok.value;
       if (peek().type == TType::Identifier && peek().value == "c") {
@@ -888,24 +879,24 @@ ASTExpr *Parser::parse_primary() {
       return literal;
     }
     case TType::LParen: {
+      auto range = begin_node();
       expect(TType::LParen); // (
       const auto lookahead = lookahead_buf();
       auto expr = parse_expr();
       if (peek().type == TType::Comma) {
+        ASTTuple *tuple = ast_alloc<ASTTuple>();
+        Defer _([&] { this->end_node(tuple, range); });
+        tuple->values.push_back(expr);
         eat();
-        auto exprs = std::vector<ASTExpr *>{expr};
         while (peek().type != TType::RParen) {
-          exprs.push_back(parse_expr());
+          tuple->values.push_back(parse_expr());
           if (peek().type == TType::Comma)
             eat();
         }
         expect(TType::RParen);
-        NODE_ALLOC(ASTTuple, tuple, range, _, this)
-        tuple->values = exprs;
         return tuple;
       }
       if (peek().type != TType::RParen) {
-        auto range = begin_node();
         eat();
         end_node(nullptr, range);
         throw_error("Expected ')'", range);
@@ -920,9 +911,10 @@ ASTExpr *Parser::parse_primary() {
       return expr;
     }
     default: {
+      auto error_range = begin_node();
       throw_error(
           std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
-          range);
+          error_range);
       return nullptr;
     }
   }
@@ -930,18 +922,16 @@ ASTExpr *Parser::parse_primary() {
 
 ASTType *Parser::parse_type() {
   if (peek().type == TType::LParen) {
+    NODE_ALLOC(ASTType, node, range, _, this)
+    node->resolved_type = Type::invalid_id;
+    node->kind = ASTType::TUPLE;
     eat();
-    std::vector<ASTType *> types;
     while (peek().type != TType::RParen) {
-      types.push_back(parse_type());
+      node->tuple_types.push_back(parse_type());
       if (peek().type == TType::Comma)
         eat();
     }
     expect(TType::RParen);
-    NODE_ALLOC(ASTType, node, range, _, this)
-    node->resolved_type = Type::invalid_id;
-    node->kind = ASTType::TUPLE;
-    node->tuple_types = types;
     // grab up more extensions if they exist.
     append_type_extensions(node);
     return node;
@@ -961,12 +951,11 @@ ASTType *Parser::parse_type() {
   }
 
   if (peek().type == TType::Fn) {
-    expect(TType::Fn);
     return parse_function_type();
   }
 
-  auto base = eat().value;
   NODE_ALLOC(ASTType, node, range, _, this)
+  auto base = eat().value;
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
   node->normal.base->source_range = range;
@@ -982,8 +971,8 @@ ASTType *Parser::parse_type() {
   }
 
   while (peek().type == TType::DoubleColon) {
-    eat();
     NODE_ALLOC(ASTScopeResolution, scope_res_node, range, _, this)
+    eat();
     scope_res_node->base = node->normal.base;
     scope_res_node->member_name = expect(TType::Identifier).value;
     node->normal.base = scope_res_node;
@@ -1053,8 +1042,8 @@ ASTStatement *Parser::parse_statement() {
     }
 
     if (tok.type == TType::Return) {
-      expect(TType::Return);
       NODE_ALLOC(ASTReturn, return_node, range, _, this)
+      expect(TType::Return);
       if (peek().type != TType::Semi) {
         return_node->expression = parse_expr();
       }
@@ -1063,22 +1052,22 @@ ASTStatement *Parser::parse_statement() {
     }
 
     if (tok.type == TType::Break) {
-      eat();
       NODE_ALLOC(ASTBreak, _break, range, _, this)
+      eat();
       end_node(_break, range);
       return _break;
     }
 
     if (tok.type == TType::Continue) {
-      eat();
       NODE_ALLOC(ASTContinue, _continue, range, _, this)
+      eat();
       end_node(_continue, range);
       return _continue;
     }
 
     if (tok.type == TType::For) {
-      eat();
       NODE_ALLOC(ASTFor, node, range, _, this)
+      eat();
 
       node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
 
@@ -1105,8 +1094,8 @@ ASTStatement *Parser::parse_statement() {
     }
 
     if (tok.type == TType::While) {
-      eat();
       NODE_ALLOC(ASTWhile, node, range, _, this)
+      eat();
       if (peek().type != TType::LCurly) {
         node->condition = parse_expr();
       }
@@ -1118,13 +1107,13 @@ ASTStatement *Parser::parse_statement() {
     // TODO: we should handle the 'then' statement more gracefully.
     // Also, => is super fricken janky, and is really poorly implemented.
     if (tok.type == TType::If) {
-      eat();
       NODE_ALLOC(ASTIf, node, range, _, this)
+      eat();
       node->condition = parse_expr();
 
       if (peek().type == TType::Then) {
-        eat();
         NODE_ALLOC(ASTBlock, block, _range, defer, this);
+        eat();
         node->block = block;
         ctx.set_scope();
         auto statement = parse_statement();
@@ -1138,8 +1127,8 @@ ASTStatement *Parser::parse_statement() {
       }
 
       if (peek().type == TType::Else) {
-        eat();
         NODE_ALLOC(ASTElse, node_else, range, _, this)
+        eat();
         if (peek().type == TType::If) {
           auto inner_if = parse_statement();
           assert(inner_if->get_node_type() == AST_NODE_IF);
@@ -1155,14 +1144,14 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-        lookahead_buf()[2].type == TType::Identifier &&
-        (lookahead_buf()[3].type == TType::GenericBrace || lookahead_buf()[3].type == TType::LParen)) {
-      NODE_ALLOC(ASTExprStatement, expr, range, _, this)
-      expr->expression = parse_expr();
-      end_node(expr, range);
-      return expr;
-    }
-    
+      lookahead_buf()[2].type == TType::Identifier &&
+      (lookahead_buf()[3].type == TType::GenericBrace || lookahead_buf()[3].type == TType::LParen)) {
+    NODE_ALLOC(ASTExprStatement, expr, range, _, this)
+    expr->expression = parse_expr();
+    end_node(expr, range);
+    return expr;
+  }
+
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1294,8 +1283,8 @@ ASTStatement *Parser::parse_statement() {
 }
 
 ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
-  auto first = parse_primary();
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
+  auto first = parse_primary();
   node->idens.push_back(static_cast<ASTIdentifier *>(first));
   while (peek().type == TType::Comma) {
     eat();
@@ -1389,8 +1378,8 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   ctx.set_scope(scope);
 
   if (peek().type == TType::ExpressionBody) {
-    expect(TType::ExpressionBody);
     NODE_ALLOC(ASTReturn, $return, range, _, this);
+    expect(TType::ExpressionBody);
     $return->expression = parse_expr();
     block->statements = {$return};
     block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
@@ -1432,6 +1421,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
   expect(TType::LParen);
   ASTType *type = nullptr;
   while (peek().type != TType::RParen) {
+    NODE_ALLOC(ASTParamDecl, param, range, _, this)
     if (params->is_varargs) {
       end_node(nullptr, range);
       throw_error("var args \"...\" must be the last parameter", range);
@@ -1458,7 +1448,6 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
         throw_error("\"self\" must appear first in method parameters.", range);
       }
       params->has_self = true;
-      NODE_ALLOC(ASTParamDecl, param, range, _, this)
       param->tag = ASTParamDecl::Self;
       params->params.push_back(param);
 
@@ -1478,7 +1467,6 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       type = parse_type();
     }
 
-    NODE_ALLOC(ASTParamDecl, param, range, _, this)
     param->tag = ASTParamDecl::Normal;
     param->normal.type = type;
     param->normal.name = name;
@@ -1502,9 +1490,9 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 }
 
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
+  NODE_ALLOC(ASTFunctionDeclaration, function, range, _, this)
   expect(TType::Fn);
 
-  NODE_ALLOC(ASTFunctionDeclaration, function, range, _, this)
   function->has_defer = false;
 
   if (peek().type == TType::GenericBrace) {
@@ -1514,7 +1502,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = function;
-
 
   function->params = parse_parameters(function->generic_parameters);
   function->name = name.value;
@@ -1579,8 +1566,8 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 }
 
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
-  expect(TType::Enum);
   NODE_ALLOC(ASTEnumDeclaration, node, range, _, this)
+  expect(TType::Enum);
   node->name = tok.value;
   expect(TType::LCurly);
   if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
@@ -1643,8 +1630,8 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 }
 
 ASTImpl *Parser::parse_impl() {
-  expect(TType::Impl);
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, _, this, current_impl_decl = nullptr)
+  expect(TType::Impl);
 
   ctx.set_scope();
   node->scope = ctx.exit_scope();
@@ -1697,8 +1684,8 @@ ASTImpl *Parser::parse_impl() {
 }
 
 ASTDefer *Parser::parse_defer() {
-  expect(TType::Defer);
   NODE_ALLOC(ASTDefer, node, range, _, this)
+  expect(TType::Defer);
   node->statement = parse_statement();
   end_node(node, range);
   return node;
@@ -1711,21 +1698,19 @@ ASTWhere *Parser::parse_where_clause() {
   expect(TType::Is);
   node->predicate = parse_type();
   while (peek().type == TType::And || peek().type == TType::Or) {
-    auto op = eat();
-    auto right = parse_type();
     NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+    binexpr->op = eat();
+    binexpr->right = parse_type();
     binexpr->left = node->predicate;
-    binexpr->right = right;
-    binexpr->op = op;
     node->predicate = binexpr;
   }
   return node;
 }
 
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
-  expect(TType::Interface);
   auto previous = current_interface_decl;
   NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, _, this, { current_interface_decl = previous; });
+  expect(TType::Interface);
 
   node->name = name.value;
   current_interface_decl = node;
@@ -1753,6 +1738,8 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
 
 ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   bool is_union = false;
+  auto old = current_struct_decl;
+  NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
 
   if (peek().type == TType::Struct) {
     expect(TType::Struct);
@@ -1761,8 +1748,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     expect(TType::Union);
   }
 
-  auto old = current_struct_decl;
-  NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
   node->is_union = is_union;
   current_struct_decl = node;
 
@@ -2008,6 +1993,7 @@ void Parser::append_type_extensions(ASTType *&node) {
 
 ASTType *Parser::parse_function_type() {
   NODE_ALLOC(ASTType, output_type, range, _, this)
+  expect(TType::Fn);
   output_type->kind = ASTType::FUNCTION;
   append_type_extensions(output_type);
   FunctionTypeInfo info{};
@@ -2099,7 +2085,7 @@ Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
     SourceRange range = {
-      .begin_location = peek().location,
+        .begin_location = peek().location,
     };
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
@@ -2121,8 +2107,8 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
 }
 
 ASTLambda *Parser::parse_lambda() {
-  expect(TType::Fn);
   NODE_ALLOC(ASTLambda, node, range, _, this);
+  expect(TType::Fn);
   node->params = parse_parameters();
   if (peek().type == TType::Arrow) {
     eat();

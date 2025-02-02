@@ -1079,7 +1079,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
     declaring_or_assigning_type = info->parameter_types[i];
     arg->accept(this);
     if (i < info->params_len) {
-      assert_types_can_cast_or_equal(arg->resolved_type, info->parameter_types[i], node->source_range,
+      assert_types_can_cast_or_equal(arg->resolved_type, info->parameter_types[i], arg->source_range,
                                      std::format("invalid argument type for parameter #{}", i + 1));
     }
   }
