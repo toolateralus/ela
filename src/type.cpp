@@ -357,9 +357,6 @@ std::string Type::to_string() const {
 }
 
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-#ifdef PRINT_TYPE_INFO
-  std::cout << "creating interface type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-#endif
   type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
   Type *type = type_table.back();
   type->set_base(name);
@@ -371,9 +368,6 @@ int global_create_interface_type(const InternedString &name, Scope *scope, std::
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-#ifdef PRINT_TYPE_INFO
-  std::cout << "creating struct/union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-#endif
   type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
   Type *type = type_table.back();
   std::string base = name.get_str();
@@ -389,9 +383,6 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 }
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
-#ifdef PRINT_TYPE_INFO
-  std::cout << "creating tagged union type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-#endif
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
   type->set_base(name.get_str() + mangled_type_args(generic_args));
@@ -403,9 +394,6 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope, co
 }
 
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
-#ifdef PRINT_TYPE_INFO
-  std::cout << "creating enum type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-#endif
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);
@@ -417,9 +405,6 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
 }
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
-#ifdef PRINT_TYPE_INFO
-  std::cout << "creating type: \"" << name.get_str() << "\" " << type_table.size() << '\n';
-#endif
   type_table.push_back(new Type(type_table.size(), kind));
   auto type = type_table.back();
   type->base_id = base_id;

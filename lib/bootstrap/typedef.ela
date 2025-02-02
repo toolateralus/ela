@@ -19,13 +19,13 @@ String :: struct {
   capacity: u64,
 }
 
-Init_List :: struct![T] {
-  data:   T*,
+Init_List :: struct![Value_Type] {
+  data:   Value_Type*,
   length: u64,
 }
 
-List :: struct![T] {
-  data:     T*,
+List :: struct![Value_Type] {
+  data:     Value_Type*,
   length:   u64,
   capacity: u64,
 }
@@ -37,7 +37,7 @@ any :: struct {
   type: Type*
 };
 
-Slice :: struct![T] {
-  data: T*,
+Slice :: struct![Value_Type] {
+  data: Value_Type*,
   length: u64,
 }

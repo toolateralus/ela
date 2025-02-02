@@ -163,16 +163,13 @@ struct Emitter : VisitorBase {
     if (!is_debugging) {
       return;
     }
-    auto loc = node->source_range.begin_loc;
+    auto loc = node->source_range.begin_location.line;
     if (loc != last_loc) {
       auto filename = get_source_filename(node->source_range);
-
-      // !BUG: figure out why this is sometimes empty.
       if (filename.empty()) {
-        // printf("Empty filename for line directive.\n");
+        printf("Empty filename for line directive.\n");
         return;
       }
-
       (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }

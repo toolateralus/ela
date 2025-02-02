@@ -1066,7 +1066,6 @@ void Emitter::visit(ASTInitializerList *node) {
 }
 
 void Emitter::visit(ASTRange *node) {
-  // TODO: fix this dog crap casting and lack of calculating the span of the range.
   (*ss) << "(Range) {.begin = (s64)";
   node->left->accept(this);
   (*ss) << ", .end = (s64)";

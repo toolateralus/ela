@@ -1,6 +1,5 @@
 #include "ast.hpp"
 
-#include <algorithm>
 
 #include <cassert>
 #include <cstdio>
@@ -1516,8 +1515,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = function;
 
-  if (range.begin > 0)
-    range.begin = range.begin - 1;
+
   function->params = parse_parameters(function->generic_parameters);
   function->name = name.value;
 
@@ -2101,10 +2099,7 @@ Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
     SourceRange range = {
-        .begin_location = peek().location,
-        .end_location = peek().location,
-        .begin = std::max(token_idx - 5, int64_t()),
-        .end = token_idx + 5,
+      .begin_location = peek().location,
     };
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
@@ -2116,14 +2111,10 @@ SourceRange Parser::begin_node() {
   auto location = peek().location;
   return SourceRange{
       .begin_location = location,
-      .begin = token_idx,
-      .begin_loc = (int64_t)location.line,
   };
 }
 
 void Parser::end_node(ASTNode *node, SourceRange &range) {
-  range.end = token_idx;
-  range.end_location = peek().location; // This may be inaccurate.
   if (node) {
     node->source_range = range;
   }

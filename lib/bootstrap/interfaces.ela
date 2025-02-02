@@ -24,14 +24,14 @@ Clone       :: interface {
   clone     :: fn(self*) -> #self;
 }
 
-Init :: interface![T] {
-  init :: fn(init: Init_List![T]) -> #self;
+Init :: interface![Value_Type] {
+  init :: fn(init: Init_List![Value_Type]) -> #self;
 }
 
 // An object used to iterate over a collection of items, or any sequence.
-Enumerator   :: interface![T] {  
+Enumerator   :: interface![Value_Type] {  
   // Return the current value this enumerator points to within the sequence it's iterating over.  
-  current   :: fn(self*) -> T;
+  current   :: fn(self*) -> Value_Type;
   // Advance the enumerator by one step.
   next      :: fn(self*) -> void;
   // Check whether the enumerator is complete, or should continue.
@@ -41,24 +41,24 @@ Enumerator   :: interface![T] {
 }
 
 // A collection or range of items that can be enumerated over, with a for loop, or some other means.
-Enumerable   :: interface![Enum, T] where Enum is Enumerator![T] { 
+Enumerable   :: interface![Enum, Value_Type] where Enum is Enumerator![Value_Type] { 
   // get the Enumerator object that was implemented for this type.
   enumerator      :: fn(self*) -> Enum;
 }
 
-// Iter is a generic struct that represents an iterator over a collection of type T.
+// Iter is a generic struct that represents an iterator over a collection of type Value_Type.
 // It contains a pointer to the current element (ptr) and a pointer to the end of the collection (end).
 
 // It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
 // represented by a chunk of memory that can be trivially traversed.
-Iter :: struct![T] {
-  ptr: T*,  // Pointer to the current element in the collection.
-  end: T*,  // Pointer to the end of the collection.
+Iter :: struct![Value_Type] {
+  ptr: Value_Type*,  // Pointer to the current element in the collection.
+  end: Value_Type*,  // Pointer to the end of the collection.
 }
 
-impl![T] Iter![T] {
+impl![Value_Type] Iter![Value_Type] {
   // Returns a pointer to the current element in the collection.
-  current :: fn(self*) -> T* => self.ptr;
+  current :: fn(self*) -> Value_Type* => self.ptr;
 
   // Advances the iterator to the next element in the collection.
   next :: fn(self*) {
@@ -73,9 +73,9 @@ impl![T] Iter![T] {
 
 // Iterable is a generic interface that represents a collection that can be iterated over.
 // It defines a single method, iter, which returns an iterator for the collection.
-Iterable :: interface![T] {
+Iterable :: interface![Value_Type] {
   // Returns an iterator for the collection.
-  iter :: fn(self*) -> Iter![T];
+  iter :: fn(self*) -> Iter![Value_Type];
 }
 
 // Binary arithmetic operator overloads.
@@ -121,12 +121,12 @@ Allocator :: interface {
   copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
 }
 
-As_Char_Slice :: interface![T] {
-  as_char_slice :: fn(v: T) -> Slice![u32];
+As_Char_Slice :: interface![Value_Type] {
+  as_char_slice :: fn(v: Value_Type) -> Slice![u32];
 }
 
-As_Byte_Slice :: interface![T] {
-  as_byte_slice :: fn(v: T) -> Slice![u8];
+As_Byte_Slice :: interface![Value_Type] {
+  as_byte_slice :: fn(v: Value_Type) -> Slice![u8];
 }
 
 Deinit :: interface {

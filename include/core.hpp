@@ -90,9 +90,6 @@ extern CompileCommand compile_command;
 
 struct SourceRange {
   SourceLocation begin_location;
-  SourceLocation end_location;
-  int64_t begin, end;
-  int64_t begin_loc;
 };
 
 static std::string get_source_filename(const SourceRange &range) {

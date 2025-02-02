@@ -1,9 +1,4 @@
 #include "lex.hpp"
-
-#include <cctype>
-#include <iostream>
-#include <sstream>
-
 #include "error.hpp"
 
 using std::string;
@@ -87,7 +82,7 @@ void Lexer::get_token(State &state) {
       col++;
       c = input[pos];
       if (c != '\'') {
-        throw_error("invalid char literal: too many characters", {.begin = (int64_t)start, .end = (int64_t)pos});
+        throw_error("invalid char literal: too many characters", {location});
       }
       pos++; // move past '
       col++;
@@ -114,9 +109,7 @@ void Lexer::get_token(State &state) {
             pos++;
             col++;
           } else {
-            std::cout << location.ToString();
-            std::cout << "\nela: incomplete escape sequence at end of input\n";
-            exit(1);
+            throw_error("incomplete escape sequence at end of input", {location});
           }
         } else {
           token.put(c);
@@ -173,9 +166,7 @@ void Lexer::get_token(State &state) {
             Token(location, longest_match, operators.at(longest_match), TFamily::Operator));
         return;
       } else {
-        std::cout << location.ToString();
-        std::cout << "\nela: unable to lex operator: " << current_match << std::endl;
-        exit(1);
+        throw_error("unable to lex operator :: '" + current_match + '\'', {location});
       }
     } else if (std::isdigit(c)) {
       bool is_float = false;
@@ -205,8 +196,7 @@ void Lexer::get_token(State &state) {
         }
         if (c == '.') {
           if (is_float) {
-            printf("got too many '.' periods in a float literal.\n");
-            exit(1);
+            throw_error("got too many '.' periods in a float literal.", {location});
           }
           is_float = true;
         }
@@ -233,9 +223,7 @@ void Lexer::get_token(State &state) {
       }
       return;
     } else {
-      std::cout << location.ToString();
-      std::cout << "\nela: unable to lex : " << c << std::endl;
-      exit(1);
+      throw_error("unable to lex character :: '" + std::string(1, c) + '\'', {location});
     }
   }
   state.lookahead_buffer.push_back(Token::Eof());

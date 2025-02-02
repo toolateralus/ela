@@ -56,7 +56,7 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
-static std::string format_error_message(const std::string &message, int max_width = 128) {
+static std::string format_error_message(const std::string &message, int max_width = 80) {
   std::stringstream formatted;
   formatted << "\033[1;31m";
   int width = 0;

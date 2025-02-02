@@ -159,6 +159,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       ctx.scope->types[param] = *generic_arg;
+      info->scope->types[param] = *generic_arg;
       generic_arg++;
     }
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
@@ -471,6 +472,17 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
 void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                         std::vector<int> generic_args) {
+  auto id = ctx.scope->find_type_id(node->name, {});
+  if (id != -1) {
+    auto type = global_get_type(id);
+    if (type->is_kind(TYPE_INTERFACE)) {
+      if (!generic_instantiation)
+        throw_error("re-definition of interface type.", node->source_range);
+    } else {
+      throw_error("re-definition of a type", node->source_range);
+    }
+  }
+
   auto previous = ctx.scope;
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
@@ -487,18 +499,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
     node->where_clause.get()->accept(this);
   }
 
-  auto id = ctx.scope->find_type_id(node->name, {});
-  if (id != -1) {
-    auto type = global_get_type(id);
-    if (type->is_kind(TYPE_INTERFACE)) {
-      if (!generic_instantiation)
-        throw_error("re-definition of interface type.", node->source_range);
-    } else {
-      throw_error("re-definition of a type", node->source_range);
-    }
-  }
-
-  auto type = global_get_type(global_create_interface_type(node->name, node->scope, generic_args));
+  auto type = global_get_type(global_create_interface_type(node->name, ctx.scope, generic_args));
   type->declaring_node = node;
   node->resolved_type = type->id;
 }
@@ -1547,7 +1548,6 @@ void Typer::visit(ASTDotExpr *node) {
     for (const auto &[name, _] : base_scope->symbols) {
       std::cout << "symbol: " << name.get_str() << '\n';
     }
-
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
                 node->source_range);
   }
@@ -1565,7 +1565,7 @@ void Typer::visit(ASTScopeResolution *node) {
     node->resolved_type = member->type_id;
     return;
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type < 0)
+    if (type == Type::invalid_id)
       goto ERROR_CASE;
     node->resolved_type = type;
     return;
@@ -1794,9 +1794,11 @@ void Typer::visit(ASTSwitch *node) {
   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
     auto operator_overload = find_operator_overload(TType::EQ, type, OPERATION_BINARY);
     if (operator_overload == -1) {
-      throw_error(std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
-                  "SelfEq (== operator on self)\ngot type '{}'", type->to_string()),
-                  node->target->source_range);
+      throw_error(
+          std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
+                      "SelfEq (== operator on self)\ngot type '{}'",
+                      type->to_string()),
+          node->target->source_range);
     }
   }
 
