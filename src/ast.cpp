@@ -1775,6 +1775,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           member.bitsize = _node->bitsize;
           member.type = _node->type;
           node->members.push_back(member);
+        } else if (directive && directive.get()->get_node_type() == AST_NODE_ALIAS) {
+          node->aliases.push_back(static_cast<ASTAlias*>(directive.get()));
         } else {
           end_node(node, range);
           throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the "

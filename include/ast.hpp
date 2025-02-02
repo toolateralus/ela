@@ -477,6 +477,8 @@ struct ASTStructMember {
   ASTType *type;
 };
 
+struct ASTAlias;
+
 struct ASTStructDeclaration : ASTStatement {
   Nullable<ASTWhere> where_clause;
   Scope *scope;
@@ -486,6 +488,7 @@ struct ASTStructDeclaration : ASTStatement {
   bool is_union = false;
 
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
+  std::vector<ASTAlias *> aliases; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;
 
   std::vector<GenericParameter> generic_parameters;
