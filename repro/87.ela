@@ -1,0 +1,14 @@
+Generic :: fn![T](obj: T) {
+  obj.do_thing();
+}
+
+Obj :: struct {};
+
+impl Obj {
+  do_thing :: fn(self*) {};
+}
+
+main :: fn() {
+  obj: Obj;
+  Generic(obj);
+}
