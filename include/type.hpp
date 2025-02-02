@@ -226,7 +226,6 @@ int u32_type();
 int u64_type();
 int f64_type();
 int f32_type();
-int range_type();
 
 Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);

@@ -1066,11 +1066,16 @@ void Emitter::visit(ASTInitializerList *node) {
 }
 
 void Emitter::visit(ASTRange *node) {
-  (*ss) << "(Range) {.begin = (s64)";
-  node->left->accept(this);
-  (*ss) << ", .end = (s64)";
-  node->right->accept(this);
-  (*ss) << "}";
+  ASTInitializerList init_list;
+  ASTType type;
+  type.resolved_type = node->resolved_type;
+  init_list.target_type = &type;
+  init_list.key_values = {
+    {"begin", node->left},
+    {"end",   node->right},
+  };
+  init_list.accept(&typer);
+  init_list.accept(this);
   return;
 }
 

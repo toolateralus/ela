@@ -1,5 +1,6 @@
 #include "typedef.ela"
 #include "interfaces.ela";
+#include "numeric.ela"; // impls for numeric types.
 #include "libc.ela";
 #include "range.ela";
 #include "memory.ela";
@@ -8,7 +9,6 @@
 #include "reflection.ela";
 #include "slice.ela";
 
-#include "numeric.ela"; // impls for numeric types.
 
 assert :: fn(message: str, condition: bool) {
   if !condition {

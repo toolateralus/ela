@@ -33,3 +33,4 @@ impl Is_Integer for s8 {}
 impl Is_Integer for s16 {}
 impl Is_Integer for s32 {}
 impl Is_Integer for s64 {}
+

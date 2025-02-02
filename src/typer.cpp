@@ -174,6 +174,9 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       node->scope->insert(field.name, field.type->resolved_type, nullptr);
     }
   }
+  for (auto alias: node->aliases) {
+    alias->accept(this);
+  }
   for (auto decl : node->members) {
     decl.type->accept(this);
     ctx.scope->insert(decl.name, decl.type->resolved_type, node);
@@ -1763,25 +1766,20 @@ void Typer::visit(ASTRange *node) {
   node->right->accept(this);
   auto left = node->left->resolved_type;
   auto right = node->right->resolved_type;
-  if (!type_is_numerical(global_get_type(left)) || !type_is_numerical(global_get_type(right))) {
-    throw_error("cannot use a non-numerical type in a range expression", node->source_range);
+
+  auto conversion_rule_left_to_right = type_conversion_rule(global_get_type(left), global_get_type(right));
+  auto conversion_rule_right_to_left = type_conversion_rule(global_get_type(right), global_get_type(left));
+
+  // Alwyas cast to the left? or should we upcast to the largest number type?
+  if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
+    node->right->resolved_type = left;
+  } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED || conversion_rule_right_to_left == CONVERT_IMPLICIT) {
+    node->left->resolved_type = right;
+  } else {
+    throw_error("Can only use ranges when both types are implicitly castable to each other. Range will always take the left side's type", node->source_range);
   }
 
-  auto l_ty = global_get_type(left);
-  auto r_ty = global_get_type(right);
-
-  if (!l_ty->is_kind(TYPE_SCALAR) || !r_ty->is_kind(TYPE_SCALAR)) {
-    throw_error("Cannot use non-scalar or integral types in a range expression", node->source_range);
-  }
-
-  auto l_info = (l_ty->get_info()->as<ScalarTypeInfo>());
-  auto r_info = (r_ty->get_info()->as<ScalarTypeInfo>());
-
-  if (!l_info->is_integral || !r_info->is_integral) {
-    throw_error("Cannot use non-scalar or integral types in a range expression", node->source_range);
-  }
-
-  node->resolved_type = range_type();
+  node->resolved_type = find_generic_type_of("Range_Base", {left}, node->source_range);
 }
 void Typer::visit(ASTSwitch *node) {
   node->target->accept(this);
@@ -1815,7 +1813,7 @@ void Typer::visit(ASTSwitch *node) {
       return_type = block_cf.type;
     }
 
-    if (expr_type == range_type() && type_is_numerical(type)) {
+    if (type_is_numerical(type)) {
       continue;
     } else {
       assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "Invalid switch case.");

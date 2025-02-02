@@ -517,8 +517,6 @@ int voidptr_type() {
   return type;
 }
 
-int range_type() { return root_scope->find_type_id("Range", {}); }
-
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   out.clear();
   if (!type->is_kind(TYPE_FUNCTION)) {

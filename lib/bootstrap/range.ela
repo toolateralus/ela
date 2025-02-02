@@ -1,25 +1,27 @@
 
 // TODO: add reverse ranges?
 
-Range :: struct {
-  begin: s64,
-  end:   s64,
+Range_Base :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric {
+  begin: Value_Type,
+  end:   Value_Type,
 }
 
-impl Range {
-  contains :: fn(self, value: s64) -> bool {
+#alias Range :: Range_Base![s64];
+
+impl![T] Range_Base![T] {
+  contains :: fn(self, value: T) -> bool {
     return self.begin <= value && self.end >= value;
   }
 }
 
-Range_Enumerator :: struct {
-  begin: s64,
-  end:   s64,
-  idx:   s64,
+Range_Enumerator :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric {
+  begin: Value_Type,
+  end:   Value_Type,
+  idx:   Value_Type,
 }
 
-impl Enumerator![s64] for Range_Enumerator {
-  current   :: fn(self*) -> s64 {
+impl![Value_Type] Enumerator![Value_Type] for Range_Enumerator![Value_Type]  {
+  current   :: fn(self*) -> Value_Type {
     return self.idx;
   }
   next      :: fn(self*) {
@@ -30,8 +32,8 @@ impl Enumerator![s64] for Range_Enumerator {
   }
 }
 
-impl Enumerable![Range_Enumerator, s64] for Range {
-  enumerator :: fn(self*) -> Range_Enumerator {
+impl![Value_Type] Enumerable![Range_Enumerator![Value_Type], Value_Type] for Range_Base![Value_Type]  {
+  enumerator :: fn(self*) -> Range_Enumerator![Value_Type] {
     return {
       begin: self.begin,
       end:   self.end,
