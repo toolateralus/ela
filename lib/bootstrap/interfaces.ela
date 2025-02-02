@@ -132,3 +132,7 @@ As_Byte_Slice :: interface![Value_Type] {
 Deinit :: interface {
   deinit :: fn(self*);
 }
+
+Hash :: interface {
+  hash :: fn(self) -> u64;
+}
