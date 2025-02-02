@@ -17,14 +17,6 @@
       return self.data[idx];
     }
     
-    eq :: fn(self*, other: #self) -> bool {
-      if self.length != other.length then return false;
-      for idx in 0..self.length {
-        if (*self)[idx] != other[idx] then return false;
-      }
-      return true;
-    }
-    
     starts_with :: fn(self*, prefix: u8*) -> bool {
       prefix_len := strlen(prefix);
       if self.length < prefix_len then return false;
@@ -240,4 +232,29 @@ impl As_Byte_Slice![String] for String {
       length: self.length
     }
   }
+}
+
+impl SelfEq for str {
+  eq :: fn(self, other: #self) -> bool {
+    if self.length != other.length then return false;
+    for idx in 0..self.length {
+      if self[idx] != other[idx] then return false;
+    }
+    return true;
+  }
+  
+  neq :: fn(self, other: #self) -> bool {
+    return !self.eq(other);
+  }
+}
+
+impl Hash for str {
+	hash :: fn(self) -> u64 {
+		hash : u64 = 0xCBF29CE484222325;
+		for byte in self {
+			hash ^= byte;
+			hash *= 0x100000001B3;
+		}
+		return hash;
+	}
 }

@@ -1,0 +1,33 @@
+hash :: fn![T](data: T) {
+	hash := 0xCBF29CE484222325;
+	ptr := &data as u8*;
+	for byte in ptr..(ptr + sizeof(T)) {
+		hash ^= *byte;
+		hash *= 0x100000001B3;
+	}
+	return hash 
+}
+
+impl Hash for str {
+	hash :: fn(self) {
+		hash := 0xCBF29CE484222325;
+		for byte in self {
+			hash ^= byte;
+			hash *= 0x100000001B3;
+		}
+		return hash;
+	}
+}
+
+Bucket :: struct![T] {
+	item: T,
+	next: Bucket*
+}
+
+Hash_Map :: struct![Key_T, Value_T] where Key_T is Hash & SelfEq {
+	#alias Key_Value_Pair :: (Key_T, Value_T),
+}
+
+main :: fn() {
+	map: Hash_Map![str, str];
+}
