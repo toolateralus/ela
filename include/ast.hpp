@@ -828,6 +828,9 @@ struct Parser {
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
 
+  // returns true if successful, false if already included
+  void import(InternedString name);
+
   Parser(const std::string &filename, Context &context);
   ~Parser();
 

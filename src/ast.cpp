@@ -153,38 +153,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto iden = parser->expect(TType::Identifier).value;
-
-        std::string ela_lib_path;
-        if (const char* env_p = std::getenv("ELA_LIB_PATH")) {
-            ela_lib_path = env_p;
-        } else {
-      #ifdef _WIN32
-            ela_lib_path = "C:\\Program Files\\ela";
-      #else
-            ela_lib_path = "/usr/local/lib/ela";
-      #endif
-        }
-
-        auto module_name = iden;
-        auto filename = std::filesystem::path(ela_lib_path) / iden.get_str();
-        // Right now, we just return noop if we're double including.
-        if (import_set.contains(module_name)) {
-          return nullptr;
-        }
-        if (std::filesystem::is_directory(filename)) {
-            filename += std::filesystem::path::preferred_separator;
-            filename.append("lib.ela");
-        } else {
-          filename += ".ela";
-        }
-
-        if (!std::filesystem::exists(filename)) { 
-          throw_error(std::format("Couldn't find imported module: {}\nIf you're writing a directory based module, make sure you have a 'lib.ela' as your lib main.", module_name), {});
-        }
-
-        import_set.insert(module_name);
-        parser->states.push_back(Lexer::State::from_file(filename));
-        parser->fill_buffer_if_needed();
+        parser->import(iden.get_str());
         return nullptr;
     }},
 
@@ -2081,6 +2050,43 @@ void Parser::fill_buffer_if_needed() {
   }
 }
 
+void Parser::import(InternedString name) {
+  std::string ela_lib_path;
+  if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
+    ela_lib_path = env_p;
+  } else {
+#ifdef _WIN32
+    ela_lib_path = "C:\\Program Files\\ela";
+#else
+    ela_lib_path = "/usr/local/lib/ela";
+#endif
+  }
+
+  auto module_name = name;
+  auto filename = std::filesystem::path(ela_lib_path) / name.get_str();
+  // Right now, we just return noop if we're double including.
+  if (import_set.contains(module_name)) {
+    return;
+  }
+  if (std::filesystem::is_directory(filename)) {
+    filename += std::filesystem::path::preferred_separator;
+    filename.append("lib.ela");
+  } else {
+    filename += ".ela";
+  }
+
+  if (!std::filesystem::exists(filename)) {
+    throw_error(std::format("Couldn't find imported module: {}\nIf you're writing a directory based module, make sure "
+                            "you have a 'lib.ela' as your lib main.",
+                            module_name),
+                {});
+  }
+
+  import_set.insert(module_name);
+  states.push_back(Lexer::State::from_file(filename));
+  fill_buffer_if_needed();
+}
+
 Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
@@ -2141,10 +2147,11 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
-  auto &state = states.back();
-  state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
-  state.input_len = state.input.length();
   fill_buffer_if_needed();
+  import("bootstrap");
+  // auto &state = states.back();
+  // state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
+  // state.input_len = state.input.length();
   typer = new Typer(context);
 }
 

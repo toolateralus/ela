@@ -56,25 +56,6 @@ static bool supports_color() {
 
 static bool terminal_supports_color = supports_color();
 
-static std::string format_error_message(const std::string &message, int max_width = 80) {
-  std::stringstream formatted;
-  formatted << "\033[1;31m";
-  int width = 0;
-  for (char ch : message) {
-    formatted << ch;
-    if (ch == '\n') {
-      width = 0; // Reset width on newline
-    } else {
-      width++;
-      if (width > max_width && std::isspace(ch)) {
-        formatted << '\n';
-        width = 0; // Reset width after line break
-      }
-    }
-  }
-  formatted << "\033[0m";
-  return formatted.str();
-}
 
 static std::string get_text_representation_of_source_range(const SourceRange &source_range,
                                                            int num_lines_of_source_to_show) {
@@ -179,7 +160,7 @@ static PanicHandler get_default_panic_handler() {
                        "included in this mode";
     }
 
-    ss << format_error_message(message);
+    ss << message;
     ss << "\n\tat: " << format_source_location(source_range, ERROR_FAILURE);
     const auto err = ss.str();
     printf("%s\n", err.c_str());
@@ -198,7 +179,7 @@ static void throw_warning(const WarningFlags id, const std::string message, cons
   std::stringstream ss;
   if (terminal_supports_color)
     ss << "\033[36m";
-  ss << "Warning:\n\t" << format_error_message(message);
+  ss << "Warning:\n\t" << message;
   if (terminal_supports_color)
     ss << "\033[0m\n";
   ss << format_source_location(source_range, ERROR_WARNING);

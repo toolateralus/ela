@@ -29,21 +29,18 @@ static size_t get_uid() {
   set_error_user_data(&data_name);                                                                                     \
   Defer defer_##uid([] { reset_panic_handler(); });                                                                    \
   if (setjmp(data_name.save_state) == 0) {                                                                             \
-    /* std::cout << "panic handler started!\n"; */                                                                     \
     /* clang-format off */\
     block                                                                                            \
     /* clang-format on */                                                                                              \
   } else {                                                                                                             \
-    /* std::cout << "panic error occured!\n"; */                                                                       \
     handle_generic_error(&data_name, source_range);                                                                    \
   }                                                                                                                    \
-  /* std::cout << "panic handler exited with ok!\n"; */
 
 void handle_generic_error(GenericInstantiationErrorUserData *data, const SourceRange &range) {
   reset_panic_handler();
   throw_error(std::format("Error at definition: {}\nerror: {}",
                           format_source_location(data->definition_range, ERROR_FAILURE, 3),
-                          format_error_message(data->message)),
+                          data->message),
               range);
 }
 
