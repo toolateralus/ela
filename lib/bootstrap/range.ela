@@ -6,8 +6,18 @@ Range_Base :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric {
   end:   Value_Type,
 }
 
-#alias Range :: Range_Base![s32];
-#alias Range_64 :: Range_Base![s64];
+
+#alias Range_s8 :: Range_Base![s8];
+#alias Range_s16 :: Range_Base![s16];
+#alias Range_s32 :: Range_Base![s32];
+#alias Range_s64 :: Range_Base![s64];
+
+#alias Range_u8 :: Range_Base![u8];
+#alias Range_u16 :: Range_Base![u16];
+#alias Range_u32 :: Range_Base![u32];
+#alias Range_u64 :: Range_Base![u64];
+
+#alias Range :: Range_s32;
 
 impl![T] Range_Base![T] {
   contains :: fn(self, value: T) -> bool {
