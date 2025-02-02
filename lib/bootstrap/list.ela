@@ -17,7 +17,8 @@ panic :: fn(msg: str);
         capacity: len
       }
     }
-
+    
+    
     view :: fn(self*, range: Range) -> #self {
       if range.begin < 0 || range.end > self.length || range.begin > range.end {
         return {};
@@ -74,6 +75,16 @@ panic :: fn(msg: str);
 
     at :: fn(self*, index: u64) -> T {
       return self.data[index];
+    }
+
+    // Initalize the array to a specific length, and zero initialize the data.
+    // useful to create a dynamic of at least num_to_fill length, and have all the elements be valid data.
+    // Do not use this on an array that is already full of your data, unless you want to zero it out and reset to 
+    // a specific new size.
+    initialize :: fn(self*, num_to_fill: u64) {
+      self.resize(num_to_fill);
+      memset(self.data, 0, sizeof(T) * self.capacity);
+      self.length = num_to_fill;
     }
   }
 
