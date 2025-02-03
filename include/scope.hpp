@@ -171,6 +171,8 @@ struct Scope {
     symbol.name = name;
     symbol.type_id = type_id;
     symbol.type.kind = kind;
+    symbol.flags = SYMBOL_IS_TYPE;
+    symbols.insert({name, symbol});
   }
 
   void forward_declare_type(const InternedString &name, int default_id) {
@@ -180,6 +182,7 @@ struct Scope {
     symbol.flags = SYMBOL_IS_TYPE;
     symbols.insert({name, symbol});
   }
+
   int create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto id = global_create_enum_type(name, scope, flags);
     symbols.insert({name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration)});

@@ -23,6 +23,7 @@ static size_t get_uid() {
   return n++;
 }
 
+#ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
   GenericInstantiationErrorUserData data_name;                                                                         \
   set_panic_handler(generic_instantiation_panic_handler);                                                              \
@@ -35,6 +36,9 @@ static size_t get_uid() {
   } else {                                                                                                             \
     handle_generic_error(&data_name, source_range);                                                                    \
   }
+#else
+#define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
+#endif
 
 void handle_generic_error(GenericInstantiationErrorUserData *data, const SourceRange &range) {
   reset_panic_handler();
@@ -445,8 +449,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);
           } else {
-            throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null",
-                        node->source_range);
+            throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
           }
         }
       } else {
@@ -457,8 +460,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
     for (auto &[name, impl_sym] : impl_scope.symbols) {
       if (!interface->scope->local_lookup(name)) {
-        throw_error(std::format("impl method \"{}\" not found in interface", name),
-                    node->source_range);
+        throw_error(std::format("impl method \"{}\" not found in interface", name), node->source_range);
       }
     }
     target_ty->interfaces.push_back(interface_ty->id);
@@ -504,11 +506,10 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
 
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    // forward declare the type so we can reference ourselves.
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT);
-    return;
+  } else {
+    visit_struct_declaration(node, false);
   }
-  visit_struct_declaration(node, false);
 }
 
 void Typer::visit(ASTEnumDeclaration *node) {
@@ -2041,7 +2042,7 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
 
   // Probably not a generic type?
   if (!symbol || !symbol->is_type()) {
-    return -1; 
+    return -1;
   }
 
   auto declaring_node = symbol->type.declaration.get();

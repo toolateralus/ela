@@ -2,6 +2,7 @@
 #include "scope.hpp"
 #include "core.hpp"
 #include "type.hpp"
+#include <format>
 
 Context::Context() {
   root_scope = scope;
@@ -41,6 +42,7 @@ Context::Context() {
     if (type_table[i]->get_info()->scope) {
       type_table[i]->get_info()->scope->parent = root_scope;
     }
+    std::cout << std::format("creating alias for scalar/builtin {} :: {}\n", type_table[i]->get_base(), i);
     root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind);
   }
 }
