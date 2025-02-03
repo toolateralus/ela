@@ -1441,13 +1441,17 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
         return std::string("{}");
       }
 
-      int count = info->scope->ordered_symbols.size();
+      int count = info->scope->fields_count();
+      
       fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
       fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
       fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
 
       int it = 0;
       for (const auto &field : info->scope->ordered_symbols) {
+        auto symbol = info->scope->local_lookup(field);
+        if (!symbol || symbol->is_function()) continue;
+
         auto t = global_get_type(s32_type());
 
         if (!t) {

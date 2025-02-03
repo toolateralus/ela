@@ -1640,11 +1640,6 @@ ASTImpl *Parser::parse_impl() {
     node->target = target;
   }
 
-  // TODO: make it so we dont have to get the scope of the type, we shouldn't be doing much typing
-  // during parse time.
-
-  node->target->accept(typer);
-  auto type = global_get_type(node->target->resolved_type);
   node->target->resolved_type = Type::invalid_id;
 
   if (peek().type == TType::Where) {
