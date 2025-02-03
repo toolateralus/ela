@@ -674,6 +674,7 @@ void Typer::visit(ASTBlock *node) {
   node->return_type = node->control_flow.type == Type::INVALID_TYPE_ID ? void_type() : node->control_flow.type;
   ctx.exit_scope();
 }
+
 // TODO: Remove ParamDecl, and ArgumentDecl probably. Such unneccesary nodes, a ton of boilerplate visitor logic
 // and no real benefit.
 // TODO: we can keep an ASTParamsDecl but meh
@@ -683,6 +684,7 @@ void Typer::visit(ASTParamsDecl *node) {
   }
   return;
 }
+
 void Typer::visit(ASTParamDecl *node) {
   if (node->tag == ASTParamDecl::Self) {
     if (!type_context) {
@@ -735,10 +737,11 @@ void Typer::visit(ASTReturn *node) {
   node->resolved_type = type;
   node->control_flow = ControlFlow{BLOCK_FLAGS_RETURN, type};
 }
+
 void Typer::visit(ASTContinue *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_CONTINUE, Type::INVALID_TYPE_ID}; }
+
 void Typer::visit(ASTBreak *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_BREAK, Type::INVALID_TYPE_ID}; }
 
-// @CooperPilot I don't think this is very good, I am certain we can do this withotu mocking up function calls.
 void Typer::compiler_mock_function_call_visit_impl(int left_type, const InternedString &method_name) {
   ASTCall call;
   ASTArguments arguments;
@@ -923,6 +926,7 @@ void Typer::visit(ASTIf *node) {
   }
   node->control_flow = control_flow;
 }
+
 void Typer::visit(ASTElse *node) {
   if (node->_if.is_not_null()) {
     node->_if.get()->accept(this);
@@ -1173,6 +1177,7 @@ void Typer::visit(ASTExprStatement *node) {
     node->resolved_type = _switch->resolved_type;
   }
 }
+
 template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T definition, std::vector<int> args) {
   if (definition->generic_parameters.size() != args.size()) {
     return nullptr;
