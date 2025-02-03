@@ -39,6 +39,9 @@ Context::Context() {
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
+    if (type_table[i]->kind == TYPE_FUNCTION) {
+      continue;
+    }
     if (type_table[i]->get_info()->scope) {
       type_table[i]->get_info()->scope->parent = root_scope;
     }
