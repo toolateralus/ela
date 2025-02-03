@@ -1,0 +1,108 @@
+
+#ifndef FREESTANDING {
+  impl str {
+    as_string :: fn(self) -> String {
+      return {
+        data: strdup(self.data),
+        length: self.length,
+      };
+    }
+  }
+}
+
+impl str {
+  empty :: fn() -> #self {
+    return {};
+  }
+  subscript :: fn(self*, idx: s64) -> u8 {
+    return self.data[idx];
+  }
+  
+  starts_with :: fn(self*, prefix: u8*) -> bool {
+    prefix_len := strlen(prefix);
+    if self.length < prefix_len then return false;
+    for i in 0..prefix_len {
+      if self.data[i] != prefix[i] then return false;
+    }
+    return true;
+  }
+  
+  ends_with :: fn(self*, suffix: u8*) -> bool {
+    suffix_len := strlen(suffix);
+    if self.length < suffix_len then return false;
+    for i in 0..suffix_len {
+      if self.data[self.length - suffix_len + i] != suffix[i] then return false;
+    }
+    return true;
+  }
+  
+  slice :: fn(self*, range: Range) -> Slice![u8] {
+    start, end := (range.begin, range.end);
+    length := end - start;
+
+    if start < 0 || length < 0 || start + length > self.length {
+      return {};
+    }
+    
+    return {
+      data: self.data + start,
+      length: length,
+    };
+  }
+  
+  
+}
+
+
+// This iterator is over the bytes.
+impl Iterable![u8] for str { 
+  iter :: fn(self*) -> Iter![u8] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length,
+    }
+  }
+}
+
+impl Eq for str {
+  eq :: fn(self, other: #self) -> bool {
+    if self.length != other.length then return false;
+    for idx in 0..self.length {
+      if self[idx] != other[idx] then return false;
+    }
+    return true;
+  }
+  
+  neq :: fn(self, other: #self) -> bool {
+    return !self.eq(other);
+  }
+}
+
+impl Hash for str {
+	hash :: fn(self) -> u64 {
+		hash : u64 = 0xCBF29CE484222325;
+		for byte in self {
+			hash ^= byte;
+			hash *= 0x100000001B3;
+		}
+		return hash;
+	}
+}
+
+impl As_Char_Slice for str {
+  as_char_slice :: fn(self) -> Slice![u32] {
+    return {
+      data: self.data,
+      length: self.length,
+    }
+  }
+}
+
+impl As_Byte_Slice for str {
+  as_byte_slice :: fn(self) -> Slice![u8] {
+    return {
+      data: self.data,
+      length: self.length
+    }
+  }
+}

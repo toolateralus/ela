@@ -16,7 +16,7 @@ Bucket :: struct![T] {
 	next: Bucket*
 }
 
-Hash_Map :: struct![Key_T, Value_T] where Key_T is Hash & SelfEq {
+Hash_Map :: struct![Key_T, Value_T] where Key_T is Hash & Eq {
 	#alias Key_Value_Pair :: (Key_T, Value_T),
 }
 

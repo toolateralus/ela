@@ -1,11 +1,12 @@
 #include "typedef.ela"
 #include "interfaces.ela";
 #include "numeric.ela"; // impls for numeric types.
-#include "libc.ela";
 #include "range.ela";
+#include "libc.ela";
 #include "memory.ela";
 #include "list.ela";
-#include "string.ela";
+#include "str.ela";
+#include "String.ela";
 #include "reflection.ela";
 #include "slice.ela";
 
@@ -17,14 +18,14 @@ assert :: fn(message: str, condition: bool) {
   }
 }
 
-assert_eq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | SelfEq {
+assert_eq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | Eq {
   if a != b {
     printf("assertion failed: %s\n"c, message.data);
     exit(1);
   }
 }
 
-assert_neq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | SelfEq {
+assert_neq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | Eq {
   if a == b {
     printf("assertion failed: %s\n"c, message.data);
     exit(1);

@@ -1,7 +1,7 @@
 
 // TODO: add reverse ranges?
 
-Range_Base :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric {
+Range_Base :: struct![Value_Type] where Value_Type is Eq | Is_Numeric {
   begin: Value_Type,
   end:   Value_Type,
 }
@@ -24,7 +24,7 @@ impl![T] Range_Base![T] {
   }
 }
 
-Range_Enumerator :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric {
+Range_Enumerator :: struct![Value_Type] where Value_Type is Eq | Is_Numeric {
   begin: Value_Type,
   end:   Value_Type,
   idx:   Value_Type,

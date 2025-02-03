@@ -1772,14 +1772,18 @@ void Typer::visit(ASTRange *node) {
 
   // Alwyas cast to the left? or should we upcast to the largest number type?
   if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
-    node->right->resolved_type = left;
+    right = node->right->resolved_type = left;
   } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED || conversion_rule_right_to_left == CONVERT_IMPLICIT) {
-    node->left->resolved_type = right;
+    left = node->left->resolved_type = right;
   } else {
     throw_error("Can only use ranges when both types are implicitly castable to each other. Range will always take the left side's type", node->source_range);
   }
 
   node->resolved_type = find_generic_type_of("Range_Base", {left}, node->source_range);
+
+  if (node->resolved_type == -1) {
+    throw_error(std::format("Unable to find range type for `{}..{}`", global_get_type(left)->to_string(), global_get_type(right)->to_string()), node->source_range);
+  }
 }
 void Typer::visit(ASTSwitch *node) {
   node->target->accept(this);
@@ -1791,7 +1795,7 @@ void Typer::visit(ASTSwitch *node) {
     if (operator_overload == -1) {
       throw_error(
           std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
-                      "SelfEq (== operator on self)\ngot type '{}'",
+                      "Eq (== operator on #self)\ngot type '{}'",
                       type->to_string()),
           node->target->source_range);
     }

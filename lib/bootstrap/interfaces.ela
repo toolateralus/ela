@@ -6,7 +6,7 @@ Drop        :: interface {
 }
 
 // Allow an object to be converted to a str
-ToString    :: interface {
+To_String    :: interface {
   // convert self to str::
   to_string :: fn(self) -> str;
 }
@@ -96,9 +96,8 @@ Bitwise :: interface![Right] {
   and       :: fn(self, right: Right) -> #self;   //  '&' operator.
 }
 
-
 // TODO:  We should tidy up operator overloads, where we can automatically use + as += etc.
-SelfEq :: interface {
+Eq :: interface {
   eq :: fn(self, right: #self) -> bool;
   neq :: fn(self, right: #self) -> bool;
 }
