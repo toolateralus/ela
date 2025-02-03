@@ -1527,7 +1527,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   // TODO: find a better solution to this.
   for (const auto &param : function->generic_parameters) {
-    ctx.scope->types[param] = -2;
+    ctx.scope->forward_declare_type(param, -2);
   }
 
   function->block = parse_block();
@@ -1753,7 +1753,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = ctx.scope->create_struct_type(name.value, {});
+    type_id = ctx.scope->create_struct_type(name.value, nullptr, node);
   }
 
   node->name = name.value;
@@ -1765,7 +1765,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->flags |= STRUCT_FLAG_IS_UNION;
 
   for (const auto &param : node->generic_parameters) {
-    info->scope->types[param] = -2;
+    info->scope->forward_declare_type(param, -2);
   }
 
   if (!semicolon()) {
@@ -1827,7 +1827,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
-  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr));
+  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr, node));
   auto scope = create_child(ctx.scope);
   ctx.set_scope(scope);
 

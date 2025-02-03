@@ -7,11 +7,11 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
     case AST_NODE_IDENTIFIER: {
       auto name = static_cast<ASTIdentifier*>(node);
       auto symbol = ctx.scope->lookup(name->value);
-      if (symbol && symbol->declaring_node.is_not_null() && symbol->declaring_node.get()->is_expr()) {
-        return evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
-      } else {
-        throw_error("unable to evaluate value of symbol", node->source_range);
+      if (!symbol || !symbol->is_function()) {
+        throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
+      auto initial_value = symbol->variable.initial_value;
+      return evaluate_constexpr(initial_value, ctx);
     }
     case AST_NODE_BIN_EXPR: {
       auto binary = static_cast<ASTBinExpr *>(node);

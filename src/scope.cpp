@@ -40,13 +40,28 @@ Context::Context() {
     if (type_table[i]->get_info()->scope) {
       type_table[i]->get_info()->scope->parent = root_scope;
     }
-    root_scope->types.insert({type_table[i]->get_base(), i});
+    root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind);
   }
 }
 
+
+// We probably want to just alltogether get rid of this entire function.
+// We should be creating symbols explicitly based on their symbol kind, not reading the flags.
+
 void Scope::insert(const InternedString &name, int type_id, ASTNode *declaring_node, int flags) {
-  auto sym = Symbol{name, type_id, flags, declaring_node};
-  symbols[name] = sym;
+  if ((flags & SYMBOL_IS_VARIABLE) != 0) {
+    symbols.insert({name, Symbol::create_variable(name, (ASTExpr*)declaring_node)});
+  } else if ((flags & SYMBOL_IS_FUNCTION) != 0) {
+    symbols.insert({name, Symbol::create_function(name, (ASTFunctionDeclaration*)declaring_node, (SymbolFlags)flags)});
+  } else if ((flags & SYMBOL_IS_TYPE) != 0) {
+    auto type = global_get_type(type_id);
+    if (type) {
+      symbols.insert({name, Symbol::create_type(type_id, name, type->kind, declaring_node)});
+    } else {
+      symbols.insert({name, Symbol::create_type(type_id, name, (TypeKind)0, declaring_node)});
+    }
+  }
+  symbols[name].flags |= flags;
   ordered_symbols.push_back(name);
 }
 
@@ -65,9 +80,5 @@ void Scope::erase(const InternedString &name) {
 }
 
 void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
-  symbols[name] = {
-      .name = name,
-      .type_id = Type::invalid_id,
-      .declaring_node = node,
-  };
+  symbols.insert({name, Symbol::create_type(-1, name, TYPE_INTERFACE, node)});
 }

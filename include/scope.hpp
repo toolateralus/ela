@@ -44,8 +44,10 @@ struct Symbol {
       ASTFunctionDeclaration *declaration;
     } function;
     struct {
-      ASTNode *declaration;
-      TypeKind kind = TypeKind::TYPE_INVALID;
+      // This is nullable purely because `tuple` types do not have a declaring node!
+      // Otherwise, all other nodes have this property, and must.
+      Nullable<ASTNode> declaration;
+      TypeKind kind;
     } type;
   };
 
@@ -150,6 +152,20 @@ struct Scope {
     return id;
   }
 
+  void create_type_alias(const InternedString &name, int type_id, TypeKind kind) {
+    Symbol symbol;
+    symbol.name = name;
+    symbol.type_id = type_id;
+    symbol.type.kind = kind;
+  }
+
+  void forward_declare_type(const InternedString &name, int default_id) {
+    Symbol symbol;
+    symbol.name = name;
+    symbol.type_id = default_id;
+    symbol.flags = SYMBOL_IS_TYPE;
+    symbols.insert({name, symbol});
+  }
   int create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto id = global_create_enum_type(name, scope, flags);
     symbols.insert({name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration)});

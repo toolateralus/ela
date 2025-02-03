@@ -342,9 +342,13 @@ void Emitter::visit(ASTCall *node) {
   }
 
   auto symbol = base_symbol.get();
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR && base_symbol && symbol->declaring_node.is_not_null() &&
-      symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-    auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+    if (!base_symbol || !base_symbol.get()->is_function()) {
+      throw_error("can't call a non-function", node->source_range);
+    }
+    
+    auto func = symbol->function.declaration;
+    
     auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
     auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
 
@@ -1260,7 +1264,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 
   if (parent_type->is_kind(TYPE_ENUM)) {
     auto symbol = parent_type->get_info()->as<EnumTypeInfo>()->scope->local_lookup(name);
-    auto value = evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
+    auto value = evaluate_constexpr((ASTExpr*)symbol->variable.initial_value, ctx);
     ss << std::format(".enum_value = {}", value.integer);
   }
 

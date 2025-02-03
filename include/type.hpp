@@ -50,7 +50,6 @@ enum ScalarType {
 };
 
 enum TypeKind {
-  TYPE_INVALID, // only used by symbol table.
   TYPE_SCALAR,
   TYPE_FUNCTION,
   TYPE_STRUCT,

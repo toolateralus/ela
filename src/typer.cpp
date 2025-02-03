@@ -154,8 +154,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
-      info->scope->types[param] = *generic_arg;
+      auto kind = global_get_type(*generic_arg)->kind;
+      ctx.scope->create_type_alias(param, *generic_arg, kind);
       generic_arg++;
     }
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
@@ -200,7 +200,8 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
+      auto kind = global_get_type(*generic_arg)->kind;
+      ctx.scope->create_type_alias(param, *generic_arg, kind);
       generic_arg++;
     }
     type = global_get_type(global_create_tagged_union_type(node->name, node->scope, generic_args));
@@ -309,7 +310,8 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
+      auto kind = global_get_type(*generic_arg)->kind;
+      ctx.scope->create_type_alias(param, *generic_arg, kind);
       generic_arg++;
     }
   }
@@ -363,7 +365,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
+      auto kind = global_get_type(*generic_arg)->kind;
+      ctx.scope->create_type_alias(param, *generic_arg, kind);
       generic_arg++;
     }
   }
@@ -442,13 +445,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);
           } else {
-            std::cout << "\033[1;90mmmethod.type_id == \033[1;31m" << std::to_string(interface_sym.type_id)
-                      << "\033[0m\n";
-            std::cout << "\033[1;90mimpl_symbol.type_id == \033[1;31m" << std::to_string(impl_symbol->type_id)
-                      << "\033[0m\n";
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null",
-                        interface_sym.declaring_node ? interface_sym.declaring_node.get()->source_range
-                                                     : node->source_range);
+                        node->source_range);
           }
         }
       } else {
@@ -460,7 +458,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     for (auto &[name, impl_sym] : impl_scope.symbols) {
       if (!interface->scope->local_lookup(name)) {
         throw_error(std::format("impl method \"{}\" not found in interface", name),
-                    impl_sym.declaring_node.get()->source_range);
+                    node->source_range);
       }
     }
     target_ty->interfaces.push_back(interface_ty->id);
@@ -489,7 +487,8 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      ctx.scope->types[param] = *generic_arg;
+      auto kind = global_get_type(*generic_arg)->kind;
+      ctx.scope->create_type_alias(param, *generic_arg, kind);
       generic_arg++;
     }
   }
@@ -513,7 +512,7 @@ void Typer::visit(ASTStructDeclaration *node) {
 
 void Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = Type::invalid_id;
-  ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags);
+  ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
   auto info = enum_type->get_info()->as<EnumTypeInfo>();
 
@@ -957,8 +956,13 @@ void Typer::visit(ASTCall *node) {
       type = global_get_type(symbol->type_id);
     }
 
-    if (symbol->declaring_node && symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      func_decl = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
+    if (!symbol->is_function()) {
+      throw_error("unable to call `()` a non-callable, non function symbol", node->source_range);
+    }
+
+    auto declaring_node = symbol->function.declaration;
+    if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
       if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
@@ -1223,8 +1227,14 @@ void Typer::visit(ASTType *node) {
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
     auto symbol = get_symbol(normal_ty.base).get();
-    if (symbol && symbol->declaring_node.is_not_null() && !normal_ty.generic_arguments.empty()) {
-      auto declaring_node = symbol->declaring_node.get();
+
+    if (!symbol || !symbol->is_type()) {
+      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
+    }
+
+    auto declaring_node = symbol->type.declaration.get();
+
+    if (declaring_node && !normal_ty.generic_arguments.empty()) {
       std::vector<int> generic_args;
       for (auto &arg : normal_ty.generic_arguments) {
         arg->accept(this);
@@ -1869,10 +1879,13 @@ void Typer::visit(ASTAlias *node) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
   }
 
-  if (ctx.scope->types.contains(node->name)) {
+  if (ctx.scope->symbols.contains(node->name)) {
     throw_error("Redeclaration of type", node->source_range);
   }
-  ctx.scope->types[node->name] = node->type->resolved_type;
+
+  auto type = global_get_type(node->type->resolved_type);
+
+  ctx.scope->create_type_alias(node->name, node->type->resolved_type, type->kind);
 
   return;
 }
@@ -1906,7 +1919,9 @@ void Typer::visit(ASTTupleDeconstruction *node) {
       if (symbol.is_function()) {
         continue;
       }
-      ctx.scope->insert(name, symbol.type_id, symbol.declaring_node.get());
+      if (symbol.is_variable()) {
+        ctx.scope->insert(name, symbol.type_id, symbol.variable.initial_value);
+      }
     }
   }
 
@@ -1916,13 +1931,17 @@ void Typer::visit(ASTTupleDeconstruction *node) {
 void Typer::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     auto symbol_nullable = get_symbol(node->target);
-    if (symbol_nullable.is_null() || symbol_nullable.get()->declaring_node.is_null()) {
-      throw_error("Generic impls only for generic types for now.", node->source_range);
+
+    if (symbol_nullable.is_null() || !symbol_nullable.get()->is_type()) {
+      throw_error("generic `impl![...]` can only be used on types.", node->source_range);
     }
-    auto declaring_node = symbol_nullable.get()->declaring_node.get();
+
+    auto declaring_node = symbol_nullable.get()->type.declaration.get();
+
     if (declaring_node->get_node_type() != AST_NODE_STRUCT_DECLARATION) {
-      throw_error("Generic impls are only for struct types for now.", node->source_range);
+      throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
     }
+
     auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
     node_as_struct->impls.push_back(node);
     GENERIC_PANIC_HANDLER(
@@ -2018,10 +2037,18 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
                                 const SourceRange &source_range) {
   ASTStatement *instantiation = nullptr;
   auto symbol = ctx.scope->lookup(base);
-  if (!symbol || !symbol->declaring_node) {
-    return -1; // Probably not a generic type?
+
+  // Probably not a generic type?
+  if (!symbol || !symbol->is_type()) {
+    return -1; 
   }
-  auto declaring_node = symbol->declaring_node.get();
+
+  auto declaring_node = symbol->type.declaration.get();
+
+  if (!declaring_node) {
+    throw_error("internal compiler error: unable to find type's declaring node", source_range);
+  }
+
   auto decl_node_type = declaring_node->get_node_type();
 
   GENERIC_PANIC_HANDLER(
