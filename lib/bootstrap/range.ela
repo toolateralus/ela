@@ -31,13 +31,13 @@ Range_Enumerator :: struct![Value_Type] where Value_Type is SelfEq | Is_Numeric 
 }
 
 impl![Value_Type] Enumerator![Value_Type] for Range_Enumerator![Value_Type]  {
-  current   :: fn(self*) -> Value_Type {
+  current   :: fn(self) -> Value_Type {
     return self.idx;
   }
   next      :: fn(self*) {
     self.idx++;
   };
-  done      :: fn(self*) -> bool {
+  done      :: fn(self) -> bool {
     return self.idx >= self.end;
   }
 }

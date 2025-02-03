@@ -8,7 +8,7 @@ Drop        :: interface {
 // Allow an object to be converted to a str
 ToString    :: interface {
   // convert self to str::
-  to_string :: fn(self*) -> str;
+  to_string :: fn(self) -> str;
 }
 
 // equivalent to an explicit cast operator overload in C++,
@@ -21,7 +21,7 @@ From        :: interface![T] {
 // A deep clone, versus assignment always being a shallow clone in Ela.
 Clone       :: interface {
   // get a deep clone of self.
-  clone     :: fn(self*) -> #self;
+  clone     :: fn(self) -> #self;
 }
 
 Init :: interface![Value_Type] {
@@ -31,13 +31,13 @@ Init :: interface![Value_Type] {
 // An object used to iterate over a collection of items, or any sequence.
 Enumerator   :: interface![Value_Type] {  
   // Return the current value this enumerator points to within the sequence it's iterating over.  
-  current   :: fn(self*) -> Value_Type;
+  current   :: fn(self) -> Value_Type;
   // Advance the enumerator by one step.
   next      :: fn(self*) -> void;
   // Check whether the enumerator is complete, or should continue.
   // return true for 'done',
   // return false if needs to continue
-  done      :: fn(self*) -> bool;
+  done      :: fn(self) -> bool;
 }
 
 // A collection or range of items that can be enumerated over, with a for loop, or some other means.
@@ -58,7 +58,7 @@ Iter :: struct![Value_Type] {
 
 impl![Value_Type] Iter![Value_Type] {
   // Returns a pointer to the current element in the collection.
-  current :: fn(self*) -> Value_Type* => self.ptr;
+  current :: fn(self) -> Value_Type* => self.ptr;
 
   // Advances the iterator to the next element in the collection.
   next :: fn(self*) {
@@ -66,7 +66,7 @@ impl![Value_Type] Iter![Value_Type] {
   }
 
   // Checks if the iterator has reached the end of the collection.
-  done :: fn(self*) -> bool {
+  done :: fn(self) -> bool {
     return self.ptr >= self.end || self.ptr == self.end; 
   }
 }

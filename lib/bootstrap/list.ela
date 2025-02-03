@@ -107,7 +107,7 @@ panic :: fn(msg: str);
   }
 
   impl![T] Clone for List![T] {
-    clone :: fn(self*) -> #self {
+    clone :: fn(self) -> #self {
       new_data := malloc(sizeof(T) * self.capacity);
       if !new_data then panic("Failed to allocate in List clone");
       memcpy(new_data, self.data, sizeof(T) * self.length);

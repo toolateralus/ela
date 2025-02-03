@@ -219,18 +219,18 @@ void Emitter::visit(ASTFor *node) {
       break;
   }
 
-  (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(&" << unique_id << ")) {\n";
+  (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(" << unique_id << ")) {\n";
   indent_level++;
 
   (*ss) << indent() << identifier_type_str << " ";
   node->iden->accept(this);
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
+    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
   } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
-    (*ss) << iterable_method_str << "_current(&" << unique_id << ");\n";
+    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
   } else {
-    (*ss) << "*" << iterable_method_str << "_current(&" << unique_id << ");\n";
+    (*ss) << "*" << iterable_method_str << "_current(" << unique_id << ");\n";
   }
 
   // this MUST happen before the block or continue will cause a permanent hangup!!!

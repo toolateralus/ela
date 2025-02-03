@@ -1,6 +1,6 @@
 
 impl![T] Clone for Slice![T] {
-  clone :: fn(self*) -> #self {
+  clone :: fn(self) -> #self {
     data : T* = malloc(sizeof(T) * self.length);
     memcpy(data, self.data, self.length * sizeof(T));
     return {
