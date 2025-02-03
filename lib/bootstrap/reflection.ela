@@ -7,6 +7,7 @@ Type :: struct;
     type: Type*,
     size: u64,
     offset: u64,
+    enum_value: s64,
   };
 
   Type :: struct {

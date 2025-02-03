@@ -80,7 +80,7 @@ utf8_decode_sequence :: fn(bytes: Slice![u8]) -> (u32, s8) {
   return (ch, sequence_length);   
 }
 
-utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice![T] {
+utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice {
   slice := data.as_byte_slice();
   idx := 0;
   output: u32[];

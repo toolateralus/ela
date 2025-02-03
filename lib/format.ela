@@ -16,6 +16,11 @@ to_string :: fn![T](value: T) -> String {
     }
   }
 
+  if type.is_enum() {
+    
+  }
+
+
   if type == #type(u8) {
     format = "%c";
   } else if type.is_integral() {

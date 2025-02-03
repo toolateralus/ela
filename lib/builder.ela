@@ -72,7 +72,7 @@ impl String_Builder {
     };
   }
 
-  append :: fn![T](self*, value: T) where T is As_Char_Slice![T] {
+  append :: fn![T](self*, value: T) where T is As_Char_Slice {
     slice := value.as_char_slice();
 
     if slice.length == 0 

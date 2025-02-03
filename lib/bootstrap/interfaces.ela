@@ -121,12 +121,12 @@ Allocator :: interface {
   copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
 }
 
-As_Char_Slice :: interface![Value_Type] {
-  as_char_slice :: fn(v: Value_Type) -> Slice![u32];
+As_Char_Slice :: interface {
+  as_char_slice :: fn(self) -> Slice![u32];
 }
 
-As_Byte_Slice :: interface![Value_Type] {
-  as_byte_slice :: fn(v: Value_Type) -> Slice![u8];
+As_Byte_Slice :: interface {
+  as_byte_slice :: fn(self) -> Slice![u8];
 }
 
 Deinit :: interface {

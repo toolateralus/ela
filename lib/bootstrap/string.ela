@@ -141,9 +141,7 @@
     resize :: fn(self*, new_size: u64) {
       if new_size < self.length then self.length = new_size;
       self.capacity = new_size;
-      printf("new size %d\n"c, new_size);
       self.data = realloc(self.data, new_size * sizeof(u8));
-      printf("done resizing\n"c);
     }
     
     push :: fn(self*, ch: u8) {
@@ -198,7 +196,7 @@ impl Iterable![u8] for String {
   }
 }
 
-impl As_Char_Slice![String] for String {
+impl As_Char_Slice for String {
   as_char_slice :: fn(self) -> Slice![u32] {
     return {
       data: self.data,
@@ -207,7 +205,7 @@ impl As_Char_Slice![String] for String {
   }
 }
 
-impl As_Char_Slice![str] for str {
+impl As_Char_Slice for str {
   as_char_slice :: fn(self) -> Slice![u32] {
     return {
       data: self.data,
@@ -216,7 +214,7 @@ impl As_Char_Slice![str] for str {
   }
 }
 
-impl As_Byte_Slice![str] for str {
+impl As_Byte_Slice for str {
   as_byte_slice :: fn(self) -> Slice![u8] {
     return {
       data: self.data,
@@ -225,7 +223,7 @@ impl As_Byte_Slice![str] for str {
   }
 }
 
-impl As_Byte_Slice![String] for String {
+impl As_Byte_Slice for String {
   as_byte_slice :: fn(self) -> Slice![u8] {
     return {
       data: self.data,

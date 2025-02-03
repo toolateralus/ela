@@ -11,7 +11,7 @@ JsonError :: enum {
 
 #static _json_last_error: u8*;
 
-set_json_error :: fn![T](error: T) where T is As_Char_Slice![T] {
+set_json_error :: fn![T](error: T) where T is As_Char_Slice {
   slice := error.as_char_slice().clone().data;
   _json_last_error = slice;
 }

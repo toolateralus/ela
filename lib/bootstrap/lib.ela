@@ -97,7 +97,7 @@ panic :: fn(msg: str) {
   }
 }
 
-impl As_Char_Slice![u32] for u32 {
+impl As_Char_Slice for u32 {
   as_char_slice :: fn(self) -> Slice![u32] {
     // Since we have to null terminate the slice, which we shouldn't,
     // we'd have to do this little static hack.

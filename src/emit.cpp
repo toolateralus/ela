@@ -1,3 +1,4 @@
+#include <format>
 #include <functional>
 #include <iterator>
 #include <ostream>
@@ -27,12 +28,12 @@ constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 5;
 constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
 constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 9;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 10;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 11;
+constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 9;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 12;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 13;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
 
 static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
 #ifdef TESTING
@@ -1258,6 +1259,12 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
     ss << std::format(".offset = offsetof({}, {})", parent_type->get_base().get_str(), name);
+  }
+
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    auto symbol = parent_type->get_info()->as<EnumTypeInfo>()->scope->local_lookup(name);
+    auto value = evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
+    ss << std::format(".enum_value = {}", value.integer);
   }
 
   ss << " }";

@@ -521,7 +521,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
-    info->scope->insert(key, node_ty, node);
+    info->scope->insert(key, node_ty, value);
     if (elem_type == Type::invalid_id) {
       elem_type = node_ty;
     } else {

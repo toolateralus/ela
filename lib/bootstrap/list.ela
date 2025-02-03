@@ -58,6 +58,24 @@ panic :: fn(msg: str);
       return value;
     }
 
+    push_front :: fn(self*, v: T) {
+      if self.length + 1 >= self.capacity {
+      if self.capacity == 0 then self.capacity = 4;
+      self.resize(self.capacity * 2);
+      }
+      memmove(self.data + 1, self.data, sizeof(T) * self.length);
+      self.data[0] = v;
+      self.length++;
+    }
+
+    pop_front :: fn(self*) -> T {
+      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+      value := self.data[0];
+      memmove(self.data, self.data + 1, sizeof(T) * (self.length - 1));
+      self.length -= 1;
+      return value;
+    }
+
     // This does not actually deinit any of members in the list.
     // We should have some compile time way to have alternatives based on a specializiation
     // like #if T: Deinit { } .. else {}

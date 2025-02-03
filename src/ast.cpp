@@ -315,6 +315,16 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto name = parser->expect(TType::Identifier);
         parser->expect(TType::DoubleColon);
         auto enum_decl = parser->parse_enum_declaration(name);
+
+        int index = 0;
+        for (auto &key_value : enum_decl->key_values) {
+          NODE_ALLOC(ASTLiteral, literal, range, _, parser);
+          literal->tag = ASTLiteral::Integer;
+          literal->value = std::to_string(1 << index);
+          key_value.second = literal;
+          index++;
+        }
+
         enum_decl->is_flags = true;
         return enum_decl;
     }},
