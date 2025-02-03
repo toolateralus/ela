@@ -983,7 +983,7 @@ Mat4 :: union {
     M31: f32,
     M32: f32,
     M33: f32,
-  };
+  },
   // #operator(*) :: fn(self, other: #self) -> #self {
   //   matrix: #self;
   //   matrix.M00 = self.M00 * other.M00 + self.M01 * other.M10 + self.M02 * other.M20 + self.M03 * other.M30;
