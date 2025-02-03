@@ -118,7 +118,7 @@ void Emitter::forward_decl_type(Type *type) {
 }
 
 void Emitter::emit_type_or_fwd_decl(Type *type) {
-  if (type->base_id != Type::invalid_id) {
+  if (type->base_id != Type::INVALID_TYPE_ID) {
     for (auto ext : type->get_ext().extensions) {
       if (ext.type != TYPE_EXT_ARRAY) {
         forward_decl_type(global_get_type(type->base_id));
@@ -220,7 +220,7 @@ void Emitter::visit(ASTFor *node) {
   indent_level++;
 
   (*ss) << indent() << identifier_type_str << " ";
-  node->iden->accept(this);
+  node->iter_identifier->accept(this);
   (*ss) << " = ";
   if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
     (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
@@ -330,7 +330,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
                               (int)node->get_node_type()),
                   node->source_range);
   }
-  return Type::invalid_id;
+  return Type::INVALID_TYPE_ID;
 }
 
 void Emitter::visit(ASTCall *node) {
@@ -348,7 +348,7 @@ void Emitter::visit(ASTCall *node) {
     }
     
     auto func = symbol->function.declaration;
-    
+
     auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
     auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
 
@@ -601,7 +601,7 @@ void Emitter::visit(ASTDeclaration *node) {
     return;
   }
 
-  if (node->type->resolved_type == Type::invalid_id) {
+  if (node->type->resolved_type == Type::INVALID_TYPE_ID) {
     throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
@@ -1264,7 +1264,9 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 
   if (parent_type->is_kind(TYPE_ENUM)) {
     auto symbol = parent_type->get_info()->as<EnumTypeInfo>()->scope->local_lookup(name);
-    auto value = evaluate_constexpr((ASTExpr*)symbol->variable.initial_value, ctx);
+    // We don't check the nullable here because it's an absolute guarantee that enum variables all have
+    // a value always.
+    auto value = evaluate_constexpr((ASTExpr*)symbol->variable.initial_value.get(), ctx);
     ss << std::format(".enum_value = {}", value.integer);
   }
 

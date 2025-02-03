@@ -38,7 +38,9 @@ struct Symbol {
   union {
     struct {
       Value value;
-      ASTExpr *initial_value;
+      // This is null for almost every variable besides constant declarations,
+      // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
+      Nullable<ASTExpr> initial_value;
     } variable;
     struct {
       ASTFunctionDeclaration *declaration;
@@ -54,9 +56,10 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, ASTExpr *initial_value) {
+  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value) {
     Symbol symbol;
     symbol.name = name;
+    symbol.type_id = type_id;
     symbol.flags = SYMBOL_IS_VARIABLE;
     symbol.variable.initial_value = initial_value;
     return symbol;
@@ -119,7 +122,18 @@ struct Scope {
     return fields;
   }
 
-  void insert(const InternedString &name, int type_id, ASTNode *declaring_node, int flags = SYMBOL_IS_VARIABLE);
+  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value) {
+    symbols.insert({name, Symbol::create_variable(name, type_id, initial_value)});
+  }
+
+  void insert_function(const InternedString &name, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+    symbols.insert({name, Symbol::create_function(name, declaration, flags)});
+  }
+
+  void insert_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+    symbols.insert({name, Symbol::create_type(type_id, name, kind, declaration)});
+  }
+
 
   Symbol *lookup(const InternedString &name);
 
@@ -186,7 +200,7 @@ struct Scope {
       if (parent) {
         return parent->find_type_id(name, ext);
       } else {
-        return Type::invalid_id;
+        return Type::INVALID_TYPE_ID;
       }
     }
     return global_find_type_id(symbol->type_id, ext);

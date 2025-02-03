@@ -255,8 +255,8 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
 struct ASTNode;
 
 struct Type {
-  int id = invalid_id;
-  int base_id = invalid_id;
+  int id = INVALID_TYPE_ID;
+  int base_id = INVALID_TYPE_ID;
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
@@ -312,7 +312,8 @@ public:
   int get_element_type() const;
   int take_pointer_to() const;
 
-  constexpr static int invalid_id = -1;
+  constexpr static int UNRESOLVED_GENERIC_TYPE_ID = -2;
+  constexpr static int INVALID_TYPE_ID = -1;
 };
 
 struct ASTFunctionDeclaration;

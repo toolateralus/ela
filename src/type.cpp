@@ -26,7 +26,7 @@ std::vector<int> expand_function_types(std::vector<int> type_ids) {
       output.insert(output.end(), fun_tys.begin(), fun_tys.end());
     } else {
       auto type = global_get_type(type_id);
-      if (type->base_id != Type::invalid_id) {
+      if (type->base_id != Type::INVALID_TYPE_ID) {
         type = global_get_type(type->base_id);
       }
       output.push_back(type_id);
@@ -95,7 +95,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
       return type->id;
     }
   }
-  auto base = Type::invalid_id;
+  auto base = Type::INVALID_TYPE_ID;
   auto type_name = info.to_string();
   auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
   if (type_extensions.has_extensions()) {
@@ -106,7 +106,7 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   if (base < 0)
-    return Type::invalid_id;
+    return Type::INVALID_TYPE_ID;
 
   if (!type_extensions.has_extensions())
     return base;
@@ -114,7 +114,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
 
-  if (base_t && base_t->base_id != Type::invalid_id) {
+  if (base_t && base_t->base_id != Type::INVALID_TYPE_ID) {
     ext = base_t->get_ext().append(ext);
     base_t = global_get_type(base_t->base_id);
   }
@@ -182,7 +182,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
       // Found a matching type with the same extensions. Return it.
       return type->id;
     } else {
-      if (type->base_id != Type::invalid_id) {
+      if (type->base_id != Type::INVALID_TYPE_ID) {
         return global_find_type_id(type->base_id, type_extensions);
       } else {
         return global_find_type_id(type->id, type_extensions);
@@ -684,7 +684,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   // purely for emit time.
   int eldest = *std::max_element(dependencies.begin(), dependencies.end());
   auto eldest_t = global_get_type(eldest);
-  if (eldest_t->base_id != Type::invalid_id) {
+  if (eldest_t->base_id != Type::INVALID_TYPE_ID) {
     eldest = eldest_t->base_id;
   }
 
@@ -693,7 +693,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   // We do this for dot expressions that do tuple.1 etc.
   // Only in the base type.
   for (const auto [i, type] : types | std::ranges::views::enumerate) {
-    info->scope->insert(std::to_string(i), type, nullptr);
+    info->scope->insert_variable(std::to_string(i), type, nullptr);
   }
 
   return type->id;
@@ -801,14 +801,14 @@ int find_operator_overload(TType op, Type *type, OperationKind kind) {
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
   auto scope = type->get_info()->scope;
   if (!scope)
-    return Type::invalid_id;
+    return Type::INVALID_TYPE_ID;
   // TODO: make a system for type checking against this.
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {
       return symbol->type_id;
     }
   }
-  return Type::invalid_id;
+  return Type::INVALID_TYPE_ID;
 }
 
 std::string mangled_type_args(const std::vector<int> &args) {

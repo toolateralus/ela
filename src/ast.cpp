@@ -786,7 +786,7 @@ ASTExpr *Parser::parse_primary() {
       return init_list;
     }
     case TType::Identifier: {
-      if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
+      if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
         auto type = parse_type();
         if (peek().type == TType::LCurly) {
           auto init_list = parse_expr();
@@ -902,7 +902,7 @@ ASTExpr *Parser::parse_primary() {
 ASTType *Parser::parse_type() {
   if (peek().type == TType::LParen) {
     NODE_ALLOC(ASTType, node, range, _, this)
-    node->resolved_type = Type::invalid_id;
+    node->resolved_type = Type::INVALID_TYPE_ID;
     node->kind = ASTType::TUPLE;
     eat();
     while (peek().type != TType::RParen) {
@@ -1057,7 +1057,7 @@ ASTStatement *Parser::parse_statement() {
       }
 
       if (lookahead_buf()[1].type == TType::In) {
-        node->iden = parse_primary();
+        node->iter_identifier = parse_primary();
         expect(TType::In);
         auto expr = parse_expr();
         node->range = expr;
@@ -1167,7 +1167,7 @@ ASTStatement *Parser::parse_statement() {
     decl->value = parse_expr();
     decl->is_constexpr = true;
 
-    if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id || keywords.contains(tok.value.get_str()) ||
+    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str()) ||
         reserved.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
@@ -1179,9 +1179,7 @@ ASTStatement *Parser::parse_statement() {
     if (ctx.scope->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-
-    ctx.scope->insert(tok.value, Type::invalid_id, decl->value.get());
-
+    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get());
     return decl;
   }
 
@@ -1247,7 +1245,7 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->find_type_id(tok.value, {}) == Type::invalid_id) {
+    if (ctx.scope->find_type_id(tok.value, {}) == Type::INVALID_TYPE_ID) {
       eat();
       throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
     }
@@ -1297,12 +1295,12 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      ctx.scope->insert(iden->value, Type::invalid_id, node);
+      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
       // already exist", node->source_range);
-      ctx.scope->insert(iden->value, Type::invalid_id, node);
+      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
     }
   }
 
@@ -1314,7 +1312,7 @@ ASTDeclaration *Parser::parse_declaration() {
   auto iden = eat();
   decl->name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::invalid_id || keywords.contains(iden.value.get_str()) ||
+  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str()) ||
       reserved.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
@@ -1344,7 +1342,7 @@ ASTDeclaration *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
 
-  ctx.scope->insert(iden.value, Type::invalid_id, decl->value.get());
+  ctx.scope->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl->value.get());
 
   return decl;
 }
@@ -1494,7 +1492,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  ctx.scope->insert(name.value, Type::invalid_id, function, SYMBOL_IS_FUNCTION);
+  ctx.scope->insert_function(name.value, function);
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
@@ -1527,7 +1525,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   // TODO: find a better solution to this.
   for (const auto &param : function->generic_parameters) {
-    ctx.scope->forward_declare_type(param, -2);
+    ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
   }
 
   function->block = parse_block();
@@ -1549,7 +1547,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
   node->name = tok.value;
   expect(TType::LCurly);
-  if (ctx.scope->find_type_id(tok.value, {}) != Type::invalid_id) {
+  if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
@@ -1640,7 +1638,7 @@ ASTImpl *Parser::parse_impl() {
     node->target = target;
   }
 
-  node->target->resolved_type = Type::invalid_id;
+  node->target->resolved_type = Type::INVALID_TYPE_ID;
 
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
@@ -1741,7 +1739,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
 
-  if (type_id != Type::invalid_id) {
+  if (type_id != Type::INVALID_TYPE_ID) {
     auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
@@ -1765,7 +1763,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->flags |= STRUCT_FLAG_IS_UNION;
 
   for (const auto &param : node->generic_parameters) {
-    info->scope->forward_declare_type(param, -2);
+    info->scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
   }
 
   if (!semicolon()) {

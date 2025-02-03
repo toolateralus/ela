@@ -33,7 +33,8 @@ Context::Context() {
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;
-    scope->insert("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr, SYMBOL_IS_FUNCTION);
+    scope->insert_function("sizeof", nullptr);
+    scope->symbols["sizeof"].type_id = global_find_function_type_id(sizeof_info, {});
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
@@ -44,26 +45,6 @@ Context::Context() {
   }
 }
 
-
-// We probably want to just alltogether get rid of this entire function.
-// We should be creating symbols explicitly based on their symbol kind, not reading the flags.
-
-void Scope::insert(const InternedString &name, int type_id, ASTNode *declaring_node, int flags) {
-  if ((flags & SYMBOL_IS_VARIABLE) != 0) {
-    symbols.insert({name, Symbol::create_variable(name, (ASTExpr*)declaring_node)});
-  } else if ((flags & SYMBOL_IS_FUNCTION) != 0) {
-    symbols.insert({name, Symbol::create_function(name, (ASTFunctionDeclaration*)declaring_node, (SymbolFlags)flags)});
-  } else if ((flags & SYMBOL_IS_TYPE) != 0) {
-    auto type = global_get_type(type_id);
-    if (type) {
-      symbols.insert({name, Symbol::create_type(type_id, name, type->kind, declaring_node)});
-    } else {
-      symbols.insert({name, Symbol::create_type(type_id, name, (TypeKind)0, declaring_node)});
-    }
-  }
-  symbols[name].flags |= flags;
-  ordered_symbols.push_back(name);
-}
 
 Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {

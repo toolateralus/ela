@@ -91,7 +91,7 @@ struct ASTNode {
   };
   Nullable<ASTBlock> declaring_block;
   SourceRange source_range{};
-  int resolved_type = Type::invalid_id;
+  int resolved_type = Type::INVALID_TYPE_ID;
   bool is_emitted = false;
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
@@ -146,7 +146,7 @@ struct ASTBlock : ASTStatement {
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
   int defer_count = 0;
-  int return_type = Type::invalid_id;
+  int return_type = Type::INVALID_TYPE_ID;
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -421,13 +421,17 @@ struct ASTFor : ASTStatement {
   } iteration_kind;
 
   // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
-  int range_type = Type::invalid_id;
+  int range_type = Type::INVALID_TYPE_ID;
     // This is either the type of that implements Enumerator![T], or is Iter![T];
-  int iterable_type = Type::invalid_id;
+  int iterable_type = Type::INVALID_TYPE_ID;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
-  int identifier_type = Type::invalid_id;
+  int identifier_type = Type::INVALID_TYPE_ID;
   
-  ASTExpr *iden;
+  // this is the 'i' in `for i in 0..100`
+  ASTExpr *iter_identifier;
+  // this is the '0..100' or any thing on the right hand side of the 'in'
+  // `for i in 0..100`
+  //           ^^^^^^^ <- this is the `range`
   ASTExpr *range;
   ValueSemantic value_semantic;
   ASTBlock *block;

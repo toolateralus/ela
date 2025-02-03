@@ -169,7 +169,7 @@ ASTContinue *ASTCopier::copy_continue(ASTContinue *node) { return new (ast_alloc
 ASTBreak *ASTCopier::copy_break(ASTBreak *node) { return new (ast_alloc<ASTBreak>()) ASTBreak(*node); }
 ASTFor *ASTCopier::copy_for(ASTFor *node) {
   auto new_node = copy(node);
-  new_node->iden = static_cast<ASTIdentifier *>(copy_node(node->iden));
+  new_node->iter_identifier = static_cast<ASTIdentifier *>(copy_node(node->iter_identifier));
   new_node->range = static_cast<ASTRange *>(copy_node(node->range));
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
