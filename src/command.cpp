@@ -60,7 +60,7 @@ int CompileCommand::compile() {
 
     cpp.begin();
     result = system(compilation_string.c_str());
-    cpp.end("compiling and linking cpp");
+    cpp.end("invoking `clang` C compiler and `lld` linker");
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);
     }

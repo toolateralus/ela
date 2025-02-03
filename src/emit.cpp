@@ -113,10 +113,7 @@ void Emitter::forward_decl_type(Type *type) {
       break;
     case TYPE_ENUM:
     case TYPE_INTERFACE:
-      throw_error(
-          std::format("internal compiler error: tried to forward declare an invalid type :: {}", type->to_string()),
-          {});
-      break;
+      return;
   }
 }
 

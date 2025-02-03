@@ -1,10 +1,6 @@
 
 #ifndef FREESTANDING {
-  // TODO: reimplement all the helper functions we used to have.
-  // Also, we should make this not null terminated, rather controlled by length.
-  // Another thing: We should use u8 or u64 for length, but you have to cast to signed 32 for all the C functions anyway,
-  // So we'll have to rewrite them all for that.
-
+  
   impl String {
     replace :: fn(self*, old: u8*, replacement: u8*) -> str {
       old_len := strlen(old);
@@ -45,6 +41,12 @@
       self.data[self.length] = 0;
       return self;
     }
+  }
+
+  /* 
+    These are the 'List' like functions for dynamic strings.
+  */
+  impl String {
 
     resize :: fn(self*, new_size: u64) {
       if new_size < self.length then self.length = new_size;
@@ -84,8 +86,6 @@
       self.data[0] = ch;
       self.length++;
     }
-
-    
   }
 
   impl Deinit for String {
@@ -104,6 +104,7 @@ impl String {
       length: self.length,
     }
   }
+
   empty :: fn() -> #self {
     return {};
   }
@@ -128,6 +129,7 @@ impl String {
     }
     return true;
   }
+  
   ends_with :: fn(self*, suffix: u8*) -> bool {
     suffix_len := strlen(suffix);
     if self.length < suffix_len then return false;
@@ -136,6 +138,7 @@ impl String {
     }
     return true;
   }
+
   front :: fn(self*) -> u8 {
     if self.length == 0 then return '\0' as u8;
     return self.data[0];

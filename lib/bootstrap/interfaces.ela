@@ -110,7 +110,6 @@ Compare :: interface![Right] {
   gte :: fn(self, right: Right) -> bool;  // '>=' operator.
 }
 
-
 // Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and str::
 Allocator :: interface {
   allocate :: fn![T](self*) -> T*;
@@ -118,6 +117,10 @@ Allocator :: interface {
   allocate_array :: fn![T](self*, n: u64) -> T*;
   resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
   copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
+}
+
+As_Slice :: interface![T] {
+  as_slice :: fn(self, range: Range) -> Slice![T];
 }
 
 As_Char_Slice :: interface {

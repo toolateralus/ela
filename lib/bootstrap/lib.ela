@@ -5,10 +5,10 @@
 #include "libc.ela";
 #include "memory.ela";
 #include "list.ela";
+#include "slice.ela";
 #include "str.ela";
 #include "String.ela";
 #include "reflection.ela";
-#include "slice.ela";
 
 
 assert :: fn(message: str, condition: bool) {
@@ -100,16 +100,6 @@ panic :: fn(msg: str) {
 
 impl As_Char_Slice for u32 {
   as_char_slice :: fn(self) -> Slice![u32] {
-    // Since we have to null terminate the slice, which we shouldn't,
-    // we'd have to do this little static hack.
-
-    // This blatantly has massive problems when you deal with more than one slice at a time
-    // but this is just a hack.
-    #static slice_data: u32[2] = {'\0', '\0'};
-    slice_data[0] = self;
-
-    // ! See repro 84.ela
-
     return {
       data: &self,
       length: 1,

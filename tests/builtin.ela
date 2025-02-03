@@ -56,7 +56,7 @@ Xaryu :: struct {
   //   arr[i] = 100;
   // }
 
-  subarr := arr.slice(0..10);
+  subarr := arr.subarray(0..10);
 
   for i in 0..10 {
     assert("Slice failed", subarr[i] == arr[i]);

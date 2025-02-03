@@ -43,19 +43,6 @@ to_string :: fn![T](value: T) -> String {
   return String::from(strdup(buffer));
 } 
 
-#static print :: fn![T](message: T) {
-  formatted := to_string(message);
-  printf("%s"c, formatted.data);
-  formatted.deinit();
-}
-
-#static println :: fn![T](message: T) {
-  formatted := to_string(message)
-  printf("%s\n"c, formatted.data);
-  formatted.deinit();
-}
-
-
 format :: fn(fmt : str, list: Init_List![any]) -> String {
   if fmt.length == 0 {
     return {};
@@ -100,7 +87,8 @@ format :: fn(fmt : str, list: Init_List![any]) -> String {
           #type(f64):  { builder.append_then_free(to_string(value.unwrap![f64]()));  }
 
           #type(bool): { builder.append_then_free(to_string(value.unwrap![bool]())); }
-
+          #type(String): { builder.append(*(value.ptr as String*));   }
+          #type(str): { builder.append((*(value.ptr as str*)).as_string());   }
         }
       }
       value_index++;
@@ -111,4 +99,23 @@ format :: fn(fmt : str, list: Init_List![any]) -> String {
   }
 
   return builder.get_string();
+}
+
+#static print :: fn![T](message: T) {
+  formatted := format("%", {any::new(&message)});
+  printf("%s"c, formatted.data);
+  formatted.deinit();
+}
+
+#static println :: fn![T](message: T) {
+  formatted := format("%", {any::new(&message)});
+  printf("%s\n"c, formatted.data);
+  formatted.deinit();
+}
+
+// format, print, and deinit a String via `format` function.
+#static printlnf :: fn(fmt: str, list: Init_List![any]) {
+  formatted := format(fmt, list);
+  printf("%s\n"c, formatted.data);
+  formatted.deinit();
 }

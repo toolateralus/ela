@@ -1604,6 +1604,12 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     keys.push_back(key);
     keys_set.insert(key);
   }
+
+  if (node->key_values.empty()) {
+    end_node(nullptr, range);
+    throw_error("Empty `enum` types are not allowed", range);
+  }
+
   expect(TType::RCurly);
   return node;
 }

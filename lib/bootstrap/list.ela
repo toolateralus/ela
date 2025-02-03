@@ -4,31 +4,23 @@ panic :: fn(msg: str);
 
 #ifndef FREESTANDING {
   impl![T] List![T] {
-    slice :: fn(self*, range: Range) -> #self {
+    subarray :: fn(self, range: Range) -> #self {
       if range.begin < 0 || range.end > self.length || range.begin > range.end {
-        return {};
+        panic("Invalid range for subarray");
       }
       len := range.end - range.begin;
-      slice_data: T* = malloc(sizeof(T) * len);
-      memcpy(slice_data, self.data + range.begin, len);
+      new_data := malloc(sizeof(T) * len);
+      if !new_data then panic("Failed to allocate in subarray");
+      memcpy(new_data, self.data + range.begin, sizeof(T) * len);
       return {
-        data: slice_data,
+        data: new_data,
         length: len,
-        capacity: len
+        capacity: len,
       }
     }
-    
-    
-    view :: fn(self*, range: Range) -> #self {
-      if range.begin < 0 || range.end > self.length || range.begin > range.end {
-        return {};
-      }
-      len := range.end - range.begin;
-      return {
-        data: self.data + range.begin,
-        length: len,
-        capacity: len
-      }
+
+    at :: fn(self*, index: u64) -> T {
+      return self.data[index];
     }
 
     // You should probably not call this function, and you do not need to for normal push operations.
@@ -91,9 +83,6 @@ panic :: fn(msg: str);
       self.length = 0;
     }
 
-    at :: fn(self*, index: u64) -> T {
-      return self.data[index];
-    }
 
     // Initalize the array to a specific length, and zero initialize the data.
     // useful to create a dynamic of at least num_to_fill length, and have all the elements be valid data.
@@ -119,21 +108,6 @@ panic :: fn(msg: str);
     } 
   }
 
-  impl![T] Iterable![T] for List![T] {
-    iter :: fn(self*) -> Iter![T] {
-      return {
-        ptr: self.data,
-        end: (self.data + self.length) as T*,
-      }
-    }
-  }
-
-  impl![T] List![T] {
-    subscript :: fn(self*, idx: s64) -> T {
-      return self.data[idx];
-    }
-  }
-
   impl![T] Init![T] for List![T] {
     init :: fn(init: Init_List![T]) -> #self {
       self: #self;
@@ -141,6 +115,34 @@ panic :: fn(msg: str);
         self.push(init.data[idx]);
       }
       return self;
+    }
+  }
+}
+
+impl![T] Iterable![T] for List![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: (self.data + self.length) as T*,
+    }
+  }
+}
+
+impl![T] List![T] {
+  subscript :: fn(self*, idx: s64) -> T {
+    return self.data[idx];
+  }
+}
+
+impl![T] As_Slice![T] for List![T] {
+  as_slice :: fn(self, range: Range) -> Slice![T] {
+    if range.begin < 0 || range.end > self.length || range.begin > range.end {
+      panic("Invalid range for as_slice");
+    }
+    len := range.end - range.begin;
+    return Slice![T] {
+      data: self.data + range.begin,
+      length: len,
     }
   }
 }

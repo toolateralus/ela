@@ -34,13 +34,12 @@ static size_t get_uid() {
     /* clang-format on */                                                                                              \
   } else {                                                                                                             \
     handle_generic_error(&data_name, source_range);                                                                    \
-  }                                                                                                                    \
+  }
 
 void handle_generic_error(GenericInstantiationErrorUserData *data, const SourceRange &range) {
   reset_panic_handler();
   throw_error(std::format("Error at definition: {}\nerror: {}",
-                          format_source_location(data->definition_range, ERROR_FAILURE, 3),
-                          data->message),
+                          format_source_location(data->definition_range, ERROR_FAILURE, 3), data->message),
               range);
 }
 
@@ -174,7 +173,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       node->scope->insert(field.name, field.type->resolved_type, nullptr);
     }
   }
-  for (auto alias: node->aliases) {
+  for (auto alias : node->aliases) {
     alias->accept(this);
   }
   for (auto decl : node->members) {
@@ -1773,16 +1772,21 @@ void Typer::visit(ASTRange *node) {
   // Alwyas cast to the left? or should we upcast to the largest number type?
   if (conversion_rule_left_to_right == CONVERT_NONE_NEEDED || conversion_rule_left_to_right == CONVERT_IMPLICIT) {
     right = node->right->resolved_type = left;
-  } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED || conversion_rule_right_to_left == CONVERT_IMPLICIT) {
+  } else if (conversion_rule_right_to_left == CONVERT_NONE_NEEDED ||
+             conversion_rule_right_to_left == CONVERT_IMPLICIT) {
     left = node->left->resolved_type = right;
   } else {
-    throw_error("Can only use ranges when both types are implicitly castable to each other. Range will always take the left side's type", node->source_range);
+    throw_error("Can only use ranges when both types are implicitly castable to each other. Range will always take the "
+                "left side's type",
+                node->source_range);
   }
 
   node->resolved_type = find_generic_type_of("Range_Base", {left}, node->source_range);
 
   if (node->resolved_type == -1) {
-    throw_error(std::format("Unable to find range type for `{}..{}`", global_get_type(left)->to_string(), global_get_type(right)->to_string()), node->source_range);
+    throw_error(std::format("Unable to find range type for `{}..{}`", global_get_type(left)->to_string(),
+                            global_get_type(right)->to_string()),
+                node->source_range);
   }
 }
 void Typer::visit(ASTSwitch *node) {
