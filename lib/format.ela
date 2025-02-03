@@ -17,7 +17,11 @@ to_string :: fn![T](value: T) -> String {
   }
 
   if type.is_enum() {
-    
+    for field in type.fields {
+      if value == field.enum_value {
+        return String::from(field.name);
+      }
+    }
   }
 
 

@@ -35,3 +35,12 @@ impl![T] Slice![T] {
     }
   }
 }
+
+impl![T] Iterable![T] for Slice![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length
+    }
+  }
+}
