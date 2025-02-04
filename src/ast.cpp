@@ -1492,7 +1492,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  ctx.scope->insert_function(name.value, function);
+  ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, function);
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();

@@ -135,7 +135,7 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args
 
 void Typer::visit(ASTTaggedUnionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::INVALID_TYPE_ID, TypeKind(0));
+    ctx.scope->create_type_alias(node->name, Type::INVALID_TYPE_ID, TypeKind(0), node);
     return;
   }
   visit_tagged_union_declaration(node, false);
@@ -159,7 +159,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind);
+      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
@@ -205,7 +205,7 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind);
+      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
     type = global_get_type(global_create_tagged_union_type(node->name, node->scope, generic_args));
@@ -303,7 +303,7 @@ void Typer::visit(ASTLambda *node) {
   // std::cout << global_get_type(node->resolved_type)->to_string() << '\n';
 }
 
-void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
+void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
   // Setup context.
   auto old_scope = ctx.scope;
@@ -315,7 +315,7 @@ void Typer::visit_function_signature(ASTFunctionDeclaration *node, bool generic_
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind);
+      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
   }
@@ -370,7 +370,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind);
+      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
   }
@@ -400,11 +400,11 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
     if (!method->generic_parameters.empty()) {
-      type_scope->insert_function(method->name, method);
+      type_scope->insert_function(method->name, method->resolved_type, method);
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
-    visit_function_signature(method, false);
+    visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
@@ -414,9 +414,9 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       }
     } else {
       if ((method->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-        type_scope->insert_function(method->name, method, SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+        type_scope->insert_function(method->name, method->resolved_type, method, SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
       } else {
-        type_scope->insert_function(method->name, method);
+        type_scope->insert_function(method->name, method->resolved_type, method);
       }
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
@@ -441,6 +441,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
     ctx.set_scope(node->scope);
     for (auto &[name, interface_sym] : interface->scope->symbols) {
+      if (!interface_sym.is_function()) continue;
+
       if (auto impl_symbol = impl_scope.local_lookup(name)) {
         if (interface_sym.type_id != impl_symbol->type_id) {
           if (interface_sym.type_id != Type::INVALID_TYPE_ID && impl_symbol->type_id != Type::INVALID_TYPE_ID) {
@@ -490,7 +492,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind);
+      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
   }
@@ -506,7 +508,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
 
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT, node);
   } else {
     visit_struct_declaration(node, false);
   }
@@ -538,22 +540,23 @@ void Typer::visit(ASTEnumDeclaration *node) {
 
 void Typer::visit(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->insert_function(node->name, node);
+    ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);
     return;
   }
 
-  visit_function_signature(node, false);
+  visit_function_header(node, false);
 
   if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-    ctx.scope->insert_function(node->name, node, SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+    ctx.scope->insert_function(node->name, node->resolved_type, node, SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
     return;
   }
 
-  ctx.scope->insert_function(node->name, node);
+  ctx.scope->insert_function(node->name, node->resolved_type, node);
 
   if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
     return;
   }
+
   visit_function_body(node);
 }
 
@@ -1134,7 +1137,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   } else {
     generic_args = get_generic_arg_types(node->generic_arguments);
   }
-  auto instantiation = visit_generic(&Typer::visit_function_signature, func, generic_args);
+  auto instantiation = visit_generic(&Typer::visit_function_header, func, generic_args);
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", node->source_range);
   }
@@ -1258,7 +1261,7 @@ void Typer::visit(ASTType *node) {
                                           generic_args);
             break;
           case AST_NODE_FUNCTION_DECLARATION:
-            instantiation = visit_generic(&Typer::visit_function_signature,
+            instantiation = visit_generic(&Typer::visit_function_header,
                                           (ASTFunctionDeclaration *)declaring_node, generic_args);
             break;
           case AST_NODE_INTERFACE_DECLARATION:
@@ -1887,7 +1890,7 @@ void Typer::visit(ASTAlias *node) {
 
   auto type = global_get_type(node->type->resolved_type);
 
-  ctx.scope->create_type_alias(node->name, node->type->resolved_type, type->kind);
+  ctx.scope->create_type_alias(node->name, node->type->resolved_type, type->kind, node);
 
   return;
 }
@@ -1983,7 +1986,7 @@ void Typer::visit(ASTInterfaceDeclaration *node) {
     ctx.scope->declare_interface(node->name, node);
   } else {
     visit_interface_declaration(node, false);
-    ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE);
+    ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE, node);
   }
   return;
 }
@@ -2063,7 +2066,7 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
             break;
           case AST_NODE_FUNCTION_DECLARATION:
             instantiation =
-                visit_generic(&Typer::visit_function_signature, (ASTFunctionDeclaration *)declaring_node, generic_args);
+                visit_generic(&Typer::visit_function_header, (ASTFunctionDeclaration *)declaring_node, generic_args);
             break;
           case AST_NODE_INTERFACE_DECLARATION:
             instantiation = visit_generic(&Typer::visit_interface_declaration,

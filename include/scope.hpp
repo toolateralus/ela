@@ -65,8 +65,9 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, ASTFunctionDeclaration *declaration, SymbolFlags flags) {
+  static Symbol create_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags) {
     Symbol symbol;
+    symbol.type_id = type_id;
     symbol.name = name;
     symbol.flags = flags;
     symbol.function.declaration = declaration;
@@ -126,8 +127,8 @@ struct Scope {
     symbols.insert({name, Symbol::create_variable(name, type_id, initial_value)});
   }
 
-  void insert_function(const InternedString &name, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    symbols.insert({name, Symbol::create_function(name, declaration, flags)});
+  void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+    symbols.insert({name, Symbol::create_function(name, type_id, declaration, flags)});
   }
 
   void insert_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
@@ -166,12 +167,14 @@ struct Scope {
     return id;
   }
 
-  void create_type_alias(const InternedString &name, int type_id, TypeKind kind) {
+  void create_type_alias(const InternedString &name, int type_id, TypeKind kind, ASTNode *declaring_node) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
     symbol.type.kind = kind;
     symbol.flags = SYMBOL_IS_TYPE;
+    symbol.type.declaration = declaring_node;
+    symbols.erase(name);
     symbols.insert({name, symbol});
   }
 

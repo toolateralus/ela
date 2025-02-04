@@ -34,8 +34,7 @@ Context::Context() {
     FunctionTypeInfo sizeof_info{};
     sizeof_info.return_type = u32_type();
     sizeof_info.is_varargs = true;
-    scope->insert_function("sizeof", nullptr);
-    scope->symbols["sizeof"].type_id = global_find_function_type_id(sizeof_info, {});
+    scope->insert_function("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr);
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
@@ -45,8 +44,10 @@ Context::Context() {
     if (type_table[i]->get_info()->scope) {
       type_table[i]->get_info()->scope->parent = root_scope;
     }
+
     std::cout << std::format("creating alias for scalar/builtin {} :: {}\n", type_table[i]->get_base(), i);
-    root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind);
+
+    root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
   }
 }
 
