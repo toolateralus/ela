@@ -1,3 +1,5 @@
+#error "the hash map implementation disappeared? what happened to it?";
+
 #import hash_map;
 
 Interned :: struct![T] where T is Hash {
