@@ -106,3 +106,74 @@ impl As_Char_Slice for u32 {
     }
   }
 }
+
+#import utf8;
+
+// Define the UTF8_Enumerator struct
+UTF8_Enumerator :: struct {
+  data: Slice![u8],            // The input byte slice
+  byte_position: s32,   // Current position in the byte slice
+  buffer: u32[2],       // Buffer to hold decoded code points
+  buffer_length: s32,   // Number of valid code points in the buffer
+}
+
+impl UTF8_Enumerator {
+  preload :: fn(self*) -> void {
+    if self.buffer_length == 0 {
+      ch, advance := utf8_to_code_point(self.data.slice(self.byte_position..self.byte_position + 4));
+      self.byte_position += advance; // Advance the byte position
+      self.buffer[0] = ch;           // Store the decoded code point in the buffer
+      self.buffer_length = 1;        // Update the buffer length
+    }
+  }
+}
+
+impl Enumerator![u32] for UTF8_Enumerator {
+  // Return the current code point
+  current :: fn(self) -> u32 {
+    self.preload();
+    return self.buffer[0];
+  }
+
+  // Move to the next code point
+  next :: fn(self*) -> void {
+    self.preload();
+
+    // Shift the buffer to prepare for the next code point
+    if self.buffer_length > 0 {
+      self.buffer[0] = self.buffer[1]; 
+      self.buffer_length -= 1;
+    }
+
+    if self.byte_position < self.data.length {
+      ch, advance := utf8_to_code_point(self.data.slice(self.byte_position..self.byte_position + 4));
+      self.byte_position += advance; // Advance the byte position
+      self.buffer[1] = ch;           // Store the decoded code point in the buffer
+      self.buffer_length += 1;       // Update the buffer length
+    }
+  }
+
+  done :: fn(self) -> bool {
+    return self.byte_position >= self.data.length && self.buffer_length == 0;
+  }
+}
+
+impl String {
+  chars :: fn(self) -> UTF8_Enumerator![String] {
+    return UTF8_Enumerator![String] {
+      data: self.as_byte_slice(),
+      byte_position: 0,
+      buffer_length: 0,
+    };
+  }
+}
+
+impl str {
+  chars :: fn(self) -> UTF8_Enumerator![String] {
+    return UTF8_Enumerator![String] {
+      data: self.as_byte_slice(),
+      byte_position: 0,
+      buffer_length: 0,
+    };
+  }
+}

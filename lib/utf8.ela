@@ -92,6 +92,34 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   return (code_point, index as s8);
 }
 
+code_point_to_utf8 :: fn(code_point: u32) -> u8[] {
+  if code_point <= 0x7F {
+    return u8[]::init({code_point as u8});
+  } else if code_point <= 0x7FF {
+    return u8[]::init({
+      (0b11000000 | ((code_point >> 6))) as u8,
+      (0b10000000 | ((code_point & 0x3F))) as u8,
+    });
+  } else if code_point <= 0xFFFF {
+    return u8[]::init({
+      (0b11100000 | ((code_point >> 12))) as u8,
+      (0b10000000 | (((code_point >> 6) & 0x3F))) as u8,
+      (0b10000000 | ((code_point & 0x3F))) as u8,
+    });
+  } else if code_point <= 0x10FFFF {
+    return u8[]::init({
+      (0b11110000 | ((code_point >> 18))) as u8,
+      (0b10000000 | (((code_point >> 12) & 0x3F))) as u8,
+      (0b10000000 | (((code_point >> 6) & 0x3F))) as u8,
+      (0b10000000 | ((code_point & 0x3F))) as u8,
+    });
+  } else {
+    return {};
+  }
+}
+
+
+
 utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice {
   slice := data.as_byte_slice();
   output: u32[];
@@ -134,4 +162,3 @@ utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice {
           utf8_is_latin_alpha(ch);
   }
 }
-
