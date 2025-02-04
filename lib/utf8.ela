@@ -34,75 +34,61 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   if sequence.length == 0 
     then return (UTF8_ERROR, 1);
 
-  if sequence[0] <= 0x7F 
-    then return (sequence[0] as u32, 1);
-
-  /* Multibyte sequence. We assume valid sequences appear more
-      frequently than invalid ones. */
-  max_length : u32;
-  min_code_point: u32;
-  code_point: u32;
-  
   byte_0 := sequence[0];
 
-  if (byte_0 & 0xF0) < 0xE0 {
-    /* First byte in the range [0x80, 0xBF] is covered here.
-        It wraps around to an invalid code point. */
+  if byte_0 <= 0x7F 
+    then return (byte_0 as u32, 1);
+
+  // Determine the number of bytes in the sequence
+  max_length: u32;
+  min_code_point: u32;
+  code_point: u32;
+
+  if (byte_0 & 0xE0) == 0xC0 {
     max_length = 2;
     min_code_point = 0x80;
-    code_point = (byte_0 - 0xC0) as u32;
-  } else if ((byte_0 & 0xF0) == 0xE0) {
+    code_point = (byte_0 & 0x1F) as u32;
+  } else if (byte_0 & 0xF0) == 0xE0 {
     max_length = 3;
     min_code_point = 0x0800;
-    code_point = (byte_0 - 0xE0) as u32; 
-  } else {
+    code_point = (byte_0 & 0x0F) as u32;
+  } else if (byte_0 & 0xF8) == 0xF0 {
     max_length = 4;
     min_code_point = 0x10000;
-    code_point = (byte_0 - 0xF0) as u32;
+    code_point = (byte_0 & 0x07) as u32;
+  } else {
+    return (UTF8_ERROR, 1); // Invalid first byte
   }
 
-  index := 1; // we start 1 byte in front of the byte we already decoded above.
-  while index < sequence.length {
-    index++;
+  index := 1;
+  while index < sequence.length && index < max_length {
     byte := sequence[index];
-    
-    max_length -= 1;
-
-    if max_length == 0 
-      then break;
-
-    offset : u32 = byte - 0x80;
-
-    /* 
-      (*sequence) points to the byte where the next sequence may begin.
-      The next sequence may be valid or invalid. 
-    */
-    if offset > 0x3F {
-      return (UTF8_ERROR, 1);
+    if (byte & 0xC0) != 0x80 {
+      return (UTF8_ERROR, 1); // Invalid continuation byte
     }
-    code_point = (code_point << 6) + offset;
+    code_point = (code_point << 6) | (byte & 0x3F) as u32;
+    index += 1;
   }
 
-  /* Overlong sequence */
+  if index < max_length {
+    return (UTF8_ERROR, 1); // Incomplete sequence
+  }
+
+  // Check for overlong sequences
   if code_point < min_code_point {
     return (UTF8_ERROR, 1);
   }
-  
-  /* 
-    UTF-16 surrogates are invalid in UTF-8.
-    They are used in CESU-8, which is a different encoding. 
-  */
+
+  // Check for UTF-16 surrogates
   if code_point >= 0xD800 && code_point <= 0xDFFF {
     return (UTF8_ERROR, 1);
   }
 
-  /* 
-    Any value outside the [0x00, 0x10FFFF] range indicates an invalid sequence.
-  */
+  // Check for invalid Unicode code points
   if code_point > 0x10FFFF {
     return (UTF8_ERROR, 1);
   }
-  
+
   return (code_point, index as s8);
 }
 
