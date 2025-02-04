@@ -1,0 +1,26 @@
+
+
+:::       ITERATORS         :::
+  We don't need to implicitly search for iter()/enumerator(),
+  we can just make it so the user has to call that, and then loops can just use either or.
+  this will simplify our compiler slightly, and also increase flexibility of how you can use iterators.
+::::::::::::::::::::::::::::::::
+
+
+:::  GENERIC SPECIALIZATION :::
+  We need some form of generic specialization or function overloading, otherwise we're going to be in a living nightmare.
+  Say `to_string()` checks if it's operand is null or not: well, for non-pointer non-bool-convertible objects,
+  this isn't feasible. So, we specialize for String/str, etc other structs.
+
+  Another use case is for things like `From![T]` and `AsSlice![T, T1]`
+  Where we might want `from(int)` but also `from(float)` on the same type
+  and right now that's not possible.
+::::::::::::::::::::::::::::::::
+
+
+::: IMPLICIT CASTING ROUTINES :::
+  We should be able to do some routine on an implicit cast, say from Init_List![T] to whatever takes it,
+  or implicitly cast any value to any without calling any::new(&value)
+:::::::::::::::::::::::::::::::::
+
+::: 

@@ -1,4 +1,4 @@
-#import core;
+;
 
 add_generic :: fn![T](a: T, b: T) -> T {
   return a + b;
@@ -10,8 +10,33 @@ generic_return :: fn![T]() -> T {
 }
 
 #test test_generic_add :: fn() {
-  assert("generic_add_float failed"c, add_generic![float](100.0, 100.0) == 200.0);
-  assert("generic_add_int failed"c, add_generic![int](5, 6) == 11);
-  assert("generic_return failed"c, generic_return![int]() == 0)
-  assert("generic_return failed"c, generic_return![float]() == 0.0);
+  assert("generic_add_float failed", add_generic![f32](100.0, 100.0) == 200.0);
+  assert("generic_add_int failed", add_generic![s32](5, 6) == 11);
+  assert("generic_return failed", generic_return![s32]() == 0)
+  assert("generic_return failed", generic_return![f32]() == 0.0);
+}
+
+Generic :: struct![T] {
+  t: T
+}
+
+generic_fn :: fn![T]() {}
+
+Other :: struct{}
+
+impl![T] Generic![T] {
+  dont :: fn(self*) -> T {
+    t: T;
+    return t;
+  }
+}
+
+My_Struct :: struct {
+  a: Other
+}
+
+#test test_generic_dependencies :: fn() {
+  a : Generic![My_Struct];
+  generic_fn![Other]();
+  b := a.dont();
 }

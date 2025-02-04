@@ -1,0 +1,43 @@
+
+#alias char :: u32; // this represents a single UTF-8 scalar.
+
+// This is a string literal type. "..." will return this type. 
+// It's meant to be an immutable constant string.
+
+// to get a 'u8*' literal, use `"..."c` the little `c` postfix.                              ^
+str :: struct {
+  data:    u8*,
+  length:  u64,
+}
+
+// This is basically just a u8[]
+// but it has some particularly special methods for dealing with strings,
+// so it gets it's own distinct type.
+String :: struct {
+  data: u8*,
+  length: u64,
+  capacity: u64,
+}
+
+Init_List :: struct![Value_Type] {
+  data:   Value_Type*,
+  length: u64,
+}
+
+List :: struct![Value_Type] {
+  data:     Value_Type*,
+  length:   u64,
+  capacity: u64,
+}
+
+Type :: struct;
+
+any :: struct {
+  ptr: void*,
+  type: Type*
+};
+
+Slice :: struct![Value_Type] {
+  data: Value_Type*,
+  length: u64,
+}

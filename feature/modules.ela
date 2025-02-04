@@ -1,16 +1,16 @@
-// declare a module (rest of this file will be inside this)
+// declare or add to a module (rest of this file will be inside this)
 #mod std::mem;
 
 Allocator :: interface![T] {
-  #static alloc :: fn![T]() -> T*;
+  alloc :: fn![T]() -> T*;
 }
 
 // declare a function within std::mem;
 alloc :: fn![T, Alloc = std::mem::default_allocator]() {
-  return Alloc::alloc![T]();
+  Alloc::alloc![T]();
 }
 
-// declare a module (the block's contents will be inside it.)
+// declare or add to a module (the block's contents will be inside it.)
 #mod std::mem {
   // declare a function within std::mem;
   alloc :: fn![T, Alloc = std::mem::default_allocator]() {
@@ -18,10 +18,7 @@ alloc :: fn![T, Alloc = std::mem::default_allocator]() {
   }
 }
 
-
-
-
-
-
-
+#import {mem, math} from std;
+#import {alloc, free} from mem;
+#import {alloc, free} from std::mem;
 

@@ -1,5 +1,6 @@
 #pragma once
 
+#include <csetjmp>
 #include <deque>
 #include <vector>
 
@@ -7,7 +8,7 @@
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
-#include "string_builder.hpp"
+#include "type.hpp"
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
@@ -21,22 +22,23 @@ struct VisitorBase {
 };
 
 struct Typer : VisitorBase {
-
   Nullable<ASTType> type_context = nullptr;
   int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
 
-  template <typename T>
-  using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
-  template <typename T>
-  T visit_generic(VisitorMethod<T> visit_method, T declaring_node,
-                    std::vector<int> args);
+  template <typename T> using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
+  template <typename T> T visit_generic(VisitorMethod<T> visit_method, T declaring_node, std::vector<int> args);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   Nullable<Symbol> get_symbol(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
+
+  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
+                           const SourceRange &source_range);
+
+ 
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTFunctionDeclaration *node) override;
@@ -53,31 +55,35 @@ struct Typer : VisitorBase {
   void visit(ASTType *node) override;
   void visit(ASTScopeResolution *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTSize_Of *node) override;
 
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
   void visit_function_signature(ASTFunctionDeclaration *node, bool generic_instantiation,
-                                 std::vector<int> generic_args = {});
+                                std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
-                               std::vector<int> generic_args = {});
-  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation,
-                              std::vector<int> generic_args = {});
+                                std::vector<int> generic_args = {});
+  void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
+                                      std::vector<int> generic_args = {});
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
                                    std::vector<int> generic_args = {});
-  void visit_function_body(ASTFunctionDeclaration *node, int return_type);
+  void visit_function_body(ASTFunctionDeclaration *node);
 
   int get_self_type();
 
   void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
-  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, Type *&type, ASTFunctionDeclaration *func);
-  void try_visit_impl_on_call(ASTCall *node);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
+
+  void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
 
   void visit(ASTCall *node) override;
   void visit(ASTArguments *node) override;
   void visit(ASTReturn *node) override;
   void visit(ASTContinue *node) override;
   void visit(ASTBreak *node) override;
+
   void visit(ASTFor *node) override;
   void visit(ASTIf *node) override;
   void visit(ASTElse *node) override;
@@ -113,12 +119,17 @@ struct DeferBlock {
 };
 
 struct Emitter : VisitorBase {
-  void emit_deferred_statements(DeferBlockType type);
-  static constexpr const char * defer_return_value_key = "$defer$return$value";
+  static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
+  bool emit_default_value = true;
   bool emit_default_args = false;
   int num_tests = 0;
+
+  void emit_tuple_dependants(std::vector<int> &types);
+
+  int cf_expr_return_id = 0;
+  Nullable<std::string> cf_expr_return_register;
 
   Nullable<ASTType> type_context;
 
@@ -128,17 +139,18 @@ struct Emitter : VisitorBase {
   bool emitting_function_with_defer = false;
 
   // the one at the top was the last one that was placed. we do this because you need to hit all the outer ones,
-  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched into that block.
-  std::deque<DeferBlock> defer_blocks {};
-
+  // which will be done witha  fall thruogh on the labels,but you may want to skip some defers, say you never branched
+  // into that block.
+  std::deque<DeferBlock> defer_blocks{};
 
   std::stringstream code{};
   std::stringstream *ss{};
   std::stringstream test_functions{};
 
-  int indentLevel = 0;
+  int indent_level = 0;
   Context &ctx;
 
+  int type_list_id = -1;
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
                                compile_command.compilation_flags.contains("-nostdlib");
 
@@ -151,32 +163,36 @@ struct Emitter : VisitorBase {
     if (!is_debugging) {
       return;
     }
-    auto loc = node->source_range.begin_loc;
+    auto loc = node->source_range.begin_location.line;
     if (loc != last_loc) {
       auto filename = get_source_filename(node->source_range);
-
-      // !BUG: figure out why this is sometimes empty.
       if (filename.empty()) {
-        // printf("Empty filename for line directive.\n");
+        printf("Empty filename for line directive.\n");
         return;
       }
-
       (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     }
   }
 
+  void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
+                              ASTExpr *right = nullptr);
+
+  void emit_type_or_fwd_decl(Type* type);
+  void forward_decl_type(Type* type);
+  template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
+  void emit_deferred_statements(DeferBlockType type);
+
   std::string to_type_struct(Type *type, Context &context);
   inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
-  inline std::string indent() { return std::string(indentLevel * 2, ' '); }
+  inline std::string indent() { return std::string(indent_level * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
   inline void newline() { (*ss) << '\n'; }
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
   inline void space() { (*ss) << ' '; }
-  void interpolate_string(ASTLiteral *node);
-  void emit_local_function(ASTFunctionDeclaration *node);
+  
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
@@ -194,9 +210,8 @@ struct Emitter : VisitorBase {
                             Nullable<ASTBlock> block);
 
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
-  std::string get_function_pointer_dynamic_array_declaration(const std::string &type_string, const std::string &name,
-                                                             Type *type);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
+
   int get_expr_left_type_sr_dot(ASTNode *node);
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
@@ -229,6 +244,7 @@ struct Emitter : VisitorBase {
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTSize_Of *node) override;
   void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
@@ -247,4 +263,10 @@ struct Emitter : VisitorBase {
     }
     return;
   };
+};
+
+struct GenericInstantiationErrorUserData {
+  std::string message = "";
+  SourceRange definition_range = {};
+  jmp_buf save_state;
 };

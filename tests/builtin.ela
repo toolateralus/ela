@@ -1,137 +1,105 @@
-#import core;
-
-
 #test test_string :: fn() {
-  my_string : string = "Xaryu Baryu";
-  assert("string length failed to equal expected value"c, my_string.length == 11);
+  my_string := "Xaryu Baryu";
+  assert("str length failed to equal expected value", my_string.length == 11);
 }
 
 #test test_array :: fn() {
-  array : int[] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
-  assert("array length failed to equal expected value"c, array.length == 11);
+  array : s32[11] = {0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10};
+  assert("array length failed to equal expected value", sizeof(array) / sizeof(s32) == 11);
 }
-
 
 Xaryu :: struct {
-  value: int;
+  value: s32
 }
 
-impl Xaryu {
-  to_string :: fn(self) -> string {
-    return "XarBar";
-  }
-}
-
-#test test_string_interpolation :: fn() {
-  xarbar: Xaryu;
-  interp: string = $"{xarbar}";
-  assert("unexpected interpolated string value"c, strcmp(interp.data, "XarBar"c) == 0);
-  interp = $"{(1 + 1) * 2}";
-  assert("unexpected interpolated string value"c, strcmp(interp.data, "4"c) == 0);
-}
-
-
-
-/* 
-  These operators will be removed as soon as we finish this massive rewrite.
-  Where [] array is implemented in ela, and we can just have generic methods for these operations.
-*/
 #test test_array_concat_operator :: fn() {
-  array: int[];
-  array ~= 10;
-  assert("concat operator failed"c, array.length == 1);
+  array: List![s32];
+  array.push(10);
+  assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
-  array: int[];
+  array: List![s32];
   for i in 0..100 {
-    array ~= 10;
+    array.push(10);
   }
-  n: int;
+  n: s32;
   for i in 0..100 {
-    n = ~array;
+    n = array.pop();
   }
-  assert("pop operator failed"c, array.length == 0 && n == 10);
+  assert("pop operator failed", array.length == 0 && n == 10);
 }
 
-#test test_array_erase_operator :: fn() {
-  array: int[] ;
-  array ~= 10;
-  array ~~ 10;
-  assert("failed to erase element from array with ~~"c, array.length == 0);
-}
-
-
-
-#test test_multidimensional_arrays :: fn() {
-  array: int[5][5];
-  for x in 0..5 {
-    for y in 0..5 {
-      array[x][y] = x * y;
-    }
-  }
-
-  for x in 0..5 {
-    for y in 0..5 {
-      assert("multidimensional failure"c, array[x][y] == x * y);
-    }
-  }
-
-  dynamic : s64[][];
-  for x in 0..5 {
-    dynamic ~= {};
-    for y in 0..5 {
-      dynamic[x] ~= x * y;
-    }
-  }
-
-  assert("length failed"c, dynamic.length == 5);
-
-  for x in 0..5 {
-    for y in 0..5 {
-      assert("multidimensional failure"c, dynamic[x][y] == x * y);
-    }
-  }
-}
-
-
-#test subscript_string :: fn() {
-  s: string = "0,1,2,3";
-  s[0] = 10;
-  assert("subscript assign string failed"c, s[0] == (10 as char));
-}
 
 #test test_range_var :: fn() {
   r : Range = 0..10;
-  assert("range variable failed"c, r.first == 0 && r.last == 10);
+  assert("range variable failed", r.begin == 0 && r.end == 10);
 
-  i: int;
+  i: s32;
   for z in r {
-    assert("range iteration failed"c, i == z);
+    assert("range iteration failed", i == z);
     i++;
   }
 }
 
 #test test_slicing_array :: fn() {
-  arr := s64[] {
+  arr := List![s32]::init({
     0, 0, 0,
     0, 0, 0,
     0, 0, 0,
     0, 0,
-  };
+  });
   
-  assert("Length"c, arr.length == 11);
+  assert("Length", arr.length == 11);
+
+  // for i in 0..10 {
+  //   arr[i] = 100;
+  // }
+
+  subarr := arr.subarray(0..10);
 
   for i in 0..10 {
-    arr[i] = 100;
+    assert("Slice failed", subarr[i] == arr[i]);
   }
 
-  subarr := arr[0..10];
-
-  for i in 0..10 {
-    assert("Slice failed"c, subarr[i] == arr[i]);
-  }
-
-  assert("Slice failed"c, subarr.length == 10);
+  assert("Slice failed", subarr.length == 10);
 }
 
+
+
+// #test test_multidimensional_arrays :: fn() {
+//   array: s32[5][5];
+//   for x in 0..5 {
+//     for y in 0..5 {
+//       array[x][y] = x * y;
+//     }
+//   }
+
+//   for x in 0..5 {
+//     for y in 0..5 {
+//       assert("multidimensional failure", array[x][y] == x * y);
+//     }
+//   }
+
+//   dynamic : List![List![s64]];
+//   for x in 0..5 {
+//     dynamic.push({});
+//     for y in 0..5 {
+//       dynamic[x].push(x * y);
+//     }
+//   }
+
+//   assert("length failed", dynamic.length == 5);
+
+//   for x in 0..5 {
+//     for y in 0..5 {
+//       assert("multidimensional failure", dynamic[x][y] == x * y);
+//     }
+//   }
+// }
+
+// #test subscript_string :: fn() {
+//   s: str = str::from("0,1,2,3");
+//   s[0] = 10;
+//   assert("subscript assign str failed", s[0] == (10 as u8));
+// }

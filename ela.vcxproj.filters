@@ -47,9 +47,6 @@
     </ClCompile>
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ela_source\boilerplate.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
     <ClInclude Include="include\arena.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>

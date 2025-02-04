@@ -1,0 +1,34 @@
+// The standard allocator is only available when not in a freestanding environement.
+#ifndef FREESTANDING  {
+  mem_zero :: fn![T](ptr: T*, count: u64) {
+    memset(ptr, 0, sizeof(T) * count);
+  }
+  Std_Allocator :: struct {}
+
+  impl Allocator for Std_Allocator {
+    allocate :: fn![T](self*) -> T* {
+      return malloc(sizeof(T)) as T*;
+    }
+    free :: fn![T](self*, ptr: T*) {
+      free(ptr);
+    }
+    allocate_array :: fn![T](self*, n: u64) -> T* {
+      return calloc(sizeof(T) * n) as T*;
+    }
+    resize :: fn![T](self*, ptr: T*, new_size: u64) -> T* {
+      return realloc(ptr, sizeof(T) * new_size) as T*;
+    }
+    copy :: fn![T](self*, ptr: T*, n: u64) -> T* {
+      newptr : T* = self.allocate_array![T](n);
+      memcpy(newptr, ptr, n * sizeof(T));
+      return newptr;
+    }
+  }
+
+  impl Std_Allocator {
+    get :: fn() -> #self {
+      #static self: #self;
+      return self;
+    }
+  }
+}

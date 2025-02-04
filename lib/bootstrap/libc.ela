@@ -1,0 +1,147 @@
+// Obviously LIBC is only available when not in a freestanding environment.
+#ifndef FREESTANDING {
+  #foreign system :: fn(cmd: u8*) -> s32;
+
+  #foreign free :: fn(ptr: void*) -> void;
+  #foreign malloc :: fn(nbytes: u64) -> void*;
+  #foreign calloc :: fn(num: u64, size: u64) -> void*;
+  #foreign realloc :: fn(ptr: void*, size: u64) -> void*;
+
+
+  #foreign printf :: fn(format: u8*, ...) -> s32;
+  #foreign exit :: fn(code: s32);
+
+  #foreign scanf :: fn(format: u8*, ...) -> s32;
+  #foreign getchar :: fn() -> s32;
+
+  #foreign sleep :: fn(seconds: s32);
+  #foreign usleep :: fn(c: s32);
+
+  #foreign snprintf :: fn(buffer: u8*, buffer_size: u64, format: u8*, ...) -> s32;
+  #foreign sprintf :: fn(buffer: u8*, format: u8*, ...) -> s32;
+  
+  #foreign strdup :: fn(s: u8*) -> u8*;
+  #foreign strndup :: fn(s: u8*, n: u64) -> u8*;
+  #foreign strerror :: fn(errnum: s32) -> u8*;
+  #foreign strtok :: fn(s: u8*, delim: u8*) -> u8*;
+  #foreign strcat :: fn(dest: u8*, src: u8*) -> u8*;
+  #foreign strncat :: fn(dest: u8*, src: u8*, n: u64) -> u8*;
+
+  #foreign strtol :: fn(s: u8*, endptr: u8***, base: s32) -> s64;
+  #foreign strtoul :: fn(s: u8*, endptr: u8***, base: s32) -> u64;
+  #foreign strtod :: fn(s: u8*, endptr: u8***) -> f64;
+
+  #foreign atoi :: fn(v: u8*) -> s32;
+  #foreign atof :: fn(v: u8*) -> f64;
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+  #foreign memset :: fn(dest: void*, c: s32, n: u64) -> void*;
+  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> s32;
+  #foreign strncmp :: fn(s: u8*, str2: u8*, len: s32) -> s32;
+  #foreign strcmp :: fn(str1: u8*, str2: u8*) -> s32;
+  #foreign isalnum :: fn(c: s32) -> s32;
+  #foreign isalpha :: fn(c: s32) -> s32;
+  #foreign isspace :: fn(c: s32) -> s32;
+  #foreign isdigit :: fn(c: s32) -> s32;
+  #foreign islower :: fn(c: s32) -> s32;
+  #foreign isupper :: fn(c: s32) -> s32;
+  #foreign isprint :: fn(c: s32) -> s32;
+  #foreign ispunct :: fn(c: s32) -> s32;
+  #foreign strlen :: fn(string: u8*) -> u32;
+
+} else {
+  memcpy :: fn(dest: void*, src: void*, n: u64) -> void* {
+    d : u8* = dest;
+    s : u8* = src;
+    for i in 0..n {
+      d[i] = s[i];
+    }
+    return dest;
+  }
+
+  memset :: fn(dest: void*, c: s32, n: u64) -> void* {
+    d := dest as u8*;
+    for i in 0..n {
+      d[i] = c as u8;
+    }
+    return dest;
+  }
+
+  memmove :: fn(dest: void*, src: void*, nbytes: s64) -> s32 {
+    d := dest as u8*;
+    s := src as u8*;
+    if d < s || d >= s + nbytes {
+      for i in 0..nbytes {
+        d[i] = s[i];
+      }
+    } else {
+      i := nbytes - 1;
+      while i >= 0 {
+        d[i] = s[i];
+        --i;
+      }
+    }
+    return 0;
+  }
+
+  strncmp :: fn(s: u8*, str2: u8*, len: s32) -> s32 {
+    for i in 0..len {
+      if s[i] != str2[i] {
+        return s[i] - str2[i];
+      }
+      if s[i] == '\0' {
+        return 0;
+      }
+    }
+    return 0;
+  }
+
+  strcmp :: fn(str1: u8*, str2: u8*) -> s32 {
+    while *str1 && *str1 == *str2 {
+      str1++;
+      str2++;
+    }
+    return *str1 - *str2;
+  }
+
+  isalnum :: fn(c: s32) -> s32 {
+    return ((c >= '0' && c <= '9') || (c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) as s32;
+  }
+
+  isalpha :: fn(c: s32) -> s32 {
+    return ((c >= 'A' && c <= 'Z') || (c >= 'a' && c <= 'z')) as s32;
+  }
+
+  isspace :: fn(c: s32) -> s32 {
+    return (c == ' ' || c == '\t' || c == '\n' || c == '\v' || c == '\f' || c == '\r') as s32;
+  }
+
+  isdigit :: fn(c: s32) -> s32 {
+    return (c >= '0' && c <= '9') as s32;
+  }
+
+  islower :: fn(c: s32) -> s32 {
+    return (c >= 'a' && c <= 'z') as s32;
+  }
+
+  isupper :: fn(c: s32) -> s32 {
+    return (c >= 'A' && c <= 'Z') as s32;
+  }
+
+  isprint :: fn(c: s32) -> s32 {
+    return (c >= 32 && c < 127) as s32;
+  }
+
+  ispunct :: fn(c: s32) -> s32 {
+    return ((c >= '!' && c <= '/') || (c >= ':' && c <= '@') || (c >= '[' && c <= '`') || (c >= '{' && c <= '~')) as s32;
+  }
+
+  strlen :: fn(string: u8*) -> u32 {
+    if !string then return 0;
+    if string[0] as u32 == '\0' then return 0;
+    i := 0;
+    while *string {
+      i++
+    }
+    return i;
+  }
+}

@@ -3,10 +3,8 @@
 #include <chrono>
 #include <filesystem>
 #include <format>
-#include <fstream>
 #include <functional>
 #include <iostream>
-#include <sstream>
 #include <unordered_map>
 
 #include "lex.hpp"
@@ -78,113 +76,24 @@ struct CompileCommand {
   std::filesystem::path original_path;  // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
   std::string compilation_flags;
-  inline void print() const {
-    std::cout << "\033[1;32mInput Path:\033[0m " << input_path << std::endl;
-    std::cout << "\033[1;32mOutput Path:\033[0m " << output_path << std::endl;
-    std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;
-    std::cout << "\033[1;32mFlags:\033[0m" << std::endl;
-    for (const auto &flag : flags) {
-      std::cout << "  \033[1;34m--" << flag.first << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
-    }
-  }
-  inline void add_compilation_flag(const std::string &flags) {
-    this->compilation_flags += flags;
-    if (!this->compilation_flags.ends_with(' ')) {
-      this->compilation_flags += ' ';
-    }
-  }
-  inline CompileCommand(int argc, char *argv[]) {
-    if (argc < 2) {
-      printf(
-          "\033[31mUsage: <input.ela> (optional)::[-o "
-          "<output.cpp>] [--flag]\033[0m\n");
-    }
 
-    for (int i = 1; i < argc; ++i) {
-      std::string arg = argv[i];
-      if (arg == "-o" && i + 1 < argc) {
-        output_path = argv[++i];
-      } else if (arg.rfind("--", 0) == 0) {
-        flags[arg.substr(2)] = true;
-      } else {
-        input_path = arg;
-      }
-    }
-
-    if (input_path.empty()) {
-      printf("\033[31mError: No input file specified.\033[0m\n");
-      exit(1);
-    }
-
-    std::filesystem::path input_fs_path(input_path);
-
-    if (!std::filesystem::exists(input_fs_path)) {
-      printf("%s\n", (std::format("\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
-      exit(1);
-    }
-
-    std::filesystem::path parent_path = input_fs_path.parent_path();
-    if (!parent_path.empty() && !std::filesystem::exists(parent_path)) {
-      printf("%s\n",
-             std::format("\033[31mError: Parent directory '{}' does not exist.\033[0m", parent_path.string()).c_str());
-      exit(1);
-    }
-
-    binary_path = input_fs_path.stem().string();
-
-    if (output_path.empty()) {
-      std::string filename = input_fs_path.filename().string();
-      size_t pos = filename.rfind(".ela");
-      if (pos != std::string::npos) {
-        filename.replace(pos, 4, ".cpp");
-      } else {
-        filename += ".cpp";
-      }
-      output_path = filename;
-    }
-  }
-  inline std::string read_input_file() {
-    std::ifstream stream(std::filesystem::canonical(input_path));
-    std::stringstream ss;
-    ss << stream.rdbuf();
-    if (ss.str().empty()) {
-      printf("%s\n", std::format("\033[31mError: {} is empty.\033[0m", input_path.string()).c_str());
-      exit(1);
-    }
-    return ss.str();
-  }
+  void print() const;
+  void add_compilation_flag(const std::string &flags);
+  CompileCommand(int argc, char *argv[]);
+  std::string read_input_file();
   bool has_flag(const std::string &flag) const;
   int compile();
+  void setup_ignored_warnings();
 };
 
 extern CompileCommand compile_command;
-extern std::vector<Token> all_tokens;
 
 struct SourceRange {
-  inline bool empty() const {
-    return begin < 0 || end < 0 || begin > end || begin == end || begin > all_tokens.size() || end > all_tokens.size();
-  }
-  int64_t begin, end;
-  int64_t begin_loc;
-  std::vector<Token> get_tokens() const {
-    int64_t valid_begin = std::clamp(begin, int64_t(0), int64_t(all_tokens.size()));
-    int64_t valid_end = std::clamp(end, valid_begin, int64_t(all_tokens.size()));
-    if (valid_end - valid_begin == 0) {
-      valid_begin = std::max(int64_t(0), valid_begin - 2);
-      valid_end = std::min(int64_t(all_tokens.size()), valid_end + 3);
-    }
-    return std::vector<Token>(all_tokens.begin() + valid_begin, all_tokens.begin() + valid_end);
-  }
+  SourceLocation begin_location;
 };
 
 static std::string get_source_filename(const SourceRange &range) {
-  auto tokens = range.get_tokens();
-  if (tokens.empty()) {
-    return "";
-  }
-  auto token = tokens[0];
-  auto location = token.location;
-  return location.files()[location.file];
+  return SourceLocation::files()[range.begin_location.file];
 }
 
 struct Defer {

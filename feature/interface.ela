@@ -9,16 +9,16 @@ Struct :: struct {
   // abstract interface.
   // each method has to be implemented or compiler errors.
   Format :: interface![T] {
-    to_string :: fn(self*) -> string;
-    parse     :: fn(input: string) -> #self;
+    to_string :: fn(self*) -> u8*;
+    parse     :: fn(input: str) -> #self;
   }
 
   // impl generic Format interface for Struct.
   impl Format![Struct] for Struct {
-    to_string :: fn(self*)         -> string {
+    to_string :: fn(self*)         -> str {
       return $"Struct {{x: {self.x}, y: {self.y}}}";
     }
-    parse     :: fn(input: string) -> #self {
+    parse     :: fn(input: str) -> #self {
       // omitted for simplicity.
       self: #self;
       return self;
@@ -28,7 +28,7 @@ Struct :: struct {
 } else if AUTO_INTERFACE {
   // non-abstract interface, can be partially or completely automatically implemented.
   Format :: interface![T] {
-    to_string :: fn(self*) -> string {
+    to_string :: fn(self*) -> u8* {
       return $"{*self}";              // omitted for simplicity.
     }
     parse     :: fn(self*) -> #self {
@@ -65,6 +65,11 @@ impl Speak for Dog {
   }
 }
 
+dyn Speak {
+  void* self;
+  void(*speak)(void* self);
+}
+
 impl Speak for Cat {
   greet :: fn(self*) {
     println("meow");
@@ -91,7 +96,6 @@ main :: fn () {
   //             No dynamic dispatch needed for these 2 calls: just call the function.
   dog.speak();                     // print "woof";  
   cat.speak();                     // print "meow";
-
 
   // dynamic dispatch & storing variables:
   speaker: dyn(Speak);
@@ -145,7 +149,7 @@ Iter :: interface![T] {
 }
 
 RangeIterator :: struct {
-  #alias  value_type :: int;
+  #alias  value_type :: s32;
   value:  value_type;
   min:    value_type;
   max:    value_type;
@@ -155,10 +159,10 @@ impl Iter![RangeIterator] for RangeIterator {
   reset :: fn(self*){
     self.value = self.min;
   }
-  current :: fn(self*) -> int {
+  current :: fn(self*) -> s32 {
     return self.value;
   }
-  next :: fn(self*) -> (bool, int) {
+  next :: fn(self*) -> (bool, s32) {
     self.current++;
     return (self.current >= self.max, self.current);
   }

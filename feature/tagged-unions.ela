@@ -1,8 +1,8 @@
 
 
 AST :: enum(union) {
-  Identifier :: string;
-  Float :: float64;
+  Identifier :: str;
+  Float :: f64;
   Integer :: s64;
   Binary :: struct {
     left: AST*,
@@ -14,16 +14,16 @@ AST :: enum(union) {
     op: Operator,
   };
   Program :: struct {
-    statements: AST[];
+    statements: List![AST];
   }
 }
 
 c: {
   typedef struct AST {
-    int index;
+    s32 index;
     union {
-      string _Identifier;       // index0
-      float _Float;             // index1
+      str _Identifier;       // index0
+      f32 _Float;             // index1
       int64_t _Integer;         // index2
       struct {  
         AST *left;
@@ -66,11 +66,11 @@ main :: fn() {
     typeof(AST, program) program = {0};
   }
 
-  program.statements ~= AST::Binary {
+  program.statements.push(AST::Binary {
     left: mem::arena::new(AST::Identifier{"Xaryu"}),
     right: new mem::arena::new(AST::Integer{25}),
     op: Operator::Add,
-  };
+  });
 
   node : AST = program.statements.first();
 

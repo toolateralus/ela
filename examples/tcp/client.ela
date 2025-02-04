@@ -1,19 +1,19 @@
 #import net;
-#import core;
+;
 
 PORT : u16 = 8080
 
 // Function designed for chat between client and server.
 // sockfd: socket file descriptor.
-chatting :: fn(sockfd: int) { 
-  buffer : char[80];
+chatting :: fn(sockfd: s32) { 
+  buffer : u8[80];
 
   while true {
     memset(buffer, 0, 80);
-    printf("Enter message : "c);
+    printf("Enter message : ");
 
-    n: int;
-    while n < 80 && (buffer[n++] = getchar()) != '\n' {}
+    n: s32;
+    while n < 80 && (buffer[n++] = getu8()) != '\n' {}
     
     write(sockfd, buffer, 80);
 
@@ -21,9 +21,9 @@ chatting :: fn(sockfd: int) {
 
     read(sockfd, buffer, 80);
 
-    println($"From Server : {buffer as char*}");
+    println($"From Server : {buffer as u8*}");
 
-    if ((strncmp(buffer, "exit"c, 4)) == 0) {
+    if ((strncmp(buffer, "exit", 4)) == 0) {
       println("Client Exit...");
       break;
     }
@@ -31,7 +31,7 @@ chatting :: fn(sockfd: int) {
 }
 
 main :: fn() {
-  sockfd : int = socket(AF_INET, SocketType::Stream, 0);
+  sockfd : s32 = socket(AF_INET, SocketType::Stream, 0);
   if (sockfd == -1) {
     panic("socket creation failed...");
   } else {
@@ -40,14 +40,14 @@ main :: fn() {
 
   servaddr: sockaddr_in;
   servaddr.sin_family = AF_INET;
-  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1"c);
+  servaddr.sin_addr.s_addr = inet_addr("127.0.0.1");
   servaddr.sin_port = htons(PORT);
   servaddr_ptr : sockaddr* = &servaddr;
 
   if connect(sockfd, servaddr_ptr, sizeof(servaddr)) != 0 {
-    panic("connection with the server failed...");
+    panic("onnection with the server failed...");
   } else {
-    println("connected to the server..");
+    println("onnected to the server..");
   }
 
   chatting(sockfd);

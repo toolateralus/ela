@@ -17,5 +17,5 @@ position : Vector2;
   };
 
   command.color = WHITE;
-  ctx.commands ~= command;
+  ctx.commands.push(command);
 }

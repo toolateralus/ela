@@ -16,8 +16,7 @@ print:
   xor rdx, rdx
   call strlen
   mov rdx, rax
-
-print_string:
+  
   ; Print the format string
   mov rax, 1           ; syscall: write
   mov rdi, 1           ; file descriptor: stdout

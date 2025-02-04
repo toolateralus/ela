@@ -1,0 +1,16 @@
+// We need to implement generic specialization to support this kind of nice behaviour.
+impl From![s32] for s32 {
+  from :: fn(n : s32) -> s32 {
+    return n as s32;
+  }
+}
+
+impl From![bool] for s32 {
+  from :: fn(n : bool) -> s32 {
+    return n as s32;
+  }
+}
+
+main :: fn() {
+  
+}

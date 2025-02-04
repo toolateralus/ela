@@ -1,21 +1,13 @@
 # This is a list of functions that if defined in a type, will be treated as an operator overload.
-- concat
-- erase
-- dot
 - logicalnot
 - not
+- neg
 - add
 - sub
 - mul
 - div
 - modulo
 - assign
-- comma
-- semi
-- lparen
-- rparen
-- lcurly
-- rcurly
 - or
 - and
 - logicalor
@@ -29,8 +21,6 @@
 - neq
 - le
 - ge
-- lbrace
-- rbrace
 - increment
 - decrement
 - compadd

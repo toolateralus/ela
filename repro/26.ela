@@ -1,17 +1,12 @@
-
-
 Struct :: struct;
+
 impl Struct {
-  static_method :: fn() -> int {
+  static_method :: fn() -> s32 {
     return 0;
   }
   other_method :: fn() {
-    // this passes our compiler, but tries to call static_method as a free function,
-    // instead of implicitly becoming a static method call.
-    // We need to check if it's a static method in the same impl block, so we don't have to do
-    // Struct::static_method() 
-    // everywhere;
-    static_method();
+    // #self can't begin an expression statement for some reason
+    #self::static_method();
   }
 }
 

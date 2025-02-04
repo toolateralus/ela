@@ -1,9 +1,4 @@
 #include "lex.hpp"
-
-#include <cctype>
-#include <iostream>
-#include <sstream>
-
 #include "error.hpp"
 
 using std::string;
@@ -25,7 +20,7 @@ void Lexer::get_token(State &state) {
     if (c == '\n') {
       pos++;
       lines++;
-      col = 1;  // Reset column position at the start of a new line
+      col = 1; // Reset column position at the start of a new line
       continue;
     }
 
@@ -42,7 +37,7 @@ void Lexer::get_token(State &state) {
       size_t newlinePos = input.find('\n', pos);
       if (newlinePos != std::string::npos) {
         lines++;
-        col = 1;  // Reset column position at the start of a new line
+        col = 1; // Reset column position at the start of a new line
         pos = newlinePos + 1;
       } else {
         pos = len;
@@ -57,7 +52,7 @@ void Lexer::get_token(State &state) {
       while (pos + 1 < len && !(input[pos] == '*' && input[pos + 1] == '/')) {
         if (input[pos] == '\n') {
           lines++;
-          col = 1;  // Reset column position at the start of a new line
+          col = 1; // Reset column position at the start of a new line
         } else {
           col++;
         }
@@ -72,24 +67,24 @@ void Lexer::get_token(State &state) {
 
     if (c == '\'') {
       auto start = pos;
-      pos++;  // move past '
+      pos++; // move past '
       col++;
       c = input[pos];
       std::string value;
       if (c == '\\') {
-        value += c;  // eat escape characters if present
+        value += c; // eat escape characters if present
         pos++;
         col++;
         c = input[pos];
       }
       value += c;
-      pos++;  // move past character
+      pos++; // move past character
       col++;
       c = input[pos];
       if (c != '\'') {
-        throw_error("invalid char literal: too many characters", {.begin = (int64_t)start, .end = (int64_t)pos});
+        throw_error("invalid char literal: too many characters", {location});
       }
-      pos++;  // move past '
+      pos++; // move past '
       col++;
       state.lookahead_buffer.push_back(Token(location, value, TType::Char, TFamily::Literal));
       return;
@@ -114,9 +109,7 @@ void Lexer::get_token(State &state) {
             pos++;
             col++;
           } else {
-            std::cout << location.ToString();
-            std::cout << "\nela: incomplete escape sequence at end of input\n";
-            exit(1);
+            throw_error("incomplete escape sequence at end of input", {location});
           }
         } else {
           token.put(c);
@@ -173,9 +166,7 @@ void Lexer::get_token(State &state) {
             Token(location, longest_match, operators.at(longest_match), TFamily::Operator));
         return;
       } else {
-        std::cout << location.ToString();
-        std::cout << "\nela: unable to lex operator: " << current_match << std::endl;
-        exit(1);
+        throw_error("unable to lex operator :: '" + current_match + '\'', {location});
       }
     } else if (std::isdigit(c)) {
       bool is_float = false;
@@ -183,12 +174,12 @@ void Lexer::get_token(State &state) {
       bool is_bin = false;
       if (c == '0' && (input[pos + 1] == 'x' || input[pos + 1] == 'X')) {
         is_hex = true;
-        pos += 2;  // Skip '0x'
+        pos += 2; // Skip '0x'
         col += 2;
         c = input[pos];
       } else if (c == '0' && (input[pos + 1] == 'b' || input[pos + 1] == 'B')) {
         is_bin = true;
-        pos += 2;  // Skip '0b'
+        pos += 2; // Skip '0b'
         col += 2;
         c = input[pos];
       }
@@ -200,16 +191,12 @@ void Lexer::get_token(State &state) {
           col++;
           c = input[pos];
         }
+        if (c == '.' && pos + 1 < len && input[pos + 1] == '.') {
+          break;
+        }
         if (c == '.') {
           if (is_float) {
-            auto str = token.str();
-            str.pop_back();
-            pos++;
-            col++;
-            state.lookahead_buffer.push_back(Token(location, str, TType::Integer, TFamily::Literal));
-
-            state.lookahead_buffer.emplace_back(location, "..", TType::Range, TFamily::Operator);
-            return;
+            throw_error("got too many '.' periods in a float literal.", {location});
           }
           is_float = true;
         }
@@ -217,7 +204,6 @@ void Lexer::get_token(State &state) {
         pos++;
         col++;
         c = input[pos];
-
         if (c == '_') {
           pos++;
           col++;
@@ -237,9 +223,7 @@ void Lexer::get_token(State &state) {
       }
       return;
     } else {
-      std::cout << location.ToString();
-      std::cout << "\nela: unable to lex : " << c << std::endl;
-      exit(1);
+      throw_error("unable to lex character :: '" + std::string(1, c) + '\'', {location});
     }
   }
   state.lookahead_buffer.push_back(Token::Eof());

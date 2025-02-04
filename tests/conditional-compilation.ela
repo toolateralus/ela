@@ -1,4 +1,4 @@
-#import core;
+;
 
 #test test_conditional_compilation :: fn() {
   #def CHEESE;
@@ -11,7 +11,7 @@
     CONSTANT0 :: 10;
   }
   
-  assert("ifdef failed"c, CONSTANT0 == 20);
+  assert("ifdef failed", CONSTANT0 == 20);
   #undef CHEESE;
 
   #def HAMBURGER;
@@ -24,7 +24,7 @@
     CONSTANT1 :: 10;
   }
   
-  assert("ifdef failed"c, CONSTANT1 == 100);
+  assert("ifdef failed", CONSTANT1 == 100);
 
   #undef HAMBURGER;
   
@@ -37,13 +37,13 @@
   }
 
   
-  assert("ifdef failed"c, CONSTANT2 == 10);
+  assert("ifdef failed", CONSTANT2 == 10);
 
   #ifndef HAMBURGER {
     CONSTANT3 :: 100;
   } 
 
-  assert("ifndef failed"c, CONSTANT3 == 100);
+  assert("ifndef failed", CONSTANT3 == 100);
 
   #def thing
 
@@ -54,7 +54,7 @@
         n -= 2;
       }
     }
-    assert("ndef"c, false);
+    assert("ndef", false);
   } else {
     for i in 0..100 {
       n := i;
@@ -62,7 +62,7 @@
         n -= 2;
       }
     }
-    assert("ndef"c, true);
+    assert("ndef", true);
   }
 
   #undef thing;
@@ -74,7 +74,7 @@
         n -= 2;
       }
     }
-    assert("ndef"c, true);
+    assert("ndef", true);
   } else {
     for i in 0..100 {
       n := i;
@@ -82,7 +82,7 @@
         n -= 2;
       }
     }
-    assert("ndef"c, false);
+    assert("ndef", false);
   }
 }
 
@@ -93,7 +93,7 @@
   } else {
     n := 1;
   }
-  assert("`#if true` failed"c, n == 0);
+  assert("`#if true` failed", n == 0);
 
   CONSTANT_EXPR :: 100 * 2;
   #if CONSTANT_EXPR > 199 {
@@ -102,6 +102,6 @@
     n = 0;
   }
 
-  assert("#if V(200) > 199 failed"c, n == 1)
+  assert("#if V(200) > 199 failed", n == 1)
 
 }

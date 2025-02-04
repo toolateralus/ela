@@ -1,7 +1,7 @@
-#import core;
+;
 
 main :: fn() {
-  tuple := (1, 2); // tuple by value; equivalent to `tuple: (int, int) = (1, 2)` 
+  tuple := (1, 2); // tuple by value; equivalent to `tuple: (s32, s32) = (1, 2)` 
   // accessing the tuple sub elements is currently only possible with a destructure.
   a, b := tuple; // You cannot redefine `a` or `b` if they already exist, if using := both variables must not exist.
   // you can reassign `a` and `b`, but both must already exist, and match the type of the sub element.

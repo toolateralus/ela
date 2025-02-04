@@ -74,8 +74,6 @@ enum struct TType {
   CompXor,
   CompSHL,
   CompSHR,
-  Concat,
-  Erase,
 
   True,
   False,
@@ -83,7 +81,6 @@ enum struct TType {
   Varargs,
   Directive,   // #
   ColonEquals, //  :=
-  Dollar,      // $
 
   Struct,
   Enum,
@@ -101,10 +98,11 @@ enum struct TType {
   ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
   Defer,
 
-  Impl,           // impl
-  Interface,      // interface
+  Impl,      // impl
+  Interface, // interface
   Where,
   Is,
+  Size_Of,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -113,6 +111,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Size_Of);
     TTYPE_CASE(Interface);
     TTYPE_CASE(Where);
     TTYPE_CASE(Defer);
@@ -125,8 +124,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Switch);
     TTYPE_CASE(In);
     TTYPE_CASE(Then);
-    TTYPE_CASE(Erase);
-    TTYPE_CASE(Concat);
     TTYPE_CASE(Union);
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
@@ -196,7 +193,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompXor);
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
-    TTYPE_CASE(Dollar);
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
   }
@@ -242,7 +238,7 @@ struct Token {
   inline bool is_comp_assign() const {
     return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
            type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR || type == TType::Concat || type == TType::Erase;
+           type == TType::CompSHL || type == TType::CompSHR;
   }
 
   Token() {}
@@ -266,7 +262,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"in", TType::In},
     {"where", TType::Where},
     {"is", TType::Is},
-    
+    {"sizeof", TType::Size_Of},
     {"fn", TType::Fn},
     {"switch", TType::Switch},
     {"then", TType::Then},
@@ -293,23 +289,57 @@ static std::unordered_map<std::string, TType> keywords{
     {"interface", TType::Interface},
 };
 
-static std::unordered_map<std::string, TType> operators{
-    {"=>", TType::ExpressionBody },
-    {":", TType::Colon},        {"~=", TType::Concat},    {"~~", TType::Erase},       {"$", TType::Dollar},
-    {":=", TType::ColonEquals}, {"...", TType::Varargs},  {"#", TType::Directive},    {".", TType::Dot},
-    {"!", TType::LogicalNot},   {"~", TType::Not},        {"::", TType::DoubleColon}, {"->", TType::Arrow},
-    {"..", TType::Range},       {"+", TType::Add},        {"-", TType::Sub},          {"*", TType::Mul},
-    {"/", TType::Div},          {"%", TType::Modulo},     {"=", TType::Assign},       {",", TType::Comma},
-    {";", TType::Semi},         {"(", TType::LParen},     {")", TType::RParen},       {"{", TType::LCurly},
-    {"}", TType::RCurly},       {"|", TType::Or},         {"&", TType::And},          {"||", TType::LogicalOr},
-    {"&&", TType::LogicalAnd},  {"<<", TType::SHL},       {">>", TType::SHR},         {"^", TType::Xor},
-    {"<", TType::LT},           {">", TType::GT},         {"==", TType::EQ},          {"!=", TType::NEQ},
-    {"<=", TType::LE},          {">=", TType::GE},        {"[", TType::LBrace},       {"]", TType::RBrace},
-    {"++", TType::Increment},   {"--", TType::Decrement},
-
-    {"+=", TType::CompAdd},     {"-=", TType::CompSub},   {"*=", TType::CompMul},     {"/=", TType::CompDiv},
-    {"%=", TType::CompMod},     {"&=", TType::CompAnd},   {"|=", TType::CompOr},      {"^=", TType::CompXor},
-    {"<<=", TType::CompSHL},    {">>=", TType::CompSHR},  {"![", TType::GenericBrace}};
+static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},
+                                                        {":", TType::Colon},
+                                                        {":=", TType::ColonEquals},
+                                                        {"...", TType::Varargs},
+                                                        {"#", TType::Directive},
+                                                        {".", TType::Dot},
+                                                        {"!", TType::LogicalNot},
+                                                        {"~", TType::Not},
+                                                        {"::", TType::DoubleColon},
+                                                        {"->", TType::Arrow},
+                                                        {"..", TType::Range},
+                                                        {"+", TType::Add},
+                                                        {"-", TType::Sub},
+                                                        {"*", TType::Mul},
+                                                        {"/", TType::Div},
+                                                        {"%", TType::Modulo},
+                                                        {"=", TType::Assign},
+                                                        {",", TType::Comma},
+                                                        {";", TType::Semi},
+                                                        {"(", TType::LParen},
+                                                        {")", TType::RParen},
+                                                        {"{", TType::LCurly},
+                                                        {"}", TType::RCurly},
+                                                        {"|", TType::Or},
+                                                        {"&", TType::And},
+                                                        {"||", TType::LogicalOr},
+                                                        {"&&", TType::LogicalAnd},
+                                                        {"<<", TType::SHL},
+                                                        {">>", TType::SHR},
+                                                        {"^", TType::Xor},
+                                                        {"<", TType::LT},
+                                                        {">", TType::GT},
+                                                        {"==", TType::EQ},
+                                                        {"!=", TType::NEQ},
+                                                        {"<=", TType::LE},
+                                                        {">=", TType::GE},
+                                                        {"[", TType::LBrace},
+                                                        {"]", TType::RBrace},
+                                                        {"++", TType::Increment},
+                                                        {"--", TType::Decrement},
+                                                        {"+=", TType::CompAdd},
+                                                        {"-=", TType::CompSub},
+                                                        {"*=", TType::CompMul},
+                                                        {"/=", TType::CompDiv},
+                                                        {"%=", TType::CompMod},
+                                                        {"&=", TType::CompAnd},
+                                                        {"|=", TType::CompOr},
+                                                        {"^=", TType::CompXor},
+                                                        {"<<=", TType::CompSHL},
+                                                        {">>=", TType::CompSHR},
+                                                        {"![", TType::GenericBrace}};
 
 struct Lexer {
   struct State {
@@ -362,4 +392,3 @@ struct Lexer {
 
   void get_token(State &state);
 };
-

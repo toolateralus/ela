@@ -1,20 +1,20 @@
-#import core;
+;
 #import raylib;
 
 DrawCommand :: struct {
-  rect: Rectangle;
-  color: Color;
+  rect: Rectangle,
+  color: Color,
 }
 
 DrawContext :: struct {
-  commands: DrawCommand[];
-  inputState: bool[256];
+  commands: List![DrawCommand],
+  inputState: bool[256],
 }
 impl DrawContext {
    draw :: fn(self*) {
     while self.commands.length > 0 {
-      command := ~self.commands;
-      DrawRectangle(command.rect.x as int, command.rect.y as int, command.rect.width as int, command.rect.height as int, command.color);
+      command := self.commands.pop();
+      DrawRectangle(command.rect.x as s32, command.rect.y as s32, command.rect.width as s32, command.rect.height as s32, command.color);
     }
   }
 }

@@ -2,6 +2,7 @@
 
 #include <cstddef>
 #include <ostream>
+#include <ranges>
 #include <sstream>
 #include <vector>
 
@@ -12,6 +13,28 @@
 #include "lex.hpp"
 #include "scope.hpp"
 
+std::vector<int> expand_function_types(std::vector<int> type_ids) {
+  std::vector<int> output;
+  for (auto type_id : type_ids) {
+    auto type = global_get_type(type_id);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      std::vector<int> fun_tys;
+      auto info = type->get_info()->as<FunctionTypeInfo>();
+      fun_tys.insert(fun_tys.end(), info->parameter_types, info->parameter_types + info->params_len);
+      fun_tys.push_back(info->return_type);
+      fun_tys = expand_function_types(fun_tys);
+      output.insert(output.end(), fun_tys.begin(), fun_tys.end());
+    } else {
+      auto type = global_get_type(type_id);
+      if (type->base_id != Type::invalid_id) {
+        type = global_get_type(type->base_id);
+      }
+      output.push_back(type_id);
+    }
+  }
+  return output;
+}
+
 std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   std::stringstream ss;
   ss << "fn ";
@@ -19,7 +42,7 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   ss << "(";
   for (int i = 0; i < params_len; ++i) {
     auto t = global_get_type(parameter_types[i]);
-    ss << t->to_string();
+    ss << get_unmangled_name(t);
     if (i < params_len - 1) {
       ss << ", ";
     }
@@ -30,10 +53,11 @@ std::string FunctionTypeInfo::to_string(const TypeExtensions &ext) const {
   else
     ss << ')';
 
-  ss << " -> " << global_get_type(return_type)->get_base().get_str();
+  ss << " -> " << get_unmangled_name(global_get_type(return_type));
 
   return ss.str();
 }
+
 std::string FunctionTypeInfo::to_string() const {
   std::stringstream ss;
   ss << "fn ";
@@ -57,16 +81,16 @@ std::string FunctionTypeInfo::to_string() const {
 }
 
 Type *global_get_type(const int id) {
-  [[unlikely]] if (id < 0)
+  if (id < 0 || id > type_table.size())
     return nullptr;
-  return &type_table[id];
+  return type_table[id];
 }
 
 int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i].kind != TYPE_FUNCTION)
+    if (type_table[i]->kind != TYPE_FUNCTION)
       continue;
-    const Type *type = &type_table[i];
+    const Type *type = type_table[i];
     if (type->type_info_equals(&info, TYPE_FUNCTION) && type->get_ext() == type_extensions) {
       return type->id;
     }
@@ -81,16 +105,16 @@ int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensi
 }
 
 int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
-  if (base < 0) {
+  if (base < 0)
     return Type::invalid_id;
-  }
 
-  if (!type_extensions.has_extensions()) {
+  if (!type_extensions.has_extensions())
     return base;
-  }
+
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
-  while (base_t && base_t->base_id != Type::invalid_id) {
+
+  if (base_t && base_t->base_id != Type::invalid_id) {
     ext = base_t->get_ext().append(ext);
     base_t = global_get_type(base_t->base_id);
   }
@@ -105,42 +129,76 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     if (type->equals(base_t->id, ext))
       return type->id;
   }
-  return global_create_type(base_t->kind, base_t->get_base(), base_t->get_info(), ext, base_t->id);
+
+  // Base types have a seperate scope from the extended types now.
+
+  TypeInfo *info = nullptr;
+  switch (base_t->kind) {
+    case TYPE_SCALAR: {
+      info = new (type_info_alloc<ScalarTypeInfo>()) ScalarTypeInfo(*base_t->get_info()->as<ScalarTypeInfo>());
+    } break;
+    case TYPE_FUNCTION: {
+      info = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(*base_t->get_info()->as<FunctionTypeInfo>());
+    } break;
+    case TYPE_STRUCT: {
+      info = new (type_info_alloc<StructTypeInfo>()) StructTypeInfo(*base_t->get_info()->as<StructTypeInfo>());
+    } break;
+    case TYPE_ENUM: {
+      info = new (type_info_alloc<EnumTypeInfo>()) EnumTypeInfo(*base_t->get_info()->as<EnumTypeInfo>());
+    } break;
+    case TYPE_TUPLE: {
+      info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
+    } break;
+    case TYPE_TAGGED_UNION: {
+      info = new (type_info_alloc<TaggedUnionTypeInfo>())
+          TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
+    } break;
+    case TYPE_INTERFACE: {
+      info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
+    } break;
+  }
+
+  assert(info && "Copying type info for extended type failed");
+
+  info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+
+  return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions) {
   for (int i = 0; i < type_table.size(); ++i) {
-    auto type = &type_table[i];
+    auto type = type_table[i];
 
     if (!type->is_kind(TYPE_TUPLE))
       continue;
 
     auto info = (type->get_info()->as<TupleTypeInfo>());
 
-    if (info->types.size() != tuple_types.size())
+    if (info->types != tuple_types) {
       continue;
-
-    for (int i = 0; i < info->types.size(); ++i)
-      if (info->types[i] != tuple_types[i])
-        goto end_of_loop;
+    }
 
     if (type->get_ext() == type_extensions) {
       // Found a matching type with the same extensions. Return it.
       return type->id;
+    } else {
+      if (type->base_id != Type::invalid_id) {
+        return global_find_type_id(type->base_id, type_extensions);
+      } else {
+        return global_find_type_id(type->id, type_extensions);
+      }
     }
-  end_of_loop:
-    do {
-    } while (false); // This line just prevents a MSVC syntax error. Silly.
   }
 
   // We didn't find the tuple type. Return a new one.
-  return global_create_tuple_type(tuple_types, type_extensions);
+  auto base_id =  global_create_tuple_type(tuple_types);
+  return global_find_type_id(base_id, type_extensions);
 }
 
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
-    throw_error("Internal Compiler Error: type was null when checking type "
+    throw_error("internal compiler error: type was null when checking type "
                 "conversion rules",
                 source_range);
   }
@@ -149,37 +207,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   if (from->id == to->id)
     return CONVERT_NONE_NEEDED;
 
-  // ! We can cast tuples as long as their interior types are castable?
-  // ! this seems like nonsense. Why?
-  if (from->is_kind(TYPE_TUPLE) && to->is_kind(TYPE_TUPLE)) {
-    auto from_info = (from->get_info()->as<TupleTypeInfo>());
-    auto to_info = (to->get_info()->as<TupleTypeInfo>());
-    if (from_info->types.size() != to_info->types.size()) {
-      return CONVERT_PROHIBITED;
-    }
-    ConversionRule rule;
-    for (int i = 0; i < from_info->types.size(); ++i) {
-      auto from_t = from_info->types[i];
-      auto to_t = to_info->types[i];
-      rule = type_conversion_rule(global_get_type(from_t), global_get_type(to_t), source_range);
-      if (rule == CONVERT_PROHIBITED || rule == CONVERT_EXPLICIT) {
-        return rule;
-      }
-    }
-    return rule;
-  }
-
   // implicitly upcast integer and float types.
   // u8 -> u16 -> u32 etc legal.
   // u16 -> u8 == implicit required.
-  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && 
-      to->is_kind(TYPE_SCALAR) && to->get_ext().has_no_extensions()) {
+  if (from->is_kind(TYPE_SCALAR) && from->get_ext().has_no_extensions() && to->is_kind(TYPE_SCALAR) &&
+      to->get_ext().has_no_extensions()) {
     if (type_is_numerical(from) && type_is_numerical(to)) {
       if (numerical_type_safe_to_upcast(from, to)) {
         return CONVERT_IMPLICIT;
       }
       return CONVERT_EXPLICIT;
-    } else if ((from->id == bool_type() && type_is_numerical(to)) || to->id == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
+    } else if ((from->id == bool_type() && type_is_numerical(to)) ||
+               to->id == bool_type() && type_is_numerical(from)) { // Convert booleans to number types explicitly
       // TODO(Josh) 1/13/2025, 3:07:06 PM :: Why did I have to add this? I could've sworn we had this working othrwise.
       // TODO: It's possible we just never noticed.
       return CONVERT_EXPLICIT;
@@ -187,8 +226,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
-  const auto from_is_scalar_ptr = from->is_kind(TYPE_SCALAR) && from->get_ext().is_pointer();
+  const auto from_is_scalar_ptr = from->get_ext().is_pointer();
   const auto to_is_non_ptr_number = type_is_numerical(to) && to->get_ext().has_no_extensions();
+
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
     return CONVERT_IMPLICIT;
   }
@@ -308,20 +348,17 @@ std::string Type::to_string() const {
     case TYPE_STRUCT:
     case TYPE_TUPLE:
     case TYPE_SCALAR:
-      return base.get_str() + extensions.to_string();
     case TYPE_ENUM:
     case TYPE_TAGGED_UNION:
     case TYPE_INTERFACE:
-      return base.get_str();
+      return get_unmangled_name(this);
       break;
   }
 }
 
-
-int global_create_interface_type(const InternedString &name, Scope *scope,
-                                 std::vector<int> generic_args) {
-  type_table.emplace_back(type_table.size(), TYPE_INTERFACE);
-  Type *type = &type_table.back();
+int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
+  type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
+  Type *type = type_table.back();
   type->set_base(name);
   type->generic_args = generic_args;
   InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
@@ -331,8 +368,8 @@ int global_create_interface_type(const InternedString &name, Scope *scope,
 }
 
 int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
-  type_table.emplace_back(type_table.size(), TYPE_STRUCT);
-  Type *type = &type_table.back();
+  type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
+  Type *type = type_table.back();
   std::string base = name.get_str();
   if (!generic_args.empty()) {
     base += mangled_type_args(generic_args);
@@ -345,10 +382,11 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
   return type->id;
 }
 
-int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
-  type_table.emplace_back(type_table.size(), TYPE_TAGGED_UNION);
-  Type *type = &type_table.back();
-  type->set_base(name);
+int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
+  type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
+  Type *type = type_table.back();
+  type->set_base(name.get_str() + mangled_type_args(generic_args));
+  type->generic_args = generic_args;
   TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
   info->scope = scope;
   type->set_info(info);
@@ -356,8 +394,8 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope) {
 }
 
 int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
-  type_table.emplace_back(type_table.size(), TYPE_ENUM);
-  Type *type = &type_table.back();
+  type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
+  Type *type = type_table.back();
   type->set_base(name);
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
@@ -367,15 +405,16 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
 }
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
-  auto &type = type_table.emplace_back(type_table.size(), kind);
-  type.base_id = base_id;
-  type.set_ext(extensions);
-  type.set_base(name);
-  type.set_info(info);
+  type_table.push_back(new Type(type_table.size(), kind));
+  auto type = type_table.back();
+  type->base_id = base_id;
+  type->set_ext(extensions);
+  type->set_base(name);
+  type->set_info(info);
   if (!info->scope) {
     info->scope = create_child(root_scope);
   }
-  return type.id;
+  return type->id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
@@ -394,10 +433,11 @@ InternedString get_function_typename(ASTFunctionDeclaration *decl) {
 }
 
 int Type::get_element_type() const {
-  if (!extensions.is_pointer() && !extensions.is_array() && !extensions.is_fixed_sized_array()) {
-    throw_error(std::format("Internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
-                            to_string()),
-                {});
+  if (!extensions.is_pointer() && !extensions.is_fixed_sized_array()) {
+    throw_error(
+        std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
+                    to_string()),
+        {});
   }
   auto extensions = this->get_ext().without_back();
   if (is_kind(TYPE_TUPLE)) {
@@ -423,10 +463,6 @@ ScalarTypeInfo *create_scalar_type_info(ScalarType type, size_t size, bool is_in
   return info;
 }
 
-int char_type() {
-  static int type = global_create_type(TYPE_SCALAR, "char", create_scalar_type_info(TYPE_CHAR, 1, true));
-  return type;
-}
 int bool_type() {
   static int type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
   return type;
@@ -467,43 +503,17 @@ int s8_type() {
   static int type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
   return type;
 }
-int float32_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float32", create_scalar_type_info(TYPE_FLOAT, 4));
+int f32_type() {
+  static int type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
   return type;
 }
-int float64_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float64", create_scalar_type_info(TYPE_DOUBLE, 8));
+int f64_type() {
+  static int type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
   return type;
 }
-int int_type() {
-  static int type = global_create_type(TYPE_SCALAR, "int", create_scalar_type_info(TYPE_S32, 4, true));
-  return type;
-}
-int float_type() {
-  static int type = global_create_type(TYPE_SCALAR, "float", create_scalar_type_info(TYPE_FLOAT, 4));
-  return type;
-}
+
 int voidptr_type() {
   static int type = global_find_type_id(void_type(), {.extensions = {{TYPE_EXT_POINTER}}});
-  return type;
-}
-int charptr_type() {
-  static int type = global_find_type_id(char_type(), {.extensions = {{TYPE_EXT_POINTER}}});
-  return type;
-}
-
-int &range_type() {
-  static int type;
-  return type;
-}
-
-int &string_type() {
-  static int type;
-  return type;
-}
-
-int &c_string_type() {
-  static int type;
   return type;
 }
 
@@ -532,7 +542,6 @@ void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRang
     case TType::Varargs:
     case TType::Directive:
     case TType::ColonEquals:
-    case TType::Dollar:
     case TType::RParen:
     case TType::RBrace:
       throw_error("Operator overload not allowed", range);
@@ -603,33 +612,23 @@ void init_type_system() {
 
   // Floats
   {
-    float64_type();
-    float32_type();
+    f64_type();
+    f32_type();
   }
 
   // Other
   {
-    char_type();
     bool_type();
     void_type();
-
-    // Other
-    // CLEANUP: alias these, don't generate new types.
-    int_type();
-    float_type();
-
-    // TODO: declare type alias here.
-    // auto id = charptr_type();
-    // global_create_type_alias(id, "c_string");
   }
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == char_type() || t->id == float_type() || t->id == int_type() || t->id == s8_type() ||
+  return t->id == s32_type() || t->id == s8_type() ||
          t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
-         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == float32_type() ||
-         t->id == float64_type();
+         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == f32_type() ||
+         t->id == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
@@ -654,36 +653,49 @@ std::string TypeExtensions::to_string() const {
       case TYPE_EXT_POINTER:
         ss << "*";
         break;
-      case TYPE_EXT_ARRAY: {
+      case TYPE_EXT_ARRAY:
         ss << "[]";
-      } break;
-      case TYPE_EXT_FIXED_ARRAY:
-        ss << "[" << ext.array_size << "]";
         break;
       case TYPE_EXT_INVALID:
-        throw_error("Internal compiler error: extension type invalid", {});
+        throw_error("internal compiler error: extension type invalid", {});
         break;
     }
   }
   return ss.str();
 }
 
-
-int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
-  type_table.emplace_back(type_table.size(), TYPE_TUPLE);
-  Type *type = &type_table.back();
-
-  //! BUG: we should allow nested tuples;
-  //! see some of the repros ("repro/14.ela" i think?)
-
+int global_create_tuple_type(const std::vector<int> &types) {
+  type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
+  Type *type = type_table.back();
   type->set_base(get_tuple_type_name(types));
 
   auto info = type_info_alloc<TupleTypeInfo>();
   info->types = types;
 
   type->set_info(info);
-  type->set_ext(ext);
   info->scope = create_child(root_scope);
+
+  // getting all types within a function type because some function types
+  // arent associated with any existing funcitons and  whose parameters or return
+  // types might not be built-in
+  auto dependencies = expand_function_types(types);
+
+  // declare this type as a dependant on the eldest dependency from our subtypes.
+  // purely for emit time.
+  int eldest = *std::max_element(dependencies.begin(), dependencies.end());
+  auto eldest_t = global_get_type(eldest);
+  if (eldest_t->base_id != Type::invalid_id) {
+    eldest = eldest_t->base_id;
+  }
+
+  global_get_type(eldest)->tuple_dependants.push_back(type->id);
+
+  // We do this for dot expressions that do tuple.1 etc.
+  // Only in the base type.
+  for (const auto [i, type] : types | std::ranges::views::enumerate) {
+    info->scope->insert(std::to_string(i), type, nullptr);
+  }
+
   return type->id;
 }
 
@@ -705,10 +717,8 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
 int Type::take_pointer_to() const {
   auto ext = this->extensions;
   ext.extensions.push_back({TYPE_EXT_POINTER});
-  return global_find_type_id(id, ext);
+  return global_find_type_id(base_id == -1 ? id : base_id, ext);
 }
-
-
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
   std::string output = "";
@@ -716,13 +726,12 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::LBrace:
       return "subscript";
 
-
     // Do we want this? might be useful for stuff like Array implementations etc.
     // However, it feels like bringing in the complexity of C++'s
     // copy constructor, copy assign, copy assign ref, move constructor , etc.
     case TType::Assign:
 
-    // via interface Arithmetic 
+    // via interface Arithmetic
     case TType::Add:
     case TType::Sub: {
       if (kind == OPERATION_UNARY) {
@@ -773,21 +782,26 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::CompXor:
     case TType::CompSHL:
     case TType::CompSHR:
-      output =  TTypeToString(op);
-    default: break;
+      output = TTypeToString(op);
+    default:
+      break;
   }
   std::transform(output.begin(), output.end(), output.begin(), ::tolower);
   return output;
 }
 
 int find_operator_overload(TType op, Type *type, OperationKind kind) {
+  if (!type) {
+    return -1;
+  }
   std::string op_str = get_operator_overload_name(op, kind);
   if (op_str.empty()) {
     return -1;
   }
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
   auto scope = type->get_info()->scope;
-  if (!scope) return Type::invalid_id;
+  if (!scope)
+    return Type::invalid_id;
   // TODO: make a system for type checking against this.
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {

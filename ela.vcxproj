@@ -139,7 +139,6 @@
     <ClCompile Include="src\visitor.cpp" />
   </ItemGroup>
   <ItemGroup>
-    <ClInclude Include="ela_source\boilerplate.hpp" />
     <ClInclude Include="include\arena.hpp" />
     <ClInclude Include="include\ast.hpp" />
     <ClInclude Include="include\core.hpp" />

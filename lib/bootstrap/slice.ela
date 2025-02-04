@@ -1,0 +1,46 @@
+
+impl![T] Clone for Slice![T] {
+  clone :: fn(self) -> #self {
+    data : T* = malloc(sizeof(T) * self.length);
+    memcpy(data, self.data, self.length * sizeof(T));
+    return {
+      data: data,
+      length: self.length,
+    };
+  }
+}
+
+impl![T] Slice![T] {
+  subscript :: fn(self*, idx: u32) -> T {
+    return self.data[idx];
+  }
+  
+  // TODO: do we want to truncate or throw an error when the requested range's length is greater than the amount of 
+  // data available??
+  slice :: fn(self, range: Range) -> Slice![T] {
+    if range.begin < 0 then range.begin = 0;
+
+    if range.end == -1 || range.end > self.length {
+      range.end = self.length;  
+    }
+
+    length := range.end - range.begin;
+    
+    // TODO: support reverse ranges?
+    if length < 0 then return {};
+
+    return {
+      data: self.data + range.begin,
+      length: length,
+    }
+  }
+}
+
+impl![T] Iterable![T] for Slice![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: self.data + self.length
+    }
+  }
+}

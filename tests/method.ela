@@ -1,18 +1,18 @@
-#import core;
+;
 
 IHaveAMethod :: struct {}
 
 impl IHaveAMethod {
-  method :: fn(self*) -> float32 {
+  method :: fn(self*) -> f32 {
     return 0.0;
   }
-  parameter_method :: fn(self*, x: float32) -> float32 {
+  parameter_method :: fn(self*, x: f32) -> f32 {
       return x;
   }
 }
 
 #test test_method :: fn() {
   owner: IHaveAMethod ;
-  assert("failed to get 0.0 from method."c, owner.method() == 0.0);
-  assert("failed to get 0.0 from method (passing back param)."c, owner.parameter_method(0.0) == 0.0);
+  assert("failed to get 0.0 from method.", owner.method() == 0.0);
+  assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }

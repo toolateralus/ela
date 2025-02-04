@@ -1,5 +1,6 @@
-
+#include <format>
 #include <functional>
+#include <iterator>
 #include <ostream>
 #include <sstream>
 #include <string>
@@ -28,12 +29,119 @@ constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
 constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
 constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
-constexpr auto TYPE_FLAGS_FIXED_ARRAY = 1 << 9;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 10;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 11;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 9;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 12;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 13;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
+
+static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
+#ifdef TESTING
+#define __TEST_RUNNER_MAIN                                                                                             \
+  int main() {                                                                                                         \
+    for (int i = 0; i < sizeof(tests) / sizeof(__COMPILER_GENERATED_TEST); i++) {                                      \
+      __COMPILER_GENERATED_TEST_RUN(&tests[i]);                                                                        \
+    }                                                                                                                  \
+  }                                                                                                                     
+#endif
+)__";
+
+// This is stuff we just can't really get rid of while using a transpiled backend.
+static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
+
+typedef unsigned long long int u64;
+typedef signed long long int s64;
+
+typedef signed int s32;
+typedef unsigned int u32;
+
+typedef double f64;
+typedef float f32;
+
+typedef short int s16;
+typedef unsigned short int u16;
+
+typedef signed char s8;
+typedef unsigned char u8;
+#include <stddef.h>
+
+#if USE_STD_LIB
+  #include <stdint.h>
+  #include <errno.h>
+  #undef RAND_MAX
+#endif
+
+#ifdef TESTING
+  int printf(u8 *, ...);
+  void exit(s32);
+  
+  typedef struct {
+    const char *name;
+    void (*function)();
+  } __COMPILER_GENERATED_TEST;
+  static void __COMPILER_GENERATED_TEST_RUN(__COMPILER_GENERATED_TEST *test) {
+    #if TEST_VERBOSE 
+      printf("running %s\n", test->name);
+    #endif
+    test->function();
+  }
+#endif
+)__";
+
+void Emitter::forward_decl_type(Type *type) {
+  switch (type->kind) {
+    case TYPE_STRUCT: {
+      auto info = type->get_info()->template as<StructTypeInfo>();
+      std::string kw = "typedef struct ";
+      if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
+        kw = "typedef union ";
+      (*ss) << kw << type->get_base().get_str() << " " << type->get_base().get_str() << ";\n";
+    } break;
+    case TYPE_TUPLE:
+    case TYPE_TAGGED_UNION: {
+      (*ss) << "struct " << to_cpp_string(type) << ";\n";
+    } break;
+    case TYPE_FUNCTION: {
+      auto info = type->get_info()->template as<FunctionTypeInfo>();
+      for (int index = 0; index < info->params_len; index++) {
+        auto param_ty = info->parameter_types[index];
+        forward_decl_type(global_get_type(param_ty));
+      }
+      forward_decl_type(global_get_type(info->return_type));
+    } break;
+    case TYPE_SCALAR:
+      break;
+    case TYPE_ENUM:
+    case TYPE_INTERFACE:
+      return;
+  }
+}
+
+void Emitter::emit_type_or_fwd_decl(Type *type) {
+  if (type->base_id != Type::invalid_id) {
+    for (auto ext : type->get_ext().extensions) {
+      if (ext.type != TYPE_EXT_ARRAY) {
+        forward_decl_type(global_get_type(type->base_id));
+        return;
+      }
+    }
+    type = global_get_type(type->base_id);
+  }
+  if (type->declaring_node) {
+    type->declaring_node.get()->accept(this);
+  }
+}
+
+template <typename T> void Emitter::emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations) {
+  for (auto &instantiation : instantiations) {
+    for (auto type_id : instantiation.arguments) {
+      emit_type_or_fwd_decl(global_get_type(type_id));
+    }
+    instantiation.node->accept(this);
+    auto type = global_get_type(instantiation.node->resolved_type);
+    emit_tuple_dependants(type->tuple_dependants);
+  }
+}
 
 void Emitter::visit(ASTWhile *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
@@ -64,30 +172,77 @@ void Emitter::visit(ASTFor *node) {
   auto old_scope = ctx.scope;
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
-  (*ss) << indent() << "for (";
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    // Emit old-style for loop for pointer semantics
-    (*ss) << "auto* ";
-    node->iden->accept(this);
-    (*ss) << " = ";
-    node->range->accept(this);
-    (*ss) << ".begin(); ";
-    node->iden->accept(this);
-    (*ss) << " != ";
-    node->range->accept(this);
-    (*ss) << ".end(); ";
-    node->iden->accept(this);
-    (*ss) << "++";
-  } else {
-    // Emit range-based for loop for copy semantics
-    (*ss) << "auto ";
-    node->iden->accept(this);
-    (*ss) << " : ";
-    node->range->accept(this);
+
+  static int depth = 0;
+  std::string range_unique_id = "$_range_id" + std::to_string(depth);
+  std::string unique_id = "$_loop_id" + std::to_string(depth);
+  depth++;
+
+  Defer _defer([] { depth--; });
+
+  (*ss) << indent() << "{\n";
+  indent_level++;
+
+  std::string range_type_str = to_cpp_string(global_get_type(node->range_type));
+  std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
+  std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
+  auto iterable_method_str = "$" + std::to_string(node->iterable_type);
+
+  switch (node->iteration_kind) {
+    case ASTFor::ITERABLE:
+      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type) << "_iter(&" << range_unique_id << ");\n";
+      break;
+
+    case ASTFor::ENUMERABLE:
+      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type) << "_enumerator(&" << range_unique_id << ");\n";
+      break;
+
+    case ASTFor::ENUMERATOR:
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      break;
+
+    case ASTFor::ITERATOR:
+      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
+      node->range->accept(this);
+      (*ss) << ";\n";
+      break;
   }
-  (*ss) << ")";
+
+  (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(" << unique_id << ")) {\n";
+  indent_level++;
+
+  (*ss) << indent() << identifier_type_str << " ";
+  node->iden->accept(this);
+  (*ss) << " = ";
+  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+  } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
+    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+  } else {
+    (*ss) << "*" << iterable_method_str << "_current(" << unique_id << ");\n";
+  }
+
+  // this MUST happen before the block or continue will cause a permanent hangup!!!
+  (*ss) << indent() << iterable_method_str << "_next(&" << unique_id << ");\n";
+
   node->block->accept(this);
+
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+
+  indent_level--;
+  (*ss) << indent() << "}\n";
+
+  indent_level--;
+  (*ss) << indent() << "}\n";
+
   defer_blocks.pop_back();
   ctx.set_scope(old_scope);
   return;
@@ -98,7 +253,24 @@ void Emitter::visit(ASTAlias *node) { return; }
 void Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
-    node->arguments[i]->accept(this);
+    bool emitted = false;
+
+    // ! This is a terrible hack.
+    // ! We should have a specific node for functions that take types as arguments
+    // ! sizeof(), typeof(), etc etc.
+    if (node->arguments[i]->get_node_type() == AST_NODE_IDENTIFIER) {
+      auto iden = static_cast<ASTIdentifier *>(node->arguments[i]);
+      auto type = ctx.scope->find_type_id(iden->value, {});
+      if (type != -1) {
+        emitted = true;
+        (*ss) << to_cpp_string(global_get_type(type));
+      }
+    }
+
+    if (!emitted) {
+      node->arguments[i]->accept(this);
+    }
+
     if (i != node->arguments.size() - 1) {
       (*ss) << ", ";
     }
@@ -114,7 +286,10 @@ void Emitter::visit(ASTType *node) {
 
   // For reflection
   if (node->kind == ASTType::REFLECTION) {
-    (*ss) << to_type_struct(global_get_type(node->pointing_to.get()->resolved_type), ctx);
+    auto id = node->pointing_to.get()->resolved_type;
+    if (id == -1) throw_error("Invalid type in #type() node", node->source_range);
+    auto type = global_get_type(id);
+    (*ss) << to_type_struct(type, ctx);
     return;
   }
 
@@ -151,7 +326,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
       return srnode->base->resolved_type;
     } break;
     default:
-      throw_error(std::format("Internal Compiler Error: 'get_dot_left_type' encountered an unexpected node, kind {}",
+      throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
                               (int)node->get_node_type()),
                   node->source_range);
   }
@@ -159,7 +334,6 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 }
 
 void Emitter::visit(ASTCall *node) {
-  auto node_type = node->function->get_node_type();
   auto base_symbol = typer.get_symbol(node->function);
 
   std::vector<int> generic_args;
@@ -168,7 +342,7 @@ void Emitter::visit(ASTCall *node) {
   }
 
   auto symbol = base_symbol.get();
-  if (base_symbol && node_type == AST_NODE_DOT_EXPR && symbol->declaring_node.is_not_null() &&
+  if (node->function->get_node_type() == AST_NODE_DOT_EXPR && base_symbol && symbol->declaring_node.is_not_null() &&
       symbol->declaring_node.get()->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
     auto func = static_cast<ASTFunctionDeclaration *>(symbol->declaring_node.get());
     auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
@@ -178,21 +352,30 @@ void Emitter::visit(ASTCall *node) {
       throw_error("cannot call a static method from an instance", node->source_range);
     }
 
-    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
-    Type *function_type = global_get_type(base_symbol.get()->type_id);
-    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
     auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
     if (!base_type) {
-      throw_error("Internal compiler error: unable to find method call", node->source_range);
+      throw_error("internal compiler error: unable to find method call", node->source_range);
     }
-    (*ss) << base_type->get_base().get_str() << "_" << base_symbol.get()->name.get_str();
+
+    (*ss) << "$" << std::to_string(base_type->base_id == -1 ? base_type->id : base_type->base_id) << "_"
+          << symbol->name.get_str();
     (*ss) << mangled_type_args(generic_args);
     (*ss) << "(";
 
+    Type *function_type = global_get_type(symbol->type_id);
+    // if generic function
+    if (!function_type) {
+      auto instance =
+          find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
+      function_type = global_get_type(instance->resolved_type);
+    }
+    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
     if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
       // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
       (*ss) << "&";
     }
+
+    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
     base->accept(this);
     if (node->arguments->arguments.size() > 0) {
       (*ss) << ", ";
@@ -206,37 +389,99 @@ void Emitter::visit(ASTCall *node) {
     }
     (*ss) << ")";
   } else {
+    auto func = node->function;
+    if (func->get_node_type() == AST_NODE_TYPE) {
+      auto ast_type = static_cast<ASTType *>(func);
+      if (ast_type->kind != ASTType::NORMAL) {
+        throw_error("Cannot call a tuple or function type", node->source_range);
+      }
+      if (!ast_type->normal.generic_arguments.empty()) {
+        throw_error("internal compiler error: generic args to call put on base", node->source_range);
+      }
+      func = ast_type->normal.base;
+    }
     // normal function call, or a static method.
-    node->function->accept(this);
+    func->accept(this);
     (*ss) << mangled_type_args(generic_args);
     node->arguments->accept(this);
   }
 
   return;
 }
+
+size_t calculate_actual_length(const std::string_view &str_view) {
+  size_t length = 0;
+  for (size_t i = 0; i < str_view.size(); ++i) {
+    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+      switch (str_view[i + 1]) {
+        case 'n':
+        case 't':
+        case 'r':
+        case '\\':
+        case '"':
+          ++i; // Skip the escape character
+          break;
+        case 'x': // Hexadecimal escape sequence
+          i += 2; // Skip \x and the next two hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'u': // Unicode escape sequence
+          i += 4; // Skip \u and the next four hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'U': // Unicode escape sequence
+          i += 8; // Skip \U and the next eight hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        default:
+          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') { // Octal escape sequence
+            ++i;                                                  // Skip the first digit
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the second digit
+            }
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the third digit
+            }
+          }
+          break;
+      }
+    }
+    ++length;
+  }
+  return length;
+}
+
 void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
   std::string output;
   switch (node->tag) {
-    case ASTLiteral::InterpolatedString: {
-      interpolate_string(node);
-      return;
-    }
     case ASTLiteral::Null:
-      (*ss) << "(std::nullptr_t)nullptr";
+      (*ss) << "NULL";
       return;
-    case ASTLiteral::String:
-      if (node->resolved_type == string_type() && !is_freestanding) {
-        output = std::format("string{{\"{}\"}}", node->value);
-      } else if (node->resolved_type == c_string_type()) {
-        output = std::format("\"{}\"", node->value);
+    case ASTLiteral::String: {
+      if (node->is_c_string) {
+        output = std::format("\"{}\"", node->value.get_str());
+      } else {
+        // TODO:
+        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of
+        // bytes, then all of our string literals are stack allocated. If we make them static, then there's a chance
+        // that the user mutates the string literal, and it will change it's meaning for the rest of the program
+
+        // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
+        // we will keep the null terminated strings until we have a solution for this.
+        auto str = node->value.get_str();
+        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
+        return;
       }
-      break;
-    case ASTLiteral::RawString:
-      output = std::format("R\"__({})__\"", node->value);
-      break;
+    } break;
     case ASTLiteral::Float:
-      if (node->resolved_type != float64_type()) {
+      if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";
       } else {
         output = node->value.get_str();
@@ -255,6 +500,7 @@ void Emitter::visit(ASTLiteral *node) {
   (*ss) << '(' << type << ')' << output;
   return;
 }
+
 void Emitter::visit(ASTIdentifier *node) {
   (*ss) << node->value.get_str();
   return;
@@ -268,30 +514,11 @@ void Emitter::visit(ASTUnaryExpr *node) {
   auto left_ty = global_get_type(left_type);
 
   if (left_ty && node->is_operator_overload) {
-    // !! THIS IS A TOTAL HACK!!!
-    // !! JUST TRYING THIS OUT!!!
-    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_UNARY);
-    auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTDotExpr>();
-    auto left_id = ast_alloc<ASTIdentifier>();
-    sr->base = node->operand;
-    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
-    call->function = sr;
-    call->arguments = ast_alloc<ASTArguments>();
-    call->accept(&typer);
-    call->accept(this);
-    sr->source_range = node->source_range;
-    call->arguments->source_range = node->source_range;
-    call->source_range = node->source_range;
+    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op.type, node->operand, node);
     return;
   }
 
   auto type = global_get_type(left_type);
-  if (node->op.type == TType::Not && type->get_ext().is_array()) {
-    node->operand->accept(this);
-    (*ss) << ".pop()";
-    return;
-  }
 
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
@@ -307,42 +534,28 @@ void Emitter::visit(ASTUnaryExpr *node) {
   return;
 }
 void Emitter::visit(ASTBinExpr *node) {
+  if (node->op.type == TType::Assign &&
+      (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->right->accept(this);
+    node->left->accept(this);
+    (*ss) << " = " << str;
+    return;
+  }
+
   auto left_ty = global_get_type(node->left->resolved_type);
 
   if (left_ty && node->is_operator_overload) {
-    // !! THIS IS A TOTAL HACK!!!
-    // !! JUST TRYING THIS OUT!!!
-    auto function_type = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
-    auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTDotExpr>();
-    auto left_id = ast_alloc<ASTIdentifier>();
-    sr->base = node->left;
-    sr->member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
-    call->function = sr;
-    call->arguments = ast_alloc<ASTArguments>();
-    call->arguments->arguments = {node->right};
-    call->accept(&typer);
-    call->accept(this);
-    sr->source_range = node->source_range;
-    call->arguments->source_range = node->source_range;
-    call->source_range = node->source_range;
+    call_operator_overload(node->source_range, left_ty, OPERATION_BINARY, node->op.type, node->left, node->right);
     return;
   }
 
-  if (node->op.type == TType::Erase) {
-    node->left->accept(this);
-    (*ss) << ".erase(";
-    node->right->accept(this);
-    (*ss) << ");\n";
-    return;
-  }
-  if (node->op.type == TType::Concat) {
-    node->left->accept(this);
-    (*ss) << ".push(";
-    node->right->accept(this);
-    (*ss) << ");\n";
-    return;
-  }
   auto op_ty = node->op.type;
   (*ss) << "(";
   node->left->accept(this);
@@ -369,22 +582,55 @@ void Emitter::visit(ASTExprStatement *node) {
 void Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
 
+  // Emit switch / if expressions.
+  if (node->value &&
+      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->value.get()->accept(this);
+    (*ss) << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << node->name.get_str() << " = " << str;
+    return;
+  }
+
   if (node->type->resolved_type == Type::invalid_id) {
-    throw_error("Internal Compiler Error: type was null upon emitting an ASTDeclaration", node->source_range);
+    throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
   }
 
   auto type = global_get_type(node->type->resolved_type);
   auto symbol = ctx.scope->local_lookup(node->name);
 
   auto handle_initialization = [&]() {
-    if (node->value.is_not_null()) {
+    if (node->value.is_not_null() && emit_default_value) {
       (*ss) << " = ";
       cast_pointers_implicit(node);
       node->value.get()->accept(this);
     } else if (emit_default_init) {
-      (*ss) << "{}";
+      auto type = global_get_type(node->type->resolved_type);
+      if (type->is_kind(TYPE_STRUCT)) {
+        (*ss) << "= (" + to_cpp_string(type) + ") {}";
+      } else {
+        (*ss) << "= (" + to_cpp_string(type) + ") {0}";
+      }
     }
   };
+
+  auto old = emit_default_init;
+  Defer _([&] { emit_default_init = old; });
+  if (node->is_extern) {
+    (*ss) << "extern ";
+    emit_default_init = false;
+  }
+  if (node->is_static) {
+    (*ss) << "static ";
+  }
+  if (node->is_constexpr) {
+    (*ss) << "static constexpr ";
+  }
 
   if (type->is_kind(TYPE_FUNCTION)) {
     (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
@@ -405,17 +651,12 @@ void Emitter::visit(ASTDeclaration *node) {
   if (type->get_ext().is_fixed_sized_array()) {
     (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     if (node->value.is_not_null()) {
+      (*ss) << " = ";
       node->value.get()->accept(this);
     } else if (emit_default_init) {
-      (*ss) << "{}";
+      (*ss) << "= {0}";
     }
     return;
-  }
-
-  if (node->is_static) {
-    (*ss) << "static ";
-  } else if (node->is_constexpr) {
-    (*ss) << "static constexpr ";
   }
 
   node->type->accept(this);
@@ -430,7 +671,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   emit_default_args = true;
 
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-    (*ss) << "extern \"C\" ";
+    (*ss) << "extern  ";
   }
 
   node->return_type->accept(this);
@@ -439,24 +680,12 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   (*ss) << ";\n";
   emit_default_args = false;
 }
-void Emitter::emit_local_function(ASTFunctionDeclaration *node) {
-  // Right now we just always do a closure on local lambda functions.
-  // This probably isn't desirable for simple in-out functions
-  (*ss) << indent() << "auto " << node->name.get_str() << " = [&]";
-  node->params->accept(this);
-  (*ss) << " -> ";
-  node->return_type->accept(this);
-  if (node->block.is_null()) {
-    throw_error("local function cannot be #foreign", node->source_range);
-  }
-  node->block.get()->accept(this);
-}
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
-  (*ss) << "extern \"C\" ";
+  (*ss) << "extern ";
   (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
   space();
   (*ss) << node->name.get_str() << '(';
@@ -475,47 +704,69 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
 }
 
 void Emitter::visit(ASTStructDeclaration *node) {
-  if (!node->generic_parameters.empty()) {
-    for (auto &instantiation : node->generic_instantiations) {
-      auto type = global_get_type(instantiation.node->resolved_type);
-      static_cast<ASTStructDeclaration *>(instantiation.node)->resolved_type = type->id;
-      instantiation.node->accept(this);
-    }
+  if (node->is_emitted) {
     return;
   }
+
+  if (!node->generic_parameters.empty()) {
+    emit_generic_instantiations(node->generic_instantiations);
+    return;
+  }
+
+  node->is_emitted = true;
+
+  auto old_init = emit_default_init;
+  auto old_default_val = emit_default_value;
+
+  Defer _defer([&] {
+    emit_default_init = old_init;
+    emit_default_value = old_default_val;
+  });
+
+  emit_default_init = false;
+  emit_default_value = false;
+
+  for (auto member : node->members) {
+    emit_type_or_fwd_decl(global_get_type(member.type->resolved_type));
+  }
+
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
+
   auto info = (type->get_info()->as<StructTypeInfo>());
 
-  // TODO: fix forward declarations not emitting?
-
-  auto type_tag = node->is_union ? " union " : " struct ";
+  std::string type_name = type->get_base().get_str();
+  ;
+  std::string type_tag = (node->is_union ? "typedef union " : "typedef struct ");
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
     if (node->is_extern) {
-      (*ss) << "extern \"C\" ";
+      // (*ss) << "extern ";
+      // I do not believe this is ever neccesary in C, you can alwasy just define an
+      // opaque struct and link against it, or redefine it: it doesn't matter.
     }
-    (*ss) << type_tag << type->get_base().get_str() << ";\n";
+    (*ss) << type_tag << " " << type_name << " " << type_name << ";\n";
     return;
   }
 
-  ctx.set_scope(node->scope);
+  auto previous = ctx.scope;
+  ctx.set_scope(info->scope);
+  Defer _defer2([&] { ctx.set_scope(previous); });
 
   if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
-    (*ss) << type_tag;
+    (*ss) << (node->is_union ? "union " : "struct ");
     (*ss) << "{\n";
   } else {
     if (node->is_extern) {
-      (*ss) << "extern \"C\" ";
+      (*ss) << "extern ";
     }
-    (*ss) << type_tag;
-    (*ss) << type->get_base().get_str() << "{\n";
+    (*ss) << type_tag << " " << type_name << "{\n";
   }
-  indentLevel++;
+  indent_level++;
 
   auto old = emit_default_init;
-  if (node->is_union)
-    emit_default_init = false;
+
+  emit_default_init = false;
 
   Defer _defer1([&] { emit_default_init = old; });
 
@@ -526,27 +777,45 @@ void Emitter::visit(ASTStructDeclaration *node) {
     newline();
   }
 
-  for (const auto &decl : node->fields) {
+  for (const auto &member : node->members) {
     indented("");
-    decl->accept(this);
+    auto type = global_get_type(member.type->resolved_type);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      auto name = member.name.get_str();
+      auto name_nullable = Nullable(&name);
+      (*ss) << get_function_pointer_type_string(type, name_nullable);
+    } else if (type->get_ext().is_fixed_sized_array()) {
+      (*ss) << get_declaration_type_signature_and_identifier(member.name.get_str(), type);
+    } else {
+      member.type->accept(this);
+      space();
+      (*ss) << member.name.get_str();
+    }
     semicolon();
     newline();
   }
 
-  (*ss) << "};\n";
-  indentLevel--;
+  // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
+  if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+    (*ss) << "};\n";
+  } else {
+    (*ss) << "} " << type_name << ";\n";
+  }
+
+  emit_tuple_dependants(type->tuple_dependants);
+
+  indent_level--;
 
   bool has_default_ctor = false;
   bool has_dtor = false;
 
-  ctx.exit_scope();
   return;
 }
 void Emitter::visit(ASTEnumDeclaration *node) {
   emit_line_directive(node);
   auto type_name = node->name.get_str();
   int n = 0;
-  (*ss) << "enum " << type_name << " {\n";
+  (*ss) << "typedef enum {\n";
   for (const auto &[key, value] : node->key_values) {
     (*ss) << type_name << "_" << key.get_str();
     if (node->is_flags) {
@@ -561,7 +830,10 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     }
     n++;
   }
-  (*ss) << "};\n";
+  (*ss) << "} " << type_name << ";\n";
+
+  auto type = global_get_type(node->resolved_type);
+  emit_tuple_dependants(type->tuple_dependants);
   return;
 }
 
@@ -574,10 +846,6 @@ void Emitter::visit(ASTParamDecl *node) {
     } else {
       node->normal.type->accept(this);
       (*ss) << ' ' << node->normal.name.get_str();
-    }
-    if (node->normal.default_value.is_not_null() && emit_default_args) {
-      (*ss) << " = ";
-      node->normal.default_value.get()->accept(this);
     }
   } else {
     (*ss) << ' ' << to_cpp_string(type) << " self";
@@ -624,44 +892,29 @@ void Emitter::visit(ASTProgram *node) {
     std ::cout << "adding TEST_VERBOSE\n";
   }
 
-  code << "#include \"/usr/local/lib/ela/boilerplate.hpp\"\n";
+  code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {
-    code << "extern Type **_type_info;\n";
+    code << "typedef struct Type Type;\n";
+    auto type_ptr_id = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
+                        type_ptr_id);
   }
 
   if (testing) {
     code << "#define TESTING\n";
   }
 
+  for (auto &type : type_table) {
+    if (type->is_kind(TYPE_SCALAR) || (type->is_kind(TYPE_FUNCTION) && type->generic_args.empty()) || type->is_kind(TYPE_ENUM)) {
+      emit_tuple_dependants(type->tuple_dependants);
+    }
+  }
+
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
     newline();
-  }
-
-  if (testing) {
-    auto test_init = test_functions.str();
-    if (test_init.ends_with(',')) {
-      test_init.pop_back();
-    }
-
-    // deploy the array of test struct wrappers.
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
-
-    // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
-  } else {
-    if (has_user_defined_main && !is_freestanding) {
-      code << R"__(
-int main (int argc, char** argv) {
-  for (int i = 0; i < argc; ++i) {
-    Env_args().push(string(argv[i]));
-  }
-  __ela_main_();
-}
-)__";
-    } // C calls main() for freestanding
   }
 
   // Emit runtime reflection type info for requested types, only when we have
@@ -671,36 +924,37 @@ int main (int argc, char** argv) {
     for (const auto &str : ctx.type_info_strings) {
       type_info << str.get_str() << ";\n";
     }
-    code << std::format("Type **_type_info = new Type*[{}];\n"
-                        "auto __ts_init_func_result__ = []{{\n"
-                        "  {};\n"
-                        "  return 0;\n"
-                        "}}();\n",
-                        type_table.size(), type_info.str());
 
-    code << std::format(R"_(
-Type *find_type(string name) {{
-  for (size_t i = 0; i < {}; ++i) {{
-    Type *type = _type_info[i];
-    const char *type_name = type->name;
-    const char *name_data = name.data;
-    bool match = true;
-    while (*type_name && *name_data) {{
-      if (*type_name != *name_data) {{
-        match = false;
-        break;
-      }}
-      ++type_name;
-      ++name_data;
-    }}
-    if (match && *type_name == '\\0' && *name_data == '\\0') {{
-      return type;
-    }}
-  }}
-  return nullptr; // Return nullptr if the type is not found
-}}
-)_",
-                        type_table.size());
+    code << "void $initialize_reflection_system() {\n";
+    {
+      // we don't bother doing pushes into type info, it's easier for us to do it this way.
+      code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
+      code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
+      code << type_info.str() << ";\n";
+    }
+    code << "}\n";
+  }
+
+  if (testing) {
+    auto test_init = test_functions.str();
+    if (test_init.ends_with(',')) {
+      test_init.pop_back();
+    }
+
+    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
+    // deploy the array of test struct wrappers.
+    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
+
+    // use the test runner main macro.
+    code << "__TEST_RUNNER_MAIN;";
+  } else {
+    if (has_user_defined_main && !is_freestanding) {
+#define FORMAT_STR "int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n"
+      // I made that macro because the formatting goes CRAZY with a raw string as an arg
+      code << std::format(FORMAT_STR, ctx.scope->find_type_id("Env", {}),
+                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
+                                                            : "{/* no reflection present in module */};");
+    } // C calls main() for freestanding
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for #type().
@@ -721,8 +975,11 @@ void Emitter::visit(ASTDotExpr *node) {
     op = "->";
   }
   node->base->accept(this);
-  (*ss) << op << node->member_name.get_str();
-
+  (*ss) << op;
+  if (base_ty->is_kind(TYPE_TUPLE)) {
+    (*ss) << "$";
+  }
+  (*ss) << node->member_name.get_str();
   return;
 }
 
@@ -758,13 +1015,13 @@ void Emitter::visit(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
 
   if (!type->get_ext().is_fixed_sized_array()) {
-    (*ss) << to_cpp_string(type);
+    (*ss) << "(" + to_cpp_string(type) + ")";
   }
   (*ss) << " {";
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
-      (*ss) << "}";
+      (*ss) << "0}";
       return;
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
@@ -780,12 +1037,26 @@ void Emitter::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      for (const auto &expr : node->values) {
-        expr->accept(this);
-        if (expr != node->values.back()) {
-          (*ss) << ", ";
+      if (type->get_base().get_str().starts_with("Init_List$")) {
+        auto element_type = type->generic_args[0];
+        (*ss) << " .data = ";
+        (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
+        for (const auto &expr : node->values) {
+          expr->accept(this);
+          if (expr != node->values.back()) {
+            (*ss) << ", ";
+          }
+        }
+        (*ss) << "}, .length = " << std::to_string(node->values.size());
+      } else {
+        for (const auto &expr : node->values) {
+          expr->accept(this);
+          if (expr != node->values.back()) {
+            (*ss) << ", ";
+          }
         }
       }
+
     } break;
   }
   (*ss) << "}";
@@ -793,21 +1064,21 @@ void Emitter::visit(ASTInitializerList *node) {
 }
 
 void Emitter::visit(ASTRange *node) {
-  // TODO: fix this dog crap casting and lack of calculating the span of the range.
-  (*ss) << "Range{.first = (s64)";
+  (*ss) << "(" << to_cpp_string(global_get_type(node->resolved_type)) << ") {";
+  (*ss) << ".begin = ";
   node->left->accept(this);
-  (*ss) << ", .last = (s64)";
+  (*ss) << ", .end = ";
   node->right->accept(this);
   (*ss) << "}";
   return;
 }
+
 void Emitter::visit(ASTSwitch *node) {
-  if (!node->is_statement) {
-    (*ss) << "[&] ->";
-    auto type = global_get_type(node->return_type);
-    (*ss) << to_cpp_string(type);
-    (*ss) << "{\n";
-    ;
+  auto type = global_get_type(node->target->resolved_type);
+  bool use_eq_operator = true;
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+    use_eq_operator = false;    
   }
 
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
@@ -816,70 +1087,90 @@ void Emitter::visit(ASTSwitch *node) {
     }
     emit_line_directive(target);
     (*ss) << " if (";
-    target->accept(this);
-    (*ss) << " == ";
-    _case.expression->accept(this);
+    if (use_eq_operator) {
+      target->accept(this);
+      (*ss) << " == ";
+      _case.expression->accept(this);
+    } else {
+      call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
+    }
     (*ss) << ") ";
     emit_line_directive(_case.block);
     _case.block->accept(this);
   };
-
   bool first = true;
-
   for (const auto &_case : node->cases) {
     emit_switch_case(node->target, _case, first);
     first = false;
   }
-
-  if (!node->is_statement) {
-    (*ss) << "else {";
-
-    auto type = global_get_type(node->return_type);
-    (*ss) << "return " << to_cpp_string(type) << "{};";
-    (*ss) << "\n}\n";
-
-    (*ss) << "}()";
-  }
-
-  return;
 }
 void Emitter::visit(ASTTuple *node) {
-  (*ss) << "std::tuple(";
-  for (const auto &value : node->values) {
+  auto type = global_get_type(node->resolved_type);
+  auto name = "(" + to_cpp_string(type) + ")";
+  (*ss) << name << " {";
+  for (int i = 0; i < node->values.size(); ++i) {
+    auto &value = node->values[i];
+    (*ss) << ".$" << std::to_string(i) << " = ";
     value->accept(this);
-    if (value != node->values.back())
+    if (i != node->values.size() - 1)
       (*ss) << ", ";
   }
-  (*ss) << ")";
+  (*ss) << "}";
   return;
 }
+
 void Emitter::visit(ASTTupleDeconstruction *node) {
   emit_line_directive(node);
-  if (node->op == TType::ColonEquals) {
-    (*ss) << "auto [";
-    for (auto &iden : node->idens) {
-      (*ss) << iden->value.get_str();
-      if (iden != node->idens.back()) {
-        (*ss) << ", ";
-      }
+
+  auto type = global_get_type(node->resolved_type);
+
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto block = node->declaring_block;
+    if (!block) {
+      throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
+                  node->source_range);
     }
-    (*ss) << "] = ";
+    auto id = block.get()->temp_iden_idx++;
+    std::string temp_id = "$temp_tuple$" + std::to_string(id++);
+    (*ss) << "auto " << temp_id << " = ";
     node->right->accept(this);
     (*ss) << ";\n";
+
+    if (node->op == TType::ColonEquals) {
+      for (size_t i = 0; i < node->idens.size(); ++i) {
+        (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
+    } else {
+      for (size_t i = 0; i < node->idens.size(); ++i) {
+        (*ss) << node->idens[i]->value.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
+    }
   } else {
-    (*ss) << "std::tie(";
-    for (auto &iden : node->idens) {
-      (*ss) << iden->value.get_str();
-      if (iden != node->idens.back()) {
-        (*ss) << ", ";
+    auto scope = type->get_info()->scope;
+    auto index = 0;
+    static int temp_idx = 0;
+    std::string identifier = "$deconstruction$"+ std::to_string(temp_idx++); 
+    (*ss) << to_cpp_string(type) << " " << identifier << " = ";
+    node->right->accept(this);
+    semicolon();
+
+    for (const auto name : scope->ordered_symbols) {
+      auto symbol = scope->local_lookup(name);
+      if (symbol->is_function()) {
+        continue;
+      }
+      if (node->op == TType::ColonEquals) {
+        (*ss) << to_cpp_string(global_get_type(symbol->type_id)) << " " << node->idens[index++]->value.get_str() << " = ";
+        (*ss) << identifier << "." << name.get_str() << ";\n";
+      } else {
+        (*ss) << node->idens[index++]->value.get_str() << " = ";
+        (*ss) << identifier << "." << name.get_str() << ";\n";
       }
     }
-    (*ss) << ") = ";
-    node->right->accept(this);
-    (*ss) << ";\n";
   }
-  return;
-};
+}
 
 // TODO: remove me, add explicit casting, at least for non-void pointers.
 // I don't mind implicit casting to void*/u8*
@@ -889,64 +1180,29 @@ void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
     (*ss) << "(" << to_cpp_string(type) << ")";
 }
 
-std::string Emitter::get_function_pointer_dynamic_array_declaration(const std::string &type_string,
-                                                                    const std::string &name, Type *type) {
-  //? type string will equal something like void(*)();
-  //? we need to emit _array<void(*)()>
-  //? or possibly _array<_array<void(*)()>*>
-
-  // TODO: remove both of these hacks and address the real problem. These are just patches to cover most cases.
-  // It shouldn't be bad finding the real problem
-  // #define SLIGHTLY_AWFUL_HACK
-  // #ifdef SLIGHTLY_AWFUL_HACK
-  //   std::string string = "_array"; // We just can use C++'s type inference on generics to take care of this.
-  //   // This probably won't work for nested arrays
-  // #elif defined(TERRIBLE_HACK)
-  //   // We could just purge off the problematic characters?
-  //   // Much better solution would be fix the codegen where this is happening, But I have no freaking idea how to do
-  //   that. auto string = to_cpp_string(type->get_ext(), type_string); size_t pos = 0; while ((pos = string.find(")*>",
-  //   pos)) != std::string::npos) {
-  //     string.replace(pos, 3, ")>");
-  //     pos += 2;
-  //   }
-  // #endif
-  auto string = to_cpp_string(type->get_ext(), type_string);
-
-  if (!string.contains(' ' + name + ' ')) {
-    return string + ' ' + name;
-  } else {
-    return string;
-  }
-}
-
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   std::stringstream tss;
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
-    // Fixed array fn*[10]();
+
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
-      // Dynamic array. fn*[]();
-    } else if (ext.is_array()) {
-      auto type_string = get_function_pointer_type_string(type, nullptr);
-      return get_function_pointer_dynamic_array_declaration(type_string, name, type);
     }
+
     return get_function_pointer_type_string(type, &identifier);
   }
-  tss << type->get_base().get_str();
+  auto base = type->get_base().get_str();
+  ;
+  tss << to_cpp_string(global_get_type(type->get_element_type()));
   if (!type->get_ext().is_fixed_sized_array()) {
     tss << name << ' ';
   }
   bool emitted_iden = false;
   for (const auto ext : type->get_ext().extensions) {
-    if (ext.type == TYPE_EXT_ARRAY) {
-      std::string current = tss.str();
-      tss.clear();
-      tss << "_array<" << current << ">";
-    } else if (ext.type == TYPE_EXT_POINTER) {
+    if (ext.type == TYPE_EXT_POINTER) {
       tss << "*";
-    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
+    } else if (ext.type == TYPE_EXT_ARRAY) {
       if (!emitted_iden) {
         emitted_iden = true;
         tss << ' ' << name;
@@ -957,165 +1213,13 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   return tss.str();
 }
 
-std::string get_format_str(int type_id, ASTNode *node) {
-  auto type = global_get_type(type_id);
-  // We just assume that the type-checker has validated that this struct has a
-  // to_string() function
-
-  if (type->is_kind(TYPE_TUPLE)) {
-    auto info = type->get_info()->as<TupleTypeInfo>();
-    std::string format_str = "<";
-    int i = 0;
-    for (const auto &t : info->types) {
-      format_str += get_format_str(t, node);
-      if (i != info->types.size() - 1) {
-        format_str += ", ";
-      }
-      ++i;
-    }
-    format_str += ">";
-    return format_str;
-  }
-
-  if (type->is_kind(TYPE_STRUCT)) {
-    return "%s";
-  }
-  if (type->id == charptr_type() || (type->get_base() == "string" && type->get_ext().has_no_extensions())) {
-    return "%s";
-  }
-  if (type->get_ext().is_pointer()) {
-    return "%p";
-  }
-  if (type->id == bool_type()) {
-    return "%s";
-  }
-  if (type->is_kind(TYPE_SCALAR)) {
-    if (type->id == char_type()) {
-      return "%c";
-    } else if (type->id == s8_type() || type->id == s16_type() || type->id == s32_type() || type->id == u8_type() ||
-               type->id == u16_type() || type->id == u32_type() || type->id == int_type()) {
-      return "%d";
-    } else if (type->id == s64_type() || type->id == u64_type()) {
-      return "%ld";
-    } else if (type->id == float_type() || type->id == float32_type()) {
-      return "%f";
-    } else if (type->id == float64_type()) {
-      return "%lf";
-    } else if (type->id == bool_type()) {
-      return "%d";
-    }
-  }
-  if (type->is_kind(TYPE_ENUM)) {
-    return "%d";
-  }
-  throw_error(std::format("Cannot deduce a format specifier for interpolated "
-                          "string. type: {}",
-                          type->to_string()),
-              node->source_range);
-}
-
-// TODO: This needs a lot of work, front to back.
-// Parsing, lexing, and emitting.
-void Emitter::interpolate_string(ASTLiteral *node) {
-  emit_line_directive(node);
-
-  std::string str;
-  auto current = node->interpolated_string_root;
-  std::stringstream interp_ss;
-
-  while (current) {
-    interp_ss << current->prefix.get_str();
-    if (current->expression) {
-      auto type_id = current->expression->resolved_type;
-      interp_ss << get_format_str(type_id, node);
-    }
-    current = current->next;
-  }
-
-  (*ss) << "[&] -> string { char* buf = new char[1024];\nsprintf(buf, \"" << interp_ss.str() << "\",";
-
-  current = node->interpolated_string_root;
-  while (current) {
-    if (current->expression) {
-      auto type_id = current->expression->resolved_type;
-      auto type = global_get_type(type_id);
-
-      const auto interpolate_to_string_struct_union = [&](Scope *scope) {
-        auto sym = scope->lookup("to_string");
-
-        if (!sym)
-          throw_error("Cannot use a struct in an interpolated string without defining a "
-                      "`to_string` function that returns either a char* or a string",
-                      current->expression->source_range);
-
-        auto sym_ty = static_cast<FunctionTypeInfo *>(global_get_type(sym->type_id)->get_info());
-        auto return_ty = global_get_type(sym_ty->return_type);
-        auto param_0 = global_get_type(sym_ty->parameter_types[0]);
-        auto takes_pointer = param_0->get_ext().is_pointer();
-        auto &extensions = type->get_ext();
-        auto name = type->get_base();
-
-        if (extensions.back_type() == TYPE_EXT_POINTER) {
-          (*ss) << name.get_str() << "_to_string(";
-          if (!takes_pointer) {
-            (*ss) << "*";
-          }
-          current->expression->accept(this);
-          (*ss) << ")";
-        } else {
-          (*ss) << name.get_str() << "_to_string(";
-          if (takes_pointer) {
-            (*ss) << "&";
-          }
-          current->expression->accept(this);
-          (*ss) << ")";
-        }
-
-        if (return_ty->get_base() == "string" && return_ty->get_ext().has_no_extensions()) {
-          (*ss) << ".data";
-        }
-      };
-
-      if (type->id == bool_type()) {
-        current->expression->accept(this);
-        (*ss) << " ? \"true\" : \"false\"";
-      } else if (type->get_base() == "string" && type->get_ext().has_no_extensions()) {
-        current->expression->accept(this);
-        (*ss) << ".data";
-      } else if (type->is_kind(TYPE_STRUCT)) {
-        auto info = (type->get_info()->as<StructTypeInfo>());
-        interpolate_to_string_struct_union(info->scope);
-      } else if (type->is_kind(TYPE_TUPLE)) {
-        auto info = type->get_info()->as<TupleTypeInfo>();
-        for (int i = 0; i < info->types.size(); ++i) {
-          (*ss) << "std::get<" << std::to_string(i) << ">(";
-          current->expression->accept(this);
-          (*ss) << ")";
-          if (i != info->types.size() - 1) {
-            (*ss) << ", ";
-          }
-        }
-      } else {
-        current->expression->accept(this);
-      }
-      if (current->next && current->next->expression) {
-        (*ss) << ", ";
-      }
-    }
-    current = current->next;
-  }
-
-  (*ss) << ");\n auto str = string(); str.data = buf; str.length = "
-           "strlen(buf); return str; }()";
-}
-
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
 std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
   auto type_prefix = std::string{"*"};
 
   if (!type->is_kind(TYPE_FUNCTION)) {
-    throw_error("Internal compiler error: tried to get a function pointer from "
+    throw_error("internal compiler error: tried to get a function pointer from "
                 "a non-function type",
                 {});
   }
@@ -1146,7 +1250,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
   std::stringstream ss;
-  ss << "new Field { " << std::format(".name = \"{}\", ", name)
+  ss << "(Field) { " << std::format(".name = \"{}\", ", name)
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
@@ -1154,11 +1258,18 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     ss << std::format(".offset = offsetof({}, {})", parent_type->get_base().get_str(), name);
   }
 
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    auto symbol = parent_type->get_info()->as<EnumTypeInfo>()->scope->local_lookup(name);
+    auto value = evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
+    ss << std::format(".enum_value = {}", value.integer);
+  }
+
   ss << " }";
   return ss.str();
 }
 
 std::string Emitter::get_elements_function(Type *type) {
+  //! We have to remove these lambdas so we can compile down to C.
   auto element_type = global_get_type(type->get_element_type());
   if (!type->get_ext().is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
@@ -1192,14 +1303,20 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
+  // TODO: refactor this for new String/str types?
+  // And C string.
+  // For now we'll just say it's u8* only.
+  if (type->id == root_scope->find_type_id("u8", {{{TYPE_EXT_POINTER}}})) {
+    return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
+  }
   switch (type->kind) {
     case TYPE_SCALAR: {
-      auto sint = type->id == int_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
+      auto sint = type->id == s32_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
                   type->id == s64_type();
 
       auto uint = type->id == u8_type() || type->id == u16_type() || type->id == u32_type() || type->id == u64_type();
 
-      auto floating_pt = type->id == float32_type() || type->id == float64_type() || type->id == float_type();
+      auto floating_pt = type->id == f32_type() || type->id == f64_type();
       if (sint) {
         kind_flags |= TYPE_FLAGS_SIGNED;
       } else if (uint) {
@@ -1212,8 +1329,6 @@ std::string get_type_flags(Type *type) {
         kind_flags |= TYPE_FLAGS_FLOAT;
       } else if (type->id == bool_type()) {
         kind_flags |= TYPE_FLAGS_BOOL;
-      } else if (type->get_base() == "string") {
-        kind_flags |= TYPE_FLAGS_STRING;
       }
       break;
     }
@@ -1245,14 +1360,11 @@ std::string get_type_flags(Type *type) {
       case TYPE_EXT_POINTER:
         kind_flags |= TYPE_FLAGS_POINTER;
         break;
-      case TYPE_EXT_FIXED_ARRAY:
-        kind_flags |= TYPE_FLAGS_FIXED_ARRAY;
-        break;
       case TYPE_EXT_ARRAY:
         kind_flags |= TYPE_FLAGS_ARRAY;
         break;
       case TYPE_EXT_INVALID:
-        throw_error("Internal Compiler Error: Extension type not set.", {});
+        throw_error("internal compiler error: Extension type not set.", {});
         break;
     }
   }
@@ -1262,33 +1374,108 @@ std::string get_type_flags(Type *type) {
 std::string Emitter::get_type_struct(Type *type, int id, Context &context, const std::string &fields) {
   std::stringstream ss;
 
+  if (!type) {
+    throw_error("internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
+  }
+
   auto kind = 0;
 
-  ss << "_type_info[" << id << "] = new Type {" << ".id = " << id << ", "
+  ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
+  ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
 
   if (!type->is_kind(TYPE_ENUM))
     ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
 
-  ss << get_type_flags(type) << ",\n"
-     << ".fields = " << fields << ",\n";
+  ss << get_type_flags(type) << ",\n";
 
-  if (type->get_ext().is_array() || type->get_ext().is_fixed_sized_array()) {
-    ss << get_elements_function(type) << ",\n";
-  }
+  // ! We can't use this either: it uses a lambda.
+  //   if (type->get_ext().is_fixed_sized_array()) {
+  //     ss << get_elements_function(type) << ",\n";
+  //   }
 
-  if (type->get_ext().is_array() || type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
+  if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
-    ss << ".element_type = nullptr,\n";
+    ss << ".element_type = NULL,\n";
   }
 
   ss << " };";
+
+  auto get_fields_init_statements = [&] {
+    std::stringstream fields_ss;
+    if (type->kind == TYPE_STRUCT) {
+      auto info = type->get_info();
+      if (info->scope->symbols.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info->scope->fields_count();
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &tuple : info->scope->symbols) {
+        auto &[name, sym] = tuple;
+
+        if (name == "this")
+          continue;
+
+        auto t = global_get_type(sym.type_id);
+        // TODO: handle methods separately
+        if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+          continue;
+
+        if (!t)
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(name.get_str(), t, type, context) << ";\n";
+        ++it;
+      }
+    } else if (type->kind == TYPE_ENUM) {
+      // TODO: we have to fix this!.
+      auto info = type->get_info();
+      if (info->scope->ordered_symbols.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info->scope->fields_count();
+      
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &field : info->scope->ordered_symbols) {
+        auto symbol = info->scope->local_lookup(field);
+        if (!symbol || symbol->is_function()) continue;
+
+        auto t = global_get_type(s32_type());
+
+        if (!t) {
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
+        }
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(field.get_str(), t, type, context) << ";\n";
+        ++it;
+      }
+    }
+    return fields_ss.str();
+  };
+
+  ss << get_fields_init_statements();
   context.type_info_strings.push_back(ss.str());
-  return std::format("_type_info[{}]", id);
+  return std::format("_type_info.data[{}]", id);
 }
 
 std::string Emitter::to_type_struct(Type *type, Context &context) {
+  if (!type) {
+    throw_error("internal compiler error: Reflection system got a null type", {});
+  }
+
   auto id = type->id;
 
   static bool *type_cache = [] {
@@ -1298,75 +1485,12 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
   }();
 
   if (type_cache[id]) {
-    return std::format("_type_info[{}]", id);
+    return std::format("_type_info.data[{}]", id);
   }
 
   type_cache[id] = true;
 
-  // TODO:
-  // ! This needs serious improvement to be really really useful. It's a great
-  // starting point, ! but it could be far better.
-
-  std::stringstream fields_ss;
-  if (type->kind == TYPE_STRUCT) {
-    auto info = type->get_info();
-    if (info->scope->symbols.empty()) {
-      return get_type_struct(type, id, context, "{}");
-    }
-    fields_ss << "{";
-    int count = info->scope->symbols.size();
-    int it = 0;
-    for (const auto &tuple : info->scope->symbols) {
-      auto &[name, sym] = tuple;
-
-      if (name == "this")
-        continue;
-
-      auto t = global_get_type(sym.type_id);
-      // TODO: handle methods separately
-      if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
-        continue;
-
-      if (!t)
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      fields_ss << get_field_struct(name.get_str(), t, type, context);
-      ++it;
-      if (it < count) {
-        fields_ss << ", ";
-      }
-    }
-    fields_ss << "}";
-  } else if (type->kind == TYPE_ENUM) {
-    // TODO: we have to fix this!.
-    auto info = type->get_info();
-    if (info->scope->ordered_symbols.empty()) {
-      return get_type_struct(type, id, context, "{}");
-    }
-    fields_ss << "{";
-    for (const auto &field : info->scope->ordered_symbols) {
-      auto t = global_get_type(s32_type());
-
-      if (!t) {
-        throw_error("Internal Compiler Error: Type was null in reflection "
-                    "'to_type_struct()'",
-                    {});
-      }
-
-      fields_ss << get_field_struct(field.get_str(), t, type, context);
-
-      if (field != info->scope->ordered_symbols.back()) {
-        fields_ss << ",\n";
-      }
-    }
-
-    fields_ss << "}";
-  } else {
-    return get_type_struct(type, id, context, "{}");
-  }
-
-  return get_type_struct(type, id, context, fields_ss.str());
+  return get_type_struct(type, id, context, "{}");
 }
 
 bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
@@ -1376,8 +1500,8 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   }
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "__COMPILER_GENERATED_TEST(\"" << node->name.get_str() << "\", " << node->name.get_str()
-                            << "),";
+    visitor->test_functions << "(__COMPILER_GENERATED_TEST){.name = \"" << node->name.get_str() << "\", .function = &"
+                            << node->name.get_str() << "},";
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
@@ -1389,18 +1513,9 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
 
 std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
   std::stringstream ss;
-
-  // TODO: we need to fix the emitting of 'c_string' as const char*,
-  // right now it's fricked up.
   ss << base;
-
   for (const auto ext : extensions.extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
-      std::string current = ss.str();
-      ss.str("");
-      ss.clear();
-      ss << "_array<" << current << ">";
-    } else if (ext.type == TYPE_EXT_FIXED_ARRAY) {
       ss << "[" << std::to_string(ext.array_size) << "]";
     } else if (ext.type == TYPE_EXT_POINTER) {
       ss << "*";
@@ -1413,13 +1528,7 @@ std::string Emitter::get_cpp_scalar_type(int id) {
   auto type = global_get_type(id);
   std::string name = "";
 
-  if (id == c_string_type()) {
-    name = "const char";
-  } else if (type->get_base() == "u8" && type->get_ext().is_pointer()) {
-    name = "char";
-  } else {
-    return to_cpp_string(type);
-  }
+  return to_cpp_string(type);
 
   if (type->get_ext().has_no_extensions()) {
     return name;
@@ -1442,14 +1551,13 @@ std::string Emitter::to_cpp_string(Type *type) {
     }
     case TYPE_TUPLE: {
       auto info = (type->get_info()->as<TupleTypeInfo>());
-      output = "std::tuple<";
+      output = "$tuple";
       for (int i = 0; i < info->types.size(); ++i) {
-        output += to_cpp_string(global_get_type(info->types[i]));
+        output += std::to_string(info->types[i]);
         if (i != info->types.size() - 1) {
-          output += ", ";
+          output += "$";
         }
       }
-      output += ">";
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
@@ -1475,35 +1583,30 @@ void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nu
 }
 
 void Emitter::visit(ASTScopeResolution *node) {
-  bool emitted = false;
-  if (node->base->get_node_type() == AST_NODE_TYPE) {
-    auto t = static_cast<ASTType *>(node->base);
-    auto type = global_get_type(t->resolved_type);
+  auto type = global_get_type(node->base->resolved_type);
+  // for static function aclls and enum access, but this probably encompasses all of the usage.
+  // The reason we check here, is because the left of this may be another Scope Resolution node.
+  // This should probably be a lot more robust
+  if (node->base->get_node_type() == AST_NODE_IDENTIFIER || node->base->get_node_type() == AST_NODE_TYPE) {
     if (type->is_kind(TYPE_ENUM)) {
       (*ss) << type->get_base().get_str();
-      emitted = true;
+    } else {
+      (*ss) << "$" + std::to_string(type->id);
     }
-  }
-  if (!emitted) {
+  } else {
     node->base->accept(this);
   }
-  auto op = "_"; // ! this may cause issues, but this is going to be a permanent change. we obviously can't lower to C,
-                 // when we use C++ features like `::`
+  auto op = "_";
   (*ss) << op << node->member_name.get_str();
   return;
 }
 
 void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
-    for (auto &instantiation : node->generic_instantiations) {
-      instantiation.node->accept(this);
-    }
+    emit_generic_instantiations(node->generic_instantiations);
     return;
   }
 
-  // !! If we visit this here, we get 'use of undeclared identifier T'
-  // !! if we just use the resolved type, we get Type::invalid_id.
-  // !! it's a lose lose, what is causing this?
   auto target = global_get_type(node->target->resolved_type);
 
   if (!target) {
@@ -1528,48 +1631,53 @@ void Emitter::visit(ASTCast *node) {
 }
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
-
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+  if (node->is_emitted) {
+    return;
+  }
+
+  node->is_emitted = true;
+
+  emit_line_directive(node);
+
   (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
   auto name = node->name.get_str();
-  for (const auto &member : node->members) {
-    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      auto subtype_name = name + "_" + struct_node->name.get_str();
-      (*ss) << "typedef struct " << subtype_name << "{\n";
-      for (const auto &field : struct_node->fields) {
+
+  for (const auto &variant : node->variants) {
+    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "typedef struct " << subtype_name << " {\n";
+      for (const auto &field : variant.struct_declarations) {
         field->accept(this);
         (*ss) << ";\n";
       }
-      for (const auto &$union : struct_node->subtypes) {
-        $union->accept(this);
-      }
       (*ss) << "} " << subtype_name << ";\n";
-    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration *>(member);
-      auto subtype_name = name + "_" + declaration_node->name.get_str();
-
+    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+      auto subtype_name = name + "_" + variant.name.get_str();
       (*ss) << "typedef ";
-      declaration_node->type->accept(this);
+      variant.tuple->accept(this);
       (*ss) << " " << subtype_name << ";\n";
     }
   }
 
-  (*ss) << "typedef struct " << node->name.get_str() << "{\n int index;\n union {\n";
+  (*ss) << "typedef struct " << node->name.get_str() << " {\n";
+  (*ss) << "  int index;\n";
+  (*ss) << "  union {\n";
 
   int n = 0;
-  for (const auto &member : node->members) {
-    if (member->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
-      auto struct_node = static_cast<ASTStructDeclaration *>(member);
-      (*ss) << name + "_" + struct_node->name.get_str() << " $index_" << std::to_string(n) << ";\n";
-    } else if (member->get_node_type() == AST_NODE_DECLARATION) {
-      auto declaration_node = static_cast<ASTDeclaration *>(member);
-      auto alias = name + "_" + declaration_node->name.get_str();
-      (*ss) << alias << " $index_" << std::to_string(n) << ";\n";
+  for (const auto &variant : node->variants) {
+    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
+    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+      auto subtype_name = name + "_" + variant.name.get_str();
+      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
     }
     n++;
   }
-  (*ss) << "\n };\n} " << node->name.get_str() << " ;\n";
+
+  (*ss) << "  };\n";
+  (*ss) << "} " << node->name.get_str() << ";\n";
   return;
 }
 
@@ -1578,9 +1686,9 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
   auto defer_block = defer_blocks.rbegin();
   while (defer_block->type != type) {
     if (defer_block == defer_blocks.rend()) {
-      throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+      throw_error("internal compiler error: could not find defer block type in stack", {});
     }
-    for (auto defer : defer_block->defers){
+    for (auto defer : defer_block->defers) {
       defer->statement->accept(this);
       semicolon();
       newline();
@@ -1588,9 +1696,9 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
     defer_block++;
   }
   if (defer_block == defer_blocks.rend()) {
-    throw_error("Internal Compiler Error: could not find defer block type in stack", {});
+    throw_error("internal compiler error: could not find defer block type in stack", {});
   }
-  for (auto defer : defer_block->defers){
+  for (auto defer : defer_block->defers) {
     defer->statement->accept(this);
     semicolon();
     newline();
@@ -1615,15 +1723,11 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
   auto emit_various_function_declarations = [&] {
     if (!node->generic_parameters.empty()) {
-      for (auto &instantiation : node->generic_instantiations) {
-        instantiation.node->accept(this);
-      }
+      emit_generic_instantiations(node->generic_instantiations);
       return;
     }
 
-    auto is_local = (node->flags & FUNCTION_IS_LOCAL) != 0;
-
-    if (node->name != "main" && !is_local) {
+    if (node->name != "main") {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
@@ -1633,20 +1737,13 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       }
     }
 
-    // local function
-    if (is_local) {
-      emit_local_function(node);
-      return;
-    }
-
     if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-      (*ss) << "extern \"C\" ";
+      (*ss) << "extern  ";
     }
 
     std::string name;
     if (type_context) {
-      auto type = global_get_type(type_context.get()->resolved_type);
-      name += to_cpp_string(type) + "_";
+      name += "$" + std::to_string(type_context.get()->resolved_type) + "_";
     }
     name += node->name.get_str();
     if (!node->generic_arguments.empty()) {
@@ -1662,6 +1759,18 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       emit_function_signature_and_body(name);
     }
   };
+
+  if (node->generic_instantiations.empty()) {
+    // Emit all the lambdas that this function depends on.
+    for (const auto &lambda : node->lambdas) {
+      emit_line_directive(lambda);
+      lambda->return_type->accept(this);
+      (*ss) << ' ' << lambda->unique_identifier.get_str() << ' ';
+      lambda->params->accept(this);
+      lambda->block->accept(this);
+      newline();
+    }
+  }
 
   emit_line_directive(node);
 
@@ -1688,6 +1797,30 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
 void Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->expression && (node->expression.get()->get_node_type() == AST_NODE_SWITCH ||
+                           node->expression.get()->get_node_type() == AST_NODE_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->expression.get()->accept(this);
+
+    if (emitting_function_with_defer ||
+        (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+      (*ss) << "return " << defer_return_value_key << ";\n";
+    } else {
+      (*ss) << "return " << str << ";\n";
+    }
+    return;
+  }
+
   if (emitting_function_with_defer ||
       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
@@ -1702,12 +1835,16 @@ void Emitter::visit(ASTReturn *node) {
       (*ss) << " " << defer_return_value_key;
     }
     (*ss) << ";\n";
-  } else {
+  } else if (cf_expr_return_register.is_null() || node->expression.is_null()) {
     indented("return");
     if (node->expression.is_not_null()) {
       space();
       node->expression.get()->accept(this);
     }
+    (*ss) << ";\n";
+  } else {
+    (*ss) << *cf_expr_return_register.get() << " = ";
+    node->expression.get()->accept(this);
     (*ss) << ";\n";
   }
   return;
@@ -1725,14 +1862,12 @@ void Emitter::visit(ASTContinue *node) {
   indented("continue;\n");
 }
 
-void Emitter::visit(ASTDefer *node) {
-  defer_blocks.back().defers.push_back(node);
-}
+void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
 
 void Emitter::visit(ASTBlock *node) {
   emit_line_directive(node);
   (*ss) << (" {\n");
-  indentLevel++;
+  indent_level++;
   ctx.set_scope(node->scope);
 
   defer_blocks.emplace_back();
@@ -1750,20 +1885,74 @@ void Emitter::visit(ASTBlock *node) {
   emit_deferred_statements(DEFER_BLOCK_TYPE_OTHER);
   defer_blocks.pop_back();
 
-  indentLevel--;
+  indent_level--;
   indented("}");
   ctx.exit_scope();
   return;
 }
-void Emitter::visit(ASTLambda *node) {
-  (*ss) << "+[]";
-  node->params->accept(this);
-  (*ss) << " -> ";
-  node->return_type->accept(this);
-  node->block->accept(this);
-}
+
+void Emitter::visit(ASTLambda *node) { (*ss) << node->unique_identifier.get_str(); }
 
 // This should never get hit.
 void Emitter::visit(ASTWhere *node) {
-  throw_error("Internal compiler error: 'where' expression was visited in the emitter", node->source_range);
+  throw_error("internal compiler error: 'where' expression was visited in the emitter", node->source_range);
+}
+
+void Emitter::emit_tuple_dependants(std::vector<int> &types) {
+  static std::unordered_set<int> emitted_tuples;
+
+  while (!types.empty()) {
+    auto type_id = types.back();
+    types.pop_back();
+
+    if (emitted_tuples.contains(type_id)) {
+      continue;
+    }
+    emitted_tuples.insert(type_id);
+
+    auto type = global_get_type(type_id);
+    auto name = to_cpp_string(type);
+
+    (*ss) << "typedef struct {";
+    auto info = type->get_info()->as<TupleTypeInfo>();
+    for (int i = 0; i < info->types.size(); ++i) {
+      auto type = global_get_type(info->types[i]);
+      if (type->is_kind(TYPE_FUNCTION)) {
+        (*ss) << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+      } else {
+        auto name = to_cpp_string(type);
+        (*ss) << name << " $" << std::to_string(i) << ";\n";
+      }
+    }
+    (*ss) << "} " << name << ";\n";
+    // We have to do this recursively for nested tuples.
+    emit_tuple_dependants(type->tuple_dependants);
+  }
+}
+
+void Emitter::visit(ASTSize_Of *node) {
+  (*ss) << "sizeof(";
+  node->target_type->accept(this);
+  (*ss) << ")";
+}
+
+void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
+                                     ASTExpr *left, ASTExpr *right) {
+  auto function_type = find_operator_overload(op, left_ty, operation);
+  auto call = ASTCall{};
+  auto sr = ASTDotExpr{};
+  auto left_id = ASTIdentifier{};
+  sr.base = left;
+  sr.member_name = get_operator_overload_name(op, operation);
+  call.function = &sr;
+  auto args = ASTArguments{};
+  if (right) {
+    args.arguments = {right};
+  }
+  call.arguments = &args;
+  call.accept(&typer);
+  call.accept(this);
+  sr.source_range = range;
+  call.arguments->source_range = range;
+  call.source_range = range;
 }

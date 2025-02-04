@@ -1,28 +1,28 @@
 
-#import core;
+;
 #import net;
 
 PORT : u16 = 8080;
 
-chatting :: fn(connfd: int) {
-  buff : char[80];
+chatting :: fn(connfd: s32) {
+  buff : u8[80];
   while true {
     memset(buff, 0, 80);
     read(connfd, buff, 80);
-    println($"From client: {buff as char*}   To client : ");
+    println($"From client: {buff as u8*}   To client : ");
     memset(buff, 0, 80);
-    n: int;
-    while n < 80 && ((buff[n++] = getchar()) != '\n') {}
+    n: s32;
+    while n < 80 && ((buff[n++] = getu8()) != '\n') {}
     write(connfd, buff, 80);
-    if (strncmp("exit"c, buff as char*, 4) == 0) {
-      printf("Server Exit...\n"c);
+    if (strncmp("exit", buff as u8*, 4) == 0) {
+      printf("Server Exit...\n");
       break;
     }
   }
 }
 
-main :: fn() -> int {
-  sockfd : int = socket(AF_INET, SocketType::Stream, 0);
+main :: fn() -> s32 {
+  sockfd : s32 = socket(AF_INET, SocketType::Stream, 0);
 
   if sockfd == -1 {
     panic("socket creation failed...\n");
@@ -55,7 +55,7 @@ main :: fn() -> int {
   cli: sockaddr_in;
 
   cliaddr : sockaddr* = &cli;
-  connfd: int = accept(sockfd, cliaddr, &len);
+  connfd: s32 = accept(sockfd, cliaddr, &len);
 
   if connfd < 0 {
     panic("server accept failed...");

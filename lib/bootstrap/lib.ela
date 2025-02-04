@@ -1,0 +1,179 @@
+#include "typedef.ela"
+#include "interfaces.ela";
+#include "numeric.ela"; // impls for numeric types.
+#include "range.ela";
+#include "libc.ela";
+#include "memory.ela";
+#include "list.ela";
+#include "slice.ela";
+#include "str.ela";
+#include "String.ela";
+#include "reflection.ela";
+
+
+assert :: fn(message: str, condition: bool) {
+  if !condition {
+    printf("assertion failed: %s\n"c, message.data);
+    exit(1);
+  }
+}
+
+assert_eq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | Eq {
+  if a != b {
+    printf("assertion failed: %s\n"c, message.data);
+    exit(1);
+  }
+}
+
+assert_neq :: fn![T](message: str, a: T, b: T) where T is Is_Numeric | Eq {
+  if a == b {
+    printf("assertion failed: %s\n"c, message.data);
+    exit(1);
+  }
+}
+
+#alias Panic_Handler :: fn *(str);
+
+panic_handler: Panic_Handler;
+
+set_panic_handler :: fn(handler: Panic_Handler) {
+  panic_handler = handler;
+}
+
+panic :: fn(msg: str) {
+  if !panic_handler {
+    #ifndef FREESTANDING {
+      panic_handler = fn(msg: str) {
+        printf("panic(): %s\n"c, msg.data);
+        exit(1);
+      };
+    } else {
+      panic_handler = fn(msg: str) {
+        // idk, segfault on panic?
+        n : s32 * = null;
+        *n = 10;
+      }
+    }
+  }
+  panic_handler(msg);
+}
+
+#ifdef FREESTANDING  {
+  Env :: struct {
+    m_args: str*,
+    length: u64,
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn(self*) -> (str*, u64) {
+      return (self.m_args, self.length);
+    }
+    initialize :: fn(argc: s32, argv: str*) {
+      self := #self::current();
+      self.m_args = argv;
+      self.length = argc;
+    }
+  }
+} else {
+  Env :: struct {
+    m_args: str[],
+  };
+  impl Env {
+    current :: fn() -> #self* {
+      #static self: #self;
+      return &self;
+    }
+    args :: fn() -> str[] {
+      return #self::current().m_args.clone();
+    }
+    initialize :: fn(argc: s32, argv: str*) {
+      self := #self::current();
+      for i in 0..argc {
+        self.m_args.push(argv[i]);
+      }
+    }
+  }
+}
+
+impl As_Byte_Slice for u32 {
+  as_byte_slice :: fn(self) -> Slice![u8] {
+    return {
+      data: &self,
+      length: 4,
+    }
+  }
+}
+
+#import utf8;
+
+// Define the UTF8_Enumerator struct
+UTF8_Enumerator :: struct {
+  data: Slice![u8],            // The input byte slice
+  byte_position: s32,   // Current position in the byte slice
+  buffer: u32[2],       // Buffer to hold decoded code points
+  buffer_length: s32,   // Number of valid code points in the buffer
+}
+
+impl UTF8_Enumerator {
+  preload :: fn(self*) -> void {
+    if self.buffer_length == 0 {
+      ch, advance := utf8_to_code_point(self.data.slice(self.byte_position..self.byte_position + 4));
+      self.byte_position += advance; // Advance the byte position
+      self.buffer[0] = ch;           // Store the decoded code point in the buffer
+      self.buffer_length = 1;        // Update the buffer length
+    }
+  }
+}
+
+impl Enumerator![u32] for UTF8_Enumerator {
+  // Return the current code point
+  current :: fn(self) -> u32 {
+    self.preload();
+    return self.buffer[0];
+  }
+
+  // Move to the next code point
+  next :: fn(self*) -> void {
+    self.preload();
+
+    // Shift the buffer to prepare for the next code point
+    if self.buffer_length > 0 {
+      self.buffer[0] = self.buffer[1]; 
+      self.buffer_length -= 1;
+    }
+
+    if self.byte_position < self.data.length {
+      ch, advance := utf8_to_code_point(self.data.slice(self.byte_position..self.byte_position + 4));
+      self.byte_position += advance; // Advance the byte position
+      self.buffer[1] = ch;           // Store the decoded code point in the buffer
+      self.buffer_length += 1;       // Update the buffer length
+    }
+  }
+
+  done :: fn(self) -> bool {
+    return self.byte_position >= self.data.length && self.buffer_length == 0;
+  }
+}
+
+impl String {
+  chars :: fn(self) -> UTF8_Enumerator![String] {
+    return UTF8_Enumerator![String] {
+      data: self.as_byte_slice(),
+      byte_position: 0,
+      buffer_length: 0,
+    };
+  }
+}
+
+impl str {
+  chars :: fn(self) -> UTF8_Enumerator![String] {
+    return UTF8_Enumerator![String] {
+      data: self.as_byte_slice(),
+      byte_position: 0,
+      buffer_length: 0,
+    };
+  }
+}

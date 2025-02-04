@@ -7,7 +7,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
     case AST_NODE_IDENTIFIER: {
       auto name = static_cast<ASTIdentifier*>(node);
       auto symbol = ctx.scope->lookup(name->value);
-      if (symbol->declaring_node.is_not_null() && symbol->declaring_node.get()->is_expr()) {
+      if (symbol && symbol->declaring_node.is_not_null() && symbol->declaring_node.get()->is_expr()) {
         return evaluate_constexpr((ASTExpr*)symbol->declaring_node.get(), ctx);
       } else {
         throw_error("unable to evaluate value of symbol", node->source_range);
@@ -99,5 +99,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
     } break;
     default:
       throw_error("Invalid node in constant expression", node->source_range);
+      return {};
   }
+  return {};
 }

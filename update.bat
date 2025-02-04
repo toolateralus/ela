@@ -21,7 +21,6 @@ if not exist "%TARGET_DIR%" (
 :: Copy files to the target directory
 echo Copying files...
 xcopy /y /e "%SOURCE_LIB%\*" "%TARGET_DIR%\"
-copy /y "%SOURCE_ELA_SOURCE%\boilerplate.hpp" "%TARGET_DIR%\boilerplate.hpp"
 
 echo Files copied successfully.
 

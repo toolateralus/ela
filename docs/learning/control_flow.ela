@@ -1,4 +1,4 @@
-#import core;
+;
 
 main :: fn() {
   /* If statements */
@@ -29,28 +29,28 @@ main :: fn() {
 
   /* For loops:  */
 
-  // C equivalent:  for (int i = 0; i < 100; ++i) {}
+  // C equivalent:  for (s32 i = 0; i < 100; ++i) {}
   for i in 0..100 {}
 
   // you can use any expression on the left or right of the range, as long as it's an s64 type.
   for i in 0..get_max() {}
   for _ in get_min()..get_max() + 100 {}
 
-  // C equivalent: for (int i = 100; i >= 0; --i) {}
+  // C equivalent: for (s32 i = 100; i >= 0; --i) {}
   // If the first (left) of the range is greater than the last (right)
   // it will implicitly iterate in reverse.
   for i in 100..0 {}
 
   // To control the increment in a range, you can use Range's initializer list.
 
-  // C equivalent: for (int i = 0; i < 100; i += 2) {}
+  // C equivalent: for (s32 i = 0; i < 100; i += 2) {}
   for i in Range{first: 0, last: 100, increment: 2} {}
 
-  // C equivalent: for (int i = 100; i >= 0; i -= 4) {}
+  // C equivalent: for (s32 i = 100; i >= 0; i -= 4) {}
   for i in Range{first: 100, last: 0, incrment: 4} {}
 
-  get_array :: fn() -> s32[] {
-    arr: s32[];
+  get_array :: fn() -> List![s32] {
+    arr: List![s32];
     for i in 0..100 {
       arr != i;
     }
@@ -93,7 +93,7 @@ main :: fn() {
 
   // In control flow, the expression body => has some interesting semantics. You can do an implicit return out of a function via a switch case,
   // if statement, etc, with the => operator.
-  func:: fn() -> int {
+  func:: fn() -> s32 {
     // so then this:
     if done() => 100;
 

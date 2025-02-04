@@ -36,7 +36,6 @@ set_target_properties(ela PROPERTIES
 
 # Set compiler flags based on the compiler and platform
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -Wall -Wextra -Werror")
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
@@ -45,14 +44,6 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Ob2 /DNDEBUG")
 endif()
 
-target_compile_definitions(ela PRIVATE MAX_NUM_TYPES=10000)
-
-# Use bear on Linux
-if (UNIX AND NOT APPLE)
-    add_custom_target(bear_build
-        COMMAND bear -- make -j${CMAKE_BUILD_PARALLEL_LEVEL}
-        WORKING_DIRECTORY ${CMAKE_BINARY_DIR}
-        COMMENT "Running bear to generate compilation database"
-    )
-    add_dependencies(bear_build ela)
+if(CMAKE_BUILD_TYPE STREQUAL "Debug")
+  target_compile_definitions(ela PRIVATE DEBUG DEBUG=1)
 endif()

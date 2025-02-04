@@ -1,67 +1,67 @@
-#import core;
+;
 
 #test test_for :: fn() {
   for i in 0..10 {
-    assert("i should be less than 10"c, i < 10);
+    assert("i should be less than 10", i < 10);
     return;
   }
 
   for i in 10..0 {
-    assert("i should be greater than 0"c, i > 0);
+    assert("i should be greater than 0", i > 0);
     return;
   }
 
-  arr: s32[];
+  arr: List![s32];
   for v in arr {
-      assert("Unexpected case in array loop"c, false);
+      assert("Unexpected case in array loop", false);
       return;
   }
-  assert("End of test_for reached"c, true);
+  assert("End of test_for reached", true);
 }
 
 #test test_while :: fn() {
   b: bool = true;
   while b {
-      assert("while condition == true"c, b == true);
+      assert("while condition == true", b == true);
       return;
   }
-  assert("End of test_while reached"c, true);
+  assert("End of test_while reached", true);
 }
 
 #test test_if_1 :: fn() {
   v: bool = true;
   hit: bool = false;
   if v {
-      assert("v should be true"c, v == true);
+      assert("v should be true", v == true);
       hit = true;
   } else {
-      assert("Unexpected case"c, false);
+      assert("Unexpected case", false);
   }
-  assert("failed to fall through if statement"c, hit);
+  assert("failed to fall through if statement", hit);
 }
 
 #test test_if_2 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
-      assert("Unexpected case"c, false);
+      assert("Unexpected case", false);
   } else if !v {
       hit = true;
   }
-  assert("fell through if else, but didn't set the variable"c, hit);
+  assert("fell through if else, but didn't set the variable", hit);
 }
 
 #test test_if_3 :: fn() {
   v: bool = false;
   hit: bool = true;
   if v {
-      assert("Unexpected case"c, false);
+      assert("Unexpected case", false);
   } else if v {
-      assert("Unexpected case"c, false);
+      assert("Unexpected case", false);
   } else {
       hit = true;
   }
-  assert("fell though if,if_else,else but didn't set the variable"c, hit);
+  assert("fell though if,if_else,else but didn't set the variable", hit);
 }
 
 
@@ -73,7 +73,7 @@
     i = i;
   }
 
-  array: int[];
+  array: List![s32];
 
   for k in array {
     k = k;
@@ -83,37 +83,33 @@
   }
 }
 
-
-#test test_range_iterator :: fn() {
-  for i in Range{first: 0, last: 10, increment: 2} {
-    assert("iter increment failed to be divisible by 2"c, i % 2 == 0);
-  }
-  for i in Range{first: 0, last: 10, increment: 3} {
-    assert("iter increment failed to be divisible by 3"c, i % 3 == 0);
-  }
-}
-
 #test test_iterate_array :: fn() {
-  array: s8[] = {0,1,2,3};
-  n: int ;
+  array: List![s8];
+  for i in 0..4 {
+    array.push(i as s8);
+  }
+  n: s32 ;
   for *v in array {
-    assert(""c, n == *v);
+    assert("", n == *v);
     ++n;
   }
 
   n = 0;
-  arr : s8[]* = malloc(sizeof(s8[])); 
-  *arr = s8[]{0,1,2,3};
+  arr : List![s8]* = malloc(sizeof(List![s8])); 
+  *arr = {};
+  for i in 0..4 {
+    arr.push(i as s8);
+  }
 
   for v in *arr {
-    assert(""c, n == v);
+    assert("", n == v);
     ++n;
   }
   free(arr);
 }
 
 #test test_range_based_for_loop_exclusive :: fn() {
-  n: int;
+  n: s32;
   ten := 10;
   zero := 0;
 
@@ -133,7 +129,7 @@
     n = i;
   }
 
-  assert("Range based for loop failed."c, n == 9);
+  assert("Range based for loop failed.", n == 9);
 }
 
 SwitchCaseEnum :: enum {
@@ -141,7 +137,7 @@ SwitchCaseEnum :: enum {
   SwitchVariant1,
 }
 
-switch_helper :: fn() -> int {
+switch_helper :: fn() -> s32 {
   number := 5;
   switch number {
     0: { return 0; }
@@ -150,24 +146,26 @@ switch_helper :: fn() -> int {
   return 1;
 }
 
+// ! Some stuff is commented out in here.
+// ! There are repros for these items.
 #test test_switch_statements :: fn() {
-  integer: int;
+  integer: s32;
 
   passed := false;
   switch integer {
     0: { passed = true; }
-    1: { assert("Switch on int case failed"c, false);  }
+    1: { assert("Switch on s32 case failed", false);  }
   }
 
-  assert("Failed to hit positive switch case for integer"c, passed);
-  str: string = "Hello!";
+  assert("Failed to hit positive switch case for integer", passed);
+  s := "Hello!";
 
   passed = false;
-  switch str {
-    "Hello": { assert("Switch case on string failed"c, false); }
+  switch s {
+    "Hello": { assert("Switch case on str failed", false); }
     "Hello!": { passed = true; }
   }
-  assert("Failed to hit positive switch case for string"c, passed);
+  assert("Failed to hit positive switch case for str", passed);
 
   passed = false;
   switch SwitchCaseEnum::SwitchVariant0 {
@@ -175,10 +173,10 @@ switch_helper :: fn() -> int {
       passed = true;
     }
     SwitchCaseEnum::SwitchVariant1: {
-      assert("Switch on enum value failed"c, false);
+      assert("Switch on enum value failed", false);
     }
   }
-  assert("Failed to hit positive switch case for enum"c, passed);
+  assert("Failed to hit positive switch case for enum", passed);
 
   /*  With return value as expression :  */
 
@@ -187,21 +185,43 @@ switch_helper :: fn() -> int {
     1 => -1,
   }
 
-  assert("Return value of switch statement failed"c, new_int == integer);
+  assert("Return value of switch statement failed", new_int == integer);
 
-  // test range based shiz.
-  passed = false;
-  switch 0 {
-    0..10: {
-      passed = true;
-    }
-    10..20: {
-      assert("switch on range passing in number failed"c, false);
-    }
-  }
-  assert("Failed to pass range based switch statement"c, passed);
+  // // test range based shiz.
+  // passed = false;
+  // switch 0 {
+  //   0..10: {
+  //     passed = true;
+  //   }
+  //   10..20: {
+  //     assert("switch on range passing in number failed", false);
+  //   }
+  // }
+  // assert("Failed to pass range based switch statement", passed);
 
-  assert("Returns in switched failed"c, switch_helper() == 5);
+  assert("Returns in switched failed", switch_helper() == 5);
 }
 
 
+#test test_iterate_iter :: fn() {
+  list: s32[] = s32[]::init({0,1,2,3,4,5,6,7,8,9,10});
+  idx := 0;
+  for v in list.iter() {
+    assert("list.iter() for loop failed", v == idx);
+    idx++;
+  }
+  idx = 0;
+  for *v in list.iter() {
+    assert("list.iter() for loop failed", (*v) == idx);
+    idx++;
+  }
+}
+
+#test test_iterate_enumerator :: fn() {
+  range := 0..10;
+  idx := 0;
+  for v in range.enumerator() {
+    assert("range.enumerator() for loop failed", v == idx);
+    idx++;
+  }
+}

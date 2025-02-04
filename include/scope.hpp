@@ -14,8 +14,10 @@ extern jstl::Arena scope_arena;
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
-  SYMBOL_IS_METHOD = 1 << 4,
-  SYMBOL_IS_FORWARD_DECLARED = 1 << 5,
+  SYMBOL_IS_METHOD = 1 << 2,
+  SYMBOL_IS_FORWARD_DECLARED = 1 << 3,
+  // ! TODO:
+  // !!! Add a SYMBOL_IS_TYPE  !!!
 };
 
 struct ASTNode;
@@ -33,11 +35,10 @@ struct ASTFunctionDeclaration;
 struct ASTInterfaceDeclaration;
 extern Scope *root_scope;
 struct Scope {
-  bool is_struct_scope = false; // TODO: do we need this anymore?
   std::vector<InternedString> ordered_symbols;
   std::unordered_map<InternedString, Symbol> symbols;
   std::unordered_map<InternedString, int> types;
-
+  
   static std::unordered_set<InternedString> &defines() {
     static std::unordered_set<InternedString> defines;
     return defines;
@@ -61,7 +62,7 @@ struct Scope {
   inline int fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function() && name != "this") fields++;
+      if (!sym.is_function()) fields++;
     }
     return fields;
   }
@@ -88,7 +89,7 @@ struct Scope {
   void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
   int create_tagged_union(const InternedString &name, Scope *scope) {
-    auto id = global_create_tagged_union_type(name, scope);
+    auto id = global_create_tagged_union_type(name, scope, {});
     types[name] = id;
     return id;
   }
@@ -109,8 +110,8 @@ struct Scope {
     return id;
   }
 
-  int create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext) {
-    auto id = global_create_tuple_type(types, ext);
+  int create_tuple_type(const std::vector<int> &types) {
+    auto id = global_create_tuple_type(types);
     this->types[get_tuple_type_name(types)] = id;
     return id;
   }
@@ -149,7 +150,7 @@ struct Context {
   }
   inline Scope *exit_scope() {
     if (scope == root_scope) {
-      throw_error("Internal Compiler Error: attempted to exit the global scope.", {});
+      throw_error("internal compiler error: attempted to exit the global scope.", {});
     }
     auto old_scope = scope;
     if (scope) {

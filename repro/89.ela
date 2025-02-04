@@ -1,0 +1,20 @@
+thing :: struct![T] {
+	next: thing![T]*
+}
+
+main :: fn() {
+	a: thing![s32];
+	b: thing![s32];
+	a.next = &b;
+	a.next.next = &a;
+}
+
+/* Member "next" not found in type "thing"
+        at: /home/cooper/repos/languages/ela/repro/89.ela:9:3
+main :: fn() {
+        a: thing![s32];
+        b: thing![s32];
+        a.next = &b;
+        a.next.next = &a;
+   ^^^
+} */

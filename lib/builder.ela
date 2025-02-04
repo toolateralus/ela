@@ -1,0 +1,131 @@
+// This seems pretty chunky,
+// it might be more performant for building large strings,
+// but perhaps this is a setting we can have the user pass in.
+STRING_BUILDER_BLOCK_MAX_LEN :: 8192;
+
+String_Builder_Block :: struct {
+  data: u8*,
+  length: u64,
+  next: String_Builder_Block*,
+}
+
+impl String_Builder_Block {
+  new :: fn() -> #self* {
+    self : #self* =  malloc(sizeof(String_Builder_Block));
+    self.data = calloc(sizeof(u8), STRING_BUILDER_BLOCK_MAX_LEN);
+    return self;
+  }
+  deinit :: fn(self*) {
+    if self.data then free(self.data);
+    if self.next { 
+      self.next.deinit();
+      free(self.next);
+    }
+    self.data = null;
+    self.next = null;
+    self.length = 0;
+  } 
+}
+
+String_Builder :: struct {
+  root: String_Builder_Block*,
+  current: String_Builder_Block*,
+}
+
+impl String_Builder {
+  deinit :: fn(self*) {
+    if self.root then self.root.deinit();
+    self.root = null;
+    self.current = null;
+  }
+
+  // just here for 'clarity' (no pun intended)
+  clear :: fn(self*) {
+    self.deinit();
+  }
+
+  length :: fn(self*) -> u64 {
+    if !self.root then return 0;
+    current := self.root;
+    len: u64;
+    while current {
+      len += current.length;
+      current = current.next;
+    }
+    return len;
+  }
+
+  get_string :: fn(self*) -> String {
+    length := self.length();
+    data : u8* = malloc(sizeof(u8) * length + 1);
+    data[length] = '\0'; // Null-terminate the final str
+    current := self.root;
+    offset := 0;
+    while current {
+      memcpy(data + offset, current.data, current.length);
+      offset += current.length;
+      current = current.next;
+    }
+    return {
+      data: data,
+      length: length,
+    };
+  }
+
+  append :: fn![T](self*, value: T) where T is As_Byte_Slice {
+    slice := value.as_byte_slice();
+
+    if slice.length == 0 
+              then return;
+    
+    if !self.root { 
+      self.root = String_Builder_Block::new();
+      self.current = self.root;
+    }
+    
+    slice_index := 0;
+    length := slice.length;
+
+    remaining := STRING_BUILDER_BLOCK_MAX_LEN - self.current.length;
+
+    while length > 0 {
+      // Simple append, no overflow
+      if length <= remaining {
+        memcpy(self.current.data + self.current.length, slice.data + slice_index, length);
+        self.current.length += length;
+        break;
+      } 
+
+      // Append with overflow
+      memcpy(self.current.data + self.current.length, slice.data + slice_index, remaining);
+      self.current.length += remaining;
+      slice_index += remaining;
+      length -= remaining;
+      self.current.next = String_Builder_Block::new();
+      self.current = self.current.next;
+      remaining = STRING_BUILDER_BLOCK_MAX_LEN;
+    }
+  }
+
+  append_then_free :: fn![T](self*, value: T) where T is Deinit {
+    self.append![T](value);
+    value.deinit();
+  }
+
+  append_concat :: fn![T](self*, list: Init_List![T]) {
+    for i in 0..list.length {
+      self.append![T](list.data[i]);
+    }
+  }
+
+  append_concat_then_free :: fn![T](self*, list: Init_List![T], free_list: Init_List![bool]) where T is Deinit {
+    if free_list.length != list.length {
+      printf("append_concat_then_free() requires that the str initializer and the free_list are the same length\n"c);
+      exit(1); // we shouldn't have to panic here, but whatever.
+    }
+    for i in 0..list.length {
+      self.append![T](list.data[i]);
+      if free_list.data[i] then list.data[i].deinit();
+    }
+  }
+}

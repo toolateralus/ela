@@ -1,6 +1,6 @@
 
 Struct :: struct![T] {
-  n: T;
+  n: T
 }
 
 main :: fn() {

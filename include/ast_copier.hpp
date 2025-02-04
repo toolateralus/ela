@@ -4,9 +4,16 @@
 #include "scope.hpp"
 
 struct ASTCopier {
+
+  template<class T>
+  T *copy(T *node) requires std::is_base_of_v<ASTNode, T> {
+    auto new_node = new (ast_alloc<T>()) T(*node);
+    new_node->control_flow.type = -1;
+    return new_node;
+  }
+
   Scope *current_scope = nullptr;
   ASTImpl *copy_impl(ASTImpl* node);
-  InterpolatedStringSegment *copy_interp_string_segment(InterpolatedStringSegment* segment);
   Scope *copy_scope(Scope *old);
   ASTProgram *copy_program(ASTProgram *node);
   ASTBlock *copy_block(ASTBlock *node);
@@ -39,6 +46,12 @@ struct ASTCopier {
   ASTTuple *copy_tuple(ASTTuple *node);
   ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
   ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
+  ASTAlias *copy_alias(ASTAlias *node);
+  ASTSize_Of *copy_sizeof(ASTSize_Of *node);
+  ASTDefer *copy_defer(ASTDefer *node);
+  ASTLambda *copy_lambda(ASTLambda *node);
+  ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
+  ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
   ASTWhere *copy_where(ASTWhere *node);

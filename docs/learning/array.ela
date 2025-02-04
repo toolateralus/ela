@@ -11,30 +11,29 @@ main :: fn() {
   fixed1 : s32[3] = {0, 1, 2};
 
   // * For a dynamic array, similar to rust Vec<T> or c++ std::vector<T>
-  dynamic: s32[];
+  dynamic: List![s32];
 
-  dynamic2: s32[] = {0, 1, 2, 3, 4};
+  dynamic2: List![s32] = {0, 1, 2, 3, 4};
 
   // ? Note: these operators are temporary and subject to be replaced with methods.
   // ? Arrays lack robust support in the langauge currently.
 
 
   // * appending to a dynamic array
-  dynamic ~= 10;
+  dynamic.push(10);
     
   // * erasing a 10 from a dynamic array
-  dynamic ~~ 10;
+  dynamic.erase(10);
     
   // * popping an element off the end of a dynamic array
-  // * note that using ~dynamic as a standalone statement does not currently work, so youd need _ := ~dynamic to ignore the value.
-  value := ~dynamic;
+  value := dynamic.pop();
 
   // * of course these types can be decorated with pointers or be multidimensional.
-  array_of_pointers: s32*[];
+  array_of_pointers: List![s32*];
 
-  pointer_to_array: s32*[]*;
+  pointer_to_array: List![s32*]*;
 
-  array_of_arrays: s32[][];
+  array_of_arrays: List![List![s32]];
 
   fixed_array_of_arrays: s32[100][100];
 
@@ -43,7 +42,7 @@ main :: fn() {
     * use '.data'
   */
 
-  array := s32[]{};
+  array := List![s32]{};
 
   ptr: s32* = array.data;
 

@@ -1,4 +1,4 @@
-#import core;
+;
 
 // TODO: pack these with GL, we need a system for storing .so/.a files with these modules & linking with them properly?
 // TODO Or do we leave it up the the user to do that?
@@ -9,55 +9,55 @@ GLFWwindow :: struct;
 
 #foreign glfwInit :: fn() -> bool;
 #foreign glfwTerminate :: fn();
-#foreign glfwCreateWindow :: fn(w: int, h: int, t: c_string, v: void*, v1: void*) -> GLFWwindow*;
+#foreign glfwCreateWindow :: fn(w: s32, h: s32, t: u8*, v: void*, v1: void*) -> GLFWwindow*;
 #foreign glfwMakeContextCurrent :: fn(ctx: void*);
 #foreign glfwWindowShouldClose :: fn(window: GLFWwindow*) -> bool;
 #foreign glfwPollEvents :: fn();
 #foreign glfwSwapBuffers :: fn(window: GLFWwindow*);
 #foreign glewInit :: fn() -> bool;
-#foreign glGenVertexArrays :: fn(n: int, arrays: u32*);
-#foreign glBindVertexArray :: fn(array: int);
-#foreign glGenBuffers :: fn(n_buf: int, buf: u32*);
-#foreign glBindBuffer :: fn(type: int, buf: u32);
-#foreign glBufferData :: fn(target: int, size: s64, data: void*, usage: int);
-#foreign glEnableVertexAttribArray :: fn(index: int);
-#foreign glVertexAttribPointer :: fn(index: int, size: s64, type: int, normalized: bool, stride: s64, pointer: void*);
+#foreign glGenVertexArrays :: fn(n: s32, arrays: u32*);
+#foreign glBindVertexArray :: fn(array: s32);
+#foreign glGenBuffers :: fn(n_buf: s32, buf: u32*);
+#foreign glBindBuffer :: fn(type: s32, buf: u32);
+#foreign glBufferData :: fn(target: s32, size: s64, data: void*, usage: s32);
+#foreign glEnableVertexAttribArray :: fn(index: s32);
+#foreign glVertexAttribPointer :: fn(index: s32, size: s64, type: s32, normalized: bool, stride: s64, pointer: void*);
 #foreign glDrawArrays :: fn(mode: u32, first, count);
-#foreign glClearColor :: fn(red: float, green: float, blue: float, alpha: float);
+#foreign glClearColor :: fn(red: f32, green: f32, blue: f32, alpha: f32);
 #foreign glClear :: fn(mask: u32);
-#foreign glGetError :: fn() -> int;
+#foreign glGetError :: fn() -> s32;
 #foreign glCreateShader :: fn(type: u32) -> u32;
-#foreign glShaderSource :: fn(shader: u32, count: int, string: c_string*, length: int*);
+#foreign glShaderSource :: fn(shader: u32, count: s32, s: u8**, length: s32*);
 #foreign glCompileShader :: fn(shader: u32);
-#foreign glGetShaderiv :: fn(shader: u32, pname, params: int*);
-#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: int, length: int*, infoLog: c_string);
+#foreign glGetShaderiv :: fn(shader: u32, pname, params: s32*);
+#foreign glGetShaderInfoLog :: fn(shader: u32, maxLength: s32, length: s32*, infoLog: u8*);
 #foreign glCreateProgram :: fn() -> u32;
 #foreign glAttachShader :: fn(program: u32, shader);
 #foreign glLinkProgram :: fn(program: u32);
-#foreign glGetProgramiv :: fn(program: u32, pname, params: int*);
-#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: int, length: int*, infoLog: c_string);
+#foreign glGetProgramiv :: fn(program: u32, pname, params: s32*);
+#foreign glGetProgramInfoLog :: fn(program: u32, maxLength: s32, length: s32*, infoLog: u8*);
 #foreign glUseProgram :: fn(program: u32);
 #foreign glDeleteShader :: fn(shader: s32);
 #foreign glDeleteProgram :: fn(shader: s32);
-#foreign glViewport :: fn(x: int, y: int, width: int, height: int);
+#foreign glViewport :: fn(x: s32, y: s32, width: s32, height: s32);
 
-#foreign glfwGetKey :: fn(window: GLFWwindow*, key: int) -> u32;
-#foreign glfwGetMouseButton :: fn(window: GLFWwindow*, button: int) -> u32;
-#foreign glfwGetCursorPos :: fn(window: GLFWwindow*, xpos: float*, ypos);
-#foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: float, ypos);
-#foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: int, value);
+#foreign glfwGetKey :: fn(window: GLFWwindow*, key: s32) -> u32;
+#foreign glfwGetMouseButton :: fn(window: GLFWwindow*, button: s32) -> u32;
+#foreign glfwGetCursorPos :: fn(window: GLFWwindow*, xpos: f32*, ypos);
+#foreign glfwSetCursorPos :: fn(window: GLFWwindow*, xpos: f32, ypos);
+#foreign glfwSetInputMode :: fn(window: GLFWwindow*, mode: s32, value);
 
-#foreign glGetUniformLocation :: fn(program: u32, name: c_string) -> int;
-#foreign glUniform4fv :: fn(location: int, count, value: float*);
-#foreign glUniform3fv :: fn(location: int, count, value: float*);
-#foreign glUniform2fv :: fn(location: int, count, value: float*);
-#foreign glUniform1f :: fn(location: int, v0: float);
-#foreign glUniformMatrix4fv :: fn(location: int, count, transpose: bool, value: float*);
-#foreign glfwSwapInterval :: fn(interval: int);
+#foreign glGetUniformLocation :: fn(program: u32, name: u8*) -> s32;
+#foreign glUniform4fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform3fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform2fv :: fn(location: s32, count, value: f32*);
+#foreign glUniform1f :: fn(location: s32, v0: f32);
+#foreign glUniformMatrix4fv :: fn(location: s32, count, transpose: bool, value: f32*);
+#foreign glfwSwapInterval :: fn(interval: s32);
 
-#foreign glEnable :: fn(cap: int);
-#foreign glDisable :: fn(cap: int);
-#foreign glIsEnabled :: fn(cap: int) -> bool;
+#foreign glEnable :: fn(cap: s32);
+#foreign glDisable :: fn(cap: s32);
+#foreign glIsEnabled :: fn(cap: s32) -> bool;
 
 GL :: enum {
  STATIC_DRAW = 35044,
@@ -734,26 +734,26 @@ GLKey :: enum {
   LAST = 348,
 }
 
-compile_shader :: fn(kind: u32, source: c_string) -> u32 {
+compile_shader :: fn(kind: u32, source: u8*) -> u32 {
   shader: u32 = glCreateShader(kind);
   glShaderSource(shader, 1, &source, null);
   glCompileShader(shader);
 
-  success: int;
+  success: s32;
   glGetShaderiv(shader, GL::COMPILE_STATUS, &success);
   if success == 0 {
-    length: int;
+    length: s32;
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
-    info_log: c_string = malloc(sizeof(c_string) * length);
+    info_log: u8* = malloc(sizeof(u8*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
-    printf("Shader compilation failed: %s\n"cc, info_log);
+    printf("Shader compilation failed: %s\n", info_log);
     free(info_log);
     return 0 as u32;
   }
   return shader;
 }
 
-create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
+create_program :: fn(vert_source: u8*, frag_source: u8*) -> u32 {
   vertex_shader: u32 = compile_shader(GL::VERTEX_SHADER, vert_source);
   fragment_shader: u32 = compile_shader(GL::FRAGMENT_SHADER, frag_source);
 
@@ -766,14 +766,14 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   glAttachShader(program, fragment_shader);
   glLinkProgram(program);
 
-  success: int;
+  success: s32;
   glGetProgramiv(program, GL::LINK_STATUS, &success);
   if success == 0 {
-    length: int;
+    length: s32;
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
-    info_log: c_string = malloc(sizeof(c_string) * length);
+    info_log: u8* = malloc(sizeof(u8*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
-    printf("Program linking failed: %s\n"cc, info_log);
+    printf("Program linking failed: %s\n", info_log);
     free(info_log);
     return 0 as u32;
   }
@@ -784,32 +784,32 @@ create_program :: fn(vert_source: c_string, frag_source: c_string) -> u32 {
   return program;
 }
 
-check_error :: fn(location: c_string) {
-  err: int = glGetError();
+check_error :: fn(location: u8*) {
+  err: s32 = glGetError();
   if err == GL::INVALID_ENUM {
-    printf("error: %s, from: %s\n"c, "GL::INVALID_ENUM"c, location);
+    printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
   } else if err == GL::INVALID_VALUE {
-    printf("error: %s, from: %s\n"c, "GL::INVALID_VALUE"c, location);
+    printf("error: %s, from: %s\n", "GL::INVALID_VALUE", location);
   } else if err == GL::INVALID_OPERATION {
-    printf("error: %s, from: %s\n"c, "GL::INVALID_OPERATION"c, location);
+    printf("error: %s, from: %s\n", "GL::INVALID_OPERATION", location);
   } else if err == GL::STACK_OVERFLOW {
-    printf("error: %s, from: %s\n"c, "GL::STACK_OVERFLOW"c, location);
+    printf("error: %s, from: %s\n", "GL::STACK_OVERFLOW", location);
   } else if err == GL::STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n"c, "GL::STACK_UNDERFLOW"c, location);
+    printf("error: %s, from: %s\n", "GL::STACK_UNDERFLOW", location);
   } else if err == GL::OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n"c, "GL::OUT_OF_MEMORY"c, location);
+    printf("error: %s, from: %s\n", "GL::OUT_OF_MEMORY", location);
   } else if err != 0 {
-    printf("unknown gl error: %d, from: %s\n"c, err, location);
+    printf("unknown gl error: %d, from: %s\n", err, location);
   }
 }
 
 Vec4 :: union {
-  values: float[4];
+  values: f32[4],
   #anon :: struct {
-    x: float;
-    y: float;
-    z: float;
-    w: float;
+    x: f32,
+    y: f32,
+    z: f32,
+    w: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -850,7 +850,7 @@ Vec4 :: union {
 }
 
 impl Vec4 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
   }
   one :: fn() -> #self {
@@ -862,11 +862,11 @@ impl Vec4 {
 }
 
 Vec3 :: union {
-  values: float[3];
+  values: f32[3],
   #anon :: struct {
-    x: float;
-    y: float;
-    z: float;
+    x: f32,
+    y: f32,
+    z: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -905,7 +905,7 @@ Vec3 :: union {
 }
 
 impl Vec3 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y + self.z * self.z;
   }
   one :: fn() -> #self {
@@ -917,10 +917,10 @@ impl Vec3 {
 }
 
 Vec2 :: union {
-  values: float[2];
+  values: f32[2],
   #anon :: struct {
-    x: float;
-    y: float;
+    x: f32,
+    y: f32,
   }
 
   // #operator(+) :: fn(other: #self) -> #self {
@@ -953,7 +953,7 @@ Vec2 :: union {
 }
 
 impl Vec2 {
-  sqr_mag :: fn(self*) -> float {
+  sqr_mag :: fn(self*) -> f32 {
     return self.x * self.x + self.y * self.y;
   }
   one :: fn() -> #self {
@@ -965,25 +965,25 @@ impl Vec2 {
 }
 
 Mat4 :: union {
-  values: float[16];
+  values: f32[16],
   #anon :: struct {
-    M00: float;
-    M01: float;
-    M02: float;
-    M03: float;
-    M10: float;
-    M11: float;
-    M12: float;
-    M13: float;
-    M20: float;
-    M21: float;
-    M22: float;
-    M23: float;
-    M30: float;
-    M31: float;
-    M32: float;
-    M33: float;
-  };
+    M00: f32,
+    M01: f32,
+    M02: f32,
+    M03: f32,
+    M10: f32,
+    M11: f32,
+    M12: f32,
+    M13: f32,
+    M20: f32,
+    M21: f32,
+    M22: f32,
+    M23: f32,
+    M30: f32,
+    M31: f32,
+    M32: f32,
+    M33: f32,
+  },
   // #operator(*) :: fn(self, other: #self) -> #self {
   //   matrix: #self;
   //   matrix.M00 = self.M00 * other.M00 + self.M01 * other.M10 + self.M02 * other.M20 + self.M03 * other.M30;
@@ -1010,7 +1010,7 @@ Mat4 :: union {
 }
 
 impl Mat4 {
-  scale :: fn(self*, factor: float) -> #self {
+  scale :: fn(self*, factor: f32) -> #self {
     matrix: #self;
     matrix.M00 = self.M00 * factor;
     matrix.M01 = self.M01 * factor;
@@ -1031,11 +1031,11 @@ impl Mat4 {
     return matrix;
   }
 
-  determinant :: fn(self*) -> float {
-    r0: float = self.M00 * (self.M11 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M21 * self.M33 - self.M23 * self.M31) + self.M13 * (self.M21 * self.M32 - self.M22 * self.M31));
-    r1: float = self.M01 * (self.M10 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M32 - self.M22 * self.M30));
-    r2: float = self.M02 * (self.M10 * (self.M21 * self.M33 - self.M23 * self.M31) - self.M11 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M31 - self.M21 * self.M30));
-    r3: float = self.M03 * (self.M10 * (self.M21 * self.M32 - self.M22 * self.M31) - self.M11 * (self.M20 * self.M32 - self.M22 * self.M30) + self.M12 * (self.M20 * self.M31 - self.M21 * self.M30));
+  determinant :: fn(self*) -> f32 {
+    r0: f32 = self.M00 * (self.M11 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M21 * self.M33 - self.M23 * self.M31) + self.M13 * (self.M21 * self.M32 - self.M22 * self.M31));
+    r1: f32 = self.M01 * (self.M10 * (self.M22 * self.M33 - self.M23 * self.M32) - self.M12 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M32 - self.M22 * self.M30));
+    r2: f32 = self.M02 * (self.M10 * (self.M21 * self.M33 - self.M23 * self.M31) - self.M11 * (self.M20 * self.M33 - self.M23 * self.M30) + self.M13 * (self.M20 * self.M31 - self.M21 * self.M30));
+    r3: f32 = self.M03 * (self.M10 * (self.M21 * self.M32 - self.M22 * self.M31) - self.M11 * (self.M20 * self.M32 - self.M22 * self.M30) + self.M12 * (self.M20 * self.M31 - self.M21 * self.M30));
     return r0 - r1 + r2 - r3;
   }
 
@@ -1062,7 +1062,7 @@ impl Mat4 {
 }
 
 Shader :: struct {
-  handle: u32;
+  handle: u32
 }
 
 impl Shader {
@@ -1073,73 +1073,73 @@ impl Shader {
   use :: fn(self*) {
     glUseProgram(self.handle);
   }
-  create :: fn(vertexSource: c_string, fragSource: c_string) -> #self {
+  create :: fn(vertexSource: u8*, fragSource: u8*) -> #self {
     v: #self;
     v.handle = create_program(vertexSource, fragSource);
     return v;
   }
-  set_Mat4 :: fn(self*, name: c_string, v: Mat4*) {
+  set_Mat4 :: fn(self*, name: u8*, v: Mat4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniformMatrix4fv(index, 1, false, v.values as float*);
+      glUniformMatrix4fv(index, 1, false, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec4 :: fn(self*, name: c_string, v: Vec4*) {
+  set_Vec4 :: fn(self*, name: u8*, v: Vec4*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform4fv(index, 1, v.values as float*);
+      glUniform4fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec3 :: fn(self*, name: c_string, v: Vec3*) {
+  set_Vec3 :: fn(self*, name: u8*, v: Vec3*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform3fv(index, 1, v.values as float*);
+      glUniform3fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n", name);
     }
   }
-  set_Vec2 :: fn(self*, name: c_string, v: Vec2*) {
+  set_Vec2 :: fn(self*, name: u8*, v: Vec2*) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
-      glUniform2fv(index, 1, v.values as float*);
+      glUniform2fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n", name);
     }
   }
-  set_float :: fn(self*, name: c_string, v: float) {
+  set_float :: fn(self*, name: u8*, v: f32) {
     index := glGetUniformLocation(self.handle, name);
     if index != -1 {
       glUniform1f(index, v);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n", name);
     }
   }
 }
 
 Window :: struct {
-  handle: GLFWwindow*;
+  handle: GLFWwindow*
 }
 
 impl Window {
-  create :: fn(width: int, height: int, title: c_string) -> #self {
+  create :: fn(width: s32, height: s32, title: u8*) -> #self {
     self: #self;
     if !glfwInit() {
-      printf("Failed to initialize glfw\n"c);
+      printf("Failed to initialize glfw\n");
       return self;
     }
     self.handle = glfwCreateWindow(width, height, title, null, null);
     if self.handle == null {
-      printf("Failed to create window\n"c);
+      printf("Failed to create window\n");
       glfwTerminate();
       return self;
     }
     glfwMakeContextCurrent(self.handle);
     if glewInit() != 0 {
-      printf("Failed to initialize glew\n"c);
+      printf("Failed to initialize glew\n");
       glfwTerminate();
       return self;
     }

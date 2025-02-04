@@ -1,0 +1,140 @@
+// Run a cleanup procedure implicitly when an object goes out of scope.
+// Absolutely equivalent to a C++ Destructor.
+// This could be called explicitly on pointers, but it's not reccomended.
+Drop        :: interface {
+  drop      :: fn(self*);
+}
+
+// Allow an object to be converted to a str
+To_String    :: interface {
+  // convert self to str::
+  to_string :: fn(self) -> str;
+}
+
+// equivalent to an explicit cast operator overload in C++,
+// allow an object to be constructed from another.
+From        :: interface![T] {
+  // construct a self type from T.
+  from :: fn(v: T) -> #self;
+}
+
+// A deep clone, versus assignment always being a shallow clone in Ela.
+Clone       :: interface {
+  // get a deep clone of self.
+  clone     :: fn(self) -> #self;
+}
+
+Init :: interface![Value_Type] {
+  init :: fn(init: Init_List![Value_Type]) -> #self;
+}
+
+// An object used to iterate over a collection of items, or any sequence.
+Enumerator   :: interface![Value_Type] {  
+  // Return the current value this enumerator points to within the sequence it's iterating over.  
+  current   :: fn(self) -> Value_Type;
+  // Advance the enumerator by one step.
+  next      :: fn(self*) -> void;
+  // Check whether the enumerator is complete, or should continue.
+  // return true for 'done',
+  // return false if needs to continue
+  done      :: fn(self) -> bool;
+}
+
+// A collection or range of items that can be enumerated over, with a for loop, or some other means.
+Enumerable   :: interface![Enum, Value_Type] where Enum is Enumerator![Value_Type] { 
+  // get the Enumerator object that was implemented for this type.
+  enumerator      :: fn(self*) -> Enum;
+}
+
+// Iter is a generic struct that represents an iterator over a collection of type Value_Type.
+// It contains a pointer to the current element (ptr) and a pointer to the end of the collection (end).
+
+// It differs from Enumerator because it requires an incrementable piece of memory, so it must be a contiguous collection of data
+// represented by a chunk of memory that can be trivially traversed.
+Iter :: struct![Value_Type] {
+  ptr: Value_Type*,  // Pointer to the current element in the collection.
+  end: Value_Type*,  // Pointer to the end of the collection.
+}
+
+impl![Value_Type] Iter![Value_Type] {
+  // Returns a pointer to the current element in the collection.
+  current :: fn(self) -> Value_Type* => self.ptr;
+
+  // Advances the iterator to the next element in the collection.
+  next :: fn(self*) {
+    self.ptr++;
+  }
+
+  // Checks if the iterator has reached the end of the collection.
+  done :: fn(self) -> bool {
+    return self.ptr >= self.end || self.ptr == self.end; 
+  }
+}
+
+// Iterable is a generic interface that represents a collection that can be iterated over.
+// It defines a single method, iter, which returns an iterator for the collection.
+Iterable :: interface![Value_Type] {
+  // Returns an iterator for the collection.
+  iter :: fn(self*) -> Iter![Value_Type];
+}
+
+// Binary arithmetic operator overloads.
+Arithmetic :: interface![Right] {
+  add       :: fn(self, right: Right) -> #self;   // '+' operator.
+  sub       :: fn(self, right: Right) -> #self;   // '-' operator.
+  mul       :: fn(self, right: Right) -> #self;   // '*' operator.
+  div       :: fn(self, right: Right) -> #self;   // '/' operator.
+  modulo    :: fn(self, right: Right) -> #self;   // '%' operator.
+}
+
+// Binary bitwise operator overloading.
+Bitwise :: interface![Right] {
+  shr       :: fn(self, right: Right) -> #self;   // '>>' operator.
+  shl       :: fn(self, right: Right) -> #self;   // '<<' operator.
+  xor       :: fn(self, right: Right) -> #self;   //  '^' operator.
+  or        :: fn(self, right: Right) -> #self;   //  '|' operator.
+  and       :: fn(self, right: Right) -> #self;   //  '&' operator.
+}
+
+// TODO:  We should tidy up operator overloads, where we can automatically use + as += etc.
+Eq :: interface {
+  eq :: fn(self, right: #self) -> bool;
+  neq :: fn(self, right: #self) -> bool;
+}
+
+Compare :: interface![Right] {
+  lt  :: fn(self, right: Right) -> bool;  // '<' operator.
+  gt  :: fn(self, right: Right) -> bool;  // '>' operator.
+
+  lte :: fn(self, right: Right) -> bool;  // '<=' operator.
+  gte :: fn(self, right: Right) -> bool;  // '>=' operator.
+}
+
+// Basic allocator interface. Coupled with most heap allocated structures, such as List![T] and str::
+Allocator :: interface {
+  allocate :: fn![T](self*) -> T*;
+  free :: fn![T](self*, ptr: T*);
+  allocate_array :: fn![T](self*, n: u64) -> T*;
+  resize :: fn![T](self*, ptr: T*, new_size: u64) -> T*;
+  copy :: fn![T](self*, ptr: T*, n: u64) -> T*;
+}
+
+As_Slice :: interface![T] {
+  as_slice :: fn(self, range: Range) -> Slice![T];
+}
+
+As_Char_Slice :: interface {
+  as_char_slice :: fn(self) -> Slice![u32];
+}
+
+As_Byte_Slice :: interface {
+  as_byte_slice :: fn(self) -> Slice![u8];
+}
+
+Deinit :: interface {
+  deinit :: fn(self*);
+}
+
+Hash :: interface {
+  hash :: fn(self) -> u64;
+}

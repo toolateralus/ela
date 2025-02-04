@@ -1,29 +1,32 @@
 // assert that --freestanding was used in compiler invocation.
-#ifndef FREESTANDING { #error "This is only supposed to be used freestanding " }
+#ifndef FREESTANDING { #error "This is only supposed to be used freestanding. don't use `ela r`, use `run.sh`!" }
 
-// compile in a freestanding environment and compile to an object file.
-#c_flags "-fPIC -c -m64 -fno-stack-protector -o main.o"
-
-
+// specify 
+// -fPIC  :: position independent code,
+// -c for :: compiling to object files.
+// -m64   :: 64 bit architecture
+#c_flags "-fPIC -c -m64 -o main.o"
 
 // our function declared in print.s
-#foreign print :: fn(f: char *);
-#foreign exit :: fn(code: int);
+#foreign print :: fn(f: u8 *);
+#foreign exit :: fn(code: s32);
 
-memset :: fn(p: char *, value: u32, len: u32) {
+memset :: fn(p: u8 *, value: u64, len: u64) {
   for i in 0..len {
     p[i] = value;
   }
 }
 
-memcpy :: fn(dest: char**, src: char*, len: u32) {
+memcpy :: fn(dest: u8**, src: u8*, len: u64) {
   for i in 0..len {
     (*dest)[i] = src[i];
   }
 }
 
-#export strlen :: fn(s: char*) -> int {
-  i: int;
+// used from 'print' in print.s
+// just easier to write in ela.
+#export strlen :: fn(s: u8*) -> s32 {
+  i: s32;
   while s[i] != '\0' {
     ++i;
   }
@@ -32,55 +35,62 @@ memcpy :: fn(dest: char**, src: char*, len: u32) {
 
 // A simple linear allocator (aka arena) 
 // for a freestanding environment without allocations.
-Allocator :: struct {
-  mem : char[1024 * 24];
-  ptr : u32;
-  size: u32;
+
+LINEAR_ALLOCATOR_SIZE :: 1024 * 24;
+
+LinearAlloc :: struct {
+  mem : u8[LINEAR_ALLOCATOR_SIZE],
+  ptr : u64,
 }
 
-impl Allocator {
+impl LinearAlloc {
   create :: fn() -> #self {
     self: #self;
-    self.size = 1024 * 24;
-    memset(self.mem as char*, 0, self.size);
+    memset(self.mem as u8*, 0, LINEAR_ALLOCATOR_SIZE);
     return self;
   }
-
-  alloc :: fn(self*, size: u32) -> char* {
+  alloc :: fn(self*, size: u64) -> u8* {
     data := &self.mem[self.ptr];
     self.ptr += size;
-    
-    if (self.ptr > self.size) {
-      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n"c);
+    if (self.ptr > LINEAR_ALLOCATOR_SIZE) {
+      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n");
       exit(1);
     }
-
     return data;
   }
 }
 
-allocator := Allocator::create();
-
 Vector2 :: struct {
-  x: float;
-  y: float;
+  x: f32,
+  y: f32,
 }
 
-// declare main as 'export' (much like 'extern "C"' in cpp) so our assembly program can find it.
+// declare main as 'export' (equivalent to 'extern' in C) so our assembly program can find it.
 // 'export' differs from foreign, because foreign is an external dependency we're importing,
-// and 'export' is declaring an externally visible symbol.
-#export main :: fn() -> int {
-  print("\e[1;4;32mHello (free-standing) World!\e[0m\n"c);
-  
-  while {
+// and 'export' is declaring an externally visible symbol, or a external dependency that's a field / global variable.
 
-    // example of getting a 'dynamically allocated' struct.
+// perhaps in the future we'll just have a #extern.
+
+// unlike a normal Ela program, or C for that matter,
+// you have to define your own _start() and (optionally) main()
+// these can have whatever signature you want.
+// We make main here just for an example, but all of this could be put into _start.
+#export main :: fn() {
+  // create our 'linear allocator' which is just a piece of memory sitting on the stack.
+  allocator := LinearAlloc::create();
+
+  // say hello!
+  print("\e[1;4;32mHello (free-standing) World!\e[0m\n");
+  
+  // example of getting a 'dynamically allocated' struct.
+  // intentionally run the allocator out of memory, so we can 'panic' with exit(1);
+  while {
     v: Vector2* = allocator.alloc(sizeof(Vector2));
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
-    memcpy((&v1) as char**, v as char*, sizeof(Vector2));
-    // we do this in a loop to show that our exit(1) call works to 
-    // 'panic' on an error.
+    memcpy((&v1) as u8**, v as u8*, sizeof(Vector2));
   }
-  
-  return 0;
+}
+
+#export _start :: fn() {
+  main();
 }

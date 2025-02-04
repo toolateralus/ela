@@ -1,17 +1,18 @@
-#import core;
 #import rayui;
 
 #import directory;
 #import file;
 
+#c_flags  " -fsanitize=address,leak,undefined "
+
 playing := false;
 timer: Timer;
-bpm : float = 120;
-subdivisions: int = 1;
-beats: int = 4;
-total_notes: int = 4;
+bpm : f32 = 120;
+subdivisions: s32 = 1;
+beats: s32 = 4;
+total_notes: s32 = 4;
 
-bpm_slider : SliderF = {
+bpm_slider : Slider![f32] = {
   text: "bpm", 
   rect: {x: 0, y: 0, width: 150, height: 40}, 
   style: Style { 
@@ -29,7 +30,7 @@ bpm_slider : SliderF = {
   held: false, 
 };
 
-subdivision_slider : SliderI = {
+subdivision_slider : Slider![s32] = {
   text: "subdivisions", 
   rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -49,7 +50,7 @@ subdivision_slider : SliderI = {
 
 bg_color := LIGHTCYAN;
 
-beats_slider : SliderI = {
+beats_slider : Slider![s32] = {
   text: "beats", 
   rect: {x: 150, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -97,7 +98,7 @@ sequence_channel_style : Style = {
   jiggle_rate: 2.0,
 }
 
-check_buttons: CheckButton[];
+check_buttons: List![CheckButton];
 
 check_button_style: Style = {
   foreground: WHITE,
@@ -121,11 +122,6 @@ reset_button_style : Style = {
 
 index : s32 = 0;
 
-play_callback :: fn() {
-  playing = !playing;
-  timer.last_tick_time = 0;
-  index = 0;
-}
 
 color_index: s32;
 
@@ -141,17 +137,17 @@ get_sequencer_style :: fn(style: Style) -> Style {
 }
 
 SequenceChannel :: struct {
-  check_buttons: CheckButton[];
-  sound: Sound;
-  active: bool;
-  style: Style;
-  volume : int = 50;
-  old_volume : int = 50;
-  volume_slider: SliderI;
+  check_buttons: List![CheckButton],
+  sound: Sound,
+  active: bool,
+  style: Style,
+  volume : s32,
+  old_volume : s32,
+  volume_slider: Slider![s32],
 }
 
 impl SequenceChannel {
-  create :: fn(_sound: Sound, _style: Style, name: string) -> #self {
+  create :: fn(_sound: Sound, _style: Style, name: u8*) -> #self {
     self: #self;
     self.sound = _sound;
     self.style = _style;
@@ -164,20 +160,20 @@ impl SequenceChannel {
     };
     return self;
   }
-  draw :: fn(self*, x: float, y: float) {
+  draw :: fn(self*, x: f32, y: f32) {
     if total_notes != self.check_buttons.length {
       while total_notes > self.check_buttons.length {
-        _x : float = x + 150 + ((self.check_buttons.length * 40) as float) + 2;
-        self.check_buttons ~= {
+        _x : f32 = x + 150 + ((self.check_buttons.length * 40) as f32) + 2;
+        self.check_buttons.push({
           value:      false,
           rect:       Rectangle{x: _x, y: y, width: 36, height: 36},
           style:      self.style,
-          text:       string::empty(),
+          text:       null,
           allow_hold: true,
-        }
+        });
       }
       while self.check_buttons.length > total_notes {
-        button := ~self.check_buttons;
+        button := self.check_buttons.pop();
       }
     }
     self.volume_slider.value = &self.volume;
@@ -192,10 +188,10 @@ impl SequenceChannel {
       button.draw();
     }
   }
-  update :: fn(self*, index: int) {
+  update :: fn(self*, index: s32) {
     if self.volume != self.old_volume {
       self.old_volume = self.volume;
-      SetSoundVolume(self.sound, (self.volume as float) / 100.0);
+      SetSoundVolume(self.sound, (self.volume as f32) / 100.0);
     }
     if self.check_buttons[index].value {
       PlaySound(self.sound);
@@ -203,19 +199,9 @@ impl SequenceChannel {
   }
 }
 
-channels: SequenceChannel[];
+channels: List![SequenceChannel];
 
-on_remove_channel :: fn() {
-  if channels.length > 0 then _ := ~channels;
-}
-
-on_reset :: fn() {
-  while channels.length > 0 {
-    _ := ~channels;
-  }
-}
-
-on_file_selected :: fn(index: int);
+on_file_selected :: fn(index: s32);
 
 file_dropdown : DropDown = {
   options: {},
@@ -225,13 +211,13 @@ file_dropdown : DropDown = {
   label: "New Channel"
 };
 
-on_file_selected :: fn(index: int) {
+on_file_selected :: fn(index: s32) {
   fileName := file_dropdown.options[index];
-  channels ~= SequenceChannel::create(
-    LoadSound(fileName.data),
+  channels.push(SequenceChannel::create(
+    LoadSound(fileName),
     get_sequencer_style(check_button_style),
     fileName
-  );
+  ));
 }
 
 sequencer :: fn() {
@@ -249,43 +235,59 @@ main :: fn() {
   bg_color.b -= 175;
 
   dir := Directory::open(".");
+  defer dir.deinit();
 
   InitAudioDevice();
-  InitWindow(800, 600, "Sequencer"c);
+  InitWindow(800, 600, "Sequencer");
 
   SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);
 
-  for file in dir.files {
-    if file.ends_with(".wav") || file.ends_with(".mp3") || file.ends_with(".ogg") {
-      file_dropdown.options ~= file;
+  for file in dir.files { 
+    if file.length <= 4 then continue;
+    #static extensions: String[3] = {
+      String::from(".wav"),
+      String::from(".mp3"),
+      String::from(".ogg"),
+    }
+    
+    for idx in 0..3 {
+      if extensions[idx] == file {
+        file_dropdown.options.push(file.data);
+        break;
+      }
     }
   }
 
   while !WindowShouldClose() {
     ClearBackground(GRAY);
     BeginDrawing();
-      if IsKeyPressed(KeyboardKey::KEY_SPACE) then play_callback();
+      if IsKeyPressed(KeyboardKey::KEY_SPACE) {
+        playing = !playing;
+        timer.last_tick_time = 0;
+        index = 0;
+      };
 
       seq_y := GetScreenHeight() / 2.0;
       seq_x := 0.0;
 
       for note in 0..total_notes {
-        label_x := seq_x + 150.0 + note * 40.0;
+        label_x := seq_x + 150.0 + (note as f32) * 40.0;
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
-        str : string = $"{beat}.{subdiv}";
-        DrawText(str.data, label_x as int, (seq_y - 40.0) as int, 12, WHITE);
+        text := $"{beat}.{subdiv}";
+        DrawText(text, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
+        free(text);
       }
 
       if playing {
         cursor_x := seq_x + 150.0 + (index - 1 + total_notes) % total_notes * 40.0
-        DrawRectangleLines(cursor_x as int, seq_y, 40, (channels.length as int) * 40, ORANGE);
+        DrawRectangleLines(cursor_x as s32, seq_y, 40, (channels.length as s32) * 40, ORANGE);
       }
 
       sequencer();
       bpm_slider.draw();
-      bpm = (bpm as int) as float;
+      bpm = (bpm as s32) as f32;
 
       timer.interval = (1 / (bpm / 60)) / subdivisions;
 
@@ -294,8 +296,14 @@ main :: fn() {
       subdivision_slider.draw();
       beats_slider.draw();
 
-      draw_button("reset (no undo)", {x: (GetScreenWidth() as float) - 210.0, y: 10, width: 200, height: 40}, reset_button_style, &on_reset);
-      draw_button("remove channel", {x: 0, y: 215, width: 125, height: 30}, reset_button_style, &on_remove_channel);
+      if button("reset (no undo)", {x: (GetScreenWidth() as f32) - 210.0, y: 10, width: 200, height: 40}, reset_button_style) {
+        while channels.length > 0 {
+          channels.pop();
+        }
+      }
+      if button("remove channel", {x: 0, y: 215, width: 125, height: 30}, reset_button_style) {
+        if channels.length > 0 then channels.pop();
+      }
 
       for *channel in channels {
         channel.draw(seq_x, seq_y);
@@ -310,7 +318,11 @@ main :: fn() {
         } else {
           play_button_style.highlighted = GREEN;
         }
-        draw_button("play", {x: 0, y: 50, width: 100, height: 40}, play_button_style, &play_callback);
+        if button("play", {x: 0, y: 50, width: 100, height: 40}, play_button_style) {
+          playing = !playing;
+          timer.last_tick_time = 0;
+          index = 0;
+        }
       }
     EndDrawing();
   }

@@ -1,5 +1,3 @@
-#import core;
-
 /* 
  * :: Important :: 
   - Some of these value-based returns from defers may be surprising in that they do not mutate the variables.
@@ -9,7 +7,7 @@
 */
 
 
-nested_defer_test :: fn() -> int {
+nested_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   if (true) {
@@ -19,10 +17,10 @@ nested_defer_test :: fn() -> int {
 }
 
 #test test_nested_defer :: fn() {
-  assert("nested defer failed"c, nested_defer_test() == 2);
+  assert("nested defer failed", nested_defer_test() == 2);
 }
 
-loop_defer_test :: fn() -> int {
+loop_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += i;
@@ -31,10 +29,10 @@ loop_defer_test :: fn() -> int {
 }
 
 #test test_loop_defer :: fn() {
-  assert("loop defer failed"c, loop_defer_test() == 3);
+  assert("loop defer failed", loop_defer_test() == 3);
 }
 
-early_return_defer_test :: fn() -> int {
+early_return_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   if (true) {
@@ -45,11 +43,11 @@ early_return_defer_test :: fn() -> int {
 }
 
 #test test_early_return_defer :: fn() {
-  assert("early return defer failed"c, early_return_defer_test() == 0);
+  assert("early return defer failed", early_return_defer_test() == 0);
 }
 
 DeferCleanup :: struct {
-  ptr : void*;
+  ptr : void*
 }
 
 // Return statements are evaluated BEFORE the defer, so
@@ -63,7 +61,7 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
     free(c.ptr);
     c.ptr = null;
   }
-  assert("defer cleanup got null input"c, c.ptr != null);
+  assert("defer cleanup got null input", c.ptr != null);
   return c.ptr as u64;
 }
 
@@ -74,13 +72,13 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
   };
   ptr_as_int : u64 = ptr as u64;
   n := defer_cleanup_routine(&cleanup);
-  assert("yep"c, n == ptr_as_int);
-  assert("cleanup on defer failed"c, cleanup.ptr == null);
+  assert("yep", n == ptr_as_int);
+  assert("leanup on defer failed", cleanup.ptr == null);
 }
 
 // Additional comprehensive tests
 
-continue_defer_test :: fn() -> int {
+continue_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -93,10 +91,10 @@ continue_defer_test :: fn() -> int {
 }
 
 #test test_continue_defer :: fn() {
-  assert("continue defer failed"c, continue_defer_test() == 7);
+  assert("ontinue defer failed", continue_defer_test() == 7);
 }
 
-break_defer_test :: fn() -> int {
+break_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -109,10 +107,10 @@ break_defer_test :: fn() -> int {
 }
 
 #test test_break_defer :: fn() {
-  assert("break defer failed"c, break_defer_test() == 4);
+  assert("break defer failed", break_defer_test() == 4);
 }
 
-multiple_defer_test :: fn() -> int {
+multiple_defer_test :: fn() -> s32 {
   x := 0;
   defer x += 1;
   defer x += 2;
@@ -120,10 +118,10 @@ multiple_defer_test :: fn() -> int {
 }
 
 #test test_multiple_defer :: fn() {
-  assert("multiple defer failed"c, multiple_defer_test() == 0);
+  assert("multiple defer failed", multiple_defer_test() == 0);
 }
 
-nested_control_flow_defer_test :: fn() -> int {
+nested_control_flow_defer_test :: fn() -> s32 {
   x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -137,5 +135,5 @@ nested_control_flow_defer_test :: fn() -> int {
 }
 
 #test test_nested_control_flow_defer :: fn() {
-  assert("nested control flow defer failed"c, nested_control_flow_defer_test() == 7);
+  assert("nested control flow defer failed", nested_control_flow_defer_test() == 7);
 }

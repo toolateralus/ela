@@ -1,6 +1,6 @@
 GenericStruct :: struct![T] {
-  a: T;
-  b: T;
+  a: T,
+  b: T,
 }
 
 impl![T] GenericStruct![T] {
@@ -10,21 +10,21 @@ impl![T] GenericStruct![T] {
 }
 
 #test test_generic_struct :: fn() {
-  int_adder: GenericStruct![int] = {a: 5, b: 6};
-  assert("generic type failure"c, int_adder.add() == 5 + 6);
-  float_adder: GenericStruct![float] = {a: 1.23, b: 4.56};
-  assert("generic type failure"c, float_adder.add() == 1.23 + 4.56);
+  int_adder: GenericStruct![s32] = {a: 5, b: 6};
+  assert("generic type failure", int_adder.add() == 5 + 6);
+  float_adder: GenericStruct![f32] = {a: 1.23, b: 4.56};
+  assert("generic type failure", float_adder.add() == 1.23 + 4.56);
 }
 
 GenericUnion :: union![T, T1] {
-  a: T;
-  b: T1;
+  a: T,
+  b: T1,
 }
 
 #test test_generic_union :: fn() {
-  int_adder: GenericUnion![int, float];
+  int_adder: GenericUnion![s32, f32];
   int_adder.a = 11;
-  assert("generic type failure"c, int_adder.a == 5 + 6);
+  assert("generic type failure", int_adder.a == 5 + 6);
   int_adder.b = 1.23 + 4.56;
-  assert("generic type failure"c, int_adder.b == 1.23 + 4.56);
+  assert("generic type failure", int_adder.b == 1.23 + 4.56);
 }

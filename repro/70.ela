@@ -1,0 +1,20 @@
+
+generic :: fn![T]() {
+  /* 
+    * internal compiler error: ASTType* resolved to null in emitter.
+    *    at: /home/josh_arch/source/c++/ela/repro/70.ela:5:30
+
+    * this error occurs on `u8*` ?? 
+  */
+  lambda := fn() -> u8* { 
+    printf("%s\n", "alloo"); 
+    return null;
+  }
+
+  // * This just straight up crashes the compiler when trying to read from the lambda's unique id.
+  lambda := fn() { 
+    printf("%s\n", "alloo"); 
+  }
+}
+
+main :: fn() { }

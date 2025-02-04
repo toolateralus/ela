@@ -1,0 +1,30 @@
+
+// !this fails to transpile to C because C doesn't allow empty enums.
+// * Enum1 :: enum {}
+
+Enum :: enum {
+  A,
+  B,
+  C
+}
+
+some_stuff :: fn() -> (Enum, u8*) {
+  /* 
+  * i guess our type system is treating all of our enum types as 
+  * just straight integers?
+  * this needs to change, I think it should be rather strict, or not strict at all.
+  * Right now, you have to type the fully qualified enum name & member, which makes you
+  * think that it's stricted than it actually is
+
+  
+      /home/josh_arch/source/c++/ela/repro/80.ela:13:10: error: returning '$tuple1$14' from a function with incompatible result type '$tuple242$14'
+      13 |   return ($tuple1$14) {.$0 = Enum_A, .$1 = NULL};
+          |          ^~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    1 error generated.
+  */
+  return (Enum::A, null); 
+}
+
+main :: fn() { 
+
+}

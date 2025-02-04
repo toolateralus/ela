@@ -1,0 +1,148 @@
+
+// forward declare panic.
+panic :: fn(msg: str);
+
+#ifndef FREESTANDING {
+  impl![T] List![T] {
+    subarray :: fn(self, range: Range) -> #self {
+      if range.begin < 0 || range.end > self.length || range.begin > range.end {
+        panic("Invalid range for subarray");
+      }
+      len := range.end - range.begin;
+      new_data := malloc(sizeof(T) * len);
+      if !new_data then panic("Failed to allocate in subarray");
+      memcpy(new_data, self.data + range.begin, sizeof(T) * len);
+      return {
+        data: new_data,
+        length: len,
+        capacity: len,
+      }
+    }
+
+    at :: fn(self*, index: u64) -> T {
+      return self.data[index];
+    }
+
+    // You should probably not call this function, and you do not need to for normal push operations.
+    // In the case you want to shrink your array, you can pass in array.length or whatever you want to shrink to,
+    // and this will set your length appropriately.
+    resize :: fn(self*, new_capacity: u64) {
+      if new_capacity < self.capacity && new_capacity < self.length then self.length = new_capacity; // Truncating.
+
+      self.capacity = new_capacity;
+      self.data = realloc(self.data, sizeof(T) * self.capacity);
+      if !self.data then panic("Failed to allocate in List![{#type(T).name}]");
+    }
+
+    push   :: fn(self*, v: T) {
+      if self.length + 1 >= self.capacity {
+        if self.capacity == 0 then self.capacity = 4;
+        self.resize(self.capacity * 2);
+      }
+      self.data[self.length] = v;
+      self.length++;
+    }
+
+    pop    :: fn(self*) -> T {
+      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+      value := self.data[self.length - 1];
+      self.length -= 1;
+      return value;
+    }
+
+    push_front :: fn(self*, v: T) {
+      if self.length + 1 >= self.capacity {
+      if self.capacity == 0 then self.capacity = 4;
+      self.resize(self.capacity * 2);
+      }
+      memmove(self.data + 1, self.data, sizeof(T) * self.length);
+      self.data[0] = v;
+      self.length++;
+    }
+
+    pop_front :: fn(self*) -> T {
+      if self.length == 0 then panic("Attempted to pop from an empty List![{#type(T).name}]");
+      value := self.data[0];
+      memmove(self.data, self.data + 1, sizeof(T) * (self.length - 1));
+      self.length -= 1;
+      return value;
+    }
+
+    // This does not actually deinit any of members in the list.
+    // We should have some compile time way to have alternatives based on a specializiation
+    // like #if T: Deinit { } .. else {}
+
+    // that causes an odd problem, though. Not really a problem, just an oddity:
+    // some specializations would have functions where others would not.
+    // you may expect a Type![T] to have a function and depending on a hidden where condition,
+    // it may just not have it, and that would probably be a really confusing issue, where you call a known function on one generic
+    // instantiation, but another jsut doesn't have it. We could have nice descriptive errors to combat this?
+    deinit :: fn(self*) {
+      free(self.data);
+      self.data = null;
+      self.length = 0;
+    }
+
+
+    // Initalize the array to a specific length, and zero initialize the data.
+    // useful to create a dynamic of at least num_to_fill length, and have all the elements be valid data.
+    // Do not use this on an array that is already full of your data, unless you want to zero it out and reset to 
+    // a specific new size.
+    initialize :: fn(self*, num_to_fill: u64) {
+      self.resize(num_to_fill);
+      memset(self.data, 0, sizeof(T) * self.capacity);
+      self.length = num_to_fill;
+    }
+  }
+
+  impl![T] Clone for List![T] {
+    clone :: fn(self) -> #self {
+      new_data := malloc(sizeof(T) * self.capacity);
+      if !new_data then panic("Failed to allocate in List clone");
+      memcpy(new_data, self.data, sizeof(T) * self.length);
+      return {
+        data: new_data,
+        length: self.length,
+        capacity: self.capacity,
+      }
+    } 
+  }
+
+  impl![T] Init![T] for List![T] {
+    init :: fn(init: Init_List![T]) -> #self {
+      self: #self;
+      for idx in 0..init.length {
+        self.push(init.data[idx]);
+      }
+      return self;
+    }
+  }
+}
+
+impl![T] Iterable![T] for List![T] {
+  iter :: fn(self*) -> Iter![T] {
+    return {
+      ptr: self.data,
+      end: (self.data + self.length) as T*,
+    }
+  }
+}
+
+impl![T] List![T] {
+  subscript :: fn(self*, idx: s64) -> T {
+    return self.data[idx];
+  }
+}
+
+impl![T] As_Slice![T] for List![T] {
+  as_slice :: fn(self, range: Range) -> Slice![T] {
+    if range.begin < 0 || range.end > self.length || range.begin > range.end {
+      panic("Invalid range for as_slice");
+    }
+    len := range.end - range.begin;
+    return Slice![T] {
+      data: self.data + range.begin,
+      length: len,
+    }
+  }
+}

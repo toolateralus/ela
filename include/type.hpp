@@ -20,7 +20,7 @@ struct ASTDeclaration;
 struct Scope;
 struct Context;
 
-extern std::vector<Type> type_table;
+extern std::vector<Type*> type_table;
 extern jstl::Arena type_info_arena;
 
 enum ConversionRule {
@@ -63,7 +63,6 @@ enum TypeExtEnum {
   TYPE_EXT_INVALID,
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
-  TYPE_EXT_FIXED_ARRAY,
 };
 
 enum FunctionInstanceFlags : size_t {
@@ -74,8 +73,7 @@ enum FunctionInstanceFlags : size_t {
   FUNCTION_IS_EXPORTED = 1 << 4,
   FUNCTION_IS_FORWARD_DECLARED = 1 << 5,
   FUNCTION_IS_STATIC = 1 << 6,
-  FUNCTION_IS_LOCAL = 1 << 7,
-  FUNCTION_IS_FOREIGN = 1 << 8,
+  FUNCTION_IS_FOREIGN = 1 << 7,
 };
 
 enum StructTypeFlags {
@@ -90,14 +88,11 @@ std::string mangled_type_args(const std::vector<int> &args);
 
 struct TypeExtension {
   TypeExtEnum type;
-  union {
-    size_t array_size;
-    int key_type;
-  };
+  size_t array_size;
   bool operator==(const TypeExtension &other) const {
     if (type != other.type)
       return false;
-    if (type == TYPE_EXT_FIXED_ARRAY) {
+    if (type == TYPE_EXT_ARRAY) {
       return array_size == other.array_size;
     }
     return true;
@@ -117,9 +112,7 @@ struct TypeExtensions {
     }
   }
 
-  inline bool is_array() const { return back_type() == TYPE_EXT_ARRAY; }
-
-  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_FIXED_ARRAY; }
+  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
 
   inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER; }
 
@@ -133,7 +126,9 @@ struct TypeExtensions {
 
   inline TypeExtensions append(const TypeExtensions &to_append) const {
     auto these = *this;
-    these.extensions.insert(these.extensions.end(), to_append.extensions.begin(), to_append.extensions.end());
+    for (const auto &ext: to_append.extensions) {
+      these.extensions.push_back({ext});
+    }
     return these;
   }
 
@@ -186,7 +181,6 @@ struct FunctionTypeInfo : TypeInfo {
   int return_type = -1;
   int parameter_types[256]; // max no of params in c++.
   int params_len = 0;
-  int default_params = 0; // number of default params, always trailing.
   bool is_varargs = false;
   // defined in cpp file
   virtual std::string to_string() const override;
@@ -220,26 +214,18 @@ struct TupleTypeInfo : TypeInfo {
 
 // helpers to get scalar types for fast comparison
 int voidptr_type();
-int char_type();
 int bool_type();
 int void_type();
 int s8_type();
 int s16_type();
 int s32_type();
 int s64_type();
-int int_type();
 int u8_type();
 int u16_type();
 int u32_type();
 int u64_type();
-int float64_type();
-int float_type();
-int float32_type();
-
-// These 3 type getters are assigned by the Context constructor.
-int &c_string_type();
-int &string_type();
-int &range_type();
+int f64_type();
+int f32_type();
 
 Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
@@ -250,12 +236,11 @@ int global_create_struct_type(const InternedString &, Scope *, std::vector<int> 
 int global_create_interface_type(const InternedString &name, Scope *scope,
                                  std::vector<int> generic_args);
 
-int global_create_tagged_union_type(const InternedString &, Scope *);
+int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args);
 int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
-int global_create_tuple_type(const std::vector<int> &types, const TypeExtensions &ext);
+int global_create_tuple_type(const std::vector<int> &types);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
-int charptr_type();
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions);
 int global_find_type_id(const int, const TypeExtensions &);
@@ -275,6 +260,12 @@ struct Type {
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
+
+  // These are for emit time strictly.
+  // it's just saying that when we emit a declaration of this type, whether it's a struct, enum, tagged union, etc.
+  // we need to emit these tuple types as structs RIGHT after our struct declaration, because we are the elder dependency that this
+  // tuple depends on.
+  std::vector<int> tuple_dependants; 
   // if this is an alias or something just get the actual real true type.
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
@@ -285,8 +276,23 @@ struct Type {
   inline InternedString const get_base() const { return base; }
   TypeExtensions const get_ext() const { return extensions; }
   TypeExtensions const get_ext_no_compound() const { return extensions; }
-
   TypeInfo *get_info() const { return info; }
+
+  bool implements(const InternedString &interface) {
+    for (auto id : interfaces) {
+      auto iface = global_get_type(id);
+      std::string iface_base_str = iface->base.get_str();
+      std::string interface_str = interface.get_str();
+      auto pos = iface_base_str.find('$');
+      if (pos != std::string::npos) {
+        iface_base_str = iface_base_str.substr(0, pos);
+      }
+      if (iface_base_str == interface_str) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 private:
   TypeInfo *info;
@@ -322,13 +328,12 @@ enum OperationKind {
 int find_operator_overload(TType op, Type *left_ty, OperationKind kind);
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
-static std::string get_unmangled_name(Type *type) {
+static std::string get_unmangled_name(const Type *type) {
   std::string base = type->get_base().get_str();
   auto first = base.find("$");
   if (first != std::string::npos) {
     base = base.substr(0, first);
   }
-
   if (!type->generic_args.empty()) {
     base += "![";
     auto it = 0;
@@ -341,5 +346,6 @@ static std::string get_unmangled_name(Type *type) {
     }
     base += "]";
   }
+  base += type->get_ext().to_string();
   return base;
 }
