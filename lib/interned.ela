@@ -25,3 +25,5 @@ impl![T] Eq for Interned![T] {
     return self.hash == other.hash;
   }
 }
+
+#alias Interned_String :: Interned![String];

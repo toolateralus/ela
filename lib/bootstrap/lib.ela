@@ -98,11 +98,11 @@ panic :: fn(msg: str) {
   }
 }
 
-impl As_Char_Slice for u32 {
-  as_char_slice :: fn(self) -> Slice![u32] {
+impl As_Byte_Slice for u32 {
+  as_byte_slice :: fn(self) -> Slice![u8] {
     return {
       data: &self,
-      length: 1,
+      length: 4,
     }
   }
 }

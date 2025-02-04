@@ -906,7 +906,7 @@ void Emitter::visit(ASTProgram *node) {
   }
 
   for (auto &type : type_table) {
-    if (type->is_kind(TYPE_SCALAR) || type->is_kind(TYPE_FUNCTION) || type->is_kind(TYPE_ENUM)) {
+    if (type->is_kind(TYPE_SCALAR) || (type->is_kind(TYPE_FUNCTION) && type->generic_args.empty()) || type->is_kind(TYPE_ENUM)) {
       emit_tuple_dependants(type->tuple_dependants);
     }
   }
