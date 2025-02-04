@@ -1,0 +1,25 @@
+#import hash_map;
+
+Interned :: struct![T] where T is Hash {
+  hash: u64,
+}
+
+impl![T] Interned {
+  table :: fn() -> Hash_Map![u64, T]* {
+    static map: Hash_Map![u64, T];
+    return &map;
+  }
+  new :: fn(t: T) -> #self {
+    self.hash := t.hash();
+    table := self.table();
+    if !table.get(self.hash) {
+      table.insert(self.hash, t);
+    }
+  }
+}
+
+impl![T] Eq for Interned![T] {
+  eq :: fn(self, other: #self) -> bool {
+    return self.hash == other.hash;
+  }
+}

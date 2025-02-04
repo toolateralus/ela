@@ -33,9 +33,22 @@
 
   #foreign atoi :: fn(v: u8*) -> s32;
   #foreign atof :: fn(v: u8*) -> f64;
-}
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+  #foreign memset :: fn(dest: void*, c: s32, n: u64) -> void*;
+  #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> s32;
+  #foreign strncmp :: fn(s: u8*, str2: u8*, len: s32) -> s32;
+  #foreign strcmp :: fn(str1: u8*, str2: u8*) -> s32;
+  #foreign isalnum :: fn(c: s32) -> s32;
+  #foreign isalpha :: fn(c: s32) -> s32;
+  #foreign isspace :: fn(c: s32) -> s32;
+  #foreign isdigit :: fn(c: s32) -> s32;
+  #foreign islower :: fn(c: s32) -> s32;
+  #foreign isupper :: fn(c: s32) -> s32;
+  #foreign isprint :: fn(c: s32) -> s32;
+  #foreign ispunct :: fn(c: s32) -> s32;
+  #foreign strlen :: fn(string: u8*) -> u32;
 
-#region Compiler Provided Libc Functions {
+} else {
   memcpy :: fn(dest: void*, src: void*, n: u64) -> void* {
     d : u8* = dest;
     s : u8* = src;

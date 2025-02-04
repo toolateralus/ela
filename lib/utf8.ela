@@ -118,8 +118,6 @@ code_point_to_utf8 :: fn(code_point: u32) -> u8[] {
   }
 }
 
-
-
 utf8_decode :: fn![T](data: T) -> u32[] where T is As_Char_Slice {
   slice := data.as_byte_slice();
   output: u32[];
