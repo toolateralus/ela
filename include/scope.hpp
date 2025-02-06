@@ -124,15 +124,15 @@ struct Scope {
   }
 
   void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value) {
-    symbols.insert({name, Symbol::create_variable(name, type_id, initial_value)});
+    symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value));
   }
 
   void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    symbols.insert({name, Symbol::create_function(name, type_id, declaration, flags)});
+    symbols.insert_or_assign(name, Symbol::create_function(name, type_id, declaration, flags));
   }
 
   void insert_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
-    symbols.insert({name, Symbol::create_type(type_id, name, kind, declaration)});
+    symbols.insert_or_assign(name, Symbol::create_type(type_id, name, kind, declaration));
   }
 
 
@@ -151,19 +151,19 @@ struct Scope {
 
   int create_tagged_union(const InternedString &name, Scope *scope, ASTTaggedUnionDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
-    symbols.insert({name, Symbol::create_type(id, name, TYPE_TAGGED_UNION, (ASTNode*)declaration)});
+    symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_TAGGED_UNION, (ASTNode*)declaration));
     return id;
   }
 
   int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args, ASTInterfaceDeclaration *declaration) {
     auto id = global_create_interface_type(name, scope, generic_args);
-    symbols.insert({name, Symbol::create_type(id, name, TYPE_INTERFACE, (ASTNode*)declaration)});
+    symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_INTERFACE, (ASTNode*)declaration));
     return id;
   }
 
   int create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
     auto id = global_create_struct_type(name, scope);
-    symbols.insert({name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration)});
+    symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration));
     return id;
   }
 
@@ -175,7 +175,7 @@ struct Scope {
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.declaration = declaring_node;
     symbols.erase(name);
-    symbols.insert({name, symbol});
+    symbols.insert_or_assign(name, symbol);
   }
 
   void forward_declare_type(const InternedString &name, int default_id) {
@@ -183,12 +183,12 @@ struct Scope {
     symbol.name = name;
     symbol.type_id = default_id;
     symbol.flags = SYMBOL_IS_TYPE;
-    symbols.insert({name, symbol});
+    symbols.insert_or_assign(name, symbol);
   }
 
   int create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto id = global_create_enum_type(name, scope, flags);
-    symbols.insert({name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration)});
+    symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration));
     return id;
   }
 
@@ -196,7 +196,7 @@ struct Scope {
     auto id = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    symbols.insert({name, Symbol::create_type(id, name, TYPE_STRUCT, nullptr)});
+    symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
     return id;
   }
 

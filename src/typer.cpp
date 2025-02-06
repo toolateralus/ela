@@ -400,7 +400,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
     if (!method->generic_parameters.empty()) {
-      type_scope->insert_function(method->name, method->resolved_type, method);
+      // TODO: actually generate a signature for a generic function so that you can compare them
+      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
@@ -540,6 +541,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
 
 void Typer::visit(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
+    // TODO: actually generate a signature for a generic function so that you can compare them
     ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);
     return;
   }
