@@ -39,7 +39,7 @@ to_string :: fn![T](value: T) -> String {
     format = "(unsupported type)";  // * do we throw an error here? format = null?
   } 
 
-  snprintf(buffer, sizeof(buffer), format.data, value);
+  snprintf(buffer, 64 * sizeof(u8), format.data, value);
   return String::from(strdup(buffer));
 } 
 

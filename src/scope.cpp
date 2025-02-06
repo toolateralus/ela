@@ -45,8 +45,6 @@ Context::Context() {
       type_table[i]->get_info()->scope->parent = root_scope;
     }
 
-    std::cout << std::format("creating alias for scalar/builtin {} :: {}\n", type_table[i]->get_base(), i);
-
     root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
   }
 }

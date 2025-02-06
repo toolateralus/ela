@@ -962,13 +962,10 @@ void Typer::visit(ASTCall *node) {
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
-  if (auto symbol = get_symbol(node->function).get()) {
+  auto symbol = get_symbol(node->function).get();
+  if (symbol && symbol->is_function()) {
     if (!type) {
       type = global_get_type(symbol->type_id);
-    }
-
-    if (!symbol->is_function()) {
-      throw_error("unable to call `()` a non-callable, non function symbol", node->source_range);
     }
 
     auto declaring_node = symbol->function.declaration;

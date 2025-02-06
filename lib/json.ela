@@ -83,7 +83,6 @@ impl JsonLexer {
       free(get_json_error());
     }
     set_json_error(format("[%:%:%] :: %", {any::new(&self.file), any::new(&token.line), any::new(&token.column), any::new(&msg)}));
-    set_json_error(format("[%:%:%] :: %", {self.file,            token.line, token.column, msg}));
     return (JsonError::ERROR, token);
   }
 

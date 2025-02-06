@@ -8,7 +8,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
       auto name = static_cast<ASTIdentifier*>(node);
       auto symbol = ctx.scope->lookup(name->value);
       
-      if (!symbol || !symbol->is_function()) {
+      if (!symbol || symbol->is_function()) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
 
