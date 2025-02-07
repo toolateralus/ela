@@ -127,7 +127,8 @@
     if string[0] as u32 == '\0' then return 0;
     i := 0;
     while *string {
-      i++
+      i++;
+      string++;
     }
     return i;
   }
