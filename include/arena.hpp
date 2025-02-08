@@ -13,11 +13,13 @@
  * std::runtime_error is thrown.
  */
 
+#include <cstring>
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
 
 #include <cstddef>
+#include <stdexcept>
 
 namespace jstl {
 struct Arena final {
@@ -28,25 +30,32 @@ struct Arena final {
   Arena &operator=(const Arena &) = delete;
   Arena &operator=(Arena &&) = delete;
 
+
   inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
 
-  inline ~Arena() { delete[] data; }
+  inline ~Arena() { delete[] data; delete next; }
 
   inline char *allocate(size_t size_in_bytes) {
-    size_t alignment = alignof(std::max_align_t);
-    size_t aligned_ptr = (ptr + alignment - 1) & ~(alignment - 1);
+    constexpr size_t MAX_ALIGN = alignof(std::max_align_t);
+    size_t aligned_ptr = (ptr + MAX_ALIGN - 1) & ~(MAX_ALIGN - 1);
+
     if (aligned_ptr + size_in_bytes > capacity) {
-      printf("failed to allocate in arena");
-      exit(1);
+      if (!next) {
+        next = new Arena(capacity);
+      }
+      return next->allocate(size_in_bytes);
     }
+
     char *mem = (char *)data + aligned_ptr;
     ptr = aligned_ptr + size_in_bytes;
     return mem;
   }
 
  private:
-  const size_t capacity;
-  const char *data;
+  Arena *next = nullptr;
+  const size_t capacity = 0;
+  char *data = nullptr;
   size_t ptr = 0;
+
 };
 }  // namespace jstl

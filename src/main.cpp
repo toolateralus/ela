@@ -23,11 +23,11 @@ using std::string;
 using std::vector;
 
 // This is probably WAYY over allocated but we just want to be sure there's enough space.
-jstl::Arena type_info_arena{MB(333)};
+jstl::Arena type_info_arena{MB(10)};
 // the same for this
-jstl::Arena scope_arena{MB(333)};
+jstl::Arena scope_arena{MB(10)};
 // the same for this
-jstl::Arena ast_arena{MB(333)};
+jstl::Arena ast_arena{MB(10)};
 
 std::vector<Type *> type_table{};
 size_t LAMBDA_UNIQUE_ID = 0;
@@ -79,8 +79,9 @@ int main(int argc, char *argv[]) {
     run_on_finished = true;
   }
 
+  bool run_tests = false;
   if (argc >= 2 && (strcmp(argv[1], "test") == 0 || strcmp(argv[1], "t") == 0)) {
-    compile_command.flags["test"] = true;
+    run_tests = true;
     argv[1] = (char *)"main.ela";
     argc = 2;
     run_on_finished = true;
@@ -97,6 +98,10 @@ int main(int argc, char *argv[]) {
   }
 
   compile_command = CompileCommand(argc, argv);
+
+  if (run_tests) {
+    compile_command.flags["test"] = true;
+  }
 
   if (compile_command.has_flag("freestanding")) {
     compile_command.compilation_flags += " -ffreestanding -nostdlib ";
