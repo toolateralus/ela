@@ -1700,6 +1700,10 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       return;
     }
 
+    if (node->name == "to_string" && !node->generic_arguments.empty() && node->generic_arguments[0] == 30) {
+      int x = 0;
+    }
+
     if (node->name != "main") {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
@@ -1715,8 +1719,8 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
 
     std::string name;
-    if (type_context) {
-      name += "$" + std::to_string(type_context.get()->resolved_type) + "_";
+    if (node->declaring_type != Type::INVALID_TYPE_ID) {
+      name += "$" + std::to_string(node->declaring_type) + "_";
     }
     name += node->name.get_str();
     if (!node->generic_arguments.empty()) {

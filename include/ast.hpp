@@ -340,6 +340,7 @@ struct ASTLambda;
 struct ASTFunctionDeclaration : ASTStatement {
   size_t flags = 0;
   bool has_defer = false;
+  int declaring_type = Type::INVALID_TYPE_ID;
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
