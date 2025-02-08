@@ -116,7 +116,7 @@ impl String_Builder {
     for i in 0..list.length {
       self.append![T](list.data[i]);
     }
-  }
+  } 
 
   append_concat_then_free :: fn![T](self*, list: Init_List![T], free_list: Init_List![bool]) where T is Deinit {
     if free_list.length != list.length {
