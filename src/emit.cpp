@@ -145,13 +145,25 @@ template <typename T> void Emitter::emit_generic_instantiations(std::vector<Gene
 
 void Emitter::visit(ASTWhile *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
-  emit_condition_block(node, "while", node->condition, node->block);
+  emit_line_directive(node);
+  (*ss) << indent() << "while (";
+  if (node->condition.is_not_null()) {
+    node->condition.get()->accept(this);
+  } else {
+    (*ss) << "true";
+  }
+  (*ss) << ") ";
+  node->block->accept(this);
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
   defer_blocks.pop_back();
   return;
 }
 void Emitter::visit(ASTIf *node) {
-  emit_condition_block(node, "if", node->condition, node->block);
+  emit_line_directive(node);
+  (*ss) << indent() << "if (";
+  node->condition->accept(this);
+  (*ss) << ")";
+  node->block->accept(this);
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
   }
@@ -253,31 +265,15 @@ void Emitter::visit(ASTAlias *node) { return; }
 void Emitter::visit(ASTArguments *node) {
   (*ss) << "(";
   for (int i = 0; i < node->arguments.size(); ++i) {
-    bool emitted = false;
-
-    // ! This is a terrible hack.
-    // ! We should have a specific node for functions that take types as arguments
-    // ! sizeof(), typeof(), etc etc.
-    if (node->arguments[i]->get_node_type() == AST_NODE_IDENTIFIER) {
-      auto iden = static_cast<ASTIdentifier *>(node->arguments[i]);
-      auto type = ctx.scope->find_type_id(iden->value, {});
-      if (type != -1) {
-        emitted = true;
-        (*ss) << to_cpp_string(global_get_type(type));
-      }
-    }
-
-    if (!emitted) {
-      node->arguments[i]->accept(this);
-    }
-
-    if (i != node->arguments.size() - 1) {
+    if (i != 0) {
       (*ss) << ", ";
     }
+    node->arguments[i]->accept(this);
   }
   (*ss) << ")";
   return;
 }
+
 void Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
   if (!type) {
@@ -990,22 +986,7 @@ void Emitter::visit(ASTDotExpr *node) {
 void Emitter::visit(ASTSubscript *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   if (left_ty && node->is_operator_overload) {
-    // !! THIS IS A TOTAL HACK!!!
-    // !! JUST TRYING THIS OUT!!!
-    auto function_type = find_operator_overload(TType::LBrace, left_ty, OPERATION_SUBSCRIPT);
-    auto call = ast_alloc<ASTCall>();
-    auto sr = ast_alloc<ASTDotExpr>();
-    auto left_id = ast_alloc<ASTIdentifier>();
-    sr->base = node->left;
-    sr->member_name = get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT);
-    call->function = sr;
-    call->arguments = ast_alloc<ASTArguments>();
-    call->arguments->arguments = {node->subscript};
-    call->accept(&typer);
-    call->accept(this);
-    sr->source_range = node->source_range;
-    call->arguments->source_range = node->source_range;
-    call->source_range = node->source_range;
+    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, TType::LBrace, node->left, node->subscript);
     return;
   }
 
@@ -1574,20 +1555,6 @@ std::string Emitter::to_cpp_string(Type *type) {
   return output;
 }
 
-void Emitter::emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition,
-                                   Nullable<ASTBlock> block) {
-  emit_line_directive(node);
-  (*ss) << indent() << keyword << " ";
-  if (condition.is_not_null()) {
-    (*ss) << "(";
-    condition.get()->accept(this);
-    (*ss) << ")";
-  } else {
-    (*ss) << "(true)";
-  }
-  block.get()->accept(this);
-}
-
 void Emitter::visit(ASTScopeResolution *node) {
   auto type = global_get_type(node->base->resolved_type);
   // for static function aclls and enum access, but this probably encompasses all of the usage.
@@ -1944,21 +1911,26 @@ void Emitter::visit(ASTSize_Of *node) {
 
 void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
-  auto function_type = find_operator_overload(op, left_ty, operation);
   auto call = ASTCall{};
-  auto sr = ASTDotExpr{};
-  auto left_id = ASTIdentifier{};
-  sr.base = left;
-  sr.member_name = get_operator_overload_name(op, operation);
-  call.function = &sr;
+  auto dot = ASTDotExpr{};
+  dot.base = left;
+  dot.member_name = get_operator_overload_name(op, operation);
+  call.function = &dot;
   auto args = ASTArguments{};
   if (right) {
     args.arguments = {right};
   }
   call.arguments = &args;
-  call.accept(&typer);
-  call.accept(this);
-  sr.source_range = range;
+  dot.source_range = range;
   call.arguments->source_range = range;
   call.source_range = range;
+  call.accept(&typer);
+  call.accept(this);
 }
+
+Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {
+  ss = &code;
+  dependencyEmitter = new DependencyEmitter(context, this);
+}
+
+Emitter::~Emitter() { delete dependencyEmitter; };

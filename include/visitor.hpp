@@ -118,7 +118,10 @@ struct DeferBlock {
   DeferBlockType type;
 };
 
+struct DependencyEmitter;
+
 struct Emitter : VisitorBase {
+  DependencyEmitter *dependencyEmitter;
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
@@ -184,7 +187,8 @@ struct Emitter : VisitorBase {
   void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type, Context &context);
-  inline Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
+  Emitter(Context &context, Typer &type_visitor);
+  ~Emitter();
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
@@ -205,9 +209,6 @@ struct Emitter : VisitorBase {
   std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
-
-  void emit_condition_block(ASTNode *node, const std::string &keyword, Nullable<ASTExpr> condition,
-                            Nullable<ASTBlock> block);
 
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
@@ -263,7 +264,61 @@ struct Emitter : VisitorBase {
     }
     return;
   };
-};
+}; 
+
+struct DependencyEmitter : VisitorBase {
+  Context &ctx;
+  Emitter *emitter;
+  inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
+
+  void emit_type(int type_id);
+
+  void visit(ASTStructDeclaration *node) override;
+  void visit(ASTProgram *node) override;
+  void visit(ASTBlock *node) override;
+  void visit(ASTFunctionDeclaration *node) override;
+  void visit(ASTParamsDecl *node) override;
+  void visit(ASTParamDecl *node) override;
+  void visit(ASTDeclaration *node) override;
+  void visit(ASTExprStatement *node) override;
+  void visit(ASTBinExpr *node) override;
+  void visit(ASTUnaryExpr *node) override;
+  void visit(ASTIdentifier *node) override;
+  void visit(ASTLiteral *node) override;
+  void visit(ASTType *node) override;
+  void visit(ASTCall *node) override;
+  void visit(ASTArguments *node) override;
+  void visit(ASTReturn *node) override;
+  void visit(ASTContinue *node) override;
+  void visit(ASTBreak *node) override;
+  void visit(ASTFor *node) override;
+  void visit(ASTIf *node) override;
+  void visit(ASTElse *node) override;
+  void visit(ASTWhile *node) override;
+  void visit(ASTDotExpr *node) override;
+  void visit(ASTSubscript *node) override;
+  void visit(ASTInitializerList *node) override;
+  void visit(ASTEnumDeclaration *node) override;
+  void visit(ASTRange *node) override;
+  void visit(ASTSwitch *node) override;
+  void visit(ASTTuple *node) override;
+  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTSize_Of *node) override;
+  void visit(ASTScopeResolution *node) override;
+  void visit(ASTAlias *node) override;
+  void visit(ASTImpl *node) override;
+  void visit(ASTDefer *node) override;
+  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTCast *node) override;
+  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTLambda *node) override;
+  void visit(ASTWhere *node) override;
+  void visit(ASTStatementList *node) override {
+    for (const auto &stmt : node->statements) {
+      stmt->accept(this);
+    }
+  };
+}; 
 
 struct GenericInstantiationErrorUserData {
   std::string message = "";
