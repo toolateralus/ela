@@ -38,9 +38,7 @@ extern std::unordered_set<InternedString> import_set;
 enum AST_Node_Type {
   AST_NODE_PROGRAM,
   AST_NODE_BLOCK,
-  AST_NODE_FUNCTION_DECLARATION,
-  AST_NODE_PARAMS_DECL,
-  AST_NODE_PARAM_DECL,
+  AST_NODE_FUNCTION,
   AST_NODE_DECLARATION,
   AST_NODE_EXPR_STATEMENT,
   AST_NODE_BIN_EXPR,
@@ -50,7 +48,6 @@ enum AST_Node_Type {
   AST_NODE_TYPE,
   AST_NODE_TUPLE,
   AST_NODE_CALL,
-  AST_NODE_ARGUMENTS,
   AST_NODE_RETURN,
   AST_NODE_CONTINUE,
   AST_NODE_BREAK,
@@ -58,17 +55,16 @@ enum AST_Node_Type {
   AST_NODE_IF,
   AST_NODE_ELSE,
   AST_NODE_WHILE,
-  AST_NODE_STRUCT_DECLARATION,
+  AST_NODE_STRUCT,
   AST_NODE_DOT_EXPR,
   AST_NODE_SCOPE_RESOLUTION,
   AST_NODE_SUBSCRIPT,
   AST_NODE_INITIALIZER_LIST,
-  AST_NODE_ENUM_DECLARATION,
-  AST_NODE_TAGGED_UNION_DECLARATION,
+  AST_NODE_ENUM,
   AST_NODE_NOOP,
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
-  AST_NODE_INTERFACE_DECLARATION,
+  AST_NODE_INTERFACE,
   AST_NODE_SIZE_OF,
   AST_NODE_DEFER,
   AST_NODE_CAST,
@@ -105,7 +101,7 @@ constexpr const inline static auto block_flags_to_string(const auto flags) {
 
 struct AST_Type_Extension {
   TypeExtEnum type;
-  ASTExpr *expression;
+  AST *expression;
 };
 
 struct AST;
@@ -152,6 +148,14 @@ struct SwitchCase {
   AST *block;
 };
 
+enum AST_Type_Kind {
+  AST_TYPE_NORMAL,
+  AST_TYPE_REFLECTION,
+  AST_TYPE_TUPLE,
+  AST_TYPE_FUNCTION,
+  AST_TYPE_SELF,
+};
+
 struct AST {
   AST(AST_Node_Type node_type) : node_type(node_type) {}
   ~AST() {}
@@ -178,7 +182,6 @@ struct AST {
       case AST_NODE_TYPE:
       case AST_NODE_TUPLE:
       case AST_NODE_CALL:
-      case AST_NODE_ARGUMENTS:
       case AST_NODE_DOT_EXPR:
       case AST_NODE_SCOPE_RESOLUTION:
       case AST_NODE_SUBSCRIPT:
@@ -195,13 +198,7 @@ struct AST {
   union {
     std::vector<AST *> statements;
     struct {
-      enum {
-        NORMAL,
-        REFLECTION,
-        TUPLE,
-        FUNCTION,
-        SELF,
-      } kind = NORMAL;
+      AST_Type_Kind kind = AST_TYPE_NORMAL;
       union {
         struct {
           AST *base;
@@ -217,7 +214,7 @@ struct AST {
       // [], *, [string] etc.
       std::vector<AST_Type_Extension> extensions;
       // special info for reflection
-      Nullable<ASTExpr> pointing_to;
+      Nullable<AST> pointing_to;
     } type;
     struct {
       size_t temp_iden_idx = 0;
@@ -251,7 +248,7 @@ struct AST {
       bool is_operator_overload : 1 = false;
     } binary;
     struct {
-      ASTExpr *operand;
+      AST *operand;
       Token_Type op;
       bool is_operator_overload : 1 = false;
     } unary;
@@ -261,6 +258,7 @@ struct AST {
       bool is_c_string : 1 = false;
       InternedString value;
     } literal;
+
     struct {
       std::vector<AST *> idens; // TODO: make it so you can take it by pointer, like *a, *b := some_struct;
       AST *right;
@@ -270,7 +268,7 @@ struct AST {
 
     struct {
       // various flags.
-      Function_Instance_Flags flags = (Function_Instance_Flags)0;
+      int16_t flags = 0;
       // has a self/self* parameter.
       bool has_self : 1 = false;
       // params have varargs.
@@ -289,7 +287,7 @@ struct AST {
       std::vector<AST_Parameter_Declaration> parameters;
       Nullable<AST> return_type;
       Nullable<AST> block;
-    } function_declaration;
+    } function;
 
     struct {
       std::vector<AST *> generic_arguments;
@@ -307,11 +305,11 @@ struct AST {
       InternedString member_name;
     } scope_resolution;
 
-    Nullable<ASTExpr> $return;
+    Nullable<AST> $return;
 
     struct {
-      ASTExpr *left;
-      ASTExpr *right;
+      AST *left;
+      AST *right;
     } range;
 
     struct {
@@ -398,8 +396,8 @@ struct AST {
 
     struct {
       union {
-        std::vector<std::pair<InternedString, ASTExpr *>> key_values;
-        std::vector<ASTExpr *> values;
+        std::vector<std::pair<InternedString, AST *>> key_values;
+        std::vector<AST *> values;
       };
       enum {
         INIT_LIST_EMPTY,
@@ -454,7 +452,7 @@ struct AST {
   };
 };
 
-extern AST *NOOP;
+extern AST *GLOBAL_NOOP;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,
@@ -512,7 +510,6 @@ struct Parser {
   AST *parse_multiple_asssignment();
   AST *parse_struct_declaration(Token);
   AST *parse_declaration();
-  AST *parse_parameters(std::vector<GenericParameter> params = {});
   AST *parse_enum_declaration(Token);
   AST *parse_lambda();
   AST *parse_block(Scope *scope = nullptr);
@@ -520,15 +517,16 @@ struct Parser {
   AST *parse_unary();
   AST *parse_postfix();
   AST *parse_primary();
-  AST *parse_call(ASTExpr *function);
+  AST *parse_call(AST *function);
   AST *parse_impl();
   AST *parse_where_clause();
   AST *parse_type();
   AST *parse_function_declaration(Token);
-  void append_type_extensions(AST *&type);
   AST *parse_function_type();
   AST *parse_defer();
 
+  void append_type_extensions(AST *&type);
+  std::vector<AST_Parameter_Declaration> parse_parameters(std::vector<GenericParameter> params = {});
   Nullable<AST> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<AST> try_parse_directive_expr();
 
@@ -575,12 +573,12 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
 }
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
-  AST *node = ast_alloc(type);                                                                                      \
+  AST *node = ast_alloc(type);                                                                                         \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  AST *node = ast_alloc(type);                                                                                      \
+  AST *node = ast_alloc(type);                                                                                         \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \

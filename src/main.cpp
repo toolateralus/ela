@@ -41,7 +41,7 @@ PanicHandler panic_handler = get_default_panic_handler();
 
 CompileCommand compile_command;
 
-AST * NOOP = ast_alloc(AST_NODE_NOOP);
+AST * GLOBAL_NOOP = ast_alloc(AST_NODE_NOOP);
 
 std::unordered_set<InternedString> import_set;
 /*

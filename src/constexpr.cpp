@@ -14,7 +14,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
         throw_error(std::format("Couldn't evaluate symbol {}, it didn't have a value. Make sure it's a constant, such as `CONSTANT :: 100`, or a default initialized runtime variable with a constant value.", name->value.get_str()), node->source_range);
       }
       return evaluate_constexpr(initial_value.get(), ctx);
-    }
+    } 
     case AST_NODE_BIN_EXPR: {
       auto binary = node->binary;
       auto left = evaluate_constexpr(binary.left, ctx);

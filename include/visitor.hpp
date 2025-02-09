@@ -17,7 +17,7 @@
         return visit_program(node);                                                                                    \
       case AST_NODE_BLOCK:                                                                                             \
         return visit_block(node);                                                                                      \
-      case AST_NODE_FUNCTION_DECLARATION:                                                                              \
+      case AST_NODE_FUNCTION:                                                                              \
         return visit_function_declaration(node);                                                                       \
       case AST_NODE_PARAMS_DECL:                                                                                       \
         return visit_params_decl(node);                                                                                \
@@ -57,7 +57,7 @@
         return visit_else(node);                                                                                       \
       case AST_NODE_WHILE:                                                                                             \
         return visit_while(node);                                                                                      \
-      case AST_NODE_STRUCT_DECLARATION:                                                                                \
+      case AST_NODE_STRUCT:                                                                                \
         return visit_struct_declaration(node);                                                                         \
       case AST_NODE_DOT_EXPR:                                                                                          \
         return visit_dot_expr(node);                                                                                   \

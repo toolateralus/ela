@@ -349,7 +349,7 @@ AST *ASTCopier::copy_node(AST *node) {
       return copy_program(static_cast<ASTProgram *>(node));
     case AST_NODE_BLOCK:
       return copy_block(static_cast<ASTBlock *>(node));
-    case AST_NODE_FUNCTION_DECLARATION:
+    case AST_NODE_FUNCTION:
       return copy_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
     case AST_NODE_PARAMS_DECL:
       return copy_params_decl(static_cast<ASTParamsDecl *>(node));
@@ -389,7 +389,7 @@ AST *ASTCopier::copy_node(AST *node) {
       return copy_else(static_cast<ASTElse *>(node));
     case AST_NODE_WHILE:
       return copy_while(static_cast<ASTWhile *>(node));
-    case AST_NODE_STRUCT_DECLARATION:
+    case AST_NODE_STRUCT:
       return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
     case AST_NODE_DOT_EXPR:
       return copy_dot_expr(static_cast<ASTDotExpr *>(node));

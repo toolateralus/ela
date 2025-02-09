@@ -1,12 +1,9 @@
 #include "ast.hpp"
-
 #include <cassert>
 #include <cstdio>
 #include <cstdlib>
 #include <filesystem>
 #include <format>
-#include <fstream>
-#include <set>
 #include <string>
 #include <unordered_set>
 #include "visitor.hpp"
@@ -137,7 +134,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->fill_buffer_if_needed();
         return nullptr;
     }},
-
     // #import
     // Imports from usr/local/lib/ela by identifier and no file ext.
     {.identifier = "import",
@@ -147,7 +143,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->import(iden.get_str());
         return nullptr;
     }},
-
     // This is only used for debugging the compiler in rare cases.
     {.identifier = "print",
      .kind = DIRECTIVE_KIND_STATEMENT,
@@ -157,7 +152,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
      }
     },
-    
     // #read
     // Read a file into a string at compile time. Nice for embedding resources
     // into your program.
@@ -181,17 +175,17 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         
         parser->expect(Token_Type::RParen);
         NODE_ALLOC(AST_NODE_LITERAL, string, range, _, parser)
-        string->tag = LITERAL_STRING;
+        string->literal.tag = LITERAL_STRING;
         std::stringstream ss;
         if (mode == "binary") {
           std::ifstream isftr(filename.get_str(), std::ios::binary);
           ss << isftr.rdbuf();
-          string->value = ss.str();
+          string->literal.value = ss.str();
           return string;
         } else {
           std::ifstream isftr(filename.get_str());
           ss << isftr.rdbuf();
-          string->value = ss.str();
+          string->literal.value = ss.str();
           return string;
         }
     }},
@@ -214,13 +208,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto name = parser->expect(Token_Type::Identifier);
         parser->expect(Token_Type::DoubleColon);
         auto func = parser->parse_function_declaration(name);
-        func->flags |= (int)Function_Instance_Flags::FUNCTION_IS_TEST;
+        func->function.flags |= (int)Function_Instance_Flags::FUNCTION_IS_TEST;
 
         if (compile_command.has_flag("test")) {
           return func;
         } else {
-          parser->ctx.scope->erase(func->name);
-          return ast_alloc<ASTNoop>(); 
+          parser->ctx.scope->erase(func->function.name);
+          return GLOBAL_NOOP;
         }
     }},
     // #foreign
@@ -228,7 +222,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "foreign",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
-        NODE_ALLOC(ASTFunctionDeclaration, function, range, _, parser)
+        NODE_ALLOC(AST_NODE_FUNCTION, function, range, _, parser)
         auto name = parser->expect(Token_Type::Identifier);
         auto last_func_decl = parser->current_func_decl;
         parser->current_func_decl = function;
@@ -243,19 +237,14 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(Token_Type::DoubleColon);
         parser->expect(Token_Type::Fn);
 
-        function->params = parser->parse_parameters();
-        function->name = name.value;
-        if (parser->peek().type != Token_Type::Arrow) {
-          function->return_type = ASTType::get_void();
-        } else {
+        function->function.parameters = parser->parse_parameters();
+        function->function.name = name.value;
+        if (parser->peek().type == Token_Type::Arrow) {
           parser->expect(Token_Type::Arrow);
-          function->return_type = parser->parse_type();
+          function->function.return_type = parser->parse_type();
         }
-        function->flags |= FUNCTION_IS_FOREIGN;
-
+        function->function.flags |= FUNCTION_IS_FOREIGN;
         parser->expect(Token_Type::Semi);
-
-        parser->end_node(function, range);
         return function;
     }},
     // #error, for throwing compiler errors.
@@ -266,8 +255,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (error->node_type != AST_NODE_LITERAL) {
           throw_error("Can only throw a literal as a error", error->source_range);
         }
-        auto literal = static_cast<ASTLiteral *>(error);
-        throw_error(literal->value.get_str(), error->source_range);
+        auto literal = error->literal;
+        throw_error(literal.value.get_str(), error->source_range);
         return nullptr;
     }},
     // #type
@@ -276,14 +265,18 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "type",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTType, outer, range, _, parser)
+        NODE_ALLOC(AST_NODE_TYPE, outer, range, _, parser)
         parser->expect(Token_Type::LParen);
-        outer->pointing_to = parser->parse_expr();
+        outer->type.pointing_to = parser->parse_expr();
         parser->expect(Token_Type::RParen);
-        
-        outer->kind = ASTType::REFLECTION;
-        outer->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("Type");
-        outer->extensions.push_back({TYPE_EXT_POINTER});
+
+        // TODO: Refactor how this works, the #type() should probably just be it's own node.
+        // It would vastly simplify a ton of stuff.
+
+        outer->type.kind = AST_TYPE_REFLECTION;
+        outer->type.normal.base = ast_alloc(AST_NODE_IDENTIFIER);
+        outer->type.normal.base->identifier = "Type";
+        outer->type.extensions.push_back({TYPE_EXT_POINTER});
         return outer;
     }},
     // #c_flags, for adding stuff like linker options, -g etc from within
@@ -306,27 +299,25 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto name = parser->expect(Token_Type::Identifier);
         parser->expect(Token_Type::DoubleColon);
         auto enum_decl = parser->parse_enum_declaration(name);
-
         int index = 0;
-        for (auto &key_value : enum_decl->key_values) {
-          NODE_ALLOC(ASTLiteral, literal, range, _, parser);
-          literal->tag = LITERAL_INTEGER;
-          literal->value = std::to_string(1 << index);
+        for (auto &key_value : enum_decl->$enum.key_values) {
+          NODE_ALLOC(AST_NODE_LITERAL, literal, range, _, parser);
+          literal->literal.tag = LITERAL_INTEGER;
+          literal->literal.value = std::to_string(1 << index);
           key_value.second = literal;
           index++;
         }
-
-        enum_decl->is_flags = true;
+        enum_decl->$enum.is_flags = true;
         return enum_decl;
     }},
     // #alias for making type aliases. #alias NewName :: OldName;
     {.identifier = "alias",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTAlias, alias, range, _, parser)
-        alias->name = parser->expect(Token_Type::Identifier).value;
+        NODE_ALLOC(AST_NODE_ALIAS, alias, range, _, parser)
+        alias->alias.name = parser->expect(Token_Type::Identifier).value;
         parser->expect(Token_Type::DoubleColon);
-        alias->type = parser->parse_type();
+        alias->alias.type = parser->parse_type();
         return alias;
       }
     },
@@ -334,8 +325,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTType, type, range, defer, parser);
-        type->kind = ASTType::SELF;
+        NODE_ALLOC(AST_NODE_TYPE, type, range, defer, parser);
+        type->type.kind = AST_TYPE_SELF;
         parser->append_type_extensions(type);
         return type;
     }},
@@ -365,15 +356,15 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
         auto node = parser->parse_statement();
-        if (node->node_type == AST_NODE_STRUCT_DECLARATION) {
-          auto struct$ = static_cast<ASTStructDeclaration*>(node);
-          struct$->is_extern = true;
+        if (node->node_type == AST_NODE_STRUCT) {
+          auto &$struct = node->$struct;
+          $struct.is_extern = true;
         } else if (node->node_type == AST_NODE_DECLARATION) {
-          auto decl = static_cast<ASTDeclaration*>(node);
-          decl->is_extern = true;
-        } else if (node->node_type == AST_NODE_FUNCTION_DECLARATION) {
-          auto func = static_cast<ASTFunctionDeclaration*>(node);
-          func->flags |= FUNCTION_IS_EXPORTED;
+          auto &decl = node->declaration;
+          decl.is_extern = true;
+        } else if (node->node_type == AST_NODE_FUNCTION) {
+          auto &function = node->function;
+          function.flags |= FUNCTION_IS_EXPORTED;
         }
         return node;
     }},
@@ -543,10 +534,10 @@ ASTProgram *Parser::parse() {
 
     auto type = statement->node_type;
     switch (type) {
-      case AST_NODE_STRUCT_DECLARATION:
-      case AST_NODE_FUNCTION_DECLARATION:
-      case AST_NODE_INTERFACE_DECLARATION:
-      case AST_NODE_ENUM_DECLARATION:
+      case AST_NODE_STRUCT:
+      case AST_NODE_FUNCTION:
+      case AST_NODE_INTERFACE:
+      case AST_NODE_ENUM:
       case AST_NODE_TAGGED_UNION_DECLARATION:
       case AST_NODE_ALIAS:
       case AST_NODE_DECLARATION:
@@ -1532,7 +1523,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   for (const auto &stmt : function->block.get()->statements) {
-    if (stmt->node_type == AST_NODE_FUNCTION_DECLARATION) {
+    if (stmt->node_type == AST_NODE_FUNCTION) {
       throw_error("local functions are not allowed", stmt->source_range);
     }
   }
@@ -1651,7 +1642,7 @@ ASTImpl *Parser::parse_impl() {
   node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
-    if (statement->node_type == AST_NODE_FUNCTION_DECLARATION) {
+    if (statement->node_type == AST_NODE_FUNCTION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       node->methods.push_back(function);
     } else {
@@ -1774,7 +1765,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (peek().type == Token_Type::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(Token_Type::Identifier).value);
-        if (directive && directive.get()->node_type == AST_NODE_STRUCT_DECLARATION) {
+        if (directive && directive.get()->node_type == AST_NODE_STRUCT) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
         } else if (directive && directive.get()->node_type == AST_NODE_DECLARATION) {
           ASTStructMember member{};
