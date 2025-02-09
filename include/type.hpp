@@ -50,16 +50,6 @@ enum ScalarType {
   TYPE_BOOL,
 };
 
-enum TypeKind {
-  TYPE_SCALAR,
-  TYPE_FUNCTION,
-  TYPE_STRUCT,
-  TYPE_ENUM,
-  TYPE_TUPLE,
-  TYPE_TAGGED_UNION,
-  TYPE_INTERFACE,
-};
-
 enum TypeExtEnum {
   TYPE_EXT_INVALID,
   TYPE_EXT_POINTER,
