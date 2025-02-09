@@ -37,6 +37,7 @@ struct Symbol {
 
   union {
     struct {
+      Nullable<ASTNode> declaration;
       Value value;
       // This is null for almost every variable besides constant declarations,
       // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
@@ -56,12 +57,13 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value) {
+  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode* decl) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
     symbol.flags = SYMBOL_IS_VARIABLE;
     symbol.variable.initial_value = initial_value;
+    symbol.variable.declaration = decl;
     return symbol;
   }
 
@@ -123,8 +125,8 @@ struct Scope {
     return fields;
   }
 
-  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value) {
-    symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value));
+  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode* decl = nullptr) {
+    symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value, decl));
   }
 
   void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {

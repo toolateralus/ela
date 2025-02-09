@@ -344,7 +344,6 @@ struct ASTFunctionDeclaration : ASTStatement {
   std::vector<int> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
-  std::vector<ASTLambda *> lambdas;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   ASTParamsDecl *params;

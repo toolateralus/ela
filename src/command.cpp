@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "strings.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
 #include <filesystem>
@@ -6,6 +7,58 @@
 bool CompileCommand::has_flag(const std::string &flag) const {
   auto it = flags.find(flag);
   return it != flags.end() && it->second;
+}
+
+void emit(ASTNode *root, Context& context, Typer &type_visitor) {
+  Emitter emit(context, type_visitor);
+  DependencyEmitter dependencyEmitter(context, &emit);
+
+  static const auto testing = compile_command.has_flag("test");
+  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
+                               compile_command.compilation_flags.contains("-nostdlib");
+
+  if (!is_freestanding) {
+    emit.code << "#define USE_STD_LIB 1\n";
+  } else {
+    if (compile_command.has_flag("test")) {
+      throw_error("You cannot use unit tests in a freestanding or nostlib "
+                  "environment due to lack of exception handling",
+                  {});
+    }
+  }
+
+  if (compile_command.has_flag("test-verbose")) {
+    emit.code << "#define TEST_VERBOSE;\n";
+    std ::cout << "adding TEST_VERBOSE\n";
+  }
+
+  emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
+
+  if (!is_freestanding) {
+    emit.code << "typedef struct Type Type;\n";
+    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
+                        type_ptr_id);
+  }
+
+  if (testing) {
+    emit.code << "#define TESTING\n";
+  }
+
+  root->accept(&dependencyEmitter);
+  root->accept(&emit);
+
+  std::filesystem::current_path(compile_command.original_path);
+  std::ofstream output(compile_command.output_path);
+
+  std::string program;
+  if (compile_command.has_flag("test")) {
+    output << "#define TESTING\n";
+  }
+
+  output << emit.code.str();
+  output.flush();
+  output.close();
 }
 
 int CompileCommand::compile() {
@@ -21,23 +74,10 @@ int CompileCommand::compile() {
   Typer type_visitor{context};
   type_visitor.visit(root);
 
-  Emitter emit(context, type_visitor);
-  emit.visit(root);
-
+  emit(root, context, type_visitor);
+  
   lower.end("lowering to cpp complete");
 
-  std::string program;
-  if (has_flag("test")) {
-    program = "#define TESTING\n" + emit.code.str();
-  } else {
-    program = emit.code.str();
-  }
-
-  std::filesystem::current_path(original_path);
-  std::ofstream output(output_path);
-  output << program;
-  output.flush();
-  output.close();
   int result = 0;
 
   if (!has_flag("no-compile")) {

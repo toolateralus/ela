@@ -121,7 +121,6 @@ struct DeferBlock {
 struct DependencyEmitter;
 
 struct Emitter : VisitorBase {
-  DependencyEmitter *dependencyEmitter;
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
@@ -129,7 +128,7 @@ struct Emitter : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
 
-  void emit_tuple_dependants(std::vector<int> &types);
+  void emit_tuple(int type);
 
   int cf_expr_return_id = 0;
   Nullable<std::string> cf_expr_return_register;
@@ -181,14 +180,11 @@ struct Emitter : VisitorBase {
   void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);
 
-  void emit_type_or_fwd_decl(Type* type);
   void forward_decl_type(Type* type);
-  template <typename T> void emit_generic_instantiations(std::vector<GenericInstance<T>> instantiations);
   void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
-  ~Emitter();
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
@@ -199,6 +195,7 @@ struct Emitter : VisitorBase {
   
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
+  void emit_lambda(ASTLambda *node);
   void cast_pointers_implicit(ASTDeclaration *&node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
@@ -271,7 +268,8 @@ struct DependencyEmitter : VisitorBase {
   Emitter *emitter;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
-  void emit_type(int type_id);
+  std::string define_type(int type_id);
+  std::string decl_type(int type_id);
 
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;

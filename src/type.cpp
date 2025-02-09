@@ -675,21 +675,6 @@ int global_create_tuple_type(const std::vector<int> &types) {
   type->set_info(info);
   info->scope = create_child(root_scope);
 
-  // getting all types within a function type because some function types
-  // arent associated with any existing funcitons and  whose parameters or return
-  // types might not be built-in
-  auto dependencies = expand_function_types(types);
-
-  // declare this type as a dependant on the eldest dependency from our subtypes.
-  // purely for emit time.
-  int eldest = *std::max_element(dependencies.begin(), dependencies.end());
-  auto eldest_t = global_get_type(eldest);
-  if (eldest_t->base_id != Type::INVALID_TYPE_ID) {
-    eldest = eldest_t->base_id;
-  }
-
-  global_get_type(eldest)->tuple_dependants.push_back(type->id);
-
   // We do this for dot expressions that do tuple.1 etc.
   // Only in the base type.
   for (const auto [i, type] : types | std::ranges::views::enumerate) {

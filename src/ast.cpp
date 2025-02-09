@@ -1342,7 +1342,7 @@ ASTDeclaration *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
   }
 
-  ctx.scope->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl->value.get());
+  ctx.scope->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl->value.get(), decl);
 
   return decl;
 }
@@ -1484,11 +1484,11 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   function->name = name.value;
 
   // check for definition.
+  auto has_definition = false;
   {
     auto sym = ctx.scope->local_lookup(name.value);
     if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
-      end_node(nullptr, range);
-      throw_error(std::format("Redefinition of function {}", name.value), range);
+      has_definition = true;
     }
   }
 
@@ -1530,6 +1530,11 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   function->block = parse_block();
   function->block.get()->parent = function;
+
+  if (function->block && has_definition) {
+    end_node(nullptr, range);
+    throw_error(std::format("Redefinition of function {}", name.value), range);
+  }
 
   for (const auto &stmt : function->block.get()->statements) {
     if (stmt->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -2139,7 +2144,6 @@ ASTLambda *Parser::parse_lambda() {
     end_node(nullptr, range);
     throw_error("temporarily, lambda functions cannot be used at a global level, only within functions", range);
   }
-  current_func_decl.get()->lambdas.push_back(node);
   return node;
 }
 

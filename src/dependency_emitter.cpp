@@ -1,52 +1,82 @@
 #include "ast.hpp"
+#include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
 
-void DependencyEmitter::emit_type(int type_id) {
+[[nodiscard]] std::string DependencyEmitter::decl_type(int type_id) {
   auto type = global_get_type(type_id);
+  auto extensions = type->get_ext().extensions;
+  for (auto ext : extensions) {
+    if (ext.type == TYPE_EXT_POINTER) {
+      emitter->forward_decl_type(type);
+      return {};
+    }
+  }
+  return define_type(type_id);
+}
+
+[[nodiscard]] std::string DependencyEmitter::define_type(int type_id) {
+  auto type = global_get_type(type_id);
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
   switch (type->kind) {
     case TYPE_FUNCTION: {
       auto info = type->get_info()->as<FunctionTypeInfo>();
-      emit_type(info->return_type);
+      auto err = decl_type(info->return_type);
+      if (!err.empty()) {
+        return err;
+      }
       for (int index = 0; index < info->params_len; index++) {
         auto param_ty = info->parameter_types[index];
-        emit_type(param_ty);
+        err = decl_type(param_ty);
+        if (!err.empty()) {
+          return err;
+        }
       }
     } break;
     case TYPE_TAGGED_UNION:
     case TYPE_STRUCT: {
-      if (type->get_ext().is_pointer()) {
-        emitter->forward_decl_type(type);
-        return;
-      }
       if (type->declaring_node.is_not_null()) {
         type->declaring_node.get()->accept(this);
+        type->declaring_node.get()->accept(emitter);
       } else {
-        throw_error("internal compiler error: could not locate node for struct or tagged union type", {});
+        return "internal compiler error: could not locate node for struct or tagged union type";
       }
     } break;
     case TYPE_TUPLE: {
-      if (type->get_ext().is_pointer()) {
-        emitter->forward_decl_type(type);
-        return;
-      }
       auto info = type->get_info()->as<TupleTypeInfo>();
       for (auto type : info->types) {
-        emit_type(type);
+        auto err = define_type(type);
+        if (!err.empty()) {
+          return err;
+        }
       }
+      emitter->emit_tuple(type_id);
     } break;
+    case TYPE_ENUM:
+      // TODO: enums should be handled here
     case TYPE_INTERFACE:
     case TYPE_SCALAR:
-    case TYPE_ENUM:
       break;
   }
+  return {};
 }
 
 void DependencyEmitter::visit(ASTStructDeclaration *node) {
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
   for (auto member : node->members) {
-    member.type->accept(this);
+    auto err = decl_type(member.type->resolved_type);
+    if (!err.empty()) {
+      throw_error(err, member.type->source_range);
+    }
   }
 }
 
@@ -57,12 +87,25 @@ void DependencyEmitter::visit(ASTProgram *node) {
 }
 
 void DependencyEmitter::visit(ASTBlock *node) {
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
   for (auto statement : node->statements) {
     statement->accept(this);
   }
 }
 
 void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
+  auto err = decl_type(node->return_type->resolved_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
   node->params->accept(this);
   if (node->block.is_not_null()) {
     node->block.get()->accept(this);
@@ -76,19 +119,20 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
 }
 
 void DependencyEmitter::visit(ASTParamDecl *node) {
-	emit_type(node->resolved_type);
+  auto err = decl_type(node->resolved_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
 }
 
 void DependencyEmitter::visit(ASTDeclaration *node) {
-	node->type->accept(this);
-	if (node->value) {
-		node->value.get()->accept(this);
-	}
+  node->type->accept(this);
+  if (node->value) {
+    node->value.get()->accept(this);
+  }
 }
 
-void DependencyEmitter::visit(ASTExprStatement *node) {
-	node->expression->accept(this);
-}
+void DependencyEmitter::visit(ASTExprStatement *node) { node->expression->accept(this); }
 
 void DependencyEmitter::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
@@ -120,16 +164,46 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
     call.arguments = &args;
     call.accept(this);
   } else {
+    if (node->op.type == TType::Mul) {
+      auto err = define_type(node->operand->resolved_type);
+      if (!err.empty()) {
+        throw_error(err, node->operand->source_range);
+      }
+    }
     node->operand->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTIdentifier *node) {}
+void DependencyEmitter::visit(ASTIdentifier *node) {
+  // TODO: this should be handled by ASTType
+  auto type = global_get_type(node->resolved_type);
+  if (type && type->kind == TYPE_ENUM) {
+    type->declaring_node.get()->accept(this);
+    type->declaring_node.get()->accept(emitter);
+  }
+  // for global variables
+  if (auto symbol = ctx.scope->lookup(node->value)) {
+    if (symbol->is_variable() && symbol->variable.declaration) {
+      auto decl = symbol->variable.declaration.get();
+      if (!decl->declaring_block) {
+        symbol->variable.declaration.get()->accept(this);
+        symbol->variable.declaration.get()->accept(emitter);
+      }
+    } else if (symbol->is_function()) {
+      // TODO: we should change how template retrival works;
+      symbol->function.declaration->accept(this);
+      symbol->function.declaration->accept(emitter);
+    }
+  }
+}
 
 void DependencyEmitter::visit(ASTLiteral *node) {}
 
 void DependencyEmitter::visit(ASTType *node) {
-  emit_type(node->resolved_type);
+  auto err = decl_type(node->resolved_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
 }
 
 void DependencyEmitter::visit(ASTCall *node) {
@@ -139,10 +213,18 @@ void DependencyEmitter::visit(ASTCall *node) {
   node->arguments->accept(this);
   auto symbol_nullable = emitter->typer.get_symbol(node->function);
   if (symbol_nullable.is_not_null()) {
-    auto symbol = symbol_nullable.get();
-    if (symbol->is_function()) {
-      symbol->function.declaration->accept(this);
+    auto decl = symbol_nullable.get()->function.declaration;
+    if (!node->generic_arguments.empty()) {
+      auto generic_args = emitter->typer.get_generic_arg_types(node->generic_arguments);
+      decl = find_generic_instance(decl->generic_instantiations, generic_args);
     }
+    // only accept if not a fn ptr
+    if (decl) {
+      decl->accept(this);
+      decl->accept(emitter);
+    }
+  } else {
+    node->function->accept(this);
   }
 }
 
@@ -163,7 +245,52 @@ void DependencyEmitter::visit(ASTContinue *node) {}
 void DependencyEmitter::visit(ASTBreak *node) {}
 
 void DependencyEmitter::visit(ASTFor *node) {
+  auto err = define_type(node->iterable_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
+  err = define_type(node->range_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
+  err = define_type(node->identifier_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
+
   node->range->accept(this);
+
+  auto range_scope = global_get_type(node->range_type)->get_info()->scope;
+  auto iter_scope = global_get_type(node->iterable_type)->get_info()->scope;
+
+  switch (node->iteration_kind) {
+    case ASTFor::ITERABLE: {
+      auto iter_sym = range_scope->local_lookup("iter");
+      iter_sym->function.declaration->accept(this);
+      iter_sym->function.declaration->accept(emitter);
+    } break;
+    case ASTFor::ENUMERABLE: {
+      auto enum_sym = range_scope->local_lookup("enumerator");
+      enum_sym->function.declaration->accept(this);
+      enum_sym->function.declaration->accept(emitter);
+    } break;
+    case ASTFor::ENUMERATOR:
+    case ASTFor::ITERATOR:
+      break;
+  }
+
+  auto done_sym = iter_scope->local_lookup("done");
+  done_sym->function.declaration->accept(this);
+  done_sym->function.declaration->accept(emitter);
+
+  auto current_sym = iter_scope->local_lookup("current");
+  current_sym->function.declaration->accept(this);
+  current_sym->function.declaration->accept(emitter);
+
+  auto next_sym = iter_scope->local_lookup("next");
+  next_sym->function.declaration->accept(this);
+  next_sym->function.declaration->accept(emitter);
+
   node->block->accept(this);
 }
 
@@ -192,6 +319,10 @@ void DependencyEmitter::visit(ASTWhile *node) {
 }
 
 void DependencyEmitter::visit(ASTDotExpr *node) {
+  auto err = define_type(node->base->resolved_type);
+  if (!err.empty()) {
+    throw_error(err, node->base->source_range);
+  }
   node->base->accept(this);
 }
 
@@ -213,20 +344,21 @@ void DependencyEmitter::visit(ASTSubscript *node) {
 }
 
 void DependencyEmitter::visit(ASTInitializerList *node) {
-  if (node->target_type) node->target_type.get()->accept(this);
+  if (node->target_type)
+    node->target_type.get()->accept(this);
   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
-    for (const auto &value: node->values) {
+    for (const auto &value : node->values) {
       value->accept(this);
     }
   } else {
-    for (const auto [key, value]: node->key_values) {
+    for (const auto [key, value] : node->key_values) {
       value->accept(this);
     }
   }
 }
 
 void DependencyEmitter::visit(ASTEnumDeclaration *node) {
-  for (const auto &[key, value]: node->key_values) {
+  for (const auto &[key, value] : node->key_values) {
     value->accept(this);
   }
 }
@@ -238,46 +370,51 @@ void DependencyEmitter::visit(ASTRange *node) {
 
 void DependencyEmitter::visit(ASTSwitch *node) {
   node->target->accept(this);
-  for (const auto $case: node->cases) {
+  for (const auto $case : node->cases) {
     $case.block->accept(this);
     $case.expression->accept(this);
   }
 }
 
 void DependencyEmitter::visit(ASTTuple *node) {
-  for (const auto &value: node->values) {
+  for (const auto &value : node->values) {
     value->accept(this);
   }
 }
 
 void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
+  auto err = define_type(node->right->resolved_type);
+  if (!err.empty()) {
+    throw_error(err, node->source_range);
+  }
   node->right->accept(this);
 }
 
-void DependencyEmitter::visit(ASTSize_Of *node) {
-  node->target_type->accept(this);
-}
+void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTScopeResolution *node) {
-  node->base->accept(this);
-}
+void DependencyEmitter::visit(ASTScopeResolution *node) { node->base->accept(this); }
 
-void DependencyEmitter::visit(ASTAlias *node) {
-  node->type->accept(this);
-}
+void DependencyEmitter::visit(ASTAlias *node) { }
 
 void DependencyEmitter::visit(ASTImpl *node) {
-  node->target->accept(this);
-  for (const auto &method: node->methods) {
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
+  for (const auto &method : node->methods) {
     method->accept(this);
   }
 }
 
-void DependencyEmitter::visit(ASTDefer *node) {
-  node->statement->accept(this);
-}
+void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
+
 void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
-  for (const auto &variant: node->variants) {
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
+  for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTTaggedUnionVariant::NORMAL:
         break;
@@ -297,15 +434,13 @@ void DependencyEmitter::visit(ASTCast *node) {
   node->expression->accept(this);
   node->target_type->accept(this);
 }
-void DependencyEmitter::visit(ASTInterfaceDeclaration *node) {
-  for (auto method : node->methods) {
-    method->accept(this);
-  }
-}
+
+void DependencyEmitter::visit(ASTInterfaceDeclaration *node) {}
 
 void DependencyEmitter::visit(ASTLambda *node) {
   node->params->accept(this);
   node->block->accept(this);
+  emitter->emit_lambda(node);
 }
 
 void DependencyEmitter::visit(ASTWhere *node) {

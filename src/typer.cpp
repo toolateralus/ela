@@ -384,7 +384,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (!target_ty) {
     throw_error("use of undeclared type", node->target->source_range);
   }
-
   Type *interface_ty = nullptr;
 
   if (node->interface) {
@@ -518,7 +517,8 @@ void Typer::visit(ASTStructDeclaration *node) {
 
 void Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = Type::INVALID_TYPE_ID;
-  ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  global_get_type(enum_ty_id)->declaring_node = node;
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
   auto info = enum_type->get_info()->as<EnumTypeInfo>();
 
