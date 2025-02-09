@@ -118,6 +118,21 @@ impl String_Builder {
     }
   } 
 
+  append_byte :: fn(self*, ch: u8) {
+    if !self.root {
+      self.root = String_Builder_Block::new();
+      self.current = self.root;
+    }
+
+    if self.current.length == STRING_BUILDER_BLOCK_MAX_LEN {
+      self.current.next = String_Builder_Block::new();
+      self.current = self.current.next;
+    }
+
+    self.current.data[self.current.length] = ch;
+    self.current.length += 1;
+  }
+
   append_concat_then_free :: fn![T](self*, list: Init_List![T], free_list: Init_List![bool]) where T is Deinit {
     if free_list.length != list.length {
       printf("append_concat_then_free() requires that the str initializer and the free_list are the same length\n"c);
@@ -126,6 +141,16 @@ impl String_Builder {
     for i in 0..list.length {
       self.append![T](list.data[i]);
       if free_list.data[i] then list.data[i].deinit();
+    }
+  }
+}
+
+
+impl String_Builder {
+  append_utf8 :: fn(self*, ch: u32) {
+    bytes := utf8_encode(ch);
+    for byte in bytes {
+      self.append_byte(byte);
     }
   }
 }
