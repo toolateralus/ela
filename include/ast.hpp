@@ -59,7 +59,7 @@ enum AST_Node_Type {
   AST_DOT_EXPR,
   AST_SCOPE_RESOLUTION,
   AST_SUBSCRIPT,
-  AST_INITIALIZER_LIST,
+  AST_INITIALIZER,
   AST_ENUM,
   AST_NOOP,
   AST_ALIAS,
@@ -156,6 +156,12 @@ enum AST_Type_Kind {
   AST_TYPE_SELF,
 };
 
+enum AST_Initializer_Tag {
+  INITIALIZER_EMPTY,
+  INITIALIZER_NAMED,
+  INITIALIZER_COLLECTION,
+};
+
 struct AST {
   AST(AST_Node_Type node_type) : node_type(node_type) {}
   ~AST() {}
@@ -188,7 +194,7 @@ struct AST {
       case AST_DOT_EXPR:
       case AST_SCOPE_RESOLUTION:
       case AST_SUBSCRIPT:
-      case AST_INITIALIZER_LIST:
+      case AST_INITIALIZER:
       case AST_CAST:
       case AST_RANGE:
       case AST_SWITCH:
@@ -343,11 +349,11 @@ struct AST {
     struct {
       AST *condition;
       AST *block;
-      Nullable<AST> _else;
+      Nullable<AST> $else;
     } $if;
 
     struct {
-      Nullable<AST> _if; // conditional else.
+      Nullable<AST> elseif; // conditional else.
       Nullable<AST> block;
     } $else;
 
@@ -359,7 +365,7 @@ struct AST {
     struct {
       bool is_operator_overload : 1 = false;
       AST *left;
-      AST *subscript;
+      AST *index_expression;
     } subscript;
 
     struct {
@@ -398,11 +404,7 @@ struct AST {
         std::vector<std::pair<InternedString, AST *>> key_values;
         std::vector<AST *> values;
       };
-      enum {
-        INIT_LIST_EMPTY,
-        INIT_LIST_NAMED,
-        INIT_LIST_COLLECTION,
-      } tag;
+      AST_Initializer_Tag tag;
       Nullable<AST> target_type;
     } initializer;
 
@@ -588,6 +590,7 @@ struct Parser {
   Nullable<AST> current_interface_decl = nullptr;
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
+  AST *last_parent;
   static Nullable<AST> current_block;
 
   AST *parse();
@@ -643,8 +646,9 @@ struct Parser {
   ~Parser();
 };
 
-static inline AST *ast_alloc(AST_Node_Type type) {
+static inline AST *ast_alloc(AST_Node_Type type, AST *parent) {
   auto node = new (ast_arena.allocate(sizeof(AST))) AST(type);
+  node->parent = parent;
   node->declaring_block = Parser::current_block;
   return node;
 }
@@ -659,13 +663,13 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   return nullptr;
 }
 
-#define NODE_ALLOC(type, node, range, parent, parser, defer)                                                           \
-  AST *node = ast_alloc(type, parent);                                                                                 \
+#define NODE_ALLOC(type, node, range, parser, defer)                                                                   \
+  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, parent, deferred)                                     \
-  AST *node = ast_alloc(type, parent);                                                                                 \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
+  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \
