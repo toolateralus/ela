@@ -1571,8 +1571,6 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
   }
 }
 
-
-
 void Emitter::emit_lambda(ASTLambda *node) {
   if (node->is_emitted) {
     return;
