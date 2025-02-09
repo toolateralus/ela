@@ -585,48 +585,90 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
     deferred;                                                                                                          \
   });
 
-#define DEFINE_VISITOR(node_name)                                                                              \
-  void visit_##node_name(AST *node);
+#define DEFINE_VISITOR(node_name) void visit_##node_name(AST *node);
 
-#define DEFINE_VISITORS()                                                                                        \
-  DEFINE_VISITOR(program)                                                                                      \
-  DEFINE_VISITOR(block)                                                                                        \
-  DEFINE_VISITOR(function_declaration)                                                                         \
-  DEFINE_VISITOR(params_decl)                                                                                  \
-  DEFINE_VISITOR(param_decl)                                                                                   \
-  DEFINE_VISITOR(declaration)                                                                                  \
-  DEFINE_VISITOR(expr_statement)                                                                               \
-  DEFINE_VISITOR(bin_expr)                                                                                     \
-  DEFINE_VISITOR(unary_expr)                                                                                   \
-  DEFINE_VISITOR(identifier)                                                                                   \
-  DEFINE_VISITOR(literal)                                                                                      \
-  DEFINE_VISITOR(type)                                                                                         \
-  DEFINE_VISITOR(tuple)                                                                                        \
-  DEFINE_VISITOR(call)                                                                                         \
-  DEFINE_VISITOR(arguments)                                                                                    \
-  DEFINE_VISITOR(return)                                                                                       \
-  DEFINE_VISITOR(continue)                                                                                     \
-  DEFINE_VISITOR(break)                                                                                        \
-  DEFINE_VISITOR(for)                                                                                          \
-  DEFINE_VISITOR(if)                                                                                           \
-  DEFINE_VISITOR(else)                                                                                         \
-  DEFINE_VISITOR(while)                                                                                        \
-  DEFINE_VISITOR(struct_declaration)                                                                           \
-  DEFINE_VISITOR(dot_expr)                                                                                     \
-  DEFINE_VISITOR(scope_resolution)                                                                             \
-  DEFINE_VISITOR(subscript)                                                                                    \
-  DEFINE_VISITOR(initializer_list)                                                                             \
-  DEFINE_VISITOR(enum_declaration)                                                                             \
-  DEFINE_VISITOR(tagged_union_declaration)                                                                     \
-  DEFINE_VISITOR(noop)                                                                                         \
-  DEFINE_VISITOR(alias)                                                                                        \
-  DEFINE_VISITOR(impl)                                                                                         \
-  DEFINE_VISITOR(interface_declaration)                                                                        \
-  DEFINE_VISITOR(size_of)                                                                                      \
-  DEFINE_VISITOR(defer)                                                                                        \
-  DEFINE_VISITOR(cast)                                                                                         \
-  DEFINE_VISITOR(lambda)                                                                                       \
-  DEFINE_VISITOR(range)                                                                                        \
+#define DEFINE_VISITORS()                                                                                              \
+  DEFINE_VISITOR(program)                                                                                              \
+  DEFINE_VISITOR(block)                                                                                                \
+  DEFINE_VISITOR(function_declaration)                                                                                 \
+  DEFINE_VISITOR(params_decl)                                                                                          \
+  DEFINE_VISITOR(param_decl)                                                                                           \
+  DEFINE_VISITOR(declaration)                                                                                          \
+  DEFINE_VISITOR(expr_statement)                                                                                       \
+  DEFINE_VISITOR(bin_expr)                                                                                             \
+  DEFINE_VISITOR(unary_expr)                                                                                           \
+  DEFINE_VISITOR(identifier)                                                                                           \
+  DEFINE_VISITOR(literal)                                                                                              \
+  DEFINE_VISITOR(type)                                                                                                 \
+  DEFINE_VISITOR(tuple)                                                                                                \
+  DEFINE_VISITOR(call)                                                                                                 \
+  DEFINE_VISITOR(arguments)                                                                                            \
+  DEFINE_VISITOR(return)                                                                                               \
+  DEFINE_VISITOR(continue)                                                                                             \
+  DEFINE_VISITOR(break)                                                                                                \
+  DEFINE_VISITOR(for)                                                                                                  \
+  DEFINE_VISITOR(if)                                                                                                   \
+  DEFINE_VISITOR(else)                                                                                                 \
+  DEFINE_VISITOR(while)                                                                                                \
+  DEFINE_VISITOR(struct_declaration)                                                                                   \
+  DEFINE_VISITOR(dot_expr)                                                                                             \
+  DEFINE_VISITOR(scope_resolution)                                                                                     \
+  DEFINE_VISITOR(subscript)                                                                                            \
+  DEFINE_VISITOR(initializer_list)                                                                                     \
+  DEFINE_VISITOR(enum_declaration)                                                                                     \
+  DEFINE_VISITOR(tagged_union_declaration)                                                                             \
+  DEFINE_VISITOR(noop)                                                                                                 \
+  DEFINE_VISITOR(alias)                                                                                                \
+  DEFINE_VISITOR(impl)                                                                                                 \
+  DEFINE_VISITOR(interface_declaration)                                                                                \
+  DEFINE_VISITOR(size_of)                                                                                              \
+  DEFINE_VISITOR(defer)                                                                                                \
+  DEFINE_VISITOR(cast)                                                                                                 \
+  DEFINE_VISITOR(lambda)                                                                                               \
+  DEFINE_VISITOR(range)                                                                                                \
   DEFINE_VISITOR(switch)                                                                                       \
   DEFINE_VISITOR(tuple_deconstruction)                                                                         \
-  DEFINE_VISITOR(where)                                                                                        
+  DEFINE_VISITOR(where)
+
+#define DECLARE_VISITOR_METHODS(type)                                                                                  \
+  void type::visit_program(AST *node) {}                                                                               \
+  void type::visit_block(AST *node) {}                                                                                 \
+  void type::visit_function_declaration(AST *node) {}                                                                  \
+  void type::visit_params_decl(AST *node) {}                                                                           \
+  void type::visit_param_decl(AST *node) {}                                                                            \
+  void type::visit_declaration(AST *node) {}                                                                           \
+  void type::visit_expr_statement(AST *node) {}                                                                        \
+  void type::visit_bin_expr(AST *node) {}                                                                              \
+  void type::visit_unary_expr(AST *node) {}                                                                            \
+  void type::visit_identifier(AST *node) {}                                                                            \
+  void type::visit_literal(AST *node) {}                                                                               \
+  void type::visit_type(AST *node) {}                                                                                  \
+  void type::visit_tuple(AST *node) {}                                                                                 \
+  void type::visit_call(AST *node) {}                                                                                  \
+  void type::visit_arguments(AST *node) {}                                                                             \
+  void type::visit_return(AST *node) {}                                                                                \
+  void type::visit_continue(AST *node) {}                                                                              \
+  void type::visit_break(AST *node) {}                                                                                 \
+  void type::visit_for(AST *node) {}                                                                                   \
+  void type::visit_if(AST *node) {}                                                                                    \
+  void type::visit_else(AST *node) {}                                                                                  \
+  void type::visit_while(AST *node) {}                                                                                 \
+  void type::visit_struct_declaration(AST *node) {}                                                                    \
+  void type::visit_dot_expr(AST *node) {}                                                                              \
+  void type::visit_scope_resolution(AST *node) {}                                                                      \
+  void type::visit_subscript(AST *node) {}                                                                             \
+  void type::visit_initializer_list(AST *node) {}                                                                      \
+  void type::visit_enum_declaration(AST *node) {}                                                                      \
+  void type::visit_tagged_union_declaration(AST *node) {}                                                              \
+  void type::visit_noop(AST *node) {}                                                                                  \
+  void type::visit_alias(AST *node) {}                                                                                 \
+  void type::visit_impl(AST *node) {}                                                                                  \
+  void type::visit_interface_declaration(AST *node) {}                                                                 \
+  void type::visit_size_of(AST *node) {}                                                                               \
+  void type::visit_defer(AST *node) {}                                                                                 \
+  void type::visit_cast(AST *node) {}                                                                                  \
+  void type::visit_lambda(AST *node) {}                                                                                \
+  void type::visit_range(AST *node) {}                                                                                 \
+  void type::visit_switch(AST *node) {}                                                                                \
+  void type::visit_tuple_deconstruction(AST *node) {}                                                                  \
+  void type::visit_where(AST *node) {}
