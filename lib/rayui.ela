@@ -319,7 +319,7 @@ impl DropDown {
     if hit && IsMouseButtonPressed(MouseButton::MOUSE_BUTTON_LEFT) {
       self.is_open = !self.is_open;
       if self.is_open && self.on_open {
-        self.on_open();
+        // self.on_open();
       }
     }
 
@@ -342,7 +342,7 @@ impl DropDown {
           self.selected_index = i;
           self.is_open = false;
           if self.on_selected {
-            self.on_selected(i as s32);
+            // self.on_selected(i as s32);
           }
         }
         option_rect.y += option_rect.height;

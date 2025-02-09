@@ -975,13 +975,15 @@ ASTStatement *Parser::parse_statement() {
 
   // * '#' Directives.
   if (tok.type == TType::Directive) {
-    auto range = begin_node();
-    eat();
+    auto range = begin_node(); eat();
     auto directive_name = eat().value;
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
+
     if (!statement) {
-      throw_error(std::format("Directive '{}' did not return a valid statement node", directive_name), range);
+      static auto noop = ast_alloc<ASTNoop>();
+      statement = noop;
     }
+
     end_node(statement, range);
     return statement;
   }

@@ -5,7 +5,14 @@
 // NOTE:
 // If you use static libraries in your .ela library, you should provide that dependency in your lib/ dir, and just link against it as such.
 // do not use -lsome_system_library, or you will have a terrible library.
-#c_flags " /usr/local/lib/ela/raylib/libraylib.a -lm "
+
+#ifdef RAYLIB_LINK_SHARED {
+  #print "Linking against raylib dynamically."
+  #c_flags " -L/usr/local/lib/ela/raylib/libraylib.so -lm "
+} else {
+  #print "Linking against raylib statically."
+  #c_flags " /usr/local/lib/ela/raylib/libraylib.a -lm "
+}
 
 
 impl Color {

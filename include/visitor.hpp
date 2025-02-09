@@ -199,7 +199,6 @@ struct Emitter : VisitorBase {
   
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
-  void cast_pointers_implicit(ASTDeclaration *&node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
