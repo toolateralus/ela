@@ -37,7 +37,7 @@ impl str {
   }
   
   slice :: fn(self*, range: Range) -> Slice![u8] {
-    start, end := (range.begin, range.end);
+    start, end := (range.begin, range.end); 
     length := end - start;
 
     if start < 0 || length < 0 || start + length > self.length {

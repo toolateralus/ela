@@ -1,7 +1,6 @@
 *
 !*.gitignore
 !*.ela
-!run.sh
-!all.sh
-!new.sh
+!*.sh
+!fixed
 !counter

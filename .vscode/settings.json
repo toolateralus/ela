@@ -2,6 +2,7 @@
   "lldb.showDisassembly": "auto",
   "lldb.dereferencePointers": true,
   "lldb.consoleMode": "commands",
+  "lldb.launch.expressions": "native",
   "files.associations": {
     "*.ela": "ela"
   },
@@ -18,6 +19,6 @@
     "**/*vcxproj.user": true,
     "**/*.sln": true,
     "**/*.cache": true
-  }
+  },
 }
 

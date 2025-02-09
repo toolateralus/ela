@@ -61,3 +61,58 @@ main :: fn() {
   println("Hello World!");
 }
 )__";
+
+
+static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
+  #ifdef TESTING
+  #define __TEST_RUNNER_MAIN                                                                                             \
+    int main() {                                                                                                         \
+      for (int i = 0; i < sizeof(tests) / sizeof(__COMPILER_GENERATED_TEST); i++) {                                      \
+        __COMPILER_GENERATED_TEST_RUN(&tests[i]);                                                                        \
+      }                                                                                                                  \
+    }                                                                                                                     
+  #endif
+  )__";
+  
+  // This is stuff we just can't really get rid of while using a transpiled backend.
+  static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
+  
+  typedef unsigned long long int u64;
+  typedef signed long long int s64;
+  
+  typedef signed int s32;
+  typedef unsigned int u32;
+  
+  typedef double f64;
+  typedef float f32;
+  
+  typedef short int s16;
+  typedef unsigned short int u16;
+  
+  typedef signed char s8;
+  typedef unsigned char u8;
+  #include <stddef.h>
+  
+  #if USE_STD_LIB
+    #include <stdint.h>
+    #include <errno.h>
+    #undef RAND_MAX
+  #endif
+  
+  #ifdef TESTING
+    int printf(u8 *, ...);
+    void exit(s32);
+    
+    typedef struct {
+      const char *name;
+      void (*function)();
+    } __COMPILER_GENERATED_TEST;
+    static void __COMPILER_GENERATED_TEST_RUN(__COMPILER_GENERATED_TEST *test) {
+      #if TEST_VERBOSE 
+        printf("running %s\n", test->name);
+      #endif
+      test->function();
+    }
+  #endif
+  )__";
+  

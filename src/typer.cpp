@@ -384,7 +384,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (!target_ty) {
     throw_error("use of undeclared type", node->target->source_range);
   }
-
   Type *interface_ty = nullptr;
 
   if (node->interface) {
@@ -399,6 +398,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
+    method->declaring_type = target_ty->id;
     if (!method->generic_parameters.empty()) {
       // TODO: actually generate a signature for a generic function so that you can compare them
       type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
@@ -517,7 +517,8 @@ void Typer::visit(ASTStructDeclaration *node) {
 
 void Typer::visit(ASTEnumDeclaration *node) {
   auto elem_type = Type::INVALID_TYPE_ID;
-  ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
+  global_get_type(enum_ty_id)->declaring_node = node;
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
   auto info = enum_type->get_info()->as<EnumTypeInfo>();
 
@@ -975,36 +976,13 @@ void Typer::visit(ASTCall *node) {
       // resolve a generic call.
       if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
+        // TODO: handle this in the function decl itself, maybe insert self into symbol table
         auto old_type = type_context;
         Defer _([&] { type_context = old_type; });
-        auto func = node->function;
-        if (func->get_node_type() == AST_NODE_TYPE) {
-          auto ast_type = static_cast<ASTType *>(func);
-          if (ast_type->kind == ASTType::NORMAL) {
-            if (!ast_type->normal.generic_arguments.empty()) {
-              throw_error("Internal compiler error: generic args atached to wrong ast", func->source_range);
-            }
-            func = ast_type->normal.base;
-          } else {
-            throw_error("Cannot call method of function or tuple type", func->source_range);
-          }
-        }
-        auto func_node_ty = func->get_node_type();
-        ASTType type_ast;
-        if (func_node_ty == AST_NODE_DOT_EXPR) {
-          auto func_as_dot = static_cast<ASTDotExpr *>(func);
-          func_as_dot->base->accept(this);
-          auto type = global_get_type(func_as_dot->base->resolved_type);
-          if (!type->get_info()->scope->local_lookup(func_as_dot->member_name) && type->get_ext().is_pointer()) {
-            type = global_get_type(type->get_element_type());
-          }
-          type_ast.resolved_type = type->id;
-          type_context = &type_ast;
-        } else if (func_node_ty == AST_NODE_SCOPE_RESOLUTION) {
-          auto func_as_scope_res = static_cast<ASTScopeResolution *>(func);
-          func_as_scope_res->base->accept(this);
-          type_ast.resolved_type = func_as_scope_res->base->resolved_type;
-          type_context = &type_ast;
+        ASTType func_type_ast;
+        if (func_decl->declaring_type != Type::INVALID_TYPE_ID) {
+          func_type_ast.resolved_type = func_decl->declaring_type;
+          type_context = &func_type_ast;
         }
 
         GENERIC_PANIC_HANDLER(
