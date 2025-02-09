@@ -452,7 +452,7 @@ struct AST {
   };
 };
 
-extern AST *NOOP; // @nocheckin put a prealloced noop in main and use it everywhere.
+extern AST *NOOP;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,

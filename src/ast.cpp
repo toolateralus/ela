@@ -2154,7 +2154,6 @@ Token Parser::peek() const {
     return Token::Eof();
   }
 
-  // nocheckin
   if (!states.back().lookahead_buffer.empty()) {
     return states.back().lookahead_buffer.front();
   } else {
