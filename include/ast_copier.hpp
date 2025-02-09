@@ -4,58 +4,52 @@
 #include "scope.hpp"
 
 struct ASTCopier {
-
-  template<class T>
-  T *copy(T *node) requires std::is_base_of_v<AST, T> {
-    auto new_node = new (ast_alloc<T>()) T(*node);
-    new_node->control_flow.type = -1;
-    return new_node;
-  }
-
   Scope *current_scope = nullptr;
-  ASTImpl *copy_impl(ASTImpl* node);
   Scope *copy_scope(Scope *old);
-  ASTProgram *copy_program(ASTProgram *node);
-  ASTBlock *copy_block(ASTBlock *node);
-  ASTFunctionDeclaration *copy_function_declaration(ASTFunctionDeclaration *node);
-  ASTParamsDecl *copy_params_decl(ASTParamsDecl *node);
-  ASTParamDecl *copy_param_decl(ASTParamDecl *node);
-  ASTDeclaration *copy_declaration(ASTDeclaration *node);
-  ASTExprStatement *copy_expr_statement(ASTExprStatement *node);
-  ASTBinExpr *copy_bin_expr(ASTBinExpr *node);
-  ASTUnaryExpr *copy_unary_expr(ASTUnaryExpr *node);
-  ASTIdentifier *copy_identifier(ASTIdentifier *node);
-  ASTLiteral *copy_literal(ASTLiteral *node);
-  ASTType *copy_type(ASTType *node);
-  ASTCall *copy_call(ASTCall *node);
-  ASTArguments *copy_arguments(ASTArguments *node);
-  ASTReturn *copy_return(ASTReturn *node);
-  ASTContinue *copy_continue(ASTContinue *node);
-  ASTBreak *copy_break(ASTBreak *node);
-  ASTFor *copy_for(ASTFor *node);
-  ASTIf *copy_if(ASTIf *node);
-  ASTElse *copy_else(ASTElse *node);
-  ASTWhile *copy_while(ASTWhile *node);
-  ASTStructDeclaration *copy_struct_declaration(ASTStructDeclaration *node);
-  ASTDotExpr *copy_dot_expr(ASTDotExpr *node);
-  ASTSubscript *copy_subscript(ASTSubscript *node);
-  ASTInitializerList *copy_initializer_list(ASTInitializerList *node);
-  ASTEnumDeclaration *copy_enum_declaration(ASTEnumDeclaration *node);
-  ASTRange *copy_range(ASTRange *node);
-  ASTSwitch *copy_switch(ASTSwitch *node);
-  ASTTuple *copy_tuple(ASTTuple *node);
-  ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
-  ASTInterfaceDeclaration *copy_interface_declaration(ASTInterfaceDeclaration *node);
-  ASTAlias *copy_alias(ASTAlias *node);
-  ASTSize_Of *copy_sizeof(ASTSize_Of *node);
-  ASTDefer *copy_defer(ASTDefer *node);
-  ASTLambda *copy_lambda(ASTLambda *node);
-  ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
-  ASTStatementList *copy_statement_list(ASTStatementList *node);
-  ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
+
+  AST *copy(AST* node);
+  AST *copy_impl(AST* node);
+  AST *copy_program(AST *node);
+  AST *copy_block(AST *node);
+  AST *copy_function_declaration(AST *node);
+  AST *copy_params_decl(AST *node);
+  AST *copy_param_decl(AST *node);
+  AST *copy_declaration(AST *node);
+  AST *copy_expr_statement(AST *node);
+  AST *copy_bin_expr(AST *node);
+  AST *copy_unary_expr(AST *node);
+  AST *copy_identifier(AST *node);
+  AST *copy_literal(AST *node);
+  AST *copy_type(AST *node);
+  AST *copy_call(AST *node);
+  AST *copy_arguments(AST *node);
+  AST *copy_return(AST *node);
+  AST *copy_continue(AST *node);
+  AST *copy_break(AST *node);
+  AST *copy_for(AST *node);
+  AST *copy_if(AST *node);
+  AST *copy_else(AST *node);
+  AST *copy_while(AST *node);
+  AST *copy_struct_declaration(AST *node);
+  AST *copy_dot_expr(AST *node);
+  AST *copy_subscript(AST *node);
+  AST *copy_initializer_list(AST *node);
+  AST *copy_enum_declaration(AST *node);
+  AST *copy_range(AST *node);
+  AST *copy_switch(AST *node);
+  AST *copy_tuple(AST *node);
+  AST *copy_tuple_deconstruction(AST *node);
+  AST *copy_interface_declaration(AST *node);
+  AST *copy_alias(AST *node);
+  AST *copy_sizeof(AST *node);
+  AST *copy_defer(AST *node);
+  AST *copy_lambda(AST *node);
+  AST *copy_tagged_union_declaration(AST *node);
+  AST *copy_statement_list(AST *node);
+  AST *copy_scope_resolution(AST *node);
   AST *copy_node(AST *node);
-  ASTWhere *copy_where(ASTWhere *node);
-  ASTCast *copy_cast(ASTCast *node);
+  AST *copy_where(AST *node);
+  AST *copy_cast(AST *node);
 };
 
 AST *deep_copy_ast(AST *root);
