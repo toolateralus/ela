@@ -170,7 +170,7 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
       throw_error("Ela does not support default parameters.", node->source_range);
     }
     function.parameters.push_back(param);
-    
+
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     } else
@@ -1406,22 +1406,22 @@ AST *Parser::parse_block(Scope *scope) {
   return block;
 }
 
-ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
-  NODE_ALLOC(ASTFunctionDeclaration, function, range, this, _)
+AST *Parser::parse_function_declaration(Token name) {
+  NODE_ALLOC(AST_FUNCTION, node, range, this, _)
   expect(Token_Type::Fn);
 
-  function->has_defer = false;
+  node->function.has_defer = false;
 
   if (peek().type == Token_Type::GenericBrace) {
-    function->generic_parameters = parse_generic_parameters();
+    node->function.generic_parameters = parse_generic_parameters();
   }
 
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
-  current_func_decl = function;
+  current_func_decl = node;
 
-  function->params = parse_parameters(function->generic_parameters);
-  function->name = name.value;
+  parse_parameters(node->function.generic_parameters, node);
+  node->function.name = name.value;
 
   // check for definition.
   auto has_definition = false;
@@ -1432,34 +1432,34 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, function);
+  ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, node);
 
   if (peek().type != Token_Type::Arrow) {
     function->return_type = AST_TYPE::get_void();
   } else {
     expect(Token_Type::Arrow);
-    function->return_type = parse_type();
+    node->return_type = parse_type();
   }
 
   if (peek().type == Token_Type::Where) {
-    function->where_clause = parse_where_clause();
+    node->where_clause = parse_where_clause();
   }
 
   if (peek().type == Token_Type::Semi) {
-    function->flags |= FUNCTION_IS_FORWARD_DECLARED;
+    node->flags |= FUNCTION_IS_FORWARD_DECLARED;
     auto sym = ctx.scope->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
-    end_node(function, range);
+    end_node(node, range);
     current_func_decl = last_func_decl;
-    return function;
+    return node;
   }
 
   ctx.set_scope();
 
   if (current_impl_decl) {
-    if (function->params->has_self) {
-      function->flags |= FUNCTION_IS_METHOD;
+    if (node->params->has_self) {
+      node->flags |= FUNCTION_IS_METHOD;
     } else {
-      function->flags |= FUNCTION_IS_STATIC;
+      node->flags |= FUNCTION_IS_STATIC;
     }
   }
 
@@ -1468,10 +1468,10 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
   }
 
-  function->block = parse_block();
-  function->block.get()->parent = function;
+  node->block = parse_block();
+  node->block.get()->parent = node;
 
-  if (function->block && has_definition) {
+  if (node->block && has_definition) {
     end_node(nullptr, range);
     throw_error(std::format("Redefinition of function {}", name.value), range);
   }
@@ -1482,9 +1482,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  end_node(function, range);
-  function->scope = ctx.exit_scope();
-  return function;
+  end_node(node, range);
+  node->scope = ctx.exit_scope();
+  return node;
 }
 
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
