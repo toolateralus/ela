@@ -5,9 +5,19 @@
 #include "arena.hpp"
 #include "constexpr.hpp"
 #include "interned_string.hpp"
-#include "type.hpp"
 
 extern jstl::Arena symbol_arena;
+
+enum TypeKind {
+  TYPE_SCALAR,
+  TYPE_FUNCTION,
+  TYPE_STRUCT,
+  TYPE_ENUM,
+  TYPE_TUPLE,
+  TYPE_TAGGED_UNION,
+  TYPE_INTERFACE,
+};
+
 
 enum SymbolFlags {
   SYMBOL_IS_VARIABLE = 1 << 0,
@@ -91,9 +101,6 @@ struct SymbolTable {
   bool erase(const InternedString &name);
   void insert(const Symbol &symbol);
 };
-
-struct AST;
-extern Scope *root_scope;
 
 static std::unordered_set<InternedString> &defines() {
   static std::unordered_set<InternedString> defines;
