@@ -10,7 +10,7 @@
 
 #include "interned_string.hpp"
 
-enum struct TType {
+enum struct Token_Type: char {
   Eof = -1,
   Identifier,
   Integer,
@@ -105,96 +105,96 @@ enum struct TType {
   Size_Of,
 };
 
-#define TTYPE_CASE(type)                                                                                               \
-  case TType::type:                                                                                                    \
+#define Token_Type_Case(type)                                                                                               \
+  case Token_Type::type:                                                                                                    \
     return #type
 
-static inline std::string TTypeToString(TType type) {
+static inline std::string Token_Type_To_String(Token_Type type) {
   switch (type) {
-    TTYPE_CASE(Size_Of);
-    TTYPE_CASE(Interface);
-    TTYPE_CASE(Where);
-    TTYPE_CASE(Defer);
-    TTYPE_CASE(Is);
-    TTYPE_CASE(Char);
-    TTYPE_CASE(ExpressionBody);
-    TTYPE_CASE(GenericBrace);
-    TTYPE_CASE(Fn);
-    TTYPE_CASE(Colon);
-    TTYPE_CASE(Switch);
-    TTYPE_CASE(In);
-    TTYPE_CASE(Then);
-    TTYPE_CASE(Union);
-    TTYPE_CASE(Directive);
-    TTYPE_CASE(Enum);
-    TTYPE_CASE(ColonEquals);
-    TTYPE_CASE(Varargs);
-    TTYPE_CASE(True);
-    TTYPE_CASE(False);
-    TTYPE_CASE(Null);
-    TTYPE_CASE(Identifier);
-    TTYPE_CASE(Integer);
-    TTYPE_CASE(Float);
-    TTYPE_CASE(String);
-    TTYPE_CASE(Assign);
-    TTYPE_CASE(Add);
-    TTYPE_CASE(Sub);
-    TTYPE_CASE(Mul);
-    TTYPE_CASE(Div);
-    TTYPE_CASE(Modulo);
-    TTYPE_CASE(Range);
-    TTYPE_CASE(Arrow);
-    TTYPE_CASE(Comma);
-    TTYPE_CASE(Semi);
-    TTYPE_CASE(Or);
-    TTYPE_CASE(And);
-    TTYPE_CASE(SHL);
-    TTYPE_CASE(SHR);
-    TTYPE_CASE(Xor);
-    TTYPE_CASE(LogicalOr);
-    TTYPE_CASE(LogicalAnd);
-    TTYPE_CASE(LT);
-    TTYPE_CASE(GT);
-    TTYPE_CASE(EQ);
-    TTYPE_CASE(NEQ);
-    TTYPE_CASE(LE);
-    TTYPE_CASE(GE);
-    TTYPE_CASE(LParen);
-    TTYPE_CASE(RParen);
-    TTYPE_CASE(LCurly);
-    TTYPE_CASE(RCurly);
-    TTYPE_CASE(LBrace);
-    TTYPE_CASE(RBrace);
-    TTYPE_CASE(Eof);
-    TTYPE_CASE(DoubleColon);
-    TTYPE_CASE(Dot);
-    TTYPE_CASE(LogicalNot);
-    TTYPE_CASE(Not);
+    Token_Type_Case(Size_Of);
+    Token_Type_Case(Interface);
+    Token_Type_Case(Where);
+    Token_Type_Case(Defer);
+    Token_Type_Case(Is);
+    Token_Type_Case(Char);
+    Token_Type_Case(ExpressionBody);
+    Token_Type_Case(GenericBrace);
+    Token_Type_Case(Fn);
+    Token_Type_Case(Colon);
+    Token_Type_Case(Switch);
+    Token_Type_Case(In);
+    Token_Type_Case(Then);
+    Token_Type_Case(Union);
+    Token_Type_Case(Directive);
+    Token_Type_Case(Enum);
+    Token_Type_Case(ColonEquals);
+    Token_Type_Case(Varargs);
+    Token_Type_Case(True);
+    Token_Type_Case(False);
+    Token_Type_Case(Null);
+    Token_Type_Case(Identifier);
+    Token_Type_Case(Integer);
+    Token_Type_Case(Float);
+    Token_Type_Case(String);
+    Token_Type_Case(Assign);
+    Token_Type_Case(Add);
+    Token_Type_Case(Sub);
+    Token_Type_Case(Mul);
+    Token_Type_Case(Div);
+    Token_Type_Case(Modulo);
+    Token_Type_Case(Range);
+    Token_Type_Case(Arrow);
+    Token_Type_Case(Comma);
+    Token_Type_Case(Semi);
+    Token_Type_Case(Or);
+    Token_Type_Case(And);
+    Token_Type_Case(SHL);
+    Token_Type_Case(SHR);
+    Token_Type_Case(Xor);
+    Token_Type_Case(LogicalOr);
+    Token_Type_Case(LogicalAnd);
+    Token_Type_Case(LT);
+    Token_Type_Case(GT);
+    Token_Type_Case(EQ);
+    Token_Type_Case(NEQ);
+    Token_Type_Case(LE);
+    Token_Type_Case(GE);
+    Token_Type_Case(LParen);
+    Token_Type_Case(RParen);
+    Token_Type_Case(LCurly);
+    Token_Type_Case(RCurly);
+    Token_Type_Case(LBrace);
+    Token_Type_Case(RBrace);
+    Token_Type_Case(Eof);
+    Token_Type_Case(DoubleColon);
+    Token_Type_Case(Dot);
+    Token_Type_Case(LogicalNot);
+    Token_Type_Case(Not);
 
-    TTYPE_CASE(Increment);
-    TTYPE_CASE(Decrement);
+    Token_Type_Case(Increment);
+    Token_Type_Case(Decrement);
 
-    TTYPE_CASE(Return);
-    TTYPE_CASE(Break);
-    TTYPE_CASE(Continue);
-    TTYPE_CASE(Struct);
-    TTYPE_CASE(For);
-    TTYPE_CASE(While);
-    TTYPE_CASE(If);
-    TTYPE_CASE(Else);
+    Token_Type_Case(Return);
+    Token_Type_Case(Break);
+    Token_Type_Case(Continue);
+    Token_Type_Case(Struct);
+    Token_Type_Case(For);
+    Token_Type_Case(While);
+    Token_Type_Case(If);
+    Token_Type_Case(Else);
 
-    TTYPE_CASE(CompAdd);
-    TTYPE_CASE(CompSub);
-    TTYPE_CASE(CompMul);
-    TTYPE_CASE(CompDiv);
-    TTYPE_CASE(CompMod);
-    TTYPE_CASE(CompAnd);
-    TTYPE_CASE(CompOr);
-    TTYPE_CASE(CompXor);
-    TTYPE_CASE(CompSHL);
-    TTYPE_CASE(CompSHR);
-    TTYPE_CASE(As);
-    TTYPE_CASE(Impl);
+    Token_Type_Case(CompAdd);
+    Token_Type_Case(CompSub);
+    Token_Type_Case(CompMul);
+    Token_Type_Case(CompDiv);
+    Token_Type_Case(CompMod);
+    Token_Type_Case(CompAnd);
+    Token_Type_Case(CompOr);
+    Token_Type_Case(CompXor);
+    Token_Type_Case(CompSHL);
+    Token_Type_Case(CompSHR);
+    Token_Type_Case(As);
+    Token_Type_Case(Impl);
   }
   return "Unknown";
 }
@@ -222,124 +222,124 @@ struct SourceLocation {
 struct Token {
   inline bool is_relational() const {
     switch (type) {
-      case TType::LT:
-      case TType::GT:
-      case TType::EQ:
-      case TType::NEQ:
-      case TType::LE:
-      case TType::GE:
-      case TType::LogicalOr:
-      case TType::LogicalAnd:
+      case Token_Type::LT:
+      case Token_Type::GT:
+      case Token_Type::EQ:
+      case Token_Type::NEQ:
+      case Token_Type::LE:
+      case Token_Type::GE:
+      case Token_Type::LogicalOr:
+      case Token_Type::LogicalAnd:
         return true;
       default:
         return false;
     }
   }
   inline bool is_comp_assign() const {
-    return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
-           type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR;
+    return type == Token_Type::CompAdd || type == Token_Type::CompSub || type == Token_Type::CompMul || type == Token_Type::CompDiv ||
+           type == Token_Type::CompMod || type == Token_Type::CompAnd || type == Token_Type::CompOr || type == Token_Type::CompXor ||
+           type == Token_Type::CompSHL || type == Token_Type::CompSHR;
   }
 
   Token() {}
 
-  Token(SourceLocation location, InternedString value, TType type, TFamily family)
+  Token(SourceLocation location, InternedString value, Token_Type type, TFamily family)
       : value(std::move(value)), type(type), family(family), location(location) {}
   InternedString value;
-  TType type;
+  Token_Type type;
   TFamily family;
   SourceLocation location;
   static Token &Eof() {
-    static Token eof = Token(SourceLocation(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
+    static Token eof = Token(SourceLocation(0, 0, 0), {""}, Token_Type::Eof, TFamily::Operator);
     return eof;
   }
 
-  bool is_eof() const { return type == TType::Eof; }
+  bool is_eof() const { return type == Token_Type::Eof; }
 };
 
-static std::unordered_map<std::string, TType> keywords{
+static std::unordered_map<std::string, Token_Type> keywords{
     // control flow
-    {"in", TType::In},
-    {"where", TType::Where},
-    {"is", TType::Is},
-    {"sizeof", TType::Size_Of},
-    {"fn", TType::Fn},
-    {"switch", TType::Switch},
-    {"then", TType::Then},
-    {"return", TType::Return},
-    {"break", TType::Break},
-    {"continue", TType::Continue},
-    {"for", TType::For},
-    {"while", TType::While},
-    {"if", TType::If},
-    {"else", TType::Else},
+    {"in", Token_Type::In},
+    {"where", Token_Type::Where},
+    {"is", Token_Type::Is},
+    {"sizeof", Token_Type::Size_Of},
+    {"fn", Token_Type::Fn},
+    {"switch", Token_Type::Switch},
+    {"then", Token_Type::Then},
+    {"return", Token_Type::Return},
+    {"break", Token_Type::Break},
+    {"continue", Token_Type::Continue},
+    {"for", Token_Type::For},
+    {"while", Token_Type::While},
+    {"if", Token_Type::If},
+    {"else", Token_Type::Else},
     // type declarations
-    {"struct", TType::Struct},
-    {"union", TType::Union},
-    {"enum", TType::Enum},
+    {"struct", Token_Type::Struct},
+    {"union", Token_Type::Union},
+    {"enum", Token_Type::Enum},
     // literals
-    {"true", TType::True},
-    {"false", TType::False},
-    {"null", TType::Null},
+    {"true", Token_Type::True},
+    {"false", Token_Type::False},
+    {"null", Token_Type::Null},
 
     // miscellaneous
-    {"as", TType::As},
-    {"impl", TType::Impl},
-    {"defer", TType::Defer},
-    {"interface", TType::Interface},
+    {"as", Token_Type::As},
+    {"impl", Token_Type::Impl},
+    {"defer", Token_Type::Defer},
+    {"interface", Token_Type::Interface},
 };
 
-static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},
-                                                        {":", TType::Colon},
-                                                        {":=", TType::ColonEquals},
-                                                        {"...", TType::Varargs},
-                                                        {"#", TType::Directive},
-                                                        {".", TType::Dot},
-                                                        {"!", TType::LogicalNot},
-                                                        {"~", TType::Not},
-                                                        {"::", TType::DoubleColon},
-                                                        {"->", TType::Arrow},
-                                                        {"..", TType::Range},
-                                                        {"+", TType::Add},
-                                                        {"-", TType::Sub},
-                                                        {"*", TType::Mul},
-                                                        {"/", TType::Div},
-                                                        {"%", TType::Modulo},
-                                                        {"=", TType::Assign},
-                                                        {",", TType::Comma},
-                                                        {";", TType::Semi},
-                                                        {"(", TType::LParen},
-                                                        {")", TType::RParen},
-                                                        {"{", TType::LCurly},
-                                                        {"}", TType::RCurly},
-                                                        {"|", TType::Or},
-                                                        {"&", TType::And},
-                                                        {"||", TType::LogicalOr},
-                                                        {"&&", TType::LogicalAnd},
-                                                        {"<<", TType::SHL},
-                                                        {">>", TType::SHR},
-                                                        {"^", TType::Xor},
-                                                        {"<", TType::LT},
-                                                        {">", TType::GT},
-                                                        {"==", TType::EQ},
-                                                        {"!=", TType::NEQ},
-                                                        {"<=", TType::LE},
-                                                        {">=", TType::GE},
-                                                        {"[", TType::LBrace},
-                                                        {"]", TType::RBrace},
-                                                        {"++", TType::Increment},
-                                                        {"--", TType::Decrement},
-                                                        {"+=", TType::CompAdd},
-                                                        {"-=", TType::CompSub},
-                                                        {"*=", TType::CompMul},
-                                                        {"/=", TType::CompDiv},
-                                                        {"%=", TType::CompMod},
-                                                        {"&=", TType::CompAnd},
-                                                        {"|=", TType::CompOr},
-                                                        {"^=", TType::CompXor},
-                                                        {"<<=", TType::CompSHL},
-                                                        {">>=", TType::CompSHR},
-                                                        {"![", TType::GenericBrace}};
+static std::unordered_map<std::string, Token_Type> operators{{"=>", Token_Type::ExpressionBody},
+                                                        {":", Token_Type::Colon},
+                                                        {":=", Token_Type::ColonEquals},
+                                                        {"...", Token_Type::Varargs},
+                                                        {"#", Token_Type::Directive},
+                                                        {".", Token_Type::Dot},
+                                                        {"!", Token_Type::LogicalNot},
+                                                        {"~", Token_Type::Not},
+                                                        {"::", Token_Type::DoubleColon},
+                                                        {"->", Token_Type::Arrow},
+                                                        {"..", Token_Type::Range},
+                                                        {"+", Token_Type::Add},
+                                                        {"-", Token_Type::Sub},
+                                                        {"*", Token_Type::Mul},
+                                                        {"/", Token_Type::Div},
+                                                        {"%", Token_Type::Modulo},
+                                                        {"=", Token_Type::Assign},
+                                                        {",", Token_Type::Comma},
+                                                        {";", Token_Type::Semi},
+                                                        {"(", Token_Type::LParen},
+                                                        {")", Token_Type::RParen},
+                                                        {"{", Token_Type::LCurly},
+                                                        {"}", Token_Type::RCurly},
+                                                        {"|", Token_Type::Or},
+                                                        {"&", Token_Type::And},
+                                                        {"||", Token_Type::LogicalOr},
+                                                        {"&&", Token_Type::LogicalAnd},
+                                                        {"<<", Token_Type::SHL},
+                                                        {">>", Token_Type::SHR},
+                                                        {"^", Token_Type::Xor},
+                                                        {"<", Token_Type::LT},
+                                                        {">", Token_Type::GT},
+                                                        {"==", Token_Type::EQ},
+                                                        {"!=", Token_Type::NEQ},
+                                                        {"<=", Token_Type::LE},
+                                                        {">=", Token_Type::GE},
+                                                        {"[", Token_Type::LBrace},
+                                                        {"]", Token_Type::RBrace},
+                                                        {"++", Token_Type::Increment},
+                                                        {"--", Token_Type::Decrement},
+                                                        {"+=", Token_Type::CompAdd},
+                                                        {"-=", Token_Type::CompSub},
+                                                        {"*=", Token_Type::CompMul},
+                                                        {"/=", Token_Type::CompDiv},
+                                                        {"%=", Token_Type::CompMod},
+                                                        {"&=", Token_Type::CompAnd},
+                                                        {"|=", Token_Type::CompOr},
+                                                        {"^=", Token_Type::CompXor},
+                                                        {"<<=", Token_Type::CompSHL},
+                                                        {">>=", Token_Type::CompSHR},
+                                                        {"![", Token_Type::GenericBrace}};
 
 struct Lexer {
   struct State {

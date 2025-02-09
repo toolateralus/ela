@@ -65,7 +65,7 @@ enum TypeExtEnum {
   TYPE_EXT_ARRAY,
 };
 
-enum FunctionInstanceFlags : size_t {
+enum Function_Instance_Flags : int16_t {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
@@ -239,7 +239,7 @@ int global_create_interface_type(const InternedString &name, Scope *scope,
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args);
 int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types);
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const Source_Range & = {});
 // char *
 int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions);
@@ -250,16 +250,16 @@ bool type_is_numerical(const Type *t);
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 // returns false for failure, else true and passed param signature as out.
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
-void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
+void emit_warnings_or_errors_for_operator_overloads(const Token_Type type, Source_Range &range);
 
-struct ASTNode;
+struct AST;
 
 struct Type {
   int id = INVALID_TYPE_ID;
   int base_id = INVALID_TYPE_ID;
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
-  Nullable<ASTNode> declaring_node;
+  Nullable<AST> declaring_node;
   bool fwd_decl_is_emitted = false;
   bool tuple_is_emitted = false;
   // if this is an alias or something just get the actual real true type.
@@ -322,8 +322,8 @@ enum OperationKind {
   OPERATION_SUBSCRIPT,
 };
 
-int find_operator_overload(TType op, Type *left_ty, OperationKind kind);
-std::string get_operator_overload_name(TType op, OperationKind kind);
+int find_operator_overload(Token_Type op, Type *left_ty, OperationKind kind);
+std::string get_operator_overload_name(Token_Type op, OperationKind kind);
 
 static std::string get_unmangled_name(const Type *type) {
   std::string base = type->get_base().get_str();

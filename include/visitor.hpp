@@ -10,101 +10,142 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-struct VisitorBase {
-  virtual ~VisitorBase() = default;
-  DECLARE_VISIT_BASE_METHODS()
-  virtual void visit(ASTStatementList *node) {
-    for (const auto &stmt : node->statements) {
-      stmt->accept(this);
-    }
-    return;
-  };
-};
+#define DEFINE_GENERIC_VISITOR()                                                                                       \
+  void visit(AST *node) {                                                                                              \
+    switch (node->node_type) {                                                                                         \
+      case AST_NODE_PROGRAM:                                                                                           \
+        return visit_program(node);                                                                                    \
+      case AST_NODE_BLOCK:                                                                                             \
+        return visit_block(node);                                                                                      \
+      case AST_NODE_FUNCTION_DECLARATION:                                                                              \
+        return visit_function_declaration(node);                                                                       \
+      case AST_NODE_PARAMS_DECL:                                                                                       \
+        return visit_params_decl(node);                                                                                \
+      case AST_NODE_PARAM_DECL:                                                                                        \
+        return visit_param_decl(node);                                                                                 \
+      case AST_NODE_DECLARATION:                                                                                       \
+        return visit_declaration(node);                                                                                \
+      case AST_NODE_EXPR_STATEMENT:                                                                                    \
+        return visit_expr_statement(node);                                                                             \
+      case AST_NODE_BIN_EXPR:                                                                                          \
+        return visit_bin_expr(node);                                                                                   \
+      case AST_NODE_UNARY_EXPR:                                                                                        \
+        return visit_unary_expr(node);                                                                                 \
+      case AST_NODE_IDENTIFIER:                                                                                        \
+        return visit_identifier(node);                                                                                 \
+      case AST_NODE_LITERAL:                                                                                           \
+        return visit_literal(node);                                                                                    \
+      case AST_NODE_TYPE:                                                                                              \
+        return visit_type(node);                                                                                       \
+      case AST_NODE_TUPLE:                                                                                             \
+        return visit_tuple(node);                                                                                      \
+      case AST_NODE_CALL:                                                                                              \
+        return visit_call(node);                                                                                       \
+      case AST_NODE_ARGUMENTS:                                                                                         \
+        return visit_arguments(node);                                                                                  \
+      case AST_NODE_RETURN:                                                                                            \
+        return visit_return(node);                                                                                     \
+      case AST_NODE_CONTINUE:                                                                                          \
+        return visit_continue(node);                                                                                   \
+      case AST_NODE_BREAK:                                                                                             \
+        return visit_break(node);                                                                                      \
+      case AST_NODE_FOR:                                                                                               \
+        return visit_for(node);                                                                                        \
+      case AST_NODE_IF:                                                                                                \
+        return visit_if(node);                                                                                         \
+      case AST_NODE_ELSE:                                                                                              \
+        return visit_else(node);                                                                                       \
+      case AST_NODE_WHILE:                                                                                             \
+        return visit_while(node);                                                                                      \
+      case AST_NODE_STRUCT_DECLARATION:                                                                                \
+        return visit_struct_declaration(node);                                                                         \
+      case AST_NODE_DOT_EXPR:                                                                                          \
+        return visit_dot_expr(node);                                                                                   \
+      case AST_NODE_SCOPE_RESOLUTION:                                                                                  \
+        return visit_scope_resolution(node);                                                                           \
+      case AST_NODE_SUBSCRIPT:                                                                                         \
+        return visit_subscript(node);                                                                                  \
+      case AST_NODE_INITIALIZER_LIST:                                                                                  \
+        return visit_initializer_list(node);                                                                           \
+      case AST_NODE_ENUM_DECLARATION:                                                                                  \
+        return visit_enum_declaration(node);                                                                           \
+      case AST_NODE_TAGGED_UNION_DECLARATION:                                                                          \
+        return visit_tagged_union_declaration(node);                                                                   \
+      case AST_NODE_NOOP:                                                                                              \
+        return visit_noop(node);                                                                                       \
+      case AST_NODE_ALIAS:                                                                                             \
+        return visit_alias(node);                                                                                      \
+      case AST_NODE_IMPL:                                                                                              \
+        return visit_impl(node);                                                                                       \
+      case AST_NODE_INTERFACE_DECLARATION:                                                                             \
+        return visit_interface_declaration(node);                                                                      \
+      case AST_NODE_SIZE_OF:                                                                                           \
+        return visit_size_of(node);                                                                                    \
+      case AST_NODE_DEFER:                                                                                             \
+        return visit_defer(node);                                                                                      \
+      case AST_NODE_CAST:                                                                                              \
+        return visit_cast(node);                                                                                       \
+      case AST_NODE_LAMBDA:                                                                                            \
+        return visit_lambda(node);                                                                                     \
+      case AST_NODE_RANGE:                                                                                             \
+        return visit_range(node);                                                                                      \
+      case AST_NODE_SWITCH:                                                                                            \
+        return visit_switch(node);                                                                                     \
+      case AST_NODE_TUPLE_DECONSTRUCTION:                                                                              \
+        return visit_tuple_deconstruction(node);                                                                       \
+      case AST_NODE_WHERE:                                                                                             \
+        return visit_where(node);                                                                                      \
+      case AST_NODE_STATEMENT_LIST:                                                                                    \
+        return visit_statement_list(node);                                                                             \
+    }                                                                                                                  \
+  }
 
-struct Typer : VisitorBase {
-  Nullable<ASTType> type_context = nullptr;
-  int current_block_statement_idx;
-  int declaring_or_assigning_type = -1;
-
-  template <typename T> using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
-  template <typename T> T visit_generic(VisitorMethod<T> visit_method, T declaring_node, std::vector<int> args);
-
-  Typer(Context &context) : ctx(context) {}
+struct Typer {
+  // used for scoping etc.
   Context &ctx;
-  Nullable<Symbol> get_symbol(ASTNode *);
-  std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
-  std::string getIndent();
+  // parent type of impl's or whatever struct/union/enum etc that's currently being processed.
+  Nullable<AST> type_context = nullptr;
+  // either the current argument type,
+  // the assigning type, declaring type,
+  // used for type inference in more complex scenarios.
+  int expected_type = -1;
+  Typer(Context &context) : ctx(context) {}
 
-  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
-                           const SourceRange &source_range);
+  using VisitorMethod = void (Typer::*)(AST *, bool, std::vector<int>);
+  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, std::vector<int> args);
 
- 
-  void visit(ASTStructDeclaration *node) override;
-  void visit(ASTProgram *node) override;
-  void visit(ASTFunctionDeclaration *node) override;
-  void visit(ASTBlock *node) override;
-  void visit(ASTParamsDecl *node) override;
-  void visit(ASTParamDecl *node) override;
-  void visit(ASTDeclaration *node) override;
-  void visit(ASTExprStatement *node) override;
-  void visit(ASTBinExpr *node) override;
-  void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
-  void visit(ASTLiteral *node) override;
-  void visit(ASTCast *node) override;
-  void visit(ASTType *node) override;
-  void visit(ASTScopeResolution *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
-  void visit(ASTSize_Of *node) override;
-
-  std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
-  // For generics.
-  void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
-                                std::vector<int> generic_args = {});
+  void visit_tagged_union_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
+  void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
+  void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
-  void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
-                                      std::vector<int> generic_args = {});
-  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
-  void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
-                                   std::vector<int> generic_args = {});
-  void visit_function_body(ASTFunctionDeclaration *node);
 
-  int get_self_type();
+  void visit_function_body(AST *node);
+  void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
+                             std::vector<int> generic_args = {});
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first);
-  void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
-  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
+  AST *resolve_generic_function_call(AST *node, AST *function);
+  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
+                           const Source_Range &source_range);
+  std::vector<int> get_generic_arg_types(const std::vector<AST *> &args);
 
+  void type_check_args_from_params(AST *call, AST *function, bool skip_first);
+  void type_check_args_from_info(AST *call, FunctionTypeInfo *info);
+
+  bool visit_where_predicate(Type *type, AST *node);
   void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
 
-  void visit(ASTCall *node) override;
-  void visit(ASTArguments *node) override;
-  void visit(ASTReturn *node) override;
-  void visit(ASTContinue *node) override;
-  void visit(ASTBreak *node) override;
-
-  void visit(ASTFor *node) override;
-  void visit(ASTIf *node) override;
-  void visit(ASTElse *node) override;
-  void visit(ASTWhile *node) override;
-  void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
-  void visit(ASTInitializerList *node) override;
-  void visit(ASTEnumDeclaration *node) override;
-  void visit(ASTRange *node) override;
-  void visit(ASTSwitch *node) override;
-  void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
-  void visit(ASTAlias *node) override;
-  void visit(ASTImpl *node) override;
-  void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
-  void visit(ASTLambda *node) override;
-  void visit(ASTWhere *node) override;
-  bool visit_where_predicate(Type *type, ASTExpr *node);
-
-  InternedString type_name(ASTExpr *node);
+  Nullable<Symbol> get_symbol(AST *node);
+  InternedString type_name(AST *node);
+  int get_self_type();
+  std::vector<TypeExtension> accept_extensions(std::vector<AST_Type_Extension> ast_extensions);
+  void visit_statement_list(AST *node) {
+    for (auto &stmt : node->statements) {
+      visit(stmt);
+    }
+  };
+  DEFINE_VISITORS()
+  DEFINE_GENERIC_VISITOR()
 };
 
 enum DeferBlockType {
@@ -114,25 +155,23 @@ enum DeferBlockType {
 };
 
 struct DeferBlock {
-  std::vector<ASTDefer *> defers;
+  std::vector<AST *> defers;
   DeferBlockType type;
 };
 
 struct DependencyEmitter;
 
-struct Emitter : VisitorBase {
+struct Emitter {
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
   bool emit_default_value = true;
   bool emit_default_args = false;
   int num_tests = 0;
-
-  
   int cf_expr_return_id = 0;
-  Nullable<std::string> cf_expr_return_register;
 
-  Nullable<ASTType> type_context;
+  Nullable<std::string> cf_expr_return_register;
+  Nullable<AST> type_context;
 
   Typer &typer;
 
@@ -158,7 +197,7 @@ struct Emitter : VisitorBase {
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.
-  inline void emit_line_directive(ASTNode *node) {
+  inline void emit_line_directive(AST *node) {
     static int last_loc = -1;
     static bool is_debugging = !compile_command.has_flag("release");
     if (!is_debugging) {
@@ -176,11 +215,11 @@ struct Emitter : VisitorBase {
     }
   }
   void emit_tuple(int type);
-  void emit_lambda(ASTLambda *node);
-  void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
-                              ASTExpr *right = nullptr);
+  void emit_lambda(AST *node);
+  void call_operator_overload(const Source_Range &range, Type *left_ty, OperationKind operation, Token_Type op,
+                              AST *left, AST *right = nullptr);
 
-  void forward_decl_type(Type* type);
+  void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type, Context &context);
@@ -192,11 +231,11 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { (*ss) << '\n' << indent(); }
   inline void semicolon() { (*ss) << ";"; }
   inline void space() { (*ss) << ' '; }
-  
-  void emit_forward_declaration(ASTFunctionDeclaration *node);
-  void emit_foreign_function(ASTFunctionDeclaration *node);
 
-  bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
+  void emit_forward_declaration(AST *node);
+  void emit_foreign_function(AST *node);
+
+  bool should_emit_function(Emitter *visitor, AST *node, bool test_flag);
   std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
@@ -208,116 +247,39 @@ struct Emitter : VisitorBase {
   std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
-  int get_expr_left_type_sr_dot(ASTNode *node);
-  void visit(ASTStructDeclaration *node) override;
-  void visit(ASTProgram *node) override;
-  void visit(ASTBlock *node) override;
-  void visit(ASTFunctionDeclaration *node) override;
-  void visit(ASTParamsDecl *node) override;
-  void visit(ASTParamDecl *node) override;
+  int get_expr_left_type_sr_dot(AST *node);
 
-  void visit(ASTDeclaration *node) override;
-  void visit(ASTExprStatement *node) override;
-  void visit(ASTBinExpr *node) override;
-  void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
-  void visit(ASTLiteral *node) override;
-  void visit(ASTType *node) override;
-  void visit(ASTCall *node) override;
-  void visit(ASTArguments *node) override;
-  void visit(ASTReturn *node) override;
-  void visit(ASTContinue *node) override;
-  void visit(ASTBreak *node) override;
-  void visit(ASTFor *node) override;
-  void visit(ASTIf *node) override;
-  void visit(ASTElse *node) override;
-  void visit(ASTWhile *node) override;
-  void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
-  void visit(ASTInitializerList *node) override;
-  void visit(ASTEnumDeclaration *node) override;
-  void visit(ASTRange *node) override;
-  void visit(ASTSwitch *node) override;
-  void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
-  void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
-  void visit(ASTAlias *node) override;
-  void visit(ASTImpl *node) override;
-  void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
-  void visit(ASTCast *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
-  void visit(ASTLambda *node) override;
-  void visit(ASTWhere *node) override;
-
-  void visit(ASTStatementList *node) override {
-    for (const auto &stmt : node->statements) {
+  void visit_statement_list(AST *node) {
+    for (auto stmt : node->statements) {
       emit_line_directive(stmt);
-      stmt->accept(this);
-      (*ss) << ";";
+      visit(stmt);
+      semicolon();
+      newline();
     }
     return;
   };
-}; 
 
-struct DependencyEmitter : VisitorBase {
+  DEFINE_VISITORS();
+  DEFINE_GENERIC_VISITOR()
+};
+
+struct DependencyEmitter {
   Context &ctx;
   Emitter *emitter;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
-
   std::string define_type(int type_id);
   std::string decl_type(int type_id);
-
-  void visit(ASTStructDeclaration *node) override;
-  void visit(ASTProgram *node) override;
-  void visit(ASTBlock *node) override;
-  void visit(ASTFunctionDeclaration *node) override;
-  void visit(ASTParamsDecl *node) override;
-  void visit(ASTParamDecl *node) override;
-  void visit(ASTDeclaration *node) override;
-  void visit(ASTExprStatement *node) override;
-  void visit(ASTBinExpr *node) override;
-  void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
-  void visit(ASTLiteral *node) override;
-  void visit(ASTType *node) override;
-  void visit(ASTCall *node) override;
-  void visit(ASTArguments *node) override;
-  void visit(ASTReturn *node) override;
-  void visit(ASTContinue *node) override;
-  void visit(ASTBreak *node) override;
-  void visit(ASTFor *node) override;
-  void visit(ASTIf *node) override;
-  void visit(ASTElse *node) override;
-  void visit(ASTWhile *node) override;
-  void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
-  void visit(ASTInitializerList *node) override;
-  void visit(ASTEnumDeclaration *node) override;
-  void visit(ASTRange *node) override;
-  void visit(ASTSwitch *node) override;
-  void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
-  void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
-  void visit(ASTAlias *node) override;
-  void visit(ASTImpl *node) override;
-  void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
-  void visit(ASTCast *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
-  void visit(ASTLambda *node) override;
-  void visit(ASTWhere *node) override;
-  void visit(ASTStatementList *node) override {
-    for (const auto &stmt : node->statements) {
-      stmt->accept(this);
+  DEFINE_VISITORS()
+  DEFINE_GENERIC_VISITOR()
+  void visit_statement_list(AST *node) {
+    for (auto &stmt : node->statements) {
+      visit(stmt);
     }
   };
-}; 
+};
 
 struct GenericInstantiationErrorUserData {
   std::string message = "";
-  SourceRange definition_range = {};
+  Source_Range definition_range = {};
   jmp_buf save_state;
 };

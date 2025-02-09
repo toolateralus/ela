@@ -1,5 +1,5 @@
 
-
+#import format;
 main :: fn() { 
   // This just crahes the compiler?
   // We're passing Type* to println, which should be fine

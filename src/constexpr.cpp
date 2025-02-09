@@ -24,51 +24,51 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
       auto left = evaluate_constexpr(binary->left, ctx);
       auto right = evaluate_constexpr(binary->right, ctx);
       switch (binary->op.type) {
-        case TType::Add:
+        case Token_Type::Add:
           return left + right;
-        case TType::Sub:
+        case Token_Type::Sub:
           return left - right;
-        case TType::Mul:
+        case Token_Type::Mul:
           return left * right;
-        case TType::Div:
+        case Token_Type::Div:
           if ((right == Value::Int(0)).is_truthy()) {
             throw_error("Division by zero in constant expression", node->source_range);
           }
           return left / right;
-        case TType::Modulo:
+        case Token_Type::Modulo:
           if ((right == Value::Int(0)).is_truthy()) {
             throw_error("Modulo by zero in constant expression", node->source_range);
           }
           return left % right;
-        case TType::LogicalNot:
+        case Token_Type::LogicalNot:
           return !left;
-        case TType::Not:
+        case Token_Type::Not:
           return ~left;
-        case TType::Or:
+        case Token_Type::Or:
           return left | right;
-        case TType::And:
+        case Token_Type::And:
           return left & right;
-        case TType::SHL:
+        case Token_Type::SHL:
           return left << right;
-        case TType::SHR:
+        case Token_Type::SHR:
           return left >> right;
-        case TType::Xor:
+        case Token_Type::Xor:
           return left ^ right;
-        case TType::LogicalOr:
+        case Token_Type::LogicalOr:
           return left || right;
-        case TType::LogicalAnd:
+        case Token_Type::LogicalAnd:
           return left && right;
-        case TType::LT:
+        case Token_Type::LT:
           return left < right;
-        case TType::GT:
+        case Token_Type::GT:
           return left > right;
-        case TType::EQ:
+        case Token_Type::EQ:
           return left == right;
-        case TType::NEQ:
+        case Token_Type::NEQ:
           return left != right;
-        case TType::LE:
+        case Token_Type::LE:
           return left <= right;
-        case TType::GE:
+        case Token_Type::GE:
           return left >= right;
         default:
           throw_error("Invalid binary operator in constant expression", node->source_range);
@@ -79,11 +79,11 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
       auto unary = static_cast<ASTUnaryExpr *>(node);
       auto operand = evaluate_constexpr(unary->operand, ctx);
       switch (unary->op.type) {
-        case TType::Sub:
+        case Token_Type::Sub:
           return -operand;
-        case TType::LogicalNot:
+        case Token_Type::LogicalNot:
           return !operand;
-        case TType::Not:
+        case Token_Type::Not:
           return ~operand;
         default:
           throw_error("Invalid unary operator in constant expression", node->source_range);

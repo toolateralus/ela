@@ -336,7 +336,7 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
   return new_node;
 }
 
-ASTNode *ASTCopier::copy_node(ASTNode *node) {
+AST *ASTCopier::copy_node(AST *node) {
   const auto type = node->get_node_type();
   switch (type) {
     case AST_NODE_WHERE:
@@ -426,7 +426,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
   }
 }
 
-ASTNode *deep_copy_ast(ASTNode *root) {
+AST *deep_copy_ast(AST *root) {
   ASTCopier copier;
   return copier.copy_node(root);
 }

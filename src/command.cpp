@@ -9,7 +9,7 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-void emit(ASTNode *root, Context& context, Typer &type_visitor) {
+void emit(AST *root, Context& context, Typer &type_visitor) {
   Emitter emit(context, type_visitor);
   DependencyEmitter dependencyEmitter(context, &emit);
 

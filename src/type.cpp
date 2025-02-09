@@ -195,7 +195,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
   return global_find_type_id(base_id, type_extensions);
 }
 
-ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange &source_range) {
+ConversionRule type_conversion_rule(const Type *from, const Type *to, const Source_Range &source_range) {
   // just to make it more lax at call sites, we check here.
   if (!from || !to) {
     throw_error("internal compiler error: type was null when checking type "
@@ -450,7 +450,7 @@ int Type::get_element_type() const {
 // used for anonymous structs etc.
 Token get_unique_identifier() {
   static int num = 0;
-  auto tok = Token({}, "__anon_D" + std::to_string(num), TType::Identifier, TFamily::Identifier);
+  auto tok = Token({}, "__anon_D" + std::to_string(num), Token_Type::Identifier, TFamily::Identifier);
   num++;
   return tok;
 }
@@ -534,58 +534,58 @@ bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
 // because in C++ it requires a reference. a lot of these operators should be
 // banned too, we don't need () for example, it just creates a bunch of
 // complexity.
-void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range) {
+void emit_warnings_or_errors_for_operator_overloads(const Token_Type type, Source_Range &range) {
   switch (type) {
-    case TType::Range:
-    case TType::Comma:
-    case TType::Semi:
-    case TType::Varargs:
-    case TType::Directive:
-    case TType::ColonEquals:
-    case TType::RParen:
-    case TType::RBrace:
+    case Token_Type::Range:
+    case Token_Type::Comma:
+    case Token_Type::Semi:
+    case Token_Type::Varargs:
+    case Token_Type::Directive:
+    case Token_Type::ColonEquals:
+    case Token_Type::RParen:
+    case Token_Type::RBrace:
       throw_error("Operator overload not allowed", range);
-    case TType::Arrow:
+    case Token_Type::Arrow:
       throw_warning(WarningUseDotNotArrowOperatorOverload, "Operator overload: Use '.' instead of '->'", range);
       return;
 
     // Valid
-    case TType::Assign:
-    case TType::Add:
-    case TType::Sub:
-    case TType::Mul:
-    case TType::Div:
-    case TType::Modulo:
-    case TType::LogicalNot:
-    case TType::Not:
-    case TType::Or:
-    case TType::And:
-    case TType::SHL:
-    case TType::SHR:
-    case TType::Xor:
-    case TType::LogicalOr:
-    case TType::LogicalAnd:
-    case TType::LT:
-    case TType::GT:
-    case TType::EQ:
-    case TType::NEQ:
-    case TType::LE:
-    case TType::GE:
-    case TType::LParen:
-    case TType::LBrace:
-    case TType::Dot:
-    case TType::Increment:
-    case TType::Decrement:
-    case TType::CompAdd:
-    case TType::CompSub:
-    case TType::CompMul:
-    case TType::CompDiv:
-    case TType::CompMod:
-    case TType::CompAnd:
-    case TType::CompOr:
-    case TType::CompXor:
-    case TType::CompSHL:
-    case TType::CompSHR:
+    case Token_Type::Assign:
+    case Token_Type::Add:
+    case Token_Type::Sub:
+    case Token_Type::Mul:
+    case Token_Type::Div:
+    case Token_Type::Modulo:
+    case Token_Type::LogicalNot:
+    case Token_Type::Not:
+    case Token_Type::Or:
+    case Token_Type::And:
+    case Token_Type::SHL:
+    case Token_Type::SHR:
+    case Token_Type::Xor:
+    case Token_Type::LogicalOr:
+    case Token_Type::LogicalAnd:
+    case Token_Type::LT:
+    case Token_Type::GT:
+    case Token_Type::EQ:
+    case Token_Type::NEQ:
+    case Token_Type::LE:
+    case Token_Type::GE:
+    case Token_Type::LParen:
+    case Token_Type::LBrace:
+    case Token_Type::Dot:
+    case Token_Type::Increment:
+    case Token_Type::Decrement:
+    case Token_Type::CompAdd:
+    case Token_Type::CompSub:
+    case Token_Type::CompMul:
+    case Token_Type::CompDiv:
+    case Token_Type::CompMod:
+    case Token_Type::CompAnd:
+    case Token_Type::CompOr:
+    case Token_Type::CompXor:
+    case Token_Type::CompSHL:
+    case Token_Type::CompSHR:
       break;
     default:
       throw_error(std::format("Invalid operator overload {}", TTypeToString(type)), range);
@@ -705,68 +705,68 @@ int Type::take_pointer_to() const {
   return global_find_type_id(base_id == -1 ? id : base_id, ext);
 }
 
-std::string get_operator_overload_name(TType op, OperationKind kind) {
+std::string get_operator_overload_name(Token_Type op, OperationKind kind) {
   std::string output = "";
   switch (op) {
-    case TType::LBrace:
+    case Token_Type::LBrace:
       return "subscript";
 
     // Do we want this? might be useful for stuff like Array implementations etc.
     // However, it feels like bringing in the complexity of C++'s
     // copy constructor, copy assign, copy assign ref, move constructor , etc.
-    case TType::Assign:
+    case Token_Type::Assign:
 
     // via interface Arithmetic
-    case TType::Add:
-    case TType::Sub: {
+    case Token_Type::Add:
+    case Token_Type::Sub: {
       if (kind == OPERATION_UNARY) {
         return "neg";
       }
     }
-    case TType::Mul: {
+    case Token_Type::Mul: {
       if (kind == OPERATION_UNARY) {
         return "deref"; // ?? do we want this?
       }
     }
-    case TType::Div:
-    case TType::Modulo:
+    case Token_Type::Div:
+    case Token_Type::Modulo:
 
     // via interface Logical
-    case TType::LogicalNot:
-    case TType::LogicalOr:
-    case TType::LogicalAnd:
+    case Token_Type::LogicalNot:
+    case Token_Type::LogicalOr:
+    case Token_Type::LogicalAnd:
 
     // via interface Bitwise
-    case TType::Not:
-    case TType::Or:
-    case TType::And:
-    case TType::SHL:
-    case TType::SHR:
-    case TType::Xor:
+    case Token_Type::Not:
+    case Token_Type::Or:
+    case Token_Type::And:
+    case Token_Type::SHL:
+    case Token_Type::SHR:
+    case Token_Type::Xor:
 
     // via interface Compare.
-    case TType::LT:
-    case TType::GT:
-    case TType::EQ:
-    case TType::NEQ:
-    case TType::LE:
-    case TType::GE:
+    case Token_Type::LT:
+    case Token_Type::GT:
+    case Token_Type::EQ:
+    case Token_Type::NEQ:
+    case Token_Type::LE:
+    case Token_Type::GE:
 
     // via interface Inc/Dec
-    case TType::Increment:
-    case TType::Decrement:
+    case Token_Type::Increment:
+    case Token_Type::Decrement:
 
     // via interfaces CompArith/CompBitwise/CompLogical etc.
-    case TType::CompAdd:
-    case TType::CompSub:
-    case TType::CompMul:
-    case TType::CompDiv:
-    case TType::CompMod:
-    case TType::CompAnd:
-    case TType::CompOr:
-    case TType::CompXor:
-    case TType::CompSHL:
-    case TType::CompSHR:
+    case Token_Type::CompAdd:
+    case Token_Type::CompSub:
+    case Token_Type::CompMul:
+    case Token_Type::CompDiv:
+    case Token_Type::CompMod:
+    case Token_Type::CompAnd:
+    case Token_Type::CompOr:
+    case Token_Type::CompXor:
+    case Token_Type::CompSHL:
+    case Token_Type::CompSHR:
       output = TTypeToString(op);
     default:
       break;
@@ -775,7 +775,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   return output;
 }
 
-int find_operator_overload(TType op, Type *type, OperationKind kind) {
+int find_operator_overload(Token_Type op, Type *type, OperationKind kind) {
   if (!type) {
     return -1;
   }

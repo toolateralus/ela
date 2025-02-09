@@ -34,31 +34,31 @@ enum PreprocKind {
 };
 
 static void remove_body(Parser *parser) {
-  parser->expect(TType::LCurly);
+  parser->expect(Token_Type::LCurly);
   int depth = 1;
   while (depth > 0) {
-    if (parser->peek().type == TType::LCurly)
+    if (parser->peek().type == Token_Type::LCurly)
       depth++;
-    if (parser->peek().type == TType::RCurly)
+    if (parser->peek().type == Token_Type::RCurly)
       depth--;
-    if (parser->peek().type == TType::LCurly)
+    if (parser->peek().type == Token_Type::LCurly)
       depth++;
-    if (parser->peek().type == TType::RCurly)
+    if (parser->peek().type == Token_Type::RCurly)
       depth--;
     parser->eat();
   }
 }
 
 static void remove_preproc(Parser *parser) {
-  if (parser->peek().type == TType::If ||
-      (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") ||
-      (parser->peek().type == TType::Identifier && parser->peek().value == "ifndef")) {
-    while (parser->peek().type != TType::LCurly) {
+  if (parser->peek().type == Token_Type::If ||
+      (parser->peek().type == Token_Type::Identifier && parser->peek().value == "ifdef") ||
+      (parser->peek().type == Token_Type::Identifier && parser->peek().value == "ifndef")) {
+    while (parser->peek().type != Token_Type::LCurly) {
       parser->eat();
     }
     remove_body(parser);
-    if (parser->peek().type == TType::Else) {
-      parser->expect(TType::Else);
+    if (parser->peek().type == Token_Type::Else) {
+      parser->expect(Token_Type::Else);
       remove_preproc(parser);
     }
   } else {
@@ -70,10 +70,10 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   bool executed = false;
 
   if (kind == PREPROC_IFDEF) { // Handling #ifdef
-    auto symbol = parser->expect(TType::Identifier).value;
+    auto symbol = parser->expect(Token_Type::Identifier).value;
     executed = parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
-    auto symbol = parser->expect(TType::Identifier).value;
+    auto symbol = parser->expect(Token_Type::Identifier).value;
     executed = !parser->ctx.scope->has_def(symbol);
   } else if (kind == PREPROC_IF) { // Handling #if
     auto condition = parser->parse_expr();
@@ -86,37 +86,37 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list,
   }
 
   if (executed) {
-    parser->expect(TType::LCurly);
-    while (parser->peek().type != TType::RCurly) {
+    parser->expect(Token_Type::LCurly);
+    while (parser->peek().type != Token_Type::RCurly) {
       list->statements.push_back(parser->parse_statement());
-      while (parser->peek().type == TType::Semi)
+      while (parser->peek().type == Token_Type::Semi)
         parser->eat();
     }
-    parser->expect(TType::RCurly);
+    parser->expect(Token_Type::RCurly);
   } else {
     remove_body(parser);
   }
 
-  if (parser->peek().type == TType::Else) {
-    parser->expect(TType::Else);
+  if (parser->peek().type == Token_Type::Else) {
+    parser->expect(Token_Type::Else);
     if (!executed) { /* No code has been emitted yet. try again if we can. */
-      if (parser->peek().type == TType::If) {
-        parser->expect(TType::If);
+      if (parser->peek().type == Token_Type::If) {
+        parser->expect(Token_Type::If);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
-      } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifdef") {
-        parser->expect(TType::Identifier);
+      } else if (parser->peek().type == Token_Type::Identifier && parser->peek().value == "ifdef") {
+        parser->expect(Token_Type::Identifier);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
-      } else if (parser->peek().type == TType::Identifier && parser->peek().value == "ifndef") {
-        parser->expect(TType::Identifier);
+      } else if (parser->peek().type == Token_Type::Identifier && parser->peek().value == "ifndef") {
+        parser->expect(Token_Type::Identifier);
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
       } else {
-        parser->expect(TType::LCurly);
-        while (parser->peek().type != TType::RCurly) {
+        parser->expect(Token_Type::LCurly);
+        while (parser->peek().type != Token_Type::RCurly) {
           list->statements.push_back(parser->parse_statement());
-          while (parser->peek().type == TType::Semi)
+          while (parser->peek().type == Token_Type::Semi)
             parser->eat();
         }
-        parser->expect(TType::RCurly);
+        parser->expect(Token_Type::RCurly);
       }
     } else { /* No code emitted for this case, eat it up. */
       remove_preproc(parser);
@@ -132,7 +132,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "include",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
-        auto filename = parser->expect(TType::String).value;
+        auto filename = parser->expect(Token_Type::String).value;
         if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
                                   std::filesystem::current_path().string()),
@@ -151,8 +151,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // Imports from usr/local/lib/ela by identifier and no file ext.
     {.identifier = "import",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto iden = parser->expect(TType::Identifier).value;
+      .run = [](Parser *parser) -> Nullable<AST> {
+        auto iden = parser->expect(Token_Type::Identifier).value;
         parser->import(iden.get_str());
         return nullptr;
     }},
@@ -160,8 +160,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // This is only used for debugging the compiler in rare cases.
     {.identifier = "print",
      .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto str = parser->expect(TType::String);
+     .run = [](Parser *parser) -> Nullable<AST> {
+        auto str = parser->expect(Token_Type::String);
         std::cout << str.value.get_str() << "\n";
         return nullptr;
      }
@@ -175,11 +175,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "read",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) {
-        parser->expect(TType::LParen);
-        auto filename = parser->expect(TType::String).value;
+        parser->expect(Token_Type::LParen);
+        auto filename = parser->expect(Token_Type::String).value;
 
         InternedString mode = "text";
-        if (parser->peek().type == TType::Comma) {
+        if (parser->peek().type == Token_Type::Comma) {
           parser->eat();
           // could be binary, and whatever other options
           mode = parser->eat().value; 
@@ -188,7 +188,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
         
-        parser->expect(TType::RParen);
+        parser->expect(Token_Type::RParen);
         NODE_ALLOC(ASTLiteral, string, range, _, parser)
         string->tag = ASTLiteral::String;
         std::stringstream ss;
@@ -212,7 +212,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // filtering etc.
     {.identifier = "test",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         // Issue 2
         // TODO: implement something so we can do
         // * #test(group: "My Test Group", expects: false) *
@@ -220,10 +220,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // --filter="My Test Group" // run only test group
         // --filter=* - "My Test Group" // run all but test group
 
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
+        auto name = parser->expect(Token_Type::Identifier);
+        parser->expect(Token_Type::DoubleColon);
         auto func = parser->parse_function_declaration(name);
-        func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
+        func->flags |= (int)Function_Instance_Flags::FUNCTION_IS_TEST;
 
         if (compile_command.has_flag("test")) {
           return func;
@@ -238,7 +238,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
         NODE_ALLOC(ASTFunctionDeclaration, function, range, _, parser)
-        auto name = parser->expect(TType::Identifier);
+        auto name = parser->expect(Token_Type::Identifier);
         auto last_func_decl = parser->current_func_decl;
         parser->current_func_decl = function;
 
@@ -249,20 +249,20 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
               std::format("cannot declare a non-top level foreign function:: {}", name.value),
               range);
 
-        parser->expect(TType::DoubleColon);
-        parser->expect(TType::Fn);
+        parser->expect(Token_Type::DoubleColon);
+        parser->expect(Token_Type::Fn);
 
         function->params = parser->parse_parameters();
         function->name = name.value;
-        if (parser->peek().type != TType::Arrow) {
+        if (parser->peek().type != Token_Type::Arrow) {
           function->return_type = ASTType::get_void();
         } else {
-          parser->expect(TType::Arrow);
+          parser->expect(Token_Type::Arrow);
           function->return_type = parser->parse_type();
         }
         function->flags |= FUNCTION_IS_FOREIGN;
 
-        parser->expect(TType::Semi);
+        parser->expect(Token_Type::Semi);
 
         parser->end_node(function, range);
         return function;
@@ -284,11 +284,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // has .fields and .size only currently
     {.identifier = "type",
       .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTType, outer, range, _, parser)
-        parser->expect(TType::LParen);
+        parser->expect(Token_Type::LParen);
         outer->pointing_to = parser->parse_expr();
-        parser->expect(TType::RParen);
+        parser->expect(Token_Type::RParen);
         
         outer->kind = ASTType::REFLECTION;
         outer->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("Type");
@@ -299,8 +299,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // your program or header.
     {.identifier = "c_flags",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto string = parser->expect(TType::String).value;
+      .run = [](Parser *parser) -> Nullable<AST> {
+        auto string = parser->expect(Token_Type::String).value;
         if (string == "-g") {
           compile_command.flags[string.get_str()] = true;
         }
@@ -311,9 +311,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #flags MyEnum :: enum {...};
     {.identifier = "flags",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
+      .run = [](Parser *parser) -> Nullable<AST> {
+        auto name = parser->expect(Token_Type::Identifier);
+        parser->expect(Token_Type::DoubleColon);
         auto enum_decl = parser->parse_enum_declaration(name);
 
         int index = 0;
@@ -331,10 +331,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #alias for making type aliases. #alias NewName :: OldName;
     {.identifier = "alias",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTAlias, alias, range, _, parser)
-        alias->name = parser->expect(TType::Identifier).value;
-        parser->expect(TType::DoubleColon);
+        alias->name = parser->expect(Token_Type::Identifier).value;
+        parser->expect(Token_Type::DoubleColon);
         alias->type = parser->parse_type();
         return alias;
       }
@@ -342,7 +342,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
         type->kind = ASTType::SELF;
         parser->append_type_extensions(type);
@@ -351,9 +351,9 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto tok = parser->expect(TType::DoubleColon);
-        if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
+      .run = [](Parser *parser) -> Nullable<AST> {
+        auto tok = parser->expect(Token_Type::DoubleColon);
+        if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
           auto decl = parser->parse_struct_declaration(get_unique_identifier());
           auto t = global_get_type(decl->resolved_type);
           auto info = (t->get_info()->as<StructTypeInfo>());
@@ -372,7 +372,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // Equivalent to marking a function extern "C" in C++.
     {.identifier = "export",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         auto node = parser->parse_statement();
         if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           auto struct$ = static_cast<ASTStructDeclaration*>(node);
@@ -390,11 +390,11 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // the pointers.
     {.identifier = "typeid",
       .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTLiteral, literal, range, _, parser)
-        parser->expect(TType::LParen);
+        parser->expect(Token_Type::LParen);
         auto type = parser->parse_type();
-        parser->expect(TType::RParen);
+        parser->expect(Token_Type::RParen);
         type->accept(parser->typer);
         literal->tag = ASTLiteral::Integer;
         // TODO: we should move this out of here.
@@ -408,13 +408,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // set of flags.
     {.identifier = "bitfield",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         if (parser->current_struct_decl.is_null()) {
           throw_error("Cannot declare bitfields outside of a struct declaration.", {});
         }
-        parser->expect(TType::LParen);
-        auto size = parser->expect(TType::Integer);
-        parser->expect(TType::RParen);
+        parser->expect(Token_Type::LParen);
+        auto size = parser->expect(Token_Type::Integer);
+        parser->expect(Token_Type::RParen);
         ASTDeclaration *decl = parser->parse_declaration();
         decl->is_bitfield = true;
         decl->bitsize = size.value;
@@ -424,7 +424,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // We do not support static methods or static members.
     {.identifier = "static",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         auto statement = parser->parse_statement();
         if (auto decl = dynamic_cast<ASTDeclaration *>(statement)) {
           decl->is_static = true;
@@ -436,23 +436,23 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
-        while (parser->peek().type == TType::Semi) parser->eat();
+      .run = [](Parser *parser) -> Nullable<AST> {
+        parser->ctx.scope->add_def(parser->expect(Token_Type::Identifier).value);
+        while (parser->peek().type == Token_Type::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
     // #undef, remove a #def
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
-        while (parser->peek().type == TType::Semi) parser->eat();
+      .run = [](Parser *parser) -> Nullable<AST> {
+        parser->ctx.scope->undef(parser->expect(Token_Type::Identifier).value);
+        while (parser->peek().type == Token_Type::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
     // #ifdef, conditional compilation based on a #def being present.
     {.identifier = "ifdef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
         return list;
@@ -460,7 +460,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #ifndef, conditional compilation based on a #def not being present.
     {.identifier = "ifndef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
         return list;
@@ -468,7 +468,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #if, conditional compilation based on compile time value.
     {.identifier = "if",
       .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
@@ -478,24 +478,24 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #region My code region 1 {...} is legal.
     {.identifier = "region",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
+      .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
-        while (parser->peek().type != TType::LCurly) {
+        while (parser->peek().type != Token_Type::LCurly) {
           parser->eat();
         }
-        parser->expect(TType::LCurly);
-        while (parser->peek().type != TType::RCurly) {
+        parser->expect(Token_Type::LCurly);
+        while (parser->peek().type != Token_Type::RCurly) {
           list->statements.push_back(parser->parse_statement());
-          while (parser->peek().type == TType::Semi) parser->eat();
+          while (parser->peek().type == Token_Type::Semi) parser->eat();
         }
-        parser->expect(TType::RCurly);
+        parser->expect(Token_Type::RCurly);
         return list;
       }
     },
 };
 // clang-format on
 
-Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedString &identifier) {
+Nullable<AST> Parser::process_directive(DirectiveKind kind, const InternedString &identifier) {
   auto range = begin_node();
   // compare aganist the kind of the routine with expected type, based on parser
   // location
@@ -516,7 +516,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
 ASTProgram *Parser::parse() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
   while (true) {
-    if (peek().type == TType::Eof && !states.empty()) {
+    if (peek().type == Token_Type::Eof && !states.empty()) {
       states.pop_back();
       if (!states.empty()) {
         std::filesystem::current_path(states.back().path.parent_path());
@@ -526,13 +526,13 @@ ASTProgram *Parser::parse() {
     while (semicolon())
       eat();
 
-    if (peek().type == TType::Eof && states.empty()) {
+    if (peek().type == Token_Type::Eof && states.empty()) {
       break;
-    } else if (peek().type == TType::Eof) {
+    } else if (peek().type == Token_Type::Eof) {
       eat();
     }
 
-    if (peek().type == TType::Directive) {
+    if (peek().type == Token_Type::Directive) {
       eat();
       InternedString identifier = eat().value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
@@ -578,14 +578,14 @@ ASTProgram *Parser::parse() {
 
 ASTArguments *Parser::parse_arguments() {
   NODE_ALLOC(ASTArguments, args, range, _, this)
-  expect(TType::LParen);
-  while (peek().type != TType::RParen) {
+  expect(Token_Type::LParen);
+  while (peek().type != Token_Type::RParen) {
     args->arguments.push_back(parse_expr());
-    if (peek().type != TType::RParen) {
-      expect(TType::Comma);
+    if (peek().type != Token_Type::RParen) {
+      expect(Token_Type::Comma);
     }
   }
-  expect(TType::RParen);
+  expect(Token_Type::RParen);
   end_node(args, range);
   return args;
 }
@@ -593,7 +593,7 @@ ASTArguments *Parser::parse_arguments() {
 ASTCall *Parser::parse_call(ASTExpr *function) {
   NODE_ALLOC(ASTCall, call, range, _, this);
   call->function = function;
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     call->generic_arguments = parse_generic_arguments();
   }
   call->arguments = parse_arguments();
@@ -622,9 +622,9 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 ASTExpr *Parser::parse_unary() {
   // bitwise not is a unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
-  if (peek().type == TType::Add || peek().type == TType::Sub || peek().type == TType::LogicalNot ||
-      peek().type == TType::Not || peek().type == TType::Increment || peek().type == TType::Decrement ||
-      peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::Not) {
+  if (peek().type == Token_Type::Add || peek().type == Token_Type::Sub || peek().type == Token_Type::LogicalNot ||
+      peek().type == Token_Type::Not || peek().type == Token_Type::Increment || peek().type == Token_Type::Decrement ||
+      peek().type == Token_Type::Mul || peek().type == Token_Type::And || peek().type == Token_Type::Not) {
     NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
     auto op = eat();
     auto expr = parse_unary();
@@ -632,9 +632,9 @@ ASTExpr *Parser::parse_unary() {
     // TODO: make a more comprehensive rvalue evaluator.
     // We need to use it later for self* method calls
     auto is_rvalue =
-        expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
+        expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == Token_Type::And);
 
-    if ((is_rvalue) && (op.type == TType::And || op.type == TType::Mul)) {
+    if ((is_rvalue) && (op.type == Token_Type::And || op.type == Token_Type::Mul)) {
       end_node(nullptr, range);
       throw_error("Cannot take the address of, or dereference a literal or "
                   "'rvalue'\nlike a function result or constructor result. It "
@@ -655,47 +655,47 @@ ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
   auto range = begin_node();
   // build dot and subscript expressions
-  while (peek().type == TType::DoubleColon || peek().type == TType::Dot || peek().type == TType::LBrace ||
-         peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
-         peek().type == TType::Decrement || peek().type == TType::Range || peek().type == TType::As) {
-    if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
+  while (peek().type == Token_Type::DoubleColon || peek().type == Token_Type::Dot || peek().type == Token_Type::LBrace ||
+         peek().type == Token_Type::LParen || peek().type == Token_Type::GenericBrace || peek().type == Token_Type::Increment ||
+         peek().type == Token_Type::Decrement || peek().type == Token_Type::Range || peek().type == Token_Type::As) {
+    if (peek().type == Token_Type::LParen || peek().type == Token_Type::GenericBrace) {
       left = parse_call(left);
-    } else if (peek().type == TType::Dot) {
+    } else if (peek().type == Token_Type::Dot) {
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
       eat();
       dot->base = left;
-      if (peek().type == TType::Integer || peek().type == TType::Identifier) {
+      if (peek().type == Token_Type::Integer || peek().type == Token_Type::Identifier) {
         dot->member_name = eat().value;
       } else {
         end_node(left, range);
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
       }
       left = dot;
-    } else if (peek().type == TType::DoubleColon) {
+    } else if (peek().type == Token_Type::DoubleColon) {
       NODE_ALLOC(ASTScopeResolution, scope_resolution, range, _, this)
       eat();
       scope_resolution->base = left;
-      scope_resolution->member_name = expect(TType::Identifier).value;
+      scope_resolution->member_name = expect(Token_Type::Identifier).value;
       left = scope_resolution;
-    } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
+    } else if (peek().type == Token_Type::Increment || peek().type == Token_Type::Decrement) {
       NODE_ALLOC(ASTUnaryExpr, unary, unary_range, _, this)
       unary->operand = left;
       unary->op = eat();
       return unary;
-    } else if (peek().type == TType::LBrace) {
+    } else if (peek().type == Token_Type::LBrace) {
       NODE_ALLOC(ASTSubscript, subscript, range, _, this)
       subscript->left = left;
       eat();
       subscript->subscript = parse_expr();
-      expect(TType::RBrace);
+      expect(Token_Type::RBrace);
       left = subscript;
-    } else if (peek().type == TType::Range) {
+    } else if (peek().type == Token_Type::Range) {
       NODE_ALLOC(ASTRange, node, range, _, this)
       eat();
       node->right = parse_expr();
       node->left = left;
       return node;
-    } else if (peek().type == TType::As) {
+    } else if (peek().type == Token_Type::As) {
       NODE_ALLOC(ASTCast, node, range, _, this)
       eat();
       node->target_type = parse_type();
@@ -717,39 +717,39 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
-    case TType::Size_Of: {
+    case Token_Type::Size_Of: {
       NODE_ALLOC(ASTSize_Of, node, range, _, this);
       eat();
-      expect(TType::LParen);
+      expect(Token_Type::LParen);
       node->target_type = parse_type();
-      expect(TType::RParen);
+      expect(Token_Type::RParen);
       return node;
     }
-    case TType::Fn: {
+    case Token_Type::Fn: {
       return parse_lambda();
     }
-    case TType::Switch: {
+    case Token_Type::Switch: {
       NODE_ALLOC(ASTSwitch, node, range, _, this)
-      expect(TType::Switch);
+      expect(Token_Type::Switch);
       node->target = parse_expr();
-      expect(TType::LCurly);
-      while (peek().type != TType::RCurly) {
+      expect(Token_Type::LCurly);
+      while (peek().type != Token_Type::RCurly) {
         SwitchCase _case{
             .expression = parse_expr(),
         };
-        if (peek().type != TType::ExpressionBody) {
-          expect(TType::Colon);
+        if (peek().type != Token_Type::ExpressionBody) {
+          expect(Token_Type::Colon);
         }
         _case.block = parse_block();
         node->cases.push_back(_case);
-        if (peek().type == TType::Comma) {
+        if (peek().type == Token_Type::Comma) {
           eat();
         }
       }
-      expect(TType::RCurly);
+      expect(Token_Type::RCurly);
       return node;
     }
-    case TType::Char: {
+    case Token_Type::Char: {
       NODE_ALLOC(ASTLiteral, node, range, _, this)
       eat();
       node->tag = ASTLiteral::Char;
@@ -757,38 +757,38 @@ ASTExpr *Parser::parse_primary() {
       end_node(node, range);
       return node;
     }
-    case TType::LCurly: {
+    case Token_Type::LCurly: {
       NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
       eat();
-      if (peek().type == TType::RCurly) {
+      if (peek().type == Token_Type::RCurly) {
         init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
-      } else if (lookahead_buf()[1].type != TType::Colon) {
+      } else if (lookahead_buf()[1].type != Token_Type::Colon) {
         init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
-        while (peek().type != TType::RCurly) {
+        while (peek().type != Token_Type::RCurly) {
           init_list->values.push_back(parse_expr());
-          if (peek().type == TType::Comma) {
+          if (peek().type == Token_Type::Comma) {
             eat();
           }
         }
       } else {
         init_list->tag = ASTInitializerList::INIT_LIST_NAMED;
-        while (peek().type != TType::RCurly) {
-          auto identifier = expect(TType::Identifier).value;
-          expect(TType::Colon);
+        while (peek().type != Token_Type::RCurly) {
+          auto identifier = expect(Token_Type::Identifier).value;
+          expect(Token_Type::Colon);
           init_list->key_values.push_back({identifier, parse_expr()});
-          if (peek().type == TType::Comma) {
+          if (peek().type == Token_Type::Comma) {
             eat();
           }
         }
       }
-      expect(TType::RCurly);
+      expect(Token_Type::RCurly);
       end_node(init_list, range);
       return init_list;
     }
-    case TType::Identifier: {
+    case Token_Type::Identifier: {
       if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
         auto type = parse_type();
-        if (peek().type == TType::LCurly) {
+        if (peek().type == Token_Type::LCurly) {
           auto init_list = parse_expr();
           if (init_list->get_node_type() != AST_NODE_INITIALIZER_LIST) {
             throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
@@ -805,7 +805,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(iden, range);
       return iden;
     }
-    case TType::Null: {
+    case Token_Type::Null: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::Null;
@@ -813,7 +813,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(literal, range);
       return literal;
     }
-    case TType::True: {
+    case Token_Type::True: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::Bool;
@@ -821,7 +821,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(literal, range);
       return literal;
     }
-    case TType::False: {
+    case Token_Type::False: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::Bool;
@@ -829,7 +829,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(literal, range);
       return literal;
     }
-    case TType::Integer: {
+    case Token_Type::Integer: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::Integer;
@@ -837,7 +837,7 @@ ASTExpr *Parser::parse_primary() {
       end_node(literal, range);
       return literal;
     }
-    case TType::Float: {
+    case Token_Type::Float: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::Float;
@@ -845,37 +845,37 @@ ASTExpr *Parser::parse_primary() {
       end_node(literal, range);
       return literal;
     }
-    case TType::String: {
+    case Token_Type::String: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
       literal->tag = ASTLiteral::String;
       literal->value = tok.value;
-      if (peek().type == TType::Identifier && peek().value == "c") {
+      if (peek().type == Token_Type::Identifier && peek().value == "c") {
         literal->is_c_string = true;
         eat();
       }
       end_node(literal, range);
       return literal;
     }
-    case TType::LParen: {
+    case Token_Type::LParen: {
       auto range = begin_node();
-      expect(TType::LParen); // (
+      expect(Token_Type::LParen); // (
       const auto lookahead = lookahead_buf();
       auto expr = parse_expr();
-      if (peek().type == TType::Comma) {
+      if (peek().type == Token_Type::Comma) {
         ASTTuple *tuple = ast_alloc<ASTTuple>();
         Defer _([&] { this->end_node(tuple, range); });
         tuple->values.push_back(expr);
         eat();
-        while (peek().type != TType::RParen) {
+        while (peek().type != Token_Type::RParen) {
           tuple->values.push_back(parse_expr());
-          if (peek().type == TType::Comma)
+          if (peek().type == Token_Type::Comma)
             eat();
         }
-        expect(TType::RParen);
+        expect(Token_Type::RParen);
         return tuple;
       }
-      if (peek().type != TType::RParen) {
+      if (peek().type != Token_Type::RParen) {
         eat();
         end_node(nullptr, range);
         throw_error("Expected ')'", range);
@@ -892,7 +892,7 @@ ASTExpr *Parser::parse_primary() {
     default: {
       auto error_range = begin_node();
       throw_error(
-          std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, TTypeToString(tok.type)),
+          std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, Token_Type_To_string(tok.type)),
           error_range);
       return nullptr;
     }
@@ -900,24 +900,24 @@ ASTExpr *Parser::parse_primary() {
 }
 
 ASTType *Parser::parse_type() {
-  if (peek().type == TType::LParen) {
+  if (peek().type == Token_Type::LParen) {
     NODE_ALLOC(ASTType, node, range, _, this)
     node->resolved_type = Type::INVALID_TYPE_ID;
     node->kind = ASTType::TUPLE;
     eat();
-    while (peek().type != TType::RParen) {
+    while (peek().type != Token_Type::RParen) {
       node->tuple_types.push_back(parse_type());
-      if (peek().type == TType::Comma)
+      if (peek().type == Token_Type::Comma)
         eat();
     }
-    expect(TType::RParen);
+    expect(Token_Type::RParen);
     // grab up more extensions if they exist.
     append_type_extensions(node);
     return node;
   }
 
   // parse #self types.
-  if (peek().type == TType::Directive) {
+  if (peek().type == Token_Type::Directive) {
     auto range = begin_node();
     auto expr = try_parse_directive_expr().get();
     if (expr->get_node_type() != AST_NODE_TYPE) {
@@ -929,7 +929,7 @@ ASTType *Parser::parse_type() {
     return type;
   }
 
-  if (peek().type == TType::Fn) {
+  if (peek().type == Token_Type::Fn) {
     return parse_function_type();
   }
 
@@ -939,21 +939,21 @@ ASTType *Parser::parse_type() {
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
   node->normal.base->source_range = range;
 
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     node->normal.generic_arguments = parse_generic_arguments();
   }
 
-  if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier &&
-      lookahead_buf()[2].type == TType::LParen) {
+  if (peek().type == Token_Type::DoubleColon && lookahead_buf()[1].type == Token_Type::Identifier &&
+      lookahead_buf()[2].type == Token_Type::LParen) {
     // this is a function call to a static, single depth function.
     return node;
   }
 
-  while (peek().type == TType::DoubleColon) {
+  while (peek().type == Token_Type::DoubleColon) {
     NODE_ALLOC(ASTScopeResolution, scope_res_node, range, _, this)
     eat();
     scope_res_node->base = node->normal.base;
-    scope_res_node->member_name = expect(TType::Identifier).value;
+    scope_res_node->member_name = expect(Token_Type::Identifier).value;
     node->normal.base = scope_res_node;
   }
 
@@ -968,13 +968,13 @@ ASTStatement *Parser::parse_statement() {
 
   auto tok = peek();
 
-  while (tok.type == TType::Semi) {
+  while (tok.type == Token_Type::Semi) {
     eat();
     tok = peek();
   }
 
   // * '#' Directives.
-  if (tok.type == TType::Directive) {
+  if (tok.type == Token_Type::Directive) {
     auto range = begin_node(); eat();
     auto directive_name = eat().value;
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
@@ -988,16 +988,16 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
-  if (peek().type == TType::Defer) {
+  if (peek().type == Token_Type::Defer) {
     return parse_defer();
   }
 
-  if (peek().type == TType::Impl) {
+  if (peek().type == Token_Type::Impl) {
     return parse_impl();
   }
 
   // * Tuple destructure.
-  if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
+  if (tok.type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::Comma) {
     return parse_multiple_asssignment();
   }
 
@@ -1008,59 +1008,59 @@ ASTStatement *Parser::parse_statement() {
   // TODO: this condition seems excessively complicated.
 
   bool is_colon_or_colon_equals =
-      lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals;
+      lookahead_buf()[1].type == Token_Type::Colon || lookahead_buf()[1].type == Token_Type::ColonEquals;
 
-  if (tok.type == TType::Identifier && is_colon_or_colon_equals) {
+  if (tok.type == Token_Type::Identifier && is_colon_or_colon_equals) {
     auto decl = parse_declaration();
     return decl;
   }
 
   // * Control flow
   {
-    if (tok.type == TType::LCurly) {
+    if (tok.type == Token_Type::LCurly) {
       auto block = parse_block();
       return block;
     }
 
-    if (tok.type == TType::Return) {
+    if (tok.type == Token_Type::Return) {
       NODE_ALLOC(ASTReturn, return_node, range, _, this)
-      expect(TType::Return);
-      if (peek().type != TType::Semi) {
+      expect(Token_Type::Return);
+      if (peek().type != Token_Type::Semi) {
         return_node->expression = parse_expr();
       }
       end_node(return_node, range);
       return return_node;
     }
 
-    if (tok.type == TType::Break) {
+    if (tok.type == Token_Type::Break) {
       NODE_ALLOC(ASTBreak, _break, range, _, this)
       eat();
       end_node(_break, range);
       return _break;
     }
 
-    if (tok.type == TType::Continue) {
+    if (tok.type == Token_Type::Continue) {
       NODE_ALLOC(ASTContinue, _continue, range, _, this)
       eat();
       end_node(_continue, range);
       return _continue;
     }
 
-    if (tok.type == TType::For) {
+    if (tok.type == Token_Type::For) {
       NODE_ALLOC(ASTFor, node, range, _, this)
       eat();
 
       node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
 
       // reference semantic for iterating over list
-      if (peek().type == TType::Mul) {
+      if (peek().type == Token_Type::Mul) {
         node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
         eat();
       }
 
-      if (lookahead_buf()[1].type == TType::In) {
+      if (lookahead_buf()[1].type == Token_Type::In) {
         node->iter_identifier = parse_primary();
-        expect(TType::In);
+        expect(Token_Type::In);
         auto expr = parse_expr();
         node->range = expr;
       } else {
@@ -1074,10 +1074,10 @@ ASTStatement *Parser::parse_statement() {
       return node;
     }
 
-    if (tok.type == TType::While) {
+    if (tok.type == Token_Type::While) {
       NODE_ALLOC(ASTWhile, node, range, _, this)
       eat();
-      if (peek().type != TType::LCurly) {
+      if (peek().type != Token_Type::LCurly) {
         node->condition = parse_expr();
       }
       node->block = parse_block();
@@ -1087,12 +1087,12 @@ ASTStatement *Parser::parse_statement() {
 
     // TODO: we should handle the 'then' statement more gracefully.
     // Also, => is super fricken janky, and is really poorly implemented.
-    if (tok.type == TType::If) {
+    if (tok.type == Token_Type::If) {
       NODE_ALLOC(ASTIf, node, range, _, this)
       eat();
       node->condition = parse_expr();
 
-      if (peek().type == TType::Then) {
+      if (peek().type == Token_Type::Then) {
         NODE_ALLOC(ASTBlock, block, _range, defer, this);
         eat();
         node->block = block;
@@ -1107,10 +1107,10 @@ ASTStatement *Parser::parse_statement() {
         node->block = parse_block();
       }
 
-      if (peek().type == TType::Else) {
+      if (peek().type == Token_Type::Else) {
         NODE_ALLOC(ASTElse, node_else, range, _, this)
         eat();
-        if (peek().type == TType::If) {
+        if (peek().type == Token_Type::If) {
           auto inner_if = parse_statement();
           assert(inner_if->get_node_type() == AST_NODE_IF);
           node_else->_if = static_cast<ASTIf *>(inner_if);
@@ -1124,9 +1124,9 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-  if (peek().type == TType::Identifier && lookahead_buf()[1].type == TType::DoubleColon &&
-      lookahead_buf()[2].type == TType::Identifier &&
-      (lookahead_buf()[3].type == TType::GenericBrace || lookahead_buf()[3].type == TType::LParen)) {
+  if (peek().type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::DoubleColon &&
+      lookahead_buf()[2].type == Token_Type::Identifier &&
+      (lookahead_buf()[3].type == Token_Type::GenericBrace || lookahead_buf()[3].type == Token_Type::LParen)) {
     NODE_ALLOC(ASTExprStatement, expr, range, _, this)
     expr->expression = parse_expr();
     end_node(expr, range);
@@ -1135,28 +1135,28 @@ ASTStatement *Parser::parse_statement() {
 
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
-  if (lookahead_buf()[1].type == TType::DoubleColon) {
-    expect(TType::Identifier);
-    expect(TType::DoubleColon);
-    if (peek().type == TType::Fn) {
+  if (lookahead_buf()[1].type == Token_Type::DoubleColon) {
+    expect(Token_Type::Identifier);
+    expect(Token_Type::DoubleColon);
+    if (peek().type == Token_Type::Fn) {
       auto node = parse_function_declaration(tok);
       return node;
     }
-    if (peek().type == TType::Interface) {
+    if (peek().type == Token_Type::Interface) {
       auto interface = parse_interface_declaration(tok);
       return interface;
     }
-    if (peek().type == TType::Struct || peek().type == TType::Union) {
+    if (peek().type == Token_Type::Struct || peek().type == Token_Type::Union) {
       auto struct_decl = parse_struct_declaration(tok);
       return struct_decl;
     }
-    if (peek().type == TType::Enum) {
-      if (lookahead_buf()[1].type == TType::LParen && lookahead_buf()[2].type == TType::Union &&
-          lookahead_buf()[3].type == TType::RParen) {
-        expect(TType::Enum);
-        expect(TType::LParen);
-        expect(TType::Union);
-        expect(TType::RParen);
+    if (peek().type == Token_Type::Enum) {
+      if (lookahead_buf()[1].type == Token_Type::LParen && lookahead_buf()[2].type == Token_Type::Union &&
+          lookahead_buf()[3].type == Token_Type::RParen) {
+        expect(Token_Type::Enum);
+        expect(Token_Type::LParen);
+        expect(Token_Type::Union);
+        expect(Token_Type::RParen);
         auto tagged_union = parse_tagged_union_declaration(tok);
         return tagged_union;
       }
@@ -1192,22 +1192,22 @@ ASTStatement *Parser::parse_statement() {
     auto next_next = lookahead_buf()[2];
     // Both postfix and prefix (inc/dec)rement
     const bool is_increment_or_decrement =
-        (next.type == TType::Increment || next.type == TType::Decrement && next_next.type != TType::Semi) ||
-        tok.type == TType::Increment || tok.type == TType::Decrement;
+        (next.type == Token_Type::Increment || next.type == Token_Type::Decrement && next_next.type != Token_Type::Semi) ||
+        tok.type == Token_Type::Increment || tok.type == Token_Type::Decrement;
 
     // subscript assignment or dot assign/ call statement.
     const bool is_identifier_with_lbrace_or_dot =
-        tok.type == TType::Identifier && (next.type == TType::LBrace || next.type == TType::Dot);
+        tok.type == Token_Type::Identifier && (next.type == Token_Type::LBrace || next.type == Token_Type::Dot);
 
-    const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
+    const bool is_call = next.type == Token_Type::LParen || next.type == Token_Type::GenericBrace;
 
     const bool is_assignment_or_compound =
-        next.type == TType::Assign || next.type == TType::Comma || next.is_comp_assign();
+        next.type == Token_Type::Assign || next.type == Token_Type::Comma || next.is_comp_assign();
 
-    const bool is_deref = tok.type == TType::Mul;
+    const bool is_deref = tok.type == Token_Type::Mul;
 
-    const bool is_special_case = tok.type == TType::LParen || // possible parenthesized dereference or something.
-                                 tok.type == TType::Switch;
+    const bool is_special_case = tok.type == Token_Type::LParen || // possible parenthesized dereference or something.
+                                 tok.type == Token_Type::Switch;
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
         is_deref || is_special_case) {
@@ -1229,12 +1229,12 @@ ASTStatement *Parser::parse_statement() {
 
   {
     if (tok.family == TFamily::Operator) {
-      throw_error(std::format("Unexpected operator: {} '{}'", TTypeToString(tok.type), tok.value), parent_range);
+      throw_error(std::format("Unexpected operator: {} '{}'", Token_Type_To_string(tok.type), tok.value), parent_range);
     }
 
     if (tok.family == TFamily::Literal) {
       eat();
-      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, TTypeToString(tok.type)), parent_range);
+      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, Token_Type_To_string(tok.type)), parent_range);
     }
 
     if (tok.family == TFamily::Keyword) {
@@ -1265,7 +1265,7 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
   auto first = parse_primary();
   node->idens.push_back(static_cast<ASTIdentifier *>(first));
-  while (peek().type == TType::Comma) {
+  while (peek().type == Token_Type::Comma) {
     eat();
     auto expr = parse_primary();
     if (auto iden = dynamic_cast<ASTIdentifier *>(expr)) {
@@ -1277,7 +1277,7 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                   range);
     }
   }
-  if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
+  if (peek().type == Token_Type::ColonEquals || peek().type == Token_Type::Assign) {
     node->op = eat().type;
     node->right = parse_expr();
   } else {
@@ -1292,7 +1292,7 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
   for (const auto &iden : node->idens) {
     auto symbol = ctx.scope->local_lookup(iden->value);
-    if (node->op == TType::ColonEquals) {
+    if (node->op == Token_Type::ColonEquals) {
       if (symbol)
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
@@ -1322,20 +1322,20 @@ ASTDeclaration *Parser::parse_declaration() {
                 range);
   }
 
-  if (peek().type == TType::Colon) {
-    expect(TType::Colon);
+  if (peek().type == Token_Type::Colon) {
+    expect(Token_Type::Colon);
     decl->type = parse_type();
-    if (peek().type == TType::Assign) {
+    if (peek().type == Token_Type::Assign) {
       eat();
       auto expr = parse_expr();
       decl->value = expr;
     }
-  } else if (peek().type == TType::DoubleColon) {
+  } else if (peek().type == Token_Type::DoubleColon) {
     eat();
     decl->value = parse_expr();
     decl->is_constexpr = true;
   } else {
-    expect(TType::ColonEquals);
+    expect(Token_Type::ColonEquals);
     decl->value = parse_expr();
   }
 
@@ -1356,9 +1356,9 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 
   ctx.set_scope(scope);
 
-  if (peek().type == TType::ExpressionBody) {
+  if (peek().type == Token_Type::ExpressionBody) {
     NODE_ALLOC(ASTReturn, $return, range, _, this);
-    expect(TType::ExpressionBody);
+    expect(Token_Type::ExpressionBody);
     $return->expression = parse_expr();
     block->statements = {$return};
     block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
@@ -1366,10 +1366,10 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     return block;
   }
 
-  expect(TType::LCurly);
+  expect(Token_Type::LCurly);
 
-  while (peek().type != TType::RCurly) {
-    if (peek().type == TType::Eof) {
+  while (peek().type != Token_Type::RCurly) {
+    if (peek().type == Token_Type::Eof) {
       end_node(nullptr, range);
       throw_error("Imbalanced '{' and '}'", range);
     }
@@ -1389,7 +1389,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     while (semicolon())
       eat();
   }
-  expect(TType::RCurly);
+  expect(Token_Type::RCurly);
   block->scope = ctx.exit_scope();
   end_node(block, range);
   return block;
@@ -1397,9 +1397,9 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 
 ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_params) {
   NODE_ALLOC(ASTParamsDecl, params, range, defer, this);
-  expect(TType::LParen);
+  expect(Token_Type::LParen);
   ASTType *type = nullptr;
-  while (peek().type != TType::RParen) {
+  while (peek().type != Token_Type::RParen) {
     NODE_ALLOC(ASTParamDecl, param, range, _, this)
     if (params->is_varargs) {
       end_node(nullptr, range);
@@ -1407,7 +1407,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     }
     auto subrange = begin_node();
 
-    if (peek().type == TType::Varargs) {
+    if (peek().type == Token_Type::Varargs) {
       eat();
       if (!current_func_decl) {
         throw_error("Cannot use varargs outside of a function declaration. "
@@ -1419,7 +1419,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       continue;
     }
 
-    auto name = expect(TType::Identifier).value;
+    auto name = expect(Token_Type::Identifier).value;
 
     if (name == "self") {
       if (!params->params.empty()) {
@@ -1430,19 +1430,19 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       param->tag = ASTParamDecl::Self;
       params->params.push_back(param);
 
-      if (peek().type == TType::Mul) {
+      if (peek().type == Token_Type::Mul) {
         eat();
         param->self.is_pointer = true;
       }
 
-      if (peek().type != TType::RParen)
-        expect(TType::Comma);
+      if (peek().type != Token_Type::RParen)
+        expect(Token_Type::Comma);
 
       continue;
     }
 
-    if (peek().type == TType::Colon) {
-      expect(TType::Colon);
+    if (peek().type == Token_Type::Colon) {
+      expect(Token_Type::Colon);
       type = parse_type();
     }
 
@@ -1450,7 +1450,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     param->normal.type = type;
     param->normal.name = name;
 
-    if (peek().type == TType::Assign) {
+    if (peek().type == Token_Type::Assign) {
       end_node(nullptr, range);
       throw_error("Ela does not support default parameters.", range);
     }
@@ -1458,23 +1458,23 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     params->params.push_back(param);
     end_node(param, subrange);
 
-    if (peek().type != TType::RParen) {
-      expect(TType::Comma);
+    if (peek().type != Token_Type::RParen) {
+      expect(Token_Type::Comma);
     } else
       break;
   }
-  expect(TType::RParen);
+  expect(Token_Type::RParen);
   end_node(params, range);
   return params;
 }
 
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   NODE_ALLOC(ASTFunctionDeclaration, function, range, _, this)
-  expect(TType::Fn);
+  expect(Token_Type::Fn);
 
   function->has_defer = false;
 
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     function->generic_parameters = parse_generic_parameters();
   }
 
@@ -1496,18 +1496,18 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, function);
 
-  if (peek().type != TType::Arrow) {
+  if (peek().type != Token_Type::Arrow) {
     function->return_type = ASTType::get_void();
   } else {
-    expect(TType::Arrow);
+    expect(Token_Type::Arrow);
     function->return_type = parse_type();
   }
 
-  if (peek().type == TType::Where) {
+  if (peek().type == Token_Type::Where) {
     function->where_clause = parse_where_clause();
   }
 
-  if (peek().type == TType::Semi) {
+  if (peek().type == Token_Type::Semi) {
     function->flags |= FUNCTION_IS_FORWARD_DECLARED;
     auto sym = ctx.scope->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
     end_node(function, range);
@@ -1551,9 +1551,9 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
 ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   NODE_ALLOC(ASTEnumDeclaration, node, range, _, this)
-  expect(TType::Enum);
+  expect(Token_Type::Enum);
   node->name = tok.value;
-  expect(TType::LCurly);
+  expect(Token_Type::LCurly);
   if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
@@ -1569,14 +1569,14 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
 
   ASTExpr *last_value = zero;
   bool was_zero = true;
-  Token add_token(tok.location, "+", TType::Add, TFamily::Operator);
+  Token add_token(tok.location, "+", Token_Type::Add, TFamily::Operator);
 
-  while (peek().type != TType::RCurly) {
-    auto iden = expect(TType::Identifier).value;
+  while (peek().type != Token_Type::RCurly) {
+    auto iden = expect(Token_Type::Identifier).value;
     ASTExpr *value = nullptr;
 
-    if (peek().type == TType::Assign) {
-      expect(TType::Assign);
+    if (peek().type == Token_Type::Assign) {
+      expect(Token_Type::Assign);
       value = parse_expr();
     } else {
       if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
@@ -1593,7 +1593,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
         end_node(bin, range);
       }
     }
-    if (peek().type == TType::Comma) {
+    if (peek().type == Token_Type::Comma) {
       eat();
     }
     node->key_values.push_back({iden, value});
@@ -1615,18 +1615,18 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     throw_error("Empty `enum` types are not allowed", range);
   }
 
-  expect(TType::RCurly);
+  expect(Token_Type::RCurly);
   return node;
 }
 
 ASTImpl *Parser::parse_impl() {
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, _, this, current_impl_decl = nullptr)
-  expect(TType::Impl);
+  expect(Token_Type::Impl);
 
   ctx.set_scope();
   node->scope = ctx.exit_scope();
 
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
 
@@ -1636,8 +1636,8 @@ ASTImpl *Parser::parse_impl() {
   // Handle 'impl INTERFACE for TYPE'
   // or normal 'impl TYPE'
   ASTType *interface = nullptr;
-  if (peek().type == TType::For) {
-    expect(TType::For);
+  if (peek().type == Token_Type::For) {
+    expect(Token_Type::For);
     interface = parse_type();
     node->interface = target;
     node->target = interface;
@@ -1647,7 +1647,7 @@ ASTImpl *Parser::parse_impl() {
 
   node->target->resolved_type = Type::INVALID_TYPE_ID;
 
-  if (peek().type == TType::Where) {
+  if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
   auto block = parse_block(node->scope);
@@ -1670,7 +1670,7 @@ ASTImpl *Parser::parse_impl() {
 
 ASTDefer *Parser::parse_defer() {
   NODE_ALLOC(ASTDefer, node, range, _, this)
-  expect(TType::Defer);
+  expect(Token_Type::Defer);
   node->statement = parse_statement();
   end_node(node, range);
   return node;
@@ -1678,11 +1678,11 @@ ASTDefer *Parser::parse_defer() {
 
 ASTWhere *Parser::parse_where_clause() {
   NODE_ALLOC(ASTWhere, node, range, _, this);
-  expect(TType::Where);
+  expect(Token_Type::Where);
   node->target_type = parse_type();
-  expect(TType::Is);
+  expect(Token_Type::Is);
   node->predicate = parse_type();
-  while (peek().type == TType::And || peek().type == TType::Or) {
+  while (peek().type == Token_Type::And || peek().type == Token_Type::Or) {
     NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
     binexpr->op = eat();
     binexpr->right = parse_type();
@@ -1695,15 +1695,15 @@ ASTWhere *Parser::parse_where_clause() {
 ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   auto previous = current_interface_decl;
   NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, _, this, { current_interface_decl = previous; });
-  expect(TType::Interface);
+  expect(Token_Type::Interface);
 
   node->name = name.value;
   current_interface_decl = node;
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
 
-  if (peek().type == TType::Where) {
+  if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
 
@@ -1726,21 +1726,21 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   auto old = current_struct_decl;
   NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
 
-  if (peek().type == TType::Struct) {
-    expect(TType::Struct);
+  if (peek().type == Token_Type::Struct) {
+    expect(Token_Type::Struct);
   } else {
     is_union = true;
-    expect(TType::Union);
+    expect(Token_Type::Union);
   }
 
   node->is_union = is_union;
   current_struct_decl = node;
 
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
 
-  if (peek().type == TType::Where) {
+  if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
 
@@ -1775,12 +1775,12 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   if (!semicolon()) {
     auto scope = info->scope;
-    expect(TType::LCurly);
-    std::vector<ASTNode *> directives;
-    while (peek().type != TType::RCurly) {
-      if (peek().type == TType::Directive) {
+    expect(Token_Type::LCurly);
+    std::vector<AST *> directives;
+    while (peek().type != Token_Type::RCurly) {
+      if (peek().type == Token_Type::Directive) {
         eat();
-        auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
+        auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(Token_Type::Identifier).value);
         if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
         } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
@@ -1799,18 +1799,18 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
                       "only thing allowed in structs, besides member declarations.",
                       node->source_range);
         }
-      } else if (peek().type == TType::Identifier) {
+      } else if (peek().type == Token_Type::Identifier) {
         ASTStructMember member{};
         member.name = eat().value;
-        expect(TType::Colon);
+        expect(Token_Type::Colon);
         member.type = parse_type();
         node->members.push_back(member);
       }
-      if (peek().type != TType::RCurly) {
-        expect(TType::Comma);
+      if (peek().type != Token_Type::RCurly) {
+        expect(Token_Type::Comma);
       }
     }
-    expect(TType::RCurly);
+    expect(Token_Type::RCurly);
     node->scope = scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
     info->scope = node->scope;
@@ -1826,36 +1826,36 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
-  if (peek().type == TType::GenericBrace) {
+  if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
-  if (peek().type == TType::Where) {
+  if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
   auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr, node));
   auto scope = create_child(ctx.scope);
   ctx.set_scope(scope);
 
-  expect(TType::LCurly);
+  expect(Token_Type::LCurly);
 
-  while (peek().type != TType::RCurly) {
+  while (peek().type != Token_Type::RCurly) {
     ASTTaggedUnionVariant variant;
-    variant.name = expect(TType::Identifier).value;
-    if (peek().type == TType::Comma || peek().type == TType::RCurly) {
+    variant.name = expect(Token_Type::Identifier).value;
+    if (peek().type == Token_Type::Comma || peek().type == Token_Type::RCurly) {
       variant.kind = ASTTaggedUnionVariant::NORMAL;
       node->variants.push_back(variant);
-    } else if (peek().type == TType::LCurly) {
+    } else if (peek().type == Token_Type::LCurly) {
       variant.kind = ASTTaggedUnionVariant::STRUCT;
       eat();
-      while (peek().type != TType::RCurly) {
+      while (peek().type != Token_Type::RCurly) {
         variant.struct_declarations.push_back(parse_declaration());
-        if (peek().type == TType::Comma) {
+        if (peek().type == Token_Type::Comma) {
           eat();
         }
       }
-      expect(TType::RCurly);
+      expect(Token_Type::RCurly);
       node->variants.push_back(variant);
-    } else if (peek().type == TType::LParen) {
+    } else if (peek().type == Token_Type::LParen) {
       variant.kind = ASTTaggedUnionVariant::TUPLE;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
@@ -1864,23 +1864,23 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       end_node(node, range);
       throw_error("Unexpected token in tagged union declaration", node->source_range);
     }
-    if (peek().type != TType::RCurly)
-      expect(TType::Comma);
+    if (peek().type != Token_Type::RCurly)
+      expect(Token_Type::Comma);
   }
   node->name = name.value;
   node->scope = ctx.exit_scope();
   type->get_info()->scope = scope;
   node->resolved_type = type->id;
-  expect(TType::RCurly);
+  expect(Token_Type::RCurly);
   end_node(node, range);
   return node;
 }
 
 Nullable<ASTExpr> Parser::try_parse_directive_expr() {
-  if (peek().type == TType::Directive) {
+  if (peek().type == Token_Type::Directive) {
     eat();
     InternedString identifier = eat().value;
-    Nullable<ASTNode> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier);
+    Nullable<AST> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier);
 
     auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
     if (expr.is_not_null()) {
@@ -1900,14 +1900,14 @@ Nullable<ASTExpr> Parser::try_parse_directive_expr() {
 
 std::vector<ASTType *> Parser::parse_generic_arguments() {
   auto range = begin_node();
-  expect(TType::GenericBrace);
+  expect(Token_Type::GenericBrace);
   std::vector<ASTType *> params;
-  while (peek().type != TType::RBrace) {
+  while (peek().type != Token_Type::RBrace) {
     params.push_back(parse_type());
-    if (peek().type != TType::RBrace)
-      expect(TType::Comma);
+    if (peek().type != Token_Type::RBrace)
+      expect(Token_Type::Comma);
   }
-  expect(TType::RBrace);
+  expect(Token_Type::RBrace);
   end_node(nullptr, range);
   if (params.empty()) {
     throw_error("![] generic arguments cannot be empty!", range);
@@ -1918,14 +1918,14 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
 
 std::vector<GenericParameter> Parser::parse_generic_parameters() {
   auto range = begin_node();
-  expect(TType::GenericBrace);
+  expect(Token_Type::GenericBrace);
   std::vector<GenericParameter> params;
-  while (peek().type != TType::RBrace) {
-    params.emplace_back(expect(TType::Identifier).value);
-    if (peek().type != TType::RBrace)
-      expect(TType::Comma);
+  while (peek().type != Token_Type::RBrace) {
+    params.emplace_back(expect(Token_Type::Identifier).value);
+    if (peek().type != Token_Type::RBrace)
+      expect(Token_Type::Comma);
   }
-  expect(TType::RBrace);
+  expect(Token_Type::RBrace);
   end_node(nullptr, range);
   if (params.empty()) {
     throw_error("![] generic parameters cannot be empty!", range);
@@ -1936,25 +1936,25 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
 
 std::vector<ASTType *> Parser::parse_parameter_types() {
   std::vector<ASTType *> param_types;
-  expect(TType::LParen);
-  while (peek().type != TType::RParen) {
+  expect(Token_Type::LParen);
+  while (peek().type != Token_Type::RParen) {
     auto param_type = parse_type();
     param_types.push_back(param_type);
-    if (peek().type == TType::Comma) {
-      expect(TType::Comma);
+    if (peek().type == Token_Type::Comma) {
+      expect(Token_Type::Comma);
     } else {
       break;
     }
   }
-  expect(TType::RParen);
+  expect(Token_Type::RParen);
   return param_types;
 }
 
 void Parser::append_type_extensions(ASTType *&node) {
   while (true) {
-    if (peek().type == TType::LBrace) {
-      expect(TType::LBrace);
-      if (peek().type != TType::RBrace) {
+    if (peek().type == Token_Type::LBrace) {
+      expect(Token_Type::LBrace);
+      if (peek().type != Token_Type::RBrace) {
         auto expression = parse_expr();
         node->extensions.push_back({TYPE_EXT_ARRAY, expression});
       } else {
@@ -1968,9 +1968,9 @@ void Parser::append_type_extensions(ASTType *&node) {
         type->source_range = node->source_range;
         node = type;
       }
-      expect(TType::RBrace);
-    } else if (peek().type == TType::Mul) {
-      expect(TType::Mul);
+      expect(Token_Type::RBrace);
+    } else if (peek().type == Token_Type::Mul) {
+      expect(Token_Type::Mul);
       node->extensions.push_back({TYPE_EXT_POINTER});
     } else {
       break;
@@ -1980,12 +1980,12 @@ void Parser::append_type_extensions(ASTType *&node) {
 
 ASTType *Parser::parse_function_type() {
   NODE_ALLOC(ASTType, output_type, range, _, this)
-  expect(TType::Fn);
+  expect(Token_Type::Fn);
   output_type->kind = ASTType::FUNCTION;
   append_type_extensions(output_type);
   FunctionTypeInfo info{};
   output_type->function.parameter_types = parse_parameter_types();
-  if (peek().type == TType::Arrow) {
+  if (peek().type == Token_Type::Arrow) {
     eat();
     output_type->function.return_type = parse_type();
   } else {
@@ -2000,36 +2000,36 @@ static Precedence get_operator_precedence(Token token) {
   }
   auto type = token.type;
   switch (type) {
-    case TType::Assign:
-    case TType::ColonEquals:
+    case Token_Type::Assign:
+    case Token_Type::ColonEquals:
       return PRECEDENCE_ASSIGNMENT;
-    case TType::LogicalOr:
+    case Token_Type::LogicalOr:
       return PRECEDENCE_LOGICALOR;
-    case TType::LogicalAnd:
+    case Token_Type::LogicalAnd:
       return PRECEDENCE_LOGICALAND;
-    case TType::Or:
+    case Token_Type::Or:
       return PRECEDENCE_BITWISEOR;
-    case TType::Xor:
+    case Token_Type::Xor:
       return PRECEDENCE_BITWISEXOR;
-    case TType::And:
+    case Token_Type::And:
       return PRECEDENCE_BITWISEAND;
-    case TType::EQ:
-    case TType::NEQ:
+    case Token_Type::EQ:
+    case Token_Type::NEQ:
       return PRECEDENCE_EQUALITY;
-    case TType::LT:
-    case TType::GT:
-    case TType::LE:
-    case TType::GE:
+    case Token_Type::LT:
+    case Token_Type::GT:
+    case Token_Type::LE:
+    case Token_Type::GE:
       return PRECEDENCE_RELATIONAL;
-    case TType::SHL:
-    case TType::SHR:
+    case Token_Type::SHL:
+    case Token_Type::SHR:
       return PRECEDENCE_SHIFT;
-    case TType::Add:
-    case TType::Sub:
+    case Token_Type::Add:
+    case Token_Type::Sub:
       return PRECEDENCE_ADDITIVE;
-    case TType::Mul:
-    case TType::Div:
-    case TType::Modulo:
+    case Token_Type::Mul:
+    case Token_Type::Div:
+    case Token_Type::Modulo:
       return PRECEDENCE_MULTIPLICATIVE;
     default:
       return PRECEDENCE_LOWEST;
@@ -2105,26 +2105,26 @@ void Parser::import(InternedString name) {
   fill_buffer_if_needed();
 }
 
-Token Parser::expect(TType type) {
+Token Parser::expect(Token_Type type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
-    SourceRange range = {
+    Source_Range range = {
         .begin_location = peek().location,
     };
-    throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
+    throw_error(std::format("Expected {}, got {} : {}", Token_Type_To_string(type), Token_Type_To_string(peek().type), peek().value),
                 range);
   }
   return eat();
 }
 
-SourceRange Parser::begin_node() {
+Source_Range Parser::begin_node() {
   auto location = peek().location;
-  return SourceRange{
+  return Source_Range{
       .begin_location = location,
   };
 }
 
-void Parser::end_node(ASTNode *node, SourceRange &range) {
+void Parser::end_node(AST *node, Source_Range &range) {
   if (node) {
     node->source_range = range;
   }
@@ -2132,9 +2132,9 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
 
 ASTLambda *Parser::parse_lambda() {
   NODE_ALLOC(ASTLambda, node, range, _, this);
-  expect(TType::Fn);
+  expect(Token_Type::Fn);
   node->params = parse_parameters();
-  if (peek().type == TType::Arrow) {
+  if (peek().type == Token_Type::Arrow) {
     eat();
     node->return_type = parse_type();
   } else {

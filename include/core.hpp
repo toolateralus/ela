@@ -88,11 +88,11 @@ struct CompileCommand {
 
 extern CompileCommand compile_command;
 
-struct SourceRange {
+struct Source_Range {
   SourceLocation begin_location;
 };
 
-static std::string get_source_filename(const SourceRange &range) {
+static std::string get_source_filename(const Source_Range &range) {
   return SourceLocation::files()[range.begin_location.file];
 }
 

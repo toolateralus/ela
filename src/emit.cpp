@@ -237,7 +237,7 @@ void Emitter::visit(ASTType *node) {
   return;
 }
 
-int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
+int Emitter::get_expr_left_type_sr_dot(AST *node) {
   switch (node->get_node_type()) {
     case AST_NODE_TYPE:
       return node->resolved_type;
@@ -438,7 +438,7 @@ void Emitter::visit(ASTIdentifier *node) {
   return;
 }
 void Emitter::visit(ASTUnaryExpr *node) {
-  if (node->op.type == TType::Sub) {
+  if (node->op.type == Token_Type::Sub) {
     auto type = to_cpp_string(global_get_type(node->operand->resolved_type));
     (*ss) << '(' << type << ')';
   }
@@ -454,7 +454,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
 
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
-  if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
+  if (node->op.type == Token_Type::Increment || node->op.type == Token_Type::Decrement) {
     node->operand->accept(this);
     (*ss) << node->op.value.get_str();
   } else {
@@ -466,7 +466,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   return;
 }
 void Emitter::visit(ASTBinExpr *node) {
-  if (node->op.type == TType::Assign &&
+  if (node->op.type == Token_Type::Assign &&
       (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
@@ -493,7 +493,7 @@ void Emitter::visit(ASTBinExpr *node) {
   node->left->accept(this);
   space();
   (*ss) << node->op.value.get_str();
-  if (node->op.type == TType::Assign) {
+  if (node->op.type == Token_Type::Assign) {
     auto type = global_get_type(node->resolved_type);
     auto isptr = type->get_ext().is_pointer();
     if (isptr)
@@ -885,7 +885,7 @@ void Emitter::visit(ASTDotExpr *node) {
 void Emitter::visit(ASTSubscript *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   if (left_ty && node->is_operator_overload) {
-    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, TType::LBrace, node->left,
+    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, Token_Type::LBrace, node->left,
                            node->subscript);
     return;
   }
@@ -977,7 +977,7 @@ void Emitter::visit(ASTSwitch *node) {
       (*ss) << " == ";
       _case.expression->accept(this);
     } else {
-      call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
+      call_operator_overload(target->source_range, type, OPERATION_BINARY, Token_Type::EQ, target, _case.expression);
     }
     (*ss) << ") ";
     emit_line_directive(_case.block);
@@ -1021,7 +1021,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     node->right->accept(this);
     (*ss) << ";\n";
 
-    if (node->op == TType::ColonEquals) {
+    if (node->op == Token_Type::ColonEquals) {
       for (size_t i = 0; i < node->idens.size(); ++i) {
         (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
         (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
@@ -1046,7 +1046,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
       if (symbol->is_function()) {
         continue;
       }
-      if (node->op == TType::ColonEquals) {
+      if (node->op == Token_Type::ColonEquals) {
         (*ss) << to_cpp_string(global_get_type(symbol->type_id)) << " " << node->idens[index++]->value.get_str()
               << " = ";
         (*ss) << identifier << "." << name.get_str() << ";\n";
@@ -1807,7 +1807,7 @@ void Emitter::visit(ASTSize_Of *node) {
   (*ss) << ")";
 }
 
-void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
+void Emitter::call_operator_overload(const Source_Range &range, Type *left_ty, OperationKind operation, Token_Type op,
                                      ASTExpr *left, ASTExpr *right) {
   auto call = ASTCall{};
   auto dot = ASTDotExpr{};

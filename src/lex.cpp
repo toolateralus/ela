@@ -86,7 +86,7 @@ void Lexer::get_token(State &state) {
       }
       pos++; // move past '
       col++;
-      state.lookahead_buffer.push_back(Token(location, value, TType::Char, TFamily::Literal));
+      state.lookahead_buffer.push_back(Token(location, value, Token_Type::Char, TFamily::Literal));
       return;
     }
 
@@ -120,7 +120,7 @@ void Lexer::get_token(State &state) {
       }
       pos++;
       col++;
-      state.lookahead_buffer.push_back(Token(location, token.str(), TType::String, TFamily::Literal));
+      state.lookahead_buffer.push_back(Token(location, token.str(), Token_Type::String, TFamily::Literal));
       return;
     }
 
@@ -136,7 +136,7 @@ void Lexer::get_token(State &state) {
         state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
         return;
       } else {
-        state.lookahead_buffer.push_back(Token(location, value, TType::Identifier, TFamily::Identifier));
+        state.lookahead_buffer.push_back(Token(location, value, Token_Type::Identifier, TFamily::Identifier));
         return;
       }
     } else if (std::ispunct(c)) {
@@ -213,13 +213,13 @@ void Lexer::get_token(State &state) {
       auto value = token.str();
 
       if (is_hex) {
-        state.lookahead_buffer.push_back(Token(location, "0x" + value, TType::Integer, TFamily::Literal));
+        state.lookahead_buffer.push_back(Token(location, "0x" + value, Token_Type::Integer, TFamily::Literal));
       } else if (is_bin) {
-        state.lookahead_buffer.push_back(Token(location, "0b" + value, TType::Integer, TFamily::Literal));
+        state.lookahead_buffer.push_back(Token(location, "0b" + value, Token_Type::Integer, TFamily::Literal));
       } else if (!is_float) {
-        state.lookahead_buffer.push_back(Token(location, value, TType::Integer, TFamily::Literal));
+        state.lookahead_buffer.push_back(Token(location, value, Token_Type::Integer, TFamily::Literal));
       } else {
-        state.lookahead_buffer.push_back(Token(location, value, TType::Float, TFamily::Literal));
+        state.lookahead_buffer.push_back(Token(location, value, Token_Type::Float, TFamily::Literal));
       }
       return;
     } else {

@@ -6,7 +6,7 @@
 struct ASTCopier {
 
   template<class T>
-  T *copy(T *node) requires std::is_base_of_v<ASTNode, T> {
+  T *copy(T *node) requires std::is_base_of_v<AST, T> {
     auto new_node = new (ast_alloc<T>()) T(*node);
     new_node->control_flow.type = -1;
     return new_node;
@@ -53,9 +53,9 @@ struct ASTCopier {
   ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
   ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
-  ASTNode *copy_node(ASTNode *node);
+  AST *copy_node(AST *node);
   ASTWhere *copy_where(ASTWhere *node);
   ASTCast *copy_cast(ASTCast *node);
 };
 
-ASTNode *deep_copy_ast(ASTNode *root);
+AST *deep_copy_ast(AST *root);

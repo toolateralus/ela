@@ -57,7 +57,7 @@ static bool supports_color() {
 static bool terminal_supports_color = supports_color();
 
 
-static std::string get_text_representation_of_source_range(const SourceRange &source_range,
+static std::string get_text_representation_of_source_range(const Source_Range &source_range,
                                                            int num_lines_of_source_to_show) {
   std::stringstream ss;
   if (num_lines_of_source_to_show > 0) {
@@ -98,7 +98,7 @@ static std::string get_text_representation_of_source_range(const SourceRange &so
   return ss.str();
 }
 
-static std::string format_source_location(const SourceRange &source_range, ErrorSeverity severity,
+static std::string format_source_location(const Source_Range &source_range, ErrorSeverity severity,
                                           int num_lines_of_source_to_show = 5) {
   const char *color = "";
   const char *code_color = "";
@@ -143,7 +143,7 @@ enum WarningFlags {
 
 extern int ignored_warnings;
 
-using PanicHandler = void (*)(const std::string &, const SourceRange &, void *);
+using PanicHandler = void (*)(const std::string &, const Source_Range &, void *);
 
 extern PanicHandler panic_handler;
 
@@ -172,7 +172,7 @@ static void set_panic_handler(PanicHandler handler) { panic_handler = handler; }
 
 static void reset_panic_handler() { panic_handler = get_default_panic_handler(); }
 
-static void throw_warning(const WarningFlags id, const std::string message, const SourceRange &source_range) {
+static void throw_warning(const WarningFlags id, const std::string message, const Source_Range &source_range) {
   if ((ignored_warnings & id) != 0 || (ignored_warnings & WarningIgnoreAll) != 0) {
     return;
   }
@@ -197,7 +197,7 @@ template <class T> T *get_error_user_data_as() {
   return (T *)error_user_data;
 }
 
-static void throw_error(const std::string &message, const SourceRange &source_range) {
+static void throw_error(const std::string &message, const Source_Range &source_range) {
   if (!panic_handler) {
     get_default_panic_handler()(message, source_range, error_user_data);
   }
