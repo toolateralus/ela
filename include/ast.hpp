@@ -106,22 +106,20 @@ struct AST_Type_Extension {
 
 struct AST;
 enum AST_Parameter_Tag {
-  Normal,
-  Self,
+  AST_PARAM_NORMAL,
+  AST_PARAM_SELF,
 };
 struct AST_Parameter_Declaration {
-  struct {
-    AST_Parameter_Tag tag;
-    union {
-      struct {
-        AST *type;
-        InternedString name;
-      } normal;
-      struct {
-        bool is_pointer : 1;
-      } self;
-    };
-  } param_decl;
+  AST_Parameter_Tag tag;
+  union {
+    struct {
+      AST *type;
+      InternedString name;
+    } normal;
+    struct {
+      bool is_pointer : 1;
+    } self;
+  };
 };
 
 struct GenericInstance {

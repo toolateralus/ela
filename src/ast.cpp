@@ -144,11 +144,11 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
       }
       function.has_self = true;
       param.tag = AST_PARAM_SELF;
-      params->params.push_back(param);
+      function.parameters.push_back(param);
 
       if (peek().type == Token_Type::Mul) {
         eat();
-        param->self.is_pointer = true;
+        param.self.is_pointer = true;
       }
 
       if (peek().type != Token_Type::RParen)
@@ -161,18 +161,16 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
       type = parse_type();
     }
 
-    param->tag = ASTParamDecl::Normal;
-    param->normal.type = type;
-    param->normal.name = name;
+    param.tag = AST_PARAM_NORMAL;
+    param.normal.type = type;
+    param.normal.name = name;
 
     if (peek().type == Token_Type::Assign) {
-      end_node(nullptr, range);
-      throw_error("Ela does not support default parameters.", range);
+      end_node(nullptr, node->source_range);
+      throw_error("Ela does not support default parameters.", node->source_range);
     }
-
-    params->params.push_back(param);
-    end_node(param, subrange);
-
+    function.parameters.push_back(param);
+    
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     } else
