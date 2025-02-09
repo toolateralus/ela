@@ -356,7 +356,7 @@ std::string Type::to_string() const {
   }
 }
 
-int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
+int global_create_interface_type(const InternedString &name, SymbolTable scope, std::vector<int> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
   Type *type = type_table.back();
   type->set_base(name);
@@ -367,7 +367,7 @@ int global_create_interface_type(const InternedString &name, Scope *scope, std::
   return type->id;
 }
 
-int global_create_struct_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
+int global_create_struct_type(const InternedString &name, SymbolTable scope, std::vector<int> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_STRUCT));
   Type *type = type_table.back();
   std::string base = name.get_str();
@@ -382,7 +382,7 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
   return type->id;
 }
 
-int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
+int global_create_tagged_union_type(const InternedString &name, SymbolTable scope, const std::vector<int> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
   type->set_base(name.get_str() + mangled_type_args(generic_args));
@@ -393,7 +393,7 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope, co
   return type->id;
 }
 
-int global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
+int global_create_enum_type(const InternedString &name, SymbolTable scope, bool is_flags, size_t element_type) {
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);

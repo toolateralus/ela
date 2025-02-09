@@ -163,7 +163,7 @@ struct AST {
   const AST_Node_Type node_type;
 
   AST *parent;
-  Symbol symbol_table;
+  SymbolTable symbol_table;
 
   Control_Flow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
@@ -452,43 +452,29 @@ struct AST {
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
     auto field_ct = 0;
-    Symbol const* symbol = &symbol_table;
-    while (symbol) {
-      symbol = symbol->next;
-      if (!symbol->is_function() && symbol->is_type())
+    for (auto sym = symbol_table.head; sym; sym = sym->next) {
+      if (!sym->is_function() && sym->is_type())
         field_ct++;
     }
     return field_ct;
   }
 
-  void insert(const Symbol &symbol) {
-    Symbol *sym = &symbol_table;
-    while (sym->next) {
-      sym = sym->next;
-    }
-    sym->next = (Symbol*)symbol_arena.allocate(sizeof(Symbol));
-    *sym->next = symbol;
+  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST *decl = nullptr) {
+    symbol_table.insert(Symbol::create_variable(name, type_id, initial_value, decl));
   }
 
-  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl = nullptr) {
-    insert(Symbol::create_variable(name, type_id, initial_value, decl));
-  }
-
-  void insert_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    insert(Symbol::create_function(name, type_id, declaration, flags));
+  void insert_function(const InternedString &name, const int type_id, AST *declaration,
+                       SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+    symbol_table.insert(Symbol::create_function(name, type_id, declaration, flags));
   }
 
   void insert_type(const int type_id, const InternedString &name, TypeKind kind, AST *declaration) {
-    insert(Symbol::create_type(type_id, name, kind, declaration));
+    symbol_table.insert(Symbol::create_type(type_id, name, kind, declaration));
   }
 
   Symbol *lookup(const InternedString &name) {
-    Symbol *sym = &symbol_table;
-    while (sym) {
-      if (sym->name == name) {
+    if (auto sym = symbol_table.local_lookup(name)) {
       return sym;
-      }
-      sym = sym->next;
     }
     if (parent) {
       return parent->lookup(name);
@@ -496,34 +482,7 @@ struct AST {
     return nullptr;
   }
 
-  Symbol *local_lookup(const InternedString &name, Symbol &symbol_root) {
-    Symbol *sym = &symbol_table;
-    while (sym) {
-      if (sym->name == name) {
-        return sym;
-      }
-      sym = sym->next;
-    }
-    return nullptr;
-  }
-
   // TODO: should this traverse upward to erase?
-  void erase(const InternedString &name) {
-    Symbol *sym = &symbol_table;
-    Symbol *prev = nullptr;
-    while (sym) {
-      if (sym->name == name) {
-      if (prev) {
-        prev->next = sym->next;
-      } else {
-        symbol_table.next = sym->next;
-      }
-      return;
-      }
-      prev = sym;
-      sym = sym->next;
-    }
-  }
 
   void declare_interface(const InternedString &name, AST *node);
 
@@ -546,8 +505,7 @@ struct AST {
     symbol.type.kind = kind;
     symbol.flags = SYMBOL_IS_TYPE;
     symbol.type.declaration = declaring_node;
-    erase(name);
-    insert(symbol);
+    symbol_table.insert(symbol);
   }
 
   void forward_declare_type(const InternedString &name, int default_id) {
@@ -555,7 +513,7 @@ struct AST {
     symbol.name = name;
     symbol.type_id = default_id;
     symbol.flags = SYMBOL_IS_TYPE;
-    insert(symbol);
+    symbol_table.insert(symbol);
   }
 
   int create_enum_type(const InternedString &name, bool flags, AST *declaration) {
@@ -568,18 +526,14 @@ struct AST {
     auto id = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
+    symbol_table.insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
     return id;
   }
 
   int find_type_id(const InternedString &name, const TypeExtensions &ext) {
     auto symbol = lookup(name);
     if (!symbol || !symbol->is_type()) {
-      if (parent) {
-        return parent->find_type_id(name, ext);
-      } else {
-        return Type::INVALID_TYPE_ID;
-      }
+      return Type::INVALID_TYPE_ID;
     }
     return global_find_type_id(symbol->type_id, ext);
   }
@@ -705,13 +659,13 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   return nullptr;
 }
 
-#define NODE_ALLOC(type, node, range, parent, parser, defer)                                                                   \
-  AST *node = ast_alloc(type, parent);                                                                                         \
+#define NODE_ALLOC(type, node, range, parent, parser, defer)                                                           \
+  AST *node = ast_alloc(type, parent);                                                                                 \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, parent, deferred)                                             \
-  AST *node = ast_alloc(type, parent);                                                                                         \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, parent, deferred)                                     \
+  AST *node = ast_alloc(type, parent);                                                                                 \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \
@@ -805,3 +759,35 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_switch(AST *node) {}                                                                                \
   void type::visit_tuple_deconstruction(AST *node) {}                                                                  \
   void type::visit_where(AST *node) {}
+Symbol *SymbolTable::local_lookup(const InternedString &name) {
+  if (head == nullptr) {
+    return nullptr;
+  }
+  auto sym = head;
+  while (sym) {
+    if (sym->name == name) {
+      return sym;
+    }
+    sym = sym->next;
+  }
+  return nullptr;
+}
+void SymbolTable::insert(const Symbol &symbol) {
+  Symbol **sym = &head;
+  while (*sym) {
+    sym = &(*sym)->next;
+  }
+  *sym = (Symbol *)symbol_arena.allocate(sizeof(Symbol));
+  **sym = symbol;
+}
+bool SymbolTable::erase(const InternedString &name) {
+  Symbol **sym = &head;
+  while (*sym) {
+    if ((*sym)->name == name) {
+      *sym = (*sym)->next;
+      return true;
+    }
+    sym = &(*sym)->next;
+  }
+  return false;
+}

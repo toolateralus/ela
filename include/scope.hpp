@@ -82,6 +82,14 @@ struct Symbol {
     symbol.type_id = type_id;
     return symbol;
   }
+
+};
+
+struct SymbolTable {
+  Symbol *head;
+  Symbol *local_lookup(const InternedString &name);
+  bool erase(const InternedString &name);
+  void insert(const Symbol &symbol);
 };
 
 struct AST;
