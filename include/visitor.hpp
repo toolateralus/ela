@@ -129,8 +129,7 @@ struct Emitter : VisitorBase {
   bool emit_default_args = false;
   int num_tests = 0;
 
-  void emit_tuple(int type);
-
+  
   int cf_expr_return_id = 0;
   Nullable<std::string> cf_expr_return_register;
 
@@ -177,7 +176,8 @@ struct Emitter : VisitorBase {
       last_loc = loc;
     }
   }
-
+  void emit_tuple(int type);
+  void emit_lambda(ASTLambda *node);
   void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);
 
@@ -196,8 +196,6 @@ struct Emitter : VisitorBase {
   
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
-  void emit_lambda(ASTLambda *node);
-  void cast_pointers_implicit(ASTDeclaration *&node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);

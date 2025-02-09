@@ -92,7 +92,7 @@ int CompileCommand::compile() {
 
     std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-    auto compilation_string = std::format("clang -std=c23 {} -L/usr/local/lib {} {} {}", ignored_warnings,
+    auto compilation_string = std::format("clang -std=c23 {} {} {} {}", ignored_warnings,
                                           output_path.string(), output_flag, extra_flags);
 
     if (compile_command.has_flag("x"))

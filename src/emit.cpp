@@ -429,7 +429,7 @@ void Emitter::visit(ASTLiteral *node) {
       output = node->value.get_str();
       break;
   }
-  (*ss) << '(' << type << ')' << output;
+  (*ss) << output;
   return;
 }
 
@@ -544,7 +544,6 @@ void Emitter::visit(ASTDeclaration *node) {
   auto handle_initialization = [&]() {
     if (node->value.is_not_null() && emit_default_value) {
       (*ss) << " = ";
-      cast_pointers_implicit(node);
       node->value.get()->accept(this);
     } else if (emit_default_init) {
       auto type = global_get_type(node->type->resolved_type);
@@ -1059,14 +1058,6 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
   }
 }
 
-// TODO: remove me, add explicit casting, at least for non-void pointers.
-// I don't mind implicit casting to void*/u8*
-void Emitter::cast_pointers_implicit(ASTDeclaration *&node) {
-  auto type = global_get_type(node->type->resolved_type);
-  if (type->get_ext().is_pointer())
-    (*ss) << "(" << to_cpp_string(type) << ")";
-}
-
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
   std::stringstream tss;
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -1579,8 +1570,6 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
     newline();
   }
 }
-
-
 
 void Emitter::emit_lambda(ASTLambda *node) {
   if (node->is_emitted) {
