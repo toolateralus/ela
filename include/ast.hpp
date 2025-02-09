@@ -349,11 +349,11 @@ struct AST {
     struct {
       AST *condition;
       AST *block;
-      Nullable<AST> _else;
+      Nullable<AST> $else;
     } $if;
 
     struct {
-      Nullable<AST> _if; // conditional else.
+      Nullable<AST> elseif; // conditional else.
       Nullable<AST> block;
     } $else;
 

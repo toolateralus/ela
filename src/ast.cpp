@@ -989,7 +989,7 @@ AST *Parser::parse_statement() {
     }
 
     if (tok.type == Token_Type::Return) {
-      NODE_ALLOC(ASTReturn, return_node, range, this, _)
+      NODE_ALLOC(AST_RETURN, return_node, range, this, _)
       expect(Token_Type::Return);
       if (peek().type != Token_Type::Semi) {
         return_node->expression = parse_expr();
@@ -999,54 +999,54 @@ AST *Parser::parse_statement() {
     }
 
     if (tok.type == Token_Type::Break) {
-      NODE_ALLOC(ASTBreak, _break, range, this, _)
+      NODE_ALLOC(AST_BREAK, _break, range, this, _)
       eat();
       end_node(_break, range);
       return _break;
     }
 
     if (tok.type == Token_Type::Continue) {
-      NODE_ALLOC(ASTContinue, _continue, range, this, _)
+      NODE_ALLOC(AST_CONTINUE, _continue, range, this, _)
       eat();
       end_node(_continue, range);
       return _continue;
     }
 
     if (tok.type == Token_Type::For) {
-      NODE_ALLOC(ASTFor, node, range, this, _)
+      NODE_ALLOC(AST_FOR, node, range, this, _)
       eat();
 
-      node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+      node->$for.value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
 
       // reference semantic for iterating over list
       if (peek().type == Token_Type::Mul) {
-        node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
+        node->$for.value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
         eat();
       }
 
       if (lookahead_buf()[1].type == Token_Type::In) {
-        node->iter_identifier = parse_primary();
+        node->$for.iter_identifier = parse_primary();
         expect(Token_Type::In);
         auto expr = parse_expr();
-        node->range = expr;
+        node->$for.range = expr;
       } else {
         throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in "
                     "iterable || for *elem in iterable",
                     range);
       }
 
-      node->block = parse_block();
+      node->$for.block = parse_block();
       end_node(node, range);
       return node;
     }
 
     if (tok.type == Token_Type::While) {
-      NODE_ALLOC(ASTWhile, node, range, this, _)
+      NODE_ALLOC(AST_WHILE, node, range, this, _)
       eat();
       if (peek().type != Token_Type::LCurly) {
-        node->condition = parse_expr();
+        node->$while.condition = parse_expr();
       }
-      node->block = parse_block();
+      node->$while.block = parse_block();
       end_node(node, range);
       return node;
     }
@@ -1054,36 +1054,34 @@ AST *Parser::parse_statement() {
     // TODO: we should handle the 'then' statement more gracefully.
     // Also, => is super fricken janky, and is really poorly implemented.
     if (tok.type == Token_Type::If) {
-      NODE_ALLOC(ASTIf, node, range, this, _)
+      NODE_ALLOC(AST_IF, node, range, this, _)
       eat();
-      node->condition = parse_expr();
+      node->$if.condition = parse_expr();
 
       if (peek().type == Token_Type::Then) {
-        NODE_ALLOC(ASTBlock, block, _range, defer, this);
+        NODE_ALLOC(AST_BLOCK, block, _range, this, _);
         eat();
-        node->block = block;
-        ctx.set_scope();
+        node->$while.block = block;
         auto statement = parse_statement();
-        node->block->statements = {statement};
+        node->$while.block->statements = {statement};
         if (statement->node_type == AST_DECLARATION) {
           throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
         }
-        node->block->scope = ctx.exit_scope();
       } else {
-        node->block = parse_block();
+        node->$while.block = parse_block();
       }
 
       if (peek().type == Token_Type::Else) {
-        NODE_ALLOC(ASTElse, node_else, range, this, _)
+        NODE_ALLOC(AST_ELSE, $else, range, this, _)
         eat();
         if (peek().type == Token_Type::If) {
           auto inner_if = parse_statement();
           assert(inner_if->node_type == AST_IF);
-          node_else->_if = static_cast<ASTIf *>(inner_if);
+          $else->$else.elseif = inner_if;
         } else {
-          node_else->block = parse_block();
+          $else->$else.block = parse_block();
         }
-        node->_else = node_else;
+        node->$if.$else = $else;
       }
       end_node(node, range);
       return node;
@@ -1093,8 +1091,8 @@ AST *Parser::parse_statement() {
   if (peek().type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::DoubleColon &&
       lookahead_buf()[2].type == Token_Type::Identifier &&
       (lookahead_buf()[3].type == Token_Type::GenericBrace || lookahead_buf()[3].type == Token_Type::LParen)) {
-    NODE_ALLOC(ASTStatement, expr, range, this, _)
-    expr->expression = parse_expr();
+    NODE_ALLOC(AST_EXPR_STATEMENT, expr, range, this, _)
+    expr->expression_statement = parse_expr();
     end_node(expr, range);
     return expr;
   }
@@ -1117,23 +1115,14 @@ AST *Parser::parse_statement() {
       return struct_decl;
     }
     if (peek().type == Token_Type::Enum) {
-      if (lookahead_buf()[1].type == Token_Type::LParen && lookahead_buf()[2].type == Token_Type::Union &&
-          lookahead_buf()[3].type == Token_Type::RParen) {
-        expect(Token_Type::Enum);
-        expect(Token_Type::LParen);
-        expect(Token_Type::Union);
-        expect(Token_Type::RParen);
-        auto tagged_union = parse_tagged_union_declaration(tok);
-        return tagged_union;
-      }
       auto enum_decl = parse_enum_declaration(tok);
       return enum_decl;
     }
 
-    NODE_ALLOC(ASTDeclaration, decl, range, this, _);
-    decl->name = tok.value;
-    decl->value = parse_expr();
-    decl->is_constexpr = true;
+    NODE_ALLOC(AST_DECLARATION, decl, range, this, _);
+    decl->declaration.name = tok.value;
+    decl->declaration.value = parse_expr();
+    decl->declaration.is_constexpr = true;
 
     if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str()) ||
         reserved.contains(tok.value.get_str())) {
@@ -1177,13 +1166,11 @@ AST *Parser::parse_statement() {
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
         is_deref || is_special_case) {
-      NODE_ALLOC(ASTStatement, statement, range, this, _)
-      statement->expression = parse_expr();
-
-      if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
-        _switch->is_statement = true;
+      NODE_ALLOC(AST_EXPR_STATEMENT, statement, range, this, _)
+      statement->expression_statement = parse_expr();
+      if (statement->node_type == AST_SWITCH) {
+        statement->$switch.is_statement = true;
       }
-
       end_node(statement, range);
       return statement;
     }
@@ -1195,12 +1182,12 @@ AST *Parser::parse_statement() {
 
   {
     if (tok.family == TFamily::Operator) {
-      throw_error(std::format("Unexpected operator: {} '{}'", Token_Type_To_string(tok.type), tok.value), parent_range);
+      throw_error(std::format("Unexpected operator: {} '{}'", Token_Type_To_String(tok.type), tok.value), parent_range);
     }
 
     if (tok.family == TFamily::Literal) {
       eat();
-      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, Token_Type_To_string(tok.type)), parent_range);
+      throw_error(std::format("Unexpected literal: {} .. {}", tok.value, Token_Type_To_String(tok.type)), parent_range);
     }
 
     if (tok.family == TFamily::Keyword) {
@@ -2077,7 +2064,7 @@ Token Parser::expect(Token_Type type) {
     Source_Range range = {
         .begin_location = peek().location,
     };
-    throw_error(std::format("Expected {}, got {} : {}", Token_Type_To_string(type), Token_Type_To_string(peek().type),
+    throw_error(std::format("Expected {}, got {} : {}", Token_Type_To_String(type), Token_Type_To_String(peek().type),
                             peek().value),
                 range);
   }
