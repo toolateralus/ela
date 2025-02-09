@@ -1,8 +1,20 @@
 #include "lex.hpp"
 #include "error.hpp"
+#include <unordered_set>
 
 using std::string;
 using std::stringstream;
+
+
+// TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
+// TODO: we should not have reserved words from host language leak into this langauge.
+static std::unordered_set<std::string> reserved = {
+    "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
+    "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
+    "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
+    "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
+    "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
+
 
 void Lexer::get_token(State &state) {
   size_t &pos = state.pos;
@@ -136,6 +148,10 @@ void Lexer::get_token(State &state) {
         state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
         return;
       } else {
+        // This allows us to never conflict with the underlying language. :D
+        if (reserved.contains(value)) {
+          value = "$" + value;
+        }
         state.lookahead_buffer.push_back(Token(location, value, Token_Type::Identifier, TFamily::Identifier));
         return;
       }

@@ -3,8 +3,7 @@
 #include "interned_string.hpp"
 
 struct Context;
-struct ASTExpr;
-
+struct AST;
 struct Value {
   enum {
     INTEGER,
@@ -265,4 +264,4 @@ struct Value {
   }
 };
 
-Value evaluate_constexpr(ASTExpr *node, Context &ctx);
+Value evaluate_constexpr(AST *node, Context &ctx);

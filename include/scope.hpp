@@ -21,7 +21,7 @@ enum SymbolFlags {
 
 struct AST;
 struct ASTStructDeclaration;
-struct ASTFunctionDeclaration;
+struct AST;
 struct ASTTaggedUnionDeclaration;
 struct ASTEnumDeclaration;
 
@@ -41,10 +41,10 @@ struct Symbol {
       Value value;
       // This is null for almost every variable besides constant declarations,
       // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
-      Nullable<ASTExpr> initial_value;
+      Nullable<AST> initial_value;
     } variable;
     struct {
-      ASTFunctionDeclaration *declaration;
+      AST *declaration;
     } function;
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
@@ -57,7 +57,7 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value, AST* decl) {
+  static Symbol create_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
@@ -67,7 +67,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags) {
+  static Symbol create_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags) {
     Symbol symbol;
     symbol.type_id = type_id;
     symbol.name = name;
@@ -87,9 +87,7 @@ struct Symbol {
   }
 };
 
-struct ASTFunctionDeclaration;
-struct ASTInterfaceDeclaration;
-
+struct AST;
 extern Scope *root_scope;
 
 struct Scope {
@@ -125,11 +123,11 @@ struct Scope {
     return fields;
   }
 
-  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, AST* decl = nullptr) {
+  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl = nullptr) {
     symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value, decl));
   }
 
-  void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+  void insert_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
     symbols.insert_or_assign(name, Symbol::create_function(name, type_id, declaration, flags));
   }
 
@@ -149,7 +147,7 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
+  void declare_interface(const InternedString &name, AST *node);
 
   int create_tagged_union(const InternedString &name, Scope *scope, ASTTaggedUnionDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
@@ -157,7 +155,7 @@ struct Scope {
     return id;
   }
 
-  int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args, ASTInterfaceDeclaration *declaration) {
+  int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args, AST *declaration) {
     auto id = global_create_interface_type(name, scope, generic_args);
     symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_INTERFACE, (AST*)declaration));
     return id;

@@ -80,7 +80,7 @@ void assert_return_type_is_valid(int &return_type, int new_type, AST *node) {
 };
 
 Nullable<Symbol> Typer::get_symbol(AST *node) {
-  switch (node->get_node_type()) {
+  switch (node->node_type) {
     case AST_NODE_SUBSCRIPT:
       return nullptr;
     case AST_NODE_TYPE: {
@@ -429,7 +429,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
-    if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
+    if (!declaring_node || declaring_node->node_type != AST_NODE_INTERFACE_DECLARATION) {
       throw_error(
           std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
           node->source_range);
@@ -564,7 +564,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 }
 
 bool expr_is_literal(ASTExpr *expr) {
-  switch (expr->get_node_type()) {
+  switch (expr->node_type) {
     case AST_NODE_BIN_EXPR: {
       auto bin_expr = static_cast<ASTBinExpr *>(expr);
       return expr_is_literal(bin_expr->left) && expr_is_literal(bin_expr->right);
@@ -581,7 +581,7 @@ bool expr_is_literal(ASTExpr *expr) {
 void Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
-    if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
+    if (node->value.get()->node_type == AST_NODE_TYPE) {
       auto type = static_cast<ASTType *>(node->value.get());
       if (type->kind != ASTType::REFLECTION) {
         throw_error("Cannot use a type as a value.", node->value.get()->source_range);
@@ -617,7 +617,7 @@ void Typer::visit(ASTDeclaration *node) {
   }
 
   if (node->value.is_not_null()) {
-    if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
+    if (node->value.get()->node_type == AST_NODE_TYPE) {
       auto type = static_cast<ASTType *>(node->value.get());
       if (type->kind != ASTType::REFLECTION) {
         throw_error("Cannot use a type as a value.", node->value.get()->source_range);
@@ -779,7 +779,7 @@ void Typer::visit(ASTFor *node) {
 
   auto iden = static_cast<ASTIdentifier *>(node->iter_identifier);
   node->range->accept(this);
-  // auto range_node_ty = node->range->get_node_type();
+  // auto range_node_ty = node->range->node_type;
   int range_type_id = node->range->resolved_type;
   Type *range_type = global_get_type(range_type_id);
   node->range_type = range_type->id;
@@ -970,7 +970,7 @@ void Typer::visit(ASTCall *node) {
     }
 
     auto declaring_node = symbol->function.declaration;
-    if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    if (declaring_node && declaring_node->node_type == AST_NODE_FUNCTION_DECLARATION) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
@@ -1008,7 +1008,7 @@ void Typer::visit(ASTCall *node) {
   // else, use the type.
   if (func_decl) {
     bool skip_first = false;
-    if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+    if (node->function->node_type == AST_NODE_DOT_EXPR) {
       if (!func_decl->params->has_self) {
         throw_error("Calling static methods with instance not allowed", node->source_range);
       }
@@ -1131,7 +1131,7 @@ void Typer::visit(ASTArguments *node) {
   }
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
-    if (arg->get_node_type() == AST_NODE_SWITCH || arg->get_node_type() == AST_NODE_IF) {
+    if (arg->node_type == AST_NODE_SWITCH || arg->node_type == AST_NODE_IF) {
       throw_error(
           "cannot use 'switch' or 'if' expressions in binary expressions, only `=`, `:=` and `return` statements",
           node->source_range);
@@ -1229,7 +1229,7 @@ void Typer::visit(ASTType *node) {
       }
 
       ASTStatement *instantiation = nullptr;
-      auto decl_node_type = declaring_node->get_node_type();
+      auto decl_node_type = declaring_node->node_type;
 
       GENERIC_PANIC_HANDLER(data, 1, {
         switch (decl_node_type) {
@@ -1332,8 +1332,8 @@ void Typer::visit(ASTBinExpr *node) {
 
   if (node->op.type == Token_Type::Assign) {
     expected_type = left;
-  } else if (node->left->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_SWITCH ||
-             node->right->get_node_type() == AST_NODE_IF || node->left->get_node_type() == AST_NODE_IF) {
+  } else if (node->left->node_type == AST_NODE_SWITCH || node->right->node_type == AST_NODE_SWITCH ||
+             node->right->node_type == AST_NODE_IF || node->left->node_type == AST_NODE_IF) {
     throw_error("cannot use 'switch' or 'if' expressions in function arguments, they're only valid in `=`, `:=` and "
                 "`return` statements",
                 node->source_range);
@@ -1343,7 +1343,7 @@ void Typer::visit(ASTBinExpr *node) {
   auto right = node->right->resolved_type;
 
   if (node->op.type == Token_Type::Assign) {
-    if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
+    if (node->left->node_type == AST_NODE_IDENTIFIER) {
       ctx.scope->insert_variable(((ASTIdentifier *)node->left)->value, node->left->resolved_type, node->right);
     }
   }
@@ -1380,7 +1380,7 @@ void Typer::visit(ASTBinExpr *node) {
 }
 
 void Typer::visit(ASTUnaryExpr *node) {
-  if (node->operand->get_node_type() == AST_NODE_SWITCH || node->operand->get_node_type() == AST_NODE_IF) {
+  if (node->operand->node_type == AST_NODE_SWITCH || node->operand->node_type == AST_NODE_IF) {
     throw_error("cannot use 'switch' or 'if' expressions in unary expressions. they're only valid in `=`, `:=` and "
                 "`return` statements",
                 node->source_range);
@@ -1452,7 +1452,7 @@ void Typer::visit(ASTIdentifier *node) {
 
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
-    case ASTLiteral::Integer: {
+    case LITERAL_INTEGER: {
       int base = 10;
       auto value = node->value.get_str();
       if (value.starts_with("0x")) {
@@ -1478,10 +1478,10 @@ void Typer::visit(ASTLiteral *node) {
       node->resolved_type = s32_type();
       return;
     }
-    case ASTLiteral::Float:
+    case LITERAL_FLOAT:
       node->resolved_type = f32_type();
       return;
-    case ASTLiteral::String: {
+    case LITERAL_STRING: {
       if (node->is_c_string) {
         static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});
         ;
@@ -1493,10 +1493,10 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     }
-    case ASTLiteral::Bool:
+    case LITERAL_BOOL:
       node->resolved_type = bool_type();
       return;
-    case ASTLiteral::Null:
+    case LITERAL_NULL:
       // infer pointer type from decl or assign type, else we just use void*, for like n := null;
       if (expected_type != -1) {
         node->resolved_type = expected_type;
@@ -1504,7 +1504,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       node->resolved_type = voidptr_type();
       return;
-    case ASTLiteral::Char:
+    case LITERAL_CHAR:
       node->resolved_type = u32_type();
       return;
   }
@@ -1670,7 +1670,7 @@ void Typer::visit(ASTInitializerList *node) {
         auto element_type = values[0]->resolved_type;
         for (int i = 1; i < values.size(); ++i) {
           int type = Type::INVALID_TYPE_ID;
-          if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+          if (values[i]->node_type == AST_NODE_INITIALIZER_LIST) {
             auto old = expected_type;
             Defer _([&] { expected_type = old; });
             expected_type = target_element_type;
@@ -1726,7 +1726,7 @@ void Typer::visit(ASTInitializerList *node) {
         auto target_element_type = values[0]->resolved_type;
         for (int i = 1; i < values.size(); ++i) {
           int type = Type::INVALID_TYPE_ID;
-          if (values[i]->get_node_type() == AST_NODE_INITIALIZER_LIST) {
+          if (values[i]->node_type == AST_NODE_INITIALIZER_LIST) {
             auto old = expected_type;
             Defer _([&] { expected_type = old; });
             expected_type = target_element_type;
@@ -1920,7 +1920,7 @@ void Typer::visit(ASTImpl *node) {
 
     auto declaring_node = symbol_nullable.get()->type.declaration.get();
 
-    if (declaring_node->get_node_type() != AST_NODE_STRUCT_DECLARATION) {
+    if (declaring_node->node_type != AST_NODE_STRUCT_DECLARATION) {
       throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
     }
 
@@ -1977,7 +1977,7 @@ int Typer::get_self_type() {
 }
 
 bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
-  switch (node->get_node_type()) {
+  switch (node->node_type) {
     case AST_NODE_BIN_EXPR: {
       auto bin = static_cast<ASTBinExpr *>(node);
       auto op = bin->op.type;
@@ -2031,7 +2031,7 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
     throw_error("internal compiler error: unable to find type's declaring node", source_range);
   }
 
-  auto decl_node_type = declaring_node->get_node_type();
+  auto decl_node_type = declaring_node->node_type;
 
   GENERIC_PANIC_HANDLER(
       data, 1,

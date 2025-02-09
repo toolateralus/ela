@@ -12,7 +12,7 @@ ASTProgram *ASTCopier::copy_program(ASTProgram *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
   for (auto stmt : node->statements) {
-    if (stmt->get_node_type() == AST_NODE_NOOP)
+    if (stmt->node_type == AST_NODE_NOOP)
       continue;
     new_node->statements.push_back(static_cast<ASTStatement *>(copy_node(stmt)));
   }
@@ -337,7 +337,7 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
 }
 
 AST *ASTCopier::copy_node(AST *node) {
-  const auto type = node->get_node_type();
+  const auto type = node->node_type;
   switch (type) {
     case AST_NODE_WHERE:
       return copy_where(static_cast<ASTWhere *>(node));

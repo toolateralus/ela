@@ -13,6 +13,15 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+enum AST_Literal_Tag {
+  LITERAL_INTEGER,
+  LITERAL_FLOAT,
+  LITERAL_STRING,
+  LITERAL_CHAR,
+  LITERAL_BOOL,
+  LITERAL_NULL,
+};
+
 extern size_t LAMBDA_UNIQUE_ID;
 
 extern jstl::Arena ast_arena;
@@ -248,14 +257,7 @@ struct AST {
     } unary;
     InternedString identifier;
     struct {
-      enum Tag {
-        Integer,
-        Float,
-        String,
-        Char,
-        Bool,
-        Null,
-      } tag;
+      AST_Literal_Tag tag;
       bool is_c_string : 1 = false;
       InternedString value;
     } literal;
@@ -573,12 +575,12 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
 }
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
-  type *node = ast_alloc<type>();                                                                                      \
+  AST *node = ast_alloc(type);                                                                                      \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  type *node = ast_alloc<type>();                                                                                      \
+  AST *node = ast_alloc(type);                                                                                      \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \

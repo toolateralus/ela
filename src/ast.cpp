@@ -18,15 +18,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-// TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
-// TODO: we should not have reserved words from host language leak into this langauge.
-static std::set<std::string> reserved = {
-    "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
-    "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
-    "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
-    "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
-    "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
-
 enum PreprocKind {
   PREPROC_IF,
   PREPROC_IFDEF,
@@ -66,7 +57,7 @@ static void remove_preproc(Parser *parser) {
   }
 }
 
-static void parse_ifdef_if_else_preprocs(Parser *parser, ASTStatementList *list, PreprocKind kind) {
+static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind kind) {
   bool executed = false;
 
   if (kind == PREPROC_IFDEF) { // Handling #ifdef
@@ -189,8 +180,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         
         parser->expect(Token_Type::RParen);
-        NODE_ALLOC(ASTLiteral, string, range, _, parser)
-        string->tag = ASTLiteral::String;
+        NODE_ALLOC(AST_NODE_LITERAL, string, range, _, parser)
+        string->tag = LITERAL_STRING;
         std::stringstream ss;
         if (mode == "binary") {
           std::ifstream isftr(filename.get_str(), std::ios::binary);
@@ -272,7 +263,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
         auto error = parser->parse_primary();
-        if (error->get_node_type() != AST_NODE_LITERAL) {
+        if (error->node_type != AST_NODE_LITERAL) {
           throw_error("Can only throw a literal as a error", error->source_range);
         }
         auto literal = static_cast<ASTLiteral *>(error);
@@ -319,7 +310,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         int index = 0;
         for (auto &key_value : enum_decl->key_values) {
           NODE_ALLOC(ASTLiteral, literal, range, _, parser);
-          literal->tag = ASTLiteral::Integer;
+          literal->tag = LITERAL_INTEGER;
           literal->value = std::to_string(1 << index);
           key_value.second = literal;
           index++;
@@ -374,13 +365,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
         auto node = parser->parse_statement();
-        if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+        if (node->node_type == AST_NODE_STRUCT_DECLARATION) {
           auto struct$ = static_cast<ASTStructDeclaration*>(node);
           struct$->is_extern = true;
-        } else if (node->get_node_type() == AST_NODE_DECLARATION) {
+        } else if (node->node_type == AST_NODE_DECLARATION) {
           auto decl = static_cast<ASTDeclaration*>(node);
           decl->is_extern = true;
-        } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+        } else if (node->node_type == AST_NODE_FUNCTION_DECLARATION) {
           auto func = static_cast<ASTFunctionDeclaration*>(node);
           func->flags |= FUNCTION_IS_EXPORTED;
         }
@@ -396,7 +387,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto type = parser->parse_type();
         parser->expect(Token_Type::RParen);
         type->accept(parser->typer);
-        literal->tag = ASTLiteral::Integer;
+        literal->tag = LITERAL_INTEGER;
         // TODO: we should move this out of here.
         literal->value = std::to_string(type->resolved_type);
         literal->source_range = type->source_range;
@@ -550,7 +541,7 @@ ASTProgram *Parser::parse() {
 
     auto statement = parse_statement();
 
-    auto type = statement->get_node_type();
+    auto type = statement->node_type;
     switch (type) {
       case AST_NODE_STRUCT_DECLARATION:
       case AST_NODE_FUNCTION_DECLARATION:
@@ -631,8 +622,8 @@ ASTExpr *Parser::parse_unary() {
 
     // TODO: make a more comprehensive rvalue evaluator.
     // We need to use it later for self* method calls
-    auto is_rvalue =
-        expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == Token_Type::And);
+    auto is_rvalue = expr->node_type == AST_NODE_LITERAL ||
+                     (expr->node_type == AST_NODE_CALL && op.type == Token_Type::And);
 
     if ((is_rvalue) && (op.type == Token_Type::And || op.type == Token_Type::Mul)) {
       end_node(nullptr, range);
@@ -655,8 +646,9 @@ ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
   auto range = begin_node();
   // build dot and subscript expressions
-  while (peek().type == Token_Type::DoubleColon || peek().type == Token_Type::Dot || peek().type == Token_Type::LBrace ||
-         peek().type == Token_Type::LParen || peek().type == Token_Type::GenericBrace || peek().type == Token_Type::Increment ||
+  while (peek().type == Token_Type::DoubleColon || peek().type == Token_Type::Dot ||
+         peek().type == Token_Type::LBrace || peek().type == Token_Type::LParen ||
+         peek().type == Token_Type::GenericBrace || peek().type == Token_Type::Increment ||
          peek().type == Token_Type::Decrement || peek().type == Token_Type::Range || peek().type == Token_Type::As) {
     if (peek().type == Token_Type::LParen || peek().type == Token_Type::GenericBrace) {
       left = parse_call(left);
@@ -752,7 +744,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::Char: {
       NODE_ALLOC(ASTLiteral, node, range, _, this)
       eat();
-      node->tag = ASTLiteral::Char;
+      node->tag = LITERAL_CHAR;
       node->value = tok.value;
       end_node(node, range);
       return node;
@@ -790,7 +782,7 @@ ASTExpr *Parser::parse_primary() {
         auto type = parse_type();
         if (peek().type == Token_Type::LCurly) {
           auto init_list = parse_expr();
-          if (init_list->get_node_type() != AST_NODE_INITIALIZER_LIST) {
+          if (init_list->node_type != AST_NODE_INITIALIZER_LIST) {
             throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
                         init_list->source_range);
           }
@@ -808,7 +800,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::Null: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::Null;
+      literal->tag = LITERAL_NULL;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
@@ -816,7 +808,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::True: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::Bool;
+      literal->tag = LITERAL_BOOL;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
@@ -824,7 +816,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::False: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::Bool;
+      literal->tag = LITERAL_BOOL;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
@@ -832,7 +824,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::Integer: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::Integer;
+      literal->tag = LITERAL_INTEGER;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
@@ -840,7 +832,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::Float: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::Float;
+      literal->tag = LITERAL_FLOAT;
       literal->value = tok.value;
       end_node(literal, range);
       return literal;
@@ -848,7 +840,7 @@ ASTExpr *Parser::parse_primary() {
     case Token_Type::String: {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       eat();
-      literal->tag = ASTLiteral::String;
+      literal->tag = LITERAL_STRING;
       literal->value = tok.value;
       if (peek().type == Token_Type::Identifier && peek().value == "c") {
         literal->is_c_string = true;
@@ -883,7 +875,7 @@ ASTExpr *Parser::parse_primary() {
       eat();
       end_node(expr, range);
 
-      if (expr->get_node_type() == AST_NODE_TYPE) {
+      if (expr->node_type == AST_NODE_TYPE) {
         throw_error("using (TYPE)expr style casts are deprecated. use `expr as TYPE` syntax", range);
       }
 
@@ -891,9 +883,9 @@ ASTExpr *Parser::parse_primary() {
     }
     default: {
       auto error_range = begin_node();
-      throw_error(
-          std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value, Token_Type_To_string(tok.type)),
-          error_range);
+      throw_error(std::format("Invalid primary expression. Token: '{}'... Type: '{}'", tok.value,
+                              Token_Type_To_string(tok.type)),
+                  error_range);
       return nullptr;
     }
   }
@@ -920,7 +912,7 @@ ASTType *Parser::parse_type() {
   if (peek().type == Token_Type::Directive) {
     auto range = begin_node();
     auto expr = try_parse_directive_expr().get();
-    if (expr->get_node_type() != AST_NODE_TYPE) {
+    if (expr->node_type != AST_NODE_TYPE) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
                   range);
@@ -975,7 +967,8 @@ ASTStatement *Parser::parse_statement() {
 
   // * '#' Directives.
   if (tok.type == Token_Type::Directive) {
-    auto range = begin_node(); eat();
+    auto range = begin_node();
+    eat();
     auto directive_name = eat().value;
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
@@ -1099,7 +1092,7 @@ ASTStatement *Parser::parse_statement() {
         ctx.set_scope();
         auto statement = parse_statement();
         node->block->statements = {statement};
-        if (statement->get_node_type() == AST_NODE_DECLARATION) {
+        if (statement->node_type == AST_NODE_DECLARATION) {
           throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
         }
         node->block->scope = ctx.exit_scope();
@@ -1112,7 +1105,7 @@ ASTStatement *Parser::parse_statement() {
         eat();
         if (peek().type == Token_Type::If) {
           auto inner_if = parse_statement();
-          assert(inner_if->get_node_type() == AST_NODE_IF);
+          assert(inner_if->node_type == AST_NODE_IF);
           node_else->_if = static_cast<ASTIf *>(inner_if);
         } else {
           node_else->block = parse_block();
@@ -1191,9 +1184,9 @@ ASTStatement *Parser::parse_statement() {
     auto next = lookahead_buf()[1];
     auto next_next = lookahead_buf()[2];
     // Both postfix and prefix (inc/dec)rement
-    const bool is_increment_or_decrement =
-        (next.type == Token_Type::Increment || next.type == Token_Type::Decrement && next_next.type != Token_Type::Semi) ||
-        tok.type == Token_Type::Increment || tok.type == Token_Type::Decrement;
+    const bool is_increment_or_decrement = (next.type == Token_Type::Increment ||
+                                            next.type == Token_Type::Decrement && next_next.type != Token_Type::Semi) ||
+                                           tok.type == Token_Type::Increment || tok.type == Token_Type::Decrement;
 
     // subscript assignment or dot assign/ call statement.
     const bool is_identifier_with_lbrace_or_dot =
@@ -1375,7 +1368,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     }
     auto statement = parse_statement();
 
-    if (statement->get_node_type() == AST_NODE_DEFER) {
+    if (statement->node_type == AST_NODE_DEFER) {
       if (current_func_decl.get()) {
         current_func_decl.get()->has_defer = true;
       } else {
@@ -1539,7 +1532,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   for (const auto &stmt : function->block.get()->statements) {
-    if (stmt->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    if (stmt->node_type == AST_NODE_FUNCTION_DECLARATION) {
       throw_error("local functions are not allowed", stmt->source_range);
     }
   }
@@ -1560,11 +1553,11 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   }
 
   NODE_ALLOC(ASTLiteral, zero, lit_range, _1, this)
-  zero->tag = ASTLiteral::Integer;
+  zero->tag = LITERAL_INTEGER;
   zero->value = "0";
 
   NODE_ALLOC(ASTLiteral, one, lit_range2, _2, this)
-  one->tag = ASTLiteral::Integer;
+  one->tag = LITERAL_INTEGER;
   one->value = "1";
 
   ASTExpr *last_value = zero;
@@ -1579,7 +1572,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       expect(Token_Type::Assign);
       value = parse_expr();
     } else {
-      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
+      if (was_zero && last_value->node_type == AST_NODE_LITERAL &&
           static_cast<ASTLiteral *>(last_value)->value == "0") {
         value = zero;
         was_zero = false;
@@ -1658,7 +1651,7 @@ ASTImpl *Parser::parse_impl() {
   node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
-    if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+    if (statement->node_type == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       node->methods.push_back(function);
     } else {
@@ -1781,9 +1774,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (peek().type == Token_Type::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(Token_Type::Identifier).value);
-        if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
+        if (directive && directive.get()->node_type == AST_NODE_STRUCT_DECLARATION) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
-        } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
+        } else if (directive && directive.get()->node_type == AST_NODE_DECLARATION) {
           ASTStructMember member{};
           auto _node = static_cast<ASTDeclaration *>(directive.get());
           member.name = _node->name;
@@ -1791,8 +1784,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           member.bitsize = _node->bitsize;
           member.type = _node->type;
           node->members.push_back(member);
-        } else if (directive && directive.get()->get_node_type() == AST_NODE_ALIAS) {
-          node->aliases.push_back(static_cast<ASTAlias*>(directive.get()));
+        } else if (directive && directive.get()->node_type == AST_NODE_ALIAS) {
+          node->aliases.push_back(static_cast<ASTAlias *>(directive.get()));
         } else {
           end_node(node, range);
           throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the "
@@ -2111,7 +2104,8 @@ Token Parser::expect(Token_Type type) {
     Source_Range range = {
         .begin_location = peek().location,
     };
-    throw_error(std::format("Expected {}, got {} : {}", Token_Type_To_string(type), Token_Type_To_string(peek().type), peek().value),
+    throw_error(std::format("Expected {}, got {} : {}", Token_Type_To_string(type), Token_Type_To_string(peek().type),
+                            peek().value),
                 range);
   }
   return eat();

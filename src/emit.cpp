@@ -238,7 +238,7 @@ void Emitter::visit(ASTType *node) {
 }
 
 int Emitter::get_expr_left_type_sr_dot(AST *node) {
-  switch (node->get_node_type()) {
+  switch (node->node_type) {
     case AST_NODE_TYPE:
       return node->resolved_type;
     case AST_NODE_IDENTIFIER:
@@ -253,7 +253,7 @@ int Emitter::get_expr_left_type_sr_dot(AST *node) {
     } break;
     default:
       throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
-                              (int)node->get_node_type()),
+                              (int)node->node_type),
                   node->source_range);
   }
   return Type::INVALID_TYPE_ID;
@@ -268,7 +268,7 @@ void Emitter::visit(ASTCall *node) {
   }
 
   auto symbol = base_symbol.get();
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+  if (node->function->node_type == AST_NODE_DOT_EXPR) {
     if (!base_symbol || !base_symbol.get()->is_function()) {
       throw_error("can't call a non-function", node->source_range);
     }
@@ -320,7 +320,7 @@ void Emitter::visit(ASTCall *node) {
     (*ss) << ")";
   } else {
     auto func = node->function;
-    if (func->get_node_type() == AST_NODE_TYPE) {
+    if (func->node_type == AST_NODE_TYPE) {
       auto ast_type = static_cast<ASTType *>(func);
       if (ast_type->kind != ASTType::NORMAL) {
         throw_error("Cannot call a tuple or function type", node->source_range);
@@ -391,10 +391,10 @@ void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
   std::string output;
   switch (node->tag) {
-    case ASTLiteral::Null:
+    case LITERAL_NULL:
       (*ss) << "NULL";
       return;
-    case ASTLiteral::String: {
+    case LITERAL_STRING: {
       if (node->is_c_string) {
         output = std::format("\"{}\"", node->value.get_str());
       } else {
@@ -410,7 +410,7 @@ void Emitter::visit(ASTLiteral *node) {
         return;
       }
     } break;
-    case ASTLiteral::Float:
+    case LITERAL_FLOAT:
       if (node->resolved_type != f64_type()) {
         output = node->value.get_str() + "f";
       } else {
@@ -419,13 +419,13 @@ void Emitter::visit(ASTLiteral *node) {
       break;
     // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
     // that's why we have fat u32 chars anyway.
-    case ASTLiteral::Char: 
+    case LITERAL_CHAR: 
       output = '\'' + node->value.get_str() + '\'';
       break;
-    case ASTLiteral::Integer:
+    case LITERAL_INTEGER:
       output = node->value.get_str();
       break;
-    case ASTLiteral::Bool:
+    case LITERAL_BOOL:
       output = node->value.get_str();
       break;
   }
@@ -467,7 +467,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
 }
 void Emitter::visit(ASTBinExpr *node) {
   if (node->op.type == Token_Type::Assign &&
-      (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
+      (node->right->node_type == AST_NODE_SWITCH || node->right->node_type == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
     auto type = global_get_type(node->resolved_type);
@@ -521,7 +521,7 @@ void Emitter::visit(ASTDeclaration *node) {
 
   // Emit switch / if expressions.
   if (node->value &&
-      (node->value.get()->get_node_type() == AST_NODE_SWITCH || node->value.get()->get_node_type() == AST_NODE_IF)) {
+      (node->value.get()->node_type == AST_NODE_SWITCH || node->value.get()->node_type == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
     auto type = global_get_type(node->resolved_type);
@@ -1454,7 +1454,7 @@ void Emitter::visit(ASTScopeResolution *node) {
   // for static function aclls and enum access, but this probably encompasses all of the usage.
   // The reason we check here, is because the left of this may be another Scope Resolution node.
   // This should probably be a lot more robust
-  if (node->base->get_node_type() == AST_NODE_IDENTIFIER || node->base->get_node_type() == AST_NODE_TYPE) {
+  if (node->base->node_type == AST_NODE_IDENTIFIER || node->base->node_type == AST_NODE_TYPE) {
     if (type->is_kind(TYPE_ENUM)) {
       (*ss) << type->get_base().get_str();
     } else {
@@ -1676,8 +1676,8 @@ void Emitter::visit(ASTReturn *node) {
   emit_line_directive(node);
 
   // Emit switch / if expressions.
-  if (node->expression && (node->expression.get()->get_node_type() == AST_NODE_SWITCH ||
-                           node->expression.get()->get_node_type() == AST_NODE_IF)) {
+  if (node->expression && (node->expression.get()->node_type == AST_NODE_SWITCH ||
+                           node->expression.get()->node_type == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
     auto type = global_get_type(node->resolved_type);
@@ -1751,7 +1751,7 @@ void Emitter::visit(ASTBlock *node) {
 
   for (const auto &statement : node->statements) {
     emit_line_directive(node);
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+    if (statement->node_type == AST_NODE_DECLARATION) {
       indented("");
     }
     statement->accept(this);
