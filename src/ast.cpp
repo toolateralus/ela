@@ -512,11 +512,8 @@ AST *Parser::parse() {
       eat();
       InternedString identifier = eat().value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
-      if (result.is_not_null()) {
-        auto statement = static_cast<ASTStatement *>(result.get());
-        if (statement) {
-          program->statements.push_back(statement);
-        }
+      if (result.is_not_null() && result.get()->node_type != AST_NOOP) {
+        program->statements.push_back(result.get());
       }
       if (semicolon())
         eat();
@@ -532,7 +529,6 @@ AST *Parser::parse() {
       case AST_FUNCTION:
       case AST_INTERFACE:
       case AST_ENUM:
-      case AST_TAGGED_UNION_DECLARATION:
       case AST_ALIAS:
       case AST_DECLARATION:
       case AST_NOOP:
@@ -552,50 +548,47 @@ AST *Parser::parse() {
   return program;
 }
 
-ASTArguments *Parser::parse_arguments() {
-  NODE_ALLOC(ASTArguments, args, range, _, this)
+void Parser::parse_arguments(AST *call) {
   expect(Token_Type::LParen);
   while (peek().type != Token_Type::RParen) {
-    args->arguments.push_back(parse_expr());
+    call->call.arguments.push_back(parse_expr());
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     }
   }
   expect(Token_Type::RParen);
-  end_node(args, range);
-  return args;
 }
 
-ASTCall *Parser::parse_call(ASTExpr *function) {
-  NODE_ALLOC(ASTCall, call, range, _, this);
-  call->function = function;
+AST *Parser::parse_call(AST *function) {
+  NODE_ALLOC(AST_CALL, node, range, _, this);
+  node->call.function = function;
   if (peek().type == Token_Type::GenericBrace) {
-    call->generic_arguments = parse_generic_arguments();
+    node->call.generic_arguments = parse_generic_arguments();
   }
-  call->arguments = parse_arguments();
-  end_node(call, range);
-  return call;
+  parse_arguments(node);
+  end_node(node, range);
+  return node;
 }
 
-ASTExpr *Parser::parse_expr(Precedence precedence) {
-  ASTExpr *left = parse_unary();
+AST *Parser::parse_expr(Precedence precedence) {
+  AST *left = parse_unary();
   while (true) {
     Precedence token_precedence = get_operator_precedence(peek());
     if (token_precedence <= precedence)
       break;
-    ASTBinExpr *binexpr = ast_alloc<ASTBinExpr>();
-    binexpr->source_range = left->source_range;
+    AST *node = ast_alloc(AST_BIN_EXPR);
+    node->source_range = left->source_range;
     auto op = eat();
     auto right = parse_expr(token_precedence);
-    binexpr->left = left;
-    binexpr->right = right;
-    binexpr->op = op;
-    left = binexpr;
+    node->binary.left = left;
+    node->binary.right = right;
+    node->binary.op = op.type;
+    left = node;
   }
   return left;
 }
 
-ASTExpr *Parser::parse_unary() {
+AST *Parser::parse_unary() {
   // bitwise not is a unary expression because arrays use it as a pop operator,
   // and sometimes you might want to ignore it's result.
   if (peek().type == Token_Type::Add || peek().type == Token_Type::Sub || peek().type == Token_Type::LogicalNot ||
@@ -627,7 +620,7 @@ ASTExpr *Parser::parse_unary() {
   return parse_postfix();
 }
 
-ASTExpr *Parser::parse_postfix() {
+AST *Parser::parse_postfix() {
   auto left = parse_primary();
   auto range = begin_node();
   // build dot and subscript expressions
@@ -685,7 +678,7 @@ ASTExpr *Parser::parse_postfix() {
   return left;
 }
 
-ASTExpr *Parser::parse_primary() {
+AST *Parser::parse_primary() {
   auto tok = peek();
 
   // if theres a #... that returns a value, use that.
@@ -1105,7 +1098,7 @@ ASTStatement *Parser::parse_statement() {
   if (peek().type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::DoubleColon &&
       lookahead_buf()[2].type == Token_Type::Identifier &&
       (lookahead_buf()[3].type == Token_Type::GenericBrace || lookahead_buf()[3].type == Token_Type::LParen)) {
-    NODE_ALLOC(ASTExprStatement, expr, range, _, this)
+    NODE_ALLOC(ASTStatement, expr, range, _, this)
     expr->expression = parse_expr();
     end_node(expr, range);
     return expr;
@@ -1189,7 +1182,7 @@ ASTStatement *Parser::parse_statement() {
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
         is_deref || is_special_case) {
-      NODE_ALLOC(ASTExprStatement, statement, range, _, this)
+      NODE_ALLOC(ASTStatement, statement, range, _, this)
       statement->expression = parse_expr();
 
       if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
@@ -1545,13 +1538,13 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   one->tag = LITERAL_INTEGER;
   one->value = "1";
 
-  ASTExpr *last_value = zero;
+  AST *last_value = zero;
   bool was_zero = true;
   Token add_token(tok.location, "+", Token_Type::Add, TFamily::Operator);
 
   while (peek().type != Token_Type::RCurly) {
     auto iden = expect(Token_Type::Identifier).value;
-    ASTExpr *value = nullptr;
+    AST *value = nullptr;
 
     if (peek().type == Token_Type::Assign) {
       expect(Token_Type::Assign);
@@ -1562,7 +1555,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
         value = zero;
         was_zero = false;
       } else {
-        NODE_ALLOC(ASTBinExpr, bin, range, _, this)
+        NODE_ALLOC(AST, bin, range, _, this)
         bin->left = last_value;
         bin->right = one;
         bin->op = add_token;
@@ -1661,7 +1654,7 @@ ASTWhere *Parser::parse_where_clause() {
   expect(Token_Type::Is);
   node->predicate = parse_type();
   while (peek().type == Token_Type::And || peek().type == Token_Type::Or) {
-    NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+    NODE_ALLOC(AST, binexpr, range, _, this)
     binexpr->op = eat();
     binexpr->right = parse_type();
     binexpr->left = node->predicate;
@@ -1854,13 +1847,13 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   return node;
 }
 
-Nullable<ASTExpr> Parser::try_parse_directive_expr() {
+Nullable<AST> Parser::try_parse_directive_expr() {
   if (peek().type == Token_Type::Directive) {
     eat();
     InternedString identifier = eat().value;
     Nullable<AST> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier);
 
-    auto expr = Nullable<ASTExpr>(dynamic_cast<ASTExpr *>(node.get()));
+    auto expr = Nullable<AST>(dynamic_cast<AST *>(node.get()));
     if (expr.is_not_null()) {
       return expr;
     } else {

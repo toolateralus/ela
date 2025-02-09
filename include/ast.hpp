@@ -162,6 +162,9 @@ struct AST {
 
   const AST_Node_Type node_type;
 
+  AST *parent;
+  Symbol symbol_table;
+
   Control_Flow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
       .type = Type::INVALID_TYPE_ID,
@@ -223,7 +226,6 @@ struct AST {
       bool has_defer = false;
       int defer_count = 0;
       int return_type = Type::INVALID_TYPE_ID;
-      Scope *scope;
     } block;
     AST *expression_statement;
 
@@ -282,7 +284,6 @@ struct AST {
       std::vector<int> generic_arguments;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
-      Scope *scope;
       InternedString name;
       std::vector<AST_Parameter_Declaration> parameters;
       Nullable<AST> return_type;
@@ -363,7 +364,6 @@ struct AST {
 
     struct {
       Nullable<AST> where_clause;
-      Scope *scope;
       InternedString name;
       bool is_fwd_decl : 1 = false;
       bool is_extern : 1 = false;
@@ -381,7 +381,6 @@ struct AST {
     struct {
       Nullable<AST> where_clause;
       InternedString name;
-      Scope *scope;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
       std::vector<AST *> methods;
@@ -426,7 +425,6 @@ struct AST {
       Nullable<AST> interface;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
-      Scope *scope;
       // methods / static methods this is implementing for the type.
       std::vector<AST *> methods;
     } impl;
@@ -450,6 +448,144 @@ struct AST {
       AST *predicate;
     } where;
   };
+
+
+
+  // get the count of non-function variables in this scope.
+  inline int fields_count() const {
+    auto field_ct = 0;
+    Symbol const* symbol = &symbol_table;
+    while (symbol) {
+      symbol = symbol->next;
+      if (!symbol->is_function() && symbol->is_type())
+        field_ct++;
+    }
+    return field_ct;
+  }
+
+  void insert(const Symbol &symbol) {
+    Symbol *sym = &symbol_table;
+    while (sym->next) {
+      sym = sym->next;
+    }
+    sym->next = (Symbol*)symbol_arena.allocate(sizeof(Symbol));
+    *sym->next = symbol;
+  }
+
+  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl = nullptr) {
+    insert(Symbol::create_variable(name, type_id, initial_value, decl));
+  }
+
+  void insert_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+    insert(Symbol::create_function(name, type_id, declaration, flags));
+  }
+
+  void insert_type(const int type_id, const InternedString &name, TypeKind kind, AST *declaration) {
+    insert(Symbol::create_type(type_id, name, kind, declaration));
+  }
+
+  Symbol *lookup(const InternedString &name) {
+    Symbol *sym = &symbol_table;
+    while (sym) {
+      if (sym->name == name) {
+      return sym;
+      }
+      sym = sym->next;
+    }
+    if (parent) {
+      return parent->lookup(name);
+    }
+    return nullptr;
+  }
+
+  Symbol *local_lookup(const InternedString &name) {
+    Symbol *sym = &symbol_table;
+    while (sym) {
+      if (sym->name == name) {
+        return sym;
+      }
+      sym = sym->next;
+    }
+    return nullptr;
+  }
+
+  // TODO: should this traverse upward to erase?
+  void erase(const InternedString &name) {
+    Symbol *sym = &symbol_table;
+    Symbol *prev = nullptr;
+    while (sym) {
+      if (sym->name == name) {
+      if (prev) {
+        prev->next = sym->next;
+      } else {
+        symbol_table.next = sym->next;
+      }
+      return;
+      }
+      prev = sym;
+      sym = sym->next;
+    }
+  }
+
+  void declare_interface(const InternedString &name, AST *node);
+
+  int create_interface_type(const InternedString &name, const std::vector<int> &generic_args, AST *declaration) {
+    auto id = global_create_interface_type(name, scope, generic_args);
+    insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
+    return id;
+  }
+
+  int create_struct_type(const InternedString &name, AST *declaration) {
+    auto id = global_create_struct_type(name, scope);
+    insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
+    return id;
+  }
+
+
+  void create_type_alias(const InternedString &name, int type_id, TypeKind kind, AST *declaring_node) {
+    Symbol symbol;
+    symbol.name = name;
+    symbol.type_id = type_id;
+    symbol.type.kind = kind;
+    symbol.flags = SYMBOL_IS_TYPE;
+    symbol.type.declaration = declaring_node;
+    erase(name);
+    insert(symbol);
+  }
+
+  void forward_declare_type(const InternedString &name, int default_id) {
+    Symbol symbol;
+    symbol.name = name;
+    symbol.type_id = default_id;
+    symbol.flags = SYMBOL_IS_TYPE;
+    insert(symbol);
+  }
+
+  int create_enum_type(const InternedString &name, bool flags, ASTEnumDeclaration *declaration) {
+    auto id = global_create_enum_type(name, scope, flags);
+    insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
+    return id;
+  }
+
+  int create_tuple_type(const std::vector<int> &types) {
+    auto id = global_create_tuple_type(types);
+    auto name = get_tuple_type_name(types);
+    // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
+    insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
+    return id;
+  }
+
+  int find_type_id(const InternedString &name, const TypeExtensions &ext) {
+    auto symbol = lookup(name);
+    if (!symbol || !symbol->is_type()) {
+      if (parent) {
+        return parent->find_type_id(name, ext);
+      } else {
+        return Type::INVALID_TYPE_ID;
+      }
+    }
+    return global_find_type_id(symbol->type_id, ext);
+  }
 };
 
 extern AST *GLOBAL_NOOP;
@@ -505,7 +641,7 @@ struct Parser {
 
   AST *parse();
   AST *parse_statement();
-  AST *parse_arguments();
+  void parse_arguments(AST *call);
   AST *parse_interface_declaration(Token);
   AST *parse_multiple_asssignment();
   AST *parse_struct_declaration(Token);
@@ -572,13 +708,13 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   return nullptr;
 }
 
-#define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
-  AST *node = ast_alloc(type);                                                                                         \
+#define NODE_ALLOC(type, node, range, parent, parser, defer)                                                                   \
+  AST *node = ast_alloc(type, parent);                                                                                         \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  AST *node = ast_alloc(type);                                                                                         \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, parent, deferred)                                             \
+  AST *node = ast_alloc(type, parent);                                                                                         \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \

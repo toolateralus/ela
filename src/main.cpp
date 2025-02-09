@@ -24,10 +24,12 @@ using std::vector;
 
 // This is probably WAYY over allocated but we just want to be sure there's enough space.
 jstl::Arena type_info_arena{MB(10)};
-// the same for this
-jstl::Arena scope_arena{MB(10)};
+
 // the same for this
 jstl::Arena ast_arena{MB(10)};
+
+// for symbol linked lists.
+jstl::Arena symbol_arena{MB(10)};
 
 std::vector<Type *> type_table{};
 size_t LAMBDA_UNIQUE_ID = 0;
