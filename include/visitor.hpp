@@ -13,89 +13,89 @@
 #define DEFINE_GENERIC_VISITOR()                                                                                       \
   void visit(AST *node) {                                                                                              \
     switch (node->node_type) {                                                                                         \
-      case AST_NODE_PROGRAM:                                                                                           \
+      case AST_PROGRAM:                                                                                           \
         return visit_program(node);                                                                                    \
-      case AST_NODE_BLOCK:                                                                                             \
+      case AST_BLOCK:                                                                                             \
         return visit_block(node);                                                                                      \
-      case AST_NODE_FUNCTION:                                                                              \
+      case AST_FUNCTION:                                                                              \
         return visit_function_declaration(node);                                                                       \
-      case AST_NODE_PARAMS_DECL:                                                                                       \
+      case AST_PARAMS_DECL:                                                                                       \
         return visit_params_decl(node);                                                                                \
-      case AST_NODE_PARAM_DECL:                                                                                        \
+      case AST_PARAM_DECL:                                                                                        \
         return visit_param_decl(node);                                                                                 \
-      case AST_NODE_DECLARATION:                                                                                       \
+      case AST_DECLARATION:                                                                                       \
         return visit_declaration(node);                                                                                \
-      case AST_NODE_EXPR_STATEMENT:                                                                                    \
+      case AST_EXPR_STATEMENT:                                                                                    \
         return visit_expr_statement(node);                                                                             \
-      case AST_NODE_BIN_EXPR:                                                                                          \
+      case AST_BIN_EXPR:                                                                                          \
         return visit_bin_expr(node);                                                                                   \
-      case AST_NODE_UNARY_EXPR:                                                                                        \
+      case AST_UNARY_EXPR:                                                                                        \
         return visit_unary_expr(node);                                                                                 \
-      case AST_NODE_IDENTIFIER:                                                                                        \
+      case AST_IDENTIFIER:                                                                                        \
         return visit_identifier(node);                                                                                 \
-      case AST_NODE_LITERAL:                                                                                           \
+      case AST_LITERAL:                                                                                           \
         return visit_literal(node);                                                                                    \
-      case AST_NODE_TYPE:                                                                                              \
+      case AST_TYPE:                                                                                              \
         return visit_type(node);                                                                                       \
-      case AST_NODE_TUPLE:                                                                                             \
+      case AST_TUPLE:                                                                                             \
         return visit_tuple(node);                                                                                      \
-      case AST_NODE_CALL:                                                                                              \
+      case AST_CALL:                                                                                              \
         return visit_call(node);                                                                                       \
-      case AST_NODE_ARGUMENTS:                                                                                         \
+      case AST_ARGUMENTS:                                                                                         \
         return visit_arguments(node);                                                                                  \
-      case AST_NODE_RETURN:                                                                                            \
+      case AST_RETURN:                                                                                            \
         return visit_return(node);                                                                                     \
-      case AST_NODE_CONTINUE:                                                                                          \
+      case AST_CONTINUE:                                                                                          \
         return visit_continue(node);                                                                                   \
-      case AST_NODE_BREAK:                                                                                             \
+      case AST_BREAK:                                                                                             \
         return visit_break(node);                                                                                      \
-      case AST_NODE_FOR:                                                                                               \
+      case AST_FOR:                                                                                               \
         return visit_for(node);                                                                                        \
-      case AST_NODE_IF:                                                                                                \
+      case AST_IF:                                                                                                \
         return visit_if(node);                                                                                         \
-      case AST_NODE_ELSE:                                                                                              \
+      case AST_ELSE:                                                                                              \
         return visit_else(node);                                                                                       \
-      case AST_NODE_WHILE:                                                                                             \
+      case AST_WHILE:                                                                                             \
         return visit_while(node);                                                                                      \
-      case AST_NODE_STRUCT:                                                                                \
+      case AST_STRUCT:                                                                                \
         return visit_struct_declaration(node);                                                                         \
-      case AST_NODE_DOT_EXPR:                                                                                          \
+      case AST_DOT_EXPR:                                                                                          \
         return visit_dot_expr(node);                                                                                   \
-      case AST_NODE_SCOPE_RESOLUTION:                                                                                  \
+      case AST_SCOPE_RESOLUTION:                                                                                  \
         return visit_scope_resolution(node);                                                                           \
-      case AST_NODE_SUBSCRIPT:                                                                                         \
+      case AST_SUBSCRIPT:                                                                                         \
         return visit_subscript(node);                                                                                  \
-      case AST_NODE_INITIALIZER_LIST:                                                                                  \
+      case AST_INITIALIZER_LIST:                                                                                  \
         return visit_initializer_list(node);                                                                           \
-      case AST_NODE_ENUM_DECLARATION:                                                                                  \
+      case AST_ENUM_DECLARATION:                                                                                  \
         return visit_enum_declaration(node);                                                                           \
-      case AST_NODE_TAGGED_UNION_DECLARATION:                                                                          \
+      case AST_TAGGED_UNION_DECLARATION:                                                                          \
         return visit_tagged_union_declaration(node);                                                                   \
-      case AST_NODE_NOOP:                                                                                              \
+      case AST_NOOP:                                                                                              \
         return visit_noop(node);                                                                                       \
-      case AST_NODE_ALIAS:                                                                                             \
+      case AST_ALIAS:                                                                                             \
         return visit_alias(node);                                                                                      \
-      case AST_NODE_IMPL:                                                                                              \
+      case AST_IMPL:                                                                                              \
         return visit_impl(node);                                                                                       \
-      case AST_NODE_INTERFACE_DECLARATION:                                                                             \
+      case AST_INTERFACE_DECLARATION:                                                                             \
         return visit_interface_declaration(node);                                                                      \
-      case AST_NODE_SIZE_OF:                                                                                           \
+      case AST_SIZE_OF:                                                                                           \
         return visit_size_of(node);                                                                                    \
-      case AST_NODE_DEFER:                                                                                             \
+      case AST_DEFER:                                                                                             \
         return visit_defer(node);                                                                                      \
-      case AST_NODE_CAST:                                                                                              \
+      case AST_CAST:                                                                                              \
         return visit_cast(node);                                                                                       \
-      case AST_NODE_LAMBDA:                                                                                            \
+      case AST_LAMBDA:                                                                                            \
         return visit_lambda(node);                                                                                     \
-      case AST_NODE_RANGE:                                                                                             \
+      case AST_RANGE:                                                                                             \
         return visit_range(node);                                                                                      \
-      case AST_NODE_SWITCH:                                                                                            \
+      case AST_SWITCH:                                                                                            \
         return visit_switch(node);                                                                                     \
-      case AST_NODE_TUPLE_DECONSTRUCTION:                                                                              \
+      case AST_TUPLE_DECONSTRUCTION:                                                                              \
         return visit_tuple_deconstruction(node);                                                                       \
-      case AST_NODE_WHERE:                                                                                             \
+      case AST_WHERE:                                                                                             \
         return visit_where(node);                                                                                      \
-      case AST_NODE_STATEMENT_LIST:                                                                                    \
+      case AST_STATEMENT_LIST:                                                                                    \
         return visit_statement_list(node);                                                                             \
     }                                                                                                                  \
   }

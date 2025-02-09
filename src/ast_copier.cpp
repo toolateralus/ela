@@ -12,7 +12,7 @@ ASTProgram *ASTCopier::copy_program(ASTProgram *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
   for (auto stmt : node->statements) {
-    if (stmt->node_type == AST_NODE_NOOP)
+    if (stmt->node_type == AST_NOOP)
       continue;
     new_node->statements.push_back(static_cast<ASTStatement *>(copy_node(stmt)));
   }
@@ -339,89 +339,89 @@ ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
 AST *ASTCopier::copy_node(AST *node) {
   const auto type = node->node_type;
   switch (type) {
-    case AST_NODE_WHERE:
+    case AST_WHERE:
       return copy_where(static_cast<ASTWhere *>(node));
-    case AST_NODE_CAST:
+    case AST_CAST:
       return copy_cast(static_cast<ASTCast *>(node));
-    case AST_NODE_IMPL:
+    case AST_IMPL:
       return copy_impl(static_cast<ASTImpl *>(node));
-    case AST_NODE_PROGRAM:
+    case AST_PROGRAM:
       return copy_program(static_cast<ASTProgram *>(node));
-    case AST_NODE_BLOCK:
+    case AST_BLOCK:
       return copy_block(static_cast<ASTBlock *>(node));
-    case AST_NODE_FUNCTION:
+    case AST_FUNCTION:
       return copy_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
-    case AST_NODE_PARAMS_DECL:
+    case AST_PARAMS_DECL:
       return copy_params_decl(static_cast<ASTParamsDecl *>(node));
-    case AST_NODE_PARAM_DECL:
+    case AST_PARAM_DECL:
       return copy_param_decl(static_cast<ASTParamDecl *>(node));
-    case AST_NODE_DECLARATION:
+    case AST_DECLARATION:
       return copy_declaration(static_cast<ASTDeclaration *>(node));
-    case AST_NODE_EXPR_STATEMENT:
+    case AST_EXPR_STATEMENT:
       return copy_expr_statement(static_cast<ASTExprStatement *>(node));
-    case AST_NODE_BIN_EXPR:
+    case AST_BIN_EXPR:
       return copy_bin_expr(static_cast<ASTBinExpr *>(node));
-    case AST_NODE_UNARY_EXPR:
+    case AST_UNARY_EXPR:
       return copy_unary_expr(static_cast<ASTUnaryExpr *>(node));
-    case AST_NODE_IDENTIFIER:
+    case AST_IDENTIFIER:
       return copy_identifier(static_cast<ASTIdentifier *>(node));
-    case AST_NODE_LITERAL:
+    case AST_LITERAL:
       return copy_literal(static_cast<ASTLiteral *>(node));
-    case AST_NODE_TYPE:
+    case AST_TYPE:
       return copy_type(static_cast<ASTType *>(node));
-    case AST_NODE_TUPLE:
+    case AST_TUPLE:
       return copy_tuple(static_cast<ASTTuple *>(node));
-    case AST_NODE_CALL:
+    case AST_CALL:
       return copy_call(static_cast<ASTCall *>(node));
-    case AST_NODE_ARGUMENTS:
+    case AST_ARGUMENTS:
       return copy_arguments(static_cast<ASTArguments *>(node));
-    case AST_NODE_RETURN:
+    case AST_RETURN:
       return copy_return(static_cast<ASTReturn *>(node));
-    case AST_NODE_CONTINUE:
+    case AST_CONTINUE:
       return copy_continue(static_cast<ASTContinue *>(node));
-    case AST_NODE_BREAK:
+    case AST_BREAK:
       return copy_break(static_cast<ASTBreak *>(node));
-    case AST_NODE_FOR:
+    case AST_FOR:
       return copy_for(static_cast<ASTFor *>(node));
-    case AST_NODE_IF:
+    case AST_IF:
       return copy_if(static_cast<ASTIf *>(node));
-    case AST_NODE_ELSE:
+    case AST_ELSE:
       return copy_else(static_cast<ASTElse *>(node));
-    case AST_NODE_WHILE:
+    case AST_WHILE:
       return copy_while(static_cast<ASTWhile *>(node));
-    case AST_NODE_STRUCT:
+    case AST_STRUCT:
       return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
-    case AST_NODE_DOT_EXPR:
+    case AST_DOT_EXPR:
       return copy_dot_expr(static_cast<ASTDotExpr *>(node));
-    case AST_NODE_SCOPE_RESOLUTION:
+    case AST_SCOPE_RESOLUTION:
       return copy_scope_resolution(static_cast<ASTScopeResolution *>(node));
-    case AST_NODE_SUBSCRIPT:
+    case AST_SUBSCRIPT:
       return copy_subscript(static_cast<ASTSubscript *>(node));
-    case AST_NODE_INITIALIZER_LIST:
+    case AST_INITIALIZER_LIST:
       return copy_initializer_list(static_cast<ASTInitializerList *>(node));
-    case AST_NODE_ENUM_DECLARATION:
+    case AST_ENUM_DECLARATION:
       return copy_enum_declaration(static_cast<ASTEnumDeclaration *>(node));
-    case AST_NODE_RANGE:
+    case AST_RANGE:
       return copy_range(static_cast<ASTRange *>(node));
-    case AST_NODE_SWITCH:
+    case AST_SWITCH:
       return copy_switch(static_cast<ASTSwitch *>(node));
-    case AST_NODE_TUPLE_DECONSTRUCTION:
+    case AST_TUPLE_DECONSTRUCTION:
       return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
-    case AST_NODE_INTERFACE_DECLARATION:
+    case AST_INTERFACE_DECLARATION:
       return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
-    case AST_NODE_TAGGED_UNION_DECLARATION:
+    case AST_TAGGED_UNION_DECLARATION:
       return copy_tagged_union_declaration(static_cast<ASTTaggedUnionDeclaration *>(node));
-    case AST_NODE_NOOP:
+    case AST_NOOP:
       return node;
-    case AST_NODE_ALIAS:
+    case AST_ALIAS:
       return copy_alias(static_cast<ASTAlias *>(node));
-    case AST_NODE_SIZE_OF:
+    case AST_SIZE_OF:
       return copy_sizeof(static_cast<ASTSize_Of *>(node));
-    case AST_NODE_DEFER:
+    case AST_DEFER:
       return copy_defer(static_cast<ASTDefer *>(node));
-    case AST_NODE_LAMBDA:
+    case AST_LAMBDA:
       return copy_lambda(static_cast<ASTLambda *>(node));
-    case AST_NODE_STATEMENT_LIST:
+    case AST_STATEMENT_LIST:
       return copy_statement_list(static_cast<ASTStatementList *>(node));
   }
 }

@@ -4,7 +4,7 @@
 
 Value evaluate_constexpr(AST *node, Context &ctx) {
   switch (node->node_type) {
-    case AST_NODE_IDENTIFIER: {
+    case AST_IDENTIFIER: {
       auto symbol = ctx.scope->lookup(node->identifier);
       if (!symbol || symbol->is_function()) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
@@ -15,7 +15,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
       }
       return evaluate_constexpr(initial_value.get(), ctx);
     } 
-    case AST_NODE_BIN_EXPR: {
+    case AST_BIN_EXPR: {
       auto binary = node->binary;
       auto left = evaluate_constexpr(binary.left, ctx);
       auto right = evaluate_constexpr(binary.right, ctx);
@@ -70,7 +70,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
           throw_error("Invalid binary operator in constant expression", node->source_range);
       }
     } break;
-    case AST_NODE_UNARY_EXPR: {
+    case AST_UNARY_EXPR: {
       auto unary = node->unary;
       auto operand = evaluate_constexpr(unary.operand, ctx);
       switch (unary.op) {
@@ -84,7 +84,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
           throw_error("Invalid unary operator in constant expression", node->source_range);
       }
     } break;
-    case AST_NODE_LITERAL: {
+    case AST_LITERAL: {
       auto literal = node->literal;
       switch (literal.tag) {
         case LITERAL_INTEGER:

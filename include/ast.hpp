@@ -36,44 +36,44 @@ extern std::unordered_set<InternedString> import_set;
 #include "type.hpp"
 
 enum AST_Node_Type {
-  AST_NODE_PROGRAM,
-  AST_NODE_BLOCK,
-  AST_NODE_FUNCTION,
-  AST_NODE_DECLARATION,
-  AST_NODE_EXPR_STATEMENT,
-  AST_NODE_BIN_EXPR,
-  AST_NODE_UNARY_EXPR,
-  AST_NODE_IDENTIFIER,
-  AST_NODE_LITERAL,
-  AST_NODE_TYPE,
-  AST_NODE_TUPLE,
-  AST_NODE_CALL,
-  AST_NODE_RETURN,
-  AST_NODE_CONTINUE,
-  AST_NODE_BREAK,
-  AST_NODE_FOR,
-  AST_NODE_IF,
-  AST_NODE_ELSE,
-  AST_NODE_WHILE,
-  AST_NODE_STRUCT,
-  AST_NODE_DOT_EXPR,
-  AST_NODE_SCOPE_RESOLUTION,
-  AST_NODE_SUBSCRIPT,
-  AST_NODE_INITIALIZER_LIST,
-  AST_NODE_ENUM,
-  AST_NODE_NOOP,
-  AST_NODE_ALIAS,
-  AST_NODE_IMPL,
-  AST_NODE_INTERFACE,
-  AST_NODE_SIZE_OF,
-  AST_NODE_DEFER,
-  AST_NODE_CAST,
-  AST_NODE_LAMBDA,
-  AST_NODE_RANGE,
-  AST_NODE_SWITCH,
-  AST_NODE_TUPLE_DECONSTRUCTION,
-  AST_NODE_WHERE,
-  AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
+  AST_PROGRAM,
+  AST_BLOCK,
+  AST_FUNCTION,
+  AST_DECLARATION,
+  AST_EXPR_STATEMENT,
+  AST_BIN_EXPR,
+  AST_UNARY_EXPR,
+  AST_IDENTIFIER,
+  AST_LITERAL,
+  AST_TYPE,
+  AST_TUPLE,
+  AST_CALL,
+  AST_RETURN,
+  AST_CONTINUE,
+  AST_BREAK,
+  AST_FOR,
+  AST_IF,
+  AST_ELSE,
+  AST_WHILE,
+  AST_STRUCT,
+  AST_DOT_EXPR,
+  AST_SCOPE_RESOLUTION,
+  AST_SUBSCRIPT,
+  AST_INITIALIZER_LIST,
+  AST_ENUM,
+  AST_NOOP,
+  AST_ALIAS,
+  AST_IMPL,
+  AST_INTERFACE,
+  AST_SIZE_OF,
+  AST_DEFER,
+  AST_CAST,
+  AST_LAMBDA,
+  AST_RANGE,
+  AST_SWITCH,
+  AST_TUPLE_DECONSTRUCTION,
+  AST_WHERE,
+  AST_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
 enum BlockFlags {
   BLOCK_FLAGS_FALL_THROUGH = 1 << 0,
@@ -175,20 +175,20 @@ struct AST {
 
   inline bool is_expr() const {
     switch (node_type) {
-      case AST_NODE_BIN_EXPR:
-      case AST_NODE_UNARY_EXPR:
-      case AST_NODE_IDENTIFIER:
-      case AST_NODE_LITERAL:
-      case AST_NODE_TYPE:
-      case AST_NODE_TUPLE:
-      case AST_NODE_CALL:
-      case AST_NODE_DOT_EXPR:
-      case AST_NODE_SCOPE_RESOLUTION:
-      case AST_NODE_SUBSCRIPT:
-      case AST_NODE_INITIALIZER_LIST:
-      case AST_NODE_CAST:
-      case AST_NODE_RANGE:
-      case AST_NODE_SWITCH:
+      case AST_BIN_EXPR:
+      case AST_UNARY_EXPR:
+      case AST_IDENTIFIER:
+      case AST_LITERAL:
+      case AST_TYPE:
+      case AST_TUPLE:
+      case AST_CALL:
+      case AST_DOT_EXPR:
+      case AST_SCOPE_RESOLUTION:
+      case AST_SUBSCRIPT:
+      case AST_INITIALIZER_LIST:
+      case AST_CAST:
+      case AST_RANGE:
+      case AST_SWITCH:
         return true;
       default:
         return false;

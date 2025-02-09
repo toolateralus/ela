@@ -174,7 +174,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         
         parser->expect(Token_Type::RParen);
-        NODE_ALLOC(AST_NODE_LITERAL, string, range, _, parser)
+        NODE_ALLOC(AST_LITERAL, string, range, _, parser)
         string->literal.tag = LITERAL_STRING;
         std::stringstream ss;
         if (mode == "binary") {
@@ -222,7 +222,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "foreign",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
-        NODE_ALLOC(AST_NODE_FUNCTION, function, range, _, parser)
+        NODE_ALLOC(AST_FUNCTION, function, range, _, parser)
         auto name = parser->expect(Token_Type::Identifier);
         auto last_func_decl = parser->current_func_decl;
         parser->current_func_decl = function;
@@ -252,7 +252,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
         auto error = parser->parse_primary();
-        if (error->node_type != AST_NODE_LITERAL) {
+        if (error->node_type != AST_LITERAL) {
           throw_error("Can only throw a literal as a error", error->source_range);
         }
         auto literal = error->literal;
@@ -265,7 +265,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "type",
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_NODE_TYPE, outer, range, _, parser)
+        NODE_ALLOC(AST_TYPE, outer, range, _, parser)
         parser->expect(Token_Type::LParen);
         outer->type.pointing_to = parser->parse_expr();
         parser->expect(Token_Type::RParen);
@@ -274,7 +274,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // It would vastly simplify a ton of stuff.
 
         outer->type.kind = AST_TYPE_REFLECTION;
-        outer->type.normal.base = ast_alloc(AST_NODE_IDENTIFIER);
+        outer->type.normal.base = ast_alloc(AST_IDENTIFIER);
         outer->type.normal.base->identifier = "Type";
         outer->type.extensions.push_back({TYPE_EXT_POINTER});
         return outer;
@@ -301,7 +301,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto enum_decl = parser->parse_enum_declaration(name);
         int index = 0;
         for (auto &key_value : enum_decl->$enum.key_values) {
-          NODE_ALLOC(AST_NODE_LITERAL, literal, range, _, parser);
+          NODE_ALLOC(AST_LITERAL, literal, range, _, parser);
           literal->literal.tag = LITERAL_INTEGER;
           literal->literal.value = std::to_string(1 << index);
           key_value.second = literal;
@@ -314,7 +314,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "alias",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_NODE_ALIAS, alias, range, _, parser)
+        NODE_ALLOC(AST_ALIAS, alias, range, _, parser)
         alias->alias.name = parser->expect(Token_Type::Identifier).value;
         parser->expect(Token_Type::DoubleColon);
         alias->alias.type = parser->parse_type();
@@ -325,7 +325,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_NODE_TYPE, type, range, defer, parser);
+        NODE_ALLOC(AST_TYPE, type, range, defer, parser);
         type->type.kind = AST_TYPE_SELF;
         parser->append_type_extensions(type);
         return type;
@@ -356,34 +356,21 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
         auto node = parser->parse_statement();
-        if (node->node_type == AST_NODE_STRUCT) {
+        if (node->node_type == AST_STRUCT) {
           auto &$struct = node->$struct;
           $struct.is_extern = true;
-        } else if (node->node_type == AST_NODE_DECLARATION) {
+        } else if (node->node_type == AST_DECLARATION) {
           auto &decl = node->declaration;
           decl.is_extern = true;
-        } else if (node->node_type == AST_NODE_FUNCTION) {
+        } else if (node->node_type == AST_FUNCTION) {
           auto &function = node->function;
           function.flags |= FUNCTION_IS_EXPORTED;
         }
         return node;
     }},
-    // #typeid, integer version of #type. can be used to compare types without
-    // the pointers.
-    {.identifier = "typeid",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTLiteral, literal, range, _, parser)
-        parser->expect(Token_Type::LParen);
-        auto type = parser->parse_type();
-        parser->expect(Token_Type::RParen);
-        type->accept(parser->typer);
-        literal->tag = LITERAL_INTEGER;
-        // TODO: we should move this out of here.
-        literal->value = std::to_string(type->resolved_type);
-        literal->source_range = type->source_range;
-        return literal;
-    }},
+    
+    // TODO: rewrite #typeid.
+
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
     // a
@@ -402,6 +389,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         decl->bitsize = size.value;
         return decl;
     }}, 
+
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
     {.identifier = "static",
@@ -415,53 +403,59 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return statement;
     }},
+
     // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
         parser->ctx.scope->add_def(parser->expect(Token_Type::Identifier).value);
         while (parser->peek().type == Token_Type::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return GLOBAL_NOOP;
     }},
+
     // #undef, remove a #def
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
         parser->ctx.scope->undef(parser->expect(Token_Type::Identifier).value);
         while (parser->peek().type == Token_Type::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return GLOBAL_NOOP;
     }},
+
     // #ifdef, conditional compilation based on a #def being present.
     {.identifier = "ifdef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTStatementList, list, range, _, parser)
+        NODE_ALLOC(AST_STATEMENT_LIST, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
         return list;
     }},
+
     // #ifndef, conditional compilation based on a #def not being present.
     {.identifier = "ifndef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTStatementList, list, range, _, parser)
+        NODE_ALLOC(AST_STATEMENT_LIST, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
         return list;
     }},
+
     // #if, conditional compilation based on compile time value.
     {.identifier = "if",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTStatementList, list, range, _, parser)
+        NODE_ALLOC(AST_STATEMENT_LIST, list, range, _, parser)
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
     }},
+
     // #region, for named/unnnamed regions. just for organization, has no compilation implications.
     // can have anything between the #region directive and the {} block
     // #region My code region 1 {...} is legal.
     {.identifier = "region",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(ASTStatementList, list, range, _, parser)
+        NODE_ALLOC(AST_STATEMENT_LIST, list, range, _, parser)
         while (parser->peek().type != Token_Type::LCurly) {
           parser->eat();
         }
@@ -495,8 +489,8 @@ Nullable<AST> Parser::process_directive(DirectiveKind kind, const InternedString
   return nullptr;
 }
 
-ASTProgram *Parser::parse() {
-  NODE_ALLOC(ASTProgram, program, range, _, this)
+AST *Parser::parse() {
+  NODE_ALLOC(AST_PROGRAM, program, range, _, this)
   while (true) {
     if (peek().type == Token_Type::Eof && !states.empty()) {
       states.pop_back();
@@ -534,15 +528,15 @@ ASTProgram *Parser::parse() {
 
     auto type = statement->node_type;
     switch (type) {
-      case AST_NODE_STRUCT:
-      case AST_NODE_FUNCTION:
-      case AST_NODE_INTERFACE:
-      case AST_NODE_ENUM:
-      case AST_NODE_TAGGED_UNION_DECLARATION:
-      case AST_NODE_ALIAS:
-      case AST_NODE_DECLARATION:
-      case AST_NODE_NOOP:
-      case AST_NODE_IMPL:
+      case AST_STRUCT:
+      case AST_FUNCTION:
+      case AST_INTERFACE:
+      case AST_ENUM:
+      case AST_TAGGED_UNION_DECLARATION:
+      case AST_ALIAS:
+      case AST_DECLARATION:
+      case AST_NOOP:
+      case AST_IMPL:
         break;
       default:
       err:
@@ -613,8 +607,8 @@ ASTExpr *Parser::parse_unary() {
 
     // TODO: make a more comprehensive rvalue evaluator.
     // We need to use it later for self* method calls
-    auto is_rvalue = expr->node_type == AST_NODE_LITERAL ||
-                     (expr->node_type == AST_NODE_CALL && op.type == Token_Type::And);
+    auto is_rvalue = expr->node_type == AST_LITERAL ||
+                     (expr->node_type == AST_CALL && op.type == Token_Type::And);
 
     if ((is_rvalue) && (op.type == Token_Type::And || op.type == Token_Type::Mul)) {
       end_node(nullptr, range);
@@ -773,7 +767,7 @@ ASTExpr *Parser::parse_primary() {
         auto type = parse_type();
         if (peek().type == Token_Type::LCurly) {
           auto init_list = parse_expr();
-          if (init_list->node_type != AST_NODE_INITIALIZER_LIST) {
+          if (init_list->node_type != AST_INITIALIZER_LIST) {
             throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
                         init_list->source_range);
           }
@@ -866,7 +860,7 @@ ASTExpr *Parser::parse_primary() {
       eat();
       end_node(expr, range);
 
-      if (expr->node_type == AST_NODE_TYPE) {
+      if (expr->node_type == AST_TYPE) {
         throw_error("using (TYPE)expr style casts are deprecated. use `expr as TYPE` syntax", range);
       }
 
@@ -903,7 +897,7 @@ ASTType *Parser::parse_type() {
   if (peek().type == Token_Type::Directive) {
     auto range = begin_node();
     auto expr = try_parse_directive_expr().get();
-    if (expr->node_type != AST_NODE_TYPE) {
+    if (expr->node_type != AST_TYPE) {
       throw_error("unable to get type from directive expression where a type "
                   "was expected.",
                   range);
@@ -964,7 +958,7 @@ ASTStatement *Parser::parse_statement() {
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
     if (!statement) {
-      static auto noop = ast_alloc<ASTNoop>();
+      static auto noop = GLOBAL_NOOP;
       statement = noop;
     }
 
@@ -1083,7 +1077,7 @@ ASTStatement *Parser::parse_statement() {
         ctx.set_scope();
         auto statement = parse_statement();
         node->block->statements = {statement};
-        if (statement->node_type == AST_NODE_DECLARATION) {
+        if (statement->node_type == AST_DECLARATION) {
           throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
         }
         node->block->scope = ctx.exit_scope();
@@ -1096,7 +1090,7 @@ ASTStatement *Parser::parse_statement() {
         eat();
         if (peek().type == Token_Type::If) {
           auto inner_if = parse_statement();
-          assert(inner_if->node_type == AST_NODE_IF);
+          assert(inner_if->node_type == AST_IF);
           node_else->_if = static_cast<ASTIf *>(inner_if);
         } else {
           node_else->block = parse_block();
@@ -1359,7 +1353,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     }
     auto statement = parse_statement();
 
-    if (statement->node_type == AST_NODE_DEFER) {
+    if (statement->node_type == AST_DEFER) {
       if (current_func_decl.get()) {
         current_func_decl.get()->has_defer = true;
       } else {
@@ -1523,7 +1517,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
   }
 
   for (const auto &stmt : function->block.get()->statements) {
-    if (stmt->node_type == AST_NODE_FUNCTION) {
+    if (stmt->node_type == AST_FUNCTION) {
       throw_error("local functions are not allowed", stmt->source_range);
     }
   }
@@ -1563,7 +1557,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       expect(Token_Type::Assign);
       value = parse_expr();
     } else {
-      if (was_zero && last_value->node_type == AST_NODE_LITERAL &&
+      if (was_zero && last_value->node_type == AST_LITERAL &&
           static_cast<ASTLiteral *>(last_value)->value == "0") {
         value = zero;
         was_zero = false;
@@ -1642,7 +1636,7 @@ ASTImpl *Parser::parse_impl() {
   node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
-    if (statement->node_type == AST_NODE_FUNCTION) {
+    if (statement->node_type == AST_FUNCTION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       node->methods.push_back(function);
     } else {
@@ -1765,9 +1759,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (peek().type == Token_Type::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(Token_Type::Identifier).value);
-        if (directive && directive.get()->node_type == AST_NODE_STRUCT) {
+        if (directive && directive.get()->node_type == AST_STRUCT) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
-        } else if (directive && directive.get()->node_type == AST_NODE_DECLARATION) {
+        } else if (directive && directive.get()->node_type == AST_DECLARATION) {
           ASTStructMember member{};
           auto _node = static_cast<ASTDeclaration *>(directive.get());
           member.name = _node->name;
@@ -1775,7 +1769,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           member.bitsize = _node->bitsize;
           member.type = _node->type;
           node->members.push_back(member);
-        } else if (directive && directive.get()->node_type == AST_NODE_ALIAS) {
+        } else if (directive && directive.get()->node_type == AST_ALIAS) {
           node->aliases.push_back(static_cast<ASTAlias *>(directive.get()));
         } else {
           end_node(node, range);
