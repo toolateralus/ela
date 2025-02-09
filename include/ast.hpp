@@ -59,7 +59,7 @@ enum AST_Node_Type {
   AST_DOT_EXPR,
   AST_SCOPE_RESOLUTION,
   AST_SUBSCRIPT,
-  AST_INITIALIZER_LIST,
+  AST_INITIALIZER,
   AST_ENUM,
   AST_NOOP,
   AST_ALIAS,
@@ -156,6 +156,12 @@ enum AST_Type_Kind {
   AST_TYPE_SELF,
 };
 
+enum AST_Initializer_Tag {
+  INITIALIZER_EMPTY,
+  INITIALIZER_NAMED,
+  INITIALIZER_COLLECTION,
+};
+
 struct AST {
   AST(AST_Node_Type node_type) : node_type(node_type) {}
   ~AST() {}
@@ -188,7 +194,7 @@ struct AST {
       case AST_DOT_EXPR:
       case AST_SCOPE_RESOLUTION:
       case AST_SUBSCRIPT:
-      case AST_INITIALIZER_LIST:
+      case AST_INITIALIZER:
       case AST_CAST:
       case AST_RANGE:
       case AST_SWITCH:
@@ -359,7 +365,7 @@ struct AST {
     struct {
       bool is_operator_overload : 1 = false;
       AST *left;
-      AST *subscript;
+      AST *index_expression;
     } subscript;
 
     struct {
@@ -398,11 +404,7 @@ struct AST {
         std::vector<std::pair<InternedString, AST *>> key_values;
         std::vector<AST *> values;
       };
-      enum {
-        INIT_LIST_EMPTY,
-        INIT_LIST_NAMED,
-        INIT_LIST_COLLECTION,
-      } tag;
+      AST_Initializer_Tag tag;
       Nullable<AST> target_type;
     } initializer;
 
@@ -452,7 +454,7 @@ struct AST {
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
     auto field_ct = 0;
-    Symbol const* symbol = &symbol_table;
+    Symbol const *symbol = &symbol_table;
     while (symbol) {
       symbol = symbol->next;
       if (!symbol->is_function() && symbol->is_type())
@@ -466,15 +468,16 @@ struct AST {
     while (sym->next) {
       sym = sym->next;
     }
-    sym->next = (Symbol*)symbol_arena.allocate(sizeof(Symbol));
+    sym->next = (Symbol *)symbol_arena.allocate(sizeof(Symbol));
     *sym->next = symbol;
   }
 
-  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl = nullptr) {
+  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST *decl = nullptr) {
     insert(Symbol::create_variable(name, type_id, initial_value, decl));
   }
 
-  void insert_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
+  void insert_function(const InternedString &name, const int type_id, AST *declaration,
+                       SymbolFlags flags = SYMBOL_IS_FUNCTION) {
     insert(Symbol::create_function(name, type_id, declaration, flags));
   }
 
@@ -486,7 +489,7 @@ struct AST {
     Symbol *sym = &symbol_table;
     while (sym) {
       if (sym->name == name) {
-      return sym;
+        return sym;
       }
       sym = sym->next;
     }
@@ -513,12 +516,12 @@ struct AST {
     Symbol *prev = nullptr;
     while (sym) {
       if (sym->name == name) {
-      if (prev) {
-        prev->next = sym->next;
-      } else {
-        symbol_table.next = sym->next;
-      }
-      return;
+        if (prev) {
+          prev->next = sym->next;
+        } else {
+          symbol_table.next = sym->next;
+        }
+        return;
       }
       prev = sym;
       sym = sym->next;
@@ -634,6 +637,7 @@ struct Parser {
   Nullable<AST> current_interface_decl = nullptr;
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
+  AST *last_parent;
   static Nullable<AST> current_block;
 
   AST *parse();
@@ -689,8 +693,9 @@ struct Parser {
   ~Parser();
 };
 
-static inline AST *ast_alloc(AST_Node_Type type) {
+static inline AST *ast_alloc(AST_Node_Type type, AST *parent) {
   auto node = new (ast_arena.allocate(sizeof(AST))) AST(type);
+  node->parent = parent;
   node->declaring_block = Parser::current_block;
   return node;
 }
@@ -705,13 +710,13 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   return nullptr;
 }
 
-#define NODE_ALLOC(type, node, range, parent, parser, defer)                                                                   \
-  AST *node = ast_alloc(type, parent);                                                                                         \
+#define NODE_ALLOC(type, node, range, parser, defer)                                                                   \
+  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
-#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, parent, deferred)                                             \
-  AST *node = ast_alloc(type, parent);                                                                                         \
+#define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
+  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \
