@@ -2,6 +2,7 @@
 
 #include <csetjmp>
 #include <deque>
+#include <set>
 #include <vector>
 
 #include "ast.hpp"
@@ -266,6 +267,7 @@ struct Emitter : VisitorBase {
 struct DependencyEmitter : VisitorBase {
   Context &ctx;
   Emitter *emitter;
+  std::set<ASTFunctionDeclaration*> visitedFunctions = {};
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
   std::string define_type(int type_id);

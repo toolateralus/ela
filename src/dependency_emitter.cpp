@@ -96,6 +96,11 @@ void DependencyEmitter::visit(ASTBlock *node) {
 }
 
 void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
+  if (visitedFunctions.contains(node)) {
+    return;
+  } else {
+    visitedFunctions.insert(node);
+  }
   if (!node->generic_parameters.empty()) {
     return;
   }

@@ -1179,7 +1179,7 @@ ASTStatement *Parser::parse_statement() {
     if (ctx.scope->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get());
+    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get(), decl);
     return decl;
   }
 
