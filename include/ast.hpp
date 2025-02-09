@@ -449,8 +449,6 @@ struct AST {
     } where;
   };
 
-
-
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
     auto field_ct = 0;
@@ -498,7 +496,7 @@ struct AST {
     return nullptr;
   }
 
-  Symbol *local_lookup(const InternedString &name) {
+  Symbol *local_lookup(const InternedString &name, Symbol &symbol_root) {
     Symbol *sym = &symbol_table;
     while (sym) {
       if (sym->name == name) {
@@ -530,17 +528,16 @@ struct AST {
   void declare_interface(const InternedString &name, AST *node);
 
   int create_interface_type(const InternedString &name, const std::vector<int> &generic_args, AST *declaration) {
-    auto id = global_create_interface_type(name, scope, generic_args);
+    auto id = global_create_interface_type(name, &declaration->symbol_table, generic_args);
     insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
     return id;
   }
 
   int create_struct_type(const InternedString &name, AST *declaration) {
-    auto id = global_create_struct_type(name, scope);
+    auto id = global_create_struct_type(name, &declaration->symbol_table);
     insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
     return id;
   }
-
 
   void create_type_alias(const InternedString &name, int type_id, TypeKind kind, AST *declaring_node) {
     Symbol symbol;
@@ -561,8 +558,8 @@ struct AST {
     insert(symbol);
   }
 
-  int create_enum_type(const InternedString &name, bool flags, ASTEnumDeclaration *declaration) {
-    auto id = global_create_enum_type(name, scope, flags);
+  int create_enum_type(const InternedString &name, bool flags, AST *declaration) {
+    auto id = global_create_enum_type(name, &declaration->symbol_table, flags);
     insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
     return id;
   }

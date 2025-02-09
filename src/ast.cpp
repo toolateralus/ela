@@ -59,10 +59,10 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
 
   if (kind == PREPROC_IFDEF) { // Handling #ifdef
     auto symbol = parser->expect(Token_Type::Identifier).value;
-    executed = parser->ctx.scope->has_def(symbol);
+    executed = has_def(symbol);
   } else if (kind == PREPROC_IFNDEF) { // Handling #ifndef
     auto symbol = parser->expect(Token_Type::Identifier).value;
-    executed = !parser->ctx.scope->has_def(symbol);
+    executed = !has_def(symbol);
   } else if (kind == PREPROC_IF) { // Handling #if
     auto condition = parser->parse_expr();
     auto value = evaluate_constexpr(condition, parser->ctx);
