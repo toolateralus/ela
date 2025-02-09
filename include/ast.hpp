@@ -105,12 +105,13 @@ struct AST_Type_Extension {
 };
 
 struct AST;
+enum AST_Parameter_Tag {
+  Normal,
+  Self,
+};
 struct AST_Parameter_Declaration {
   struct {
-    enum {
-      Normal,
-      Self,
-    } tag;
+    AST_Parameter_Tag tag;
     union {
       struct {
         AST *type;
@@ -639,6 +640,14 @@ struct Parser {
   int64_t token_idx{};
   AST *last_parent;
   static Nullable<AST> current_block;
+
+  void parse_parameters(const std::vector<GenericParameter> &generic_parameters, AST *node);
+
+  Defer set_last_parent(AST *parent) {
+    auto old = last_parent;
+    last_parent = parent;
+    return Defer([&] { last_parent = old; });
+  }
 
   AST *parse();
   AST *parse_statement();

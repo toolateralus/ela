@@ -112,6 +112,75 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
   }
 }
 
+void Parser::parse_parameters(const std::vector<GenericParameter> &generic_parameters, AST *node) {
+  expect(Token_Type::LParen);
+  AST *type = nullptr;
+  auto &function = node->function; 
+  while (peek().type != Token_Type::RParen) {
+    AST_Parameter_Declaration param;
+    if (function.is_varargs) {
+      end_node(nullptr, node->source_range);
+      throw_error("var args \"...\" must be the last parameter", node->source_range);
+    }
+    auto subrange = begin_node();
+    if (peek().type == Token_Type::Varargs) {
+      eat();
+      if (!current_func_decl) {
+        throw_error("Cannot use varargs outside of a function declaration. "
+                    "Only use this for #foreign functions.",
+                    node->source_range);
+      }
+      function.flags |= FUNCTION_IS_VARARGS;
+      function.is_varargs = true;
+      continue;
+    }
+
+    auto name = expect(Token_Type::Identifier).value;
+
+    if (name == "self") {
+      if (!function.parameters.empty()) {
+        end_node(nullptr, node->source_range);
+        throw_error("\"self\" must appear first in method parameters.", node->source_range);
+      }
+      function.has_self = true;
+      param.tag = AST_PARAM_SELF;
+      params->params.push_back(param);
+
+      if (peek().type == Token_Type::Mul) {
+        eat();
+        param->self.is_pointer = true;
+      }
+
+      if (peek().type != Token_Type::RParen)
+        expect(Token_Type::Comma);
+      continue;
+    }
+
+    if (peek().type == Token_Type::Colon) {
+      expect(Token_Type::Colon);
+      type = parse_type();
+    }
+
+    param->tag = ASTParamDecl::Normal;
+    param->normal.type = type;
+    param->normal.name = name;
+
+    if (peek().type == Token_Type::Assign) {
+      end_node(nullptr, range);
+      throw_error("Ela does not support default parameters.", range);
+    }
+
+    params->params.push_back(param);
+    end_node(param, subrange);
+
+    if (peek().type != Token_Type::RParen) {
+      expect(Token_Type::Comma);
+    } else
+      break;
+  }
+  expect(Token_Type::RParen);
+}
+
 // clang-format off
 std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // #include
@@ -595,8 +664,7 @@ AST *Parser::parse_unary() {
 
     // TODO: make a more comprehensive rvalue evaluator.
     // We need to use it later for self* method calls
-    auto is_rvalue = expr->node_type == AST_LITERAL ||
-                     (expr->node_type == AST_CALL && op.type == Token_Type::And);
+    auto is_rvalue = expr->node_type == AST_LITERAL || (expr->node_type == AST_CALL && op.type == Token_Type::And);
 
     if ((is_rvalue) && (op.type == Token_Type::And || op.type == Token_Type::Mul)) {
       end_node(nullptr, range);
@@ -766,7 +834,7 @@ AST *Parser::parse_primary() {
       }
       NODE_ALLOC(AST_IDENTIFIER, iden, range, this, _)
       eat();
-      iden->value = tok.value;
+      iden->identifier = tok.value;
       end_node(iden, range);
       return iden;
     }
@@ -943,12 +1011,10 @@ AST *Parser::parse_statement() {
     auto range = begin_node();
     eat();
     auto directive_name = eat().value;
-    auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
-    if (!statement) {
-      static auto noop = GLOBAL_NOOP;
-      statement = noop;
-    }
+    auto statement = process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get();
+    if (!statement)
+      statement = GLOBAL_NOOP;
 
     end_node(statement, range);
     return statement;
@@ -992,7 +1058,7 @@ AST *Parser::parse_statement() {
       NODE_ALLOC(AST_RETURN, return_node, range, this, _)
       expect(Token_Type::Return);
       if (peek().type != Token_Type::Semi) {
-        return_node->expression = parse_expr();
+        return_node->$return = parse_expr();
       }
       end_node(return_node, range);
       return return_node;
@@ -1124,8 +1190,7 @@ AST *Parser::parse_statement() {
     decl->declaration.value = parse_expr();
     decl->declaration.is_constexpr = true;
 
-    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str()) ||
-        reserved.contains(tok.value.get_str())) {
+    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
                   "that name,",
@@ -1136,7 +1201,7 @@ AST *Parser::parse_statement() {
     if (ctx.scope->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get());
+    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
     return decl;
   }
 
@@ -1214,15 +1279,15 @@ AST *Parser::parse_statement() {
   }
 }
 
-ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
-  NODE_ALLOC(ASTTupleDeconstruction, node, range, this, _)
+AST *Parser::parse_multiple_asssignment() {
+  NODE_ALLOC(AST_TUPLE_DECONSTRUCTION, node, range, this, _)
   auto first = parse_primary();
-  node->idens.push_back(static_cast<ASTIdentifier *>(first));
+  node->tuple_deconstruction.idens.push_back(first);
   while (peek().type == Token_Type::Comma) {
     eat();
     auto expr = parse_primary();
-    if (auto iden = dynamic_cast<ASTIdentifier *>(expr)) {
-      node->idens.push_back(iden);
+    if (expr->node_type == AST_IDENTIFIER) {
+      node->tuple_deconstruction.idens.push_back(expr);
     } else {
       end_node(nullptr, range);
       throw_error("Can only have identifiers on the left hand side of a tuple "
@@ -1231,8 +1296,8 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
     }
   }
   if (peek().type == Token_Type::ColonEquals || peek().type == Token_Type::Assign) {
-    node->op = eat().type;
-    node->right = parse_expr();
+    node->tuple_deconstruction.op = eat().type;
+    node->tuple_deconstruction.right = parse_expr();
   } else {
     // TODO: allow typed tuple deconstructions.
     end_node(nullptr, range);
@@ -1243,19 +1308,19 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
   end_node(node, range);
 
-  for (const auto &iden : node->idens) {
-    auto symbol = ctx.scope->local_lookup(iden->value);
-    if (node->op == Token_Type::ColonEquals) {
+  for (const auto &iden : node->tuple_deconstruction.idens) {
+    auto symbol = ctx.scope->local_lookup(iden->identifier);
+    if (node->tuple_deconstruction.op == Token_Type::ColonEquals) {
       if (symbol)
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
+      ctx.scope->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
       // already exist", node->source_range);
-      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
+      ctx.scope->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     }
   }
 
@@ -1263,12 +1328,11 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 }
 
 AST *Parser::parse_declaration() {
-  NODE_ALLOC(ASTDeclaration, decl, range, this, _);
+  NODE_ALLOC(AST_DECLARATION, decl, range, this, _);
   auto iden = eat();
-  decl->name = iden.value;
+  decl->declaration.name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str()) ||
-      reserved.contains(iden.value.get_str())) {
+  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
                 "that name,",
@@ -1277,19 +1341,19 @@ AST *Parser::parse_declaration() {
 
   if (peek().type == Token_Type::Colon) {
     expect(Token_Type::Colon);
-    decl->type = parse_type();
+    decl->declaration.type = parse_type();
     if (peek().type == Token_Type::Assign) {
       eat();
       auto expr = parse_expr();
-      decl->value = expr;
+      decl->declaration.value = expr;
     }
   } else if (peek().type == Token_Type::DoubleColon) {
     eat();
-    decl->value = parse_expr();
-    decl->is_constexpr = true;
+    decl->declaration.value = parse_expr();
+    decl->declaration.is_constexpr = true;
   } else {
     expect(Token_Type::ColonEquals);
-    decl->value = parse_expr();
+    decl->declaration.value = parse_expr();
   }
 
   end_node(decl, range);
@@ -1302,20 +1366,17 @@ AST *Parser::parse_declaration() {
   return decl;
 }
 
-ASTBlock *Parser::parse_block(Scope *scope) {
+AST *Parser::parse_block(Scope *scope) {
   auto last_block = current_block;
-  NODE_ALLOC_EXTRA_DEFER(ASTBlock, block, range, this, _, current_block = last_block);
+  NODE_ALLOC_EXTRA_DEFER(AST_BLOCK, block, range, _, this, current_block = last_block);
   current_block = block;
-
-  ctx.set_scope(scope);
+  auto parent_defer = set_last_parent(block);
 
   if (peek().type == Token_Type::ExpressionBody) {
-    NODE_ALLOC(ASTReturn, $return, range, this, _);
+    NODE_ALLOC(AST_RETURN, node, range, this, _);
     expect(Token_Type::ExpressionBody);
-    $return->expression = parse_expr();
-    block->statements = {$return};
-    block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
-                                     // anyway when entering it.
+    node->$return = parse_expr();
+    block->statements = {node};
     return block;
   }
 
@@ -1330,12 +1391,12 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 
     if (statement->node_type == AST_DEFER) {
       if (current_func_decl.get()) {
-        current_func_decl.get()->has_defer = true;
+        current_func_decl.get()->function.has_defer = true;
       } else {
         throw_error("You can only use defer within a function scope", statement->source_range);
       }
-      block->has_defer = true;
-      block->defer_count++;
+      block->block.has_defer = true;
+      block->block.defer_count++;
     }
 
     block->statements.push_back(statement);
@@ -1343,82 +1404,8 @@ ASTBlock *Parser::parse_block(Scope *scope) {
       eat();
   }
   expect(Token_Type::RCurly);
-  block->scope = ctx.exit_scope();
   end_node(block, range);
   return block;
-}
-
-ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_params) {
-  NODE_ALLOC(ASTParamsDecl, params, range, defer, this);
-  expect(Token_Type::LParen);
-  AST_TYPE *type = nullptr;
-  while (peek().type != Token_Type::RParen) {
-    NODE_ALLOC(ASTParamDecl, param, range, this, _)
-    if (params->is_varargs) {
-      end_node(nullptr, range);
-      throw_error("var args \"...\" must be the last parameter", range);
-    }
-    auto subrange = begin_node();
-
-    if (peek().type == Token_Type::Varargs) {
-      eat();
-      if (!current_func_decl) {
-        throw_error("Cannot use varargs outside of a function declaration. "
-                    "Only use this for #foreign functions.",
-                    range);
-      }
-      current_func_decl.get()->flags |= FUNCTION_IS_VARARGS;
-      params->is_varargs = true;
-      continue;
-    }
-
-    auto name = expect(Token_Type::Identifier).value;
-
-    if (name == "self") {
-      if (!params->params.empty()) {
-        end_node(nullptr, range);
-        throw_error("\"self\" must appear first in method parameters.", range);
-      }
-      params->has_self = true;
-      param->tag = ASTParamDecl::Self;
-      params->params.push_back(param);
-
-      if (peek().type == Token_Type::Mul) {
-        eat();
-        param->self.is_pointer = true;
-      }
-
-      if (peek().type != Token_Type::RParen)
-        expect(Token_Type::Comma);
-
-      continue;
-    }
-
-    if (peek().type == Token_Type::Colon) {
-      expect(Token_Type::Colon);
-      type = parse_type();
-    }
-
-    param->tag = ASTParamDecl::Normal;
-    param->normal.type = type;
-    param->normal.name = name;
-
-    if (peek().type == Token_Type::Assign) {
-      end_node(nullptr, range);
-      throw_error("Ela does not support default parameters.", range);
-    }
-
-    params->params.push_back(param);
-    end_node(param, subrange);
-
-    if (peek().type != Token_Type::RParen) {
-      expect(Token_Type::Comma);
-    } else
-      break;
-  }
-  expect(Token_Type::RParen);
-  end_node(params, range);
-  return params;
 }
 
 ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
@@ -1532,8 +1519,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       expect(Token_Type::Assign);
       value = parse_expr();
     } else {
-      if (was_zero && last_value->node_type == AST_LITERAL &&
-          static_cast<AST_LITERAL *>(last_value)->value == "0") {
+      if (was_zero && last_value->node_type == AST_LITERAL && static_cast<AST_LITERAL *>(last_value)->value == "0") {
         value = zero;
         was_zero = false;
       } else {
@@ -2128,3 +2114,5 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
+
+
