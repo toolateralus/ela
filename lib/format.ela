@@ -327,3 +327,12 @@ impl String {
     }
   }
 }
+
+impl String_Builder {
+  append_utf8 :: fn(self*, ch: u32) {
+    bytes := utf8_encode(ch);
+    for byte in bytes {
+      self.append_byte(byte);
+    }
+  }
+}
