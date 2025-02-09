@@ -55,7 +55,7 @@ AST *ASTCopier::copy_program(AST *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
   for (auto stmt : node->statements) {
-    if (stmt->node_type == AST_NODE_NOOP)
+    if (stmt->node_type == AST_NOOP)
       continue;
     new_node->statements.push_back(copy_node(stmt));
   }

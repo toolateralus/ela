@@ -24,10 +24,12 @@ using std::vector;
 
 // This is probably WAYY over allocated but we just want to be sure there's enough space.
 jstl::Arena type_info_arena{MB(10)};
-// the same for this
-jstl::Arena scope_arena{MB(10)};
+
 // the same for this
 jstl::Arena ast_arena{MB(10)};
+
+// for symbol linked lists.
+jstl::Arena symbol_arena{MB(10)};
 
 std::vector<Type *> type_table{};
 size_t LAMBDA_UNIQUE_ID = 0;
@@ -41,7 +43,7 @@ PanicHandler panic_handler = get_default_panic_handler();
 
 CompileCommand compile_command;
 
-AST * GLOBAL_NOOP = ast_alloc(AST_NODE_NOOP);
+AST * GLOBAL_NOOP = ast_alloc(AST_NOOP);
 
 std::unordered_set<InternedString> import_set;
 /*
