@@ -136,7 +136,7 @@ using GenericParameter = InternedString;
 
 struct Symbol;
 struct TypeInfo {
-  SymbolTable symbol_table;
+  Scope symbol_table;
   std::vector<int> implemented_interfaces;
   TypeInfo() {}
   // Use this instead of the clunky static casts everywhere.
@@ -222,13 +222,13 @@ Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
-int global_create_struct_type(const InternedString &, SymbolTable scope, std::vector<int> generic_args = {});
+int global_create_struct_type(const InternedString &, Scope scope, std::vector<int> generic_args = {});
 
-int global_create_interface_type(const InternedString &name, SymbolTable scope,
+int global_create_interface_type(const InternedString &name, Scope scope,
                                  std::vector<int> generic_args);
 
-int global_create_tagged_union_type(const InternedString &name, SymbolTable scope, const std::vector<int> &generic_args);
-int global_create_enum_type(const InternedString &, SymbolTable , bool = false, size_t element_type = s32_type());
+int global_create_tagged_union_type(const InternedString &name, Scope scope, const std::vector<int> &generic_args);
+int global_create_enum_type(const InternedString &, Scope , bool = false, size_t element_type = s32_type());
 int global_create_tuple_type(const std::vector<int> &types);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const Source_Range & = {});
 // char *

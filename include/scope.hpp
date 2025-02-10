@@ -95,9 +95,9 @@ struct Symbol {
 
 };
 
-struct SymbolTable {
+struct Scope {
   Symbol *head;
-  Symbol *local_lookup(const InternedString &name);
+  Symbol *lookup(const InternedString &name);
   bool erase(const InternedString &name);
   void insert(const Symbol &symbol);
 };

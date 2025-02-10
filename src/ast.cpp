@@ -170,7 +170,7 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
       throw_error("Ela does not support default parameters.", node->source_range);
     }
     function.parameters.push_back(param);
-    
+
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     } else
@@ -280,7 +280,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (compile_command.has_flag("test")) {
           return func;
         } else {
-          parser->ctx.scope->erase(func->function.name);
+          func->parent->scope.erase(func->function.name);
           return GLOBAL_NOOP;
         }
     }},
@@ -470,7 +470,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
-        parser->ctx.scope->add_def(parser->expect(Token_Type::Identifier).value);
+        add_def(parser->expect(Token_Type::Identifier).value);
         while (parser->peek().type == Token_Type::Semi) parser->eat();
         return GLOBAL_NOOP;
     }},
@@ -479,7 +479,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
-        parser->ctx.scope->undef(parser->expect(Token_Type::Identifier).value);
+        undef(parser->expect(Token_Type::Identifier).value);
         while (parser->peek().type == Token_Type::Semi) parser->eat();
         return GLOBAL_NOOP;
     }},
@@ -817,7 +817,7 @@ AST *Parser::parse_primary() {
       return init_list;
     }
     case Token_Type::Identifier: {
-      if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
+      if (last_parent->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
         auto type = parse_type();
         if (peek().type == Token_Type::LCurly) {
           auto init_list = parse_expr();
@@ -963,35 +963,35 @@ AST *Parser::parse_type() {
     return parse_function_type();
   }
 
-  NODE_ALLOC(AST_TYPE, node, range, this, _)
+  NODE_ALLOC(AST_TYPE, type, range, this, _)
   auto base = eat().value;
-  node->type.kind = AST_TYPE_NORMAL;
-  node->type.normal.base = ast_alloc(AST_IDENTIFIER, last_parent);
-  node->type.normal.base->identifier = base;
-  node->type.normal.base->source_range = range;
+  type->type.kind = AST_TYPE_NORMAL;
+  type->type.normal.base = ast_alloc(AST_IDENTIFIER, last_parent);
+  type->type.normal.base->identifier = base;
+  type->type.normal.base->source_range = range;
 
   if (peek().type == Token_Type::GenericBrace) {
-    node->type.normal.generic_arguments = parse_generic_arguments();
+    type->type.normal.generic_arguments = parse_generic_arguments();
   }
 
   if (peek().type == Token_Type::DoubleColon && lookahead_buf()[1].type == Token_Type::Identifier &&
       lookahead_buf()[2].type == Token_Type::LParen) {
     // this is a function call to a static, single depth function.
-    return node;
+    return type;
   }
 
   while (peek().type == Token_Type::DoubleColon) {
-    NODE_ALLOC(AST_SCOPE_RESOLUTION, scope_res_node, range, this, _)
+    NODE_ALLOC(AST_SCOPE_RESOLUTION, scope_res, range, this, _)
     eat();
-    scope_res_node->scope_resolution.base = node->type.normal.base;
-    scope_res_node->scope_resolution.member_name = expect(Token_Type::Identifier).value;
-    node->type.normal.base = scope_res_node;
+    scope_res->scope_resolution.base = type->type.normal.base;
+    scope_res->scope_resolution.member_name = expect(Token_Type::Identifier).value;
+    type->type.normal.base = scope_res;
   }
 
-  append_type_extensions(node);
+  append_type_extensions(type);
 
-  end_node(node, range);
-  return node;
+  end_node(type, range);
+  return type;
 }
 
 AST *Parser::parse_statement() {
@@ -1188,7 +1188,7 @@ AST *Parser::parse_statement() {
     decl->declaration.value = parse_expr();
     decl->declaration.is_constexpr = true;
 
-    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
+    if (last_parent->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
                   "that name,",
@@ -1196,10 +1196,10 @@ AST *Parser::parse_statement() {
     }
 
     end_node(decl, range);
-    if (ctx.scope->local_lookup(tok.value)) {
+    if (last_parent->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
+    last_parent->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
     return decl;
   }
 
@@ -1258,12 +1258,12 @@ AST *Parser::parse_statement() {
       throw_error(std::format("Unexpected keyword: {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->lookup(tok.value)) {
+    if (last_parent->lookup(tok.value)) {
       eat();
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->find_type_id(tok.value, {}) == Type::INVALID_TYPE_ID) {
+    if (last_parent->find_type_id(tok.value, {}) == Type::INVALID_TYPE_ID) {
       eat();
       throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
     }
@@ -1307,18 +1307,18 @@ AST *Parser::parse_multiple_asssignment() {
   end_node(node, range);
 
   for (const auto &iden : node->tuple_deconstruction.idens) {
-    auto symbol = ctx.scope->local_lookup(iden->identifier);
+    auto symbol = node->local_lookup(iden->identifier);
     if (node->tuple_deconstruction.op == Token_Type::ColonEquals) {
       if (symbol)
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      ctx.scope->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
+      node->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
       // already exist", node->source_range);
-      ctx.scope->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
+      node->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     }
   }
 
@@ -1326,11 +1326,12 @@ AST *Parser::parse_multiple_asssignment() {
 }
 
 AST *Parser::parse_declaration() {
-  NODE_ALLOC(AST_DECLARATION, decl, range, this, _);
+  NODE_ALLOC(AST_DECLARATION, node, range, this, _);
+  auto &decl = node->declaration;
   auto iden = eat();
-  decl->declaration.name = iden.value;
+  decl.name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
+  if (last_parent->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
                 "that name,",
@@ -1339,29 +1340,29 @@ AST *Parser::parse_declaration() {
 
   if (peek().type == Token_Type::Colon) {
     expect(Token_Type::Colon);
-    decl->declaration.type = parse_type();
+    decl.type = parse_type();
     if (peek().type == Token_Type::Assign) {
       eat();
       auto expr = parse_expr();
-      decl->declaration.value = expr;
+      decl.value = expr;
     }
   } else if (peek().type == Token_Type::DoubleColon) {
     eat();
-    decl->declaration.value = parse_expr();
-    decl->declaration.is_constexpr = true;
+    decl.value = parse_expr();
+    decl.is_constexpr = true;
   } else {
     expect(Token_Type::ColonEquals);
-    decl->declaration.value = parse_expr();
+    decl.value = parse_expr();
   }
 
-  end_node(decl, range);
-  if (ctx.scope->local_lookup(iden.value)) {
-    throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
+  end_node(node, range);
+  if (last_parent->local_lookup(iden.value)) {
+    throw_error(std::format("re-definition of '{}'", iden.value), node->source_range);
   }
 
-  ctx.scope->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl->value.get(), decl);
+  last_parent->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl.value.get(), node);
 
-  return decl;
+  return node;
 }
 
 AST *Parser::parse_block(Scope *scope) {
@@ -1406,104 +1407,103 @@ AST *Parser::parse_block(Scope *scope) {
   return block;
 }
 
-ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
-  NODE_ALLOC(ASTFunctionDeclaration, function, range, this, _)
+AST *Parser::parse_function_declaration(Token name) {
+  NODE_ALLOC(AST_FUNCTION, node, range, this, _)
+  auto &function = node->function;
   expect(Token_Type::Fn);
 
-  function->has_defer = false;
+  function.has_defer = false;
 
   if (peek().type == Token_Type::GenericBrace) {
-    function->generic_parameters = parse_generic_parameters();
+    function.generic_parameters = parse_generic_parameters();
   }
 
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
-  current_func_decl = function;
+  current_func_decl = node;
 
-  function->params = parse_parameters(function->generic_parameters);
-  function->name = name.value;
+  parse_parameters(function.generic_parameters, node);
+  function.name = name.value;
 
   // check for definition.
   auto has_definition = false;
   {
-    auto sym = ctx.scope->local_lookup(name.value);
+    auto sym = node->local_lookup(name.value);
     if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
       has_definition = true;
     }
   }
 
-  ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, function);
+  node->insert_function(name.value, Type::INVALID_TYPE_ID, node);
 
   if (peek().type != Token_Type::Arrow) {
-    function->return_type = AST_TYPE::get_void();
+    // TODO: we might want to change this, it was get_void()
+    function.return_type = nullptr;
   } else {
     expect(Token_Type::Arrow);
-    function->return_type = parse_type();
+    function.return_type = parse_type();
   }
 
   if (peek().type == Token_Type::Where) {
-    function->where_clause = parse_where_clause();
+    function.where_clause = parse_where_clause();
   }
 
   if (peek().type == Token_Type::Semi) {
-    function->flags |= FUNCTION_IS_FORWARD_DECLARED;
-    auto sym = ctx.scope->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
-    end_node(function, range);
+    function.flags |= FUNCTION_IS_FORWARD_DECLARED;
+    auto sym = node->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
+    end_node(node, range);
     current_func_decl = last_func_decl;
-    return function;
+    return node;
   }
 
-  ctx.set_scope();
-
   if (current_impl_decl) {
-    if (function->params->has_self) {
-      function->flags |= FUNCTION_IS_METHOD;
+    if (function.has_self) {
+      function.flags |= FUNCTION_IS_METHOD;
     } else {
-      function->flags |= FUNCTION_IS_STATIC;
+      function.flags |= FUNCTION_IS_STATIC;
     }
   }
 
   // TODO: find a better solution to this.
-  for (const auto &param : function->generic_parameters) {
-    ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+  for (const auto &param : function.generic_parameters) {
+    node->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
   }
 
-  function->block = parse_block();
-  function->block.get()->parent = function;
+  function.block = parse_block();
+  function.block.get()->parent = node;
 
-  if (function->block && has_definition) {
+  if (function.block && has_definition) {
     end_node(nullptr, range);
     throw_error(std::format("Redefinition of function {}", name.value), range);
   }
 
-  for (const auto &stmt : function->block.get()->statements) {
+  for (const auto &stmt : function.block.get()->statements) {
     if (stmt->node_type == AST_FUNCTION) {
       throw_error("local functions are not allowed", stmt->source_range);
     }
   }
 
-  end_node(function, range);
-  function->scope = ctx.exit_scope();
-  return function;
+  end_node(node, range);
+  return node;
 }
 
-ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
-  NODE_ALLOC(ASTEnumDeclaration, node, range, this, _)
+AST *Parser::parse_enum_declaration(Token tok) {
+  NODE_ALLOC(AST_ENUM, node, range, this, _)
   expect(Token_Type::Enum);
-  node->name = tok.value;
+  node->$enum.name = tok.value;
   expect(Token_Type::LCurly);
-  if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
+  if (node->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
 
-  NODE_ALLOC(AST_LITERAL, zero, lit_range, _1, this)
-  zero->tag = LITERAL_INTEGER;
-  zero->value = "0";
+  NODE_ALLOC(AST_LITERAL, zero, lit_range, this, _1)
+  zero->literal.tag = LITERAL_INTEGER;
+  zero->literal.value = "0";
 
-  NODE_ALLOC(AST_LITERAL, one, lit_range2, _2, this)
-  one->tag = LITERAL_INTEGER;
-  one->value = "1";
+  NODE_ALLOC(AST_LITERAL, one, lit_range2, this, _2)
+  one->literal.tag = LITERAL_INTEGER;
+  one->literal.value = "1";
 
   AST *last_value = zero;
   bool was_zero = true;
@@ -1517,11 +1517,11 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       expect(Token_Type::Assign);
       value = parse_expr();
     } else {
-      if (was_zero && last_value->node_type == AST_LITERAL && static_cast<AST_LITERAL *>(last_value)->value == "0") {
+      if (was_zero && last_value->node_type == AST_LITERAL && last_value->literal.value == "0") {
         value = zero;
         was_zero = false;
       } else {
-        NODE_ALLOC(AST, bin, range, this, _)
+        NODE_ALLOC(AST_BIN_EXPR, bin, range, this, _)
         bin->left = last_value;
         bin->right = one;
         bin->op = add_token;
@@ -1556,12 +1556,12 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   return node;
 }
 
-ASTImpl *Parser::parse_impl() {
+AST *Parser::parse_impl() {
   NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, this, _, current_impl_decl = nullptr)
   expect(Token_Type::Impl);
 
   ctx.set_scope();
-  node->scope = ctx.exit_scope();
+  node = ctx.exit_scope();
 
   if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
@@ -1587,12 +1587,12 @@ ASTImpl *Parser::parse_impl() {
   if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
-  auto block = parse_block(node->scope);
+  auto block = parse_block(node);
   end_node(node, range);
 
   // TODO: maybe do this differently
   // this is just so you can't call methods directly from within an impl without self
-  node->scope->symbols.clear();
+  node->symbols.clear();
 
   for (const auto &statement : block->statements) {
     if (statement->node_type == AST_FUNCTION) {
@@ -1605,7 +1605,7 @@ ASTImpl *Parser::parse_impl() {
   return node;
 }
 
-ASTDefer *Parser::parse_defer() {
+AST *Parser::parse_defer() {
   NODE_ALLOC(ASTDefer, node, range, this, _)
   expect(Token_Type::Defer);
   node->statement = parse_statement();
@@ -1613,7 +1613,7 @@ ASTDefer *Parser::parse_defer() {
   return node;
 }
 
-ASTWhere *Parser::parse_where_clause() {
+AST *Parser::parse_where_clause() {
   NODE_ALLOC(ASTWhere, node, range, this, _);
   expect(Token_Type::Where);
   node->target_type = parse_type();
@@ -1629,7 +1629,7 @@ ASTWhere *Parser::parse_where_clause() {
   return node;
 }
 
-ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
+AST *Parser::parse_interface_declaration(Token name) {
   auto previous = current_interface_decl;
   NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, this, _, { current_interface_decl = previous; });
   expect(Token_Type::Interface);
@@ -1644,8 +1644,8 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
     node->where_clause = parse_where_clause();
   }
 
-  auto scope = create_child(ctx.scope);
-  node->scope = scope;
+  auto scope = create_child(node);
+  node = scope;
   auto block = parse_block(scope);
   for (const auto &stmt : block->statements) {
     if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
@@ -1658,7 +1658,7 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   return node;
 }
 
-ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
+AST *Parser::parse_struct_declaration(Token name) {
   bool is_union = false;
   auto old = current_struct_decl;
   NODE_ALLOC(ASTStructDeclaration, node, range, this, _)
@@ -1681,7 +1681,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     node->where_clause = parse_where_clause();
   }
 
-  auto type_id = ctx.scope->find_type_id(name.value, {});
+  auto type_id = node->find_type_id(name.value, {});
 
   if (type_id != Type::INVALID_TYPE_ID) {
     auto type = global_get_type(type_id);
@@ -1695,14 +1695,14 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = ctx.scope->create_struct_type(name.value, nullptr, node);
+    type_id = node->create_struct_type(name.value, nullptr, node);
   }
 
   node->name = name.value;
   node->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
-  info->scope = node->scope = create_child(ctx.scope);
+  info->scope = node = create_child(node);
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
 
@@ -1748,9 +1748,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       }
     }
     expect(Token_Type::RCurly);
-    node->scope = scope;
+    node = scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-    info->scope = node->scope;
+    info->scope = node;
   } else {
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     node->is_fwd_decl = true;
@@ -1761,7 +1761,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return node;
 }
 
-ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+AST *Parser::parse_tagged_union_declaration(Token name) {
   NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, this, _)
   if (peek().type == Token_Type::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
@@ -1769,8 +1769,8 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   if (peek().type == Token_Type::Where) {
     node->where_clause = parse_where_clause();
   }
-  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr, node));
-  auto scope = create_child(ctx.scope);
+  auto type = global_get_type(node->create_tagged_union(name.value, nullptr, node));
+  auto scope = create_child(node);
   ctx.set_scope(scope);
 
   expect(Token_Type::LCurly);
@@ -1805,7 +1805,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       expect(Token_Type::Comma);
   }
   node->name = name.value;
-  node->scope = ctx.exit_scope();
+  node = ctx.exit_scope();
   type->get_info()->scope = scope;
   node->resolved_type = type->id;
   expect(Token_Type::RCurly);
@@ -1915,7 +1915,7 @@ void Parser::append_type_extensions(AST_TYPE *&node) {
   }
 }
 
-AST_TYPE *Parser::parse_function_type() {
+AST *Parser::parse_function_type() {
   NODE_ALLOC(AST_TYPE, output_type, range, this, _)
   expect(Token_Type::Fn);
   output_type->kind = AST_TYPE::FUNCTION;
@@ -2068,7 +2068,7 @@ void Parser::end_node(AST *node, Source_Range &range) {
   }
 }
 
-ASTLambda *Parser::parse_lambda() {
+AST *Parser::parse_lambda() {
   NODE_ALLOC(ASTLambda, node, range, this, _);
   expect(Token_Type::Fn);
   node->params = parse_parameters();
