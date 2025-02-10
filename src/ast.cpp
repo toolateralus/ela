@@ -171,6 +171,7 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
     }
     function.parameters.push_back(param);
 
+
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     } else
