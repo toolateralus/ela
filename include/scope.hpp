@@ -26,9 +26,6 @@ enum SymbolFlags {
 };
 
 struct AST;
-struct ASTStructDeclaration;
-struct AST;
-struct ASTEnumDeclaration;
 
 struct Symbol {
   Symbol *next = nullptr;

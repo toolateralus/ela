@@ -64,7 +64,7 @@
   return {};
 }
 
-void DependencyEmitter::visit(ASTStructDeclaration *node) {
+void DependencyEmitter::visit(AST *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
@@ -94,7 +94,7 @@ void DependencyEmitter::visit(ASTBlock *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
+void DependencyEmitter::visit(AST *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }

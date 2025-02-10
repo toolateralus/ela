@@ -19,15 +19,11 @@
         return visit_block(node);                                                                                      \
       case AST_FUNCTION:                                                                              \
         return visit_function_declaration(node);                                                                       \
-      case AST_PARAMS_DECL:                                                                                       \
-        return visit_params_decl(node);                                                                                \
-      case AST_PARAM_DECL:                                                                                        \
-        return visit_param_decl(node);                                                                                 \
       case AST_DECLARATION:                                                                                       \
         return visit_declaration(node);                                                                                \
       case AST_EXPR_STATEMENT:                                                                                    \
         return visit_expr_statement(node);                                                                             \
-      case AST_BIN_EXPR:                                                                                          \
+      case AST_BINARY:                                                                                          \
         return visit_bin_expr(node);                                                                                   \
       case AST_UNARY_EXPR:                                                                                        \
         return visit_unary_expr(node);                                                                                 \
@@ -41,8 +37,6 @@
         return visit_tuple(node);                                                                                      \
       case AST_CALL:                                                                                              \
         return visit_call(node);                                                                                       \
-      case AST_ARGUMENTS:                                                                                         \
-        return visit_arguments(node);                                                                                  \
       case AST_RETURN:                                                                                            \
         return visit_return(node);                                                                                     \
       case AST_CONTINUE:                                                                                          \
@@ -65,9 +59,9 @@
         return visit_scope_resolution(node);                                                                           \
       case AST_SUBSCRIPT:                                                                                         \
         return visit_subscript(node);                                                                                  \
-      case AST_INITIALIZER_LIST:                                                                                  \
+      case AST_INITIALIZER:                                                                                  \
         return visit_initializer_list(node);                                                                           \
-      case AST_ENUM_DECLARATION:                                                                                  \
+      case AST_ENUM:                                                                                  \
         return visit_enum_declaration(node);                                                                           \
       case AST_NOOP:                                                                                              \
         return visit_noop(node);                                                                                       \
@@ -75,7 +69,7 @@
         return visit_alias(node);                                                                                      \
       case AST_IMPL:                                                                                              \
         return visit_impl(node);                                                                                       \
-      case AST_INTERFACE_DECLARATION:                                                                             \
+      case AST_INTERFACE:                                                                             \
         return visit_interface_declaration(node);                                                                      \
       case AST_SIZE_OF:                                                                                           \
         return visit_size_of(node);                                                                                    \
@@ -114,11 +108,11 @@ struct Typer {
 
   void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
-  void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+  void visit_struct_declaration(AST *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
 
   void visit_function_body(AST *node);
-  void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
+  void visit_function_header(AST *node, bool generic_instantiation,
                              std::vector<int> generic_args = {});
 
   AST *resolve_generic_function_call(AST *node, AST *function);

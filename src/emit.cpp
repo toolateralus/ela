@@ -602,7 +602,7 @@ void Emitter::visit(ASTDeclaration *node) {
   return;
 }
 
-void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
+void Emitter::emit_forward_declaration(AST *node) {
   emit_default_args = true;
 
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
@@ -615,7 +615,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   (*ss) << ";\n";
   emit_default_args = false;
 }
-void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
+void Emitter::emit_foreign_function(AST *node) {
   if (node->name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
   }
@@ -638,7 +638,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   }
 }
 
-void Emitter::visit(ASTStructDeclaration *node) {
+void Emitter::visit(AST *node) {
   if (node->is_emitted) {
     return;
   }
@@ -1369,7 +1369,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
   return get_type_struct(type, id, context, "{}");
 }
 
-bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
+bool Emitter::should_emit_function(Emitter *visitor, AST *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
   if (!test_flag && node->flags & FUNCTION_IS_TEST) {
     return false;
@@ -1530,7 +1530,7 @@ void Emitter::emit_lambda(ASTLambda *node) {
   newline();
 }
 
-void Emitter::visit(ASTFunctionDeclaration *node) {
+void Emitter::visit(AST *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
     node->return_type->accept(this);
     (*ss) << " " + name;

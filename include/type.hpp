@@ -17,12 +17,10 @@
 
 // fwd
 struct Type;
-struct ASTDeclaration;
 struct Scope;
 struct Context;
 
 extern std::vector<Type *> type_table;
-extern jstl::Arena type_info_arena;
 
 enum ConversionRule {
   CONVERT_PROHIBITED,
@@ -73,7 +71,6 @@ enum StructTypeFlags {
   STRUCT_FLAG_IS_UNION = 1 << 2,
 };
 
-struct ASTExpr;
 
 std::string mangled_type_args(const std::vector<int> &args);
 
@@ -171,6 +168,14 @@ struct Tuple_Info {
   std::vector<int> types;
 };
 
+template <typename T>
+struct Type_Name {
+    consteval static std::string get() {
+        return typeid(T).name();
+    }
+};
+
+
 struct Type_Info {
   Scope scope;
   std::vector<int> implemented_interfaces;
@@ -196,7 +201,7 @@ struct Type_Info {
       kind = TYPE_TUPLE;
       tuple = info;
     } else {
-      static_assert(std::false_type::value, "Unsupported type for Type_Info");
+      static_assert(false, "unsupported");
     }
   }
 
@@ -323,9 +328,7 @@ struct Type {
   constexpr static int INVALID_TYPE_ID = -1;
 };
 
-struct ASTFunctionDeclaration;
-Interned_String get_function_typename(ASTFunctionDeclaration *);
-template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
+Interned_String get_function_typename(AST *);
 
 enum OperationKind {
   OPERATION_BINARY,

@@ -27,9 +27,6 @@ struct Nullable {
   bool is_not_null() const { return ptr != nullptr; }
 };
 
-struct ASTProgram;
-struct Context;
-
 struct CompilationMetric {
   std::string id;
   std::chrono::time_point<std::chrono::high_resolution_clock> start_time;

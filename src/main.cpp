@@ -22,9 +22,6 @@
 using std::string;
 using std::vector;
 
-// This is probably WAYY over allocated but we just want to be sure there's enough space.
-jstl::Arena type_info_arena{MB(10)};
-
 // the same for this
 jstl::Arena ast_arena{MB(10)};
 

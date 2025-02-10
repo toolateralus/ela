@@ -27,7 +27,7 @@ void ASTIdentifier::accept(VisitorBase *visitor) { visitor->visit(this); }
 void LITERAL_accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamsDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTFunctionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void AST::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTuple::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTCall::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTArguments::accept(VisitorBase *visitor) { visitor->visit(this); }
@@ -40,7 +40,7 @@ void ASTLambda::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTNoop::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTElse::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhile::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTStructDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void AST::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTDotExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTScopeResolution::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSubscript::accept(VisitorBase *visitor) { visitor->visit(this); }

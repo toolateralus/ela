@@ -347,11 +347,11 @@ Token get_unique_identifier() {
   return tok;
 }
 
-Scalar_Info *create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
-  auto info = type_info_alloc<Scalar_Info>();
-  info->scalar_type = type;
-  info->size = size;
-  info->is_integral = is_integral;
+Scalar_Info create_scalar_type_info(ScalarType type, size_t size, bool is_integral = false) {
+  Scalar_Info info;
+  info.scalar_type = type;
+  info.size = size;
+  info.is_integral = is_integral;
   return info;
 }
 

@@ -134,7 +134,7 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args
 }
 
 
-void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
+void Typer::visit_struct_declaration(AST *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
   auto type = global_get_type(node->resolved_type);
 
@@ -186,7 +186,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   }
 }
 
-void Typer::visit_function_body(ASTFunctionDeclaration *node) {
+void Typer::visit_function_body(AST *node) {
   auto old_ty = expected_type;
   auto old_scope = ctx.scope;
   auto _defer = Defer([&] {
@@ -244,7 +244,7 @@ void Typer::visit(ASTLambda *node) {
   // std::cout << global_get_type(node->resolved_type)->to_string() << '\n';
 }
 
-void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
+void Typer::visit_function_header(AST *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
   // Setup context.
   auto old_scope = ctx.scope;
@@ -448,7 +448,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   node->resolved_type = type->id;
 }
 
-void Typer::visit(ASTStructDeclaration *node) {
+void Typer::visit(AST *node) {
   if (!node->generic_parameters.empty()) {
     ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT, node);
   } else {
@@ -481,7 +481,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
   node->resolved_type = enum_type->id;
 }
 
-void Typer::visit(ASTFunctionDeclaration *node) {
+void Typer::visit(AST *node) {
   if (!node->generic_parameters.empty()) {
     // TODO: actually generate a signature for a generic function so that you can compare them
     ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);
@@ -900,7 +900,7 @@ void Typer::visit(ASTWhile *node) {
 
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
-  ASTFunctionDeclaration *func_decl = nullptr;
+  AST *func_decl = nullptr;
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
@@ -912,7 +912,7 @@ void Typer::visit(ASTCall *node) {
 
     auto declaring_node = symbol->function.declaration;
     if (declaring_node && declaring_node->node_type == AST_FUNCTION) {
-      func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
+      func_decl = static_cast<AST *>(declaring_node);
 
       // resolve a generic call.
       if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
@@ -1015,7 +1015,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, Function_Info *info) {
   }
 }
 
-ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
+AST *Typer::resolve_generic_function_call(ASTCall *node, AST *func) {
   std::vector<int> generic_args;
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
@@ -1060,7 +1060,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     throw_error("Template instantiation argument count mismatch", node->source_range);
   }
   instantiation->generic_arguments = generic_args;
-  visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation));
+  visit_function_body(static_cast<AST *>(instantiation));
   return instantiation;
 }
 
@@ -1175,12 +1175,12 @@ void Typer::visit(ASTType *node) {
       GENERIC_PANIC_HANDLER(data, 1, {
         switch (decl_node_type) {
           case AST_STRUCT:
-            instantiation = visit_generic(&Typer::visit_struct_declaration, (ASTStructDeclaration *)declaring_node,
+            instantiation = visit_generic(&Typer::visit_struct_declaration, (AST *)declaring_node,
                                           generic_args);
             break;
           case AST_FUNCTION:
             instantiation = visit_generic(&Typer::visit_function_header,
-                                          (ASTFunctionDeclaration *)declaring_node, generic_args);
+                                          (AST *)declaring_node, generic_args);
             break;
           case AST_INTERFACE_DECLARATION:
             instantiation = visit_generic(&Typer::visit_interface_declaration,
@@ -1198,11 +1198,11 @@ void Typer::visit(ASTType *node) {
 
       GENERIC_PANIC_HANDLER(other_data, 2, {
         if (decl_node_type == AST_FUNCTION) {
-          auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
+          auto func = static_cast<AST *>(instantiation);
           func->generic_arguments = generic_args;
           visit_function_body(func);
         } else if (decl_node_type == AST_STRUCT) {
-          auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
+          auto struct_decl = static_cast<AST *>(instantiation);
           for (auto impl : struct_decl->impls) {
             if (impl->resolved_type == Type::INVALID_TYPE_ID) {
               // setting target resolved_type so that when target's visited it won't try to
@@ -1861,7 +1861,7 @@ void Typer::visit(ASTImpl *node) {
       throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
     }
 
-    auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
+    auto node_as_struct = static_cast<AST *>(declaring_node);
     node_as_struct->impls.push_back(node);
     GENERIC_PANIC_HANDLER(
         data, 1,
@@ -1976,11 +1976,11 @@ int Typer::find_generic_type_of(const Interned_String &base, const std::vector<i
         switch (decl_node_type) {
           case AST_STRUCT:
             instantiation =
-                visit_generic(&Typer::visit_struct_declaration, (ASTStructDeclaration *)declaring_node, generic_args);
+                visit_generic(&Typer::visit_struct_declaration, (AST *)declaring_node, generic_args);
             break;
           case AST_FUNCTION:
             instantiation =
-                visit_generic(&Typer::visit_function_header, (ASTFunctionDeclaration *)declaring_node, generic_args);
+                visit_generic(&Typer::visit_function_header, (AST *)declaring_node, generic_args);
             break;
           case AST_INTERFACE_DECLARATION:
             instantiation = visit_generic(&Typer::visit_interface_declaration,
@@ -2001,11 +2001,11 @@ int Typer::find_generic_type_of(const Interned_String &base, const std::vector<i
       other_data, 2,
       {
         if (decl_node_type == AST_FUNCTION) {
-          auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
+          auto func = static_cast<AST *>(instantiation);
           func->generic_arguments = generic_args;
           visit_function_body(func);
         } else if (decl_node_type == AST_STRUCT) {
-          auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
+          auto struct_decl = static_cast<AST *>(instantiation);
           for (auto impl : struct_decl->impls) {
             if (impl->resolved_type == Type::INVALID_TYPE_ID) {
               visit_generic(&Typer::visit_impl_declaration, impl, generic_args);
