@@ -204,7 +204,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
     }},
     // #import
-    // Imports from usr/local/lib/ela by identifier and no file ext.
+    // Imports from usr/local/lib/ela by identifier and no file meta.
     {.identifier = "import",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<AST> {
@@ -232,7 +232,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(Token_Type::LParen);
         auto filename = parser->expect(Token_Type::String).value;
 
-        InternedString mode = "text";
+        Interned_String mode = "text";
         if (parser->peek().type == Token_Type::Comma) {
           parser->eat();
           // could be binary, and whatever other options
@@ -402,7 +402,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
           auto decl = parser->parse_struct_declaration(get_unique_identifier());
           auto t = global_get_type(decl->resolved_type);
-          auto info = (t->get_info()->as<StructTypeInfo>());
+          auto info = (t->info->as<StructTypeInfo>());
           info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
           return decl;
         } else {
@@ -535,7 +535,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 };
 // clang-format on
 
-Nullable<AST> Parser::process_directive(DirectiveKind kind, const InternedString &identifier) {
+Nullable<AST> Parser::process_directive(DirectiveKind kind, const Interned_String &identifier) {
   auto range = begin_node();
   // compare aganist the kind of the routine with expected type, based on parser
   // location
@@ -574,7 +574,7 @@ AST *Parser::parse() {
 
     if (peek().type == Token_Type::Directive) {
       eat();
-      InternedString identifier = eat().value;
+      Interned_String identifier = eat().value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
       if (result.is_not_null() && result.get()->node_type != AST_NOOP) {
         program->statements.push_back(result.get());
@@ -1538,8 +1538,8 @@ AST *Parser::parse_enum_declaration(Token tok) {
     last_value = value;
   }
   end_node(node, range);
-  std::vector<InternedString> keys;
-  std::set<InternedString> keys_set;
+  std::vector<Interned_String> keys;
+  std::set<Interned_String> keys_set;
   for (const auto &[key, value] : node->$enum.key_values) {
     if (keys_set.find(key) != keys_set.end()) {
       throw_error(std::format("redefinition of enum variant: {}", key), node->source_range);
@@ -1692,7 +1692,7 @@ AST *Parser::parse_struct_declaration(Token name) {
     auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->get_info()->as<StructTypeInfo>());
+      auto info = (type->info->as<StructTypeInfo>());
       if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 && info->scope != nullptr) {
         throw_error("Redefinition of struct", range);
       }
@@ -1706,7 +1706,7 @@ AST *Parser::parse_struct_declaration(Token name) {
   node->name = name.value;
   node->resolved_type = type_id;
   auto type = global_get_type(type_id);
-  auto info = type->get_info()->as<StructTypeInfo>();
+  auto info = type->info->as<StructTypeInfo>();
   info->scope = node = create_child(node);
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
@@ -1769,7 +1769,7 @@ AST *Parser::parse_struct_declaration(Token name) {
 Nullable<AST> Parser::try_parse_directive_expr() {
   if (peek().type == Token_Type::Directive) {
     eat();
-    InternedString identifier = eat().value;
+    Interned_String identifier = eat().value;
     Nullable<AST> node = process_directive(DIRECTIVE_KIND_EXPRESSION, identifier);
 
     auto expr = Nullable<AST>(dynamic_cast<AST *>(node.get()));
@@ -1873,7 +1873,7 @@ AST *Parser::parse_function_type() {
   expect(Token_Type::Fn);
   output_type->kind = AST_TYPE::FUNCTION;
   append_type_extensions(output_type);
-  FunctionTypeInfo info{};
+  Function_Info info{};
   output_type->function.parameter_types = parse_parameter_types();
   if (peek().type == Token_Type::Arrow) {
     eat();
@@ -1958,7 +1958,7 @@ void Parser::fill_buffer_if_needed() {
   }
 }
 
-void Parser::import(InternedString name) {
+void Parser::import(Interned_String name) {
   std::string ela_lib_path;
   if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     ela_lib_path = env_p;

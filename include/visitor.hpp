@@ -122,18 +122,18 @@ struct Typer {
                              std::vector<int> generic_args = {});
 
   AST *resolve_generic_function_call(AST *node, AST *function);
-  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
+  int find_generic_type_of(const Interned_String &base, const std::vector<int> &generic_args,
                            const Source_Range &source_range);
   std::vector<int> get_generic_arg_types(const std::vector<AST *> &args);
 
   void type_check_args_from_params(AST *call, AST *function, bool skip_first);
-  void type_check_args_from_info(AST *call, FunctionTypeInfo *info);
+  void type_check_args_from_info(AST *call, Function_Info *info);
 
   bool visit_where_predicate(Type *type, AST *node);
-  void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
+  void compiler_mock_function_call_visit_impl(int type, const Interned_String &method_name);
 
   Nullable<Symbol> get_symbol(AST *node);
-  InternedString type_name(AST *node);
+  Interned_String type_name(AST *node);
   int get_self_type();
   std::vector<TypeExtension> accept_extensions(std::vector<AST_Type_Extension> ast_extensions);
   void visit_statement_list(AST *node) {
@@ -233,7 +233,7 @@ struct Emitter {
   void emit_foreign_function(AST *node);
 
   bool should_emit_function(Emitter *visitor, AST *node, bool test_flag);
-  std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
+  std::string to_cpp_string(const Type_Metadata &meta, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);
 

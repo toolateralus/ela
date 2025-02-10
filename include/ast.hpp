@@ -29,7 +29,7 @@ extern jstl::Arena ast_arena;
 struct VisitorBase;
 
 // used to prevent double includes.
-extern std::unordered_set<InternedString> import_set;
+extern std::unordered_set<Interned_String> import_set;
 
 #include "core.hpp"
 #include <string>
@@ -111,10 +111,11 @@ enum AST_Parameter_Tag {
 };
 struct AST_Parameter_Declaration {
   AST_Parameter_Tag tag;
+  size_t resolved_type;
   union {
     struct {
       AST *type;
-      InternedString name;
+      Interned_String name;
     } normal;
     struct {
       bool is_pointer : 1;
@@ -137,8 +138,8 @@ enum ValueSemantic {
 
 struct ASTStructMember {
   bool is_bitfield : 1 = false;
-  InternedString bitsize;
-  InternedString name;
+  Interned_String bitsize;
+  Interned_String name;
   AST *type;
 };
 
@@ -235,8 +236,8 @@ struct AST {
     AST *expression_statement;
 
     struct {
-      InternedString name;
-      InternedString bitsize;
+      Interned_String name;
+      Interned_String bitsize;
       // This isn't nullable, even though it can be null for part of compilation.
       // That's because if it ever was null, when it's done typing it will have been created.
       // It creates too much friction later on down the line if it's not.
@@ -259,11 +260,11 @@ struct AST {
       Token_Type op;
       bool is_operator_overload : 1 = false;
     } unary;
-    InternedString identifier;
+    Interned_String identifier;
     struct {
       AST_Literal_Tag tag;
       bool is_c_string : 1 = false;
-      InternedString value;
+      Interned_String value;
     } literal;
 
     struct {
@@ -289,9 +290,9 @@ struct AST {
       std::vector<int> generic_arguments;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
-      InternedString name;
+      Interned_String name;
       std::vector<AST_Parameter_Declaration> parameters;
-      Nullable<AST> return_type;
+      AST* return_type;
       Nullable<AST> block;
     } function;
 
@@ -303,12 +304,12 @@ struct AST {
 
     struct {
       AST *base;
-      InternedString member_name;
+      Interned_String member_name;
     } dot;
 
     struct {
       AST *base;
-      InternedString member_name;
+      Interned_String member_name;
     } scope_resolution;
 
     Nullable<AST> $return;
@@ -369,7 +370,7 @@ struct AST {
 
     struct {
       Nullable<AST> where_clause;
-      InternedString name;
+      Interned_String name;
       bool is_fwd_decl : 1 = false;
       bool is_extern : 1 = false;
       bool is_union : 1 = false;
@@ -385,7 +386,7 @@ struct AST {
 
     struct {
       Nullable<AST> where_clause;
-      InternedString name;
+      Interned_String name;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
       std::vector<AST *> methods;
@@ -394,13 +395,13 @@ struct AST {
     struct {
       bool is_flags : 1 = false;
       int element_type;
-      InternedString name;
-      std::vector<std::pair<InternedString, AST *>> key_values;
+      Interned_String name;
+      std::vector<std::pair<Interned_String, AST *>> key_values;
     } $enum;
 
     struct {
       union {
-        std::vector<std::pair<InternedString, AST *>> key_values;
+        std::vector<std::pair<Interned_String, AST *>> key_values;
         std::vector<AST *> values;
       };
       AST_Initializer_Tag tag;
@@ -415,7 +416,7 @@ struct AST {
     } $switch;
 
     struct {
-      InternedString name;
+      Interned_String name;
       AST *type;
     } alias;
 
@@ -438,7 +439,7 @@ struct AST {
     } cast;
 
     struct {
-      InternedString unique_identifier;
+      Interned_String unique_identifier;
       std::vector<AST_Parameter_Declaration> parameters;
       AST *return_type;
       AST *block;
@@ -460,20 +461,20 @@ struct AST {
     return field_ct;
   }
 
-  void insert_variable(const InternedString &name, int type_id, AST *initial_value, AST *decl = nullptr) {
+  void insert_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl = nullptr) {
     scope.insert(Symbol::create_variable(name, type_id, initial_value, decl));
   }
 
-  void insert_function(const InternedString &name, const int type_id, AST *declaration,
+  void insert_function(const Interned_String &name, const int type_id, AST *declaration,
                        SymbolFlags flags = SYMBOL_IS_FUNCTION) {
     scope.insert(Symbol::create_function(name, type_id, declaration, flags));
   }
 
-  void insert_type(const int type_id, const InternedString &name, TypeKind kind, AST *declaration) {
+  void insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration) {
     scope.insert(Symbol::create_type(type_id, name, kind, declaration));
   }
 
-  Symbol *lookup(const InternedString &name) {
+  Symbol *lookup(const Interned_String &name) {
     if (auto sym = scope.lookup(name)) {
       return sym;
     }
@@ -483,27 +484,27 @@ struct AST {
     return nullptr;
   }
 
-  Symbol *local_lookup(const InternedString &name) {
+  Symbol *local_lookup(const Interned_String &name) {
     return scope.lookup(name);
   }
 
   // TODO: should this traverse upward to erase?
 
-  void declare_interface(const InternedString &name, AST *node);
+  void declare_interface(const Interned_String &name, AST *node);
 
-  int create_interface_type(const InternedString &name, const std::vector<int> &generic_args, AST *declaration) {
+  int create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration) {
     auto id = global_create_interface_type(name, declaration->scope, generic_args);
     scope.insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
     return id;
   }
 
-  int create_struct_type(const InternedString &name, AST *declaration) {
+  int create_struct_type(const Interned_String &name, AST *declaration) {
     auto id = global_create_struct_type(name, declaration->scope);
     scope.insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
     return id;
   }
 
-  void create_type_alias(const InternedString &name, int type_id, TypeKind kind, AST *declaring_node) {
+  void create_type_alias(const Interned_String &name, int type_id, Type_Kind kind, AST *declaring_node) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
@@ -513,7 +514,7 @@ struct AST {
     scope.insert(symbol);
   }
 
-  void forward_declare_type(const InternedString &name, int default_id) {
+  void forward_declare_type(const Interned_String &name, int default_id) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = default_id;
@@ -521,7 +522,7 @@ struct AST {
     scope.insert(symbol);
   }
 
-  int create_enum_type(const InternedString &name, bool flags, AST *declaration) {
+  int create_enum_type(const Interned_String &name, bool flags, AST *declaration) {
     auto id = global_create_enum_type(name, declaration->scope, flags);
     scope.insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
     return id;
@@ -535,12 +536,12 @@ struct AST {
     return id;
   }
 
-  int find_type_id(const InternedString &name, const TypeExtensions &ext) {
+  int find_type_id(const Interned_String &name, const Type_Metadata &meta) {
     auto symbol = lookup(name);
     if (!symbol || !symbol->is_type()) {
       return Type::INVALID_TYPE_ID;
     }
-    return global_find_type_id(symbol->type_id, ext);
+    return global_find_type_id(symbol->type_id, meta);
   }
 };
 
@@ -555,7 +556,7 @@ enum DirectiveKind {
 struct Parser;
 struct DirectiveRoutine {
   ~DirectiveRoutine() = default;
-  InternedString identifier;
+  Interned_String identifier;
   DirectiveKind kind;
   std::function<Nullable<AST>(Parser *parser)> run;
 };
@@ -628,7 +629,7 @@ struct Parser {
 
   void append_type_extensions(AST *&type);
   std::vector<AST_Parameter_Declaration> parse_parameters(std::vector<GenericParameter> params = {});
-  Nullable<AST> process_directive(DirectiveKind kind, const InternedString &identifier);
+  Nullable<AST> process_directive(DirectiveKind kind, const Interned_String &identifier);
   Nullable<AST> try_parse_directive_expr();
 
   std::vector<GenericParameter> parse_generic_parameters();
@@ -638,7 +639,7 @@ struct Parser {
   inline bool not_eof() const { return !peek().is_eof(); }
   inline bool eof() const { return peek().is_eof(); }
   inline bool semicolon() const { return peek().type == Token_Type::Semi; }
-  InternedString type_name(AST *node);
+  Interned_String type_name(AST *node);
 
   inline std::deque<Token> &lookahead_buf() { return states.back().lookahead_buffer; }
 
@@ -651,7 +652,7 @@ struct Parser {
   void end_node(AST *node, Source_Range &range);
 
   // returns true if successful, false if already included
-  void import(InternedString name);
+  void import(Interned_String name);
 
   Parser(const std::string &filename, Context &context);
   ~Parser();

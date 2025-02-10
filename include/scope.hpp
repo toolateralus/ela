@@ -8,7 +8,7 @@
 
 extern jstl::Arena symbol_arena;
 
-enum TypeKind {
+enum Type_Kind {
   TYPE_SCALAR,
   TYPE_FUNCTION,
   TYPE_STRUCT,
@@ -32,7 +32,7 @@ struct ASTEnumDeclaration;
 
 struct Symbol {
   Symbol *next = nullptr;
-  InternedString name;
+  Interned_String name;
   int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
@@ -55,14 +55,14 @@ struct Symbol {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
       Nullable<AST> declaration;
-      TypeKind kind;
+      Type_Kind kind;
     } type;
   };
 
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, int type_id, AST *initial_value, AST* decl) {
+  static Symbol create_variable(const Interned_String &name, int type_id, AST *initial_value, AST* decl) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
@@ -72,7 +72,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, const int type_id, AST *declaration, SymbolFlags flags) {
+  static Symbol create_function(const Interned_String &name, const int type_id, AST *declaration, SymbolFlags flags) {
     Symbol symbol;
     symbol.type_id = type_id;
     symbol.name = name;
@@ -81,7 +81,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_type(const int type_id, const InternedString &name, TypeKind kind, AST *declaration) {
+  static Symbol create_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_TYPE;
@@ -95,8 +95,8 @@ struct Symbol {
 
 struct Scope {
   Symbol *head;
-  Symbol *lookup(const InternedString &name);
-  bool erase(const InternedString &name);
+  Symbol *lookup(const Interned_String &name);
+  bool erase(const Interned_String &name);
   void insert(const Symbol &symbol);
 
   // TODO:
@@ -109,17 +109,17 @@ struct Scope {
   }
 };
 
-static std::unordered_set<InternedString> &defines() {
-  static std::unordered_set<InternedString> defines;
+static std::unordered_set<Interned_String> &defines() {
+  static std::unordered_set<Interned_String> defines;
   return defines;
 };
-static bool add_def(const InternedString &define) { return defines().insert(define).second; }
+static bool add_def(const Interned_String &define) { return defines().insert(define).second; }
 
-static bool has_def(const InternedString &define) {
+static bool has_def(const Interned_String &define) {
   if (defines().contains(define)) {
     return true;
   }
   return false;
 }
-static void undef(const InternedString &define) { defines().erase(define); }
+static void undef(const Interned_String &define) { defines().erase(define); }
 

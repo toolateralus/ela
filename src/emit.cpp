@@ -40,25 +40,25 @@ void Emitter::forward_decl_type(Type *type) {
   if (type->base_id != Type::INVALID_TYPE_ID) {
     type = global_get_type(type->base_id);
   }
-  if (type->fwd_decl_is_emitted) {
+  if (type->forward_declared_emitted) {
     return;
   } else {
-    type->fwd_decl_is_emitted = true;
+    type->forward_declared_emitted = true;
   }
   switch (type->kind) {
     case TYPE_FUNCTION: {
-      auto info = type->get_info()->as<FunctionTypeInfo>();
+      auto info = type->info->as<Function_Info>();
       for (auto i = 0; i < info->params_len; i++) {
         forward_decl_type(global_get_type(info->parameter_types[i]));
       }
       forward_decl_type(global_get_type(info->return_type));
     } break;
     case TYPE_STRUCT: {
-      auto info = type->get_info()->as<StructTypeInfo>();
+      auto info = type->info->as<Struct_Info>();
       std::string kw = "typedef struct ";
       if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
         kw = "typedef union ";
-      (*ss) << kw << type->get_base().get_str() << " " << type->get_base().get_str() << ";\n";
+      (*ss) << kw << type->base.get_str() << " " << type->base.get_str() << ";\n";
     } break;
     case TYPE_TUPLE:
       (*ss) << "struct " << to_cpp_string(type) << ";\n";
@@ -223,7 +223,7 @@ void Emitter::visit(ASTType *node) {
   }
 
   if (type->is_kind(TYPE_ENUM)) {
-    auto enum_info = (type->get_info()->as<EnumTypeInfo>());
+    auto enum_info = (type->info->as<Enum_Info>());
     auto elem_ty = global_get_type(enum_info->element_type);
     (*ss) << to_cpp_string(elem_ty);
     return;
@@ -297,8 +297,8 @@ void Emitter::visit(ASTCall *node) {
           find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
       function_type = global_get_type(instance->resolved_type);
     }
-    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
-    if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
+    auto param_0_ty = global_get_type(function_type->info->as<Function_Info>()->parameter_types[0]);
+    if (param_0_ty->meta.is_pointer() && !base_type->meta.is_pointer()) {
       // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
       (*ss) << "&";
     }
@@ -493,7 +493,7 @@ void Emitter::visit(ASTBinExpr *node) {
   (*ss) << node->op.value.get_str();
   if (node->op.type == Token_Type::Assign) {
     auto type = global_get_type(node->resolved_type);
-    auto isptr = type->get_ext().is_pointer();
+    auto isptr = type->meta.is_pointer();
     if (isptr)
       (*ss) << "(" << to_cpp_string(type) << ")";
   }
@@ -583,7 +583,7 @@ void Emitter::visit(ASTDeclaration *node) {
     return;
   }
 
-  if (type->get_ext().is_fixed_sized_array()) {
+  if (type->meta.is_fixed_sized_array()) {
     (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
     if (node->value.is_not_null()) {
       (*ss) << " = ";
@@ -663,9 +663,9 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
 
-  auto info = (type->get_info()->as<StructTypeInfo>());
+  auto info = (type->info->as<Struct_Info>());
 
-  std::string type_name = type->get_base().get_str();
+  std::string type_name = type->base.get_str();
   std::string type_tag = (node->is_union ? "typedef union " : "typedef struct ");
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
@@ -713,7 +713,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
       auto name = member.name.get_str();
       auto name_nullable = Nullable(&name);
       (*ss) << get_function_pointer_type_string(type, name_nullable);
-    } else if (type->get_ext().is_fixed_sized_array()) {
+    } else if (type->meta.is_fixed_sized_array()) {
       (*ss) << get_declaration_type_signature_and_identifier(member.name.get_str(), type);
     } else {
       member.type->accept(this);
@@ -868,7 +868,7 @@ void Emitter::visit(ASTDotExpr *node) {
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
   auto op = ".";
-  if (base_ty->get_ext().back_type() == TYPE_EXT_POINTER) {
+  if (base_ty->meta.back_type() == TYPE_EXT_POINTER) {
     op = "->";
   }
   node->base->accept(this);
@@ -897,7 +897,7 @@ void Emitter::visit(ASTSubscript *node) {
 void Emitter::visit(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
 
-  if (!type->get_ext().is_fixed_sized_array()) {
+  if (!type->meta.is_fixed_sized_array()) {
     (*ss) << "(" + to_cpp_string(type) + ")";
   }
   (*ss) << " {";
@@ -920,7 +920,7 @@ void Emitter::visit(ASTInitializerList *node) {
       }
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (type->get_base().get_str().starts_with("Init_List$")) {
+      if (type->base.get_str().starts_with("Init_List$")) {
         auto element_type = type->generic_args[0];
         (*ss) << " .data = ";
         (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
@@ -960,7 +960,7 @@ void Emitter::visit(ASTSwitch *node) {
   auto type = global_get_type(node->target->resolved_type);
   bool use_eq_operator = true;
 
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->meta.is_pointer()) {
     use_eq_operator = false;
   }
 
@@ -1031,7 +1031,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
       }
     }
   } else {
-    auto scope = type->get_info()->scope;
+    auto scope = type->info->scope;
     auto index = 0;
     static int temp_idx = 0;
     std::string identifier = "$deconstruction$" + std::to_string(temp_idx++);
@@ -1060,30 +1060,30 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   std::stringstream tss;
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
-    auto &ext = type->get_ext();
+    auto &meta = type->meta;
 
-    if (ext.is_fixed_sized_array()) {
-      identifier += ext.to_string();
+    if (meta.is_fixed_sized_array()) {
+      identifier += meta.to_string();
     }
 
     return get_function_pointer_type_string(type, &identifier);
   }
-  auto base = type->get_base().get_str();
+  auto base = type->base.get_str();
   ;
   tss << to_cpp_string(global_get_type(type->get_element_type()));
-  if (!type->get_ext().is_fixed_sized_array()) {
+  if (!type->meta.is_fixed_sized_array()) {
     tss << name << ' ';
   }
   bool emitted_iden = false;
-  for (const auto ext : type->get_ext().extensions) {
-    if (ext.type == TYPE_EXT_POINTER) {
+  for (const auto meta : type->meta.extensions) {
+    if (meta.type == TYPE_EXT_POINTER) {
       tss << "*";
-    } else if (ext.type == TYPE_EXT_ARRAY) {
+    } else if (meta.type == TYPE_EXT_ARRAY) {
       if (!emitted_iden) {
         emitted_iden = true;
         tss << ' ' << name;
       }
-      tss << "[" << std::to_string(ext.array_size) << "]";
+      tss << "[" << std::to_string(meta.array_size) << "]";
     }
   }
   return tss.str();
@@ -1102,7 +1102,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
   std::stringstream ss;
 
-  auto info = (type->get_info()->as<FunctionTypeInfo>());
+  auto info = (type->info->as<Function_Info>());
   auto return_type = global_get_type(info->return_type);
 
   ss << to_cpp_string(return_type) << "(" << type_prefix;
@@ -1131,11 +1131,11 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
-    ss << std::format(".offset = offsetof({}, {})", parent_type->get_base().get_str(), name);
+    ss << std::format(".offset = offsetof({}, {})", parent_type->base.get_str(), name);
   }
 
   if (parent_type->is_kind(TYPE_ENUM)) {
-    auto symbol = parent_type->get_info()->as<EnumTypeInfo>()->scope->local_lookup(name);
+    auto symbol = parent_type->info->as<Enum_Info>()->scope->local_lookup(name);
     // We don't check the nullable here because it's an absolute guarantee that enum variables all have
     // a value always.
     auto value = evaluate_constexpr((ASTExpr *)symbol->variable.initial_value.get(), ctx);
@@ -1149,7 +1149,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 std::string Emitter::get_elements_function(Type *type) {
   //! We have to remove these lambdas so we can compile down to C.
   auto element_type = global_get_type(type->get_element_type());
-  if (!type->get_ext().is_fixed_sized_array()) {
+  if (!type->meta.is_fixed_sized_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
                        "  auto arr = (_array<{}>*)(array);\n"
                        "  _array<Element> elements;\n"
@@ -1163,7 +1163,7 @@ std::string Emitter::get_elements_function(Type *type) {
                        "}}\n",
                        to_cpp_string(element_type), to_type_struct(element_type, ctx));
   } else {
-    auto size = type->get_ext().extensions.back().array_size;
+    auto size = type->meta.extensions.back().array_size;
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
                        "  auto arr = ({}*)(array);\n"
                        "  _array<Element> elements;\n"
@@ -1230,8 +1230,8 @@ std::string get_type_flags(Type *type) {
       kind_flags = 0;
       break;
   }
-  for (const auto &ext : type->get_ext().extensions) {
-    switch (ext.type) {
+  for (const auto &meta : type->meta.extensions) {
+    switch (meta.type) {
       case TYPE_EXT_POINTER:
         kind_flags |= TYPE_FLAGS_POINTER;
         break;
@@ -1265,11 +1265,11 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << get_type_flags(type) << ",\n";
 
   // ! We can't use this either: it uses a lambda.
-  //   if (type->get_ext().is_fixed_sized_array()) {
+  //   if (type->meta.is_fixed_sized_array()) {
   //     ss << get_elements_function(type) << ",\n";
   //   }
 
-  if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
+  if (type->meta.is_pointer() || type->meta.is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
     ss << ".element_type = NULL,\n";
@@ -1280,7 +1280,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   auto get_fields_init_statements = [&] {
     std::stringstream fields_ss;
     if (type->kind == TYPE_STRUCT) {
-      auto info = type->get_info();
+      auto info = type->info;
       if (info->scope->symbols.empty()) {
         return std::string("{}");
       }
@@ -1311,7 +1311,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       }
     } else if (type->kind == TYPE_ENUM) {
       // TODO: we have to fix this!.
-      auto info = type->get_info();
+      auto info = type->info;
       if (info->scope->ordered_symbols.empty()) {
         return std::string("{}");
       }
@@ -1387,13 +1387,13 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   return true;
 }
 
-std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::string &base) {
+std::string Emitter::to_cpp_string(const Type_Metadata &extensions, const std::string &base) {
   std::stringstream ss;
   ss << base;
-  for (const auto ext : extensions.extensions) {
-    if (ext.type == TYPE_EXT_ARRAY) {
-      ss << "[" << std::to_string(ext.array_size) << "]";
-    } else if (ext.type == TYPE_EXT_POINTER) {
+  for (const auto meta : extensions.extensions) {
+    if (meta.type == TYPE_EXT_ARRAY) {
+      ss << "[" << std::to_string(meta.array_size) << "]";
+    } else if (meta.type == TYPE_EXT_POINTER) {
       ss << "*";
     }
   }
@@ -1406,11 +1406,11 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 
   return to_cpp_string(type);
 
-  if (type->get_ext().has_no_extensions()) {
+  if (type->meta.has_no_extensions()) {
     return name;
   }
 
-  return to_cpp_string(type->get_ext(), name);
+  return to_cpp_string(type->meta, name);
 }
 
 std::string Emitter::to_cpp_string(Type *type) {
@@ -1421,11 +1421,11 @@ std::string Emitter::to_cpp_string(Type *type) {
     case TYPE_SCALAR:
     case TYPE_ENUM:
     case TYPE_STRUCT: {
-      output = to_cpp_string(type->get_ext(), type->get_base().get_str());
+      output = to_cpp_string(type->meta, type->base.get_str());
       break;
     }
     case TYPE_TUPLE: {
-      auto info = (type->get_info()->as<TupleTypeInfo>());
+      auto info = (type->info->as<Tuple_Info>());
       output = "$tuple";
       for (int i = 0; i < info->types.size(); ++i) {
         output += std::to_string(info->types[i]);
@@ -1433,7 +1433,7 @@ std::string Emitter::to_cpp_string(Type *type) {
           output += "$";
         }
       }
-      output = to_cpp_string(type->get_ext(), output);
+      output = to_cpp_string(type->meta, output);
       break;
     }
     case TYPE_INTERFACE:
@@ -1450,7 +1450,7 @@ void Emitter::visit(ASTScopeResolution *node) {
   // This should probably be a lot more robust
   if (node->base->node_type == AST_IDENTIFIER || node->base->node_type == AST_TYPE) {
     if (type->is_kind(TYPE_ENUM)) {
-      (*ss) << type->get_base().get_str();
+      (*ss) << type->base.get_str();
     } else {
       (*ss) << "$" + std::to_string(type->id);
     }
@@ -1725,15 +1725,15 @@ void Emitter::emit_tuple(int type_id) {
   if (type->base_id != Type::INVALID_TYPE_ID) {
     type = global_get_type(type->base_id);
   }
-  if (type->tuple_is_emitted) {
+  if (type->emitted_tuple) {
     return;
   } else {
-    type->tuple_is_emitted = true;
+    type->emitted_tuple = true;
   }
   auto name = to_cpp_string(type);
 
   (*ss) << "typedef struct {";
-  auto info = type->get_info()->as<TupleTypeInfo>();
+  auto info = type->info->as<Tuple_Info>();
   for (int i = 0; i < info->types.size(); ++i) {
     auto type = global_get_type(info->types[i]);
     if (type->is_kind(TYPE_FUNCTION)) {

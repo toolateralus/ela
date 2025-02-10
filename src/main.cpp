@@ -45,7 +45,7 @@ CompileCommand compile_command;
 
 AST * GLOBAL_NOOP = ast_alloc(AST_NOOP, nullptr);
 
-std::unordered_set<InternedString> import_set;
+std::unordered_set<Interned_String> import_set;
 /*
   #########################
   ### PROVIDING EXTERNS ###

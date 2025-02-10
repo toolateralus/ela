@@ -29,21 +29,21 @@ struct Value {
     }
   }
 
-  static Value Int(const InternedString &str) {
+  static Value Int(const Interned_String &str) {
     Value val;
     val.tag = INTEGER;
     val.integer = std::stoll(str.get_str());
     return val;
   }
 
-  static Value Float(const InternedString &str) {
+  static Value Float(const Interned_String &str) {
     Value val;
     val.tag = FLOATING;
     val.floating = std::stod(str.get_str());
     return val;
   }
 
-  static Value Bool(const InternedString &str) {
+  static Value Bool(const Interned_String &str) {
     Value val;
     val.tag = BOOLEAN;
     val.boolean = (str.get_str() == "true");

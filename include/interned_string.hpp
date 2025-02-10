@@ -8,7 +8,7 @@
 #include <unordered_map>
 #include <memory>
 
-struct InternedString {
+struct Interned_String {
   size_t hash;
 
 #ifdef DEBUG
@@ -16,7 +16,7 @@ struct InternedString {
 #endif
   using InternedStringTable = std::unordered_map<size_t, std::unique_ptr<std::string>>;
 
-  InternedString() = default;
+  Interned_String() = default;
 
   static InternedStringTable &table() {
     static InternedStringTable table;
@@ -47,22 +47,22 @@ struct InternedString {
     }
   }
 
-  inline InternedString(const std::string &value) { insert_or_set(value); }
-  inline InternedString(const char *str) { insert_or_set(std::string{str}); }
+  inline Interned_String(const std::string &value) { insert_or_set(value); }
+  inline Interned_String(const char *str) { insert_or_set(std::string{str}); }
 
-  inline bool operator==(const InternedString &other) const { return hash == other.hash; }
-  inline bool operator!=(const InternedString &other) const { return hash != other.hash; }
-  inline bool operator<(const InternedString &other) const { return hash < other.hash; }
+  inline bool operator==(const Interned_String &other) const { return hash == other.hash; }
+  inline bool operator!=(const Interned_String &other) const { return hash != other.hash; }
+  inline bool operator<(const Interned_String &other) const { return hash < other.hash; }
 };
 
 namespace std {
-template <> struct hash<InternedString> {
-  inline size_t operator()(const InternedString &string) const {
+template <> struct hash<Interned_String> {
+  inline size_t operator()(const Interned_String &string) const {
     return string.hash;
   }
 };
 
-template <> struct formatter<InternedString, char> {
+template <> struct formatter<Interned_String, char> {
   template <class ParseContext> constexpr typename ParseContext::iterator parse(ParseContext &ctx) {
     auto it = ctx.begin();
     auto end = ctx.end();
@@ -73,7 +73,7 @@ template <> struct formatter<InternedString, char> {
   }
 
   template <class FormatContext>
-  typename FormatContext::iterator format(const InternedString &s, FormatContext &ctx) const {
+  typename FormatContext::iterator format(const Interned_String &s, FormatContext &ctx) const {
     return std::format_to(ctx.out(), "{}", s.get_str());
   }
 };

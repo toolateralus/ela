@@ -722,7 +722,7 @@ NPatchLayout :: enum {
 #foreign SaveFileText :: fn(fileName: u8 *, text: u8 *) -> bool;
 #foreign FileExists :: fn(fileName: u8 *) -> bool;
 #foreign DirectoryExists :: fn(dirPath: u8 *) -> bool;
-#foreign IsFileExtension :: fn(fileName: u8 *, ext: u8 *) -> bool;
+#foreign IsFileExtension :: fn(fileName: u8 *, meta: u8 *) -> bool;
 #foreign GetFileLength :: fn(fileName: u8 *) -> s32;
 #foreign GetFileExtension :: fn(fileName: u8 *) -> u8 *;
 #foreign GetFileName :: fn(filePath: u8 *) -> u8 *;

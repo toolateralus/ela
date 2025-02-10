@@ -243,9 +243,9 @@ struct Token {
 
   Token() {}
 
-  Token(SourceLocation location, InternedString value, Token_Type type, TFamily family)
+  Token(SourceLocation location, Interned_String value, Token_Type type, TFamily family)
       : value(std::move(value)), type(type), family(family), location(location) {}
-  InternedString value;
+  Interned_String value;
   Token_Type type;
   TFamily family;
   SourceLocation location;

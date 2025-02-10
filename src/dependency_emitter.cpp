@@ -7,9 +7,9 @@
 
 [[nodiscard]] std::string DependencyEmitter::decl_type(int type_id) {
   auto type = global_get_type(type_id);
-  auto extensions = type->get_ext().extensions;
-  for (auto ext : extensions) {
-    if (ext.type == TYPE_EXT_POINTER) {
+  auto extensions = type->meta.extensions;
+  for (auto meta : extensions) {
+    if (meta.type == TYPE_EXT_POINTER) {
       emitter->forward_decl_type(type);
       return {};
     }
@@ -24,7 +24,7 @@
   }
   switch (type->kind) {
     case TYPE_FUNCTION: {
-      auto info = type->get_info()->as<FunctionTypeInfo>();
+      auto info = type->info->as<Function_Info>();
       auto err = decl_type(info->return_type);
       if (!err.empty()) {
         return err;
@@ -46,7 +46,7 @@
       }
     } break;
     case TYPE_TUPLE: {
-      auto info = type->get_info()->as<TupleTypeInfo>();
+      auto info = type->info->as<Tuple_Info>();
       for (auto type : info->types) {
         auto err = define_type(type);
         if (!err.empty()) {
@@ -259,8 +259,8 @@ void DependencyEmitter::visit(ASTFor *node) {
 
   node->range->accept(this);
 
-  auto range_scope = global_get_type(node->range_type)->get_info()->scope;
-  auto iter_scope = global_get_type(node->iterable_type)->get_info()->scope;
+  auto range_scope = global_get_type(node->range_type)->info->scope;
+  auto iter_scope = global_get_type(node->iterable_type)->info->scope;
 
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE: {

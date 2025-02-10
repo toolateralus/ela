@@ -96,11 +96,11 @@ Nullable<Symbol> Typer::get_symbol(AST *node) {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       dotnode->base->accept(this);
       auto type = global_get_type(dotnode->base->resolved_type);
-      auto symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
+      auto symbol = type->info->scope->local_lookup(dotnode->member_name);
       // Implicit dereference, we look at the base scope.
-      if (!symbol && type->get_ext().is_pointer()) {
+      if (!symbol && type->meta.is_pointer()) {
         type = global_get_type(type->get_element_type());
-        symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
+        symbol = type->info->scope->local_lookup(dotnode->member_name);
       }
       return symbol;
     } break;
@@ -108,7 +108,7 @@ Nullable<Symbol> Typer::get_symbol(AST *node) {
       auto srnode = static_cast<ASTScopeResolution *>(node);
       srnode->base->accept(this);
       auto type = global_get_type(srnode->base->resolved_type);
-      auto scope = type->get_info()->scope;
+      auto scope = type->info->scope;
       return scope->local_lookup(srnode->member_name);
     } break;
 
@@ -138,7 +138,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
                                      std::vector<int> generic_args) {
   auto type = global_get_type(node->resolved_type);
 
-  auto info = (type->get_info()->as<StructTypeInfo>());
+  auto info = (type->info->as<Struct_Info>());
 
   if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
     node->resolved_type = type->id;
@@ -223,7 +223,7 @@ void Typer::visit(ASTLambda *node) {
   // ! std::cout << "lambda return type " << node->return_type->resolved_type << '\n';
 
   std::vector<int> param_types;
-  FunctionTypeInfo info;
+  Function_Info info;
   // TODO:
   // We need to make it so the lambda block's parent is the root scope, so that it doesn't give the impression that it
   // can do closures.
@@ -268,7 +268,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   node->return_type->accept(this);
   node->params->accept(this);
 
-  FunctionTypeInfo info;
+  Function_Info info;
   // Get function type id from header.
   info.return_type = node->return_type->resolved_type;
   info.is_varargs = (node->flags & FUNCTION_IS_VARARGS) != 0;
@@ -336,7 +336,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     interface_ty = global_get_type(type_id);
   }
 
-  auto type_scope = target_ty->get_info()->scope;
+  auto type_scope = target_ty->info->scope;
   Scope impl_scope = {};
   for (const auto &method : node->methods) {
     method->declaring_type = target_ty->id;
@@ -461,7 +461,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
   auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
   global_get_type(enum_ty_id)->declaring_node = node;
   auto enum_type = global_get_type(ctx.scope->find_type_id(node->name, {}));
-  auto info = enum_type->get_info()->as<EnumTypeInfo>();
+  auto info = enum_type->info->as<Enum_Info>();
 
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
@@ -542,8 +542,8 @@ void Typer::visit(ASTDeclaration *node) {
     node->resolved_type = value_ty;
 
     // TODO: so, we just don't set the type if it can't be assigned to int??? what?
-    if (type->is_kind(TYPE_SCALAR) && type->get_ext().has_no_extensions() && expr_is_literal(node->value.get())) {
-      auto info = (type->get_info()->as<ScalarTypeInfo>());
+    if (type->is_kind(TYPE_SCALAR) && type->meta.has_no_extensions() && expr_is_literal(node->value.get())) {
+      auto info = (type->info->as<Scalar_Info>());
       auto rule = type_conversion_rule(type, global_get_type(s32_type()), node->source_range);
       if (info->is_integral && rule != CONVERT_PROHIBITED && rule != CONVERT_EXPLICIT) {
         node->type->resolved_type = s32_type();
@@ -587,7 +587,7 @@ void Typer::visit(ASTDeclaration *node) {
     // Our interpreter can't handle structs, but we want structs.
 
     // auto type = global_get_type(node->type->resolved_type);
-    // if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
+    // if ((!type->is_kind(TYPE_SCALAR) || type->meta.has_extensions())) {
     //   throw_error(std::format("Can only use scalar types (integers, floats, "
     //                           "bools) as constant expressions, got {}",
     //                           type->to_string()),
@@ -653,7 +653,7 @@ void Typer::visit(ASTParamDecl *node) {
 
     auto type = global_get_type(id);
 
-    if (type->get_ext().is_fixed_sized_array()) {
+    if (type->meta.is_fixed_sized_array()) {
       throw_warning(WarningDownCastFixedArrayParam,
                     "using a fixed array as a function parameter: note, this "
                     "casts the length information off and gets passed as as "
@@ -689,7 +689,7 @@ void Typer::visit(ASTContinue *node) { node->control_flow = Control_Flow{BLOCK_F
 
 void Typer::visit(ASTBreak *node) { node->control_flow = Control_Flow{BLOCK_FLAGS_BREAK, Type::INVALID_TYPE_ID}; }
 
-void Typer::compiler_mock_function_call_visit_impl(int left_type, const InternedString &method_name) {
+void Typer::compiler_mock_function_call_visit_impl(int left_type, const Interned_String &method_name) {
   ASTCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -725,7 +725,7 @@ void Typer::visit(ASTFor *node) {
   Type *range_type = global_get_type(range_type_id);
   node->range_type = range_type->id;
 
-  if (range_type->get_ext().has_extensions() && range_type->get_ext().extensions.back().type == TYPE_EXT_POINTER) {
+  if (range_type->meta.has_extensions() && range_type->meta.extensions.back().type == TYPE_EXT_POINTER) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
                             "pointer to an array, range or struct? got type {}",
                             range_type->to_string()),
@@ -733,7 +733,7 @@ void Typer::visit(ASTFor *node) {
   }
 
   int iter_ty = Type::INVALID_TYPE_ID;
-  auto scope = range_type->get_info()->scope;
+  auto scope = range_type->info->scope;
 
   if (range_type->implements("Iterable")) {
     node->iteration_kind = ASTFor::ITERABLE;
@@ -748,19 +748,19 @@ void Typer::visit(ASTFor *node) {
     }
 
     auto symbol_ty = global_get_type(symbol->type_id);
-    auto iter_return_ty = global_get_type(symbol_ty->get_info()->as<FunctionTypeInfo>()->return_type);
+    auto iter_return_ty = global_get_type(symbol_ty->info->as<Function_Info>()->return_type);
     node->iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
 
-    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
+    symbol = iter_return_ty->info->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
   } else if (range_type->implements("Enumerable")) {
     node->iteration_kind = ASTFor::ENUMERABLE;
     // make sure the impl is actually emitted if this is generic.
@@ -773,19 +773,19 @@ void Typer::visit(ASTFor *node) {
                   node->source_range);
     }
     auto iter_return_ty =
-        global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
+        global_get_type(global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type);
     node->iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
 
-    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
+    symbol = iter_return_ty->info->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
   } else if (range_type->implements("Enumerator")) {
     node->iteration_kind = ASTFor::ENUMERATOR;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
@@ -796,9 +796,9 @@ void Typer::visit(ASTFor *node) {
                   "attempting to enumerate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
     node->iterable_type = range_type_id;
-  } else if (range_type->get_base().get_str().starts_with("Iter$")) {
+  } else if (range_type->base.get_str().starts_with("Iter$")) {
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
@@ -825,7 +825,7 @@ void Typer::visit(ASTFor *node) {
     // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit
     // dereference.
     auto type = global_get_type(iter_ty);
-    if (!type->get_ext().is_pointer()) {
+    if (!type->meta.is_pointer()) {
       throw_error("internal compiler error: got `for *.. in ...` but the iter() did not return a pointer type?",
                   node->source_range);
     }
@@ -943,7 +943,7 @@ void Typer::visit(ASTCall *node) {
     throw_error(std::format("unable to call a non-function, got {}", type->to_string()), node->source_range);
   }
 
-  auto info = type->get_info()->as<FunctionTypeInfo>();
+  auto info = type->info->as<Function_Info>();
 
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
@@ -992,7 +992,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   }
 }
 
-void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
+void Typer::type_check_args_from_info(ASTArguments *node, Function_Info *info) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
@@ -1036,7 +1036,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         * I tried to mke it safer, not sure if i did.
       */
 
-      if (gen_t->get_ext().is_pointer() && !func->params->params.empty()) {
+      if (gen_t->meta.is_pointer() && !func->params->params.empty()) {
         // if it == 1, then we skip zero. works out.
         int param_infer_index = func->params->params[0]->tag == ASTParamDecl::Self;
         if (param_infer_index < func->params->params.size() &&
@@ -1066,9 +1066,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
 void Typer::visit(ASTArguments *node) {
   auto type = global_get_type(expected_type);
-  FunctionTypeInfo *info = nullptr;
+  Function_Info *info = nullptr;
   if (type) {
-    info = dynamic_cast<FunctionTypeInfo *>(type->get_info());
+    info = dynamic_cast<Function_Info *>(type->info);
   }
   for (int i = 0; i < node->arguments.size(); ++i) {
     auto arg = node->arguments[i];
@@ -1116,15 +1116,15 @@ template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T de
 
 std::vector<TypeExtension> Typer::accept_extensions(std::vector<AST_Type_Extension> ast_extensions) {
   std::vector<TypeExtension> extensions;
-  for (auto &ext : ast_extensions) {
-    if (ext.type == TYPE_EXT_ARRAY) {
-      auto val = evaluate_constexpr(ext.expression, ctx);
+  for (auto &meta : ast_extensions) {
+    if (meta.type == TYPE_EXT_ARRAY) {
+      auto val = evaluate_constexpr(meta.expression, ctx);
       if (val.tag != Value::INTEGER) {
-        throw_error("Fixed array must have integer size.", ext.expression->source_range);
+        throw_error("Fixed array must have integer size.", meta.expression->source_range);
       }
-      extensions.push_back({ext.type, (size_t)val.integer});
+      extensions.push_back({meta.type, (size_t)val.integer});
     } else {
-      extensions.push_back({.type = ext.type});
+      extensions.push_back({.type = meta.type});
     }
   }
   return extensions;
@@ -1135,7 +1135,7 @@ void Typer::visit(ASTType *node) {
     return;
   }
 
-  TypeExtensions extensions;
+  Type_Metadata extensions;
   extensions.extensions = accept_extensions(node->extensions);
 
   if (node->kind == ASTType::SELF) {
@@ -1241,7 +1241,7 @@ void Typer::visit(ASTType *node) {
     node->resolved_type = global_find_type_id(base_ty->id, extensions);
   } else if (node->kind == ASTType::FUNCTION) {
     auto &func = node->function;
-    FunctionTypeInfo info;
+    Function_Info info;
     // TODO: I don' tthink is is ever null, ever.
     if (func.return_type.is_not_null()) {
       func.return_type.get()->accept(this);
@@ -1290,7 +1290,7 @@ void Typer::visit(ASTBinExpr *node) {
   auto operator_overload_ty = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
   if (operator_overload_ty != -1) {
     node->is_operator_overload = true;
-    node->resolved_type = global_get_type(operator_overload_ty)->get_info()->as<FunctionTypeInfo>()->return_type;
+    node->resolved_type = global_get_type(operator_overload_ty)->info->as<Function_Info>()->return_type;
     return;
   }
 
@@ -1331,7 +1331,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   auto overload = find_operator_overload(node->op.type, type, OPERATION_UNARY);
   if (overload != -1) {
     node->is_operator_overload = true;
-    node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    node->resolved_type = global_get_type(overload)->info->as<Function_Info>()->return_type;
     return;
   }
 
@@ -1344,7 +1344,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   // Dereference.
   if (node->op.type == Token_Type::Mul) {
     auto type = global_get_type(operand_ty);
-    if (type->get_ext().is_pointer()) {
+    if (type->meta.is_pointer()) {
       node->resolved_type = type->get_element_type();
       return;
     } else {
@@ -1405,7 +1405,7 @@ void Typer::visit(ASTLiteral *node) {
       if (expected_type != Type::INVALID_TYPE_ID) {
         auto type = global_get_type(expected_type);
         if (type->is_kind(TYPE_SCALAR) && type_is_numerical(type)) {
-          auto info = (type->get_info()->as<ScalarTypeInfo>());
+          auto info = (type->info->as<Scalar_Info>());
           if (info->is_integral) {
             node->resolved_type = type->id;
             return;
@@ -1458,12 +1458,12 @@ void Typer::visit(ASTDotExpr *node) {
                 node->source_range);
   }
 
-  Scope *base_scope = base_ty->get_info()->scope;
+  Scope *base_scope = base_ty->info->scope;
 
   // Implicit dereference, we look at the base scope.
-  if (base_ty->get_ext().is_pointer()) {
+  if (base_ty->meta.is_pointer()) {
     base_ty = global_get_type(base_ty_id = base_ty->get_element_type());
-    base_scope = base_ty->get_info()->scope;
+    base_scope = base_ty->info->scope;
   }
 
   if (!base_scope) {
@@ -1485,7 +1485,7 @@ void Typer::visit(ASTScopeResolution *node) {
   node->base->accept(this);
   auto id = node->base->resolved_type;
   auto base_ty = global_get_type(id);
-  Scope *scope = base_ty->get_info()->scope;
+  Scope *scope = base_ty->info->scope;
   if (!scope) {
     throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
   }
@@ -1513,15 +1513,15 @@ void Typer::visit(ASTSubscript *node) {
   auto overload = find_operator_overload(Token_Type::LBrace, left_ty, OPERATION_SUBSCRIPT);
   if (overload != -1) {
     node->is_operator_overload = true;
-    node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    node->resolved_type = global_get_type(overload)->info->as<Function_Info>()->return_type;
     return;
   }
 
   // * Todo: reimplement operator overloads with interfaces.
 
-  auto ext = left_ty->get_ext();
+  auto meta = left_ty->meta;
 
-  if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
+  if (!meta.is_fixed_sized_array() && !meta.is_pointer()) {
     throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: "
                             "fn(self*, idx: u32)' method. {}",
                             left_ty->to_string()),
@@ -1543,15 +1543,15 @@ void Typer::visit(ASTInitializerList *node) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
 
-  if (target_type->get_ext().is_pointer() ||
-      target_type->is_kind(TYPE_SCALAR) && target_type->get_ext().has_no_extensions()) {
+  if (target_type->meta.is_pointer() ||
+      target_type->is_kind(TYPE_SCALAR) && target_type->meta.has_no_extensions()) {
     throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
                             "not an array\n\tgot {}",
                             target_type->to_string()),
                 node->source_range);
   }
 
-  auto scope = target_type->get_info()->scope;
+  auto scope = target_type->info->scope;
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_NAMED: {
@@ -1594,7 +1594,7 @@ void Typer::visit(ASTInitializerList *node) {
       // TODO:
       // We can support these types of initializer lists, by creating something in-language like
       // Init_List :: struct![T] {  ptr: T*; length: u64; } and passing this 'dynamic' array to a special function
-      if (target_type->get_ext().is_fixed_sized_array()) {
+      if (target_type->meta.is_fixed_sized_array()) {
         auto &values = node->values;
         // Zero init construction. Pretty redundant.
         if (values.empty()) {
@@ -1628,10 +1628,10 @@ void Typer::visit(ASTInitializerList *node) {
         auto element_ty_ptr = global_get_type(element_type);
         auto target_element_ty_ptr = global_get_type(target_element_type);
 
-        if (element_ty_ptr->is_kind(TYPE_SCALAR) && element_ty_ptr->get_ext().has_no_extensions() &&
-            target_element_ty_ptr->is_kind(TYPE_SCALAR) && target_element_ty_ptr->get_ext().has_no_extensions()) {
-          auto target_info = target_element_ty_ptr->get_info()->as<ScalarTypeInfo>();
-          auto elem_info = element_ty_ptr->get_info()->as<ScalarTypeInfo>();
+        if (element_ty_ptr->is_kind(TYPE_SCALAR) && element_ty_ptr->meta.has_no_extensions() &&
+            target_element_ty_ptr->is_kind(TYPE_SCALAR) && target_element_ty_ptr->meta.has_no_extensions()) {
+          auto target_info = target_element_ty_ptr->info->as<Scalar_Info>();
+          auto elem_info = element_ty_ptr->info->as<Scalar_Info>();
 
           // We allow implicit downcasting/ sign casting, just to prevent annoyances.
           if (target_info->is_integral && elem_info->is_integral) {
@@ -1645,7 +1645,7 @@ void Typer::visit(ASTInitializerList *node) {
             "Failed to assign element type from value passed into collection-style initializer list");
         node->resolved_type = target_type->id;
       } else {
-        if (!target_type->implements("Init") && !target_type->get_base().get_str().contains("Init_List$")) {
+        if (!target_type->implements("Init") && !target_type->base.get_str().contains("Init_List$")) {
           throw_error("Unable to use 'collection style' initalizer lists on non fixed array types that don't implement "
                       "Init![T] interface",
                       node->source_range);
@@ -1723,7 +1723,7 @@ void Typer::visit(ASTSwitch *node) {
   auto type_id = node->target->resolved_type;
   auto type = global_get_type(type_id);
 
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->meta.is_pointer()) {
     auto operator_overload = find_operator_overload(Token_Type::EQ, type, OPERATION_BINARY);
     if (operator_overload == -1) {
       throw_error(
@@ -1777,7 +1777,7 @@ void Typer::visit(ASTTuple *node) {
     auto old = expected_type;
     Defer _([&] { expected_type = old; });
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
-      auto info = declaring_tuple->get_info()->as<TupleTypeInfo>();
+      auto info = declaring_tuple->info->as<TupleTypeInfo>();
       if (info->types.size() < type_index) {
         throw_error(std::format("too many expressions provided to tuple\ntuple type {}", declaring_tuple->to_string()),
                     v->source_range);
@@ -1788,7 +1788,7 @@ void Typer::visit(ASTTuple *node) {
     types.push_back(v->resolved_type);
     type_index++;
   }
-  TypeExtensions extensions;
+  Type_Metadata extensions;
   node->resolved_type = global_find_type_id(types, extensions);
 }
 void Typer::visit(ASTAlias *node) {
@@ -1815,12 +1815,12 @@ void Typer::visit(ASTTupleDeconstruction *node) {
 
   auto type = global_get_type(node->right->resolved_type);
 
-  if (type->get_ext().has_extensions()) {
+  if (type->meta.has_extensions()) {
     throw_error("Cannot destructure pointer or array type.", node->source_range);
   }
 
   if (type->is_kind(TYPE_TUPLE)) {
-    auto info = (type->get_info()->as<TupleTypeInfo>());
+    auto info = (type->info->as<Tuple_Info>());
     if (node->idens.size() != info->types.size()) {
       throw_error(std::format("Cannot currently partially deconstruct a tuple. "
                               "expected {} identifiers to assign, got {}",
@@ -1833,7 +1833,7 @@ void Typer::visit(ASTTupleDeconstruction *node) {
       ctx.scope->insert_variable(iden->value, type, iden);
     }
   } else {
-    auto scope = type->get_info()->scope;
+    auto scope = type->info->scope;
     for (const auto &[name, symbol] : scope->symbols) {
       if (symbol.is_function()) {
         continue;
@@ -1952,7 +1952,7 @@ void Typer::visit(ASTWhere *node) {
   }
 }
 
-int Typer::find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
+int Typer::find_generic_type_of(const Interned_String &base, const std::vector<int> &generic_args,
                                 const Source_Range &source_range) {
   ASTStatement *instantiation = nullptr;
   auto symbol = ctx.scope->lookup(base);
