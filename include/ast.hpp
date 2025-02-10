@@ -12,6 +12,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include <string>
 
 enum AST_Literal_Tag {
   LITERAL_INTEGER,
@@ -31,16 +32,15 @@ struct VisitorBase;
 // used to prevent double includes.
 extern std::unordered_set<Interned_String> import_set;
 
-#include "core.hpp"
-#include <string>
-#include "type.hpp"
 
-enum AST_Node_Type {
+
+enum AST_Node_Type : unsigned char {
   AST_PROGRAM,
+  // AST_FILE, // each file gets its own file scope, then we have modules with nice import semantics. // TODO: implement
+  // me!
   AST_BLOCK,
   AST_FUNCTION,
   AST_DECLARATION,
-  AST_EXPR_STATEMENT,
   AST_BINARY,
   AST_UNARY_EXPR,
   AST_IDENTIFIER,
@@ -75,22 +75,23 @@ enum AST_Node_Type {
   AST_WHERE,
   AST_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
-enum BlockFlags {
+enum BlockFlags : unsigned char {
   BLOCK_FLAGS_FALL_THROUGH = 1 << 0,
   BLOCK_FLAGS_RETURN = 1 << 1,
   BLOCK_FLAGS_CONTINUE = 1 << 2,
   BLOCK_FLAGS_BREAK = 1 << 3,
 };
+
 struct Control_Flow {
-  int flags;
-  int type;
+  unsigned char flags = BLOCK_FLAGS_FALL_THROUGH;
+  int type = Type::INVALID_TYPE_ID;
 };
 
+constexpr const inline static auto block_flags_to_string(const auto flags) {
 #define BLOCK_FLAG_TO_STRING(flag)                                                                                     \
   if (flags & flag)                                                                                                    \
     result += #flag " ";
 
-constexpr const inline static auto block_flags_to_string(const auto flags) {
   static std::string result;
   BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_FALL_THROUGH)
   BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_RETURN)
@@ -162,50 +163,33 @@ enum AST_Initializer_Tag {
   INITIALIZER_COLLECTION,
 };
 
+/*
+  TODO: test out packing this struct.
+  TODO: it will save us like 20 bytes on each node,
+  TODO: and paired with optimizing the entire union itself,
+  TODO: we should get some significant cache boosts.
+*/
+
 struct AST {
-  AST(AST_Node_Type node_type) : node_type(node_type) {}
-  ~AST() {}
-
-  const AST_Node_Type node_type;
-
+  /*
+    Don't reorder these, it's optimized for minimal padding.
+  */
+  const AST_Node_Type node_type : 6; // maximum value of 36, so 6 bit packing might save us a tiny bit of space, the
+                                     // more we can reduce the size of our ast.
+  bool is_emitted : 1 = false;
+  Nullable<AST> declaring_block;
+  Control_Flow control_flow;
+  Source_Range source_range;
+  int resolved_type = Type::INVALID_TYPE_ID;
   AST *parent;
   Scope scope;
-
-  Control_Flow control_flow = {
-      .flags = BLOCK_FLAGS_FALL_THROUGH,
-      .type = Type::INVALID_TYPE_ID,
-  };
-
-  Nullable<AST> declaring_block;
-
-  Source_Range source_range{};
-  int resolved_type = Type::INVALID_TYPE_ID;
-  bool is_emitted = false;
-
-  inline bool is_expr() const {
-    switch (node_type) {
-      case AST_BINARY:
-      case AST_UNARY_EXPR:
-      case AST_IDENTIFIER:
-      case AST_LITERAL:
-      case AST_TYPE:
-      case AST_TUPLE:
-      case AST_CALL:
-      case AST_DOT_EXPR:
-      case AST_SCOPE_RESOLUTION:
-      case AST_SUBSCRIPT:
-      case AST_INITIALIZER:
-      case AST_CAST:
-      case AST_RANGE:
-      case AST_SWITCH:
-        return true;
-      default:
-        return false;
-    }
-  }
-
+  // TODO: optimize the size of the struct & function nodes. Most of our nodes are like 8,16,32 bytes at most.
+  // TODO: yet, we're paying for 200 bytes per node, which is insane.
+  // TODO: we can definitely do some work to get rid of a lot of these vectors, and at the very least write a super
+  // TODO: compact vector, if not just remove a TON of the bloat in the AST.
   union {
     std::vector<AST *> statements;
+
     struct {
       AST_Type_Kind kind = AST_TYPE_NORMAL;
       union {
@@ -225,6 +209,7 @@ struct AST {
       // special info for reflection
       Nullable<AST> pointing_to;
     } type;
+
     struct {
       size_t temp_iden_idx = 0;
       AST *parent;
@@ -233,6 +218,7 @@ struct AST {
       int defer_count = 0;
       int return_type = Type::INVALID_TYPE_ID;
     } block;
+
     AST *expression_statement;
 
     struct {
@@ -255,12 +241,15 @@ struct AST {
       Token_Type op;
       bool is_operator_overload : 1 = false;
     } binary;
+
     struct {
       AST *operand;
       Token_Type op;
       bool is_operator_overload : 1 = false;
     } unary;
+
     Interned_String identifier;
+
     struct {
       AST_Literal_Tag tag;
       bool is_c_string : 1 = false;
@@ -272,9 +261,18 @@ struct AST {
       AST *right;
       Token_Type op;
     } tuple_deconstruction; // TODO: rename to multiple assignment.
+
     std::vector<AST *> tuple;
 
     struct {
+      std::vector<int> generic_arguments;
+      std::vector<GenericParameter> generic_parameters;
+      std::vector<GenericInstance> generic_instantiations;
+      std::vector<AST_Parameter_Declaration> parameters;
+      Interned_String name;
+      Nullable<AST> where_clause; // where T: ... type constraint.
+      Nullable<AST> block;
+      AST *return_type;
       // various flags.
       int16_t flags = 0;
       // has a self/self* parameter.
@@ -285,16 +283,21 @@ struct AST {
       bool has_defer : 1 = false;
       // for methods.
       int declaring_type = Type::INVALID_TYPE_ID;
+    } function; // todo: optimize for size.
 
-      Nullable<AST> where_clause; // where T: ... type constraint.
-      std::vector<int> generic_arguments;
+    struct {
+      std::vector<AST *> subtypes;
+      std::vector<AST *> aliases;
+      std::vector<ASTStructMember> members;
       std::vector<GenericParameter> generic_parameters;
       std::vector<GenericInstance> generic_instantiations;
+      std::vector<AST *> impls;
       Interned_String name;
-      std::vector<AST_Parameter_Declaration> parameters;
-      AST* return_type;
-      Nullable<AST> block;
-    } function;
+      Nullable<AST> where_clause;
+      bool is_fwd_decl : 1 = false;
+      bool is_extern : 1 = false;
+      bool is_union : 1 = false;
+    } $struct; // todo: optimize for size.
 
     struct {
       std::vector<AST *> generic_arguments;
@@ -368,20 +371,6 @@ struct AST {
       AST *index_expression;
     } subscript;
 
-    struct {
-      Nullable<AST> where_clause;
-      Interned_String name;
-      bool is_fwd_decl : 1 = false;
-      bool is_extern : 1 = false;
-      bool is_union : 1 = false;
-      std::vector<AST *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
-      std::vector<AST *> aliases;  // Right now this is only for '#anon :: struct // #anon :: union'
-      std::vector<ASTStructMember> members;
-      std::vector<GenericParameter> generic_parameters;
-      std::vector<GenericInstance> generic_instantiations;
-      std::vector<AST *> impls;
-    } $struct;
-
     AST *size_of;
 
     struct {
@@ -451,6 +440,32 @@ struct AST {
     } where;
   };
 
+  inline bool is_expr() const {
+    switch (node_type) {
+      case AST_BINARY:
+      case AST_UNARY_EXPR:
+      case AST_IDENTIFIER:
+      case AST_LITERAL:
+      case AST_TYPE:
+      case AST_TUPLE:
+      case AST_CALL:
+      case AST_DOT_EXPR:
+      case AST_SCOPE_RESOLUTION:
+      case AST_SUBSCRIPT:
+      case AST_INITIALIZER:
+      case AST_CAST:
+      case AST_RANGE:
+      case AST_SWITCH:
+        return true;
+      default:
+        return false;
+    }
+  }
+
+  AST(AST_Node_Type node_type) : node_type(node_type) {}
+
+  ~AST() {}
+
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
     auto field_ct = 0;
@@ -484,11 +499,7 @@ struct AST {
     return nullptr;
   }
 
-  Symbol *local_lookup(const Interned_String &name) {
-    return scope.lookup(name);
-  }
-
-  // TODO: should this traverse upward to erase?
+  Symbol *local_lookup(const Interned_String &name) { return scope.lookup(name); }
 
   void declare_interface(const Interned_String &name, AST *node);
 
@@ -585,7 +596,6 @@ struct Typer;
 
 struct Parser {
   Typer *typer;
-  Context &ctx;
   Lexer lexer{};
   std::vector<Lexer::State> states;
   Nullable<AST> current_struct_decl = nullptr;
@@ -654,7 +664,7 @@ struct Parser {
   // returns true if successful, false if already included
   void import(Interned_String name);
 
-  Parser(const std::string &filename, Context &context);
+  Parser(const std::string &filename);
   ~Parser();
 };
 
@@ -694,10 +704,7 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   DEFINE_VISITOR(program)                                                                                              \
   DEFINE_VISITOR(block)                                                                                                \
   DEFINE_VISITOR(function_declaration)                                                                                 \
-  DEFINE_VISITOR(params_decl)                                                                                          \
-  DEFINE_VISITOR(param_decl)                                                                                           \
   DEFINE_VISITOR(declaration)                                                                                          \
-  DEFINE_VISITOR(expr_statement)                                                                                       \
   DEFINE_VISITOR(bin_expr)                                                                                             \
   DEFINE_VISITOR(unary_expr)                                                                                           \
   DEFINE_VISITOR(identifier)                                                                                           \
@@ -705,7 +712,6 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   DEFINE_VISITOR(type)                                                                                                 \
   DEFINE_VISITOR(tuple)                                                                                                \
   DEFINE_VISITOR(call)                                                                                                 \
-  DEFINE_VISITOR(arguments)                                                                                            \
   DEFINE_VISITOR(return)                                                                                               \
   DEFINE_VISITOR(continue)                                                                                             \
   DEFINE_VISITOR(break)                                                                                                \
@@ -736,10 +742,7 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_program(AST *node) {}                                                                               \
   void type::visit_block(AST *node) {}                                                                                 \
   void type::visit_function_declaration(AST *node) {}                                                                  \
-  void type::visit_params_decl(AST *node) {}                                                                           \
-  void type::visit_param_decl(AST *node) {}                                                                            \
   void type::visit_declaration(AST *node) {}                                                                           \
-  void type::visit_expr_statement(AST *node) {}                                                                        \
   void type::visit_bin_expr(AST *node) {}                                                                              \
   void type::visit_unary_expr(AST *node) {}                                                                            \
   void type::visit_identifier(AST *node) {}                                                                            \
@@ -747,7 +750,6 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_type(AST *node) {}                                                                                  \
   void type::visit_tuple(AST *node) {}                                                                                 \
   void type::visit_call(AST *node) {}                                                                                  \
-  void type::visit_arguments(AST *node) {}                                                                             \
   void type::visit_return(AST *node) {}                                                                                \
   void type::visit_continue(AST *node) {}                                                                              \
   void type::visit_break(AST *node) {}                                                                                 \
@@ -773,6 +775,5 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_switch(AST *node) {}                                                                                \
   void type::visit_tuple_deconstruction(AST *node) {}                                                                  \
   void type::visit_where(AST *node) {}
-
 
 AST *get_void_type();

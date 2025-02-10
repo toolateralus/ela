@@ -10,7 +10,7 @@
 
 #include "interned_string.hpp"
 
-enum struct Token_Type: char {
+enum struct Token_Type : char {
   Eof = -1,
   Identifier,
   Integer,
@@ -105,8 +105,8 @@ enum struct Token_Type: char {
   Size_Of,
 };
 
-#define Token_Type_Case(type)                                                                                               \
-  case Token_Type::type:                                                                                                    \
+#define Token_Type_Case(type)                                                                                          \
+  case Token_Type::type:                                                                                               \
     return #type
 
 static inline std::string Token_Type_To_String(Token_Type type) {
@@ -208,9 +208,9 @@ enum struct TFamily {
 
 struct SourceLocation {
   SourceLocation() {}
-  SourceLocation(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
-  size_t line = 0, column = 0;
-  size_t file = 0;
+  SourceLocation(int32_t line, int32_t column, std::int32_t file) : line(line), column(column), file(file) {}
+  int32_t line = 0, column = 0;
+  int32_t file = 0;
 
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
@@ -219,26 +219,28 @@ struct SourceLocation {
   std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
 };
 
-struct Token {
-  inline bool is_relational() const {
-    switch (type) {
-      case Token_Type::LT:
-      case Token_Type::GT:
-      case Token_Type::EQ:
-      case Token_Type::NEQ:
-      case Token_Type::LE:
-      case Token_Type::GE:
-      case Token_Type::LogicalOr:
-      case Token_Type::LogicalAnd:
-        return true;
-      default:
-        return false;
-    }
+inline bool is_relational(Token_Type type) {
+  switch (type) {
+    case Token_Type::LT:
+    case Token_Type::GT:
+    case Token_Type::EQ:
+    case Token_Type::NEQ:
+    case Token_Type::LE:
+    case Token_Type::GE:
+    case Token_Type::LogicalOr:
+    case Token_Type::LogicalAnd:
+      return true;
+    default:
+      return false;
   }
+}
+
+struct Token {
   inline bool is_comp_assign() const {
-    return type == Token_Type::CompAdd || type == Token_Type::CompSub || type == Token_Type::CompMul || type == Token_Type::CompDiv ||
-           type == Token_Type::CompMod || type == Token_Type::CompAnd || type == Token_Type::CompOr || type == Token_Type::CompXor ||
-           type == Token_Type::CompSHL || type == Token_Type::CompSHR;
+    return type == Token_Type::CompAdd || type == Token_Type::CompSub || type == Token_Type::CompMul ||
+           type == Token_Type::CompDiv || type == Token_Type::CompMod || type == Token_Type::CompAnd ||
+           type == Token_Type::CompOr || type == Token_Type::CompXor || type == Token_Type::CompSHL ||
+           type == Token_Type::CompSHR;
   }
 
   Token() {}
@@ -290,56 +292,56 @@ static std::unordered_map<std::string, Token_Type> keywords{
 };
 
 static std::unordered_map<std::string, Token_Type> operators{{"=>", Token_Type::ExpressionBody},
-                                                        {":", Token_Type::Colon},
-                                                        {":=", Token_Type::ColonEquals},
-                                                        {"...", Token_Type::Varargs},
-                                                        {"#", Token_Type::Directive},
-                                                        {".", Token_Type::Dot},
-                                                        {"!", Token_Type::LogicalNot},
-                                                        {"~", Token_Type::Not},
-                                                        {"::", Token_Type::DoubleColon},
-                                                        {"->", Token_Type::Arrow},
-                                                        {"..", Token_Type::Range},
-                                                        {"+", Token_Type::Add},
-                                                        {"-", Token_Type::Sub},
-                                                        {"*", Token_Type::Mul},
-                                                        {"/", Token_Type::Div},
-                                                        {"%", Token_Type::Modulo},
-                                                        {"=", Token_Type::Assign},
-                                                        {",", Token_Type::Comma},
-                                                        {";", Token_Type::Semi},
-                                                        {"(", Token_Type::LParen},
-                                                        {")", Token_Type::RParen},
-                                                        {"{", Token_Type::LCurly},
-                                                        {"}", Token_Type::RCurly},
-                                                        {"|", Token_Type::Or},
-                                                        {"&", Token_Type::And},
-                                                        {"||", Token_Type::LogicalOr},
-                                                        {"&&", Token_Type::LogicalAnd},
-                                                        {"<<", Token_Type::SHL},
-                                                        {">>", Token_Type::SHR},
-                                                        {"^", Token_Type::Xor},
-                                                        {"<", Token_Type::LT},
-                                                        {">", Token_Type::GT},
-                                                        {"==", Token_Type::EQ},
-                                                        {"!=", Token_Type::NEQ},
-                                                        {"<=", Token_Type::LE},
-                                                        {">=", Token_Type::GE},
-                                                        {"[", Token_Type::LBrace},
-                                                        {"]", Token_Type::RBrace},
-                                                        {"++", Token_Type::Increment},
-                                                        {"--", Token_Type::Decrement},
-                                                        {"+=", Token_Type::CompAdd},
-                                                        {"-=", Token_Type::CompSub},
-                                                        {"*=", Token_Type::CompMul},
-                                                        {"/=", Token_Type::CompDiv},
-                                                        {"%=", Token_Type::CompMod},
-                                                        {"&=", Token_Type::CompAnd},
-                                                        {"|=", Token_Type::CompOr},
-                                                        {"^=", Token_Type::CompXor},
-                                                        {"<<=", Token_Type::CompSHL},
-                                                        {">>=", Token_Type::CompSHR},
-                                                        {"![", Token_Type::GenericBrace}};
+                                                             {":", Token_Type::Colon},
+                                                             {":=", Token_Type::ColonEquals},
+                                                             {"...", Token_Type::Varargs},
+                                                             {"#", Token_Type::Directive},
+                                                             {".", Token_Type::Dot},
+                                                             {"!", Token_Type::LogicalNot},
+                                                             {"~", Token_Type::Not},
+                                                             {"::", Token_Type::DoubleColon},
+                                                             {"->", Token_Type::Arrow},
+                                                             {"..", Token_Type::Range},
+                                                             {"+", Token_Type::Add},
+                                                             {"-", Token_Type::Sub},
+                                                             {"*", Token_Type::Mul},
+                                                             {"/", Token_Type::Div},
+                                                             {"%", Token_Type::Modulo},
+                                                             {"=", Token_Type::Assign},
+                                                             {",", Token_Type::Comma},
+                                                             {";", Token_Type::Semi},
+                                                             {"(", Token_Type::LParen},
+                                                             {")", Token_Type::RParen},
+                                                             {"{", Token_Type::LCurly},
+                                                             {"}", Token_Type::RCurly},
+                                                             {"|", Token_Type::Or},
+                                                             {"&", Token_Type::And},
+                                                             {"||", Token_Type::LogicalOr},
+                                                             {"&&", Token_Type::LogicalAnd},
+                                                             {"<<", Token_Type::SHL},
+                                                             {">>", Token_Type::SHR},
+                                                             {"^", Token_Type::Xor},
+                                                             {"<", Token_Type::LT},
+                                                             {">", Token_Type::GT},
+                                                             {"==", Token_Type::EQ},
+                                                             {"!=", Token_Type::NEQ},
+                                                             {"<=", Token_Type::LE},
+                                                             {">=", Token_Type::GE},
+                                                             {"[", Token_Type::LBrace},
+                                                             {"]", Token_Type::RBrace},
+                                                             {"++", Token_Type::Increment},
+                                                             {"--", Token_Type::Decrement},
+                                                             {"+=", Token_Type::CompAdd},
+                                                             {"-=", Token_Type::CompSub},
+                                                             {"*=", Token_Type::CompMul},
+                                                             {"/=", Token_Type::CompDiv},
+                                                             {"%=", Token_Type::CompMod},
+                                                             {"&=", Token_Type::CompAnd},
+                                                             {"|=", Token_Type::CompOr},
+                                                             {"^=", Token_Type::CompXor},
+                                                             {"<<=", Token_Type::CompSHL},
+                                                             {">>=", Token_Type::CompSHR},
+                                                             {"![", Token_Type::GenericBrace}};
 
 struct Lexer {
   struct State {
@@ -351,11 +353,11 @@ struct Lexer {
     std::string input{};
     std::filesystem::path path;
     std::deque<Token> lookahead_buffer{};
-    size_t pos = 0;
-    size_t col = 1;
-    size_t line = 1;
-    size_t file_idx{};
-    size_t input_len{};
+    int32_t pos = 0;
+    int32_t col = 1;
+    int32_t line = 1;
+    int32_t file_idx{};
+    int32_t input_len{};
 
     static State from_string(const std::string &input) { return State(input, 0, input.length(), ""); }
 

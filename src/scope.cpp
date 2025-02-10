@@ -41,11 +41,11 @@
 //     if (type_table[i]->kind == TYPE_FUNCTION) {
 //       continue;
 //     }
-//     if (type_table[i]->info->scope) {
-//       type_table[i]->info->scope->parent = root_scope;
+//     if (type_table[i]->get_info()->scope) {
+//       type_table[i]->get_info()->scope->parent = root_scope;
 //     }
 
-//     root_scope->create_type_alias(type_table[i]->base, i, type_table[i]->kind, nullptr);
+//     root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
 //   }
 // }
 
@@ -54,7 +54,7 @@
 //   symbols.insert({name, Symbol::create_type(-1, name, TYPE_INTERFACE, node)});
 // }
 
-Symbol *Scope::lookup(const Interned_String &name) {
+Symbol *Scope::lookup(const InternedString &name) {
   if (head == nullptr) {
     return nullptr;
   }
@@ -68,16 +68,24 @@ Symbol *Scope::lookup(const Interned_String &name) {
   return nullptr;
 }
 
+
 void Scope::insert(const Symbol &symbol) {
   Symbol **sym = &head;
   while (*sym) {
+    // Overwrite if we find a symbol with a matching name.
+    if ((*sym)->name == symbol.name) {
+      **sym = symbol;
+      return;
+    }
     sym = &(*sym)->next;
   }
+  // Insert the new symbol at the end of the list
   *sym = (Symbol *)symbol_arena.allocate(sizeof(Symbol));
   **sym = symbol;
 }
 
-bool Scope::erase(const Interned_String &name) {
+
+bool Scope::erase(const InternedString &name) {
   Symbol **sym = &head;
   while (*sym) {
     if ((*sym)->name == name) {

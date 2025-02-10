@@ -22,6 +22,9 @@
 using std::string;
 using std::vector;
 
+// this is for our drop in replacement for vector, which is more size conscious, and never copies or frees data.
+jstl::Arena list_arena{MB(10)};
+
 // the same for this
 jstl::Arena ast_arena{MB(10)};
 

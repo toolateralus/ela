@@ -9,9 +9,9 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-void emit(AST *root, Context& context, Typer &type_visitor) {
-  Emitter emit(context, type_visitor);
-  DependencyEmitter dependencyEmitter(context, &emit);
+void emit(AST *root, Typer &type_visitor) {
+  Emitter emit(type_visitor);
+  DependencyEmitter dependency_emitter(&emit);
 
   static const auto testing = compile_command.has_flag("test");
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
@@ -36,7 +36,7 @@ void emit(AST *root, Context& context, Typer &type_visitor) {
 
   if (!is_freestanding) {
     emit.code << "typedef struct Type Type;\n";
-    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    auto type_ptr_id = root->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
     emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
                         type_ptr_id);
   }
@@ -45,8 +45,8 @@ void emit(AST *root, Context& context, Typer &type_visitor) {
     emit.code << "#define TESTING\n";
   }
 
-  root->accept(&dependencyEmitter);
-  root->accept(&emit);
+  dependency_emitter.visit(root);
+  emit.visit(root);
 
   std::filesystem::current_path(compile_command.original_path);
   std::ofstream output(compile_command.output_path);
@@ -63,18 +63,17 @@ void emit(AST *root, Context& context, Typer &type_visitor) {
 
 int CompileCommand::compile() {
   Lexer lexer{};
-  Context context{};
   original_path = std::filesystem::current_path();
   parse.begin();
-  Parser parser(input_path.string(), context);
-  ASTProgram *root = parser.parse();
+  Parser parser(input_path.string());
+  AST *root = parser.parse();
   parse.end("parsing done.");
 
   lower.begin();
-  Typer type_visitor{context};
+  Typer type_visitor;
   type_visitor.visit(root);
 
-  emit(root, context, type_visitor);
+  emit(root, type_visitor);
   
   lower.end("lowering to cpp complete");
 

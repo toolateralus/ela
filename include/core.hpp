@@ -7,6 +7,7 @@
 #include <iostream>
 #include <unordered_map>
 
+#include "arena.hpp"
 #include "lex.hpp"
 
 #define MB(n) (n * 1024 * 1024)
@@ -14,8 +15,7 @@
 
 // simple pointer wrapper that expresses intent about whether a pointer is optional or not
 // without a nasty allocating wrapper like std::optional (which is also annoying to type)
-template <class T>
-struct Nullable {
+template <class T> struct Nullable {
   ~Nullable() = default;
   Nullable() {}
   Nullable(T *ptr) : ptr(ptr) {}
@@ -70,7 +70,7 @@ struct CompileCommand {
   std::filesystem::path input_path;
   std::filesystem::path output_path;
   std::filesystem::path binary_path;
-  std::filesystem::path original_path;  // where the compiler was invoked from
+  std::filesystem::path original_path; // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
   std::string compilation_flags;
 
@@ -99,8 +99,7 @@ struct Defer {
   ~Defer() { func(); }
 };
 
-template <class T>
-struct std::formatter<std::vector<T>> {
+template <class T> struct std::formatter<std::vector<T>> {
   constexpr auto parse(std::format_parse_context &context) { return context.begin(); }
   auto format(const std::vector<T> &sVal, std::format_context &context) const {
     auto out = context.out();
@@ -114,48 +113,4 @@ struct std::formatter<std::vector<T>> {
     out = std::format_to(out, "]");
     return out;
   }
-};
-
-
-template <class T>
-requires(std::is_enum_v<T>)
-struct Flags {
-  using underlying = std::underlying_type_t<T>;
-  Flags() = default;
-  Flags(T value) : value(static_cast<underlying>(value)) {}
-  Flags(underlying value) : value(value) {}
-
-  inline Flags &operator|=(T other) {
-    value |= static_cast<underlying>(other);
-    return *this;
-  }
-  inline Flags &operator&=(T other) {
-    value &= static_cast<underlying>(other);
-    return *this;
-  }
-  inline Flags operator|(T other) const {
-    return Flags(value | static_cast<underlying>(other));
-  }
-  inline Flags operator&(T other) const {
-    return Flags(value & static_cast<underlying>(other));
-  }
-
-  inline Flags &operator|=(underlying other) {
-    value |= other;
-    return *this;
-  }
-  inline Flags &operator&=(underlying other) {
-    value &= other;
-    return *this;
-  }
-  inline Flags operator|(underlying other) const {
-    return Flags(value | other);
-  }
-  inline Flags operator&(underlying other) const {
-    return Flags(value & other);
-  }
-  inline explicit operator bool() const {
-    return value != 0;
-  }
-  underlying value{};
 };

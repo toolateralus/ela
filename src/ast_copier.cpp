@@ -1,56 +1,64 @@
 #include "ast_copier.hpp"
 #include "ast.hpp"
+#include "scope.hpp"
 
 AST *ASTCopier::copy(AST *node) {
   switch (node->node_type) {
-    case AST_NODE_PROGRAM:
-    case AST_NODE_BLOCK:
-    case AST_NODE_FUNCTION:
-    case AST_NODE_DECLARATION:
-    case AST_NODE_EXPR_STATEMENT:
-    case AST_NODE_BIN_EXPR:
-    case AST_NODE_UNARY_EXPR:
-    case AST_NODE_IDENTIFIER:
-    case AST_NODE_LITERAL:
-    case AST_NODE_TYPE:
-    case AST_NODE_TUPLE:
-    case AST_NODE_CALL:
-    case AST_NODE_RETURN:
-    case AST_NODE_CONTINUE:
-    case AST_NODE_BREAK:
-    case AST_NODE_FOR:
-    case AST_NODE_IF:
-    case AST_NODE_ELSE:
-    case AST_NODE_WHILE:
-    case AST_NODE_STRUCT:
-    case AST_NODE_DOT_EXPR:
-    case AST_NODE_SCOPE_RESOLUTION:
-    case AST_NODE_SUBSCRIPT:
-    case AST_NODE_INITIALIZER_LIST:
-    case AST_NODE_ENUM:
-    case AST_NODE_NOOP:
-    case AST_NODE_ALIAS:
-    case AST_NODE_IMPL:
-    case AST_NODE_INTERFACE:
-    case AST_NODE_SIZE_OF:
-    case AST_NODE_DEFER:
-    case AST_NODE_CAST:
-    case AST_NODE_LAMBDA:
-    case AST_NODE_RANGE:
-    case AST_NODE_SWITCH:
-    case AST_NODE_TUPLE_DECONSTRUCTION:
-    case AST_NODE_WHERE:
-    case AST_NODE_STATEMENT_LIST:
+    case AST_PROGRAM:
+    case AST_BLOCK:
+    case AST_FUNCTION:
+    case AST_DECLARATION:
+    case AST_UNARY_EXPR:
+    case AST_IDENTIFIER:
+    case AST_LITERAL:
+    case AST_TYPE:
+    case AST_TUPLE:
+    case AST_CALL:
+    case AST_RETURN:
+    case AST_CONTINUE:
+    case AST_BREAK:
+    case AST_FOR:
+    case AST_IF:
+    case AST_ELSE:
+    case AST_WHILE:
+    case AST_STRUCT:
+    case AST_DOT_EXPR:
+    case AST_SCOPE_RESOLUTION:
+    case AST_SUBSCRIPT:
+    case AST_ENUM:
+    case AST_NOOP:
+    case AST_ALIAS:
+    case AST_IMPL:
+    case AST_INTERFACE:
+    case AST_SIZE_OF:
+    case AST_DEFER:
+    case AST_CAST:
+    case AST_LAMBDA:
+    case AST_RANGE:
+    case AST_SWITCH:
+    case AST_TUPLE_DECONSTRUCTION:
+    case AST_WHERE:
+    case AST_STATEMENT_LIST:
+    case AST_BINARY:
+    case AST_INITIALIZER:
       break;
   }
 }
-Scope *ASTCopier::copy_scope(Scope *old) {
-  auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope(*old);
-  if (current_scope) {
-    scope->parent = current_scope;
+
+Scope ASTCopier::copy_scope(Scope *old) {
+  Scope new_scope;
+  Symbol *current = old->head;
+  Symbol **new_sym = &new_scope.head;
+
+  while (current) {
+    *new_sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol(*current);
+    new_sym = &(*new_sym)->next;
+    current = current->next;
   }
-  return scope;
+
+  return new_scope;
 }
+
 AST *ASTCopier::copy_program(AST *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
@@ -382,87 +390,87 @@ AST *ASTCopier::copy_where(AST *node) {
 AST *ASTCopier::copy_node(AST *node) {
   const auto type = node->node_type;
   switch (type) {
-    case AST_NODE_WHERE:
+    case AST_WHERE:
       return copy_where(node);
-    case AST_NODE_CAST:
+    case AST_CAST:
       return copy_cast(node);
-    case AST_NODE_IMPL:
+    case AST_IMPL:
       return copy_impl(node);
-    case AST_NODE_PROGRAM:
+    case AST_PROGRAM:
       return copy_program(node);
-    case AST_NODE_BLOCK:
+    case AST_BLOCK:
       return copy_block(node);
-    case AST_NODE_FUNCTION:
+    case AST_FUNCTION:
       return copy_function_declaration(node);
-    case AST_NODE_PARAMS_DECL:
+    case AST_PARAMS_DECL:
       return copy_params_decl(node);
-    case AST_NODE_PARAM_DECL:
+    case AST_PARAM_DECL:
       return copy_param_decl(node);
-    case AST_NODE_DECLARATION:
+    case AST_DECLARATION:
       return copy_declaration(node);
-    case AST_NODE_EXPR_STATEMENT:
+    case AST_EXPR_STATEMENT:
       return copy_expr_statement(node);
-    case AST_NODE_BIN_EXPR:
+    case AST_BIN_EXPR:
       return copy_bin_expr(node);
-    case AST_NODE_UNARY_EXPR:
+    case AST_UNARY_EXPR:
       return copy_unary_expr(node);
-    case AST_NODE_IDENTIFIER:
+    case AST_IDENTIFIER:
       return copy_identifier(node);
-    case AST_NODE_LITERAL:
+    case AST_LITERAL:
       return copy_literal(node);
-    case AST_NODE_TYPE:
+    case AST_TYPE:
       return copy_type(node);
-    case AST_NODE_TUPLE:
+    case AST_TUPLE:
       return copy_tuple(node);
-    case AST_NODE_CALL:
+    case AST_CALL:
       return copy_call(node);
-    case AST_NODE_ARGUMENTS:
+    case AST_ARGUMENTS:
       return copy_arguments(node);
-    case AST_NODE_RETURN:
+    case AST_RETURN:
       return copy_return(node);
-    case AST_NODE_CONTINUE:
+    case AST_CONTINUE:
       return copy_continue(node);
-    case AST_NODE_BREAK:
+    case AST_BREAK:
       return copy_break(node);
-    case AST_NODE_FOR:
+    case AST_FOR:
       return copy_for(node);
-    case AST_NODE_IF:
+    case AST_IF:
       return copy_if(node);
-    case AST_NODE_ELSE:
+    case AST_ELSE:
       return copy_else(node);
-    case AST_NODE_WHILE:
+    case AST_WHILE:
       return copy_while(node);
-    case AST_NODE_STRUCT:
+    case AST_STRUCT:
       return copy_struct_declaration(node);
-    case AST_NODE_DOT_EXPR:
+    case AST_DOT_EXPR:
       return copy_dot_expr(node);
-    case AST_NODE_SCOPE_RESOLUTION:
+    case AST_SCOPE_RESOLUTION:
       return copy_scope_resolution(node);
-    case AST_NODE_SUBSCRIPT:
+    case AST_SUBSCRIPT:
       return copy_subscript(node);
-    case AST_NODE_INITIALIZER_LIST:
+    case AST_INITIALIZER_LIST:
       return copy_initializer_list(node);
-    case AST_NODE_ENUM_DECLARATION:
+    case AST_ENUM_DECLARATION:
       return copy_enum_declaration(node);
-    case AST_NODE_RANGE:
+    case AST_RANGE:
       return copy_range(node);
-    case AST_NODE_SWITCH:
+    case AST_SWITCH:
       return copy_switch(node);
-    case AST_NODE_TUPLE_DECONSTRUCTION:
+    case AST_TUPLE_DECONSTRUCTION:
       return copy_tuple_deconstruction(node);
-    case AST_NODE_INTERFACE_DECLARATION:
+    case AST_INTERFACE_DECLARATION:
       return copy_interface_declaration(node);
-    case AST_NODE_NOOP:
+    case AST_NOOP:
       return node;
-    case AST_NODE_ALIAS:
+    case AST_ALIAS:
       return copy_alias(node);
-    case AST_NODE_SIZE_OF:
+    case AST_SIZE_OF:
       return copy_sizeof(static_cast<ASTSize_Of *>(node));
-    case AST_NODE_DEFER:
+    case AST_DEFER:
       return copy_defer(node);
-    case AST_NODE_LAMBDA:
+    case AST_LAMBDA:
       return copy_lambda(node);
-    case AST_NODE_STATEMENT_LIST:
+    case AST_STATEMENT_LIST:
       return copy_statement_list(node);
   }
 }

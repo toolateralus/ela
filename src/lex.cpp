@@ -17,11 +17,11 @@ static std::unordered_set<std::string> reserved = {
 
 
 void Lexer::get_token(State &state) {
-  size_t &pos = state.pos;
+  auto &pos = state.pos;
   const std::string &input = state.input;
   const size_t len = state.input_len;
-  size_t &lines = state.line;
-  size_t &col = state.col;
+  auto &lines = state.line;
+  auto &col = state.col;
   std::stringstream token;
 
   while (pos < len) {

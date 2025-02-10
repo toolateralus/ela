@@ -2,7 +2,6 @@
 #include "error.hpp"
 #include "interned_string.hpp"
 
-struct Context;
 struct AST;
 struct Value {
   enum {
@@ -264,4 +263,4 @@ struct Value {
   }
 };
 
-Value evaluate_constexpr(AST *node, Context &ctx);
+Value evaluate_constexpr(AST *node);

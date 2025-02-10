@@ -66,7 +66,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
     executed = !has_def(symbol);
   } else if (kind == PREPROC_IF) { // Handling #if
     auto condition = parser->parse_expr();
-    auto value = evaluate_constexpr(condition, parser->ctx);
+    auto value = evaluate_constexpr(condition);
     executed = value.is_truthy();
   } else {
     throw_error("internal compiler error: Invalid #if/#ifdef/#ifndef, "
@@ -116,7 +116,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
 void Parser::parse_parameters(const std::vector<GenericParameter> &generic_parameters, AST *node) {
   expect(Token_Type::LParen);
   AST *type = nullptr;
-  auto &function = node->function; 
+  auto &function = node->function;
   while (peek().type != Token_Type::RParen) {
     AST_Parameter_Declaration param;
     if (function.is_varargs) {
@@ -172,7 +172,6 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
     }
     function.parameters.push_back(param);
 
-
     if (peek().type != Token_Type::RParen) {
       expect(Token_Type::Comma);
     } else
@@ -180,6 +179,13 @@ void Parser::parse_parameters(const std::vector<GenericParameter> &generic_param
   }
   expect(Token_Type::RParen);
 }
+
+// TODO: we can make most of these concrete keywords, and stop using the directive routines for the most part.
+// Also, we want to introduce a @tribute system like @const, @foreign, @public, etc, where it trails a definition
+
+// function :: fn() @const @public @static {
+//   ... do something
+// }
 
 // clang-format off
 std::vector<DirectiveRoutine> Parser:: directive_routines = {
@@ -748,6 +754,37 @@ AST *Parser::parse_primary() {
     return directive_expr.get();
   }
 
+  // .{} initializer lists.
+  if (tok.type == Token_Type::Dot && lookahead_buf()[1].type == Token_Type::LCurly) {
+    eat(); // eat .
+    eat(); // eat {
+    NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+    if (peek().type == Token_Type::RCurly) {
+      init_list->initializer.tag = INITIALIZER_EMPTY;
+    } else if (lookahead_buf()[1].type != Token_Type::Colon) {
+      init_list->initializer.tag = INITIALIZER_COLLECTION;
+      while (peek().type != Token_Type::RCurly) {
+        init_list->initializer.values.push_back(parse_expr());
+        if (peek().type == Token_Type::Comma) {
+          eat();
+        }
+      }
+    } else {
+      init_list->initializer.tag = INITIALIZER_NAMED;
+      while (peek().type != Token_Type::RCurly) {
+        auto identifier = expect(Token_Type::Identifier).value;
+        expect(Token_Type::Colon);
+        init_list->initializer.key_values.push_back({identifier, parse_expr()});
+        if (peek().type == Token_Type::Comma) {
+          eat();
+        }
+      }
+    }
+    expect(Token_Type::RCurly);
+    end_node(init_list, range);
+    return init_list;
+  }
+
   switch (tok.type) {
     case Token_Type::Size_Of: {
       NODE_ALLOC(AST_SIZE_OF, node, range, this, _);
@@ -789,48 +826,7 @@ AST *Parser::parse_primary() {
       end_node(node, range);
       return node;
     }
-    case Token_Type::LCurly: {
-      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
-      eat();
-      if (peek().type == Token_Type::RCurly) {
-        init_list->initializer.tag = INITIALIZER_EMPTY;
-      } else if (lookahead_buf()[1].type != Token_Type::Colon) {
-        init_list->initializer.tag = INITIALIZER_COLLECTION;
-        while (peek().type != Token_Type::RCurly) {
-          init_list->initializer.values.push_back(parse_expr());
-          if (peek().type == Token_Type::Comma) {
-            eat();
-          }
-        }
-      } else {
-        init_list->initializer.tag = INITIALIZER_NAMED;
-        while (peek().type != Token_Type::RCurly) {
-          auto identifier = expect(Token_Type::Identifier).value;
-          expect(Token_Type::Colon);
-          init_list->initializer.key_values.push_back({identifier, parse_expr()});
-          if (peek().type == Token_Type::Comma) {
-            eat();
-          }
-        }
-      }
-      expect(Token_Type::RCurly);
-      end_node(init_list, range);
-      return init_list;
-    }
     case Token_Type::Identifier: {
-      if (last_parent->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
-        auto type = parse_type();
-        if (peek().type == Token_Type::LCurly) {
-          auto init_list = parse_expr();
-          if (init_list->node_type != AST_INITIALIZER) {
-            throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
-                        init_list->source_range);
-          }
-          init_list->initializer.target_type = type;
-          return init_list;
-        }
-        return type;
-      }
       NODE_ALLOC(AST_IDENTIFIER, iden, range, this, _)
       eat();
       iden->identifier = tok.value;
@@ -990,6 +986,16 @@ AST *Parser::parse_type() {
   }
 
   append_type_extensions(type);
+
+  if (peek().type == Token_Type::Dot && lookahead_buf()[1].type == Token_Type::LCurly) {
+    auto init_list = parse_expr();
+    if (init_list->node_type != AST_INITIALIZER) {
+      throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
+                  init_list->source_range);
+    }
+    init_list->initializer.target_type = type;
+    return init_list;
+  }
 
   end_node(type, range);
   return type;
@@ -1156,10 +1162,7 @@ AST *Parser::parse_statement() {
   if (peek().type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::DoubleColon &&
       lookahead_buf()[2].type == Token_Type::Identifier &&
       (lookahead_buf()[3].type == Token_Type::GenericBrace || lookahead_buf()[3].type == Token_Type::LParen)) {
-    NODE_ALLOC(AST_EXPR_STATEMENT, expr, range, this, _)
-    expr->expression_statement = parse_expr();
-    end_node(expr, range);
-    return expr;
+    return parse_expr();
   }
 
   // * Type declarations.
@@ -1188,13 +1191,6 @@ AST *Parser::parse_statement() {
     decl->declaration.name = tok.value;
     decl->declaration.value = parse_expr();
     decl->declaration.is_constexpr = true;
-
-    if (last_parent->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
-      end_node(nullptr, range);
-      throw_error("Invalid variable declaration: a type or keyword exists with "
-                  "that name,",
-                  range);
-    }
 
     end_node(decl, range);
     if (last_parent->local_lookup(tok.value)) {
@@ -1230,13 +1226,11 @@ AST *Parser::parse_statement() {
 
     if (is_call || is_increment_or_decrement || is_identifier_with_lbrace_or_dot || is_assignment_or_compound ||
         is_deref || is_special_case) {
-      NODE_ALLOC(AST_EXPR_STATEMENT, statement, range, this, _)
-      statement->expression_statement = parse_expr();
-      if (statement->node_type == AST_SWITCH) {
-        statement->$switch.is_statement = true;
+      auto expr = parse_expr();
+      if (expr->node_type == AST_SWITCH) {
+        expr->$switch.is_statement = true;
       }
-      end_node(statement, range);
-      return statement;
+      return expr;
     }
   }
 
@@ -1262,11 +1256,6 @@ AST *Parser::parse_statement() {
     if (last_parent->lookup(tok.value)) {
       eat();
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
-    }
-
-    if (last_parent->find_type_id(tok.value, {}) == Type::INVALID_TYPE_ID) {
-      eat();
-      throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
     }
 
     eat();
@@ -1331,13 +1320,6 @@ AST *Parser::parse_declaration() {
   auto &decl = node->declaration;
   auto iden = eat();
   decl.name = iden.value;
-
-  if (last_parent->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
-    end_node(nullptr, range);
-    throw_error("Invalid variable declaration: a type or keyword exists with "
-                "that name,",
-                range);
-  }
 
   if (peek().type == Token_Type::Colon) {
     expect(Token_Type::Colon);
@@ -1492,10 +1474,6 @@ AST *Parser::parse_enum_declaration(Token tok) {
   expect(Token_Type::Enum);
   node->$enum.name = tok.value;
   expect(Token_Type::LCurly);
-  if (node->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
-    end_node(node, range);
-    throw_error("Redefinition of enum " + tok.value.get_str(), range);
-  }
 
   NODE_ALLOC(AST_LITERAL, zero, lit_range, this, _1)
   zero->literal.tag = LITERAL_INTEGER;
@@ -1592,7 +1570,7 @@ AST *Parser::parse_impl() {
   node->scope.clear();
 
   for (const auto &statement : block->statements) {
-    // TODO: allow constants, aliases, #ifs, #ifdef blah blah whatever a ton more nodes than just 
+    // TODO: allow constants, aliases, #ifs, #ifdef blah blah whatever a ton more nodes than just
     // functions.
     if (statement->node_type == AST_FUNCTION) {
       impl.methods.push_back(statement);
@@ -1661,20 +1639,19 @@ AST *Parser::parse_interface_declaration(Token name) {
 }
 
 AST *Parser::parse_struct_declaration(Token name) {
-  bool is_union = false;
   auto old = current_struct_decl;
   NODE_ALLOC(AST_STRUCT, node, range, this, _)
   auto _defer = set_last_parent(node);
   auto &$struct = node->$struct;
+  node->$struct.name = name.value;
+  current_struct_decl = node;
+
   if (peek().type == Token_Type::Struct) {
     expect(Token_Type::Struct);
   } else {
-    is_union = true;
+    node->$struct.is_union = true;
     expect(Token_Type::Union);
   }
-
-  $struct.is_union = is_union;
-  current_struct_decl = node;
 
   if (peek().type == Token_Type::GenericBrace) {
     $struct.generic_parameters = parse_generic_parameters();
@@ -1682,35 +1659,6 @@ AST *Parser::parse_struct_declaration(Token name) {
 
   if (peek().type == Token_Type::Where) {
     $struct.where_clause = parse_where_clause();
-  }
-
-  auto type_id = node->find_type_id(name.value, {});
-
-  if (type_id != Type::INVALID_TYPE_ID) {
-    auto type = global_get_type(type_id);
-    end_node(nullptr, range);
-    if (type->is_kind(TYPE_STRUCT)) {
-      auto info = type->info.$struct;
-      if ((info.flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
-        throw_error("Redefinition of struct", range);
-      }
-    } else {
-      throw_error("cannot redefine already existing type", range);
-    }
-  } else {
-    type_id = node->create_struct_type(name.value, node);
-  }
-
-  node->$struct.name = name.value;
-  node->resolved_type = type_id;
-  auto type = global_get_type(type_id);
-  auto &info = type->info.$struct; 
-  if (is_union)
-    info.flags |= STRUCT_FLAG_IS_UNION;
-
-  for (const auto &param : node->$struct.generic_parameters) {
-    // TODO: this is probably wrong. as it's not a scalar or whatever.
-    type->info.scope.insert(Symbol::create_type(Type::UNRESOLVED_GENERIC_TYPE_ID, param, TYPE_SCALAR, nullptr));
   }
 
   if (!semicolon()) {
@@ -1750,9 +1698,7 @@ AST *Parser::parse_struct_declaration(Token name) {
       }
     }
     expect(Token_Type::RCurly);
-    info.flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   } else {
-    info.flags |= STRUCT_FLAG_FORWARD_DECLARED;
     node->$struct.is_fwd_decl = true; // Why do we have both of these?
   }
 
@@ -2020,7 +1966,7 @@ void Parser::end_node(AST *node, Source_Range &range) {
 AST *Parser::parse_lambda() {
   NODE_ALLOC(AST_LAMBDA, node, range, this, _);
   expect(Token_Type::Fn);
-  node->lambda.parameters  = parse_parameters();
+  node->lambda.parameters = parse_parameters();
   if (peek().type == Token_Type::Arrow) {
     eat();
     node->lambda.return_type = parse_type();
@@ -2047,18 +1993,15 @@ Token Parser::peek() const {
   }
 }
 
-Parser::Parser(const std::string &filename, Context &context)
-    : ctx(context), states({Lexer::State::from_file(filename)}) {
+Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
   import("bootstrap");
   // auto &state = states.back();
   // state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
   // state.input_len = state.input.length();
-  typer = new Typer(context);
+  typer = new Typer();
 }
 
 Parser::~Parser() { delete typer; }
 
 Nullable<AST> Parser::current_block = nullptr;
-
-

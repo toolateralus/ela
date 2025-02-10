@@ -78,7 +78,7 @@ static std::string get_text_representation_of_source_range(const Source_Range &s
       if (line_index >= start_line && line_index <= end_line) {
         ss << line << '\n';
         if (line_index == first.line - 1) {
-          std::string caret_indicator = std::string(std::max(1ul, first.column ), ' ') + "^^^";
+          std::string caret_indicator = std::string(std::max(1, first.column ), ' ') + "^^^";
           if (terminal_supports_color) {
             ss << "\033[90;3m";
           }

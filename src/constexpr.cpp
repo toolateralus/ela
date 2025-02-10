@@ -2,23 +2,27 @@
 
 #include "ast.hpp"
 
-Value evaluate_constexpr(AST *node, Context &ctx) {
+Value evaluate_constexpr(AST *node) {
   switch (node->node_type) {
     case AST_IDENTIFIER: {
-      auto symbol = ctx.scope->lookup(node->identifier);
+      auto symbol = node->lookup(node->identifier);
       if (!symbol || symbol->is_function()) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
       auto initial_value = symbol->variable.initial_value;
       if (!initial_value) {
-        throw_error(std::format("Couldn't evaluate symbol {}, it didn't have a value. Make sure it's a constant, such as `CONSTANT :: 100`, or a default initialized runtime variable with a constant value.", name->value.get_str()), node->source_range);
+        throw_error(
+            std::format("Couldn't evaluate symbol {}, it didn't have a value. Make sure it's a constant, such as "
+                        "`CONSTANT :: 100`, or a default initialized runtime variable with a constant value.",
+                        node->identifier.get_str()),
+            node->source_range);
       }
-      return evaluate_constexpr(initial_value.get(), ctx);
-    } 
+      return evaluate_constexpr(initial_value.get());
+    }
     case AST_BINARY: {
       auto binary = node->binary;
-      auto left = evaluate_constexpr(binary.left, ctx);
-      auto right = evaluate_constexpr(binary.right, ctx);
+      auto left = evaluate_constexpr(binary.left);
+      auto right = evaluate_constexpr(binary.right);
       switch (binary.op) {
         case Token_Type::Add:
           return left + right;
@@ -72,7 +76,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
     } break;
     case AST_UNARY_EXPR: {
       auto unary = node->unary;
-      auto operand = evaluate_constexpr(unary.operand, ctx);
+      auto operand = evaluate_constexpr(unary.operand);
       switch (unary.op) {
         case Token_Type::Sub:
           return -operand;

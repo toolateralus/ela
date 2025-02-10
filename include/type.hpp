@@ -9,7 +9,6 @@
 #include <string>
 #include <vector>
 
-#include "arena.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"
@@ -18,7 +17,6 @@
 // fwd
 struct Type;
 struct Scope;
-struct Context;
 
 extern std::vector<Type *> type_table;
 
