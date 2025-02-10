@@ -1448,7 +1448,7 @@ AST *Parser::parse_function_declaration(Token name) {
 
   // TODO: find a better solution to this.
   for (const auto &param : function.generic_parameters) {
-    node->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+    node->scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
   }
 
   function.block = parse_block();

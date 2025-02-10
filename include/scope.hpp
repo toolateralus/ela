@@ -8,7 +8,7 @@
 
 extern jstl::Arena symbol_arena;
 
-enum Type_Kind {
+enum Type_Kind : unsigned char {
   TYPE_SCALAR,
   TYPE_FUNCTION,
   TYPE_STRUCT,
@@ -17,8 +17,7 @@ enum Type_Kind {
   TYPE_INTERFACE,
 };
 
-
-enum SymbolFlags {
+enum SymbolFlags : unsigned char {
   SYMBOL_IS_VARIABLE = 1 << 0,
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 2,
@@ -59,7 +58,7 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const Interned_String &name, int type_id, AST *initial_value, AST* decl) {
+  static Symbol create_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
@@ -87,7 +86,6 @@ struct Symbol {
     symbol.type_id = type_id;
     return symbol;
   }
-
 };
 
 struct Scope {
@@ -96,14 +94,20 @@ struct Scope {
   bool erase(const Interned_String &name);
   void insert(const Symbol &symbol);
 
+  int create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration,
+                            Scope scope);
+  int create_struct_type(const Interned_String &name, AST *declaration, Scope scope);
+  void create_type_alias(const Interned_String &name, int type_id, Type_Kind kind, AST *declaring_node);
+  void forward_declare_type(const Interned_String &name, int default_id);
+  int create_enum_type(const Interned_String &name, bool flags, AST *declaration, Scope scope);
+  int create_tuple_type(const std::vector<int> &types);
+
   // TODO:
   // One problem with this way of doing scope, is that we're using an arena for symbols.
   // So, when we do this, we basically just leak everything that had been, and cannot ever reclaim
   // that memory. This is fine, because this is done very rarely, and can probably be negated in another way
   // however, it's something to think about.
-  void clear() {
-    head = nullptr;
-  }
+  void clear() { head = nullptr; }
 };
 
 static std::unordered_set<Interned_String> &defines() {
@@ -119,4 +123,3 @@ static bool has_def(const Interned_String &define) {
   return false;
 }
 static void undef(const Interned_String &define) { defines().erase(define); }
-

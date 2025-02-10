@@ -503,50 +503,6 @@ struct AST {
 
   void declare_interface(const Interned_String &name, AST *node);
 
-  int create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration) {
-    auto id = global_create_interface_type(name, declaration->scope, generic_args);
-    scope.insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
-    return id;
-  }
-
-  int create_struct_type(const Interned_String &name, AST *declaration) {
-    auto id = global_create_struct_type(name, declaration->scope);
-    scope.insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
-    return id;
-  }
-
-  void create_type_alias(const Interned_String &name, int type_id, Type_Kind kind, AST *declaring_node) {
-    Symbol symbol;
-    symbol.name = name;
-    symbol.type_id = type_id;
-    symbol.type.kind = kind;
-    symbol.flags = SYMBOL_IS_TYPE;
-    symbol.type.declaration = declaring_node;
-    scope.insert(symbol);
-  }
-
-  void forward_declare_type(const Interned_String &name, int default_id) {
-    Symbol symbol;
-    symbol.name = name;
-    symbol.type_id = default_id;
-    symbol.flags = SYMBOL_IS_TYPE;
-    scope.insert(symbol);
-  }
-
-  int create_enum_type(const Interned_String &name, bool flags, AST *declaration) {
-    auto id = global_create_enum_type(name, declaration->scope, flags);
-    scope.insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
-    return id;
-  }
-
-  int create_tuple_type(const std::vector<int> &types) {
-    auto id = global_create_tuple_type(types);
-    auto name = get_tuple_type_name(types);
-    // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
-    scope.insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
-    return id;
-  }
-
   int find_type_id(const Interned_String &name, const Type_Metadata &meta) {
     auto symbol = lookup(name);
     if (!symbol || !symbol->is_type()) {

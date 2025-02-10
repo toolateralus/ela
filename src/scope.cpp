@@ -85,7 +85,6 @@ void Scope::insert(const Symbol &symbol) {
   **sym = symbol;
 }
 
-
 bool Scope::erase(const Interned_String &name) {
   Symbol **sym = &head;
   while (*sym) {
@@ -96,4 +95,49 @@ bool Scope::erase(const Interned_String &name) {
     sym = &(*sym)->next;
   }
   return false;
+}
+
+int Scope::create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration,
+                                 Scope scope) {
+  auto id = global_create_interface_type(name, scope, generic_args);
+  insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
+  return id;
+}
+
+int Scope::create_struct_type(const Interned_String &name, AST *declaration, Scope scope) {
+  auto id = global_create_struct_type(name, scope);
+  insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
+  return id;
+}
+
+void Scope::create_type_alias(const Interned_String &name, int type_id, Type_Kind kind, AST *declaring_node) {
+  Symbol symbol;
+  symbol.name = name;
+  symbol.type_id = type_id;
+  symbol.type.kind = kind;
+  symbol.flags = SYMBOL_IS_TYPE;
+  symbol.type.declaration = declaring_node;
+  insert(symbol);
+}
+
+void Scope::forward_declare_type(const Interned_String &name, int default_id) {
+  Symbol symbol;
+  symbol.name = name;
+  symbol.type_id = default_id;
+  symbol.flags = SYMBOL_IS_TYPE;
+  insert(symbol);
+}
+
+int Scope::create_enum_type(const Interned_String &name, bool flags, AST *declaration, Scope scope) {
+  auto id = global_create_enum_type(name, scope, flags);
+  insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
+  return id;
+}
+
+int Scope::create_tuple_type(const std::vector<int> &types) {
+  auto id = global_create_tuple_type(types);
+  auto name = get_tuple_type_name(types);
+  // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
+  insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
+  return id;
 }
