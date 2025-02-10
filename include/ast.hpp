@@ -14,7 +14,7 @@
 #include "type.hpp"
 #include <string>
 
-enum AST_Literal_Tag {
+enum AST_Literal_Tag : unsigned char {
   LITERAL_INTEGER,
   LITERAL_FLOAT,
   LITERAL_STRING,
@@ -83,8 +83,8 @@ enum BlockFlags : unsigned char {
 };
 
 struct Control_Flow {
-  unsigned char flags = BLOCK_FLAGS_FALL_THROUGH;
   int type = Type::INVALID_TYPE_ID;
+  unsigned char flags: 2 = BLOCK_FLAGS_FALL_THROUGH;
 };
 
 constexpr const inline static auto block_flags_to_string(const auto flags) {
@@ -106,7 +106,7 @@ struct AST_Type_Extension {
 };
 
 struct AST;
-enum AST_Parameter_Tag {
+enum AST_Parameter_Tag : unsigned char{
   AST_PARAM_NORMAL,
   AST_PARAM_SELF,
 };
@@ -132,7 +132,7 @@ struct GenericInstance {
 // for the for loops,
 // copy is `for i in ...`
 // pointer is `for *v in ...`
-enum ValueSemantic {
+enum ValueSemantic: unsigned char {
   VALUE_SEMANTIC_COPY,
   VALUE_SEMANTIC_POINTER,
 };
@@ -149,7 +149,7 @@ struct SwitchCase {
   AST *block;
 };
 
-enum AST_Type_Kind {
+enum AST_Type_Kind : unsigned char{
   AST_TYPE_NORMAL,
   AST_TYPE_REFLECTION,
   AST_TYPE_TUPLE,
@@ -157,7 +157,7 @@ enum AST_Type_Kind {
   AST_TYPE_SELF,
 };
 
-enum AST_Initializer_Tag {
+enum AST_Initializer_Tag: unsigned char {
   INITIALIZER_EMPTY,
   INITIALIZER_NAMED,
   INITIALIZER_COLLECTION,
@@ -213,7 +213,7 @@ struct AST {
     struct {
       size_t temp_iden_idx = 0;
       AST *parent;
-      int flags = BLOCK_FLAGS_FALL_THROUGH;
+      int flags : 2 = BLOCK_FLAGS_FALL_THROUGH;
       bool has_defer = false;
       int defer_count = 0;
       int return_type = Type::INVALID_TYPE_ID;
@@ -274,7 +274,7 @@ struct AST {
       Nullable<AST> block;
       AST *return_type;
       // various flags.
-      int16_t flags = 0;
+      unsigned char flags : 5 = 0;
       // has a self/self* parameter.
       bool has_self : 1 = false;
       // params have varargs.
@@ -323,7 +323,7 @@ struct AST {
     } range;
 
     struct {
-      enum {
+      enum : unsigned char {
         // implicitly pulled an iter() off a type that implements Iterable![T]
         ITERABLE,
         // implicitly pulled an enumerator() off a type that implements Enumerable![T]
@@ -332,7 +332,7 @@ struct AST {
         ENUMERATOR,
         // got an Iter![T] object directly
         ITERATOR,
-      } iteration_kind; // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
+      } iteration_kind : 2; // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
       int range_type = Type::INVALID_TYPE_ID;
       // This is either the type of that implements Enumerator![T], or is Iter![T];
       int iterable_type = Type::INVALID_TYPE_ID;
@@ -558,7 +558,7 @@ struct AST {
 
 extern AST *GLOBAL_NOOP;
 
-enum DirectiveKind {
+enum DirectiveKind : unsigned char{
   DIRECTIVE_KIND_STATEMENT,
   DIRECTIVE_KIND_EXPRESSION,
   DIRECTIVE_KIND_DONT_CARE,
@@ -572,7 +572,7 @@ struct DirectiveRoutine {
   std::function<Nullable<AST>(Parser *parser)> run;
 };
 
-enum Precedence {
+enum Precedence: unsigned char {
   PRECEDENCE_LOWEST,
   PRECEDENCE_ASSIGNMENT,    // =, :=
   PRECEDENCE_LOGICALOR,     // ||

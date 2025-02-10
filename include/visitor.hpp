@@ -135,7 +135,7 @@ struct Typer {
   DEFINE_GENERIC_VISITOR()
 };
 
-enum DeferBlockType {
+enum DeferBlockType: unsigned char {
   DEFER_BLOCK_TYPE_OTHER,
   DEFER_BLOCK_TYPE_FUNC,
   DEFER_BLOCK_TYPE_LOOP,

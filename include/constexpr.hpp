@@ -8,7 +8,7 @@ struct Value {
     INTEGER,
     FLOATING,
     BOOLEAN,
-  } tag;
+  } tag : 2;
 
   struct {
     int integer;

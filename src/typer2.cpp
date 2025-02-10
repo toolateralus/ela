@@ -262,7 +262,6 @@ void Typer::visit_function_declaration(AST *node) {
   visit_function_body(node);
 }
 
-
 void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto old_type = type_context;
   type_context = node->target;
@@ -421,7 +420,6 @@ void Typer::visit_function_header(AST *node, bool generic_instantiation,
 
   node->resolved_type = global_find_function_type_id(info, {});
 }
-
 
 void Typer::visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params) {
   for (auto &param : params) {

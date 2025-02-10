@@ -29,7 +29,7 @@ enum ConversionRule {
 
 Token get_unique_identifier();
 
-enum ScalarType {
+enum ScalarType: unsigned char {
   TYPE_VOID,
   TYPE_S8,
   TYPE_S16,
@@ -46,13 +46,13 @@ enum ScalarType {
   TYPE_BOOL,
 };
 
-enum TypeExtEnum {
+enum TypeExtEnum: unsigned char {
   TYPE_EXT_INVALID,
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
 };
 
-enum Function_Instance_Flags : int16_t {
+enum Function_Instance_Flags : unsigned char {
   FUNCTION_NORMAL = 0,
   FUNCTION_IS_TEST = 1 << 1,
   FUNCTION_IS_METHOD = 1 << 2,
@@ -63,7 +63,7 @@ enum Function_Instance_Flags : int16_t {
   FUNCTION_IS_FOREIGN = 1 << 7,
 };
 
-enum StructTypeFlags {
+enum StructTypeFlags: unsigned char {
   STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
   STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
   STRUCT_FLAG_IS_UNION = 1 << 2,
