@@ -69,8 +69,6 @@
         return visit_initializer_list(node);                                                                           \
       case AST_ENUM_DECLARATION:                                                                                  \
         return visit_enum_declaration(node);                                                                           \
-      case AST_TAGGED_UNION_DECLARATION:                                                                          \
-        return visit_tagged_union_declaration(node);                                                                   \
       case AST_NOOP:                                                                                              \
         return visit_noop(node);                                                                                       \
       case AST_ALIAS:                                                                                             \
@@ -114,7 +112,6 @@ struct Typer {
   using VisitorMethod = void (Typer::*)(AST *, bool, std::vector<int>);
   AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, std::vector<int> args);
 
-  void visit_tagged_union_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,

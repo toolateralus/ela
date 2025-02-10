@@ -452,8 +452,6 @@ AST *ASTCopier::copy_node(AST *node) {
       return copy_tuple_deconstruction(node);
     case AST_NODE_INTERFACE_DECLARATION:
       return copy_interface_declaration(node);
-    case AST_NODE_TAGGED_UNION_DECLARATION:
-      return copy_tagged_union_declaration(node);
     case AST_NODE_NOOP:
       return node;
     case AST_NODE_ALIAS:
@@ -497,35 +495,6 @@ AST *ASTCopier::copy_lambda(AST *node) {
   new_node->params = copy_node(node->params);
   new_node->return_type = copy_node(node->return_type);
   new_node->block = copy_node(node->block);
-  return new_node;
-}
-
-AST *ASTCopier::copy_tagged_union_declaration(AST *node) {
-  auto new_node = copy(node);
-  new_node->scope = copy_scope(new_node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  new_node->variants.clear();
-  for (const auto &variant : node->variants) {
-    ASTTaggedUnionVariant new_variant;
-    new_variant.kind = variant.kind;
-    new_variant.name = variant.name;
-    switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
-        break;
-      case ASTTaggedUnionVariant::TUPLE:
-        new_variant.tuple = copy_node(variant.tuple);
-        break;
-      case ASTTaggedUnionVariant::STRUCT:
-        new_variant.struct_declarations.clear();
-        for (auto field : variant.struct_declarations) {
-          new_variant.struct_declarations.push_back(copy_node(field));
-        }
-        break;
-    }
-    new_node->variants.push_back(std::move(new_variant));
-  }
-  current_scope = old_scope;
   return new_node;
 }
 

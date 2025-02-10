@@ -133,13 +133,6 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args
   return generic_args;
 }
 
-void Typer::visit(ASTTaggedUnionDeclaration *node) {
-  if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::INVALID_TYPE_ID, TypeKind(0), node);
-    return;
-  }
-  visit_tagged_union_declaration(node, false);
-}
 
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<int> generic_args) {
@@ -191,58 +184,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   if (type->is_kind(TYPE_SCALAR)) {
     throw_error("struct declaration was a scalar???", node->source_range);
   }
-}
-
-void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
-                                           std::vector<int> generic_args) {
-  auto type = global_get_type(node->resolved_type);
-
-  auto old_scope = ctx.scope;
-  Defer _defer([&] { ctx.scope = old_scope; });
-  ctx.set_scope(node->scope);
-
-  if (generic_instantiation) {
-    auto generic_arg = generic_args.begin();
-    for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
-      generic_arg++;
-    }
-    type = global_get_type(global_create_tagged_union_type(node->name, node->scope, generic_args));
-  }
-
-  type->declaring_node = node;
-
-  if (node->where_clause) {
-    node->where_clause.get()->accept(this);
-  }
-
-  auto info = type->get_info()->as<TaggedUnionTypeInfo>();
-
-  for (const auto &variant : node->variants) {
-    switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL: {
-        // TODO: is this how we want to do this?
-        info->variants.push_back({variant.name, void_type()});
-      } break;
-      case ASTTaggedUnionVariant::TUPLE: {
-        variant.tuple->accept(this);
-        auto type = variant.tuple->resolved_type;
-        info->variants.push_back({variant.name, type});
-      } break;
-      case ASTTaggedUnionVariant::STRUCT: {
-        auto scope = create_child(ctx.scope);
-        ctx.set_scope(scope);
-        for (const auto &field : variant.struct_declarations) {
-          field->accept(this);
-        }
-        ctx.exit_scope();
-        auto type = global_create_struct_type(variant.name, scope);
-        info->variants.push_back({variant.name, type});
-      } break;
-    }
-  }
-  ctx.exit_scope();
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
@@ -565,7 +506,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
 bool expr_is_literal(ASTExpr *expr) {
   switch (expr->node_type) {
-    case AST_BIN_EXPR: {
+    case AST_BINARY: {
       auto bin_expr = static_cast<ASTBinExpr *>(expr);
       return expr_is_literal(bin_expr->left) && expr_is_literal(bin_expr->right);
     }
@@ -1245,10 +1186,6 @@ void Typer::visit(ASTType *node) {
             instantiation = visit_generic(&Typer::visit_interface_declaration,
                                           (ASTInterfaceDeclaration *)declaring_node, generic_args);
             break;
-          case AST_TAGGED_UNION_DECLARATION: {
-            instantiation = visit_generic(&Typer::visit_tagged_union_declaration,
-                                          (ASTTaggedUnionDeclaration *)declaring_node, generic_args);
-          } break;
           default:
             throw_error("Invalid target to generic args", node->source_range);
             break;
@@ -1978,7 +1915,7 @@ int Typer::get_self_type() {
 
 bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
   switch (node->node_type) {
-    case AST_BIN_EXPR: {
+    case AST_BINARY: {
       auto bin = static_cast<ASTBinExpr *>(node);
       auto op = bin->op.type;
       if (op == Token_Type::And) {

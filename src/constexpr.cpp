@@ -15,7 +15,7 @@ Value evaluate_constexpr(AST *node, Context &ctx) {
       }
       return evaluate_constexpr(initial_value.get(), ctx);
     } 
-    case AST_BIN_EXPR: {
+    case AST_BINARY: {
       auto binary = node->binary;
       auto left = evaluate_constexpr(binary.left, ctx);
       auto right = evaluate_constexpr(binary.right, ctx);

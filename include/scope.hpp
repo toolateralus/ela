@@ -14,7 +14,6 @@ enum TypeKind {
   TYPE_STRUCT,
   TYPE_ENUM,
   TYPE_TUPLE,
-  TYPE_TAGGED_UNION,
   TYPE_INTERFACE,
 };
 
@@ -29,7 +28,6 @@ enum SymbolFlags {
 struct AST;
 struct ASTStructDeclaration;
 struct AST;
-struct ASTTaggedUnionDeclaration;
 struct ASTEnumDeclaration;
 
 struct Symbol {
@@ -100,6 +98,15 @@ struct Scope {
   Symbol *lookup(const InternedString &name);
   bool erase(const InternedString &name);
   void insert(const Symbol &symbol);
+
+  // TODO:
+  // One problem with this way of doing scope, is that we're using an arena for symbols.
+  // So, when we do this, we basically just leak everything that had been, and cannot ever reclaim
+  // that memory. This is fine, because this is done very rarely, and can probably be negated in another way
+  // however, it's something to think about.
+  void clear() {
+    head = nullptr;
+  }
 };
 
 static std::unordered_set<InternedString> &defines() {

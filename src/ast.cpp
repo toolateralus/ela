@@ -4,6 +4,7 @@
 #include <cstdlib>
 #include <filesystem>
 #include <format>
+#include <set>
 #include <string>
 #include <unordered_set>
 #include "visitor.hpp"
@@ -639,7 +640,7 @@ AST *Parser::parse_expr(Precedence precedence) {
     Precedence token_precedence = get_operator_precedence(peek());
     if (token_precedence <= precedence)
       break;
-    AST *node = ast_alloc(AST_BIN_EXPR, last_parent);
+    AST *node = ast_alloc(AST_BINARY, last_parent);
     node->source_range = left->source_range;
     auto op = eat();
     auto right = parse_expr(token_precedence);
@@ -1508,7 +1509,6 @@ AST *Parser::parse_enum_declaration(Token tok) {
 
   AST *last_value = zero;
   bool was_zero = true;
-  Token add_token(tok.location, "+", Token_Type::Add, TFamily::Operator);
 
   while (peek().type != Token_Type::RCurly) {
     auto iden = expect(Token_Type::Identifier).value;
@@ -1522,25 +1522,25 @@ AST *Parser::parse_enum_declaration(Token tok) {
         value = zero;
         was_zero = false;
       } else {
-        NODE_ALLOC(AST_BIN_EXPR, bin, range, this, _)
-        bin->left = last_value;
-        bin->right = one;
-        bin->op = add_token;
-        last_value = bin;
-        value = bin;
-        end_node(bin, range);
+        NODE_ALLOC(AST_BINARY, node, range, this, _)
+        node->binary.left = last_value;
+        node->binary.right = one;
+        node->binary.op = Token_Type::Add;
+        last_value = node;
+        value = node;
+        end_node(node, range);
       }
     }
     if (peek().type == Token_Type::Comma) {
       eat();
     }
-    node->key_values.push_back({iden, value});
+    node->$enum.key_values.push_back({iden, value});
     last_value = value;
   }
   end_node(node, range);
   std::vector<InternedString> keys;
   std::set<InternedString> keys_set;
-  for (const auto &[key, value] : node->key_values) {
+  for (const auto &[key, value] : node->$enum.key_values) {
     if (keys_set.find(key) != keys_set.end()) {
       throw_error(std::format("redefinition of enum variant: {}", key), node->source_range);
     }
@@ -1548,7 +1548,7 @@ AST *Parser::parse_enum_declaration(Token tok) {
     keys_set.insert(key);
   }
 
-  if (node->key_values.empty()) {
+  if (node->$enum.key_values.empty()) {
     end_node(nullptr, range);
     throw_error("Empty `enum` types are not allowed", range);
   }
@@ -1558,14 +1558,12 @@ AST *Parser::parse_enum_declaration(Token tok) {
 }
 
 AST *Parser::parse_impl() {
-  NODE_ALLOC_EXTRA_DEFER(ASTImpl, node, range, this, _, current_impl_decl = nullptr)
+  NODE_ALLOC_EXTRA_DEFER(AST_IMPL, node, range, _, this, current_impl_decl = nullptr)
   expect(Token_Type::Impl);
-
-  ctx.set_scope();
-  node = ctx.exit_scope();
+  auto &impl = node->impl;
 
   if (peek().type == Token_Type::GenericBrace) {
-    node->generic_parameters = parse_generic_parameters();
+    impl.generic_parameters = parse_generic_parameters();
   }
 
   current_impl_decl = node;
@@ -1573,32 +1571,33 @@ AST *Parser::parse_impl() {
 
   // Handle 'impl INTERFACE for TYPE'
   // or normal 'impl TYPE'
-  AST_TYPE *interface = nullptr;
+  AST *interface = nullptr;
   if (peek().type == Token_Type::For) {
     expect(Token_Type::For);
-    interface = parse_type();
-    node->interface = target;
-    node->target = interface;
+    AST *interface = parse_type();
+    impl.interface = target;
+    impl.target = interface;
   } else {
-    node->target = target;
+    impl.target = target;
   }
 
-  node->target->resolved_type = Type::INVALID_TYPE_ID;
+  impl.target->resolved_type = Type::INVALID_TYPE_ID;
 
   if (peek().type == Token_Type::Where) {
-    node->where_clause = parse_where_clause();
+    impl.where_clause = parse_where_clause();
   }
-  auto block = parse_block(node);
+  auto block = parse_block(&node->scope);
   end_node(node, range);
 
   // TODO: maybe do this differently
   // this is just so you can't call methods directly from within an impl without self
-  node->symbols.clear();
+  node->scope.clear();
 
   for (const auto &statement : block->statements) {
+    // TODO: allow constants, aliases, #ifs, #ifdef blah blah whatever a ton more nodes than just 
+    // functions.
     if (statement->node_type == AST_FUNCTION) {
-      auto function = static_cast<ASTFunctionDeclaration *>(statement);
-      node->methods.push_back(function);
+      impl.methods.push_back(statement);
     } else {
       throw_error("invalid statement: only methods are allowed in 'impl's", statement->source_range);
     }
@@ -1607,53 +1606,57 @@ AST *Parser::parse_impl() {
 }
 
 AST *Parser::parse_defer() {
-  NODE_ALLOC(ASTDefer, node, range, this, _)
+  NODE_ALLOC(AST_DEFER, node, range, this, _)
   expect(Token_Type::Defer);
-  node->statement = parse_statement();
+  node->defer = parse_statement();
   end_node(node, range);
   return node;
 }
 
 AST *Parser::parse_where_clause() {
-  NODE_ALLOC(ASTWhere, node, range, this, _);
+  NODE_ALLOC(AST_WHERE, node, range, this, _);
   expect(Token_Type::Where);
-  node->target_type = parse_type();
+  node->where.target_type = parse_type();
   expect(Token_Type::Is);
-  node->predicate = parse_type();
+  node->where.predicate = parse_type();
   while (peek().type == Token_Type::And || peek().type == Token_Type::Or) {
-    NODE_ALLOC(AST, binexpr, range, this, _)
-    binexpr->op = eat();
-    binexpr->right = parse_type();
-    binexpr->left = node->predicate;
-    node->predicate = binexpr;
+    NODE_ALLOC(AST_BINARY, binary, range, this, _)
+    binary->binary.op = eat().type;
+    binary->binary.right = parse_type();
+    binary->binary.left = node->where.predicate;
+    node->where.predicate = node;
   }
   return node;
 }
 
 AST *Parser::parse_interface_declaration(Token name) {
   auto previous = current_interface_decl;
-  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, this, _, { current_interface_decl = previous; });
+  NODE_ALLOC_EXTRA_DEFER(AST_INTERFACE, node, range, _, this, { current_interface_decl = previous; });
   expect(Token_Type::Interface);
-
-  node->name = name.value;
+  auto &interface = node->interface;
+  interface.name = name.value;
   current_interface_decl = node;
+
+  auto _defer = set_last_parent(node);
+
   if (peek().type == Token_Type::GenericBrace) {
-    node->generic_parameters = parse_generic_parameters();
+    interface.generic_parameters = parse_generic_parameters();
   }
 
   if (peek().type == Token_Type::Where) {
-    node->where_clause = parse_where_clause();
+    interface.where_clause = parse_where_clause();
   }
 
-  auto scope = create_child(node);
-  node = scope;
-  auto block = parse_block(scope);
+  auto block = parse_block(&node->scope);
+
   for (const auto &stmt : block->statements) {
-    if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
-      if (function->block.is_not_null()) {
+    if (stmt->node_type == AST_FUNCTION) {
+      // TODO: we should definitely allow methods in impls that are "not overriden", meaning the interface provides
+      // a default implementation until the consumer of the interface provides a new one. This wouldn't be virtual
+      if (stmt->function.block.is_not_null()) {
         throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
       }
-      node->methods.push_back(function);
+      interface.methods.push_back(stmt);
     }
   }
   return node;
@@ -1662,8 +1665,9 @@ AST *Parser::parse_interface_declaration(Token name) {
 AST *Parser::parse_struct_declaration(Token name) {
   bool is_union = false;
   auto old = current_struct_decl;
-  NODE_ALLOC(ASTStructDeclaration, node, range, this, _)
-
+  NODE_ALLOC(AST_STRUCT, node, range, this, _)
+  auto _defer = set_last_parent(node);
+  auto &$struct = node->$struct;
   if (peek().type == Token_Type::Struct) {
     expect(Token_Type::Struct);
   } else {
@@ -1671,15 +1675,15 @@ AST *Parser::parse_struct_declaration(Token name) {
     expect(Token_Type::Union);
   }
 
-  node->is_union = is_union;
+  $struct.is_union = is_union;
   current_struct_decl = node;
 
   if (peek().type == Token_Type::GenericBrace) {
-    node->generic_parameters = parse_generic_parameters();
+    $struct.generic_parameters = parse_generic_parameters();
   }
 
   if (peek().type == Token_Type::Where) {
-    node->where_clause = parse_where_clause();
+    $struct.where_clause = parse_where_clause();
   }
 
   auto type_id = node->find_type_id(name.value, {});
@@ -1758,58 +1762,6 @@ AST *Parser::parse_struct_declaration(Token name) {
   }
 
   current_struct_decl = old;
-  end_node(node, range);
-  return node;
-}
-
-AST *Parser::parse_tagged_union_declaration(Token name) {
-  NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, this, _)
-  if (peek().type == Token_Type::GenericBrace) {
-    node->generic_parameters = parse_generic_parameters();
-  }
-  if (peek().type == Token_Type::Where) {
-    node->where_clause = parse_where_clause();
-  }
-  auto type = global_get_type(node->create_tagged_union(name.value, nullptr, node));
-  auto scope = create_child(node);
-  ctx.set_scope(scope);
-
-  expect(Token_Type::LCurly);
-
-  while (peek().type != Token_Type::RCurly) {
-    ASTTaggedUnionVariant variant;
-    variant.name = expect(Token_Type::Identifier).value;
-    if (peek().type == Token_Type::Comma || peek().type == Token_Type::RCurly) {
-      variant.kind = ASTTaggedUnionVariant::NORMAL;
-      node->variants.push_back(variant);
-    } else if (peek().type == Token_Type::LCurly) {
-      variant.kind = ASTTaggedUnionVariant::STRUCT;
-      eat();
-      while (peek().type != Token_Type::RCurly) {
-        variant.struct_declarations.push_back(parse_declaration());
-        if (peek().type == Token_Type::Comma) {
-          eat();
-        }
-      }
-      expect(Token_Type::RCurly);
-      node->variants.push_back(variant);
-    } else if (peek().type == Token_Type::LParen) {
-      variant.kind = ASTTaggedUnionVariant::TUPLE;
-      variant.tuple = parse_type();
-      assert(variant.tuple->kind == AST_TYPE::TUPLE);
-      node->variants.push_back(variant);
-    } else {
-      end_node(node, range);
-      throw_error("Unexpected token in tagged union declaration", node->source_range);
-    }
-    if (peek().type != Token_Type::RCurly)
-      expect(Token_Type::Comma);
-  }
-  node->name = name.value;
-  node = ctx.exit_scope();
-  type->get_info()->scope = scope;
-  node->resolved_type = type->id;
-  expect(Token_Type::RCurly);
   end_node(node, range);
   return node;
 }

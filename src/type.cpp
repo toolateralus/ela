@@ -149,10 +149,6 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     case TYPE_TUPLE: {
       info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
     } break;
-    case TYPE_TAGGED_UNION: {
-      info = new (type_info_alloc<TaggedUnionTypeInfo>())
-          TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
-    } break;
     case TYPE_INTERFACE: {
       info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
     } break;
@@ -349,7 +345,6 @@ std::string Type::to_string() const {
     case TYPE_TUPLE:
     case TYPE_SCALAR:
     case TYPE_ENUM:
-    case TYPE_TAGGED_UNION:
     case TYPE_INTERFACE:
       return get_unmangled_name(this);
       break;
@@ -382,16 +377,6 @@ int global_create_struct_type(const InternedString &name, Scope scope, std::vect
   return type->id;
 }
 
-int global_create_tagged_union_type(const InternedString &name, Scope scope, const std::vector<int> &generic_args) {
-  type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
-  Type *type = type_table.back();
-  type->set_base(name.get_str() + mangled_type_args(generic_args));
-  type->generic_args = generic_args;
-  TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
-  info->scope = scope;
-  type->set_info(info);
-  return type->id;
-}
 
 int global_create_enum_type(const InternedString &name, Scope scope, bool is_flags, size_t element_type) {
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));

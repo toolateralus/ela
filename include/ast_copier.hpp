@@ -44,7 +44,6 @@ struct ASTCopier {
   AST *copy_sizeof(AST *node);
   AST *copy_defer(AST *node);
   AST *copy_lambda(AST *node);
-  AST *copy_tagged_union_declaration(AST *node);
   AST *copy_statement_list(AST *node);
   AST *copy_scope_resolution(AST *node);
   AST *copy_node(AST *node);

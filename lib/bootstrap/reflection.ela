@@ -43,7 +43,6 @@ Type :: struct;
   BOOL,
   STRING,
   STRUCT,
-  TAGGED_UNION,
   ENUM,
   TUPLE,
   ARRAY,

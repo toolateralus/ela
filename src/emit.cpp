@@ -25,16 +25,15 @@ constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
 constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
 constexpr auto TYPE_FLAGS_STRING = 1 << 3;
 constexpr auto TYPE_FLAGS_STRUCT = 1 << 4;
-constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 5;
-constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
-constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
+constexpr auto TYPE_FLAGS_ENUM = 1 << 5;
+constexpr auto TYPE_FLAGS_TUPLE = 1 << 6;
 
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 8;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 9;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
+constexpr auto TYPE_FLAGS_ARRAY = 1 << 7;
+constexpr auto TYPE_FLAGS_FUNCTION = 1 << 8;
+constexpr auto TYPE_FLAGS_POINTER = 1 << 9;
 
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
+constexpr auto TYPE_FLAGS_SIGNED = 1 << 10;
+constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
 
 
 void Emitter::forward_decl_type(Type *type) {
@@ -62,9 +61,8 @@ void Emitter::forward_decl_type(Type *type) {
       (*ss) << kw << type->get_base().get_str() << " " << type->get_base().get_str() << ";\n";
     } break;
     case TYPE_TUPLE:
-    case TYPE_TAGGED_UNION: {
       (*ss) << "struct " << to_cpp_string(type) << ";\n";
-    } break;
+      break;
     default:
       return;
   }
@@ -1228,9 +1226,6 @@ std::string get_type_flags(Type *type) {
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;
-    case TYPE_TAGGED_UNION:
-      kind_flags = TYPE_FLAGS_TAGGED_UNION;
-      break;
     case TYPE_INTERFACE:
       kind_flags = 0;
       break;
@@ -1425,8 +1420,7 @@ std::string Emitter::to_cpp_string(Type *type) {
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
     case TYPE_ENUM:
-    case TYPE_STRUCT:
-    case TYPE_TAGGED_UNION: {
+    case TYPE_STRUCT: {
       output = to_cpp_string(type->get_ext(), type->get_base().get_str());
       break;
     }
@@ -1497,55 +1491,6 @@ void Emitter::visit(ASTCast *node) {
 }
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
-void Emitter::visit(ASTTaggedUnionDeclaration *node) {
-  if (node->is_emitted) {
-    return;
-  }
-
-  node->is_emitted = true;
-
-  emit_line_directive(node);
-
-  (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
-  auto name = node->name.get_str();
-
-  for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      (*ss) << "typedef struct " << subtype_name << " {\n";
-      for (const auto &field : variant.struct_declarations) {
-        field->accept(this);
-        (*ss) << ";\n";
-      }
-      (*ss) << "} " << subtype_name << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      (*ss) << "typedef ";
-      variant.tuple->accept(this);
-      (*ss) << " " << subtype_name << ";\n";
-    }
-  }
-
-  (*ss) << "typedef struct " << node->name.get_str() << " {\n";
-  (*ss) << "  int index;\n";
-  (*ss) << "  union {\n";
-
-  int n = 0;
-  for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      (*ss) << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
-    }
-    n++;
-  }
-
-  (*ss) << "  };\n";
-  (*ss) << "} " << node->name.get_str() << ";\n";
-  return;
-}
 
 // Helper function to emit deferred statements
 void Emitter::emit_deferred_statements(DeferBlockType type) {

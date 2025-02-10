@@ -37,13 +37,12 @@
         }
       }
     } break;
-    case TYPE_TAGGED_UNION:
     case TYPE_STRUCT: {
       if (type->declaring_node.is_not_null()) {
         type->declaring_node.get()->accept(this);
         type->declaring_node.get()->accept(emitter);
       } else {
-        return "internal compiler error: could not locate node for struct or tagged union type";
+        return "internal compiler error: could not locate node for struct";
       }
     } break;
     case TYPE_TUPLE: {
@@ -409,26 +408,6 @@ void DependencyEmitter::visit(ASTImpl *node) {
 }
 
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
-
-void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  Defer _([&] { ctx.set_scope(old_scope); });
-  for (const auto &variant : node->variants) {
-    switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
-        break;
-      case ASTTaggedUnionVariant::TUPLE:
-        variant.tuple->accept(this);
-        break;
-      case ASTTaggedUnionVariant::STRUCT:
-        for (const auto &decl : variant.struct_declarations) {
-          decl->accept(this);
-        }
-        break;
-    }
-  }
-}
 
 void DependencyEmitter::visit(ASTCast *node) {
   node->expression->accept(this);

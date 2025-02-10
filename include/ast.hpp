@@ -41,7 +41,7 @@ enum AST_Node_Type {
   AST_FUNCTION,
   AST_DECLARATION,
   AST_EXPR_STATEMENT,
-  AST_BIN_EXPR,
+  AST_BINARY,
   AST_UNARY_EXPR,
   AST_IDENTIFIER,
   AST_LITERAL,
@@ -183,7 +183,7 @@ struct AST {
 
   inline bool is_expr() const {
     switch (node_type) {
-      case AST_BIN_EXPR:
+      case AST_BINARY:
       case AST_UNARY_EXPR:
       case AST_IDENTIFIER:
       case AST_LITERAL:
@@ -718,7 +718,6 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   DEFINE_VISITOR(subscript)                                                                                            \
   DEFINE_VISITOR(initializer_list)                                                                                     \
   DEFINE_VISITOR(enum_declaration)                                                                                     \
-  DEFINE_VISITOR(tagged_union_declaration)                                                                             \
   DEFINE_VISITOR(noop)                                                                                                 \
   DEFINE_VISITOR(alias)                                                                                                \
   DEFINE_VISITOR(impl)                                                                                                 \
@@ -761,7 +760,6 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_subscript(AST *node) {}                                                                             \
   void type::visit_initializer_list(AST *node) {}                                                                      \
   void type::visit_enum_declaration(AST *node) {}                                                                      \
-  void type::visit_tagged_union_declaration(AST *node) {}                                                              \
   void type::visit_noop(AST *node) {}                                                                                  \
   void type::visit_alias(AST *node) {}                                                                                 \
   void type::visit_impl(AST *node) {}                                                                                  \
