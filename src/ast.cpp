@@ -402,8 +402,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
           auto decl = parser->parse_struct_declaration(get_unique_identifier());
           auto t = global_get_type(decl->resolved_type);
-          auto info = (t->info->as<StructTypeInfo>());
-          info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+          t->info.$struct.flags |= STRUCT_FLAG_IS_ANONYMOUS;
           return decl;
         } else {
           auto range = parser->begin_node();
@@ -1439,8 +1438,7 @@ AST *Parser::parse_function_declaration(Token name) {
   node->insert_function(name.value, Type::INVALID_TYPE_ID, node);
 
   if (peek().type != Token_Type::Arrow) {
-    // TODO: we might want to change this, it was get_void()
-    function.return_type = nullptr;
+    function.return_type = get_void_type();
   } else {
     expect(Token_Type::Arrow);
     function.return_type = parse_type();
@@ -1692,31 +1690,30 @@ AST *Parser::parse_struct_declaration(Token name) {
     auto type = global_get_type(type_id);
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->info->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 && info->scope != nullptr) {
+      auto info = type->info.$struct;
+      if ((info.flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
         throw_error("Redefinition of struct", range);
       }
     } else {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = node->create_struct_type(name.value, nullptr, node);
+    type_id = node->create_struct_type(name.value, node);
   }
 
-  node->name = name.value;
+  node->$struct.name = name.value;
   node->resolved_type = type_id;
   auto type = global_get_type(type_id);
-  auto info = type->info->as<StructTypeInfo>();
-  info->scope = node = create_child(node);
+  auto &info = type->info.$struct; 
   if (is_union)
-    info->flags |= STRUCT_FLAG_IS_UNION;
+    info.flags |= STRUCT_FLAG_IS_UNION;
 
-  for (const auto &param : node->generic_parameters) {
-    info->scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+  for (const auto &param : node->$struct.generic_parameters) {
+    // TODO: this is probably wrong. as it's not a scalar or whatever.
+    type->info.scope.insert(Symbol::create_type(Type::UNRESOLVED_GENERIC_TYPE_ID, param, TYPE_SCALAR, nullptr));
   }
 
   if (!semicolon()) {
-    auto scope = info->scope;
     expect(Token_Type::LCurly);
     std::vector<AST *> directives;
     while (peek().type != Token_Type::RCurly) {
@@ -1724,17 +1721,17 @@ AST *Parser::parse_struct_declaration(Token name) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(Token_Type::Identifier).value);
         if (directive && directive.get()->node_type == AST_STRUCT) {
-          node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
+          node->$struct.subtypes.push_back(directive.get());
         } else if (directive && directive.get()->node_type == AST_DECLARATION) {
           ASTStructMember member{};
           auto _node = static_cast<AST *>(directive.get());
-          member.name = _node->name;
+          member.name = _node->declaration.name;
           member.is_bitfield = true;
-          member.bitsize = _node->bitsize;
-          member.type = _node->type;
-          node->members.push_back(member);
+          member.bitsize = _node->declaration.bitsize;
+          member.type = _node->declaration.type;
+          node->$struct.members.push_back(member);
         } else if (directive && directive.get()->node_type == AST_ALIAS) {
-          node->aliases.push_back(static_cast<ASTAlias *>(directive.get()));
+          node->$struct.aliases.push_back(directive.get());
         } else {
           end_node(node, range);
           throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the "
@@ -1746,19 +1743,17 @@ AST *Parser::parse_struct_declaration(Token name) {
         member.name = eat().value;
         expect(Token_Type::Colon);
         member.type = parse_type();
-        node->members.push_back(member);
+        node->$struct.members.push_back(member);
       }
       if (peek().type != Token_Type::RCurly) {
         expect(Token_Type::Comma);
       }
     }
     expect(Token_Type::RCurly);
-    node = scope;
-    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-    info->scope = node;
+    info.flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   } else {
-    info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
-    node->is_fwd_decl = true;
+    info.flags |= STRUCT_FLAG_FORWARD_DECLARED;
+    node->$struct.is_fwd_decl = true; // Why do we have both of these?
   }
 
   current_struct_decl = old;
@@ -1788,10 +1783,10 @@ Nullable<AST> Parser::try_parse_directive_expr() {
   return nullptr;
 }
 
-std::vector<AST_TYPE *> Parser::parse_generic_arguments() {
+std::vector<AST *> Parser::parse_generic_arguments() {
   auto range = begin_node();
   expect(Token_Type::GenericBrace);
-  std::vector<AST_TYPE *> params;
+  std::vector<AST *> params;
   while (peek().type != Token_Type::RBrace) {
     params.push_back(parse_type());
     if (peek().type != Token_Type::RBrace)
@@ -1824,8 +1819,8 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   return params;
 }
 
-std::vector<AST_TYPE *> Parser::parse_parameter_types() {
-  std::vector<AST_TYPE *> param_types;
+std::vector<AST *> Parser::parse_parameter_types() {
+  std::vector<AST *> param_types;
   expect(Token_Type::LParen);
   while (peek().type != Token_Type::RParen) {
     auto param_type = parse_type();
@@ -1840,28 +1835,28 @@ std::vector<AST_TYPE *> Parser::parse_parameter_types() {
   return param_types;
 }
 
-void Parser::append_type_extensions(AST_TYPE *&node) {
+void Parser::append_type_extensions(AST *&node) {
   while (true) {
     if (peek().type == Token_Type::LBrace) {
       expect(Token_Type::LBrace);
       if (peek().type != Token_Type::RBrace) {
         auto expression = parse_expr();
-        node->extensions.push_back({TYPE_EXT_ARRAY, expression});
+        node->type.extensions.push_back({TYPE_EXT_ARRAY, expression});
       } else {
         // Syntactic sugar for doing int[] instead of List![int];
-        auto type = ast_alloc<AST_TYPE>();
-        auto iden = ast_alloc<ASTIdentifier>();
-        iden->value = "List";
-        type->kind = AST_TYPE::NORMAL;
-        type->normal.base = iden;
-        type->normal.generic_arguments.push_back(node);
+        auto type = ast_alloc(AST_TYPE, last_parent);
+        auto iden = ast_alloc(AST_IDENTIFIER, last_parent);
+        iden->identifier = "List";
+        type->type.kind = AST_TYPE_NORMAL;
+        type->type.normal.base = iden;
+        type->type.normal.generic_arguments.push_back(node);
         type->source_range = node->source_range;
         node = type;
       }
       expect(Token_Type::RBrace);
     } else if (peek().type == Token_Type::Mul) {
       expect(Token_Type::Mul);
-      node->extensions.push_back({TYPE_EXT_POINTER});
+      node->type.extensions.push_back({TYPE_EXT_POINTER});
     } else {
       break;
     }
@@ -1871,10 +1866,10 @@ void Parser::append_type_extensions(AST_TYPE *&node) {
 AST *Parser::parse_function_type() {
   NODE_ALLOC(AST_TYPE, output_type, range, this, _)
   expect(Token_Type::Fn);
-  output_type->kind = AST_TYPE::FUNCTION;
+  output_type->type.kind = AST_TYPE_FUNCTION;
   append_type_extensions(output_type);
   Function_Info info{};
-  output_type->function.parameter_types = parse_parameter_types();
+  output_type->type.function.parameter_types = parse_parameter_types();
   if (peek().type == Token_Type::Arrow) {
     eat();
     output_type->function.return_type = parse_type();
@@ -1926,11 +1921,12 @@ static Precedence get_operator_precedence(Token token) {
   }
 }
 
-AST_TYPE *AST_TYPE::get_void() {
-  static AST_TYPE *type = [] {
-    AST_TYPE *type = ast_alloc<AST_TYPE>();
-    type->kind = AST_TYPE::NORMAL;
-    type->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("void");
+AST *get_void_type() {
+  static AST *type = [] {
+    AST *type = ast_alloc(AST_TYPE, nullptr);
+    type->type.kind = AST_TYPE_NORMAL;
+    type->type.normal.base = ast_alloc(AST_IDENTIFIER, nullptr);
+    type->type.normal.base->identifier = "void";
     type->resolved_type = void_type();
     return type;
   }();
@@ -2022,17 +2018,16 @@ void Parser::end_node(AST *node, Source_Range &range) {
 }
 
 AST *Parser::parse_lambda() {
-  NODE_ALLOC(ASTLambda, node, range, this, _);
+  NODE_ALLOC(AST_LAMBDA, node, range, this, _);
   expect(Token_Type::Fn);
-  node->params = parse_parameters();
+  node->lambda.parameters  = parse_parameters();
   if (peek().type == Token_Type::Arrow) {
     eat();
-    node->return_type = parse_type();
+    node->lambda.return_type = parse_type();
   } else {
-    node->return_type = AST_TYPE::get_void();
+    node->lambda.return_type = get_void_type();
   }
-  node->block = parse_block();
-
+  node->lambda.block = parse_block();
   if (current_func_decl.is_null()) {
     end_node(nullptr, range);
     throw_error("temporarily, lambda functions cannot be used at a global level, only within functions", range);
@@ -2064,6 +2059,6 @@ Parser::Parser(const std::string &filename, Context &context)
 
 Parser::~Parser() { delete typer; }
 
-Nullable<ASTBlock> Parser::current_block = nullptr;
+Nullable<AST> Parser::current_block = nullptr;
 
 
