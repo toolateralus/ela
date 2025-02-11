@@ -90,6 +90,12 @@
     }                                                                                                                  \
   }
 
+
+constexpr static auto &get_interface_variant(AST *node) { return node->interface; }
+constexpr static auto &get_struct_variant(AST *node) { return node->$struct; }
+constexpr static auto &get_function_variant(AST *node) { return node->function; }
+constexpr static auto &get_impl_variant(AST *node) { return node->impl; }
+
 struct Typer {
   // parent type of impl's or whatever struct/union/enum etc that's currently being processed.
   Nullable<AST> type_context = nullptr;

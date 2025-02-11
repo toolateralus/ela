@@ -34,6 +34,31 @@ int Typer::get_self_type() {
   return Type::INVALID_TYPE_ID;
 }
 
+// TODO: add a statement in the .accept() function of AST base type
+// TODO: where we return the if the resolved type is already calculated?
+
+// TODO: then we'd have to make suer we reset all the resolved types when copying,
+// But it would save some double visits possibly.
+
+void assert_types_can_cast_or_equal(const int from, const int to, const Source_Range &source_range,
+                                    const std::string &message) {
+  auto from_t = global_get_type(from);
+  auto to_t = global_get_type(to);
+  auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
+  if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
+    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()),
+                source_range);
+  }
+}
+
+void assert_return_type_is_valid(int &return_type, int new_type, AST *node) {
+  if (return_type == Type::INVALID_TYPE_ID) {
+    return_type = new_type;
+  } else if (new_type != Type::INVALID_TYPE_ID && new_type != return_type) {
+    assert_types_can_cast_or_equal(return_type, new_type, node->source_range, "Inconsistent return types in block.");
+  }
+};
+
 #ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
   GenericInstantiationErrorUserData data_name;                                                                         \
@@ -66,13 +91,59 @@ int Typer::find_generic_type_of(const Interned_String &base, const std::vector<i
   return type.resolved_type;
 }
 
+/*
+  TODO: these require some more intense refactoring, due to the lack of Arguments/Parameters nodes now.
+*/
+AST *Typer::resolve_generic_function_call(AST *call, AST *func) {
+  std::vector<int> generic_args;
+  if (call->call.generic_arguments.empty()) {
+    auto resolved_argument_types = visit_arguments(call->source_range, call, call->call.arguments);
+    generic_args = resolved_argument_types;
+    auto index = 0;
+    for (auto generic_arg : generic_args) {
+      auto type = ast_alloc(AST_TYPE, call);
+      type->source_range = call->source_range;
+      auto gen_t = global_get_type(generic_arg);
+      /*
+        * This is auto dereferencing an inferred generic argument when you have a parameter such as T*
+        * We do this because it's strange to pass T as s32* if i do func(&s32);
+        * it makes it hard to do certain things, and if you wanted to take T as s32*, you'd just not give it a T* in
+        your
+        * parameter signature.
+
+        * I tried to mke it safer, not sure if i did.
+      */
+
+      if (gen_t->meta.is_pointer() && !func->function.parameters.empty()) {
+        // if it == 1, then we skip zero. works out.
+        int param_infer_index = func->function.parameters[0].tag == AST_PARAM_SELF;
+        if (param_infer_index < func->function.parameters.size() &&
+            func->function.parameters[param_infer_index].normal.type != nullptr &&
+            !func->function.parameters[param_infer_index].normal.type->type.extensions.empty()) {
+          type->resolved_type = gen_t->get_element_type();
+        } else {
+          type->resolved_type = generic_arg;
+        }
+      } else {
+        type->resolved_type = generic_arg;
+      }
+      call->call.generic_arguments.push_back(type);
+      index++;
+    }
+  } else {
+    generic_args = get_generic_arg_types(call->call.generic_arguments);
+  }
+  auto instantiation = visit_generic(&Typer::visit_function_header, func, get_function_variant, generic_args);
+  if (!instantiation) {
+    throw_error("Template instantiation argument count mismatch", call->source_range);
+  }
+  instantiation->function.generic_arguments = generic_args;
+  visit_function_body(static_cast<AST *>(instantiation));
+  return instantiation;
+}
+
 // The 'variant' arg is a reference to the variant of our AST union which has the .generic_parameters,
 // .generic_instantations etc. the 'definition_node' is the parent of that variant.
-
-constexpr static auto &get_interface_variant(AST *node) { return node->interface; }
-constexpr static auto &get_struct_variant(AST *node) { return node->$struct; }
-constexpr static auto &get_function_variant(AST *node) { return node->function; }
-constexpr static auto &get_impl_variant(AST *node) { return node->impl; }
 
 AST *Typer::visit_generic(VisitorMethod visit_method, AST *definition_node, auto &(*get_variant)(AST *parent),
                           std::vector<int> args) {
@@ -108,30 +179,58 @@ auto generic_instantiation_panic_handler(auto msg, auto range, auto void_data) {
   longjmp(data->save_state, 1);
 };
 
-// TODO: add a statement in the .accept() function of AST base type
-// TODO: where we return the if the resolved type is already calculated?
-
-// TODO: then we'd have to make suer we reset all the resolved types when copying,
-// But it would save some double visits possibly.
-
-void assert_types_can_cast_or_equal(const int from, const int to, const Source_Range &source_range,
-                                    const std::string &message) {
-  auto from_t = global_get_type(from);
-  auto to_t = global_get_type(to);
-  auto conv_rule = type_conversion_rule(from_t, to_t, source_range);
-  if (to != from && (conv_rule == CONVERT_PROHIBITED || conv_rule == CONVERT_EXPLICIT)) {
-    throw_error(message + '\n' + std::format("expected \"{}\", got \"{}\"", to_t->to_string(), from_t->to_string()),
-                source_range);
+void Typer::type_check_args_from_params(AST *call, AST *parameters, bool skip_first) {
+  auto old_type = expected_type;
+  Defer _([&]() { expected_type = old_type; });
+  auto args_ct = call->call.arguments.size();
+  auto params_ct = parameters->function.parameters.size();
+  auto largest = args_ct > params_ct ? args_ct : params_ct;
+  int param_index = skip_first ? 1 : 0;
+  for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
+    if (param_index < params_ct) {
+      if (arg_index < args_ct) {
+        expected_type = parameters->function.parameters[param_index].resolved_type;
+        visit(call->call.arguments[arg_index]);
+        assert_types_can_cast_or_equal(
+            call->call.arguments[arg_index]->resolved_type, parameters->function.parameters[param_index].resolved_type,
+            call->call.arguments[arg_index]->source_range,
+            std::format("unexpected argument type.. parameter #{} of function",
+                        arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+      }
+    } else {
+      if (arg_index < args_ct) {
+        expected_type = Type::INVALID_TYPE_ID;
+        visit(call->call.arguments[arg_index]);
+        if (!parameters->function.is_varargs) {
+          throw_error("Too many arguments to function", call->source_range);
+        }
+      }
+    }
   }
 }
 
-void assert_return_type_is_valid(int &return_type, int new_type, AST *node) {
-  if (return_type == Type::INVALID_TYPE_ID) {
-    return_type = new_type;
-  } else if (new_type != Type::INVALID_TYPE_ID && new_type != return_type) {
-    assert_types_can_cast_or_equal(return_type, new_type, node->source_range, "Inconsistent return types in block.");
+void Typer::type_check_args_from_info(AST *call, Function_Info *info) {
+  auto old_type = expected_type;
+  Defer _([&]() { expected_type = old_type; });
+  auto args_ct = call->call.arguments.size();
+  // TODO: rewrite this. this is so hard tor read.
+  if ((args_ct > info->parameter_types.size() && !info->is_varargs) || args_ct < info->parameter_types.size()) {
+    throw_error(
+        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
+                    info->parameter_types.size(), args_ct, info->to_string()),
+        call->source_range);
   }
-};
+
+  for (int i = 0; i < args_ct; ++i) {
+    auto arg = call->call.arguments[i];
+    expected_type = info->parameter_types[i];
+    visit(arg);
+    if (i < info->parameter_types.size()) {
+      assert_types_can_cast_or_equal(arg->resolved_type, info->parameter_types[i], arg->source_range,
+                                     std::format("invalid argument type for parameter #{}", i + 1));
+    }
+  }
+}
 
 Nullable<Symbol> Typer::get_symbol(AST *node) {
   switch (node->node_type) {
@@ -1674,13 +1773,61 @@ void Typer::visit_range(AST *node) {
   }
 }
 
-void Typer::visit_switch(AST *node) {}
+void Typer::visit_switch(AST *node) {
+  visit(node->$switch.target);
+  auto type_id = node->$switch.target->resolved_type;
+  auto type = global_get_type(type_id);
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->meta.is_pointer()) {
+    auto operator_overload = find_operator_overload(Token_Type::EQ, type, OPERATION_BINARY);
+    if (operator_overload == -1) {
+      throw_error(
+          std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
+                      "Eq (== operator on #self)\ngot type '{}'",
+                      type->to_string()),
+          node->$switch.target->source_range);
+    }
+  }
+
+  int return_type = void_type();
+  unsigned char flags = BLOCK_FLAGS_FALL_THROUGH;
+
+  for (const auto &_case : node->$switch.cases) {
+    visit(_case.expression);
+    auto expr_type = _case.expression->resolved_type;
+    visit(_case.block);
+    auto block_cf = _case.block->control_flow;
+    flags |= block_cf.flags;
+    if ((block_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
+      if (return_type != void_type()) {
+        assert_return_type_is_valid(return_type, block_cf.type, node);
+      }
+      return_type = block_cf.type;
+    }
+
+    if (type_is_numerical(type)) {
+      continue;
+    } else {
+      assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "Invalid switch case.");
+    }
+  }
+  node->resolved_type = node->$switch.return_type = return_type;
+  if (node->$switch.is_statement) {
+    node->control_flow = Control_Flow{return_type, flags};
+  } else {
+    if ((flags & BLOCK_FLAGS_BREAK) != 0) {
+      throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
+    } else if ((flags & BLOCK_FLAGS_CONTINUE) != 0) {
+      throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
+    }
+  }
+}
 
 void Typer::visit_tuple_deconstruction(AST *node) {
   visit(node->tuple_deconstruction.right);
   node->resolved_type = node->tuple_deconstruction.right->resolved_type;
   auto type = global_get_type(node->tuple_deconstruction.right->resolved_type);
-  if (type->meta.has_extensions()) 
+  if (type->meta.has_extensions())
     throw_error("Cannot destructure pointer or array type.", node->source_range);
 
   if (type->is_kind(TYPE_TUPLE)) {
