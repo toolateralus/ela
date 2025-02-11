@@ -937,16 +937,15 @@ void Typer::visit_call(AST *node) {
 }
 
 void Typer::visit_for(AST *node) {
-  ctx.set_scope(node->block->scope);
+  auto iden = node->$for.iter_identifier;
 
-  auto iden = static_cast<ASTIdentifier *>(node->iter_identifier);
-  node->range->accept(this);
-  // auto range_node_ty = node->range->node_type;
-  int range_type_id = node->range->resolved_type;
+  visit(node->$for.range);
+  int range_type_id = node->$for.range->resolved_type;
+
   Type *range_type = global_get_type(range_type_id);
-  node->range_type = range_type->id;
+  node->$for.range_type = range_type->id;
 
-  if (range_type->meta.has_extensions() && range_type->meta.extensions.back().type == TYPE_EXT_POINTER) {
+  if (range_type->meta.has_extensions() && range_type->meta.is_pointer()) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
                             "pointer to an array, range or struct? got type {}",
                             range_type->to_string()),
@@ -954,14 +953,14 @@ void Typer::visit_for(AST *node) {
   }
 
   int iter_ty = Type::INVALID_TYPE_ID;
-  auto scope = range_type->info->scope;
+  auto &scope = range_type->info.scope;
 
   if (range_type->implements("Iterable")) {
-    node->iteration_kind = ASTFor::ITERABLE;
+    node->$for.iteration_kind = Iteration_Kind::ITERABLE;
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(range_type_id, "iter");
 
-    auto symbol = scope->local_lookup("iter");
+    auto symbol = scope.lookup("iter");
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'iter'",
@@ -969,59 +968,62 @@ void Typer::visit_for(AST *node) {
     }
 
     auto symbol_ty = global_get_type(symbol->type_id);
-    auto iter_return_ty = global_get_type(symbol_ty->info->as<Function_Info>()->return_type);
-    node->iterable_type = iter_return_ty->id;
+    auto iter_return_ty = global_get_type(symbol_ty->info.function.return_type);
+    node->$for.iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
 
-    symbol = iter_return_ty->info->scope->local_lookup("current");
+    symbol = iter_return_ty->info.scope.lookup("current");
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
+    iter_ty = global_get_type(symbol->type_id)->info.function.return_type;
   } else if (range_type->implements("Enumerable")) {
-    node->iteration_kind = ASTFor::ENUMERABLE;
+    node->$for.iteration_kind = ENUMERABLE;
+
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(range_type_id, "enumerator");
 
-    auto symbol = scope->local_lookup("enumerator");
+    auto symbol = scope.lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
                   "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
                   node->source_range);
     }
     auto iter_return_ty =
-        global_get_type(global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type);
-    node->iterable_type = iter_return_ty->id;
+        global_get_type(global_get_type(symbol->type_id)->info.function.return_type);
+    node->$for.iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
 
-    symbol = iter_return_ty->info->scope->local_lookup("current");
+    symbol = iter_return_ty->info.scope.lookup("current");
+
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
                   "attempting to iterate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
+
+    iter_ty = global_get_type(symbol->type_id)->info.function.return_type;
   } else if (range_type->implements("Enumerator")) {
-    node->iteration_kind = ASTFor::ENUMERATOR;
+    node->$for.iteration_kind = ENUMERATOR;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
-    auto symbol = scope->local_lookup("current");
+    auto symbol = scope.lookup("current");
 
     if (!symbol || !symbol->is_function()) {
       throw_error("internal compiler error: type implements 'Enumerator' but no 'current' function was found when "
                   "attempting to enumerate, or it was a non-function symbol named 'current'",
                   node->source_range);
     }
-    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
-    node->iterable_type = range_type_id;
+    iter_ty = global_get_type(symbol->type_id)->info.function.return_type;
+    node->$for.iterable_type = range_type_id;
   } else if (range_type->base.get_str().starts_with("Iter$")) {
-    node->iteration_kind = ASTFor::ITERATOR;
-    node->iterable_type = range_type_id;
+    node->$for.iteration_kind = ITERATOR;
+    node->$for.iterable_type = range_type_id;
     compiler_mock_function_call_visit_impl(range_type_id, "current");
     iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to();
   } else {
@@ -1033,16 +1035,16 @@ void Typer::visit_for(AST *node) {
   }
 
   auto is_enumerator_or_enumerable =
-      node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
+      node->$for.iteration_kind == ENUMERABLE || node->$for.iteration_kind == ENUMERATOR;
 
-  if (is_enumerator_or_enumerable && node->value_semantic == VALUE_SEMANTIC_POINTER) {
+  if (is_enumerator_or_enumerable && node->$for.value_semantic == VALUE_SEMANTIC_POINTER) {
     throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
                 "'Enumerable'. This is because the enumerable()'s return type is not restricted to being a pointer, "
                 "and we can't guarantee "
                 "that taking a reference to it is safe or even valid.",
                 node->source_range);
 
-  } else if (!is_enumerator_or_enumerable && node->value_semantic != VALUE_SEMANTIC_POINTER) {
+  } else if (!is_enumerator_or_enumerable && node->$for.value_semantic != VALUE_SEMANTIC_POINTER) {
     // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit
     // dereference.
     auto type = global_get_type(iter_ty);
@@ -1053,16 +1055,13 @@ void Typer::visit_for(AST *node) {
     iter_ty = type->get_element_type();
   }
 
-  node->identifier_type = iter_ty;
-  ctx.scope->insert_variable(iden->value, iter_ty, node->iter_identifier);
-  node->iter_identifier->accept(this);
-  node->range->accept(this);
+  node->$for.identifier_type = iter_ty;
+  node->$for.block->scope.insert_variable(iden->identifier, iter_ty, node->$for.iter_identifier);
+  visit(node->$for.iter_identifier);
+  visit(node->$for.range);
+  visit(node->$for.block);
 
-  ctx.exit_scope();
-  node->block->accept(this);
-
-  //? Is this correct???
-  auto control_flow = node->block->control_flow;
+  auto control_flow = node->$for.block->control_flow;
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
