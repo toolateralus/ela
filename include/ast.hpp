@@ -54,7 +54,7 @@ enum AST_Node_Type : unsigned char {
   AST_ELSE,
   AST_WHILE,
   AST_STRUCT,
-  AST_DOT_EXPR,
+  AST_DOT,
   AST_SCOPE_RESOLUTION,
   AST_SUBSCRIPT,
   AST_INITIALIZER,
@@ -451,7 +451,7 @@ struct AST {
       case AST_TYPE:
       case AST_TUPLE:
       case AST_CALL:
-      case AST_DOT_EXPR:
+      case AST_DOT:
       case AST_SCOPE_RESOLUTION:
       case AST_SUBSCRIPT:
       case AST_INITIALIZER:

@@ -51,7 +51,7 @@ void DependencyEmitter::visit_declaration(AST *node) {
 void DependencyEmitter::visit_bin_expr(AST *node) {
   if (node->binary.is_operator_overload) {
     AST call(AST_CALL);
-    AST dot(AST_DOT_EXPR);
+    AST dot(AST_DOT);
     dot.dot.base = node->binary.left;
     dot.dot.member_name = get_operator_overload_name(node->binary.op, OPERATION_BINARY);
     call.call.callee = &dot;
@@ -66,7 +66,7 @@ void DependencyEmitter::visit_bin_expr(AST *node) {
 void DependencyEmitter::visit_unary_expr(AST *node) {
   if (node->unary.is_operator_overload) {
     AST call(AST_CALL);
-    AST dot(AST_DOT_EXPR);
+    AST dot(AST_DOT);
     dot.dot.base = node->unary.operand;
     dot.dot.member_name = get_operator_overload_name(node->unary.op, OPERATION_UNARY);
     call.call.callee = &dot;
@@ -234,7 +234,7 @@ void DependencyEmitter::visit_scope_resolution(AST *node) { visit(node->scope_re
 void DependencyEmitter::visit_subscript(AST *node) {
   if (node->subscript.is_operator_overload) {
     AST call(AST_CALL);
-    AST dot(AST_DOT_EXPR);
+    AST dot(AST_DOT);
     dot.dot.base = node->subscript.left;
     dot.dot.member_name = get_operator_overload_name(Token_Type::LBrace, OPERATION_SUBSCRIPT);
     call.call.callee = &dot;

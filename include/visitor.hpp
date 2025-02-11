@@ -51,7 +51,7 @@
         return visit_while(node);                                                                                      \
       case AST_STRUCT:                                                                                                 \
         return visit_struct_declaration(node);                                                                         \
-      case AST_DOT_EXPR:                                                                                               \
+      case AST_DOT:                                                                                               \
         return visit_dot_expr(node);                                                                                   \
       case AST_SCOPE_RESOLUTION:                                                                                       \
         return visit_scope_resolution(node);                                                                           \
@@ -256,7 +256,7 @@ struct Emitter {
   void emit_forward_declaration(AST *node);
   void emit_foreign_function(AST *node);
 
-  bool should_emit_function(Emitter *visitor, AST *node, bool test_flag);
+  bool should_emit_function(AST *node, bool test_flag);
   std::string to_cpp_string(const Type_Metadata &meta, const std::string &base);
   std::string to_cpp_string(Type *type);
   std::string get_cpp_scalar_type(int id);

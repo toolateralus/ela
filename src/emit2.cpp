@@ -27,6 +27,24 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 9;
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 10;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
 
+bool Emitter::should_emit_function(AST *node, bool test_flag) {
+  // if we're not testing, don't emit for test functions
+  if (!test_flag && node->function.flags & FUNCTION_IS_TEST) {
+    return false;
+  }
+  // generate a test based on this function pointer.
+  if (test_flag && node->function.flags & FUNCTION_IS_TEST) {
+    test_functions << "(__COMPILER_GENERATED_TEST){.name = \"" << node->function.name.get_str() << "\", .function = &"
+                   << node->function.name.get_str() << "},";
+    num_tests++;
+  }
+  // dont emit a main if we're in test mode.
+  if (test_flag && node->function.name == "main") {
+    return false;
+  }
+  return true;
+}
+
 std::string get_operator_value_string(Token_Type type) {
   switch (type) {
     case Token_Type::Assign:
@@ -239,8 +257,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
   std::stringstream ss;
-  ss << "(Field) { " << std::format(".name = \"{}\", ", name)
-     << std::format(".type = {}, ", to_type_struct(type));
+  ss << "(Field) { " << std::format(".name = \"{}\", ", name) << std::format(".type = {}, ", to_type_struct(type));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
@@ -670,7 +687,7 @@ void Emitter ::visit_function_declaration(AST *node) {
 
   // this also happens to emit the test boilerplate that bootstraps it into the
   // test runner, if applicable.
-  if (!should_emit_function(this, node, test_flag)) {
+  if (!should_emit_function(node, test_flag)) {
     return;
   }
 
@@ -947,7 +964,7 @@ void Emitter ::visit_call(AST *node) {
   }
 
   auto symbol = base_symbol.get();
-  if (node->call.callee->node_type == AST_DOT_EXPR) {
+  if (node->call.callee->node_type == AST_DOT) {
     if (!base_symbol || !base_symbol.get()->is_function()) {
       throw_error("can't call a non-function", node->source_range);
     }
@@ -1488,6 +1505,7 @@ void Emitter ::visit_impl(AST *node) {
   for (const auto &method : node->impl.methods)
     visit(method);
 }
+
 void Emitter ::visit_interface_declaration(AST *node) {}
 
 void Emitter ::visit_size_of(AST *node) {
@@ -1502,7 +1520,7 @@ int Emitter::get_expr_left_type_sr_dot(AST *node) {
       return node->resolved_type;
     case AST_IDENTIFIER:
       return node->parent->scope.lookup(node->identifier)->type_id;
-    case AST_DOT_EXPR: {
+    case AST_DOT: {
       return node->dot.base->resolved_type;
     } break;
     case AST_SCOPE_RESOLUTION: {
@@ -1606,6 +1624,7 @@ void Emitter ::visit_switch(AST *node) {
     first = false;
   }
 }
+
 void Emitter ::visit_tuple_deconstruction(AST *node) {
   emit_line_directive(node);
 
@@ -1658,4 +1677,81 @@ void Emitter ::visit_tuple_deconstruction(AST *node) {
     }
   }
 }
+
 void Emitter ::visit_where(AST *node) {};
+
+Emitter::Emitter(Typer &type_visitor) : typer(type_visitor) { ss = &code; }
+
+std::string Emitter::to_cpp_string(const Type_Metadata &extensions, const std::string &base) {
+  std::stringstream ss;
+  ss << base;
+  for (const auto meta : extensions.extensions) {
+    if (meta.type == TYPE_EXT_ARRAY) {
+      ss << "[" << std::to_string(meta.array_size) << "]";
+    } else if (meta.type == TYPE_EXT_POINTER) {
+      ss << "*";
+    }
+  }
+  return ss.str();
+}
+
+std::string Emitter::get_cpp_scalar_type(int id) {
+  auto type = global_get_type(id);
+  std::string name = "";
+
+  return to_cpp_string(type);
+
+  if (type->meta.has_no_extensions()) {
+    return name;
+  }
+
+  return to_cpp_string(type->meta, name);
+}
+
+std::string Emitter::to_cpp_string(Type *type) {
+  auto output = std::string{};
+  switch (type->kind) {
+    case TYPE_FUNCTION:
+      return get_function_pointer_type_string(type);
+    case TYPE_SCALAR:
+    case TYPE_ENUM:
+    case TYPE_STRUCT: {
+      output = to_cpp_string(type->meta, type->base.get_str());
+      break;
+    }
+    case TYPE_TUPLE: {
+      auto info = type->info.tuple;
+      output = "$tuple";
+      for (int i = 0; i < info.types.size(); ++i) {
+        output += std::to_string(info.types[i]);
+        if (i != info.types.size() - 1) {
+          output += "$";
+        }
+      }
+      output = to_cpp_string(type->meta, output);
+      break;
+    }
+    case TYPE_INTERFACE:
+      throw_error("can't declare an instance of an interface", {});
+      break;
+  }
+  return output;
+}
+
+void Emitter::call_operator_overload(const Source_Range &range, Type *left_ty, OperationKind operation, Token_Type op,
+                                     AST *left, AST *right) {
+  AST call(AST_CALL);
+  AST dot(AST_DOT);
+  dot.dot.base = left;
+  dot.dot.member_name = get_operator_overload_name(op, operation);
+  call.call.callee = &dot;
+  if (right) {
+    call.call.arguments = {
+        right,
+    };
+  }
+  dot.source_range = range;
+  call.source_range = range;
+  typer.visit(&call);
+  this->visit(&call);
+}

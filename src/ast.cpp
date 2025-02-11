@@ -630,7 +630,7 @@ void Parser::parse_arguments(AST *call) {
 
 AST *Parser::parse_call(AST *function) {
   NODE_ALLOC(AST_CALL, node, range, this, _);
-  node->call.function = function;
+  node->call.callee = function;
   if (peek().type == Token_Type::GenericBrace) {
     node->call.generic_arguments = parse_generic_arguments();
   }
@@ -699,7 +699,7 @@ AST *Parser::parse_postfix() {
     if (peek().type == Token_Type::LParen || peek().type == Token_Type::GenericBrace) {
       left = parse_call(left);
     } else if (peek().type == Token_Type::Dot) {
-      NODE_ALLOC(AST_DOT_EXPR, dot, range, this, _)
+      NODE_ALLOC(AST_DOT, dot, range, this, _)
       eat();
       dot->dot.base = left;
       if (peek().type == Token_Type::Integer || peek().type == Token_Type::Identifier) {
@@ -1196,7 +1196,7 @@ AST *Parser::parse_statement() {
     if (last_parent->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    last_parent->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
+    last_parent->scope.insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
     return decl;
   }
 
@@ -1303,12 +1303,12 @@ AST *Parser::parse_multiple_asssignment() {
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      node->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
+      node->scope.insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
       // already exist", node->source_range);
-      node->insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
+      node->scope.insert_variable(iden->identifier, Type::INVALID_TYPE_ID, nullptr);
     }
   }
 
@@ -1343,7 +1343,7 @@ AST *Parser::parse_declaration() {
     throw_error(std::format("re-definition of '{}'", iden.value), node->source_range);
   }
 
-  last_parent->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl.value.get(), node);
+  last_parent->scope.insert_variable(iden.value, Type::INVALID_TYPE_ID, decl.value.get(), node);
 
   return node;
 }
@@ -1417,7 +1417,7 @@ AST *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  node->insert_function(name.value, Type::INVALID_TYPE_ID, node);
+  node->scope.insert_function(name.value, Type::INVALID_TYPE_ID, node);
 
   if (peek().type != Token_Type::Arrow) {
     function.return_type = get_void_type();

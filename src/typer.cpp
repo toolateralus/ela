@@ -244,7 +244,7 @@ Nullable<Symbol> Typer::get_symbol(AST *node) {
     }
     case AST_IDENTIFIER:
       return node->parent->lookup(node->identifier);
-    case AST_DOT_EXPR: {
+    case AST_DOT: {
       auto &dot = node->dot;
       visit(dot.base);
       auto type = global_get_type(dot.base->resolved_type);
@@ -672,7 +672,7 @@ void Typer::compiler_mock_function_call_visit_impl(Scope scope, int left_type, c
   call.call.arguments = {&left};
 
   // .method
-  AST dot(AST_DOT_EXPR);
+  AST dot(AST_DOT);
   dot.dot.base = &left;
   dot.dot.member_name = method_name;
   call.call.callee = &dot;
@@ -1251,7 +1251,7 @@ void Typer::visit_call(AST *node) {
   // else, use the type.
   if (func_decl) {
     bool skip_first = false;
-    if (node->call.callee->node_type == AST_DOT_EXPR) {
+    if (node->call.callee->node_type == AST_DOT) {
       if (!func_decl->function.has_self) {
         throw_error("Calling static methods with instance not allowed", node->source_range);
       }
