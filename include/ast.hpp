@@ -468,16 +468,6 @@ struct AST {
 
   ~AST() {}
 
-  // get the count of non-function variables in this scope.
-  inline int fields_count() const {
-    auto field_ct = 0;
-    for (auto sym = scope.head; sym; sym = sym->next) {
-      if (!sym->is_function() && sym->is_type())
-        field_ct++;
-    }
-    return field_ct;
-  }
-
   Symbol *lookup(const Interned_String &name) {
     if (auto sym = scope.lookup(name)) {
       return sym;

@@ -170,6 +170,315 @@ size_t calculate_actual_length(const std::string_view &str_view) {
   return length;
 }
 
+std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
+  std::stringstream tss;
+  if (type->is_kind(TYPE_FUNCTION)) {
+    std::string identifier = name;
+    auto &meta = type->meta;
+
+    if (meta.is_array()) {
+      identifier += meta.to_string();
+    }
+
+    return get_function_pointer_type_string(type, &identifier);
+  }
+  auto base = type->base.get_str();
+  ;
+  tss << to_cpp_string(global_get_type(type->get_element_type()));
+  if (!type->meta.is_array()) {
+    tss << name << ' ';
+  }
+  bool emitted_iden = false;
+  for (const auto meta : type->meta.extensions) {
+    if (meta.type == TYPE_EXT_POINTER) {
+      tss << "*";
+    } else if (meta.type == TYPE_EXT_ARRAY) {
+      if (!emitted_iden) {
+        emitted_iden = true;
+        tss << ' ' << name;
+      }
+      tss << "[" << std::to_string(meta.array_size) << "]";
+    }
+  }
+  return tss.str();
+}
+
+std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
+  auto type_prefix = std::string{"*"};
+
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    throw_error("internal compiler error: tried to get a function pointer from "
+                "a non-function type",
+                {});
+  }
+
+  std::stringstream ss;
+
+  auto info = type->info.function;
+  auto return_type = global_get_type(info.return_type);
+
+  ss << to_cpp_string(return_type) << "(" << type_prefix;
+
+  if (identifier) {
+    ss << *identifier.get();
+  }
+
+  ss << ")(";
+
+  for (int i = 0; i < info.parameter_types.size(); ++i) {
+    auto &param = info.parameter_types[i];
+    auto type = global_get_type(param);
+    ss << to_cpp_string(type);
+    if (i != info.parameter_types.size() - 1) {
+      ss << ", ";
+    }
+  }
+  ss << ")";
+  return ss.str();
+}
+
+std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type) {
+  std::stringstream ss;
+  ss << "(Field) { " << std::format(".name = \"{}\", ", name)
+     << std::format(".type = {}, ", to_type_struct(type));
+
+  if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
+    ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+    ss << std::format(".offset = offsetof({}, {})", parent_type->base.get_str(), name);
+  }
+
+  if (parent_type->is_kind(TYPE_ENUM)) {
+    auto symbol = parent_type->info.scope.lookup(name);
+    // We don't check the nullable here because it's an absolute guarantee that enum variables all have
+    // a value always.
+    auto value = evaluate_constexpr(symbol->variable.initial_value.get());
+    ss << std::format(".enum_value = {}", value.integer);
+  }
+
+  ss << " }";
+  return ss.str();
+}
+
+std::string Emitter::get_elements_function(Type *type) {
+  //! We have to remove these lambdas so we can compile down to C.
+  auto element_type = global_get_type(type->get_element_type());
+  if (!type->meta.is_array()) {
+    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
+                       "  auto arr = (_array<{}>*)(array);\n"
+                       "  _array<Element> elements;\n"
+                       "  for (int i = 0; i < arr->length; ++i) {{\n"
+                       "    elements.push({{\n"
+                       "      .data = (char*)&(*arr)[i],\n"
+                       "      .type = {},\n"
+                       "    }});\n"
+                       "  }}\n"
+                       "  return elements;\n"
+                       "}}\n",
+                       to_cpp_string(element_type), to_type_struct(element_type));
+  } else {
+    auto size = type->meta.extensions.back().array_size;
+    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
+                       "  auto arr = ({}*)(array);\n"
+                       "  _array<Element> elements;\n"
+                       "  for (int i = 0; i < {}; ++i) {{\n"
+                       "    elements.push({{\n"
+                       "      .data = (char*)&arr[i],\n"
+                       "      .type = {},\n"
+                       "    }});\n"
+                       "  }}\n"
+                       "  return elements;\n"
+                       "}}\n",
+                       to_cpp_string(element_type), size, to_type_struct(element_type));
+  }
+}
+
+std::string get_type_flags(Type *type) {
+  int kind_flags = 0;
+  // TODO: refactor this for new String/str types?
+  // And C string.
+  // For now we'll just say it's u8* only.
+  if (type->id == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}})) {
+    return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
+  }
+  switch (type->kind) {
+    case TYPE_SCALAR: {
+      auto sint = type->id == s32_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
+                  type->id == s64_type();
+
+      auto uint = type->id == u8_type() || type->id == u16_type() || type->id == u32_type() || type->id == u64_type();
+
+      auto floating_pt = type->id == f32_type() || type->id == f64_type();
+      if (sint) {
+        kind_flags |= TYPE_FLAGS_SIGNED;
+      } else if (uint) {
+        kind_flags |= TYPE_FLAGS_UNSIGNED;
+      }
+
+      if (sint || uint) {
+        kind_flags |= TYPE_FLAGS_INTEGER;
+      } else if (floating_pt) {
+        kind_flags |= TYPE_FLAGS_FLOAT;
+      } else if (type->id == bool_type()) {
+        kind_flags |= TYPE_FLAGS_BOOL;
+      }
+      break;
+    }
+    case TYPE_FUNCTION:
+      kind_flags = TYPE_FLAGS_FUNCTION;
+      break;
+    case TYPE_STRUCT:
+      kind_flags = TYPE_FLAGS_STRUCT;
+      break;
+    case TYPE_ENUM:
+      kind_flags = TYPE_FLAGS_ENUM;
+      break;
+    // TODO: We need to let struct types know that they're a union when they are.
+    // case TYPE_UNION:
+    //   kind_flags = TYPE_FLAGS_UNION;
+    //   break;
+    case TYPE_TUPLE:
+      kind_flags = TYPE_FLAGS_TUPLE;
+      break;
+    case TYPE_INTERFACE:
+      kind_flags = 0;
+      break;
+  }
+  for (const auto &meta : type->meta.extensions) {
+    switch (meta.type) {
+      case TYPE_EXT_POINTER:
+        kind_flags |= TYPE_FLAGS_POINTER;
+        break;
+      case TYPE_EXT_ARRAY:
+        kind_flags |= TYPE_FLAGS_ARRAY;
+        break;
+      case TYPE_EXT_INVALID:
+        throw_error("internal compiler error: Extension type not set.", {});
+        break;
+    }
+  }
+  return ".flags = " + std::to_string(kind_flags) + "\n";
+}
+
+std::string Emitter::get_type_struct(Type *type, int id, const std::string &fields) {
+  std::stringstream ss;
+
+  if (!type) {
+    throw_error("internal compiler error: type was null in 'get_type_struct()' reflection emitter", {});
+  }
+
+  auto kind = 0;
+
+  ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
+  ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
+     << ".name = \"" << type->to_string() << "\", ";
+
+  if (!type->is_kind(TYPE_ENUM))
+    ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+
+  ss << get_type_flags(type) << ",\n";
+
+  // ! We can't use this either: it uses a lambda.
+  //   if (type->meta.is_fixed_sized_array()) {
+  //     ss << get_elements_function(type) << ",\n";
+  //   }
+
+  if (type->meta.is_pointer() || type->meta.is_array()) {
+    ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type())) << ",\n";
+  } else {
+    ss << ".element_type = NULL,\n";
+  }
+
+  ss << " };";
+
+  auto get_fields_init_statements = [&] {
+    std::stringstream fields_ss;
+    if (type->kind == TYPE_STRUCT) {
+      auto info = type->info;
+      if (info.scope.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info.scope.fields_count();
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &sym : info.scope) {
+        if (sym.name == "this")
+          continue;
+
+        auto t = global_get_type(sym.type_id);
+        // TODO: handle methods separately
+        if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
+          continue;
+
+        if (!t)
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(sym.name.get_str(), t, type) << ";\n";
+        ++it;
+      }
+    } else if (type->kind == TYPE_ENUM) {
+      // TODO: we have to fix this!.
+      auto info = type->info;
+      if (info.scope.empty()) {
+        return std::string("{}");
+      }
+
+      int count = info.scope.fields_count();
+
+      fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
+      fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
+
+      int it = 0;
+      for (const auto &symbol : info.scope) {
+        if (symbol.is_function())
+          continue;
+
+        auto t = global_get_type(s32_type());
+
+        if (!t) {
+          throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
+        }
+
+        fields_ss << "_type_info.data[" << id << "]->fields.data[" << it << "] = ";
+        fields_ss << get_field_struct(symbol.name.get_str(), t, type) << ";\n";
+        ++it;
+      }
+    }
+    return fields_ss.str();
+  };
+
+  ss << get_fields_init_statements();
+  type_info_strings.push_back(ss.str());
+  return std::format("_type_info.data[{}]", id);
+}
+
+std::string Emitter::to_type_struct(Type *type) {
+  if (!type) {
+    throw_error("internal compiler error: Reflection system got a null type", {});
+  }
+
+  auto id = type->id;
+
+  static bool *type_cache = [] {
+    auto arr = new bool[type_table.size()];
+    memset(arr, 0, type_table.size());
+    return arr;
+  }();
+
+  if (type_cache[id]) {
+    return std::format("_type_info.data[{}]", id);
+  }
+
+  type_cache[id] = true;
+
+  return get_type_struct(type, id, "{}");
+}
+
 void Emitter::emit_foreign_function(AST *node) {
   if (node->function.name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
@@ -615,7 +924,20 @@ void Emitter ::visit_type(AST *node) {
   (*ss) << type_string;
 }
 
-void Emitter ::visit_tuple(AST *node) {}
+void Emitter ::visit_tuple(AST *node) {
+  auto type = global_get_type(node->resolved_type);
+  auto name = "(" + to_cpp_string(type) + ")";
+  (*ss) << name << " {";
+  for (int i = 0; i < node->tuple.size(); ++i) {
+    auto &value = node->tuple[i];
+    (*ss) << ".$" << std::to_string(i) << " = ";
+    visit(value);
+    if (i != node->tuple.size() - 1)
+      (*ss) << ", ";
+  }
+  (*ss) << "}";
+}
+
 void Emitter ::visit_call(AST *node) {
   auto base_symbol = typer.get_symbol(node->call.callee);
 
@@ -698,9 +1020,70 @@ void Emitter ::visit_call(AST *node) {
     visit_arguments(node->call.arguments);
   }
 }
-void Emitter ::visit_return(AST *node) {}
-void Emitter ::visit_continue(AST *node) {}
-void Emitter ::visit_break(AST *node) {}
+
+void Emitter::visit_return(AST *node) {
+  emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->$return && (node->$return.get()->node_type == AST_SWITCH || node->$return.get()->node_type == AST_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    visit(node->$return.get());
+
+    if (emitting_function_with_defer ||
+        (node->declaring_block && node->declaring_block.get()->block.defer_count != 0)) {
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+      (*ss) << "return " << defer_return_value_key << ";\n";
+    } else {
+      (*ss) << "return " << str << ";\n";
+    }
+    return;
+  }
+
+  if (emitting_function_with_defer || (node->declaring_block && node->declaring_block.get()->block.defer_count != 0)) {
+    if (node->$return) {
+      auto type = global_get_type(node->resolved_type);
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = ";
+      visit(node->$return.get());
+      (*ss) << ";\n";
+    }
+    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+    (*ss) << "return";
+    if (node->$return) {
+      (*ss) << " " << defer_return_value_key;
+    }
+    (*ss) << ";\n";
+  } else if (cf_expr_return_register.is_not_null() || !node->$return) {
+    indented("return");
+    if (node->$return) {
+      space();
+      visit(node->$return.get());
+    }
+    (*ss) << ";\n";
+  } else {
+    (*ss) << cf_expr_return_register.get() << " = ";
+    visit(node->$return.get());
+    (*ss) << ";\n";
+  }
+}
+
+void Emitter ::visit_continue(AST *node) {
+  emit_line_directive(node);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  indented("continue;\n");
+}
+
+void Emitter ::visit_break(AST *node) {
+  emit_line_directive(node);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  indented("break;\n");
+}
 
 void Emitter ::visit_for(AST *node) {
   emit_line_directive(node);
@@ -920,7 +1303,21 @@ void Emitter ::visit_dot_expr(AST *node) {
   (*ss) << node->dot.member_name.get_str();
 }
 
-void Emitter ::visit_scope_resolution(AST *node) {}
+void Emitter ::visit_scope_resolution(AST *node) {
+  auto type = global_get_type(node->scope_resolution.base->resolved_type);
+
+  if (node->scope_resolution.base->node_type == AST_IDENTIFIER || node->scope_resolution.base->node_type == AST_TYPE) {
+    if (type->is_kind(TYPE_ENUM)) {
+      (*ss) << type->base.get_str();
+    } else {
+      (*ss) << "$" + std::to_string(type->id);
+    }
+  } else {
+    visit(node->scope_resolution.base);
+  }
+  auto op = "_";
+  (*ss) << op << node->scope_resolution.member_name.get_str();
+}
 
 void Emitter ::visit_subscript(AST *node) {
   auto left_ty = global_get_type(node->subscript.left->resolved_type);
@@ -1015,14 +1412,159 @@ void Emitter ::visit_enum_declaration(AST *node) {
   auto type = global_get_type(node->resolved_type);
 }
 
+void Emitter::forward_decl_type(Type *type) {
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
+  if (type->emitted_forward_declaration) {
+    return;
+  } else {
+    type->emitted_forward_declaration = true;
+  }
+  switch (type->kind) {
+    case TYPE_FUNCTION: {
+      auto info = type->info.function;
+      for (const auto param : info.parameter_types) {
+        forward_decl_type(global_get_type(param));
+      }
+      forward_decl_type(global_get_type(info.return_type));
+    } break;
+    case TYPE_STRUCT: {
+      auto info = type->info.$struct;
+      std::string kw = "typedef struct ";
+      if ((info.flags & STRUCT_FLAG_IS_UNION) != 0)
+        kw = "typedef union ";
+      (*ss) << kw << type->base.get_str() << " " << type->base.get_str() << ";\n";
+    } break;
+    case TYPE_TUPLE:
+      (*ss) << "typedef struct " << to_cpp_string(type) << " " << to_cpp_string(type) << ";\n";
+      break;
+    default:
+      return;
+  }
+}
+
+// Helper function to emit deferred statements
+void Emitter::emit_deferred_statements(DeferBlockType type) {
+  auto defer_block = defer_blocks.rbegin();
+  while (defer_block->type != type) {
+    if (defer_block == defer_blocks.rend()) {
+      throw_error("internal compiler error: could not find defer block type in stack", {});
+    }
+    for (auto defer : defer_block->defers) {
+      visit(defer);
+      semicolon();
+      newline();
+    }
+    defer_block++;
+  }
+  if (defer_block == defer_blocks.rend()) {
+    throw_error("internal compiler error: could not find defer block type in stack", {});
+  }
+  for (auto defer : defer_block->defers) {
+    visit(defer);
+    semicolon();
+    newline();
+  }
+}
+
 void Emitter ::visit_noop(AST *node) {}
+
 void Emitter ::visit_alias(AST *node) {}
-void Emitter ::visit_impl(AST *node) {}
+
+void Emitter ::visit_impl(AST *node) {
+  if (!node->impl.generic_parameters.empty())
+    return;
+
+  auto target = global_get_type(node->impl.target->resolved_type);
+
+  if (!target)
+    throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
+
+  auto old_type = type_context;
+  type_context = node->impl.target;
+  Defer _([&] { type_context = old_type; });
+
+  for (const auto &method : node->impl.methods)
+    visit(method);
+}
 void Emitter ::visit_interface_declaration(AST *node) {}
-void Emitter ::visit_size_of(AST *node) {}
-void Emitter ::visit_defer(AST *node) {}
-void Emitter ::visit_cast(AST *node) {}
-void Emitter ::visit_lambda(AST *node) {}
+
+void Emitter ::visit_size_of(AST *node) {
+  (*ss) << "sizeof(";
+  visit(node->size_of);
+  (*ss) << ")";
+}
+
+int Emitter::get_expr_left_type_sr_dot(AST *node) {
+  switch (node->node_type) {
+    case AST_TYPE:
+      return node->resolved_type;
+    case AST_IDENTIFIER:
+      return node->parent->scope.lookup(node->identifier)->type_id;
+    case AST_DOT_EXPR: {
+      return node->dot.base->resolved_type;
+    } break;
+    case AST_SCOPE_RESOLUTION: {
+      return node->scope_resolution.base->resolved_type;
+    } break;
+    default:
+      throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
+                              (int)node->node_type),
+                  node->source_range);
+  }
+  return Type::INVALID_TYPE_ID;
+}
+
+void Emitter ::visit_defer(AST *node) { defer_blocks.back().defers.push_back(node); }
+
+void Emitter ::visit_cast(AST *node) {
+  auto type_string = to_cpp_string(global_get_type(node->cast.target_type->resolved_type));
+  (*ss) << "(" << type_string << ")";
+  visit(node->cast.expression);
+}
+
+void Emitter ::emit_lambda(AST *node) {
+  if (node->is_emitted) {
+    return;
+  } else {
+    node->is_emitted = true;
+  }
+  emit_line_directive(node);
+  visit(node->lambda.return_type);
+  (*ss) << ' ' << node->lambda.unique_identifier.get_str() << ' ';
+  visit_parameters(node->lambda.parameters);
+  visit(node->lambda.block);
+  newline();
+}
+
+void Emitter::emit_tuple(int type_id) {
+  auto type = global_get_type(type_id);
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
+  if (type->emitted_tuple) {
+    return;
+  } else {
+    type->emitted_tuple = true;
+  }
+  auto name = to_cpp_string(type);
+
+  (*ss) << "typedef struct {";
+  auto info = type->info.tuple;
+  for (int i = 0; i < info.types.size(); ++i) {
+    auto type = global_get_type(info.types[i]);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      (*ss) << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+    } else {
+      auto name = to_cpp_string(type);
+      (*ss) << name << " $" << std::to_string(i) << ";\n";
+    }
+  }
+  (*ss) << "} " << name << ";\n";
+}
+
+void Emitter ::visit_lambda(AST *node) { (*ss) << node->lambda.unique_identifier.get_str(); }
 
 void Emitter ::visit_range(AST *node) {
   (*ss) << "(" << to_cpp_string(global_get_type(node->resolved_type)) << ") {";
@@ -1064,5 +1606,56 @@ void Emitter ::visit_switch(AST *node) {
     first = false;
   }
 }
-void Emitter ::visit_tuple_deconstruction(AST *node) {}
+void Emitter ::visit_tuple_deconstruction(AST *node) {
+  emit_line_directive(node);
+
+  auto type = global_get_type(node->resolved_type);
+
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto block = node->declaring_block;
+    if (!block) {
+      throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
+                  node->source_range);
+    }
+    auto id = block.get()->block.temp_iden_idx++;
+    std::string temp_id = "$temp_tuple$" + std::to_string(id++);
+    (*ss) << "auto " << temp_id << " = ";
+    visit(node->tuple_deconstruction.right);
+    (*ss) << ";\n";
+
+    if (node->tuple_deconstruction.op == Token_Type::ColonEquals) {
+      for (size_t i = 0; i < node->tuple_deconstruction.idens.size(); ++i) {
+        (*ss) << "auto " << node->tuple_deconstruction.idens[i]->identifier.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
+    } else {
+      for (size_t i = 0; i < node->tuple_deconstruction.idens.size(); ++i) {
+        (*ss) << node->tuple_deconstruction.idens[i]->identifier.get_str() << " = ";
+        (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+      }
+    }
+  } else {
+    auto scope = type->info.scope;
+    auto index = 0;
+    static int temp_idx = 0;
+    std::string identifier = "$deconstruction$" + std::to_string(temp_idx++);
+    (*ss) << to_cpp_string(type) << " " << identifier << " = ";
+    visit(node->tuple_deconstruction.right);
+    semicolon();
+
+    for (const auto symbol : scope) {
+      if (symbol.is_function()) {
+        continue;
+      }
+      if (node->tuple_deconstruction.op == Token_Type::ColonEquals) {
+        (*ss) << to_cpp_string(global_get_type(symbol.type_id)) << " "
+              << node->tuple_deconstruction.idens[index++]->identifier.get_str() << " = ";
+        (*ss) << identifier << "." << symbol.name.get_str() << ";\n";
+      } else {
+        (*ss) << node->tuple_deconstruction.idens[index++]->identifier.get_str() << " = ";
+        (*ss) << identifier << "." << symbol.name.get_str() << ";\n";
+      }
+    }
+  }
+}
 void Emitter ::visit_where(AST *node) {};

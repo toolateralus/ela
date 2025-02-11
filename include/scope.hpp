@@ -89,6 +89,7 @@ struct Symbol {
 };
 
 struct Scope {
+  bool empty() { return head == nullptr; }
   Symbol *head;
   Symbol *lookup(const Interned_String &name);
   bool erase(const Interned_String &name);
@@ -106,13 +107,23 @@ struct Scope {
                        SymbolFlags flags = SYMBOL_IS_FUNCTION);
   void insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration);
 
+  // get the count of non-function variables in this scope.
+  inline int fields_count() const {
+    auto field_ct = 0;
+    for (auto sym = head; sym; sym = sym->next) {
+      if (!sym->is_function() && sym->is_type())
+        field_ct++;
+    }
+    return field_ct;
+  }
+  
   // TODO:
   // One problem with this way of doing scope, is that we're using an arena for symbols.
   // So, when we do this, we basically just leak everything that had been, and cannot ever reclaim
   // that memory. This is fine, because this is done very rarely, and can probably be negated in another way
   // however, it's something to think about.
   void clear() { head = nullptr; }
-  
+
   class Iterator {
   public:
     Iterator(Symbol *symbol) : current(symbol) {}
@@ -122,6 +133,7 @@ struct Scope {
       return *this;
     }
     bool operator!=(const Iterator &other) const { return current != other.current; }
+
   private:
     Symbol *current;
   };
