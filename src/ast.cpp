@@ -560,7 +560,7 @@ Nullable<AST> Parser::process_directive(DirectiveKind kind, const Interned_Strin
 
 AST *Parser::parse() {
   NODE_ALLOC(AST_PROGRAM, program, range, this, _)
-
+  last_parent = program;
 #if defined(__linux)
   defines().insert("PLATFORM_LINUX");
 #elif defined(_WIN32)
@@ -582,19 +582,11 @@ AST *Parser::parse() {
     add_def("TESTING");
   }
 
-  { // For this compiler intrinsic operator,
-    // We have to do this. However, in the future, we will implement our own sizer,
-    // and we won't have this problem.
-    Function_Info sizeof_info{};
-    sizeof_info.return_type = u32_type();
-    sizeof_info.is_varargs = true;
-    program->scope.insert_function("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr);
-  }
-
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->kind == TYPE_FUNCTION) {
       continue;
     }
+    printf("creating type alias for %s :: id='%d'\n", type_table[i]->base.get_str().c_str(), i);
     program->scope.create_type_alias(type_table[i]->base, i, type_table[i]->kind, nullptr);
   }
 
@@ -793,34 +785,41 @@ AST *Parser::parse_primary() {
   }
 
   // .{} initializer lists.
-  if (tok.type == Token_Type::Dot && lookahead_buf()[1].type == Token_Type::LCurly) {
+  if (tok.type == Token_Type::Dot) {
     eat(); // eat .
-    eat(); // eat {
-    NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
-    if (peek().type == Token_Type::RCurly) {
-      init_list->initializer.tag = INITIALIZER_EMPTY;
-    } else if (lookahead_buf()[1].type != Token_Type::Colon) {
+    if (peek().type == Token_Type::LCurly) {
+      eat(); // eat {
+      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+      if (peek().type == Token_Type::RCurly) {
+        init_list->initializer.tag = INITIALIZER_EMPTY;
+      } else {
+        init_list->initializer.tag = INITIALIZER_NAMED;
+        while (peek().type != Token_Type::RCurly) {
+          auto identifier = expect(Token_Type::Identifier).value;
+          expect(Token_Type::Colon);
+          init_list->initializer.key_values.push_back({identifier, parse_expr()});
+          if (peek().type == Token_Type::Comma) {
+            eat();
+          }
+        }
+      }
+      expect(Token_Type::RCurly);
+      end_node(init_list, range);
+      return init_list;
+    } else if (peek().type == Token_Type::LBrace) {
+      eat(); // eat [
+      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
       init_list->initializer.tag = INITIALIZER_COLLECTION;
-      while (peek().type != Token_Type::RCurly) {
+      while (peek().type != Token_Type::RBrace) {
         init_list->initializer.values.push_back(parse_expr());
         if (peek().type == Token_Type::Comma) {
           eat();
         }
       }
-    } else {
-      init_list->initializer.tag = INITIALIZER_NAMED;
-      while (peek().type != Token_Type::RCurly) {
-        auto identifier = expect(Token_Type::Identifier).value;
-        expect(Token_Type::Colon);
-        init_list->initializer.key_values.push_back({identifier, parse_expr()});
-        if (peek().type == Token_Type::Comma) {
-          eat();
-        }
-      }
+      expect(Token_Type::RBrace);
+      end_node(init_list, range);
+      return init_list;
     }
-    expect(Token_Type::RCurly);
-    end_node(init_list, range);
-    return init_list;
   }
 
   switch (tok.type) {
@@ -1025,14 +1024,45 @@ AST *Parser::parse_type() {
 
   append_type_extensions(type);
 
-  if (peek().type == Token_Type::Dot && lookahead_buf()[1].type == Token_Type::LCurly) {
-    auto init_list = parse_expr();
-    if (init_list->node_type != AST_INITIALIZER) {
-      throw_error("Type {...} syntax can only be used for initializer lists. Was this a typo?",
-                  init_list->source_range);
+  if (peek().type == Token_Type::Dot) {
+    if (lookahead_buf()[1].type == Token_Type::LCurly) {
+      eat(); // eat .
+      eat(); // eat {
+      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+      if (peek().type == Token_Type::RCurly) {
+        init_list->initializer.tag = INITIALIZER_EMPTY;
+      } else {
+        init_list->initializer.tag = INITIALIZER_NAMED;
+        while (peek().type != Token_Type::RCurly) {
+          auto identifier = expect(Token_Type::Identifier).value;
+          expect(Token_Type::Colon);
+          init_list->initializer.key_values.push_back({identifier, parse_expr()});
+          if (peek().type == Token_Type::Comma) {
+            eat();
+          }
+        }
+      }
+      expect(Token_Type::RCurly);
+      end_node(init_list, range);
+      init_list->initializer.target_type = type;
+      return init_list;
+    } else if (lookahead_buf()[1].type == Token_Type::LBrace) {
+      eat(); // eat .
+      eat(); // eat [
+      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+      init_list->initializer.tag = INITIALIZER_COLLECTION;
+      while (peek().type != Token_Type::RBrace) {
+        init_list->initializer.values.push_back(parse_expr());
+        if (peek().type == Token_Type::Comma) {
+          eat();
+        }
+      }
+      expect(Token_Type::RBrace);
+      end_node(init_list, range);
+      init_list->initializer.target_type = type; // This is wholly inaccurate, and gets corrected in the typer.
+      // i32.[0,1,2] will produce a Init_List![i32];
+      return init_list;
     }
-    init_list->initializer.target_type = type;
-    return init_list;
   }
 
   end_node(type, range);

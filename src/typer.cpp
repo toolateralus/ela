@@ -469,8 +469,7 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
     method->function.declaring_type = target_ty->id;
     if (!method->function.generic_parameters.empty()) {
       // TODO: actually generate a signature for a generic function so that you can compare them
-      type_scope.insert(
-          Symbol::create_function(method->function.name, method->resolved_type, method, SYMBOL_IS_FUNCTION));
+      type_scope.insert_function(method->function.name, method->resolved_type, method);
       impl_scope.insert(*type_scope.lookup(method->function.name));
       continue;
     }
@@ -786,9 +785,8 @@ void Typer::visit_interface_declaration(AST *node, bool generic_instantiation, s
     visit(node->interface.where_clause.get());
   }
 
-  auto type = global_get_type(global_create_interface_type(node->interface.name, node->scope, generic_args));
-  type->declaring_node = node;
-  node->resolved_type = type->id;
+  auto type_id = node->parent->scope.create_interface_type(node->interface.name, generic_args, node, node->scope);
+  node->resolved_type = type_id;
 }
 
 void Typer::visit_interface_declaration(AST *node) {
@@ -877,7 +875,7 @@ void Typer::visit_bin_expr(AST *node) {
 
   if (binary.op == Token_Type::Assign) {
     if (binary.left->node_type == AST_IDENTIFIER) {
-      node->scope.insert_variable(binary.left->identifier, binary.left->resolved_type, binary.right);
+      node->parent->scope.insert_variable(binary.left->identifier, binary.left->resolved_type, binary.right);
     }
   }
 
@@ -1519,10 +1517,9 @@ void Typer::visit_initializer_list(AST *node) {
   if (!target_type) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);
   }
-  if (target_type->meta.is_pointer() || target_type->is_kind(TYPE_SCALAR) && target_type->meta.has_no_extensions()) {
-    throw_error(std::format("Cannot use an initializer list on a pointer, or a scalar type (int/float, etc) that's "
-                            "not an array\n\tgot {}",
-                            target_type->to_string()),
+
+  if (target_type->meta.is_pointer()) {
+    throw_error(std::format("Cannot use an initializer list on a pointer, got {}", target_type->to_string()),
                 node->source_range);
   }
 
@@ -1566,9 +1563,12 @@ void Typer::visit_initializer_list(AST *node) {
       }
     } break;
     case INITIALIZER_COLLECTION: {
-      // TODO:
-      // We can support these types of initializer lists, by creating something in-language like
-      // Init_List :: struct![T] {  ptr: T*; length: u64; } and passing this 'dynamic' array to a special function
+      auto expected = global_get_type(expected_type);
+      if (expected && expected->meta.is_array()) {
+        target_type = expected;
+      } else {
+        target_type = global_get_type(find_generic_type_of("Init_List", {target_type->id}, node->source_range));
+      }
       if (target_type->meta.is_array()) {
         auto &values = initializer.values;
         // Zero init construction. Pretty redundant.
@@ -1673,7 +1673,7 @@ void Typer::visit_alias(AST *node) {
     throw_error("Redeclaration of type", node->source_range);
   }
   auto type = global_get_type(node->alias.type->resolved_type);
-  node->scope.create_type_alias(node->alias.name, node->alias.type->resolved_type, type->kind, node);
+  node->parent->scope.create_type_alias(node->alias.name, node->alias.type->resolved_type, type->kind, node);
 }
 
 void Typer::visit_impl(AST *node) {

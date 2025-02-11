@@ -21,18 +21,24 @@ Symbol *Scope::lookup(const Interned_String &name) {
 
 
 void Scope::insert(const Symbol &symbol) {
-  Symbol **sym = &head;
-  while (*sym) {
-    // Overwrite if we find a symbol with a matching name.
-    if ((*sym)->name == symbol.name) {
-      **sym = symbol;
+  Symbol *sym = head;
+  Symbol *prev = nullptr;
+
+  while (sym) {
+    if (sym->name == symbol.name) {
+      *sym = symbol;
       return;
     }
-    sym = &(*sym)->next;
+    prev = sym;
+    sym = sym->next;
   }
-  // Insert the new symbol at the end of the list
-  *sym = (Symbol *)symbol_arena.allocate(sizeof(Symbol));
-  **sym = symbol;
+
+  Symbol *new_sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol(symbol);
+  if (prev) {
+    prev->next = new_sym;
+  } else {
+    head = new_sym;
+  }
 }
 
 bool Scope::erase(const Interned_String &name) {

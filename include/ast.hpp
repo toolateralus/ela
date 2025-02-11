@@ -191,7 +191,7 @@ struct AST {
   Control_Flow control_flow;
   Source_Range source_range;
   int resolved_type = Type::INVALID_TYPE_ID;
-  AST *parent;
+  AST *parent = nullptr;
   Scope scope;
   // TODO: optimize the size of the struct & function nodes. Most of our nodes are like 8,16,32 bytes at most.
   // TODO: yet, we're paying for 200 bytes per node, which is insane.
@@ -541,7 +541,7 @@ struct Parser {
   Nullable<AST> current_interface_decl = nullptr;
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
-  AST *last_parent;
+  AST *last_parent = nullptr;
   static Nullable<AST> current_block;
 
   Defer set_last_parent(AST *parent) {
