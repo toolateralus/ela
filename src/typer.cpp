@@ -79,7 +79,9 @@ void assert_return_type_is_valid(int &return_type, int new_type, AST *node) {
 int Typer::find_generic_type_of(const Interned_String &base, const std::vector<int> &generic_args,
                                 const Source_Range &source_range) {
   AST type(AST_TYPE);
-  type.type.normal.base->identifier = base;
+  AST ident(AST_IDENTIFIER);
+  ident.identifier = base;
+  type.type.normal.base = &ident;
   type.type.kind = AST_TYPE_NORMAL;
   AST args[generic_args.size()];
   size_t i = 0;
@@ -250,7 +252,7 @@ Nullable<Symbol> Typer::get_symbol(AST *node) {
       return get_symbol(node->type.normal.base);
     }
     case AST_IDENTIFIER:
-      return node->parent->lookup(node->identifier);
+      return node->lookup(node->identifier);
     case AST_DOT: {
       auto &dot = node->dot;
       visit(dot.base);
@@ -330,6 +332,8 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     throw_error("ICE: failed", node->source_range);
   }
   auto &info = type->info.$struct;
+  
+  type->info.scope = node->scope;
 
   // if we made it this far, we're definitely not forward declared.
   info.flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
@@ -341,8 +345,11 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
       node->scope.create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type($struct.name, node->scope, node, generic_args));
+    node->resolved_type = global_create_struct_type($struct.name, node->scope, node, generic_args);
+    type = global_get_type(node->resolved_type);
   }
+
+  type->info.scope = node->scope;
 
   if ($struct.where_clause) {
     visit_where($struct.where_clause.get());
@@ -364,9 +371,8 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     node->scope.insert_variable(member.name, member.type->resolved_type, nullptr);
   }
   node->resolved_type = type->id;
-  if (type->is_kind(TYPE_SCALAR)) {
-    throw_error("struct declaration was a scalar???", node->source_range);
-  }
+  
+  type->info.scope = node->scope;
 }
 
 void Typer::visit_program(AST *node) {
@@ -1076,9 +1082,9 @@ void Typer::visit_type(AST *node) {
     auto &normal_ty = node->type.normal;
     auto symbol = get_symbol(normal_ty.base).get();
 
-    if (!symbol || !symbol->is_type()) {
+    if (!symbol || !symbol->is_type()) 
       throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
-    }
+    
 
     auto declaring_node = symbol->type.declaration.get();
 

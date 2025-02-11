@@ -349,10 +349,6 @@ std::string get_type_flags(Type *type) {
     case TYPE_ENUM:
       kind_flags = TYPE_FLAGS_ENUM;
       break;
-    // TODO: We need to let struct types know that they're a union when they are.
-    // case TYPE_UNION:
-    //   kind_flags = TYPE_FLAGS_UNION;
-    //   break;
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;
@@ -394,11 +390,6 @@ std::string Emitter::get_type_struct(Type *type, int id, const std::string &fiel
 
   ss << get_type_flags(type) << ",\n";
 
-  // ! We can't use this either: it uses a lambda.
-  //   if (type->meta.is_fixed_sized_array()) {
-  //     ss << get_elements_function(type) << ",\n";
-  //   }
-
   if (type->meta.is_pointer() || type->meta.is_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type())) << ",\n";
   } else {
@@ -426,7 +417,7 @@ std::string Emitter::get_type_struct(Type *type, int id, const std::string &fiel
           continue;
 
         auto t = global_get_type(sym.type_id);
-        // TODO: handle methods separately
+
         if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
           continue;
 
@@ -552,6 +543,9 @@ void Emitter::emit_runtime_main(AST *&node) {
   } else {
     if (has_user_defined_main && !is_freestanding) {
 
+      // ! re-enable env setup. for some reason, it gets -1.
+      // ! This is clearly a problem of structs not getting put in the correct scope.
+#warning "Re enable me";
       // code << std::format("int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n",
       //                     node->find_type_id("Env", {}),
       //                     type_info_strings.size() != 0 ? "$initialize_reflection_system();"
