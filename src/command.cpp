@@ -34,13 +34,12 @@ void emit(AST *root, Typer &type_visitor) {
 
   emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
-  // @no-checkin
-  // if (!is_freestanding) {
-  //   emit.code << "typedef struct Type Type;\n";
-  //   auto type_ptr_id = root->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
-  //   emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
-  //                       type_ptr_id);
-  // }
+  if (!is_freestanding) {
+    emit.code << "typedef struct Type Type;\n";
+    auto type_ptr_id = root->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
+                        type_ptr_id);
+  }
 
   if (testing) {
     emit.code << "#define TESTING\n";
