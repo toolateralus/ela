@@ -26,6 +26,14 @@ static size_t get_uid() {
   return n++;
 }
 
+int Typer::get_self_type() {
+  if (type_context.is_not_null()) {
+    visit(type_context.get());
+    return type_context.get()->resolved_type;
+  }
+  return Type::INVALID_TYPE_ID;
+}
+
 #ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
   GenericInstantiationErrorUserData data_name;                                                                         \
@@ -42,6 +50,21 @@ static size_t get_uid() {
 #else
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
 #endif
+
+int Typer::find_generic_type_of(const Interned_String &base, const std::vector<int> &generic_args,
+                                const Source_Range &source_range) {
+  AST type(AST_TYPE);
+  type.type.normal.base->identifier = base;
+  type.type.kind = AST_TYPE_NORMAL;
+  AST args[generic_args.size()];
+  size_t i = 0;
+  for (const auto arg : generic_args) {
+    args[i].node_type = AST_TYPE;
+    args[i].resolved_type = arg;
+  }
+  visit(&type);
+  return type.resolved_type;
+}
 
 // The 'variant' arg is a reference to the variant of our AST union which has the .generic_parameters,
 // .generic_instantations etc. the 'definition_node' is the parent of that variant.
@@ -1653,6 +1676,71 @@ void Typer::visit_range(AST *node) {
 
 void Typer::visit_switch(AST *node) {}
 
-void Typer::visit_tuple_deconstruction(AST *node) {}
+void Typer::visit_tuple_deconstruction(AST *node) {
+  visit(node->tuple_deconstruction.right);
+  node->resolved_type = node->tuple_deconstruction.right->resolved_type;
+  auto type = global_get_type(node->tuple_deconstruction.right->resolved_type);
+  if (type->meta.has_extensions()) 
+    throw_error("Cannot destructure pointer or array type.", node->source_range);
 
-void Typer::visit_where(AST *node) {};
+  if (type->is_kind(TYPE_TUPLE)) {
+    auto info = type->info.tuple;
+    if (node->tuple_deconstruction.idens.size() != info.types.size()) {
+      throw_error(std::format("Cannot currently partially deconstruct a tuple. "
+                              "expected {} identifiers to assign, got {}",
+                              info.types.size(), node->tuple_deconstruction.idens.size()),
+                  node->source_range);
+    }
+    for (int i = 0; i < node->tuple_deconstruction.idens.size(); ++i) {
+      auto type = info.types[i];
+      auto iden = node->tuple_deconstruction.idens[i];
+      node->parent->scope.insert_variable(iden->identifier, type, iden);
+    }
+  } else {
+    auto &scope = type->info.scope;
+    for (const auto symbol : scope) {
+      if (symbol.is_function())
+        continue;
+      if (symbol.is_variable())
+        node->parent->scope.insert(symbol);
+    }
+  }
+}
+
+bool Typer::visit_where_predicate(Type *type, AST *node) {
+  switch (node->node_type) {
+    case AST_BINARY: {
+      auto bin = static_cast<AST *>(node);
+      auto op = bin->binary.op;
+      if (op == Token_Type::And) {
+        return visit_where_predicate(type, bin->binary.left) && visit_where_predicate(type, bin->binary.right);
+      } else if (op == Token_Type::Or) {
+        return visit_where_predicate(type, bin->binary.left) || visit_where_predicate(type, bin->binary.right);
+      } else {
+        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+                    "bitwise' operators for brevity, they're effectively '&&' and '||'.",
+                    bin->source_range);
+      }
+    } break;
+    case AST_TYPE: {
+      visit(node);
+      return std::ranges::find(type->interfaces, node->resolved_type) != type->interfaces.end() ||
+             type->id == node->resolved_type;
+    } break;
+    default:
+      throw_error("Invalid node in 'where' clause predicate", node->source_range);
+  }
+  return false;
+}
+
+void Typer::visit_where(AST *node) {
+  visit(node->where.target_type);
+
+  auto type = global_get_type(node->where.target_type->resolved_type);
+  auto satisfied = visit_where_predicate(type, node->where.predicate);
+
+  if (!satisfied) {
+    throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)),
+                node->source_range);
+  }
+}

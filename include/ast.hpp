@@ -180,10 +180,11 @@ enum Iteration_Kind : unsigned char {
 */
 
 struct AST {
+  AST() {}
   /*
     Don't reorder these, it's optimized for minimal padding.
   */
-  const AST_Node_Type node_type : 6; // maximum value of 36, so 6 bit packing might save us a tiny bit of space, the
+  AST_Node_Type node_type : 6; // maximum value of 36, so 6 bit packing might save us a tiny bit of space, the
                                      // more we can reduce the size of our ast.
   bool is_emitted : 1 = false;
   Nullable<AST> declaring_block;
