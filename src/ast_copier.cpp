@@ -537,7 +537,8 @@ AST *ASTCopier::copy_node(AST *node, AST *new_parent) {
 
 AST *deep_copy_ast(AST *root) {
   ASTCopier copier;
-  return copier.copy_node(root, nullptr);
+  // I don't really know what to do with the parent here.
+  return copier.copy_node(root, root->parent);
 }
 
 AST *ASTCopier::copy_alias(AST *node, AST *new_parent) {

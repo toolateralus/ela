@@ -828,4 +828,4 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
   void type::visit_tuple_deconstruction(AST *node) {}                                                                  \
   void type::visit_where(AST *node) {}
 
-AST *get_void_type();
+AST *ast_get_void_type();

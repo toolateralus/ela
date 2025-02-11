@@ -312,6 +312,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == Token_Type::Arrow) {
           parser->expect(Token_Type::Arrow);
           function->function.return_type = parser->parse_type();
+        } else {
+          function->function.return_type = ast_get_void_type();
         }
         function->function.flags |= FUNCTION_IS_FOREIGN;
         parser->expect(Token_Type::Semi);
@@ -559,8 +561,11 @@ Nullable<AST> Parser::process_directive(DirectiveKind kind, const Interned_Strin
 }
 
 AST *Parser::parse() {
-  NODE_ALLOC(AST_PROGRAM, program, range, this, _)
-  program->parent = nullptr;
+
+  // Program node has special initialization.
+  AST *program = ast_alloc(AST_PROGRAM, nullptr);
+  auto range = this->begin_node();
+  Defer _([&] { this->end_node(program, range); });
   auto remove_parent = set_parent(program);
 #if defined(__linux)
   defines().insert("PLATFORM_LINUX");
@@ -1487,7 +1492,7 @@ AST *Parser::parse_function_declaration(Token name) {
   node->scope.insert_function(name.value, Type::INVALID_TYPE_ID, node);
 
   if (peek().type != Token_Type::Arrow) {
-    function.return_type = get_void_type();
+    function.return_type = ast_get_void_type();
   } else {
     expect(Token_Type::Arrow);
     function.return_type = parse_type();
@@ -1934,7 +1939,7 @@ static Precedence get_operator_precedence(Token token) {
   }
 }
 
-AST *get_void_type() {
+AST *ast_get_void_type() {
   static AST *type = [] {
     AST *type = ast_alloc(AST_TYPE, nullptr);
     type->type.kind = AST_TYPE_NORMAL;
@@ -2040,7 +2045,7 @@ AST *Parser::parse_lambda() {
     eat();
     node->lambda.return_type = parse_type();
   } else {
-    node->lambda.return_type = get_void_type();
+    node->lambda.return_type = ast_get_void_type();
   }
   node->lambda.block = parse_block();
   if (current_func_decl.is_null()) {
@@ -2064,7 +2069,7 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  import("bootstrap");
+  // import("bootstrap");
   typer = new Typer();
 }
 
