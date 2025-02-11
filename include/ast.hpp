@@ -84,7 +84,7 @@ enum BlockFlags : unsigned char {
 
 struct Control_Flow {
   int type = Type::INVALID_TYPE_ID;
-  unsigned char flags: 2 = BLOCK_FLAGS_FALL_THROUGH;
+  unsigned char flags = BLOCK_FLAGS_FALL_THROUGH;
 };
 
 constexpr const inline static auto block_flags_to_string(const auto flags) {
@@ -474,19 +474,6 @@ struct AST {
         field_ct++;
     }
     return field_ct;
-  }
-
-  void insert_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl = nullptr) {
-    scope.insert(Symbol::create_variable(name, type_id, initial_value, decl));
-  }
-
-  void insert_function(const Interned_String &name, const int type_id, AST *declaration,
-                       SymbolFlags flags = SYMBOL_IS_FUNCTION) {
-    scope.insert(Symbol::create_function(name, type_id, declaration, flags));
-  }
-
-  void insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration) {
-    scope.insert(Symbol::create_type(type_id, name, kind, declaration));
   }
 
   Symbol *lookup(const Interned_String &name) {

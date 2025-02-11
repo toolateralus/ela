@@ -101,6 +101,10 @@ struct Scope {
   void forward_declare_type(const Interned_String &name, int default_id);
   int create_enum_type(const Interned_String &name, bool flags, AST *declaration, Scope scope);
   int create_tuple_type(const std::vector<int> &types);
+  void insert_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl = nullptr);
+  void insert_function(const Interned_String &name, const int type_id, AST *declaration,
+                       SymbolFlags flags = SYMBOL_IS_FUNCTION);
+  void insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration);
 
   // TODO:
   // One problem with this way of doing scope, is that we're using an arena for symbols.
@@ -108,6 +112,21 @@ struct Scope {
   // that memory. This is fine, because this is done very rarely, and can probably be negated in another way
   // however, it's something to think about.
   void clear() { head = nullptr; }
+  
+  class Iterator {
+  public:
+    Iterator(Symbol *symbol) : current(symbol) {}
+    Symbol &operator*() { return *current; }
+    Iterator &operator++() {
+      current = current->next;
+      return *this;
+    }
+    bool operator!=(const Iterator &other) const { return current != other.current; }
+  private:
+    Symbol *current;
+  };
+  Iterator begin() { return Iterator(head); }
+  Iterator end() { return Iterator(nullptr); }
 };
 
 static std::unordered_set<Interned_String> &defines() {

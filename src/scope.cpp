@@ -141,3 +141,15 @@ int Scope::create_tuple_type(const std::vector<int> &types) {
   insert(Symbol::create_type(id, name, TYPE_STRUCT, nullptr));
   return id;
 }
+
+void Scope::insert_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl) {
+  insert(Symbol::create_variable(name, type_id, initial_value, decl));
+}
+
+void Scope::insert_function(const Interned_String &name, const int type_id, AST *declaration, SymbolFlags flags) {
+  insert(Symbol::create_function(name, type_id, declaration, flags));
+}
+
+void Scope::insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration) {
+  insert(Symbol::create_type(type_id, name, kind, declaration));
+}
