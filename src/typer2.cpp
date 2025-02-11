@@ -5,6 +5,22 @@
 #include "visitor.hpp"
 #include "ast_copier.hpp"
 
+std::vector<TypeExtension> Typer::accept_extensions(std::vector<AST_Type_Extension> ast_extensions) {
+  std::vector<TypeExtension> extensions;
+  for (auto &meta : ast_extensions) {
+    if (meta.type == TYPE_EXT_ARRAY) {
+      auto val = evaluate_constexpr(meta.expression);
+      if (val.tag != Value::INTEGER) {
+        throw_error("Fixed array must have integer size.", meta.expression->source_range);
+      }
+      extensions.push_back({meta.type, (size_t)val.integer});
+    } else {
+      extensions.push_back({.type = meta.type});
+    }
+  }
+  return extensions;
+}
+
 static size_t get_uid() {
   static size_t n = 0;
   return n++;
@@ -26,6 +42,34 @@ static size_t get_uid() {
 #else
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range) block
 #endif
+
+// The 'variant' arg is a reference to the variant of our AST union which has the .generic_parameters,
+// .generic_instantations etc. the 'definition_node' is the parent of that variant.
+
+constexpr static auto &get_interface_variant(AST *node) { return node->interface; }
+constexpr static auto &get_struct_variant(AST *node) { return node->$struct; }
+constexpr static auto &get_function_variant(AST *node) { return node->function; }
+constexpr static auto &get_impl_variant(AST *node) { return node->impl; }
+
+AST *Typer::visit_generic(VisitorMethod visit_method, AST *definition_node, auto &(*get_variant)(AST *parent),
+                          std::vector<int> args) {
+  auto variant = get_variant(definition_node);
+
+  if (variant.generic_parameters.size() != args.size()) {
+    return nullptr;
+  }
+  auto instantiation = find_generic_instance(variant.generic_instantiations, args);
+  if (!instantiation) {
+    instantiation = deep_copy_ast(definition_node);
+    variant.generic_instantiations.push_back({args, instantiation});
+    (this->*visit_method)(instantiation, true, args);
+
+    auto instantation_variant = get_variant(instantiation);
+    instantation_variant.generic_parameters.clear();
+    instantation_variant.generic_instantiations.clear();
+  }
+  return instantiation;
+}
 
 void handle_generic_error(GenericInstantiationErrorUserData *data, const Source_Range &range) {
   reset_panic_handler();
@@ -595,6 +639,36 @@ void Typer::visit_declaration(AST *node) {
   }
 }
 
+void Typer::visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args) {
+  auto id = node->find_type_id(node->interface.name, {});
+  if (id != -1) {
+    auto type = global_get_type(id);
+    if (type->is_kind(TYPE_INTERFACE)) {
+      if (!generic_instantiation)
+        throw_error("re-definition of interface type.", node->source_range);
+    } else {
+      throw_error("re-definition of a type", node->source_range);
+    }
+  }
+
+  if (generic_instantiation) {
+    auto generic_arg = generic_args.begin();
+    for (const auto &param : node->interface.generic_parameters) {
+      auto kind = global_get_type(*generic_arg)->kind;
+      node->scope.create_type_alias(param, *generic_arg, kind, node);
+      generic_arg++;
+    }
+  }
+
+  if (node->interface.where_clause) {
+    visit(node->interface.where_clause.get());
+  }
+
+  auto type = global_get_type(global_create_interface_type(node->interface.name, node->scope, generic_args));
+  type->declaring_node = node;
+  node->resolved_type = type->id;
+}
+
 void Typer::visit_interface_declaration(AST *node) {
   if (!node->interface.generic_parameters.empty()) {
     node->parent->declare_interface(node->interface.name, node);
@@ -845,7 +919,139 @@ void Typer::visit_literal(AST *node) {
   }
 }
 
-void Typer::visit_type(AST *node) {}
+void Typer::visit_type(AST *node) {
+  if (node->resolved_type != Type::INVALID_TYPE_ID) {
+    return;
+  }
+
+  Type_Metadata extensions;
+  extensions.extensions = accept_extensions(node->type.extensions);
+
+  if (node->type.kind == AST_TYPE_SELF) {
+    auto self = get_self_type();
+    if (self == Type::INVALID_TYPE_ID) {
+      throw_error("Cannot locate #self type.", node->source_range);
+    }
+    auto self_w_ext = global_find_type_id(self, extensions);
+    if (self_w_ext == Type::INVALID_TYPE_ID) {
+      throw_error("Cannot locate #self type with extensions", node->source_range);
+    }
+    node->resolved_type = self_w_ext;
+    return;
+  }
+
+  // ! I have to check if the base is null because for some reason it's just null sometimes.
+  if (node->type.kind == AST_TYPE_NORMAL) {
+    auto &normal_ty = node->type.normal;
+    auto symbol = get_symbol(normal_ty.base).get();
+
+    if (!symbol || !symbol->is_type()) {
+      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
+    }
+
+    auto declaring_node = symbol->type.declaration.get();
+
+    if (declaring_node && !normal_ty.generic_arguments.empty()) {
+      std::vector<int> generic_args;
+      for (auto &arg : normal_ty.generic_arguments) {
+        visit(arg);
+        generic_args.push_back(arg->resolved_type);
+      }
+
+      AST *instantiation = nullptr;
+      auto decl_node_type = declaring_node->node_type;
+
+      GENERIC_PANIC_HANDLER(
+          data, 1,
+          {
+            switch (decl_node_type) {
+              case AST_STRUCT:
+                instantiation =
+                    visit_generic(&Typer::visit_struct_declaration, declaring_node, get_struct_variant, generic_args);
+                break;
+              case AST_FUNCTION:
+                instantiation =
+                    visit_generic(&Typer::visit_function_header, declaring_node, get_function_variant, generic_args);
+                break;
+              case AST_INTERFACE:
+                instantiation = visit_generic(&Typer::visit_interface_declaration, declaring_node,
+                                              get_interface_variant, generic_args);
+                break;
+              default:
+                throw_error("Invalid target to generic args", node->source_range);
+                break;
+            }
+          },
+          node->source_range);
+
+      if (!instantiation) {
+        throw_error("Template instantiation argument count mismatch", node->source_range);
+      }
+
+      GENERIC_PANIC_HANDLER(
+          other_data, 2,
+          {
+            if (decl_node_type == AST_FUNCTION) {
+              auto func = static_cast<AST *>(instantiation);
+              func->function.generic_arguments = generic_args;
+              visit_function_body(func);
+            } else if (decl_node_type == AST_STRUCT) {
+              auto struct_decl = static_cast<AST *>(instantiation);
+              for (auto node : struct_decl->$struct.impls) {
+                if (node->resolved_type == Type::INVALID_TYPE_ID) {
+                  // setting target resolved_type so that when target's visited it won't try to
+                  // instatiate the impls again. otherwise, it visits them in reverse order.
+                  node->impl.target->resolved_type = instantiation->resolved_type;
+                  visit_generic(&Typer::visit_impl_declaration, node, get_impl_variant, generic_args);
+                }
+              }
+            }
+            node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
+          },
+          node->source_range);
+
+    } else {
+      visit(normal_ty.base);
+      auto base_ty = global_get_type(normal_ty.base->resolved_type);
+      if (!base_ty)
+        throw_error(std::format("use of undeclared type", normal_ty.base->resolved_type), node->source_range);
+      node->resolved_type = global_find_type_id(base_ty->id, extensions);
+    }
+  } else if (node->type.kind == AST_TYPE_TUPLE) {
+    std::vector<int> types;
+    for (const auto &t : node->type.tuple_types) {
+      visit(t);
+      types.push_back(t->resolved_type);
+    }
+    node->resolved_type = global_find_type_id(types, extensions);
+  } else if (node->type.kind == AST_TYPE_REFLECTION) {
+    auto &normal_ty = node->type.normal;
+    visit(node->type.normal.base);
+    auto base_ty = global_get_type(normal_ty.base->resolved_type);
+    if (!base_ty) {
+      throw_error("use of undeclared type", node->source_range);
+    }
+    visit_type(node->type.pointing_to.get());
+    node->resolved_type = global_find_type_id(base_ty->id, extensions);
+  } else if (node->type.kind == AST_TYPE_FUNCTION) {
+    auto &func = node->type.function;
+    Function_Info info;
+    // TODO: I don' tthink is is ever null, ever.
+    if (func.return_type.is_not_null()) {
+      visit(func.return_type.get());
+      info.return_type = func.return_type.get()->resolved_type;
+    } else {
+      info.return_type = void_type();
+    }
+    for (auto &param_ty : func.parameter_types) {
+      visit(param_ty);
+      info.parameter_types.push_back(param_ty->resolved_type);
+    }
+    node->resolved_type = global_find_function_type_id(info, extensions);
+  } else {
+    throw_error("internal compiler error: Invalid type kind", node->source_range);
+  }
+}
 
 void Typer::visit_tuple(AST *node) {
   auto &tuple = node->tuple;
@@ -993,8 +1199,7 @@ void Typer::visit_for(AST *node) {
                   "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
                   node->source_range);
     }
-    auto iter_return_ty =
-        global_get_type(global_get_type(symbol->type_id)->info.function.return_type);
+    auto iter_return_ty = global_get_type(global_get_type(symbol->type_id)->info.function.return_type);
     node->$for.iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
@@ -1034,8 +1239,7 @@ void Typer::visit_for(AST *node) {
                 node->source_range);
   }
 
-  auto is_enumerator_or_enumerable =
-      node->$for.iteration_kind == ENUMERABLE || node->$for.iteration_kind == ENUMERATOR;
+  auto is_enumerator_or_enumerable = node->$for.iteration_kind == ENUMERABLE || node->$for.iteration_kind == ENUMERATOR;
 
   if (is_enumerator_or_enumerable && node->$for.value_semantic == VALUE_SEMANTIC_POINTER) {
     throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
@@ -1139,6 +1343,21 @@ void Typer::visit_dot_expr(AST *node) {
   } else {
     throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->dot.member_name, base_ty->to_string()),
                 node->source_range);
+  }
+}
+
+void Typer::visit_scope_resolution(AST *node) {
+  visit(node->scope_resolution.base);
+  auto id = node->scope_resolution.base->resolved_type;
+  auto base_ty = global_get_type(id);
+  Scope &scope = base_ty->info.scope;
+  if (auto member = scope.lookup(node->scope_resolution.member_name)) {
+    node->resolved_type = member->type_id;
+    return;
+  } else {
+    throw_error(
+        std::format("Member \"{}\" not found in type \"{}\"", node->scope_resolution.member_name, base_ty->to_string()),
+        node->source_range);
   }
 }
 
@@ -1353,7 +1572,7 @@ void Typer::visit_impl(AST *node) {
         data, 1,
         {
           for (auto instantiations : declaring_node->$struct.generic_instantiations) {
-            visit_generic(&Typer::visit_impl_declaration, node, instantiations.arguments);
+            visit_generic(&Typer::visit_impl_declaration, node, get_impl_variant, instantiations.arguments);
           }
         },
         node->source_range);
@@ -1367,9 +1586,7 @@ void Typer::visit_size_of(AST *node) {
   node->resolved_type = u64_type();
 }
 
-void Typer::visit_defer(AST *node) {
-  visit(node->defer);
-}
+void Typer::visit_defer(AST *node) { visit(node->defer); }
 
 void Typer::visit_cast(AST *node) {
   visit(node->cast.expression);

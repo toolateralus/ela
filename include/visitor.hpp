@@ -99,7 +99,7 @@ struct Typer {
   int expected_type = -1;
 
   using VisitorMethod = void (Typer::*)(AST *, bool, std::vector<int>);
-  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, std::vector<int> args);
+  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, auto &(*subtype)(AST*), std::vector<int> args);
   void compiler_mock_function_call_visit_impl(Scope scope, int left_type, const Interned_String &method_name);
   void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
