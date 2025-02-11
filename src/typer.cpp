@@ -52,6 +52,31 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   node->resolved_type = type->id;
 }
 
+
+void Typer::visit_scope_resolution(AST *node) {
+  node->base->accept(this);
+  auto id = node->base->resolved_type;
+  auto base_ty = global_get_type(id);
+  Scope *scope = base_ty->info->scope;
+  if (!scope) {
+    throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
+  }
+  if (auto member = scope->local_lookup(node->member_name)) {
+    node->resolved_type = member->type_id;
+    return;
+  } else if (auto type = scope->find_type_id(node->member_name, {})) {
+    if (type == Type::INVALID_TYPE_ID)
+      goto ERROR_CASE;
+    node->resolved_type = type;
+    return;
+  } else {
+  ERROR_CASE:
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+                node->source_range);
+  }
+}
+
+
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });

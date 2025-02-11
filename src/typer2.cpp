@@ -441,7 +441,7 @@ void Typer::visit_parameters(Source_Range source_range, std::vector<AST_Paramete
 
       auto type = global_get_type(id);
 
-      if (type->meta.is_fixed_sized_array()) {
+      if (type->meta.is_array()) {
         throw_warning(WarningDownCastFixedArrayParam,
                       "using a fixed array as a function parameter: note, this "
                       "casts the length information off and gets passed as as "
@@ -1069,8 +1069,8 @@ void Typer::visit_for(AST *node) {
 }
 
 void Typer::visit_if(AST *node) {
-  node->condition->accept(this);
-  auto cond_ty = node->condition->resolved_type;
+  visit(node->$if.condition);
+  auto cond_ty = node->$if.condition->resolved_type;
   auto conversion_rule = type_conversion_rule(global_get_type(cond_ty), global_get_type(bool_type()));
 
   if (conversion_rule == CONVERT_PROHIBITED) {
@@ -1078,12 +1078,12 @@ void Typer::visit_if(AST *node) {
                             global_get_type(cond_ty)->to_string()),
                 node->source_range);
   }
-  node->block->accept(this);
-  auto control_flow = node->block->control_flow;
-  if (node->_else.is_not_null()) {
-    auto _else = node->_else.get();
-    _else->accept(this);
-    auto else_cf = _else->control_flow;
+  visit(node->$if.block);
+  auto control_flow = node->$if.block->control_flow;
+  if (node->$if.$else.is_not_null()) {
+    auto $else = node->$if.$else.get();
+    visit($else);
+    auto else_cf = $else->control_flow;
     control_flow.flags |= else_cf.flags;
     if ((else_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
       assert_return_type_is_valid(control_flow.type, else_cf.type, node);
@@ -1095,32 +1095,31 @@ void Typer::visit_if(AST *node) {
 }
 
 void Typer::visit_else(AST *node) {
-  if (node->_if.is_not_null()) {
-    node->_if.get()->accept(this);
-    node->control_flow = node->_if.get()->control_flow;
+  if (node->$else.elseif.is_not_null()) {
+    visit(node->$else.elseif.get());
+    node->control_flow = node->$else.elseif.get()->control_flow;
   } else {
-    node->block.get()->accept(this);
-    node->control_flow = node->block.get()->control_flow;
+    visit(node->$else.block.get());
+    node->control_flow = node->$else.block.get()->control_flow;
   }
 }
 
 void Typer::visit_while(AST *node) {
-  if (node->condition.is_not_null()) {
-    node->condition.get()->accept(this);
+  if (node->$while.condition.is_not_null()) {
+    visit(node->$while.condition.get());
   }
-  node->block->accept(this);
-  auto control_flow = node->block->control_flow;
+  visit(node->$while.block);
+  auto control_flow = node->$while.block->control_flow;
+
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
-  // we add fall through here because we dont know if this will get
-  // excecuted since we cant evaluate the condition to know
   control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   node->control_flow = control_flow;
 }
 
 void Typer::visit_dot_expr(AST *node) {
-  node->base->accept(this);
-  auto base_ty_id = node->base->resolved_type;
+  visit(node->dot.base);
+  auto base_ty_id = node->dot.base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
 
   if (!base_ty) {
@@ -1129,76 +1128,41 @@ void Typer::visit_dot_expr(AST *node) {
                 node->source_range);
   }
 
-  Scope *base_scope = base_ty->info->scope;
-
+  Scope &base_scope = base_ty->info.scope;
   // Implicit dereference, we look at the base scope.
   if (base_ty->meta.is_pointer()) {
     base_ty = global_get_type(base_ty_id = base_ty->get_element_type());
-    base_scope = base_ty->info->scope;
+    base_scope = base_ty->info.scope;
   }
-
-  if (!base_scope) {
-    throw_error("internal compiler error: dot expression used on a type that had a null scope", node->source_range);
-  }
-
-  if (auto member = base_scope->local_lookup(node->member_name)) {
+  if (auto member = base_scope.lookup(node->dot.member_name)) {
     node->resolved_type = member->type_id;
   } else {
-    for (const auto &[name, _] : base_scope->symbols) {
-      std::cout << "symbol: " << name.get_str() << '\n';
-    }
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
-                node->source_range);
-  }
-}
-
-void Typer::visit_scope_resolution(AST *node) {
-  node->base->accept(this);
-  auto id = node->base->resolved_type;
-  auto base_ty = global_get_type(id);
-  Scope *scope = base_ty->info->scope;
-  if (!scope) {
-    throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
-  }
-  if (auto member = scope->local_lookup(node->member_name)) {
-    node->resolved_type = member->type_id;
-    return;
-  } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type == Type::INVALID_TYPE_ID)
-      goto ERROR_CASE;
-    node->resolved_type = type;
-    return;
-  } else {
-  ERROR_CASE:
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->dot.member_name, base_ty->to_string()),
                 node->source_range);
   }
 }
 
 void Typer::visit_subscript(AST *node) {
-  node->left->accept(this);
-  node->subscript->accept(this);
-  auto left_ty = global_get_type(node->left->resolved_type);
-  auto subscript_ty = global_get_type(node->subscript->resolved_type);
+  visit(node->subscript.left);
+  visit(node->subscript.index_expression);
+  auto left_ty = global_get_type(node->subscript.left->resolved_type);
+  auto subscript_ty = global_get_type(node->subscript.index_expression->resolved_type);
 
   auto overload = find_operator_overload(Token_Type::LBrace, left_ty, OPERATION_SUBSCRIPT);
   if (overload != -1) {
-    node->is_operator_overload = true;
-    node->resolved_type = global_get_type(overload)->info->as<Function_Info>()->return_type;
+    node->subscript.is_operator_overload = true;
+    node->resolved_type = global_get_type(overload)->info.function.return_type;
     return;
   }
 
   // * Todo: reimplement operator overloads with interfaces.
-
   auto meta = left_ty->meta;
-
-  if (!meta.is_fixed_sized_array() && !meta.is_pointer()) {
+  if (!meta.is_array() && !meta.is_pointer()) {
     throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: "
                             "fn(self*, idx: u32)' method. {}",
                             left_ty->to_string()),
                 node->source_range);
   }
-
   node->resolved_type = left_ty->get_element_type();
 }
 
@@ -1264,7 +1228,7 @@ void Typer::visit_initializer_list(AST *node) {
       // TODO:
       // We can support these types of initializer lists, by creating something in-language like
       // Init_List :: struct![T] {  ptr: T*; length: u64; } and passing this 'dynamic' array to a special function
-      if (target_type->meta.is_fixed_sized_array()) {
+      if (target_type->meta.is_array()) {
         auto &values = initializer.values;
         // Zero init construction. Pretty redundant.
         if (values.empty()) {

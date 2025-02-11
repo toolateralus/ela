@@ -98,7 +98,7 @@ struct Type_Metadata {
     }
   }
 
-  inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
+  inline bool is_array() const { return back_type() == TYPE_EXT_ARRAY; }
 
   inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER; }
 

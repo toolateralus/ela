@@ -1062,7 +1062,7 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
     std::string identifier = name;
     auto &meta = type->meta;
 
-    if (meta.is_fixed_sized_array()) {
+    if (meta.is_array()) {
       identifier += meta.to_string();
     }
 
@@ -1071,7 +1071,7 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   auto base = type->base.get_str();
   ;
   tss << to_cpp_string(global_get_type(type->get_element_type()));
-  if (!type->meta.is_fixed_sized_array()) {
+  if (!type->meta.is_array()) {
     tss << name << ' ';
   }
   bool emitted_iden = false;
@@ -1149,7 +1149,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 std::string Emitter::get_elements_function(Type *type) {
   //! We have to remove these lambdas so we can compile down to C.
   auto element_type = global_get_type(type->get_element_type());
-  if (!type->meta.is_fixed_sized_array()) {
+  if (!type->meta.is_array()) {
     return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
                        "  auto arr = (_array<{}>*)(array);\n"
                        "  _array<Element> elements;\n"
@@ -1269,7 +1269,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   //     ss << get_elements_function(type) << ",\n";
   //   }
 
-  if (type->meta.is_pointer() || type->meta.is_fixed_sized_array()) {
+  if (type->meta.is_pointer() || type->meta.is_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
     ss << ".element_type = NULL,\n";

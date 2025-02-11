@@ -178,7 +178,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // this obviously works for char* too.
   const auto implicit_fixed_array_to_ptr_cast = [&]() {
     // not array, return.
-    if (!from->meta.is_fixed_sized_array())
+    if (!from->meta.is_array())
       return false;
 
     if (!to->meta.is_pointer())
@@ -325,7 +325,7 @@ Interned_String get_function_typename(AST *decl) {
 }
 
 int Type::get_element_type() const {
-  if (!meta.is_pointer() && !meta.is_fixed_sized_array()) {
+  if (!meta.is_pointer() && !meta.is_array()) {
     throw_error(
         std::format("internal compiler error: called get_element_type() on a non pointer/array type\ngot type: \"{}\"",
                     to_string()),
