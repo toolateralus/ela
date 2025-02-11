@@ -38,15 +38,15 @@ jiggly_text :: fn(text: u8*, rect: Rectangle, style: Style) {
   for i in 0..length {
     u8_x := rect.x + (i * style.font_size) as f32;
     u8_y := rect.y + intensity * sin(rate * time + (i as f32));
-    temp : u8[2] = { text[i], '\0' as u8 };
+    temp : u8[2] = .[text[i], '\0' as u8];
     DrawText(temp as u8*, u8_x as s32, u8_y as s32, style.font_size, style.foreground);
   }
 }
 
 // * Draw a button with that returns true for clicked, false for not clicked.
 button :: fn(text: u8*, rect: Rectangle, style: Style) -> bool {
-  position: Vector2 = { x: rect.x, y: rect.y};
-  size: Vector2 = { x: rect.width, y: rect.height};
+  position: Vector2 = .{ x: rect.x, y: rect.y};
+  size: Vector2 = .{ x: rect.width, y: rect.height};
 
   text_width : f32;
   if style.use_jiggly_text {
@@ -62,7 +62,7 @@ button :: fn(text: u8*, rect: Rectangle, style: Style) -> bool {
     position.x = rect.x - (text_width - rect.width) / 2;
   }
 
-  new_rect : Rectangle = { x: position.x, y: position.y, width: size.x, height: size.y};
+  new_rect : Rectangle = .{ x: position.x, y: position.y, width: size.x, height: size.y};
 
   text_x := position.x + (size.x - text_width) / 2;
   text_y := position.y + (size.y - text_height) / 2;
@@ -97,8 +97,8 @@ button :: fn(text: u8*, rect: Rectangle, style: Style) -> bool {
 //! make this generic, and take fn*(T*) so we don'thave to void cast our data in our callback
 button_pro :: fn(text: u8*, rect: Rectangle, style: Style, callback: fn* (void*) -> void, user_data : void*) -> bool {
   
-  position: Vector2 = { x: rect.x, y: rect.y};
-  size: Vector2 = { x: rect.width, y: rect.height};
+  position: Vector2 = .{ x: rect.x, y: rect.y};
+  size: Vector2 = .{ x: rect.width, y: rect.height};
 
   text_width : f32;
   if style.use_jiggly_text {
@@ -114,7 +114,7 @@ button_pro :: fn(text: u8*, rect: Rectangle, style: Style, callback: fn* (void*)
     position.x = rect.x - (text_width - rect.width) / 2;
   }
 
-  new_rect : Rectangle = { x: position.x, y: position.y, width: size.x, height: size.y};
+  new_rect : Rectangle = .{ x: position.x, y: position.y, width: size.x, height: size.y};
 
   text_x := position.x + (size.x - text_width) / 2;
   text_y := position.y + (size.y - text_height) / 2;
@@ -216,7 +216,7 @@ impl![T] Slider![T] {
 
     slider_width : f32 = self.rect.width * clamp(abs(v_f - min_f) / abs(max_f - min_f), 0.0, 1.0);
 
-    slider_rect : Rectangle = {
+    slider_rect : Rectangle = .{
       x: self.rect.x,
       y: self.rect.y,
       width: slider_width,

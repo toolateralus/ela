@@ -24,13 +24,13 @@ Scene :: enum {
 }
 
 #region Global Variables {
-  button_style : Style = {
+  button_style : Style = .{
     foreground: WHITE,
     background: CLEAR,
     font_size: 20
   };
 
-  jiggly_text_style : Style = {
+  jiggly_text_style : Style = .{
     foreground: WHITE,
     background: CLEAR,
     font_size: 40
@@ -45,7 +45,7 @@ Scene :: enum {
   max_tilt : f32 = 16;
   screen_width : f32;
   screen_height : f32;
-  zero : Vector2 = {x: 0, y: 0};
+  zero : Vector2 = .{x: 0, y: 0};
 
   player_drag := 0.87;
 
@@ -65,7 +65,7 @@ Scene :: enum {
 
   bullet_max_burst: s32 = 3;
 
-  smoke_particle_init_scale : Vector2 = {x: 15, y: 15};
+  smoke_particle_init_scale : Vector2 = .{x: 15, y: 15};
   smoke_particle_max_burst := 6;
   smoke_particle_density := 1.5;
 
@@ -87,7 +87,7 @@ Scene :: enum {
   menu_music: Music;
   current_music: Music*;
 
-  spark_color : Color = {
+  spark_color : Color = .{
     r: YELLOW.r,
     g: YELLOW.g,
     b: YELLOW.b,
@@ -96,7 +96,7 @@ Scene :: enum {
 
   bg_color : Color = BLACK;
 
-  target_bg_color : Color = {
+  target_bg_color : Color = .{
     r: 75 as u8, g: 75 as u8, b: 75 as u8, a: 255 as u8,
   }
 }
@@ -116,7 +116,7 @@ impl RenderInfo {
     self: #self;
     w := tex.width as f32;
     h := tex.height as f32;
-    self.tex_rect = {
+    self.tex_rect = .{
       x: 0, 
       y: 0,
       width: w,
@@ -165,7 +165,7 @@ impl Bullet {
     self.rotation = rot;
     self.render_info = info;
     self.rect = _rect;
-    self.origin = { x:  _rect.width / 2, y: _rect.height / 2 };
+    self.origin = .{ x:  _rect.width / 2, y: _rect.height / 2 };
     self.velocity = vel;
     return self;
   }
@@ -187,7 +187,7 @@ impl Enemy {
     self: #self;
     self.render_info = info;
     self.rect = _rect;
-    self.origin = { x: _rect.width / 2, y: _rect.height / 2 };
+    self.origin = .{ x: _rect.width / 2, y: _rect.height / 2 };
     return self;
   }
 }
@@ -225,7 +225,7 @@ TextParticle :: struct {
 }
 
 get_center_screen_rect:: fn(width: f32, height, offset: Vector2) -> Rectangle {
-  return {
+  return .{
     x: screen_width / 2 + offset.x,
     y: screen_width / 2 + offset.y,
     width: width,
@@ -249,7 +249,7 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: f32) -> Co
   r : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   g : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   b : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
-  return {r: r, g: g, b: b, a: 255 as u8};
+  return .{r: r, g: g, b: b, a: 255 as u8};
 }
 
 random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
@@ -299,7 +299,7 @@ make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
 
     particle.render_info = &fire_particle_render_info;
     particle.lifetime = 4.0 / 60;
-    particle.scale = {x: 16.0, y: 16.0};
+    particle.scale = .{x: 16.0, y: 16.0};
     particle.spawn_time = GetTime();
     particle.color = tint;
   }
@@ -320,7 +320,7 @@ update_particle :: fn(particle: Particle*) -> bool {
     if delta > particle.lifetime {
       return t < 0.1 && particle.color.a == 0;
     }
-    particle.scale = {x: scale, y: scale};
+    particle.scale = .{x: scale, y: scale};
   } else if  particle.kind == ParticleKind::Fire {
     particle.scale.x *= 0.95;
     particle.scale.y *= 0.95;
@@ -332,9 +332,9 @@ update_particle :: fn(particle: Particle*) -> bool {
 }
 
 enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
-  position : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
+  position : Vector2 = .{x: enemy.rect.x, y: enemy.rect.y};
   if position.distance(enemy.target) < 5 || zero.equals(enemy.target) {
-    enemy.target = { 
+    enemy.target = .{ 
       x: GetRandomValue(0, 1) * screen_width, 
       y: GetRandomValue(0, 1) * screen_height 
     };
@@ -352,7 +352,7 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 make_enemy :: fn() {
   x : f32 = GetRandomValue(0, 1) * screen_width;
   y : f32 = GetRandomValue(0, 1) * screen_height;
-  rect : Rectangle = {x: x, y: y, width: enemy_scale, height: enemy_scale};
+  rect : Rectangle = .{x: x, y: y, width: enemy_scale, height: enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);
   rect.y = clamp(rect.y, 0, screen_height / 1.5);
@@ -377,9 +377,9 @@ make_bullet :: fn(x: f32, y, rotation) {
   } else {
     offset = (bullet_scale / 2.0);
   }
-  rect : Rectangle = {x: x + offset, y: y - bullet_scale, width: bullet_scale, height: bullet_scale};
+  rect : Rectangle = .{x: x + offset, y: y - bullet_scale, width: bullet_scale, height: bullet_scale};
   radians := (rotation / 360) * 3.14159265 * 2;
-  direction : Vector2 = {x: -(sin(radians) as f32), y: cos(radians) as f32};
+  direction : Vector2 = .{x: -(sin(radians) as f32), y: cos(radians) as f32};
   start_velocity := direction.scale(bullet_start_velocity);
   
   { 
@@ -389,7 +389,7 @@ make_bullet :: fn(x: f32, y, rotation) {
   }
 
   make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, PINK);
-  fire_pos : Vector2 = {x: rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, y: rect.y - bullet_scale};
+  fire_pos : Vector2 = .{x: rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, y: rect.y - bullet_scale};
   make_particle(ParticleKind::Fire, fire_pos, WHITE);
 }
 
@@ -425,7 +425,7 @@ draw_game :: fn() {
   }
 
   for particle in particles {
-    rect : Rectangle = {
+    rect : Rectangle = .{
       x: particle.position.x,
       y: particle.position.y,
       width: particle.scale.x,
@@ -606,7 +606,7 @@ update_game :: fn() {
     }
   }
 
-  screen_rect : Rectangle = {
+  screen_rect : Rectangle = .{
     x: 0.0, y: 0.0,
     width: GetScreenWidth() as f32,
     height: GetScreenHeight() as f32,
@@ -650,8 +650,8 @@ update_game :: fn() {
         }
         targets_destroyed++;
 
-        enemy_pos : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
-        u8acter_pos : Vector2 = {x: character.rect.x, y: character.rect.y};
+        enemy_pos : Vector2 = .{x: enemy.rect.x, y: enemy.rect.y};
+        u8acter_pos : Vector2 = .{x: character.rect.x, y: character.rect.y};
         distance := enemy_pos.distance(u8acter_pos);
         amount : s32 = (distance * round_index) as s32;
         score += amount
@@ -707,7 +707,7 @@ init :: fn() {
   screen_width =  GetScreenWidth() as f32;
   screen_height = GetScreenHeight() as f32;
 
-  background_rect = {
+  background_rect = .{
     x: 0.0,
     y: 0.0,
     width: background_texture.width as f32,
@@ -723,18 +723,18 @@ init :: fn() {
 
   w := character.texture.width  as f32;
   h := character.texture.height as f32;
-  character.tex_rect = {
+  character.tex_rect = .{
     x: 0, y: 0,
     width: w, height: h
   };
 
-  character.rect = {
+  character.rect = .{
     x: screen_width / 2,
     y: screen_height / 1.25,
     width: 64, height: 64
   };
 
-  character.origin = { x: character.rect.width / 2, y: character.rect.height / 2 };
+  character.origin = .{ x: character.rect.width / 2, y: character.rect.height / 2 };
 
   bullet_render_info = RenderInfo::create(LoadTexture("res/bullet.png"));
   enemy_render_info = RenderInfo::create(LoadTexture("res/enemy.png"));
@@ -830,7 +830,7 @@ draw_main_menu :: fn() {
     round_failed = false;
   }
 
-  rect : Rectangle = {
+  rect : Rectangle = .{
     x: screen_width / 7,
     y: screen_height / 10,
     width: screen_width / 2,
@@ -841,7 +841,7 @@ draw_main_menu :: fn() {
 
   if round_failed {
     style := jiggly_text_style;
-    rect : Rectangle = {
+    rect : Rectangle = .{
       x: screen_width / 7,
       y: screen_height / 3,
       width: screen_width / 2,

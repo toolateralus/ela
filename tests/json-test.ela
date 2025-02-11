@@ -141,7 +141,7 @@ impl JsonValueDeleter {
 // }
 
 // #test test_struct_deserialization :: fn() {
-//   n : MyJsonStruct = {
+//   n : MyJsonStruct = .{
 //     n: 100,
 //     b: 200.0
 //   };
@@ -151,7 +151,7 @@ impl JsonValueDeleter {
 //   }
 //   deleter: JsonValueDeleter;
 //   deleter.add(json);
-//   n = {};
+//   n = .{};
 //   assert("json  serialize  object", json.is_object());
 //   err = json_deserialize(json, &n, #type(MyJsonStruct));
 //   assert("json error", !err.has_value);

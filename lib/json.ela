@@ -87,7 +87,7 @@ impl JsonLexer {
   }
 
   create :: fn(_file: u8*, _input: u8*) -> #self {
-    return {
+    return .{
       file: _file,
       input: _input,
       length: strlen(_input)
@@ -438,13 +438,13 @@ impl JsonValue {
     if self.type == JsonValueType::Object {
       return self.data.object;
     }
-    return {}; // or handle error
+    return .{}; // or handle error
   }
   as_array :: fn(self*) -> JsonArray {
     if self.type == JsonValueType::Array {
       return self.data.array;
     }
-    return {}; // or handle error
+    return .{}; // or handle error
   }
   as_boolean :: fn(self*) -> bool {
     if self.type == JsonValueType::Boolean {
@@ -489,7 +489,7 @@ json_parse :: fn(lexer: JsonLexer*) -> (s32, JsonValue*) {
     }
   } else if token.type == JsonTokenType::LCurly {
     value.type = JsonValueType::Object;
-    value.data.object = {};
+    value.data.object = .{};
     peek_err, peek_token := lexer.peek_token();
     if peek_token.type == JsonTokenType::RCurly {
       lexer.get_token();
@@ -650,7 +650,7 @@ json_deserialize_struct :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
       return err;
     }
   }
-  return {};
+  return .{};
 }
 
 json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
@@ -666,7 +666,7 @@ json_deserialize_array :: fn(val: JsonValue*, object: void*, type: Type*) -> Jso
     ++i;
   }
   free(ptr);
-  return {};
+  return .{};
 }
 
 json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
@@ -721,14 +721,14 @@ json_deserialize_scalar :: fn(val: JsonValue*, object: void*, type: Type*) -> Js
     set_json_error(format("Unable to deserialize into type %", {any::new(&type.name)}));
     return JsonError::ERROR;
   }
-  return {};
+  return .{};
 }
 
 json_deserialize :: fn(val: JsonValue*, object: void*, type: Type*) -> JsonError {
   if val.is_string() {
     if type.id == #typeid(u8*) {
       *(object as u8**) = val.as_string();
-      return {};
+      return .{};
     } else {
       set_json_error(format("Type mismatch: u8* to %", {any::new(&type.name)}));
       return JsonError::ERROR;

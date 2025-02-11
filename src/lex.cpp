@@ -9,11 +9,9 @@ using std::stringstream;
 // TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
 // TODO: we should not have reserved words from host language leak into this langauge.
 static std::unordered_set<std::string> reserved = {
-    "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
-    "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
-    "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
-    "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
-    "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
+  "auto", "break", "case", "const", "continue", "default", "do", "double", "else", "enum", "extern",
+  "float", "for", "goto", "if", "inline", "int", "long", "register", "restrict", "return", "short", "signed",
+  "struct", "switch", "typedef", "union", "unsigned", "volatile", "while"};
 
 
 void Lexer::get_token(State &state) {

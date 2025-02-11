@@ -128,7 +128,7 @@ impl any {
   new :: fn![T](t: T*) -> #self {
     #static type: Type*;
     if !type then type = #type(T);
-    return {
+    return .{
       ptr: t,
       type: type,
     }

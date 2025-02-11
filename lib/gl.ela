@@ -854,10 +854,10 @@ impl Vec4 {
     return self.x * self.x + self.y * self.y + self.z * self.z + self.w * self.w;
   }
   one :: fn() -> #self {
-    return { x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
+    return .{ x: 1.0, y: 1.0, z: 1.0, w: 1.0 };
   }
   zero :: fn() -> #self {
-    return { x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
+    return .{ x: 0.0, y: 0.0, z: 0.0, w: 0.0 };
   }
 }
 
@@ -909,10 +909,10 @@ impl Vec3 {
     return self.x * self.x + self.y * self.y + self.z * self.z;
   }
   one :: fn() -> #self {
-    return { x: 1.0, y: 1.0, z: 1.0 };
+    return .{ x: 1.0, y: 1.0, z: 1.0 };
   }
   zero :: fn() -> Vec3 {
-    return { x: 0.0, y: 0.0, z: 0.0 };
+    return .{ x: 0.0, y: 0.0, z: 0.0 };
   }
 }
 
@@ -957,10 +957,10 @@ impl Vec2 {
     return self.x * self.x + self.y * self.y;
   }
   one :: fn() -> #self {
-    return { x: 1.0, y: 1.0 };
+    return .{ x: 1.0, y: 1.0 };
   }
   zero  :: fn() -> #self {
-    return { x: 0.0, y: 0.0 };
+    return .{ x: 0.0, y: 0.0 };
   }
 }
 

@@ -90,7 +90,7 @@ struct Symbol {
 
 struct Scope {
   bool empty() { return head == nullptr; }
-  Symbol *head;
+  Symbol *head = nullptr;
   Symbol *lookup(const Interned_String &name);
   bool erase(const Interned_String &name);
   void insert(const Symbol &symbol);

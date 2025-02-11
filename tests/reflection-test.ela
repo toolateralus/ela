@@ -23,7 +23,7 @@ Reflector :: struct {
 }
 
 // #test test_array_reflection :: fn() {
-//   fixed: s32[3] = {1, 2, 3};
+//   fixed: s32[3] = .[1, 2, 3];
 //   fixed_type := #type(fixed);
 //   index: s32 = 0;
 //   fixed_elements := fixed_type.elements((&fixed) as u8*);

@@ -344,7 +344,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         // It would vastly simplify a ton of stuff.
 
         outer->type.kind = AST_TYPE_REFLECTION;
-        outer->type.normal.base = ast_alloc(AST_IDENTIFIER, parser->last_parent);
+        outer->type.normal.base = ast_alloc(AST_IDENTIFIER, parser->parent());
         outer->type.normal.base->identifier = "Type";
         outer->type.extensions.push_back({TYPE_EXT_POINTER});
         return outer;
@@ -560,7 +560,8 @@ Nullable<AST> Parser::process_directive(DirectiveKind kind, const Interned_Strin
 
 AST *Parser::parse() {
   NODE_ALLOC(AST_PROGRAM, program, range, this, _)
-  last_parent = program;
+  program->parent = nullptr;
+  auto remove_parent = set_parent(program);
 #if defined(__linux)
   defines().insert("PLATFORM_LINUX");
 #elif defined(_WIN32)
@@ -586,7 +587,6 @@ AST *Parser::parse() {
     if (type_table[i]->kind == TYPE_FUNCTION) {
       continue;
     }
-    printf("creating type alias for %s :: id='%d'\n", type_table[i]->base.get_str().c_str(), i);
     program->scope.create_type_alias(type_table[i]->base, i, type_table[i]->kind, nullptr);
   }
 
@@ -675,7 +675,7 @@ AST *Parser::parse_expr(Precedence precedence) {
     Precedence token_precedence = get_operator_precedence(peek());
     if (token_precedence <= precedence)
       break;
-    AST *node = ast_alloc(AST_BINARY, last_parent);
+    AST *node = ast_alloc(AST_BINARY, parent());
     node->source_range = left->source_range;
     auto op = eat();
     auto right = parse_expr(token_precedence);
@@ -928,7 +928,7 @@ AST *Parser::parse_primary() {
       const auto lookahead = lookahead_buf();
       auto expr = parse_expr();
       if (peek().type == Token_Type::Comma) {
-        AST *node = ast_alloc(AST_TUPLE, last_parent);
+        AST *node = ast_alloc(AST_TUPLE, parent());
         Defer _([&] { this->end_node(node, range); });
         node->tuple.push_back(expr);
         eat();
@@ -1000,7 +1000,7 @@ AST *Parser::parse_type() {
   NODE_ALLOC(AST_TYPE, type, range, this, _)
   auto base = eat().value;
   type->type.kind = AST_TYPE_NORMAL;
-  type->type.normal.base = ast_alloc(AST_IDENTIFIER, last_parent);
+  type->type.normal.base = ast_alloc(AST_IDENTIFIER, parent());
   type->type.normal.base->identifier = base;
   type->type.normal.base->source_range = range;
 
@@ -1261,10 +1261,10 @@ AST *Parser::parse_statement() {
     decl->declaration.is_constexpr = true;
 
     end_node(decl, range);
-    if (last_parent->local_lookup(tok.value)) {
+    if (parent()->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    last_parent->scope.insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
+    parent()->scope.insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->declaration.value.get());
     return decl;
   }
 
@@ -1321,7 +1321,7 @@ AST *Parser::parse_statement() {
       throw_error(std::format("Unexpected keyword: {}", tok.value), parent_range);
     }
 
-    if (last_parent->lookup(tok.value)) {
+    if (parent()->lookup(tok.value)) {
       eat();
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
@@ -1407,11 +1407,11 @@ AST *Parser::parse_declaration() {
   }
 
   end_node(node, range);
-  if (last_parent->local_lookup(iden.value)) {
+  if (parent()->local_lookup(iden.value)) {
     throw_error(std::format("re-definition of '{}'", iden.value), node->source_range);
   }
 
-  last_parent->scope.insert_variable(iden.value, Type::INVALID_TYPE_ID, decl.value.get(), node);
+  parent()->scope.insert_variable(iden.value, Type::INVALID_TYPE_ID, decl.value.get(), node);
 
   return node;
 }
@@ -1420,7 +1420,7 @@ AST *Parser::parse_block(Scope *scope) {
   auto last_block = current_block;
   NODE_ALLOC_EXTRA_DEFER(AST_BLOCK, block, range, _, this, current_block = last_block);
   current_block = block;
-  auto parent_defer = set_last_parent(block);
+  auto parent_defer = set_parent(block);
 
   if (peek().type == Token_Type::ExpressionBody) {
     NODE_ALLOC(AST_RETURN, node, range, this, _);
@@ -1667,7 +1667,7 @@ AST *Parser::parse_where_clause() {
     binary->binary.op = eat().type;
     binary->binary.right = parse_type();
     binary->binary.left = node->where.predicate;
-    node->where.predicate = node;
+    node->where.predicate = binary;
   }
   return node;
 }
@@ -1680,7 +1680,7 @@ AST *Parser::parse_interface_declaration(Token name) {
   interface.name = name.value;
   current_interface_decl = node;
 
-  auto _defer = set_last_parent(node);
+  auto _defer = set_parent(node);
 
   if (peek().type == Token_Type::GenericBrace) {
     interface.generic_parameters = parse_generic_parameters();
@@ -1708,7 +1708,7 @@ AST *Parser::parse_interface_declaration(Token name) {
 AST *Parser::parse_struct_declaration(Token name) {
   auto old = current_struct_decl;
   NODE_ALLOC(AST_STRUCT, node, range, this, _)
-  auto _defer = set_last_parent(node);
+  auto _defer = set_parent(node);
   auto &$struct = node->$struct;
   node->$struct.name = name.value;
   current_struct_decl = node;
@@ -1857,8 +1857,8 @@ void Parser::append_type_extensions(AST *&node) {
         node->type.extensions.push_back({TYPE_EXT_ARRAY, expression});
       } else {
         // Syntactic sugar for doing int[] instead of List![int];
-        auto type = ast_alloc(AST_TYPE, last_parent);
-        auto iden = ast_alloc(AST_IDENTIFIER, last_parent);
+        auto type = ast_alloc(AST_TYPE, parent());
+        auto iden = ast_alloc(AST_IDENTIFIER, parent());
         iden->identifier = "List";
         type->type.kind = AST_TYPE_NORMAL;
         type->type.normal.base = iden;
@@ -2064,7 +2064,7 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  // import("bootstrap");
+  import("bootstrap");
   typer = new Typer();
 }
 

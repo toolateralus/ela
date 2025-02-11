@@ -9,7 +9,7 @@ Add :: interface![Right, Result] {
 
 impl Add![Vec2, Vec2] for Vec2 {
   add :: fn(self*, right: Vec2) -> Vec2 {
-    return {
+    return .{
       x: self.x + right.x,
       y: self.y + right.y
     };
@@ -29,7 +29,7 @@ Sub :: interface![Right, Result] {
 
 impl Sub![Vec2, Vec2] for Vec2 {
   sub :: fn(self*, right: Vec2) -> Vec2 {
-    return {
+    return .{
       x: self.x - right.x,
       y: self.y - right.y
     };
@@ -42,7 +42,7 @@ Neg :: interface![Result] {
 
 impl Neg![Vec2] for Vec2 {
   neg :: fn(self*) -> Vec2 {
-    return {
+    return .{
       x: -self.x,
       y: -self.y
     };

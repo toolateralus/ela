@@ -3,7 +3,7 @@ impl![T] Clone for Slice![T] {
   clone :: fn(self) -> #self {
     data : T* = malloc(sizeof(T) * self.length);
     memcpy(data, self.data, self.length * sizeof(T));
-    return {
+    return .{
       data: data,
       length: self.length,
     };
@@ -27,9 +27,9 @@ impl![T] Slice![T] {
     length := range.end - range.begin;
     
     // TODO: support reverse ranges?
-    if length < 0 then return {};
+    if length < 0 then return .{};
 
-    return {
+    return .{
       data: self.data + range.begin,
       length: length,
     }
@@ -38,7 +38,7 @@ impl![T] Slice![T] {
 
 impl![T] Iterable![T] for Slice![T] {
   iter :: fn(self*) -> Iter![T] {
-    return {
+    return .{
       ptr: self.data,
       end: self.data + self.length
     }

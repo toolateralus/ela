@@ -5,7 +5,7 @@
     replace :: fn(self*, old: u8*, replacement: u8*) -> str {
       old_len := strlen(old);
       new_len := strlen(replacement);
-      result : str = {};
+      result : str = .{};
       for i in 0..self.length {
         if strncmp(self.data + i, old, old_len) == 0 {
           result.data = realloc(result.data, result.length + new_len + 1);
@@ -23,9 +23,9 @@
     }
     
     from :: fn(data: u8*) -> #self{
-      if !data then return {};
+      if !data then return .{};
       len := strlen(data);
-      return {
+      return .{
         data: strdup(data),
         capacity: len,
         length: len,
@@ -99,14 +99,14 @@
 impl String {
   // THIS IS JUST A VIEW OF THE CURRENT STRING, PERFORM A CLONE ON THE STR TO GET AN OWNED COPY.
   as_str :: fn(self) -> str {
-    return {
+    return .{
       data: self.data,
       length: self.length,
     }
   }
 
   empty :: fn() -> #self {
-    return {};
+    return .{};
   }
   
   subscript :: fn(self*, idx: s64) -> u8 {
@@ -152,7 +152,7 @@ impl String {
 
 impl Iterable![u8] for String { 
   iter :: fn(self*) -> Iter![u8] {
-    return {
+    return .{
       ptr: self.data,
       end: self.data + self.length,
     }
@@ -161,7 +161,7 @@ impl Iterable![u8] for String {
 
 impl As_Char_Slice for String {
   as_char_slice :: fn(self) -> Slice![u32] {
-    return {
+    return .{
       data: self.data,
       length: self.length,
     }
@@ -170,7 +170,7 @@ impl As_Char_Slice for String {
 
 impl As_Byte_Slice for String {
   as_byte_slice :: fn(self) -> Slice![u8] {
-    return {
+    return .{
       data: self.data,
       length: self.length
     }

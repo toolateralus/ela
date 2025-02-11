@@ -96,7 +96,7 @@ impl File {
     }
     fwrite(data.data, sizeof(u8), data.length, file);
     fclose(file);
-    return {};
+    return .{};
   }
 
   // Used to convert our flag enum to a str for fopen/fclose etc.
@@ -109,7 +109,7 @@ impl File {
       return "rw";
     } else {
       panic("unexpected file flags passed to a file api function");
-      return {};
+      return .{};
     }
   }
 }

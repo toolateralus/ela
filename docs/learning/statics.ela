@@ -33,7 +33,7 @@ impl Strukt {
 
   // you could also use this for rust like stuff.
   Default :: fn() -> Strukt {
-    return {};
+    return .{};
   }
 
   // ❌ Illegal!! We don't support static members directly.

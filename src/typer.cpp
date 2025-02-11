@@ -281,6 +281,7 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<AST *> &args) {
 
 void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto type_id = node->find_type_id(node->$struct.name, {});
+  node->resolved_type = type_id;
 
   if (type_id != Type::INVALID_TYPE_ID) {
     auto type = global_get_type(type_id);
@@ -294,6 +295,7 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     }
   } else {
     type_id = node->parent->scope.create_struct_type(node->$struct.name, node, node->scope);
+    node->resolved_type = type_id;
     auto type = global_get_type(type_id);
 
     // again, we ony do this once.
@@ -309,7 +311,6 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
       // We only mark a forward declaration if it's the first occurence of that type.
       // Otherwise if you used a forward declaration in a latter translation unit, you'd like erase
       // the type and make a defined type unusable.
-      node->resolved_type = type->id;
       type->info.$struct.flags |= STRUCT_FLAG_FORWARD_DECLARED;
       return;
     }
@@ -317,6 +318,10 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
 
   auto &$struct = node->$struct;
   auto type = global_get_type(node->resolved_type);
+
+  if (!type) {
+    throw_error("ICE: failed", node->source_range);
+  }
   auto &info = type->info.$struct;
 
   // if we made it this far, we're definitely not forward declared.
@@ -329,7 +334,7 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
       node->scope.create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
-    type = global_get_type(global_create_struct_type($struct.name, node->scope, generic_args));
+    type = global_get_type(global_create_struct_type($struct.name, node->scope, node, generic_args));
   }
 
   if ($struct.where_clause) {
@@ -387,8 +392,7 @@ void Typer::visit_function_body(AST *node) {
   expected_type = node->function.return_type->resolved_type;
   auto block = node->function.block.get();
   if (!block) {
-    throw_error("internal compiler error: attempting to visit body of function forward declaration.",
-                node->source_range);
+    return;
   }
   visit(block);
   auto control_flow = block->control_flow;
@@ -596,7 +600,7 @@ void Typer::visit_parameters(Source_Range source_range, std::vector<AST_Paramete
       }
       return;
     } else {
-      visit_type(param.normal.type);
+      visit(param.normal.type);
       int id = param.normal.type->resolved_type;
       param.resolved_type = id;
 

@@ -275,14 +275,15 @@ std::string Type::to_string() const {
   }
 }
 
-int global_create_interface_type(const Interned_String &name, Scope scope, std::vector<int> generic_args) {
+int global_create_interface_type(const Interned_String &name, Scope scope,  AST *node, std::vector<int> generic_args) {
   Type_Info type_info{Interface_Info{}};
   type_info.scope = scope;
   Type *type = type_table.emplace_back(new Type(name, TYPE_INTERFACE, std::move(type_info), generic_args));
+  type->declaring_node = node;
   return type->id;
 }
 
-int global_create_struct_type(const Interned_String &name, Scope scope, std::vector<int> generic_args) {
+int global_create_struct_type(const Interned_String &name, Scope scope, AST * node, std::vector<int> generic_args) {
   Type_Info info{Struct_Info{}};
   info.scope = scope;
   std::string base = name.get_str();
@@ -290,14 +291,16 @@ int global_create_struct_type(const Interned_String &name, Scope scope, std::vec
     base += mangled_type_args(generic_args);
   }
   Type *type = type_table.emplace_back(new Type(base, TYPE_STRUCT, std::move(info), generic_args));
+  type->declaring_node = node;
   return type->id;
 }
 
-int global_create_enum_type(const Interned_String &name, Scope scope, bool is_flags, size_t element_type) {
+int global_create_enum_type(const Interned_String &name, Scope scope, AST *node, bool is_flags, size_t element_type) {
   Type_Info info(Enum_Info{});
   info.$enum.is_flags = is_flags;
   info.scope = scope;
   Type *type = type_table.emplace_back(new Type(name, TYPE_ENUM, std::move(info)));
+  type->declaring_node = node;
   return type->id;
 }
 int global_create_type(Type_Kind kind, const Interned_String &name, Type_Info &&info, const Type_Metadata &meta,

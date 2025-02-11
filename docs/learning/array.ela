@@ -8,12 +8,12 @@ main :: fn() {
   // ? Note: you cannot pass this type as an argument, it will be casted to s32* and emit a warning.
   fixed : s32[100];
 
-  fixed1 : s32[3] = {0, 1, 2};
+  fixed1 : s32[3] = .[0, 1, 2];
 
   // * For a dynamic array, similar to rust Vec<T> or c++ std::vector<T>
   dynamic: List![s32];
 
-  dynamic2: List![s32] = {0, 1, 2, 3, 4};
+  dynamic2: List![s32] = .[0, 1, 2, 3, 4];
 
   // ? Note: these operators are temporary and subject to be replaced with methods.
   // ? Arrays lack robust support in the langauge currently.

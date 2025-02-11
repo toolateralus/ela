@@ -100,11 +100,11 @@ panic :: fn(msg: str) {
 
 impl As_Char_Slice for u32 {
   as_char_slice :: fn(self) -> Slice![u32] {
-    #static chars : char[2] = {
+    #static chars : char[2] = .[
       '\0', '\0'
-    };
+    ];
     chars[0] = self;
-    return {
+    return .{
       data: chars,
       length: 1,
     }

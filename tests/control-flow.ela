@@ -96,7 +96,7 @@
 
   n = 0;
   arr : List![s8]* = malloc(sizeof(List![s8])); 
-  *arr = {};
+  *arr = .{};
   for i in 0..4 {
     arr.push(i as s8);
   }

@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
+#include <stack>
 #include <vector>
 
 #include "arena.hpp"
@@ -197,9 +198,10 @@ struct AST {
   // TODO: yet, we're paying for 200 bytes per node, which is insane.
   // TODO: we can definitely do some work to get rid of a lot of these vectors, and at the very least write a super
   // TODO: compact vector, if not just remove a TON of the bloat in the AST.
-  union {
-    std::vector<AST *> statements;
 
+  std::vector<AST *> statements; // TODO: put this in the appropriate variants, not out here. Long story.
+
+  union {
     struct {
       AST_Type_Kind kind = AST_TYPE_NORMAL;
       union {
@@ -464,7 +466,119 @@ struct AST {
     }
   }
 
-  AST(AST_Node_Type node_type) : node_type(node_type) {}
+  AST(AST_Node_Type node_type) : node_type(node_type) {
+    switch (node_type) {
+      case AST_PROGRAM:
+        new (&statements) std::vector<AST *>();
+        break;
+      case AST_BLOCK:
+        new (&block) decltype(block)();
+        break;
+      case AST_FUNCTION:
+        new (&function) decltype(function)();
+        break;
+      case AST_DECLARATION:
+        new (&declaration) decltype(declaration)();
+        break;
+      case AST_BINARY:
+        new (&binary) decltype(binary)();
+        break;
+      case AST_UNARY_EXPR:
+        new (&unary) decltype(unary)();
+        break;
+      case AST_IDENTIFIER:
+        new (&identifier) decltype(identifier)();
+        break;
+      case AST_LITERAL:
+        new (&literal) decltype(literal)();
+        break;
+      case AST_TYPE:
+        memset(&type, 0, sizeof(decltype(type)));
+        break;
+      case AST_TUPLE:
+        new (&tuple) decltype(tuple)();
+        break;
+      case AST_CALL:
+        new (&call) decltype(call)();
+        break;
+      case AST_RETURN:
+        new (&$return) decltype($return)();
+        break;
+      case AST_CONTINUE:
+      case AST_BREAK:
+        break;
+      case AST_FOR:
+        new (&$for) decltype($for)();
+        break;
+      case AST_IF:
+        new (&$if) decltype($if)();
+        break;
+      case AST_ELSE:
+        new (&$else) decltype($else)();
+        break;
+      case AST_WHILE:
+        new (&$while) decltype($while)();
+        break;
+      case AST_STRUCT:
+        new (&$struct) decltype($struct)();
+        break;
+      case AST_DOT:
+        new (&dot) decltype(dot)();
+        break;
+      case AST_SCOPE_RESOLUTION:
+        new (&scope_resolution) decltype(scope_resolution)();
+        break;
+      case AST_SUBSCRIPT:
+        new (&subscript) decltype(subscript)();
+        break;
+      case AST_INITIALIZER:
+        memset(&initializer, 0, sizeof(decltype(initializer)));
+        break;
+      case AST_ENUM:
+        new (&$enum) decltype($enum)();
+        break;
+      case AST_NOOP:
+        break;
+      case AST_ALIAS:
+        new (&alias) decltype(alias)();
+        break;
+      case AST_IMPL:
+        new (&impl) decltype(impl)();
+        break;
+      case AST_INTERFACE:
+        new (&interface) decltype(interface)();
+        break;
+      case AST_SIZE_OF:
+        new (&size_of) decltype(size_of)();
+        break;
+      case AST_DEFER:
+        new (&defer) decltype(defer)();
+        break;
+      case AST_CAST:
+        new (&cast) decltype(cast)();
+        break;
+      case AST_LAMBDA:
+        new (&lambda) decltype(lambda)();
+        break;
+      case AST_RANGE:
+        new (&range) decltype(range)();
+        break;
+      case AST_SWITCH:
+        new (&$switch) decltype($switch)();
+        break;
+      case AST_TUPLE_DECONSTRUCTION:
+        new (&tuple_deconstruction) decltype(tuple_deconstruction)();
+        break;
+      case AST_WHERE:
+        new (&where) decltype(where)();
+        break;
+      case AST_STATEMENT_LIST:
+        new (&statements) std::vector<AST *>();
+        break;
+      default:
+        break;
+    }
+  }
 
   ~AST() {}
 
@@ -541,13 +655,16 @@ struct Parser {
   Nullable<AST> current_interface_decl = nullptr;
   static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
-  AST *last_parent = nullptr;
   static Nullable<AST> current_block;
+  std::stack<AST *> parent_stack;
 
-  Defer set_last_parent(AST *parent) {
-    auto old = last_parent;
-    last_parent = parent;
-    return Defer([&] { last_parent = old; });
+  AST * parent() {
+    return parent_stack.top();
+  }
+
+  Defer set_parent(AST *parent) {
+    parent_stack.push(parent);
+    return Defer([&] { parent_stack.pop(); });
   }
 
   AST *parse();
@@ -621,12 +738,12 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
 }
 
 #define NODE_ALLOC(type, node, range, parser, defer)                                                                   \
-  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
+  AST *node = ast_alloc(type, parser->parent());                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  AST *node = ast_alloc(type, parser->last_parent);                                                                    \
+  AST *node = ast_alloc(type, parser->parent());                                                                    \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \

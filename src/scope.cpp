@@ -55,13 +55,13 @@ bool Scope::erase(const Interned_String &name) {
 
 int Scope::create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration,
                                  Scope scope) {
-  auto id = global_create_interface_type(name, scope, generic_args);
+  auto id = global_create_interface_type(name, scope, declaration, generic_args);
   insert(Symbol::create_type(id, name, TYPE_INTERFACE, declaration));
   return id;
 }
 
 int Scope::create_struct_type(const Interned_String &name, AST *declaration, Scope scope) {
-  auto id = global_create_struct_type(name, scope);
+  auto id = global_create_struct_type(name, scope, declaration);
   insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
   return id;
 }
@@ -85,7 +85,7 @@ void Scope::forward_declare_type(const Interned_String &name, int default_id) {
 }
 
 int Scope::create_enum_type(const Interned_String &name, bool flags, AST *declaration, Scope scope) {
-  auto id = global_create_enum_type(name, scope, flags);
+  auto id = global_create_enum_type(name, scope, declaration, flags);
   insert(Symbol::create_type(id, name, TYPE_STRUCT, declaration));
   return id;
 }

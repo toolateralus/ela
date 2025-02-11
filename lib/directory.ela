@@ -28,7 +28,7 @@ impl Directory {
   open :: fn(path: u8*) -> Directory {
     dir := opendir(path);
 
-    if !dir then return { 
+    if !dir then return .{ 
       path: String::from(path),
       files : {}
     };
@@ -41,7 +41,7 @@ impl Directory {
     }
 
     closedir(dir);
-    return {path: String::from(path), files: files};
+    return .{path: String::from(path), files: files};
   }
 
   deinit :: fn(self*) {

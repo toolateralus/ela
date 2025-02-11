@@ -12,7 +12,7 @@ subdivisions: s32 = 1;
 beats: s32 = 4;
 total_notes: s32 = 4;
 
-bpm_slider : Slider![f32] = {
+bpm_slider : Slider![f32] = .{
   text: "bpm", 
   rect: {x: 0, y: 0, width: 150, height: 40}, 
   style: Style { 
@@ -30,7 +30,7 @@ bpm_slider : Slider![f32] = {
   held: false, 
 };
 
-subdivision_slider : Slider![s32] = {
+subdivision_slider : Slider![s32] = .{
   text: "subdivisions", 
   rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -50,7 +50,7 @@ subdivision_slider : Slider![s32] = {
 
 bg_color := LIGHTCYAN;
 
-beats_slider : Slider![s32] = {
+beats_slider : Slider![s32] = .{
   text: "beats", 
   rect: {x: 150, y: 110, width: 150, height: 40}, 
   style: Style { 
@@ -68,7 +68,7 @@ beats_slider : Slider![s32] = {
   held: false 
 };
 
-play_button_style : Style = {
+play_button_style : Style = .{
   foreground: WHITE,
   background: CLEAR,
   highlighted: GREEN,
@@ -78,7 +78,7 @@ play_button_style : Style = {
   jiggle_rate: 2.0,
 };
 
-file_dropdown_style : Style = {
+file_dropdown_style : Style = .{
   foreground: WHITE,
   background: GRAY,
   highlighted: GREEN,
@@ -88,7 +88,7 @@ file_dropdown_style : Style = {
   jiggle_rate: 2.0,
 }
 
-sequence_channel_style : Style = {
+sequence_channel_style : Style = .{
   foreground: WHITE,
   background: GRAY,
   highlighted: GREEN,
@@ -100,7 +100,7 @@ sequence_channel_style : Style = {
 
 check_buttons: List![CheckButton];
 
-check_button_style: Style = {
+check_button_style: Style = .{
   foreground: WHITE,
   background: RED,
   highlighted: GREEN,
@@ -110,7 +110,7 @@ check_button_style: Style = {
   jiggle_rate: 2.0,
 }
 
-reset_button_style : Style = {
+reset_button_style : Style = .{
   foreground: WHITE,
   background: RED,
   highlighted: GREEN,
@@ -151,7 +151,7 @@ impl SequenceChannel {
     self: #self;
     self.sound = _sound;
     self.style = _style;
-    self.volume_slider = {
+    self.volume_slider = .{
       text: name,                     // text
       rect: {x: 0, y: 0, width: 146, height: 36}, // rectangle
       style: _style,                   // style
@@ -203,7 +203,7 @@ channels: List![SequenceChannel];
 
 on_file_selected :: fn(index: s32);
 
-file_dropdown : DropDown = {
+file_dropdown : DropDown = .{
   options: {},
   rect: {x: 0, y: 250, width: 125, height: 30},
   style: file_dropdown_style,
@@ -245,7 +245,7 @@ main :: fn() {
 
   for file in dir.files { 
     if file.length <= 4 then continue;
-    #static extensions: String[3] = {
+    #static extensions: String[3] = 
       String::from(".wav"),
       String::from(".mp3"),
       String::from(".ogg"),

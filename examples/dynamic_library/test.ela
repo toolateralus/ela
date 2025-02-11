@@ -11,7 +11,7 @@ position : Vector2;
   if ctx.inputState[KeyboardKey::KEY_D] then position.x += 1;
     
   command: DrawCommand;
-  command.rect = {
+  command.rect = .{
     x: position.x, y: position.y
     width: 60.0, height: 60.0,
   };

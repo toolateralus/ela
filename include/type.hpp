@@ -261,11 +261,11 @@ Interned_String get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(Type_Kind kind, const Interned_String &name, Type_Info &&info, const Type_Metadata &meta,
                        const int base_id);
 
-int global_create_struct_type(const Interned_String &, Scope scope, std::vector<int> generic_args = {});
+int global_create_struct_type(const Interned_String &, Scope scope, AST * node, std::vector<int> generic_args = {});
 
-int global_create_interface_type(const Interned_String &name, Scope scope, std::vector<int> generic_args);
+int global_create_interface_type(const Interned_String &name, Scope scope, AST * node, std::vector<int> generic_args = {});
 
-int global_create_enum_type(const Interned_String &, Scope, bool = false, size_t element_type = s32_type());
+int global_create_enum_type(const Interned_String &, Scope, AST * node, bool = false, size_t element_type = s32_type());
 
 int global_create_tuple_type(const std::vector<int> &types);
 

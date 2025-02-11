@@ -2,7 +2,7 @@
 #ifndef FREESTANDING {
   impl str {
     as_string :: fn(self) -> String {
-      return {
+      return .{
         data: strdup(self.data),
         length: self.length,
       };
@@ -12,7 +12,7 @@
 
 impl str {
   empty :: fn() -> #self {
-    return {};
+    return .{};
   }
   subscript :: fn(self*, idx: s64) -> u8 {
     return self.data[idx];
@@ -41,10 +41,10 @@ impl str {
     length := end - start;
 
     if start < 0 || length < 0 || start + length > self.length {
-      return {};
+      return .{};
     }
     
-    return {
+    return .{
       data: self.data + start,
       length: length,
     };
@@ -57,7 +57,7 @@ impl str {
 // This iterator is over the bytes.
 impl Iterable![u8] for str { 
   iter :: fn(self*) -> Iter![u8] {
-    return {
+    return .{
       ptr: self.data,
       end: self.data + self.length,
     }
@@ -91,7 +91,7 @@ impl Hash for str {
 
 impl As_Char_Slice for str {
   as_char_slice :: fn(self) -> Slice![u32] {
-    return {
+    return .{
       data: self.data,
       length: self.length,
     }
@@ -100,7 +100,7 @@ impl As_Char_Slice for str {
 
 impl As_Byte_Slice for str {
   as_byte_slice :: fn(self) -> Slice![u8] {
-    return {
+    return .{
       data: self.data,
       length: self.length
     }

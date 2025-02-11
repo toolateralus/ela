@@ -16,7 +16,7 @@ TestFn :: fn![T]() where T is s32 | f32 {
 }
 
 TestFn1 :: fn![T]() -> T where T is s32 | f32 {
-  return {};
+  return .{};
 }
 
 TestStruct5 :: struct![T] where T is s32 | f32 {}

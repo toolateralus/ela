@@ -12,7 +12,7 @@ panic :: fn(msg: str);
       new_data := malloc(sizeof(T) * len);
       if !new_data then panic("Failed to allocate in subarray");
       memcpy(new_data, self.data + range.begin, sizeof(T) * len);
-      return {
+      return .{
         data: new_data,
         length: len,
         capacity: len,
@@ -100,7 +100,7 @@ panic :: fn(msg: str);
       new_data := malloc(sizeof(T) * self.capacity);
       if !new_data then panic("Failed to allocate in List clone");
       memcpy(new_data, self.data, sizeof(T) * self.length);
-      return {
+      return .{
         data: new_data,
         length: self.length,
         capacity: self.capacity,
@@ -121,7 +121,7 @@ panic :: fn(msg: str);
 
 impl![T] Iterable![T] for List![T] {
   iter :: fn(self*) -> Iter![T] {
-    return {
+    return .{
       ptr: self.data,
       end: (self.data + self.length) as T*,
     }
@@ -140,7 +140,7 @@ impl![T] As_Slice![T] for List![T] {
       panic("Invalid range for as_slice");
     }
     len := range.end - range.begin;
-    return Slice![T] {
+    return .{
       data: self.data + range.begin,
       length: len,
     }

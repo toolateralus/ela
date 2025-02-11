@@ -220,7 +220,7 @@ to_string :: fn![T](value: T) -> String {
 
 format :: fn(fmt : str, list: Init_List![any]) -> String {
   if fmt.length == 0 {
-    return {};
+    return .{};
   }
 
   builder: String_Builder;
@@ -320,7 +320,7 @@ impl Enumerator![u32] for UTF8_Enumerator {
 
 impl String {
   chars :: fn(self) -> UTF8_Enumerator {
-    return {
+    return .{
       slice: self.as_byte_slice(),
       position: 0,
       current_char: '\0',

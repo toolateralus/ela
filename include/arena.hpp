@@ -19,7 +19,6 @@
 #include <stdlib.h>
 
 #include <cstddef>
-#include <stdexcept>
 
 namespace jstl {
 struct Arena final {
@@ -31,7 +30,9 @@ struct Arena final {
   Arena &operator=(Arena &&) = delete;
 
 
-  inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {}
+  inline Arena(size_t capacity) : capacity(capacity), data(new char[capacity]), ptr(0) {
+    memset(data, 0, capacity);
+  }
 
   inline ~Arena() { delete[] data; delete next; }
 
