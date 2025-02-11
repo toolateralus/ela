@@ -249,7 +249,7 @@ void Typer::visit_function_declaration(AST *node) {
 
   if ((node->function.flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
     node->parent->scope.insert_function(node->function.name, node->resolved_type, node,
-                                  SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+                                        SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
     return;
   }
 
@@ -302,9 +302,9 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
   for (const auto &method : node->impl.methods) {
     method->function.declaring_type = target_ty->id;
     if (!method->function.generic_parameters.empty()) {
-
       // TODO: actually generate a signature for a generic function so that you can compare them
-      type_scope.insert(Symbol::create_function(method->function.name, method->resolved_type, method, SYMBOL_IS_FUNCTION));
+      type_scope.insert(
+          Symbol::create_function(method->function.name, method->resolved_type, method, SYMBOL_IS_FUNCTION));
       impl_scope.insert(*type_scope.lookup(method->function.name));
       continue;
     }
@@ -318,7 +318,8 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
       }
     } else {
       if ((method->function.flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-        type_scope.insert_function(method->function.name, method->resolved_type, method, SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+        type_scope.insert_function(method->function.name, method->resolved_type, method,
+                                   SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
       } else {
         type_scope.insert_function(method->function.name, method->resolved_type, method);
       }
@@ -342,7 +343,8 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
       visit_function_declaration(method);
     }
     for (auto &interface_sym : interface->scope) {
-      if (!interface_sym.is_function()) continue;
+      if (!interface_sym.is_function())
+        continue;
       auto name = interface_sym.name;
       if (auto impl_symbol = impl_scope.lookup(name)) {
         if (interface_sym.type_id != impl_symbol->type_id) {
@@ -373,9 +375,7 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
   node->resolved_type = target_ty->id;
 }
 
-void Typer::visit_function_header(AST *node, bool generic_instantiation,
-                                     std::vector<int> generic_args) {
-
+void Typer::visit_function_header(AST *node, bool generic_instantiation, std::vector<int> generic_args) {
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->function.generic_parameters) {
@@ -872,15 +872,336 @@ void Typer::visit_tuple(AST *node) {
   node->resolved_type = global_find_type_id(types, extensions);
 }
 
-void Typer::visit_call(AST *node) {}
+void Typer::visit_call(AST *node) {
+  Type *type = nullptr;
+  AST *func_decl = nullptr;
 
-void Typer::visit_for(AST *node) {}
-void Typer::visit_if(AST *node) {}
-void Typer::visit_else(AST *node) {}
-void Typer::visit_while(AST *node) {}
-void Typer::visit_dot_expr(AST *node) {}
-void Typer::visit_scope_resolution(AST *node) {}
-void Typer::visit_subscript(AST *node) {}
+  // Try to find the function via a dot expression, scope resolution, identifier, etc.
+  // Otherwise find it via a type resolution, for things like array[10](); or what have you.
+  auto symbol = get_symbol(node->call.function).get();
+  if (symbol && symbol->is_function()) {
+    if (!type) {
+      type = global_get_type(symbol->type_id);
+    }
+
+    auto declaring_node = symbol->function.declaration;
+    if (declaring_node && declaring_node->node_type == AST_FUNCTION) {
+      func_decl = static_cast<AST *>(declaring_node);
+
+      // resolve a generic call.
+      if (!node->call.generic_arguments.empty() || !func_decl->function.generic_parameters.empty()) {
+        // doing this so self will get the right type when we call generic methods
+        // TODO: handle this in the function decl itself, maybe insert self into symbol table
+        auto old_type = type_context;
+        Defer _([&] { type_context = old_type; });
+        AST func_type_ast(AST_TYPE);
+        if (func_decl->function.declaring_type != Type::INVALID_TYPE_ID) {
+          func_type_ast.resolved_type = func_decl->function.declaring_type;
+          type_context = &func_type_ast;
+        }
+
+        GENERIC_PANIC_HANDLER(
+            data, 1, { func_decl = resolve_generic_function_call(node, func_decl); }, node->source_range);
+      }
+      type = global_get_type(func_decl->resolved_type);
+    }
+  } else {
+    visit(node->call.function);
+    type = global_get_type(node->call.function->resolved_type);
+  }
+
+  if (!type)
+    throw_error("use of undeclared function", node->source_range);
+
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    throw_error(std::format("unable to call a non-function, got {}", type->to_string()), node->source_range);
+  }
+
+  auto info = &type->info.function;
+
+  // If we have the declaring node representing this function, type check it against the parameters in that definition.
+  // else, use the type.
+  if (func_decl) {
+    bool skip_first = false;
+    if (node->call.function->node_type == AST_DOT_EXPR) {
+      if (!func_decl->function.has_self) {
+        throw_error("Calling static methods with instance not allowed", node->source_range);
+      }
+      skip_first = true;
+    }
+    type_check_args_from_params(node, func_decl, skip_first);
+  } else {
+    type_check_args_from_info(node, info);
+  }
+  node->resolved_type = info->return_type;
+}
+
+void Typer::visit_for(AST *node) {
+  ctx.set_scope(node->block->scope);
+
+  auto iden = static_cast<ASTIdentifier *>(node->iter_identifier);
+  node->range->accept(this);
+  // auto range_node_ty = node->range->node_type;
+  int range_type_id = node->range->resolved_type;
+  Type *range_type = global_get_type(range_type_id);
+  node->range_type = range_type->id;
+
+  if (range_type->meta.has_extensions() && range_type->meta.extensions.back().type == TYPE_EXT_POINTER) {
+    throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
+                            "pointer to an array, range or struct? got type {}",
+                            range_type->to_string()),
+                node->source_range);
+  }
+
+  int iter_ty = Type::INVALID_TYPE_ID;
+  auto scope = range_type->info->scope;
+
+  if (range_type->implements("Iterable")) {
+    node->iteration_kind = ASTFor::ITERABLE;
+    // make sure the impl is actually emitted if this is generic.
+    compiler_mock_function_call_visit_impl(range_type_id, "iter");
+
+    auto symbol = scope->local_lookup("iter");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'iter'",
+                  node->source_range);
+    }
+
+    auto symbol_ty = global_get_type(symbol->type_id);
+    auto iter_return_ty = global_get_type(symbol_ty->info->as<Function_Info>()->return_type);
+    node->iterable_type = iter_return_ty->id;
+
+    // make sure the impl is actually emitted if this is generic.
+    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+
+    symbol = iter_return_ty->info->scope->local_lookup("current");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'current'",
+                  node->source_range);
+    }
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
+  } else if (range_type->implements("Enumerable")) {
+    node->iteration_kind = ASTFor::ENUMERABLE;
+    // make sure the impl is actually emitted if this is generic.
+    compiler_mock_function_call_visit_impl(range_type_id, "enumerator");
+
+    auto symbol = scope->local_lookup("enumerator");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
+                  "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
+                  node->source_range);
+    }
+    auto iter_return_ty =
+        global_get_type(global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type);
+    node->iterable_type = iter_return_ty->id;
+
+    // make sure the impl is actually emitted if this is generic.
+    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+
+    symbol = iter_return_ty->info->scope->local_lookup("current");
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
+                  "attempting to iterate, or it was a non-function symbol named 'current'",
+                  node->source_range);
+    }
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
+  } else if (range_type->implements("Enumerator")) {
+    node->iteration_kind = ASTFor::ENUMERATOR;
+    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    auto symbol = scope->local_lookup("current");
+
+    if (!symbol || !symbol->is_function()) {
+      throw_error("internal compiler error: type implements 'Enumerator' but no 'current' function was found when "
+                  "attempting to enumerate, or it was a non-function symbol named 'current'",
+                  node->source_range);
+    }
+    iter_ty = global_get_type(symbol->type_id)->info->as<Function_Info>()->return_type;
+    node->iterable_type = range_type_id;
+  } else if (range_type->base.get_str().starts_with("Iter$")) {
+    node->iteration_kind = ASTFor::ITERATOR;
+    node->iterable_type = range_type_id;
+    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to();
+  } else {
+    throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
+                "'Enumerable' interface. "
+                "Please implement at least one of these, note that 'Iterable'/'iter()' will be selected before "
+                "'Enumerable'/'enumerator()', mainly for performance reasons, but also ambiguity",
+                node->source_range);
+  }
+
+  auto is_enumerator_or_enumerable =
+      node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
+
+  if (is_enumerator_or_enumerable && node->value_semantic == VALUE_SEMANTIC_POINTER) {
+    throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
+                "'Enumerable'. This is because the enumerable()'s return type is not restricted to being a pointer, "
+                "and we can't guarantee "
+                "that taking a reference to it is safe or even valid.",
+                node->source_range);
+
+  } else if (!is_enumerator_or_enumerable && node->value_semantic != VALUE_SEMANTIC_POINTER) {
+    // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit
+    // dereference.
+    auto type = global_get_type(iter_ty);
+    if (!type->meta.is_pointer()) {
+      throw_error("internal compiler error: got `for *.. in ...` but the iter() did not return a pointer type?",
+                  node->source_range);
+    }
+    iter_ty = type->get_element_type();
+  }
+
+  node->identifier_type = iter_ty;
+  ctx.scope->insert_variable(iden->value, iter_ty, node->iter_identifier);
+  node->iter_identifier->accept(this);
+  node->range->accept(this);
+
+  ctx.exit_scope();
+  node->block->accept(this);
+
+  //? Is this correct???
+  auto control_flow = node->block->control_flow;
+  control_flow.flags &= ~BLOCK_FLAGS_BREAK;
+  control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
+  control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  node->control_flow = control_flow;
+}
+
+void Typer::visit_if(AST *node) {
+  node->condition->accept(this);
+  auto cond_ty = node->condition->resolved_type;
+  auto conversion_rule = type_conversion_rule(global_get_type(cond_ty), global_get_type(bool_type()));
+
+  if (conversion_rule == CONVERT_PROHIBITED) {
+    throw_error(std::format("cannot convert 'if' condition to a boolean, implicitly nor explicitly. got type \"{}\"",
+                            global_get_type(cond_ty)->to_string()),
+                node->source_range);
+  }
+  node->block->accept(this);
+  auto control_flow = node->block->control_flow;
+  if (node->_else.is_not_null()) {
+    auto _else = node->_else.get();
+    _else->accept(this);
+    auto else_cf = _else->control_flow;
+    control_flow.flags |= else_cf.flags;
+    if ((else_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
+      assert_return_type_is_valid(control_flow.type, else_cf.type, node);
+    }
+  } else {
+    control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  }
+  node->control_flow = control_flow;
+}
+
+void Typer::visit_else(AST *node) {
+  if (node->_if.is_not_null()) {
+    node->_if.get()->accept(this);
+    node->control_flow = node->_if.get()->control_flow;
+  } else {
+    node->block.get()->accept(this);
+    node->control_flow = node->block.get()->control_flow;
+  }
+}
+
+void Typer::visit_while(AST *node) {
+  if (node->condition.is_not_null()) {
+    node->condition.get()->accept(this);
+  }
+  node->block->accept(this);
+  auto control_flow = node->block->control_flow;
+  control_flow.flags &= ~BLOCK_FLAGS_BREAK;
+  control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
+  // we add fall through here because we dont know if this will get
+  // excecuted since we cant evaluate the condition to know
+  control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
+  node->control_flow = control_flow;
+}
+
+void Typer::visit_dot_expr(AST *node) {
+  node->base->accept(this);
+  auto base_ty_id = node->base->resolved_type;
+  auto base_ty = global_get_type(base_ty_id);
+
+  if (!base_ty) {
+    throw_error("internal compiler error: un-typed variable on lhs of dot "
+                "expression?",
+                node->source_range);
+  }
+
+  Scope *base_scope = base_ty->info->scope;
+
+  // Implicit dereference, we look at the base scope.
+  if (base_ty->meta.is_pointer()) {
+    base_ty = global_get_type(base_ty_id = base_ty->get_element_type());
+    base_scope = base_ty->info->scope;
+  }
+
+  if (!base_scope) {
+    throw_error("internal compiler error: dot expression used on a type that had a null scope", node->source_range);
+  }
+
+  if (auto member = base_scope->local_lookup(node->member_name)) {
+    node->resolved_type = member->type_id;
+  } else {
+    for (const auto &[name, _] : base_scope->symbols) {
+      std::cout << "symbol: " << name.get_str() << '\n';
+    }
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+                node->source_range);
+  }
+}
+
+void Typer::visit_scope_resolution(AST *node) {
+  node->base->accept(this);
+  auto id = node->base->resolved_type;
+  auto base_ty = global_get_type(id);
+  Scope *scope = base_ty->info->scope;
+  if (!scope) {
+    throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
+  }
+  if (auto member = scope->local_lookup(node->member_name)) {
+    node->resolved_type = member->type_id;
+    return;
+  } else if (auto type = scope->find_type_id(node->member_name, {})) {
+    if (type == Type::INVALID_TYPE_ID)
+      goto ERROR_CASE;
+    node->resolved_type = type;
+    return;
+  } else {
+  ERROR_CASE:
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+                node->source_range);
+  }
+}
+
+void Typer::visit_subscript(AST *node) {
+  node->left->accept(this);
+  node->subscript->accept(this);
+  auto left_ty = global_get_type(node->left->resolved_type);
+  auto subscript_ty = global_get_type(node->subscript->resolved_type);
+
+  auto overload = find_operator_overload(Token_Type::LBrace, left_ty, OPERATION_SUBSCRIPT);
+  if (overload != -1) {
+    node->is_operator_overload = true;
+    node->resolved_type = global_get_type(overload)->info->as<Function_Info>()->return_type;
+    return;
+  }
+
+  // * Todo: reimplement operator overloads with interfaces.
+
+  auto meta = left_ty->meta;
+
+  if (!meta.is_fixed_sized_array() && !meta.is_pointer()) {
+    throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: "
+                            "fn(self*, idx: u32)' method. {}",
+                            left_ty->to_string()),
+                node->source_range);
+  }
+
+  node->resolved_type = left_ty->get_element_type();
+}
 
 void Typer::visit_initializer_list(AST *node) {
   auto &initializer = node->initializer;
@@ -1051,13 +1372,54 @@ void Typer::visit_alias(AST *node) {
   node->scope.create_type_alias(node->alias.name, node->alias.type->resolved_type, type->kind, node);
 }
 
-void Typer::visit_impl(AST *node) {}
+void Typer::visit_impl(AST *node) {
+  if (!node->impl.generic_parameters.empty()) {
+    auto symbol_nullable = get_symbol(node->impl.target);
 
-void Typer::visit_size_of(AST *node) {}
+    if (symbol_nullable.is_null() || !symbol_nullable.get()->is_type()) {
+      throw_error("generic `impl![...]` can only be used on types.", node->source_range);
+    }
 
-void Typer::visit_defer(AST *node) {}
+    auto declaring_node = symbol_nullable.get()->type.declaration.get();
 
-void Typer::visit_cast(AST *node) {}
+    if (declaring_node->node_type != AST_STRUCT) {
+      throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
+    }
+    declaring_node->$struct.impls.push_back(node);
+    GENERIC_PANIC_HANDLER(
+        data, 1,
+        {
+          for (auto instantiations : declaring_node->$struct.generic_instantiations) {
+            visit_generic(&Typer::visit_impl_declaration, node, instantiations.arguments);
+          }
+        },
+        node->source_range);
+  } else {
+    visit_impl_declaration(node, false);
+  }
+}
+
+void Typer::visit_size_of(AST *node) {
+  visit(node->size_of);
+  node->resolved_type = u64_type();
+}
+
+void Typer::visit_defer(AST *node) {
+  visit(node->defer);
+}
+
+void Typer::visit_cast(AST *node) {
+  visit(node->cast.expression);
+  auto expr_type = global_get_type(node->cast.expression->resolved_type);
+  visit(node->cast.target_type);
+  auto type = global_get_type(node->cast.target_type->resolved_type);
+  auto conversion = type_conversion_rule(expr_type, type);
+  if (conversion == CONVERT_PROHIBITED) {
+    throw_error(std::format("casting {} to {} is strictly prohibited.", expr_type->to_string(), type->to_string()),
+                node->source_range);
+  }
+  node->resolved_type = type->id;
+}
 
 void Typer::visit_lambda(AST *node) {
   auto &lambda = node->lambda;
