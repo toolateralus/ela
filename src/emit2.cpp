@@ -5,6 +5,8 @@
 #include "ast.hpp"
 #include "core.hpp"
 #include "error.hpp"
+#include "interned_string.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "strings.hpp"
 #include "type.hpp"
@@ -25,6 +27,171 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 9;
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 10;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
 
+std::string get_operator_value_string(Token_Type type) {
+  switch (type) {
+    case Token_Type::Assign:
+      return "=";
+    case Token_Type::Add:
+      return "+";
+    case Token_Type::Sub:
+      return "-";
+    case Token_Type::Mul:
+      return "*";
+    case Token_Type::Div:
+      return "/";
+    case Token_Type::Modulo:
+      return "%";
+    case Token_Type::Range:
+      return "..";
+    case Token_Type::Arrow:
+      return "->";
+    case Token_Type::Comma:
+      return ",";
+    case Token_Type::Semi:
+      return ";";
+    case Token_Type::Not:
+      return "!";
+    case Token_Type::LogicalNot:
+      return "!";
+    case Token_Type::Or:
+      return "|";
+    case Token_Type::And:
+      return "&";
+    case Token_Type::SHL:
+      return "<<";
+    case Token_Type::SHR:
+      return ">>";
+    case Token_Type::Xor:
+      return "^";
+    case Token_Type::LogicalOr:
+      return "||";
+    case Token_Type::LogicalAnd:
+      return "&&";
+    case Token_Type::LT:
+      return "<";
+    case Token_Type::GT:
+      return ">";
+    case Token_Type::EQ:
+      return "==";
+    case Token_Type::NEQ:
+      return "!=";
+    case Token_Type::LE:
+      return "<=";
+    case Token_Type::GE:
+      return ">=";
+    case Token_Type::LParen:
+      return "(";
+    case Token_Type::RParen:
+      return ")";
+    case Token_Type::LBrace:
+      return "[";
+    case Token_Type::RBrace:
+      return "]";
+    case Token_Type::DoubleColon:
+      return "::";
+    case Token_Type::Dot:
+      return ".";
+    case Token_Type::Increment:
+      return "++";
+    case Token_Type::Decrement:
+      return "--";
+    case Token_Type::CompAdd:
+      return "+=";
+    case Token_Type::CompSub:
+      return "-=";
+    case Token_Type::CompMul:
+      return "*=";
+    case Token_Type::CompDiv:
+      return "/=";
+    case Token_Type::CompMod:
+      return "%=";
+    case Token_Type::CompAnd:
+      return "&=";
+    case Token_Type::CompOr:
+      return "|=";
+    case Token_Type::CompXor:
+      return "^=";
+    case Token_Type::CompSHL:
+      return "<<=";
+    case Token_Type::CompSHR:
+      return ">>=";
+    default:
+      break;
+  }
+  throw_error("Failed to get operator string", {});
+  exit(1); // [[noreturn]]
+}
+
+size_t calculate_actual_length(const std::string_view &str_view) {
+  size_t length = 0;
+  for (size_t i = 0; i < str_view.size(); ++i) {
+    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+      switch (str_view[i + 1]) {
+        case 'n':
+        case 't':
+        case 'r':
+        case '\\':
+        case '"':
+          ++i; // Skip the escape character
+          break;
+        case 'x': // Hexadecimal escape sequence
+          i += 2; // Skip \x and the next two hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'u': // Unicode escape sequence
+          i += 4; // Skip \u and the next four hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'U': // Unicode escape sequence
+          i += 8; // Skip \U and the next eight hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        default:
+          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') { // Octal escape sequence
+            ++i;                                                  // Skip the first digit
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the second digit
+            }
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the third digit
+            }
+          }
+          break;
+      }
+    }
+    ++length;
+  }
+  return length;
+}
+
+void Emitter::emit_foreign_function(AST *node) {
+  if (node->function.name == "main") {
+    throw_error("main function cannot be foreign", node->source_range);
+  }
+  (*ss) << "extern ";
+  (*ss) << get_cpp_scalar_type(node->function.return_type->resolved_type);
+  space();
+  (*ss) << node->function.name.get_str() << '(';
+  for (int i = 0; i < node->function.parameters.size(); ++i) {
+    auto &param = node->function.parameters[i];
+    (*ss) << get_cpp_scalar_type(param.resolved_type);
+    if (i != node->function.parameters.size() - 1) {
+      (*ss) << ", ";
+    }
+  }
+  if ((node->function.flags & FUNCTION_IS_VARARGS) != 0) {
+    (*ss) << ", ...);";
+  } else {
+    (*ss) << ");";
+  }
+}
+
 void Emitter::initialize_reflection_system() {
   // Emit runtime reflection type info for requested types, only when we have
   // actually requested runtime type information.
@@ -44,6 +211,7 @@ void Emitter::initialize_reflection_system() {
     code << "}\n";
   }
 }
+
 void Emitter::emit_runtime_main(AST *&node) {
   if (is_testing) {
     auto test_init = test_functions.str();
@@ -205,11 +373,214 @@ void Emitter ::visit_function_declaration(AST *node) {
   emit_various_function_declarations();
 }
 
-void Emitter ::visit_declaration(AST *node) {}
-void Emitter ::visit_bin_expr(AST *node) {}
-void Emitter ::visit_unary_expr(AST *node) {}
-void Emitter ::visit_identifier(AST *node) {}
-void Emitter ::visit_literal(AST *node) {}
+void Emitter ::visit_declaration(AST *node) {
+  if (node->is_emitted) {
+    return;
+  } else {
+    node->is_emitted = true;
+  }
+  emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->declaration.value &&
+      (node->declaration.value.get()->node_type == AST_SWITCH || node->declaration.value.get()->node_type == AST_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    visit(node->declaration.value.get());
+    (*ss) << to_cpp_string(global_get_type(node->declaration.type->resolved_type)) << " "
+          << node->declaration.name.get_str() << " = " << str;
+    return;
+  }
+
+  if (node->declaration.type->resolved_type == Type::INVALID_TYPE_ID) {
+    throw_error("internal compiler error: type was null upon emitting an ASTDeclaration", node->source_range);
+  }
+
+  auto type = global_get_type(node->declaration.type->resolved_type);
+  auto symbol = node->parent->local_lookup(node->declaration.name);
+
+  auto handle_initialization = [&]() {
+    if (node->declaration.value.is_not_null() && emit_default_value) {
+      (*ss) << " = ";
+      visit(node->declaration.value.get());
+    } else if (emit_default_init) {
+      auto type = global_get_type(node->declaration.type->resolved_type);
+      if (type->is_kind(TYPE_STRUCT)) {
+        (*ss) << "= (" + to_cpp_string(type) + ") {}";
+      } else {
+        (*ss) << "= (" + to_cpp_string(type) + ") {0}";
+      }
+    }
+    (*ss) << ";\n";
+  };
+
+  auto old = emit_default_init;
+  Defer _([&] { emit_default_init = old; });
+  if (node->declaration.is_extern) {
+    (*ss) << "extern ";
+    emit_default_init = false;
+  }
+  if (node->declaration.is_static) {
+    (*ss) << "static ";
+  }
+  if (node->declaration.is_constexpr) {
+    (*ss) << "static constexpr ";
+  }
+
+  if (type->is_kind(TYPE_FUNCTION)) {
+    (*ss) << get_declaration_type_signature_and_identifier(node->declaration.name.get_str(), type);
+    handle_initialization();
+    return;
+  }
+
+  if (node->declaration.is_bitfield) {
+    visit(node->declaration.type);
+    space();
+    (*ss) << node->declaration.name.get_str();
+    space();
+    (*ss) << ": " << node->declaration.bitsize.get_str();
+    handle_initialization();
+    return;
+  }
+
+  if (type->meta.is_array()) {
+    (*ss) << get_declaration_type_signature_and_identifier(node->declaration.name.get_str(), type);
+    if (node->declaration.value.is_not_null()) {
+      (*ss) << " = ";
+      visit(node->declaration.value.get());
+    } else if (emit_default_init) {
+      (*ss) << "= {0}";
+    }
+    return;
+  }
+
+  visit(node->declaration.type);
+  space();
+  (*ss) << node->declaration.name.get_str();
+  space();
+  handle_initialization();
+  return;
+}
+
+void Emitter ::visit_bin_expr(AST *node) {
+  if (node->binary.op == Token_Type::Assign &&
+      (node->binary.right->node_type == AST_SWITCH || node->binary.right->node_type == AST_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    visit(node->binary.right);
+    visit(node->binary.left);
+    (*ss) << " = " << str;
+    return;
+  }
+
+  auto left_ty = global_get_type(node->binary.left->resolved_type);
+
+  if (left_ty && node->binary.is_operator_overload) {
+    call_operator_overload(node->source_range, left_ty, OPERATION_BINARY, node->binary.op, node->binary.left,
+                           node->binary.right);
+    return;
+  }
+
+  auto op_ty = node->binary.op;
+  (*ss) << "(";
+  visit(node->binary.left);
+  space();
+  (*ss) << get_operator_value_string(node->binary.op);
+  if (node->binary.op == Token_Type::Assign) {
+    auto type = global_get_type(node->resolved_type);
+    auto isptr = type->meta.is_pointer();
+    if (isptr)
+      (*ss) << "(" << to_cpp_string(type) << ")";
+  }
+  space();
+  visit(node->binary.right);
+  (*ss) << ")";
+}
+
+void Emitter ::visit_unary_expr(AST *node) {
+  if (node->unary.op == Token_Type::Sub) {
+    auto type = to_cpp_string(global_get_type(node->unary.operand->resolved_type));
+    (*ss) << '(' << type << ')';
+  }
+  auto left_type = node->unary.operand->resolved_type;
+  auto left_ty = global_get_type(left_type);
+
+  if (left_ty && node->unary.is_operator_overload) {
+    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->unary.op, node->unary.operand, node);
+    return;
+  }
+
+  auto type = global_get_type(left_type);
+
+  // we always do these as postfix unary since if we don't it's kinda undefined
+  // behaviour and it messes up unary expressions at the end of dot expressions
+  if (node->unary.op == Token_Type::Increment || node->unary.op == Token_Type::Decrement) {
+    visit(node->unary.operand);
+    (*ss) << get_operator_value_string(node->unary.op);
+  } else {
+    (*ss) << '(';
+    (*ss) << get_operator_value_string(node->unary.op);
+    visit(node->unary.operand);
+    (*ss) << ")";
+  }
+}
+
+void Emitter ::visit_identifier(AST *node) { (*ss) << node->identifier.get_str(); }
+
+void Emitter ::visit_literal(AST *node) {
+  auto type = to_cpp_string(global_get_type(node->resolved_type));
+  std::string output;
+  switch (node->literal.tag) {
+    case LITERAL_NULL:
+      (*ss) << "NULL";
+      return;
+    case LITERAL_STRING: {
+      if (node->literal.is_c_string) {
+        output = std::format("\"{}\"", node->literal.value.get_str());
+      } else {
+        // TODO:
+        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of
+        // bytes, then all of our string literals are stack allocated. If we make them static, then there's a chance
+        // that the user mutates the string literal, and it will change it's meaning for the rest of the program
+
+        // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
+        // we will keep the null terminated strings until we have a solution for this.
+        auto str = node->literal.value.get_str();
+        (*ss) << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
+        return;
+      }
+    } break;
+    case LITERAL_FLOAT:
+      if (node->resolved_type != f64_type()) {
+        output = node->literal.value.get_str() + "f";
+      } else {
+        output = node->literal.value.get_str();
+      }
+      break;
+    // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
+    // that's why we have fat u32 chars anyway.
+    case LITERAL_CHAR:
+      output = '\'' + node->literal.value.get_str() + '\'';
+      break;
+    case LITERAL_INTEGER:
+      output = node->literal.value.get_str();
+      break;
+    case LITERAL_BOOL:
+      output = node->literal.value.get_str();
+      break;
+  }
+  (*ss) << output;
+}
 
 void Emitter ::visit_type(AST *node) {
   auto type = global_get_type(node->resolved_type);
@@ -442,12 +813,208 @@ void Emitter ::visit_while(AST *node) {
   defer_blocks.pop_back();
 }
 
-void Emitter ::visit_struct_declaration(AST *node) {}
-void Emitter ::visit_dot_expr(AST *node) {}
+void Emitter ::visit_struct_declaration(AST *node) {
+  if (node->is_emitted) {
+    return;
+  }
+
+  if (!node->$struct.generic_parameters.empty()) {
+    return;
+  }
+
+  node->is_emitted = true;
+
+  auto old_init = emit_default_init;
+  auto old_default_val = emit_default_value;
+
+  Defer _defer([&] {
+    emit_default_init = old_init;
+    emit_default_value = old_default_val;
+  });
+
+  emit_default_init = false;
+  emit_default_value = false;
+
+  emit_line_directive(node);
+  auto type = global_get_type(node->resolved_type);
+
+  auto info = type->info.$struct;
+
+  std::string type_name = type->base.get_str();
+  std::string type_tag = (node->$struct.is_union ? "typedef union " : "typedef struct ");
+
+  if ((info.flags & STRUCT_FLAG_FORWARD_DECLARED || node->$struct.is_fwd_decl) != 0) {
+    if (node->$struct.is_extern) {
+      // (*ss) << "extern ";
+      // I do not believe this is ever neccesary in C, you can alwasy just define an
+      // opaque struct and link against it, or redefine it: it doesn't matter.
+    }
+    (*ss) << type_tag << " " << type_name << " " << type_name << ";\n";
+    return;
+  }
+
+  if ((info.flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+    (*ss) << (node->$struct.is_union ? "union " : "struct ");
+    (*ss) << "{\n";
+  } else {
+    if (node->$struct.is_extern) {
+      (*ss) << "extern ";
+    }
+    (*ss) << type_tag << " " << type_name << "{\n";
+  }
+  indent_level++;
+
+  auto old = emit_default_init;
+
+  emit_default_init = false;
+
+  Defer _defer1([&] { emit_default_init = old; });
+
+  for (const auto &subtype : node->$struct.subtypes) {
+    indented("");
+    visit(subtype);
+    semicolon();
+    newline();
+  }
+
+  for (const auto &member : node->$struct.members) {
+    indented("");
+    auto type = global_get_type(member.type->resolved_type);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      auto name = member.name.get_str();
+      auto name_nullable = Nullable(&name);
+      (*ss) << get_function_pointer_type_string(type, name_nullable);
+    } else if (type->meta.is_array()) {
+      (*ss) << get_declaration_type_signature_and_identifier(member.name.get_str(), type);
+    } else {
+      visit(member.type);
+      space();
+      (*ss) << member.name.get_str();
+    }
+    semicolon();
+    newline();
+  }
+
+  // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
+  if ((info.flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+    (*ss) << "};\n";
+  } else {
+    (*ss) << "} " << type_name << ";\n";
+  }
+
+  indent_level--;
+}
+
+void Emitter ::visit_dot_expr(AST *node) {
+  auto base_ty_id = node->dot.base->resolved_type;
+  auto base_ty = global_get_type(base_ty_id);
+  auto op = ".";
+  if (base_ty->meta.back_type() == TYPE_EXT_POINTER) {
+    op = "->";
+  }
+  visit(node->dot.base);
+  (*ss) << op;
+  if (base_ty->is_kind(TYPE_TUPLE)) {
+    (*ss) << "$";
+  }
+  (*ss) << node->dot.member_name.get_str();
+}
+
 void Emitter ::visit_scope_resolution(AST *node) {}
-void Emitter ::visit_subscript(AST *node) {}
-void Emitter ::visit_initializer_list(AST *node) {}
-void Emitter ::visit_enum_declaration(AST *node) {}
+
+void Emitter ::visit_subscript(AST *node) {
+  auto left_ty = global_get_type(node->subscript.left->resolved_type);
+  if (left_ty && node->subscript.is_operator_overload) {
+    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, Token_Type::LBrace, node->subscript.left,
+                           node->subscript.index_expression);
+    return;
+  }
+  visit(node->subscript.left);
+  (*ss) << '[';
+  visit(node->subscript.index_expression);
+  (*ss) << ']';
+}
+
+void Emitter ::visit_initializer_list(AST *node) {
+  auto type = global_get_type(node->resolved_type);
+
+  if (!type->meta.is_array()) {
+    (*ss) << "(" + to_cpp_string(type) + ")";
+  }
+  (*ss) << " {";
+
+  switch (node->initializer.tag) {
+    case INITIALIZER_EMPTY: {
+      (*ss) << "0}";
+      return;
+    }
+    case INITIALIZER_NAMED: {
+      const auto size = node->initializer.key_values.size();
+      for (int i = 0; i < node->initializer.key_values.size(); ++i) {
+        const auto &[key, value] = node->initializer.key_values[i];
+        (*ss) << '.' << key.get_str() << " = ";
+        (*ss) << "(" << to_cpp_string(global_get_type(value->resolved_type)) << ")";
+        visit(value);
+        if (i != size - 1) {
+          (*ss) << ",\n";
+        }
+      }
+    } break;
+    case INITIALIZER_COLLECTION: {
+      if (type->base.get_str().starts_with("Init_List$")) {
+        auto element_type = type->generic_args[0];
+        (*ss) << " .data = ";
+        (*ss) << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
+        for (const auto &expr : node->initializer.values) {
+          visit(expr);
+          if (expr != node->initializer.values.back()) {
+            (*ss) << ", ";
+          }
+        }
+        (*ss) << "}, .length = " << std::to_string(node->initializer.values.size());
+      } else {
+        for (const auto &expr : node->initializer.values) {
+          visit(expr);
+          if (expr != node->initializer.values.back()) {
+            (*ss) << ", ";
+          }
+        }
+      }
+
+    } break;
+  }
+  (*ss) << "}";
+}
+
+void Emitter ::visit_enum_declaration(AST *node) {
+  if (node->is_emitted) {
+    return;
+  } else {
+    node->is_emitted = true;
+  }
+  emit_line_directive(node);
+  auto type_name = node->$enum.name.get_str();
+  int n = 0;
+  (*ss) << "typedef enum {\n";
+  for (const auto &[key, value] : node->$enum.key_values) {
+    (*ss) << type_name << "_" << key.get_str();
+    if (node->$enum.is_flags) {
+      (*ss) << " = ";
+      (*ss) << std::to_string(1 << n);
+    } else if (value) {
+      (*ss) << " = ";
+      visit(value);
+    }
+    if (n != node->$enum.key_values.size() - 1) {
+      (*ss) << ",\n";
+    }
+    n++;
+  }
+  (*ss) << "} " << type_name << ";\n";
+
+  auto type = global_get_type(node->resolved_type);
+}
+
 void Emitter ::visit_noop(AST *node) {}
 void Emitter ::visit_alias(AST *node) {}
 void Emitter ::visit_impl(AST *node) {}
@@ -456,7 +1023,46 @@ void Emitter ::visit_size_of(AST *node) {}
 void Emitter ::visit_defer(AST *node) {}
 void Emitter ::visit_cast(AST *node) {}
 void Emitter ::visit_lambda(AST *node) {}
-void Emitter ::visit_range(AST *node) {}
-void Emitter ::visit_switch(AST *node) {}
+
+void Emitter ::visit_range(AST *node) {
+  (*ss) << "(" << to_cpp_string(global_get_type(node->resolved_type)) << ") {";
+  (*ss) << ".begin = ";
+  visit(node->range.left);
+  (*ss) << ", .end = ";
+  visit(node->range.right);
+  (*ss) << "}";
+}
+
+void Emitter ::visit_switch(AST *node) {
+  auto type = global_get_type(node->$switch.target->resolved_type);
+  bool use_eq_operator = true;
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->meta.is_pointer()) {
+    use_eq_operator = false;
+  }
+
+  auto emit_switch_case = [&](AST *target, const SwitchCase &_case, bool first) {
+    if (!first) {
+      (*ss) << " else ";
+    }
+    emit_line_directive(target);
+    (*ss) << " if (";
+    if (use_eq_operator) {
+      visit(target);
+      (*ss) << " == ";
+      visit(_case.expression);
+    } else {
+      call_operator_overload(target->source_range, type, OPERATION_BINARY, Token_Type::EQ, target, _case.expression);
+    }
+    (*ss) << ") ";
+    emit_line_directive(_case.block);
+    visit(_case.block);
+  };
+  bool first = true;
+  for (const auto &_case : node->$switch.cases) {
+    emit_switch_case(node->$switch.target, _case, first);
+    first = false;
+  }
+}
 void Emitter ::visit_tuple_deconstruction(AST *node) {}
 void Emitter ::visit_where(AST *node) {};
