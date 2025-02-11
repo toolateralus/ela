@@ -185,7 +185,7 @@ struct AST {
     Don't reorder these, it's optimized for minimal padding.
   */
   AST_Node_Type node_type : 6; // maximum value of 36, so 6 bit packing might save us a tiny bit of space, the
-                                     // more we can reduce the size of our ast.
+                               // more we can reduce the size of our ast.
   bool is_emitted : 1 = false;
   Nullable<AST> declaring_block;
   Control_Flow control_flow;
@@ -333,7 +333,7 @@ struct AST {
     } range;
 
     struct {
-      Iteration_Kind iteration_kind : 2; 
+      Iteration_Kind iteration_kind : 2;
       // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
       int range_type = Type::INVALID_TYPE_ID;
       // This is either the type of that implements Enumerator![T], or is Iter![T];
@@ -480,7 +480,9 @@ struct AST {
 
   Symbol *local_lookup(const Interned_String &name) { return scope.lookup(name); }
 
-  void declare_interface(const Interned_String &name, AST *node);
+  void declare_interface(const Interned_String &name, AST *node) {
+    scope.insert(Symbol::create_type(-1, name, TYPE_INTERFACE, node));
+  }
 
   int find_type_id(const Interned_String &name, const Type_Metadata &meta) {
     auto symbol = lookup(name);

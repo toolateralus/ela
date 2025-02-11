@@ -125,7 +125,6 @@ struct Typer {
   void type_check_args_from_info(AST *call, Function_Info *info);
 
   bool visit_where_predicate(Type *type, AST *node);
-  void compiler_mock_function_call_visit_impl(int type, const Interned_String &method_name);
 
   Nullable<Symbol> get_symbol(AST *node);
   Interned_String type_name(AST *node);
@@ -289,8 +288,12 @@ struct Emitter {
 struct DependencyEmitter {
   Emitter *emitter;
   inline DependencyEmitter(Emitter *emitter) : emitter(emitter) {}
-  std::string define_type(int type_id);
-  std::string decl_type(int type_id);
+  std::string define_type(int type_id) {
+    
+  }
+  std::string decl_type(int type_id) {
+
+  }
   DEFINE_VISITORS()
   DEFINE_GENERIC_VISITOR()
   void visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params);

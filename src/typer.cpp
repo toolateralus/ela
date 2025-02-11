@@ -1286,7 +1286,7 @@ void Typer::visit_for(AST *node) {
   if (range_type->implements("Iterable")) {
     node->$for.iteration_kind = Iteration_Kind::ITERABLE;
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(range_type_id, "iter");
+    compiler_mock_function_call_visit_impl(node->scope, range_type_id, "iter");
 
     auto symbol = scope.lookup("iter");
     if (!symbol || !symbol->is_function()) {
@@ -1300,7 +1300,7 @@ void Typer::visit_for(AST *node) {
     node->$for.iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+    compiler_mock_function_call_visit_impl(node->scope, iter_return_ty->id, "current");
 
     symbol = iter_return_ty->info.scope.lookup("current");
     if (!symbol || !symbol->is_function()) {
@@ -1313,7 +1313,7 @@ void Typer::visit_for(AST *node) {
     node->$for.iteration_kind = ENUMERABLE;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(range_type_id, "enumerator");
+    compiler_mock_function_call_visit_impl(node->scope, range_type_id, "enumerator");
 
     auto symbol = scope.lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
@@ -1325,7 +1325,7 @@ void Typer::visit_for(AST *node) {
     node->$for.iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+    compiler_mock_function_call_visit_impl(node->scope, iter_return_ty->id, "current");
 
     symbol = iter_return_ty->info.scope.lookup("current");
 
@@ -1338,7 +1338,7 @@ void Typer::visit_for(AST *node) {
     iter_ty = global_get_type(symbol->type_id)->info.function.return_type;
   } else if (range_type->implements("Enumerator")) {
     node->$for.iteration_kind = ENUMERATOR;
-    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    compiler_mock_function_call_visit_impl(node->scope, range_type_id, "current");
     auto symbol = scope.lookup("current");
 
     if (!symbol || !symbol->is_function()) {
@@ -1351,7 +1351,7 @@ void Typer::visit_for(AST *node) {
   } else if (range_type->base.get_str().starts_with("Iter$")) {
     node->$for.iteration_kind = ITERATOR;
     node->$for.iterable_type = range_type_id;
-    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    compiler_mock_function_call_visit_impl(node->scope, range_type_id, "current");
     iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to();
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
