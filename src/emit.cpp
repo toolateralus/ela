@@ -1,389 +1,4 @@
-#include <format>
-#include <functional>
-#include <iterator>
-#include <ostream>
-#include <sstream>
-#include <string>
 
-#include "ast.hpp"
-#include "core.hpp"
-#include "error.hpp"
-#include "lex.hpp"
-#include "scope.hpp"
-#include "strings.hpp"
-#include "type.hpp"
-#include "visitor.hpp"
-
-/*
-  TODO:
-   This entire visitor needs a huge cleanup. there's some absolutely terrible
-  code in here and it's super messy. ? However it works xD
-*/
-
-constexpr auto TYPE_FLAGS_INTEGER = 1 << 0;
-constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
-constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
-constexpr auto TYPE_FLAGS_STRING = 1 << 3;
-constexpr auto TYPE_FLAGS_STRUCT = 1 << 4;
-constexpr auto TYPE_FLAGS_ENUM = 1 << 5;
-constexpr auto TYPE_FLAGS_TUPLE = 1 << 6;
-
-constexpr auto TYPE_FLAGS_ARRAY = 1 << 7;
-constexpr auto TYPE_FLAGS_FUNCTION = 1 << 8;
-constexpr auto TYPE_FLAGS_POINTER = 1 << 9;
-
-constexpr auto TYPE_FLAGS_SIGNED = 1 << 10;
-constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 11;
-
-
-void Emitter::forward_decl_type(Type *type) {
-  if (type->base_id != Type::INVALID_TYPE_ID) {
-    type = global_get_type(type->base_id);
-  }
-  if (type->forward_declared_emitted) {
-    return;
-  } else {
-    type->forward_declared_emitted = true;
-  }
-  switch (type->kind) {
-    case TYPE_FUNCTION: {
-      auto info = type->info->as<Function_Info>();
-      for (auto i = 0; i < info->params_len; i++) {
-        forward_decl_type(global_get_type(info->parameter_types[i]));
-      }
-      forward_decl_type(global_get_type(info->return_type));
-    } break;
-    case TYPE_STRUCT: {
-      auto info = type->info->as<Struct_Info>();
-      std::string kw = "typedef struct ";
-      if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
-        kw = "typedef union ";
-      (*ss) << kw << type->base.get_str() << " " << type->base.get_str() << ";\n";
-    } break;
-    case TYPE_TUPLE:
-      (*ss) << "struct " << to_cpp_string(type) << ";\n";
-      break;
-    default:
-      return;
-  }
-}
-
-void Emitter::visit(ASTWhile *node) {
-  defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
-  emit_line_directive(node);
-  (*ss) << indent() << "while (";
-  if (node->condition.is_not_null()) {
-    node->condition.get()->accept(this);
-  } else {
-    (*ss) << "true";
-  }
-  (*ss) << ") ";
-  node->block->accept(this);
-  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
-  defer_blocks.pop_back();
-  return;
-}
-void Emitter::visit(ASTIf *node) {
-  emit_line_directive(node);
-  (*ss) << indent() << "if (";
-  node->condition->accept(this);
-  (*ss) << ")";
-  node->block->accept(this);
-  if (node->_else.is_not_null()) {
-    node->_else.get()->accept(this);
-  }
-  return;
-}
-void Emitter::visit(ASTElse *node) {
-  emit_line_directive(node);
-  (*ss) << " else ";
-  if (node->_if.is_not_null()) {
-    node->_if.get()->accept(this);
-  } else if (node->block.is_not_null()) {
-    node->block.get()->accept(this);
-  }
-  return;
-}
-void Emitter::visit(ASTFor *node) {
-  emit_line_directive(node);
-  auto old_scope = ctx.scope;
-  defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
-  ctx.set_scope(node->block->scope);
-
-  static int depth = 0;
-  std::string range_unique_id = "$_range_id" + std::to_string(depth);
-  std::string unique_id = "$_loop_id" + std::to_string(depth);
-  depth++;
-
-  Defer _defer([] { depth--; });
-
-  (*ss) << indent() << "{\n";
-  indent_level++;
-
-  std::string range_type_str = to_cpp_string(global_get_type(node->range_type));
-  std::string iterable_type_str = to_cpp_string(global_get_type(node->iterable_type));
-  std::string identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
-  auto iterable_method_str = "$" + std::to_string(node->iterable_type);
-
-  switch (node->iteration_kind) {
-    case ASTFor::ITERABLE:
-      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
-      node->range->accept(this);
-      (*ss) << ";\n";
-      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type)
-            << "_iter(&" << range_unique_id << ");\n";
-      break;
-
-    case ASTFor::ENUMERABLE:
-      (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
-      node->range->accept(this);
-      (*ss) << ";\n";
-      (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type)
-            << "_enumerator(&" << range_unique_id << ");\n";
-      break;
-
-    case ASTFor::ENUMERATOR:
-      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
-      node->range->accept(this);
-      (*ss) << ";\n";
-      break;
-
-    case ASTFor::ITERATOR:
-      (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
-      node->range->accept(this);
-      (*ss) << ";\n";
-      break;
-  }
-
-  (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(" << unique_id << ")) {\n";
-  indent_level++;
-
-  (*ss) << indent() << identifier_type_str << " ";
-  node->iter_identifier->accept(this);
-  (*ss) << " = ";
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
-  } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
-    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
-  } else {
-    (*ss) << "*" << iterable_method_str << "_current(" << unique_id << ");\n";
-  }
-
-  // this MUST happen before the block or continue will cause a permanent hangup!!!
-  (*ss) << indent() << iterable_method_str << "_next(&" << unique_id << ");\n";
-
-  node->block->accept(this);
-
-  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
-
-  indent_level--;
-  (*ss) << indent() << "}\n";
-
-  indent_level--;
-  (*ss) << indent() << "}\n";
-
-  defer_blocks.pop_back();
-  ctx.set_scope(old_scope);
-  return;
-}
-
-void Emitter::visit(ASTAlias *node) { return; }
-
-void Emitter::visit(ASTArguments *node) {
-  (*ss) << "(";
-  for (int i = 0; i < node->arguments.size(); ++i) {
-    if (i != 0) {
-      (*ss) << ", ";
-    }
-    node->arguments[i]->accept(this);
-  }
-  (*ss) << ")";
-  return;
-}
-
-void Emitter::visit(ASTType *node) {
-  auto type = global_get_type(node->resolved_type);
-  if (!type) {
-    throw_error("internal compiler error: ASTType* resolved to null in emitter.", node->source_range);
-  }
-
-  // For reflection
-  if (node->kind == ASTType::REFLECTION) {
-    auto id = node->pointing_to.get()->resolved_type;
-    if (id == -1)
-      throw_error("Invalid type in #type() node", node->source_range);
-    auto type = global_get_type(id);
-    (*ss) << to_type_struct(type, ctx);
-    return;
-  }
-
-  if (type->is_kind(TYPE_FUNCTION)) {
-    (*ss) << get_function_pointer_type_string(type);
-    return;
-  }
-
-  if (type->is_kind(TYPE_ENUM)) {
-    auto enum_info = (type->info->as<Enum_Info>());
-    auto elem_ty = global_get_type(enum_info->element_type);
-    (*ss) << to_cpp_string(elem_ty);
-    return;
-  }
-
-  auto type_string = to_cpp_string(type);
-
-  (*ss) << type_string;
-  return;
-}
-
-int Emitter::get_expr_left_type_sr_dot(AST *node) {
-  switch (node->node_type) {
-    case AST_TYPE:
-      return node->resolved_type;
-    case AST_IDENTIFIER:
-      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
-    case AST_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
-      return dotnode->base->resolved_type;
-    } break;
-    case AST_SCOPE_RESOLUTION: {
-      auto srnode = static_cast<ASTScopeResolution *>(node);
-      return srnode->base->resolved_type;
-    } break;
-    default:
-      throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
-                              (int)node->node_type),
-                  node->source_range);
-  }
-  return Type::INVALID_TYPE_ID;
-}
-
-void Emitter::visit(ASTCall *node) {
-  auto base_symbol = typer.get_symbol(node->function);
-
-  std::vector<int> generic_args;
-  for (const auto arg : node->generic_arguments) {
-    generic_args.push_back(arg->resolved_type);
-  }
-
-  auto symbol = base_symbol.get();
-  if (node->function->node_type == AST_DOT_EXPR) {
-    if (!base_symbol || !base_symbol.get()->is_function()) {
-      throw_error("can't call a non-function", node->source_range);
-    }
-
-    auto func = symbol->function.declaration;
-
-    auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
-    auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
-
-    if (!method_call || static_method) {
-      throw_error("cannot call a static method from an instance", node->source_range);
-    }
-
-    auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
-    if (!base_type) {
-      throw_error("internal compiler error: unable to find method call", node->source_range);
-    }
-
-    (*ss) << "$" << std::to_string(base_type->base_id == -1 ? base_type->id : base_type->base_id) << "_"
-          << symbol->name.get_str();
-    (*ss) << mangled_type_args(generic_args);
-    (*ss) << "(";
-
-    Type *function_type = global_get_type(symbol->type_id);
-    // if generic function
-    if (!function_type) {
-      auto instance =
-          find_generic_instance(func->generic_instantiations, typer.get_generic_arg_types(node->generic_arguments));
-      function_type = global_get_type(instance->resolved_type);
-    }
-    auto param_0_ty = global_get_type(function_type->info->as<Function_Info>()->parameter_types[0]);
-    if (param_0_ty->meta.is_pointer() && !base_type->meta.is_pointer()) {
-      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
-      (*ss) << "&";
-    }
-
-    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
-    base->accept(this);
-    if (node->arguments->arguments.size() > 0) {
-      (*ss) << ", ";
-    }
-
-    for (auto &arg : node->arguments->arguments) {
-      arg->accept(this);
-      if (arg != node->arguments->arguments.back()) {
-        (*ss) << ", ";
-      }
-    }
-    (*ss) << ")";
-  } else {
-    auto func = node->function;
-    if (func->node_type == AST_TYPE) {
-      auto ast_type = static_cast<ASTType *>(func);
-      if (ast_type->kind != ASTType::NORMAL) {
-        throw_error("Cannot call a tuple or function type", node->source_range);
-      }
-      if (!ast_type->normal.generic_arguments.empty()) {
-        throw_error("internal compiler error: generic args to call put on base", node->source_range);
-      }
-      func = ast_type->normal.base;
-    }
-    // normal function call, or a static method.
-    func->accept(this);
-    (*ss) << mangled_type_args(generic_args);
-    node->arguments->accept(this);
-  }
-
-  return;
-}
-
-size_t calculate_actual_length(const std::string_view &str_view) {
-  size_t length = 0;
-  for (size_t i = 0; i < str_view.size(); ++i) {
-    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
-      switch (str_view[i + 1]) {
-        case 'n':
-        case 't':
-        case 'r':
-        case '\\':
-        case '"':
-          ++i; // Skip the escape character
-          break;
-        case 'x': // Hexadecimal escape sequence
-          i += 2; // Skip \x and the next two hex digits
-          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
-            ++i;
-          }
-          break;
-        case 'u': // Unicode escape sequence
-          i += 4; // Skip \u and the next four hex digits
-          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
-            ++i;
-          }
-          break;
-        case 'U': // Unicode escape sequence
-          i += 8; // Skip \U and the next eight hex digits
-          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
-            ++i;
-          }
-          break;
-        default:
-          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') { // Octal escape sequence
-            ++i;                                                  // Skip the first digit
-            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
-              ++i; // Skip the second digit
-            }
-            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
-              ++i; // Skip the third digit
-            }
-          }
-          break;
-      }
-    }
-    ++length;
-  }
-  return length;
-}
 
 void Emitter::visit(ASTLiteral *node) {
   auto type = to_cpp_string(global_get_type(node->resolved_type));
@@ -417,7 +32,7 @@ void Emitter::visit(ASTLiteral *node) {
       break;
     // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
     // that's why we have fat u32 chars anyway.
-    case LITERAL_CHAR: 
+    case LITERAL_CHAR:
       output = '\'' + node->value.get_str() + '\'';
       break;
     case LITERAL_INTEGER:
@@ -430,7 +45,6 @@ void Emitter::visit(ASTLiteral *node) {
   (*ss) << output;
   return;
 }
-
 void Emitter::visit(ASTIdentifier *node) {
   (*ss) << node->value.get_str();
   return;
@@ -508,7 +122,6 @@ void Emitter::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   return;
 }
-
 void Emitter::visit(ASTDeclaration *node) {
   if (node->is_emitted) {
     return;
@@ -518,8 +131,7 @@ void Emitter::visit(ASTDeclaration *node) {
   emit_line_directive(node);
 
   // Emit switch / if expressions.
-  if (node->value &&
-      (node->value.get()->node_type == AST_SWITCH || node->value.get()->node_type == AST_IF)) {
+  if (node->value && (node->value.get()->node_type == AST_SWITCH || node->value.get()->node_type == AST_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
     auto type = global_get_type(node->resolved_type);
@@ -601,7 +213,6 @@ void Emitter::visit(ASTDeclaration *node) {
   handle_initialization();
   return;
 }
-
 void Emitter::emit_forward_declaration(AST *node) {
   emit_default_args = true;
 
@@ -637,8 +248,7 @@ void Emitter::emit_foreign_function(AST *node) {
     (*ss) << ");";
   }
 }
-
-void Emitter::visit(AST *node) {
+void Emitter::visit(ASTStructDeclaration *node) {
   if (node->is_emitted) {
     return;
   }
@@ -767,20 +377,8 @@ void Emitter::visit(ASTEnumDeclaration *node) {
   auto type = global_get_type(node->resolved_type);
   return;
 }
-
 void Emitter::visit(ASTParamDecl *node) {
-  auto type = global_get_type(node->resolved_type);
-
-  if (node->tag == ASTParamDecl::Normal) {
-    if (type->is_kind(TYPE_FUNCTION)) {
-      (*ss) << get_declaration_type_signature_and_identifier(node->normal.name.get_str(), type);
-    } else {
-      node->normal.type->accept(this);
-      (*ss) << ' ' << node->normal.name.get_str();
-    }
-  } else {
-    (*ss) << ' ' << to_cpp_string(type) << " self";
-  }
+  
   return;
 }
 void Emitter::visit(ASTParamsDecl *node) {
@@ -803,67 +401,6 @@ void Emitter::visit(ASTParamsDecl *node) {
   return;
 }
 
-void Emitter::visit(ASTProgram *node) {
-  emit_line_directive(node);
-
-  static const auto testing = compile_command.has_flag("test");
-
-  for (const auto &statement : node->statements) {
-    statement->accept(this);
-    semicolon();
-    newline();
-  }
-
-  // Emit runtime reflection type info for requested types, only when we have
-  // actually requested runtime type information.
-  if (!ctx.type_info_strings.empty() && !is_freestanding) {
-    std::stringstream type_info{};
-    for (const auto &str : ctx.type_info_strings) {
-      type_info << str.get_str() << ";\n";
-    }
-
-    code << "void $initialize_reflection_system() {\n";
-    {
-      // we don't bother doing pushes into type info, it's easier for us to do it this way.
-      code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
-      code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
-      code << type_info.str() << ";\n";
-    }
-    code << "}\n";
-  }
-
-  if (testing) {
-    auto test_init = test_functions.str();
-    if (test_init.ends_with(',')) {
-      test_init.pop_back();
-    }
-
-    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
-    // deploy the array of test struct wrappers.
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
-
-    // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
-  } else {
-    if (has_user_defined_main && !is_freestanding) {
-#define FORMAT_STR "int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n"
-      // I made that macro because the formatting goes CRAZY with a raw string as an arg
-      code << std::format(FORMAT_STR, ctx.scope->find_type_id("Env", {}),
-                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
-                                                            : "{/* no reflection present in module */};");
-    } // C calls main() for freestanding
-  }
-
-  // TODO: if we're freestanding, we should just emit ID's only for #type().
-  if (is_freestanding && !ctx.type_info_strings.empty()) {
-    throw_error("You cannot use runtime type reflection in a freestanding or "
-                "nostdlib environment, due to a lack of allocators. To compare "
-                "types, use #typeid.",
-                {});
-  }
-
-  return;
-}
 void Emitter::visit(ASTDotExpr *node) {
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
@@ -879,7 +416,6 @@ void Emitter::visit(ASTDotExpr *node) {
   (*ss) << node->member_name.get_str();
   return;
 }
-
 void Emitter::visit(ASTSubscript *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   if (left_ty && node->is_operator_overload) {
@@ -945,7 +481,6 @@ void Emitter::visit(ASTInitializerList *node) {
   (*ss) << "}";
   return;
 }
-
 void Emitter::visit(ASTRange *node) {
   (*ss) << "(" << to_cpp_string(global_get_type(node->resolved_type)) << ") {";
   (*ss) << ".begin = ";
@@ -955,7 +490,6 @@ void Emitter::visit(ASTRange *node) {
   (*ss) << "}";
   return;
 }
-
 void Emitter::visit(ASTSwitch *node) {
   auto type = global_get_type(node->target->resolved_type);
   bool use_eq_operator = true;
@@ -1001,7 +535,6 @@ void Emitter::visit(ASTTuple *node) {
   (*ss) << "}";
   return;
 }
-
 void Emitter::visit(ASTTupleDeconstruction *node) {
   emit_line_directive(node);
 
@@ -1054,6 +587,290 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
       }
     }
   }
+}
+void Emitter::visit(ASTScopeResolution *node) {
+  auto type = global_get_type(node->base->resolved_type);
+  // for static function aclls and enum access, but this probably encompasses all of the usage.
+  // The reason we check here, is because the left of this may be another Scope Resolution node.
+  // This should probably be a lot more robust
+  if (node->base->node_type == AST_IDENTIFIER || node->base->node_type == AST_TYPE) {
+    if (type->is_kind(TYPE_ENUM)) {
+      (*ss) << type->base.get_str();
+    } else {
+      (*ss) << "$" + std::to_string(type->id);
+    }
+  } else {
+    node->base->accept(this);
+  }
+  auto op = "_";
+  (*ss) << op << node->member_name.get_str();
+  return;
+}
+void Emitter::visit(ASTImpl *node) {
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
+
+  auto target = global_get_type(node->target->resolved_type);
+
+  if (!target) {
+    throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
+  }
+  auto old_type = type_context;
+  type_context = node->target;
+  Defer _([&] { type_context = old_type; });
+
+  for (const auto &method : node->methods) {
+    method->accept(this);
+  }
+
+  return;
+}
+void Emitter::visit(ASTCast *node) {
+  auto type_string = to_cpp_string(global_get_type(node->target_type->resolved_type));
+  (*ss) << "(" << type_string << ")";
+  node->expression->accept(this);
+  return;
+}
+void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
+void Emitter::forward_decl_type(Type *type) {
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
+  if (type->emitted_forward_declaration) {
+    return;
+  } else {
+    type->emitted_forward_declaration = true;
+  }
+  switch (type->kind) {
+    case TYPE_FUNCTION: {
+      auto info = type->info->as<Function_Info>();
+      for (auto i = 0; i < info->params_len; i++) {
+        forward_decl_type(global_get_type(info->parameter_types[i]));
+      }
+      forward_decl_type(global_get_type(info->return_type));
+    } break;
+    case TYPE_STRUCT: {
+      auto info = type->info->as<Struct_Info>();
+      std::string kw = "typedef struct ";
+      if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
+        kw = "typedef union ";
+      (*ss) << kw << type->base.get_str() << " " << type->base.get_str() << ";\n";
+    } break;
+    case TYPE_TUPLE:
+      (*ss) << "struct " << to_cpp_string(type) << ";\n";
+      break;
+    default:
+      return;
+  }
+}
+// Helper function to emit deferred statements
+void Emitter::emit_deferred_statements(DeferBlockType type) {
+  auto defer_block = defer_blocks.rbegin();
+  while (defer_block->type != type) {
+    if (defer_block == defer_blocks.rend()) {
+      throw_error("internal compiler error: could not find defer block type in stack", {});
+    }
+    for (auto defer : defer_block->defers) {
+      defer->statement->accept(this);
+      semicolon();
+      newline();
+    }
+    defer_block++;
+  }
+  if (defer_block == defer_blocks.rend()) {
+    throw_error("internal compiler error: could not find defer block type in stack", {});
+  }
+  for (auto defer : defer_block->defers) {
+    defer->statement->accept(this);
+    semicolon();
+    newline();
+  }
+}
+void Emitter::emit_lambda(ASTLambda *node) {
+  if (node->is_emitted) {
+    return;
+  } else {
+    node->is_emitted = true;
+  }
+  emit_line_directive(node);
+  node->return_type->accept(this);
+  (*ss) << ' ' << node->unique_identifier.get_str() << ' ';
+  node->params->accept(this);
+  node->block->accept(this);
+  newline();
+}
+
+void Emitter::visit(ASTReturn *node) {
+  emit_line_directive(node);
+
+  // Emit switch / if expressions.
+  if (node->expression &&
+      (node->expression.get()->node_type == AST_SWITCH || node->expression.get()->node_type == AST_IF)) {
+    auto old = std::move(cf_expr_return_register);
+    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
+    auto type = global_get_type(node->resolved_type);
+    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
+    cf_expr_return_register = &str;
+
+    (*ss) << to_cpp_string(type) << " " << str << ";\n";
+    node->expression.get()->accept(this);
+
+    if (emitting_function_with_defer ||
+        (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+      (*ss) << "return " << defer_return_value_key << ";\n";
+    } else {
+      (*ss) << "return " << str << ";\n";
+    }
+    return;
+  }
+
+  if (emitting_function_with_defer ||
+      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
+    if (node->expression.is_not_null()) {
+      auto type = global_get_type(node->expression.get()->resolved_type);
+      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = ";
+      node->expression.get()->accept(this);
+      (*ss) << ";\n";
+    }
+    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
+    (*ss) << "return";
+    if (node->expression.is_not_null()) {
+      (*ss) << " " << defer_return_value_key;
+    }
+    (*ss) << ";\n";
+  } else if (cf_expr_return_register.is_null() || node->expression.is_null()) {
+    indented("return");
+    if (node->expression.is_not_null()) {
+      space();
+      node->expression.get()->accept(this);
+    }
+    (*ss) << ";\n";
+  } else {
+    (*ss) << *cf_expr_return_register.get() << " = ";
+    node->expression.get()->accept(this);
+    (*ss) << ";\n";
+  }
+  return;
+}
+void Emitter::visit(ASTBreak *node) {
+  emit_line_directive(node);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  indented("break;\n");
+}
+void Emitter::visit(ASTContinue *node) {
+  emit_line_directive(node);
+  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
+  indented("continue;\n");
+}
+void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
+
+void Emitter::visit(ASTLambda *node) { (*ss) << node->unique_identifier.get_str(); }
+// This should never get hit.
+void Emitter::visit(ASTWhere *node) {
+  throw_error("internal compiler error: 'where' expression was visited in the emitter", node->source_range);
+}
+void Emitter::emit_tuple(int type_id) {
+  auto type = global_get_type(type_id);
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
+  if (type->emitted_tuple) {
+    return;
+  } else {
+    type->emitted_tuple = true;
+  }
+  auto name = to_cpp_string(type);
+
+  (*ss) << "typedef struct {";
+  auto info = type->info->as<Tuple_Info>();
+  for (int i = 0; i < info->types.size(); ++i) {
+    auto type = global_get_type(info->types[i]);
+    if (type->is_kind(TYPE_FUNCTION)) {
+      (*ss) << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+    } else {
+      auto name = to_cpp_string(type);
+      (*ss) << name << " $" << std::to_string(i) << ";\n";
+    }
+  }
+  (*ss) << "} " << name << ";\n";
+}
+void Emitter::visit(ASTSize_Of *node) {
+  (*ss) << "sizeof(";
+  node->target_type->accept(this);
+  (*ss) << ")";
+}
+
+int Emitter::get_expr_left_type_sr_dot(AST *node) {
+  switch (node->node_type) {
+    case AST_TYPE:
+      return node->resolved_type;
+    case AST_IDENTIFIER:
+      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
+    case AST_DOT_EXPR: {
+      auto dotnode = static_cast<ASTDotExpr *>(node);
+      return dotnode->base->resolved_type;
+    } break;
+    case AST_SCOPE_RESOLUTION: {
+      auto srnode = static_cast<ASTScopeResolution *>(node);
+      return srnode->base->resolved_type;
+    } break;
+    default:
+      throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
+                              (int)node->node_type),
+                  node->source_range);
+  }
+  return Type::INVALID_TYPE_ID;
+}
+
+size_t calculate_actual_length(const std::string_view &str_view) {
+  size_t length = 0;
+  for (size_t i = 0; i < str_view.size(); ++i) {
+    if (str_view[i] == '\\' && i + 1 < str_view.size()) {
+      switch (str_view[i + 1]) {
+        case 'n':
+        case 't':
+        case 'r':
+        case '\\':
+        case '"':
+          ++i; // Skip the escape character
+          break;
+        case 'x': // Hexadecimal escape sequence
+          i += 2; // Skip \x and the next two hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'u': // Unicode escape sequence
+          i += 4; // Skip \u and the next four hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        case 'U': // Unicode escape sequence
+          i += 8; // Skip \U and the next eight hex digits
+          while (i + 1 < str_view.size() && std::isxdigit(str_view[i + 1])) {
+            ++i;
+          }
+          break;
+        default:
+          if (str_view[i + 1] >= '0' && str_view[i + 1] <= '7') { // Octal escape sequence
+            ++i;                                                  // Skip the first digit
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the second digit
+            }
+            if (i + 1 < str_view.size() && str_view[i + 1] >= '0' && str_view[i + 1] <= '7') {
+              ++i; // Skip the third digit
+            }
+          }
+          break;
+      }
+    }
+    ++length;
+  }
+  return length;
 }
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
@@ -1443,315 +1260,6 @@ std::string Emitter::to_cpp_string(Type *type) {
   return output;
 }
 
-void Emitter::visit(ASTScopeResolution *node) {
-  auto type = global_get_type(node->base->resolved_type);
-  // for static function aclls and enum access, but this probably encompasses all of the usage.
-  // The reason we check here, is because the left of this may be another Scope Resolution node.
-  // This should probably be a lot more robust
-  if (node->base->node_type == AST_IDENTIFIER || node->base->node_type == AST_TYPE) {
-    if (type->is_kind(TYPE_ENUM)) {
-      (*ss) << type->base.get_str();
-    } else {
-      (*ss) << "$" + std::to_string(type->id);
-    }
-  } else {
-    node->base->accept(this);
-  }
-  auto op = "_";
-  (*ss) << op << node->member_name.get_str();
-  return;
-}
-
-void Emitter::visit(ASTImpl *node) {
-  if (!node->generic_parameters.empty()) {
-    return;
-  }
-
-  auto target = global_get_type(node->target->resolved_type);
-
-  if (!target) {
-    throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
-  }
-  auto old_type = type_context;
-  type_context = node->target;
-  Defer _([&] { type_context = old_type; });
-
-  for (const auto &method : node->methods) {
-    method->accept(this);
-  }
-
-  return;
-}
-
-void Emitter::visit(ASTCast *node) {
-  auto type_string = to_cpp_string(global_get_type(node->target_type->resolved_type));
-  (*ss) << "(" << type_string << ")";
-  node->expression->accept(this);
-  return;
-}
-
-void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
-
-// Helper function to emit deferred statements
-void Emitter::emit_deferred_statements(DeferBlockType type) {
-  auto defer_block = defer_blocks.rbegin();
-  while (defer_block->type != type) {
-    if (defer_block == defer_blocks.rend()) {
-      throw_error("internal compiler error: could not find defer block type in stack", {});
-    }
-    for (auto defer : defer_block->defers) {
-      defer->statement->accept(this);
-      semicolon();
-      newline();
-    }
-    defer_block++;
-  }
-  if (defer_block == defer_blocks.rend()) {
-    throw_error("internal compiler error: could not find defer block type in stack", {});
-  }
-  for (auto defer : defer_block->defers) {
-    defer->statement->accept(this);
-    semicolon();
-    newline();
-  }
-}
-
-void Emitter::emit_lambda(ASTLambda *node) {
-  if (node->is_emitted) {
-    return;
-  } else {
-    node->is_emitted = true;
-  }
-  emit_line_directive(node);
-  node->return_type->accept(this);
-  (*ss) << ' ' << node->unique_identifier.get_str() << ' ';
-  node->params->accept(this);
-  node->block->accept(this);
-  newline();
-}
-
-void Emitter::visit(AST *node) {
-  auto emit_function_signature_and_body = [&](const std::string &name) {
-    node->return_type->accept(this);
-    (*ss) << " " + name;
-    emit_default_args = true;
-    node->params->accept(this);
-    emit_default_args = false;
-    defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
-    if (node->block.is_not_null()) {
-      auto block = node->block.get();
-      block->accept(this);
-    }
-    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-    defer_blocks.pop_back();
-  };
-
-  auto emit_various_function_declarations = [&] {
-    if (!node->generic_parameters.empty()) {
-      return;
-    }
-
-    if (node->name == "to_string" && !node->generic_arguments.empty() && node->generic_arguments[0] == 30) {
-      int x = 0;
-    }
-
-    if (node->name != "main") {
-      if ((node->flags & FUNCTION_IS_STATIC) != 0) {
-        (*ss) << "static ";
-      }
-      if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-        emit_forward_declaration(node);
-        return;
-      }
-    }
-
-    if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
-      (*ss) << "extern  ";
-    }
-
-    std::string name;
-    if (node->declaring_type != Type::INVALID_TYPE_ID) {
-      name += "$" + std::to_string(node->declaring_type) + "_";
-    }
-    name += node->name.get_str();
-    if (!node->generic_arguments.empty()) {
-      name += mangled_type_args(node->generic_arguments);
-    }
-
-    if (node->name == "main" && !is_freestanding) {
-      has_user_defined_main = true;
-      node->return_type->accept(this);
-      (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
-      node->block.get()->accept(this);
-    } else {
-      emit_function_signature_and_body(name);
-    }
-  };
-
-  if (node->is_emitted) {
-    return;
-  } else {
-    node->is_emitted = true;
-  }
-
-  emit_line_directive(node);
-
-  auto test_flag = compile_command.has_flag("test");
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  Defer deferred = {[&]() { ctx.set_scope(old_scope); }};
-
-  // this also happens to emit the test boilerplate that bootstraps it into the
-  // test runner, if applicable.
-  if (!should_emit_function(this, node, test_flag)) {
-    return;
-  }
-
-  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
-    emit_foreign_function(node);
-    return;
-  }
-
-  emit_various_function_declarations();
-
-  return;
-}
-
-void Emitter::visit(ASTReturn *node) {
-  emit_line_directive(node);
-
-  // Emit switch / if expressions.
-  if (node->expression && (node->expression.get()->node_type == AST_SWITCH ||
-                           node->expression.get()->node_type == AST_IF)) {
-    auto old = std::move(cf_expr_return_register);
-    Defer _defer([&]() { cf_expr_return_register = std::move(old); });
-    auto type = global_get_type(node->resolved_type);
-    std::string str = "$register$" + std::to_string(cf_expr_return_id++);
-    cf_expr_return_register = &str;
-
-    (*ss) << to_cpp_string(type) << " " << str << ";\n";
-    node->expression.get()->accept(this);
-
-    if (emitting_function_with_defer ||
-        (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
-      emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-      (*ss) << "return " << defer_return_value_key << ";\n";
-    } else {
-      (*ss) << "return " << str << ";\n";
-    }
-    return;
-  }
-
-  if (emitting_function_with_defer ||
-      (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-    if (node->expression.is_not_null()) {
-      auto type = global_get_type(node->expression.get()->resolved_type);
-      (*ss) << to_cpp_string(type) << " " << defer_return_value_key << " = ";
-      node->expression.get()->accept(this);
-      (*ss) << ";\n";
-    }
-    emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-    (*ss) << "return";
-    if (node->expression.is_not_null()) {
-      (*ss) << " " << defer_return_value_key;
-    }
-    (*ss) << ";\n";
-  } else if (cf_expr_return_register.is_null() || node->expression.is_null()) {
-    indented("return");
-    if (node->expression.is_not_null()) {
-      space();
-      node->expression.get()->accept(this);
-    }
-    (*ss) << ";\n";
-  } else {
-    (*ss) << *cf_expr_return_register.get() << " = ";
-    node->expression.get()->accept(this);
-    (*ss) << ";\n";
-  }
-  return;
-}
-
-void Emitter::visit(ASTBreak *node) {
-  emit_line_directive(node);
-  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
-  indented("break;\n");
-}
-
-void Emitter::visit(ASTContinue *node) {
-  emit_line_directive(node);
-  emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
-  indented("continue;\n");
-}
-
-void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
-
-void Emitter::visit(ASTBlock *node) {
-  emit_line_directive(node);
-  (*ss) << (" {\n");
-  indent_level++;
-  ctx.set_scope(node->scope);
-
-  defer_blocks.emplace_back();
-
-  for (const auto &statement : node->statements) {
-    emit_line_directive(node);
-    if (statement->node_type == AST_DECLARATION) {
-      indented("");
-    }
-    statement->accept(this);
-    semicolon();
-    newline();
-  }
-
-  emit_deferred_statements(DEFER_BLOCK_TYPE_OTHER);
-  defer_blocks.pop_back();
-
-  indent_level--;
-  indented("}");
-  ctx.exit_scope();
-  return;
-}
-
-void Emitter::visit(ASTLambda *node) { (*ss) << node->unique_identifier.get_str(); }
-
-// This should never get hit.
-void Emitter::visit(ASTWhere *node) {
-  throw_error("internal compiler error: 'where' expression was visited in the emitter", node->source_range);
-}
-
-void Emitter::emit_tuple(int type_id) {
-  auto type = global_get_type(type_id);
-  if (type->base_id != Type::INVALID_TYPE_ID) {
-    type = global_get_type(type->base_id);
-  }
-  if (type->emitted_tuple) {
-    return;
-  } else {
-    type->emitted_tuple = true;
-  }
-  auto name = to_cpp_string(type);
-
-  (*ss) << "typedef struct {";
-  auto info = type->info->as<Tuple_Info>();
-  for (int i = 0; i < info->types.size(); ++i) {
-    auto type = global_get_type(info->types[i]);
-    if (type->is_kind(TYPE_FUNCTION)) {
-      (*ss) << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
-    } else {
-      auto name = to_cpp_string(type);
-      (*ss) << name << " $" << std::to_string(i) << ";\n";
-    }
-  }
-  (*ss) << "} " << name << ";\n";
-}
-
-void Emitter::visit(ASTSize_Of *node) {
-  (*ss) << "sizeof(";
-  node->target_type->accept(this);
-  (*ss) << ")";
-}
-
 void Emitter::call_operator_overload(const Source_Range &range, Type *left_ty, OperationKind operation, Token_Type op,
                                      ASTExpr *left, ASTExpr *right) {
   auto call = ASTCall{};
@@ -1771,6 +1279,4 @@ void Emitter::call_operator_overload(const Source_Range &range, Type *left_ty, O
   call.accept(this);
 }
 
-Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {
-  ss = &code;
-}
+Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }

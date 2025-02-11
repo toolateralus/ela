@@ -90,7 +90,6 @@
     }                                                                                                                  \
   }
 
-
 constexpr static auto &get_interface_variant(AST *node) { return node->interface; }
 constexpr static auto &get_struct_variant(AST *node) { return node->$struct; }
 constexpr static auto &get_function_variant(AST *node) { return node->function; }
@@ -105,12 +104,12 @@ struct Typer {
   int expected_type = -1;
 
   using VisitorMethod = void (Typer::*)(AST *, bool, std::vector<int>);
-  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, auto &(*subtype)(AST*), std::vector<int> args);
+  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, auto &(*subtype)(AST *), std::vector<int> args);
   void compiler_mock_function_call_visit_impl(Scope scope, int left_type, const Interned_String &method_name);
   void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_struct_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
-  
+
   void visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params);
   std::vector<int> visit_arguments(Source_Range source_range, AST *scope, std::vector<AST *> &arguments);
 
@@ -141,7 +140,7 @@ struct Typer {
   DEFINE_GENERIC_VISITOR()
 };
 
-enum DeferBlockType: unsigned char {
+enum DeferBlockType : unsigned char {
   DEFER_BLOCK_TYPE_OTHER,
   DEFER_BLOCK_TYPE_FUNC,
   DEFER_BLOCK_TYPE_LOOP,
@@ -155,6 +154,7 @@ struct DeferBlock {
 struct DependencyEmitter;
 
 struct Emitter {
+  std::vector<Interned_String> type_info_strings;
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
   bool emit_default_init = true;
@@ -183,6 +183,9 @@ struct Emitter {
   int indent_level = 0;
 
   int type_list_id = -1;
+
+  const bool is_testing = compile_command.has_flag("test");
+
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
                                compile_command.compilation_flags.contains("-nostdlib");
 
@@ -211,18 +214,44 @@ struct Emitter {
   void call_operator_overload(const Source_Range &range, Type *left_ty, OperationKind operation, Token_Type op,
                               AST *left, AST *right = nullptr);
 
+  inline void emit_arguments(const std::vector<AST *> &arguments) {
+    (*ss) << "(";
+    for (int i = 0; i < arguments.size(); ++i) {
+      if (i != 0) {
+        (*ss) << ", ";
+      }
+      visit(arguments[i]);
+    }
+    (*ss) << ")";
+  }
+
+  void visit_arguments(const std::vector<AST *> &arguments);
+  void visit_parameters(const std::vector<AST_Parameter_Declaration> &parameters);
+  
   void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type);
   Emitter(Typer &type_visitor);
+
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
+
   inline void indented(const std::string &s) { (*ss) << indent() << s; }
+
   inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
+
   inline void newline() { (*ss) << '\n'; }
+
   inline void newline_indented() { (*ss) << '\n' << indent(); }
+
   inline void semicolon() { (*ss) << ";"; }
+
   inline void space() { (*ss) << ' '; }
+
+  inline void end_line() {
+    semicolon();
+    newline();
+  }
 
   void emit_forward_declaration(AST *node);
   void emit_foreign_function(AST *node);
@@ -251,6 +280,8 @@ struct Emitter {
     return;
   };
 
+  void initialize_reflection_system();
+  void emit_runtime_main(AST *&node);
   DEFINE_VISITORS();
   DEFINE_GENERIC_VISITOR()
 };

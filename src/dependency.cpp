@@ -54,7 +54,7 @@ void DependencyEmitter::visit_bin_expr(AST *node) {
     AST dot(AST_DOT_EXPR);
     dot.dot.base = node->binary.left;
     dot.dot.member_name = get_operator_overload_name(node->binary.op, OPERATION_BINARY);
-    call.call.function = &dot;
+    call.call.callee = &dot;
     call.call.arguments = {node->binary.right};
     visit(&call);
   } else {
@@ -69,7 +69,7 @@ void DependencyEmitter::visit_unary_expr(AST *node) {
     AST dot(AST_DOT_EXPR);
     dot.dot.base = node->unary.operand;
     dot.dot.member_name = get_operator_overload_name(node->unary.op, OPERATION_UNARY);
-    call.call.function = &dot;
+    call.call.callee = &dot;
     visit(&call);
   } else {
     if (node->unary.op == Token_Type::Mul) {
@@ -115,7 +115,7 @@ void DependencyEmitter::visit_call(AST *node) {
   for (auto &arg : node->call.arguments) {
     visit(arg);
   }
-  auto symbol_nullable = emitter->typer.get_symbol(node->call.function);
+  auto symbol_nullable = emitter->typer.get_symbol(node->call.callee);
   if (symbol_nullable.is_not_null()) {
     auto decl = symbol_nullable.get()->function.declaration;
     if (!node->call.generic_arguments.empty()) {
@@ -126,7 +126,7 @@ void DependencyEmitter::visit_call(AST *node) {
       visit(decl);
     }
   } else {
-    visit(node->call.function);
+    visit(node->call.callee);
   }
 }
 
@@ -237,7 +237,7 @@ void DependencyEmitter::visit_subscript(AST *node) {
     AST dot(AST_DOT_EXPR);
     dot.dot.base = node->subscript.left;
     dot.dot.member_name = get_operator_overload_name(Token_Type::LBrace, OPERATION_SUBSCRIPT);
-    call.call.function = &dot;
+    call.call.callee = &dot;
     call.call.arguments = { node->subscript.index_expression };
     visit(&call);
   } else {

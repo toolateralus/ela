@@ -312,7 +312,7 @@ struct AST {
     struct {
       std::vector<AST *> generic_arguments;
       std::vector<AST *> arguments;
-      AST *function;
+      AST *callee;
     } call;
 
     struct {

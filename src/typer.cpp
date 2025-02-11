@@ -675,7 +675,7 @@ void Typer::compiler_mock_function_call_visit_impl(Scope scope, int left_type, c
   AST dot(AST_DOT_EXPR);
   dot.dot.base = &left;
   dot.dot.member_name = method_name;
-  call.call.function = &dot;
+  call.call.callee = &dot;
   visit_call(&call);
 }
 
@@ -1206,7 +1206,7 @@ void Typer::visit_call(AST *node) {
 
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
-  auto symbol = get_symbol(node->call.function).get();
+  auto symbol = get_symbol(node->call.callee).get();
   if (symbol && symbol->is_function()) {
     if (!type) {
       type = global_get_type(symbol->type_id);
@@ -1234,8 +1234,8 @@ void Typer::visit_call(AST *node) {
       type = global_get_type(func_decl->resolved_type);
     }
   } else {
-    visit(node->call.function);
-    type = global_get_type(node->call.function->resolved_type);
+    visit(node->call.callee);
+    type = global_get_type(node->call.callee->resolved_type);
   }
 
   if (!type)
@@ -1251,7 +1251,7 @@ void Typer::visit_call(AST *node) {
   // else, use the type.
   if (func_decl) {
     bool skip_first = false;
-    if (node->call.function->node_type == AST_DOT_EXPR) {
+    if (node->call.callee->node_type == AST_DOT_EXPR) {
       if (!func_decl->function.has_self) {
         throw_error("Calling static methods with instance not allowed", node->source_range);
       }
