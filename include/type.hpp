@@ -29,7 +29,7 @@ enum ConversionRule {
 
 Token get_unique_identifier();
 
-enum ScalarType: unsigned char {
+enum ScalarType : unsigned char {
   TYPE_VOID,
   TYPE_S8,
   TYPE_S16,
@@ -46,7 +46,7 @@ enum ScalarType: unsigned char {
   TYPE_BOOL,
 };
 
-enum TypeExtEnum: unsigned char {
+enum TypeExtEnum : unsigned char {
   TYPE_EXT_INVALID,
   TYPE_EXT_POINTER,
   TYPE_EXT_ARRAY,
@@ -63,12 +63,11 @@ enum Function_Instance_Flags : unsigned char {
   FUNCTION_IS_FOREIGN = 1 << 7,
 };
 
-enum StructTypeFlags: unsigned char {
+enum StructTypeFlags : unsigned char {
   STRUCT_FLAG_FORWARD_DECLARED = 1 << 0,
   STRUCT_FLAG_IS_ANONYMOUS = 1 << 1,
   STRUCT_FLAG_IS_UNION = 1 << 2,
 };
-
 
 std::string mangled_type_args(const std::vector<int> &args);
 
@@ -166,13 +165,9 @@ struct Tuple_Info {
   std::vector<int> types;
 };
 
-template <typename T>
-struct Type_Name {
-    consteval static std::string get() {
-        return typeid(T).name();
-    }
+template <typename T> struct Type_Name {
+  consteval static std::string get() { return typeid(T).name(); }
 };
-
 
 struct Type_Info {
   Scope scope;
@@ -266,26 +261,38 @@ int f64_type();
 int f32_type();
 
 Type *global_get_type(const int id);
+
 Interned_String get_tuple_type_name(const std::vector<int> &types);
-int global_create_type(Type_Kind, const Interned_String &, Type_Info info, const Type_Metadata & = {},
-                       const int base_id = -1);
+
+int global_create_type(Type_Kind kind, const Interned_String &name, Type_Info &&info, const Type_Metadata &meta,
+                       const int base_id);
+
 int global_create_struct_type(const Interned_String &, Scope scope, std::vector<int> generic_args = {});
 
 int global_create_interface_type(const Interned_String &name, Scope scope, std::vector<int> generic_args);
 
 int global_create_enum_type(const Interned_String &, Scope, bool = false, size_t element_type = s32_type());
+
 int global_create_tuple_type(const std::vector<int> &types);
+
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const Source_Range & = {});
-// char *
+
 int global_find_function_type_id(const Function_Info &, const Type_Metadata &);
+
 int global_find_type_id(std::vector<int> &tuple_types, const Type_Metadata &type_extensions);
+
 int global_find_type_id(const int, const Type_Metadata &);
+
 struct Token;
+
 void init_type_system();
+
 bool type_is_numerical(const Type *t);
+
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
-// returns false for failure, else true and passed param signature as out.
+
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
+
 void emit_warnings_or_errors_for_operator_overloads(const Token_Type type, Source_Range &range);
 
 struct AST;
@@ -309,8 +316,7 @@ struct Type {
 
   ~Type() {}
 
-  Type(Interned_String base, const Type_Kind kind, const Type_Info &&info,
-       const std::vector<int> &generic_args = {})
+  Type(Interned_String base, const Type_Kind kind, const Type_Info &&info, const std::vector<int> &generic_args = {})
       : base(base), id(type_table.size()), kind(kind), info(std::move(info)), generic_args(generic_args) {}
 
   // You must check .is_pointer() or .is_fixed_array() on the meta first.
@@ -335,6 +341,7 @@ enum OperationKind {
 };
 
 int find_operator_overload(Token_Type op, Type *left_ty, OperationKind kind);
+
 std::string get_operator_overload_name(Token_Type op, OperationKind kind);
 
 static std::string get_unmangled_name(const Type *type) {

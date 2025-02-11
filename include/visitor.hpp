@@ -286,14 +286,10 @@ struct Emitter {
 };
 
 struct DependencyEmitter {
-  Emitter *emitter;
-  inline DependencyEmitter(Emitter *emitter) : emitter(emitter) {}
-  std::string define_type(int type_id) {
-    
-  }
-  std::string decl_type(int type_id) {
-
-  }
+  Emitter &emitter;
+  DependencyEmitter(Emitter &emitter) : emitter(emitter) {}
+  std::string define_type(int type_id);
+  std::string decl_type(int type_id);
   DEFINE_VISITORS()
   DEFINE_GENERIC_VISITOR()
   void visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params);

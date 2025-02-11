@@ -11,7 +11,7 @@ bool CompileCommand::has_flag(const std::string &flag) const {
 
 void emit(AST *root, Typer &type_visitor) {
   Emitter emit(type_visitor);
-  DependencyEmitter dependency_emitter(&emit);
+  DependencyEmitter dependency_emitter(emit);
 
   static const auto testing = compile_command.has_flag("test");
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||

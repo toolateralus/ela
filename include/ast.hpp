@@ -544,8 +544,6 @@ struct Parser {
   AST *last_parent;
   static Nullable<AST> current_block;
 
-  void parse_parameters(const std::vector<GenericParameter> &generic_parameters, AST *node);
-
   Defer set_last_parent(AST *parent) {
     auto old = last_parent;
     last_parent = parent;
@@ -575,7 +573,7 @@ struct Parser {
   AST *parse_defer();
 
   void append_type_extensions(AST *&type);
-  std::vector<AST_Parameter_Declaration> parse_parameters(std::vector<GenericParameter> params = {});
+  void parse_parameters(AST *node, const std::vector<GenericParameter> &params = {});
   Nullable<AST> process_directive(DirectiveKind kind, const Interned_String &identifier);
   Nullable<AST> try_parse_directive_expr();
 

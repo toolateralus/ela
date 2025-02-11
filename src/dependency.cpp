@@ -5,6 +5,66 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
+
+[[nodiscard]] std::string DependencyEmitter::decl_type(int type_id) {
+  auto type = global_get_type(type_id);
+  auto extensions = type->meta.extensions;
+  for (auto meta : extensions) {
+    if (meta.type == TYPE_EXT_POINTER) {
+      emitter.forward_decl_type(type);
+      return {};
+    }
+  }
+  return define_type(type_id);
+}
+
+[[nodiscard]] std::string DependencyEmitter::define_type(int type_id) {
+  auto type = global_get_type(type_id);
+  if (type->base_id != Type::INVALID_TYPE_ID) {
+    type = global_get_type(type->base_id);
+  }
+  switch (type->kind) {
+    case TYPE_FUNCTION: {
+      auto info = type->info.function;
+      auto err = decl_type(info.return_type);
+      if (!err.empty()) {
+        return err;
+      }
+      for (const auto &parameter: info.parameter_types) {
+        err = decl_type(parameter);
+        if (!err.empty()) {
+          return err;
+        }
+      }
+    } break;
+    case TYPE_STRUCT: {
+      if (type->declaring_node.is_not_null()) {
+        visit(type->declaring_node.get());
+        emitter.visit(type->declaring_node.get());
+      } else {
+        return "internal compiler error: could not locate node for struct";
+      }
+    } break;
+    case TYPE_TUPLE: {
+      auto info = type->info.tuple;
+      for (auto type : info.types) {
+        auto err = define_type(type);
+        if (!err.empty()) {
+          return err;
+        }
+      }
+      emitter.emit_tuple(type_id);
+    } break;
+    case TYPE_ENUM:
+      // TODO: enums should be handled here
+    case TYPE_INTERFACE:
+    case TYPE_SCALAR:
+      break;
+  }
+  return {};
+}
+
+
 void DependencyEmitter::visit_program(AST *node) {
   for (auto &statement : node->statements) {
     visit(statement);
@@ -115,11 +175,11 @@ void DependencyEmitter::visit_call(AST *node) {
   for (auto &arg : node->call.arguments) {
     visit(arg);
   }
-  auto symbol_nullable = emitter->typer.get_symbol(node->call.callee);
+  auto symbol_nullable = emitter.typer.get_symbol(node->call.callee);
   if (symbol_nullable.is_not_null()) {
     auto decl = symbol_nullable.get()->function.declaration;
     if (!node->call.generic_arguments.empty()) {
-      auto generic_args = emitter->typer.get_generic_arg_types(node->call.generic_arguments);
+      auto generic_args = emitter.typer.get_generic_arg_types(node->call.generic_arguments);
       decl = find_generic_instance(decl->function.generic_instantiations, generic_args);
     }
     if (decl) {

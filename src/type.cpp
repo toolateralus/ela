@@ -54,9 +54,9 @@ int global_find_function_type_id(const Function_Info &info, const Type_Metadata 
   auto base = Type::INVALID_TYPE_ID;
   auto type_name = info.to_string();
   if (meta.has_extensions()) {
-    base = global_create_type(TYPE_FUNCTION, type_name, type_info, {});
+    base = global_create_type(TYPE_FUNCTION, type_name, std::move(type_info), {}, -1);
   }
-  return global_create_type(TYPE_FUNCTION, type_name, type_info, meta, base);
+  return global_create_type(TYPE_FUNCTION, type_name, std::move(type_info), meta, base);
 }
 
 int global_find_type_id(const int base, const Type_Metadata &meta) {
@@ -88,7 +88,7 @@ int global_find_type_id(const int base, const Type_Metadata &meta) {
   // Base types have a seperate scope from the extended types now.
   auto new_info = base_t->info;
   new_info.scope = {};
-  return global_create_type(base_t->kind, base_t->base, new_info, meta, base_t->id);
+  return global_create_type(base_t->kind, base_t->base, std::move(new_info), meta, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const Type_Metadata &type_extensions) {
@@ -356,51 +356,51 @@ Scalar_Info create_scalar_type_info(ScalarType type, size_t size, bool is_integr
 }
 
 int bool_type() {
-  static int type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true));
+  static int type = global_create_type(TYPE_SCALAR, "bool", create_scalar_type_info(TYPE_BOOL, 1, true), {}, -1);
   return type;
 }
 int void_type() {
-  static int type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
+  static int type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0), {}, -1);
   return type;
 }
 int u64_type() {
-  static int type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
+  static int type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true), {}, -1);
   return type;
 }
 int u32_type() {
-  static int type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true));
+  static int type = global_create_type(TYPE_SCALAR, "u32", create_scalar_type_info(TYPE_U32, 4, true), {}, -1);
   return type;
 }
 int u16_type() {
-  static int type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true));
+  static int type = global_create_type(TYPE_SCALAR, "u16", create_scalar_type_info(TYPE_U16, 2, true), {}, -1);
   return type;
 }
 int u8_type() {
-  static int type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true));
+  static int type = global_create_type(TYPE_SCALAR, "u8", create_scalar_type_info(TYPE_U8, 1, true), {}, -1);
   return type;
 }
 int s64_type() {
-  static int type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true));
+  static int type = global_create_type(TYPE_SCALAR, "s64", create_scalar_type_info(TYPE_S64, 8, true), {}, -1);
   return type;
 }
 int s32_type() {
-  static int type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true));
+  static int type = global_create_type(TYPE_SCALAR, "s32", create_scalar_type_info(TYPE_S32, 4, true), {}, -1);
   return type;
 }
 int s16_type() {
-  static int type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true));
+  static int type = global_create_type(TYPE_SCALAR, "s16", create_scalar_type_info(TYPE_S16, 2, true), {}, -1);
   return type;
 }
 int s8_type() {
-  static int type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true));
+  static int type = global_create_type(TYPE_SCALAR, "s8", create_scalar_type_info(TYPE_S8, 1, true), {}, -1);
   return type;
 }
 int f32_type() {
-  static int type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4));
+  static int type = global_create_type(TYPE_SCALAR, "f32", create_scalar_type_info(TYPE_FLOAT, 4), {}, -1);
   return type;
 }
 int f64_type() {
-  static int type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
+  static int type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8), {}, -1);
   return type;
 }
 

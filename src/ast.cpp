@@ -113,7 +113,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
   }
 }
 
-void Parser::parse_parameters(const std::vector<GenericParameter> &generic_parameters, AST *node) {
+void Parser::parse_parameters(AST *node, const std::vector<GenericParameter> &generic_parameters) {
   expect(Token_Type::LParen);
   AST *type = nullptr;
   auto &function = node->function;
@@ -307,7 +307,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(Token_Type::DoubleColon);
         parser->expect(Token_Type::Fn);
 
-        function->function.parameters = parser->parse_parameters();
+        parser->parse_parameters(function);
         function->function.name = name.value;
         if (parser->peek().type == Token_Type::Arrow) {
           parser->expect(Token_Type::Arrow);
@@ -1442,8 +1442,7 @@ AST *Parser::parse_function_declaration(Token name) {
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = node;
-
-  parse_parameters(function.generic_parameters, node);
+  parse_parameters(node, function.generic_parameters);
   function.name = name.value;
 
   // check for definition.
@@ -2004,7 +2003,9 @@ void Parser::end_node(AST *node, Source_Range &range) {
 AST *Parser::parse_lambda() {
   NODE_ALLOC(AST_LAMBDA, node, range, this, _);
   expect(Token_Type::Fn);
-  node->lambda.parameters = parse_parameters();
+  AST function(AST_FUNCTION);
+  parse_parameters(&function);
+  node->lambda.parameters = std::move(function.function.parameters);
   if (peek().type == Token_Type::Arrow) {
     eat();
     node->lambda.return_type = parse_type();
