@@ -179,33 +179,40 @@ auto generic_instantiation_panic_handler(auto msg, auto range, auto void_data) {
   longjmp(data->save_state, 1);
 };
 
-void Typer::type_check_args_from_params(AST *call, AST *parameters, bool skip_first) {
+void Typer::type_check_args_from_params(AST *call, AST *function, bool skip_first) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
-  auto args_ct = call->call.arguments.size();
-  auto params_ct = parameters->function.parameters.size();
-  auto largest = args_ct > params_ct ? args_ct : params_ct;
-  int param_index = skip_first ? 1 : 0;
-  for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
+
+  const auto args_ct = call->call.arguments.size();
+  const auto params_ct = function->function.parameters.size();
+  const auto is_varargs = function->function.is_varargs;
+  size_t param_index = skip_first; // if true, start at 1
+  size_t arg_index = 0;
+
+
+// ! Somehow type checking the varargs functions has totally broken here?
+  for (size_t arg_index = 0; arg_index < args_ct; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
-      if (arg_index < args_ct) {
-        expected_type = parameters->function.parameters[param_index].resolved_type;
-        visit(call->call.arguments[arg_index]);
-        assert_types_can_cast_or_equal(
-            call->call.arguments[arg_index]->resolved_type, parameters->function.parameters[param_index].resolved_type,
-            call->call.arguments[arg_index]->source_range,
-            std::format("unexpected argument type.. parameter #{} of function",
-                        arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
-      }
+
+      expected_type = function->function.parameters[param_index].resolved_type;
+
+      visit(call->call.arguments[arg_index]);
+
+      assert_types_can_cast_or_equal(
+          call->call.arguments[arg_index]->resolved_type, function->function.parameters[param_index].resolved_type,
+          call->call.arguments[arg_index]->source_range,
+          std::format("unexpected argument type.. parameter #{} of function", arg_index + 1));
+
+    } else if (is_varargs) {
+      expected_type = Type::INVALID_TYPE_ID;
+      visit(call->call.arguments[arg_index]);
     } else {
-      if (arg_index < args_ct) {
-        expected_type = Type::INVALID_TYPE_ID;
-        visit(call->call.arguments[arg_index]);
-        if (!parameters->function.is_varargs) {
-          throw_error("Too many arguments to function", call->source_range);
-        }
-      }
+      throw_error("Too many arguments to function", call->source_range);
     }
+  }
+
+  if (args_ct < params_ct && !is_varargs) {
+    throw_error("Too few arguments to function", call->source_range);
   }
 }
 

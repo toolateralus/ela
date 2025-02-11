@@ -225,7 +225,7 @@ struct Emitter {
   }
 
   void visit_arguments(const std::vector<AST *> &arguments);
-  void visit_parameters(const std::vector<AST_Parameter_Declaration> &parameters);
+  void visit_parameters(const std::vector<AST_Parameter_Declaration> &parameters, bool is_varargs);
   
   void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);

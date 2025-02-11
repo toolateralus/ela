@@ -2069,7 +2069,7 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  import("bootstrap");
+  // import("bootstrap");
   typer = new Typer();
 }
 
