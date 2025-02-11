@@ -262,6 +262,7 @@ struct DependencyEmitter {
   std::string decl_type(int type_id);
   DEFINE_VISITORS()
   DEFINE_GENERIC_VISITOR()
+  void visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params);
   void visit_statement_list(AST *node) {
     for (auto &stmt : node->statements) {
       visit(stmt);
