@@ -44,7 +44,7 @@ impl![Value_Type] Enumerator![Value_Type] for Range_Enumerator![Value_Type]  {
 
 impl![Value_Type] Enumerable![Range_Enumerator![Value_Type], Value_Type] for Range_Base![Value_Type]  {
   enumerator :: fn(self*) -> Range_Enumerator![Value_Type] {
-    return {
+    return .{
       begin: self.begin,
       end:   self.end,
       idx:          0,

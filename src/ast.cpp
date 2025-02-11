@@ -2034,10 +2034,7 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  import("bootstrap");
-  // auto &state = states.back();
-  // state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
-  // state.input_len = state.input.length();
+  // import("bootstrap");
   typer = new Typer();
 }
 

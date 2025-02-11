@@ -212,27 +212,21 @@ struct Type_Info {
       kind = info.kind;
       switch (kind) {
         case TYPE_FUNCTION:
-          function.~Function_Info();
           new (&function) Function_Info(info.function);
           break;
         case TYPE_INTERFACE:
-          interface.~Interface_Info();
           new (&interface) Interface_Info(info.interface);
           break;
         case TYPE_SCALAR:
-          scalar.~Scalar_Info();
           new (&scalar) Scalar_Info(info.scalar);
           break;
         case TYPE_ENUM:
-          $enum.~Enum_Info();
           new (&$enum) Enum_Info(info.$enum);
           break;
         case TYPE_STRUCT:
-          $struct.~Struct_Info();
           new (&$struct) Struct_Info(info.$struct);
           break;
         case TYPE_TUPLE:
-          tuple.~Tuple_Info();
           new (&tuple) Tuple_Info(info.tuple);
           break;
         default:
