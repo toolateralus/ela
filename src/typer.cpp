@@ -1079,8 +1079,6 @@ void Typer::visit_type(AST *node) {
   if (node->type.kind == AST_TYPE_NORMAL) {
     auto &normal_ty = node->type.normal;
 
-    #warning this just crashes for some reason
-
     auto symbol = get_symbol(normal_ty.base).get();
 
     if (!symbol || !symbol->is_type()) 

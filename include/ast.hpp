@@ -496,7 +496,7 @@ struct AST {
         new (&literal) decltype(literal)();
         break;
       case AST_TYPE:
-        memset(&type, 0, sizeof(decltype(type)));
+        memset((void*)&type, 0, sizeof(decltype(type)));
         break;
       case AST_TUPLE:
         new (&tuple) decltype(tuple)();
@@ -535,7 +535,7 @@ struct AST {
         new (&subscript) decltype(subscript)();
         break;
       case AST_INITIALIZER:
-        memset(&initializer, 0, sizeof(decltype(initializer)));
+        memset((void*)&initializer, 0, sizeof(decltype(initializer)));
         break;
       case AST_ENUM:
         new (&$enum) decltype($enum)();

@@ -32,7 +32,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
       new (&new_node->literal) decltype(new_node->literal)(node->literal);
       break;
     case AST_TYPE:
-      memcpy(&new_node->type, &node->type, sizeof(decltype(new_node->type)));
+      memcpy((void*)&new_node->type, &node->type, sizeof(decltype(new_node->type)));
       break;
     case AST_TUPLE:
       new (&new_node->tuple) decltype(new_node->tuple)(node->tuple);
@@ -71,7 +71,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
       new (&new_node->subscript) decltype(new_node->subscript)(node->subscript);
       break;
     case AST_INITIALIZER:
-      memcpy(&new_node->initializer, &node->initializer, sizeof(decltype(new_node->initializer)));
+      memcpy((void*)&new_node->initializer, &node->initializer, sizeof(decltype(new_node->initializer)));
       break;
     case AST_ENUM:
       new (&new_node->$enum) decltype(new_node->$enum)(node->$enum);
@@ -304,13 +304,16 @@ AST *ASTCopier::copy_type(AST *node, AST *new_parent) {
   if (node->type.pointing_to)
     new_node->type.pointing_to = copy_node(node->type.pointing_to.get(), new_parent);
   switch (new_node->type.kind) {
-    case AST_TYPE_NORMAL:
+    case AST_TYPE_NORMAL: {
+      auto &normal = new_node->type.normal;
+      normal.base = copy_node(normal.base, new_parent);
+      normal.generic_arguments.clear();
+      for (auto arg : node->type.normal.generic_arguments) {
+        normal.generic_arguments.push_back(copy_node(arg, new_parent));
+      }
+    } break;
     case AST_TYPE_SELF:
     case AST_TYPE_REFLECTION:
-      new_node->type.normal.generic_arguments.clear();
-      for (auto arg : node->type.normal.generic_arguments) {
-        new_node->type.normal.generic_arguments.push_back(copy_node(arg, new_parent));
-      }
       break;
     case AST_TYPE_TUPLE:
       new_node->type.tuple_types.clear();
