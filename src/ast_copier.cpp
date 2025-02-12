@@ -3,9 +3,14 @@
 #include "scope.hpp"
 
 AST *ASTCopier::copy(AST *node, AST *new_parent) {
-  auto new_node = (AST*)ast_arena.allocate(sizeof(AST));
+  auto new_node = (AST *)ast_arena.allocate(sizeof(AST));
+  
+  new_node->resolved_type = Type::INVALID_TYPE_ID;
   new_node->node_type = node->node_type;
   new_node->parent = new_parent;
+  new_node->source_range = node->source_range;
+  new_node->control_flow = node->control_flow;
+
   switch (new_node->node_type) {
     case AST_PROGRAM:
       new (&new_node->program_statements) std::vector<AST *>(node->program_statements);
@@ -32,7 +37,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
       new (&new_node->literal) decltype(new_node->literal)(node->literal);
       break;
     case AST_TYPE:
-      memcpy((void*)&new_node->type, &node->type, sizeof(decltype(new_node->type)));
+      memcpy((void *)&new_node->type, &node->type, sizeof(decltype(new_node->type)));
       break;
     case AST_TUPLE:
       new (&new_node->tuple) decltype(new_node->tuple)(node->tuple);
@@ -71,7 +76,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
       new (&new_node->subscript) decltype(new_node->subscript)(node->subscript);
       break;
     case AST_INITIALIZER:
-      memcpy((void*)&new_node->initializer, &node->initializer, sizeof(decltype(new_node->initializer)));
+      memcpy((void *)&new_node->initializer, &node->initializer, sizeof(decltype(new_node->initializer)));
       break;
     case AST_ENUM:
       new (&new_node->$enum) decltype(new_node->$enum)(node->$enum);
@@ -119,7 +124,6 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
   }
   return new_node;
 }
-
 
 AST *ASTCopier::copy_node(AST *node, AST *new_parent) {
   const auto type = node->node_type;
@@ -360,7 +364,6 @@ AST *ASTCopier::copy_continue(AST *node, AST *new_parent) { return node; }
 AST *ASTCopier::copy_break(AST *node, AST *new_parent) { return node; }
 
 AST *ASTCopier::copy_for(AST *node, AST *new_parent) {
-
   auto new_node = copy(node, new_parent);
   new_node->$for.iter_identifier = copy_node(node->$for.iter_identifier, new_parent);
   new_node->$for.range = copy_node(node->$for.range, new_parent);
@@ -545,7 +548,6 @@ AST *ASTCopier::copy_where(AST *node, AST *new_parent) {
   new_node->where.target_type = copy_node(node->where.target_type, new_parent);
   return new_node;
 }
-
 
 AST *ASTCopier::copy_alias(AST *node, AST *new_parent) {
   auto new_node = copy(node, new_parent);
