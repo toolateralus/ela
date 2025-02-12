@@ -342,6 +342,7 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     for (const auto &param : $struct.generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
       node->scope.create_type_alias(param, *generic_arg, kind, node);
+      type->info.scope.create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
     node->resolved_type = global_create_struct_type($struct.name, node->scope, node, generic_args);
