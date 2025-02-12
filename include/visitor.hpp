@@ -131,7 +131,7 @@ struct Typer {
   int get_self_type();
   std::vector<TypeExtension> accept_extensions(std::vector<AST_Type_Extension> ast_extensions);
   void visit_statement_list(AST *node) {
-    for (auto &stmt : node->statements) {
+    for (auto &stmt : node->program_statements) {
       visit(stmt);
     }
   };
@@ -270,7 +270,7 @@ struct Emitter {
   int get_expr_left_type_sr_dot(AST *node);
 
   void visit_statement_list(AST *node) {
-    for (auto stmt : node->statements) {
+    for (auto stmt : node->program_statements) {
       emit_line_directive(stmt);
       visit(stmt);
       semicolon();
@@ -294,7 +294,7 @@ struct DependencyEmitter {
   DEFINE_GENERIC_VISITOR()
   void visit_parameters(Source_Range source_range, std::vector<AST_Parameter_Declaration> &params);
   void visit_statement_list(AST *node) {
-    for (auto &stmt : node->statements) {
+    for (auto &stmt : node->program_statements) {
       visit(stmt);
     }
   };

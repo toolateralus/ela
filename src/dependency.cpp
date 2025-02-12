@@ -66,13 +66,13 @@
 
 
 void DependencyEmitter::visit_program(AST *node) {
-  for (auto &statement : node->statements) {
+  for (auto &statement : node->program_statements) {
     visit(statement);
   }
 }
 
 void DependencyEmitter::visit_block(AST *node) {
-  for (auto &statement : node->statements) {
+  for (auto &statement : node->block.statements) {
     visit(statement);
   }
 }

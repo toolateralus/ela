@@ -77,7 +77,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
   if (executed) {
     parser->expect(Token_Type::LCurly);
     while (parser->peek().type != Token_Type::RCurly) {
-      list->statements.push_back(parser->parse_statement());
+      list->program_statements.push_back(parser->parse_statement());
       while (parser->peek().type == Token_Type::Semi)
         parser->eat();
     }
@@ -101,7 +101,7 @@ static void parse_ifdef_if_else_preprocs(Parser *parser, AST *list, PreprocKind 
       } else {
         parser->expect(Token_Type::LCurly);
         while (parser->peek().type != Token_Type::RCurly) {
-          list->statements.push_back(parser->parse_statement());
+          list->program_statements.push_back(parser->parse_statement());
           while (parser->peek().type == Token_Type::Semi)
             parser->eat();
         }
@@ -532,7 +532,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         parser->expect(Token_Type::LCurly);
         while (parser->peek().type != Token_Type::RCurly) {
-          list->statements.push_back(parser->parse_statement());
+          list->program_statements.push_back(parser->parse_statement());
           while (parser->peek().type == Token_Type::Semi) parser->eat();
         }
         parser->expect(Token_Type::RCurly);
@@ -617,7 +617,7 @@ AST *Parser::parse() {
       Interned_String identifier = eat().value;
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
       if (result.is_not_null() && result.get()->node_type != AST_NOOP) {
-        program->statements.push_back(result.get());
+        program->program_statements.push_back(result.get());
       }
       if (semicolon())
         eat();
@@ -643,7 +643,7 @@ AST *Parser::parse() {
         throw_error("Statement not allowed at the top-level of a program", statement->source_range);
     }
 
-    program->statements.push_back(statement);
+    program->program_statements.push_back(statement);
 
     while (semicolon())
       eat();
@@ -1207,7 +1207,7 @@ AST *Parser::parse_statement() {
         eat();
         node->$while.block = block;
         auto statement = parse_statement();
-        node->$while.block->statements = {statement};
+        node->$while.block->block.statements = {statement};
         if (statement->node_type == AST_DECLARATION) {
           throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
         }
@@ -1431,7 +1431,7 @@ AST *Parser::parse_block(Scope *scope) {
     NODE_ALLOC(AST_RETURN, node, range, this, _);
     expect(Token_Type::ExpressionBody);
     node->$return = parse_expr();
-    block->statements = {node};
+    block->block.statements = {node};
     return block;
   }
 
@@ -1454,7 +1454,7 @@ AST *Parser::parse_block(Scope *scope) {
       block->block.defer_count++;
     }
 
-    block->statements.push_back(statement);
+    block->block.statements.push_back(statement);
     while (semicolon())
       eat();
   }
@@ -1467,6 +1467,8 @@ AST *Parser::parse_function_declaration(Token name) {
   NODE_ALLOC(AST_FUNCTION, node, range, this, _)
   auto &function = node->function;
   expect(Token_Type::Fn);
+
+  auto remove_parent = set_parent(node);
 
   function.has_defer = false;
 
@@ -1531,7 +1533,7 @@ AST *Parser::parse_function_declaration(Token name) {
     throw_error(std::format("Redefinition of function {}", name.value), range);
   }
 
-  for (const auto &stmt : function.block.get()->statements) {
+  for (const auto &stmt : function.block.get()->block.statements) {
     if (stmt->node_type == AST_FUNCTION) {
       throw_error("local functions are not allowed", stmt->source_range);
     }
@@ -1641,7 +1643,7 @@ AST *Parser::parse_impl() {
   // this is just so you can't call methods directly from within an impl without self
   node->scope.clear();
 
-  for (const auto &statement : block->statements) {
+  for (const auto &statement : block->block.statements) {
     // TODO: allow constants, aliases, #ifs, #ifdef blah blah whatever a ton more nodes than just
     // functions.
     if (statement->node_type == AST_FUNCTION) {
@@ -1697,7 +1699,7 @@ AST *Parser::parse_interface_declaration(Token name) {
 
   auto block = parse_block(&node->scope);
 
-  for (const auto &stmt : block->statements) {
+  for (const auto &stmt : block->program_statements) {
     if (stmt->node_type == AST_FUNCTION) {
       // TODO: we should definitely allow methods in impls that are "not overriden", meaning the interface provides
       // a default implementation until the consumer of the interface provides a new one. This wouldn't be virtual
@@ -2069,7 +2071,7 @@ Token Parser::peek() const {
 
 Parser::Parser(const std::string &filename) : states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  // import("bootstrap");
+  import("bootstrap");
   typer = new Typer();
 }
 

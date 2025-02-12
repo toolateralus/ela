@@ -199,9 +199,10 @@ struct AST {
   // TODO: we can definitely do some work to get rid of a lot of these vectors, and at the very least write a super
   // TODO: compact vector, if not just remove a TON of the bloat in the AST.
 
-  std::vector<AST *> statements; // TODO: put this in the appropriate variants, not out here. Long story.
 
   union {
+    std::vector<AST *> program_statements;
+
     struct {
       AST_Type_Kind kind = AST_TYPE_NORMAL;
       union {
@@ -229,6 +230,8 @@ struct AST {
       bool has_defer = false;
       int defer_count = 0;
       int return_type = Type::INVALID_TYPE_ID;
+      std::vector<AST *> statements;
+
     } block;
 
     AST *expression_statement;
@@ -469,7 +472,7 @@ struct AST {
   AST(AST_Node_Type node_type) : node_type(node_type) {
     switch (node_type) {
       case AST_PROGRAM:
-        new (&statements) std::vector<AST *>();
+        new (&program_statements) std::vector<AST *>();
         break;
       case AST_BLOCK:
         new (&block) decltype(block)();
@@ -573,7 +576,7 @@ struct AST {
         new (&where) decltype(where)();
         break;
       case AST_STATEMENT_LIST:
-        new (&statements) std::vector<AST *>();
+        new (&program_statements) std::vector<AST *>();
         break;
       default:
         break;

@@ -558,7 +558,7 @@ void Emitter::emit_runtime_main(AST *&node) {
 
 void Emitter ::visit_program(AST *node) {
   emit_line_directive(node);
-  for (const auto &statement : node->statements) {
+  for (const auto &statement : node->program_statements) {
     visit(statement);
   }
   if (is_freestanding && !type_info_strings.empty()) {
@@ -576,7 +576,7 @@ void Emitter ::visit_block(AST *node) {
   indented("{\n");
   indent_level++;
   defer_blocks.emplace_back();
-  for (const auto &statement : node->statements) {
+  for (const auto &statement : node->block.statements) {
     emit_line_directive(node);
     indent();
     visit(statement);

@@ -8,7 +8,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
   new_node->parent = new_parent;
   switch (new_node->node_type) {
     case AST_PROGRAM:
-      new (&new_node->statements) std::vector<AST *>(node->statements);
+      new (&new_node->program_statements) std::vector<AST *>(node->program_statements);
       break;
     case AST_BLOCK:
       new (&new_node->block) decltype(new_node->block)(node->block);
@@ -112,7 +112,7 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
       new (&new_node->where) decltype(new_node->where)(node->where);
       break;
     case AST_STATEMENT_LIST:
-      new (&new_node->statements) std::vector<AST *>();
+      new (&new_node->program_statements) std::vector<AST *>();
       break;
     default:
       break;
@@ -120,339 +120,6 @@ AST *ASTCopier::copy(AST *node, AST *new_parent) {
   return new_node;
 }
 
-Scope ASTCopier::copy_scope(Scope old) {
-  Scope new_scope;
-  Symbol *current = old.head;
-  Symbol **new_sym = &new_scope.head;
-
-  while (current) {
-    *new_sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol(*current);
-    new_sym = &(*new_sym)->next;
-    current = current->next;
-  }
-
-  return new_scope;
-}
-
-AST *ASTCopier::copy_program(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->statements.clear();
-  for (auto stmt : node->statements) {
-    if (stmt->node_type == AST_NOOP)
-      continue;
-    new_node->statements.push_back(copy_node(stmt, new_node));
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_block(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->scope = copy_scope(new_node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  for (auto stmt : node->statements) {
-    new_node->statements.push_back(copy_node(stmt, new_node));
-  }
-  current_scope = old_scope;
-  return new_node;
-}
-
-AST *ASTCopier::copy_function_declaration(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->function.parameters.clear();
-  for (auto param : node->function.parameters) {
-    new_node->function.parameters.push_back(param);
-  }
-  new_node->function.return_type = copy_node(node->function.return_type, new_node);
-  new_node->function.generic_instantiations.clear();
-
-  auto old_scope = current_scope;
-  new_node->scope = copy_scope(node->scope);
-  current_scope = new_node->scope;
-  if (node->function.where_clause) {
-    new_node->function.where_clause = copy_node(node->function.where_clause.get(), new_node);
-  }
-  if (node->function.block) {
-    new_node->function.block = copy_node(node->function.block.get(), new_node);
-  }
-  current_scope = old_scope;
-  return new_node;
-}
-
-AST *ASTCopier::copy_declaration(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->declaration.type = copy_node(node->declaration.type, new_node);
-  new_node->declaration.value = copy_node(node->declaration.value.get(), new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_bin_expr(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->binary.left = copy_node(node->binary.left, new_node);
-  new_node->binary.right = copy_node(node->binary.right, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_unary_expr(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->unary.operand = copy_node(node->unary.operand, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_identifier(AST *node, AST *new_parent) {
-  auto new_node = ast_alloc(AST_IDENTIFIER, new_parent);
-  new_node->identifier = node->identifier;
-  return new_node;
-}
-
-AST *ASTCopier::copy_literal(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  return new_node;
-}
-
-AST *ASTCopier::copy_type(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->resolved_type = node->resolved_type;
-  if (node->type.pointing_to)
-    new_node->type.pointing_to = copy_node(node->type.pointing_to.get(), new_node);
-  switch (new_node->type.kind) {
-    case AST_TYPE_NORMAL:
-    case AST_TYPE_SELF:
-    case AST_TYPE_REFLECTION:
-      new_node->type.normal.generic_arguments.clear();
-      for (auto arg : node->type.normal.generic_arguments) {
-        new_node->type.normal.generic_arguments.push_back(copy_node(arg, new_node));
-      }
-      break;
-    case AST_TYPE_TUPLE:
-      new_node->type.tuple_types.clear();
-      for (auto type : node->type.tuple_types) {
-        new_node->type.tuple_types.push_back(copy_node(type, new_node));
-      }
-      break;
-    case AST_TYPE_FUNCTION:
-      if (node->type.function.return_type) {
-        new_node->type.function.return_type = copy_node(node->type.function.return_type.get(), new_node);
-      }
-      node->type.function.parameter_types.clear();
-      for (auto param_ty : node->type.function.parameter_types) {
-        new_node->type.function.parameter_types.push_back(copy_node(param_ty, new_node));
-      }
-      break;
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_call(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->call.callee = copy_node(node->call.callee, new_node);
-  new_node->call.arguments.clear();
-  for (auto arg : node->call.arguments) {
-    new_node->call.arguments.push_back(copy_node(arg, new_node));
-  }
-  new_node->call.generic_arguments.clear();
-  for (auto arg : node->call.generic_arguments) {
-    new_node->call.generic_arguments.push_back(copy_node(arg, new_node));
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_return(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  if (node->$return)
-    new_node->$return = copy_node(node->$return.get(), new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_continue(AST *node, AST *new_parent) { return node; }
-
-AST *ASTCopier::copy_break(AST *node, AST *new_parent) { return node; }
-
-AST *ASTCopier::copy_for(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->$for.iter_identifier = copy_node(node->$for.iter_identifier, new_node);
-  new_node->$for.range = copy_node(node->$for.range, new_node);
-  new_node->$for.block = copy_node(node->$for.block, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_if(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->$if.condition = copy_node(node->$if.condition, new_node);
-  new_node->$if.block = copy_node(node->$if.block, new_node);
-  if (node->$if.$else)
-    new_node->$if.$else = copy_node(node->$if.$else.get(), new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_else(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  if (node->$else.elseif)
-    new_node->$else.elseif = copy_node(node->$else.elseif.get(), new_node);
-  if (node->$else.block)
-    new_node->$else.block = copy_node(node->$else.block.get(), new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_while(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  if (node->$while.condition)
-    new_node->$while.condition = copy_node(node->$while.condition.get(), new_node);
-  new_node->$while.block = copy_node(node->$while.block, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_dot_expr(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->dot.base = copy_node(node->dot.base, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_scope_resolution(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->scope_resolution.base = copy_node(node->scope_resolution.base, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_subscript(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->subscript.left = copy_node(node->subscript.left, new_node);
-  new_node->subscript.index_expression = copy_node(node->subscript.index_expression, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_initializer_list(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->initializer.key_values.clear();
-  if (node->initializer.tag == INITIALIZER_COLLECTION) {
-    for (auto expr : node->initializer.values) {
-      new_node->initializer.values.push_back(copy_node(expr, new_node));
-    }
-  } else {
-    for (auto [id, expr] : node->initializer.key_values) {
-      new_node->initializer.key_values.push_back({id, copy_node(expr, new_node)});
-    }
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_enum_declaration(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->$enum.key_values.clear();
-  for (auto &kv : node->$enum.key_values) {
-    new_node->$enum.key_values.push_back({kv.first, copy_node(kv.second, new_node)});
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_struct_declaration(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->scope = copy_scope(new_node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  new_node->$struct.members.clear();
-  if (node->$struct.where_clause) {
-    new_node->$struct.where_clause = copy_node(node->$struct.where_clause.get(), new_node);
-  }
-  for (auto &member : node->$struct.members) {
-    new_node->$struct.members.push_back({.is_bitfield = member.is_bitfield,
-                                         .bitsize = member.bitsize,
-                                         .name = member.name,
-                                         .type = copy_node(member.type, new_node)});
-  }
-  new_node->$struct.subtypes.clear();
-  for (auto subtype : node->$struct.subtypes) {
-    new_node->$struct.subtypes.push_back(copy_node(subtype, new_node));
-  }
-  current_scope = old_scope;
-  return new_node;
-}
-
-AST *ASTCopier::copy_interface_declaration(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->scope = copy_scope(new_node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  new_node->interface.methods.clear();
-  if (node->interface.where_clause) {
-    new_node->interface.where_clause = copy_node(node->interface.where_clause.get(), new_node);
-  }
-  for (auto field : node->interface.methods) {
-    new_node->interface.methods.push_back(copy_node(field, new_node));
-  }
-  current_scope = old_scope;
-  return new_node;
-}
-
-AST *ASTCopier::copy_range(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->range.left = copy_node(node->range.left, new_node);
-  new_node->range.right = copy_node(node->range.right, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_switch(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->$switch.target = copy_node(node->$switch.target, new_node);
-  new_node->$switch.cases.clear();
-  for (auto &case_ : node->$switch.cases) {
-    new_node->$switch.cases.push_back({copy_node(case_.expression, new_node), copy_node(case_.block, new_node)});
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_tuple(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->tuple.clear();
-  for (auto value : node->tuple) {
-    new_node->tuple.push_back(copy_node(value, new_node));
-  }
-  return new_node;
-}
-
-AST *ASTCopier::copy_tuple_deconstruction(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->tuple_deconstruction.idens.clear();
-  for (auto iden : node->tuple_deconstruction.idens) {
-    new_node->tuple_deconstruction.idens.push_back(copy_node(iden, new_node));
-  }
-  new_node->tuple_deconstruction.right = copy_node(node->tuple_deconstruction.right, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_impl(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->impl.target = copy_node(node->impl.target, new_node);
-  if (new_node->impl.interface) {
-    new_node->impl.interface = copy_node(new_node->impl.interface.get(), new_node);
-  }
-  new_node->scope = copy_scope(new_node->scope);
-  auto old_scope = current_scope;
-  current_scope = new_node->scope;
-  new_node->impl.methods.clear();
-  if (node->impl.where_clause) {
-    new_node->impl.where_clause = copy_node(node->impl.where_clause.get(), new_node);
-  }
-  for (const auto &method : node->impl.methods) {
-    new_node->impl.methods.push_back(copy_node(method, new_node));
-  }
-  current_scope = old_scope;
-  return new_node;
-}
-
-AST *ASTCopier::copy_cast(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->cast.expression = copy_node(node->cast.expression, new_node);
-  new_node->cast.target_type = copy_node(node->cast.target_type, new_node);
-  return new_node;
-}
-
-AST *ASTCopier::copy_where(AST *node, AST *new_parent) {
-  auto new_node = copy(node, new_parent);
-  new_node->where.predicate = copy_node(node->where.predicate, new_node);
-  new_node->where.target_type = copy_node(node->where.target_type, new_node);
-  return new_node;
-}
 
 AST *ASTCopier::copy_node(AST *node, AST *new_parent) {
   const auto type = node->node_type;
@@ -541,21 +208,357 @@ AST *deep_copy_ast(AST *root) {
   return copier.copy_node(root, root->parent);
 }
 
+Scope ASTCopier::copy_scope(Scope old) {
+  Scope new_scope;
+  Symbol *current = old.head;
+  Symbol **new_sym = &new_scope.head;
+
+  while (current) {
+    *new_sym = new (symbol_arena.allocate(sizeof(Symbol))) Symbol(*current);
+    new_sym = &(*new_sym)->next;
+    current = current->next;
+  }
+
+  return new_scope;
+}
+
+AST *ASTCopier::copy_program(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->program_statements.clear();
+  for (auto stmt : node->program_statements) {
+    if (stmt->node_type == AST_NOOP)
+      continue;
+    new_node->program_statements.push_back(copy_node(stmt, new_node));
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_block(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->scope = copy_scope(new_node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  for (auto stmt : node->block.statements) {
+    new_node->block.statements.push_back(copy_node(stmt, new_node));
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+AST *ASTCopier::copy_function_declaration(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->function.parameters.clear();
+  for (auto param : node->function.parameters) {
+    new_node->function.parameters.push_back(param);
+  }
+  new_node->function.return_type = copy_node(node->function.return_type, new_node);
+  new_node->function.generic_instantiations.clear();
+
+  auto old_scope = current_scope;
+  new_node->scope = copy_scope(node->scope);
+  current_scope = new_node->scope;
+  if (node->function.where_clause) {
+    new_node->function.where_clause = copy_node(node->function.where_clause.get(), new_node);
+  }
+  if (node->function.block) {
+    new_node->function.block = copy_node(node->function.block.get(), new_node);
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+AST *ASTCopier::copy_declaration(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->declaration.type = copy_node(node->declaration.type, new_parent);
+  new_node->declaration.value = copy_node(node->declaration.value.get(), new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_bin_expr(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->binary.left = copy_node(node->binary.left, new_parent);
+  new_node->binary.right = copy_node(node->binary.right, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_unary_expr(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->unary.operand = copy_node(node->unary.operand, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_identifier(AST *node, AST *new_parent) {
+  auto new_node = ast_alloc(AST_IDENTIFIER, new_parent);
+  new_node->identifier = node->identifier;
+  return new_node;
+}
+
+AST *ASTCopier::copy_literal(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_type(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->resolved_type = node->resolved_type;
+  if (node->type.pointing_to)
+    new_node->type.pointing_to = copy_node(node->type.pointing_to.get(), new_parent);
+  switch (new_node->type.kind) {
+    case AST_TYPE_NORMAL:
+    case AST_TYPE_SELF:
+    case AST_TYPE_REFLECTION:
+      new_node->type.normal.generic_arguments.clear();
+      for (auto arg : node->type.normal.generic_arguments) {
+        new_node->type.normal.generic_arguments.push_back(copy_node(arg, new_parent));
+      }
+      break;
+    case AST_TYPE_TUPLE:
+      new_node->type.tuple_types.clear();
+      for (auto type : node->type.tuple_types) {
+        new_node->type.tuple_types.push_back(copy_node(type, new_parent));
+      }
+      break;
+    case AST_TYPE_FUNCTION:
+      if (node->type.function.return_type) {
+        new_node->type.function.return_type = copy_node(node->type.function.return_type.get(), new_parent);
+      }
+      node->type.function.parameter_types.clear();
+      for (auto param_ty : node->type.function.parameter_types) {
+        new_node->type.function.parameter_types.push_back(copy_node(param_ty, new_parent));
+      }
+      break;
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_call(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->call.callee = copy_node(node->call.callee, new_parent);
+  new_node->call.arguments.clear();
+  for (auto arg : node->call.arguments) {
+    new_node->call.arguments.push_back(copy_node(arg, new_parent));
+  }
+  new_node->call.generic_arguments.clear();
+  for (auto arg : node->call.generic_arguments) {
+    new_node->call.generic_arguments.push_back(copy_node(arg, new_parent));
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_return(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  if (node->$return)
+    new_node->$return = copy_node(node->$return.get(), new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_continue(AST *node, AST *new_parent) { return node; }
+
+AST *ASTCopier::copy_break(AST *node, AST *new_parent) { return node; }
+
+AST *ASTCopier::copy_for(AST *node, AST *new_parent) {
+
+  auto new_node = copy(node, new_parent);
+  new_node->$for.iter_identifier = copy_node(node->$for.iter_identifier, new_parent);
+  new_node->$for.range = copy_node(node->$for.range, new_parent);
+  new_node->$for.block = copy_node(node->$for.block, new_node);
+  return new_node;
+}
+
+AST *ASTCopier::copy_if(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->$if.condition = copy_node(node->$if.condition, new_parent);
+  new_node->$if.block = copy_node(node->$if.block, new_node);
+  if (node->$if.$else)
+    new_node->$if.$else = copy_node(node->$if.$else.get(), new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_else(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  if (node->$else.elseif)
+    new_node->$else.elseif = copy_node(node->$else.elseif.get(), new_parent);
+  if (node->$else.block)
+    new_node->$else.block = copy_node(node->$else.block.get(), new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_while(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  if (node->$while.condition)
+    new_node->$while.condition = copy_node(node->$while.condition.get(), new_parent);
+  new_node->$while.block = copy_node(node->$while.block, new_node);
+  return new_node;
+}
+
+AST *ASTCopier::copy_dot_expr(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->dot.base = copy_node(node->dot.base, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_scope_resolution(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->scope_resolution.base = copy_node(node->scope_resolution.base, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_subscript(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->subscript.left = copy_node(node->subscript.left, new_parent);
+  new_node->subscript.index_expression = copy_node(node->subscript.index_expression, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_initializer_list(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->initializer.key_values.clear();
+  if (node->initializer.tag == INITIALIZER_COLLECTION) {
+    for (auto expr : node->initializer.values) {
+      new_node->initializer.values.push_back(copy_node(expr, new_parent));
+    }
+  } else {
+    for (auto [id, expr] : node->initializer.key_values) {
+      new_node->initializer.key_values.push_back({id, copy_node(expr, new_parent)});
+    }
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_enum_declaration(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->$enum.key_values.clear();
+  for (auto &kv : node->$enum.key_values) {
+    new_node->$enum.key_values.push_back({kv.first, copy_node(kv.second, new_node)});
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_struct_declaration(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->scope = copy_scope(new_node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  new_node->$struct.members.clear();
+  if (node->$struct.where_clause) {
+    new_node->$struct.where_clause = copy_node(node->$struct.where_clause.get(), new_node);
+  }
+  for (auto &member : node->$struct.members) {
+    new_node->$struct.members.push_back({.is_bitfield = member.is_bitfield,
+                                         .bitsize = member.bitsize,
+                                         .name = member.name,
+                                         .type = copy_node(member.type, new_node)});
+  }
+  new_node->$struct.subtypes.clear();
+  for (auto subtype : node->$struct.subtypes) {
+    new_node->$struct.subtypes.push_back(copy_node(subtype, new_node));
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+AST *ASTCopier::copy_interface_declaration(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->scope = copy_scope(new_node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  new_node->interface.methods.clear();
+  if (node->interface.where_clause) {
+    new_node->interface.where_clause = copy_node(node->interface.where_clause.get(), new_node);
+  }
+  for (auto field : node->interface.methods) {
+    new_node->interface.methods.push_back(copy_node(field, new_node));
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+AST *ASTCopier::copy_range(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->range.left = copy_node(node->range.left, new_parent);
+  new_node->range.right = copy_node(node->range.right, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_switch(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->$switch.target = copy_node(node->$switch.target, new_parent);
+  new_node->$switch.cases.clear();
+  for (auto &case_ : node->$switch.cases) {
+    new_node->$switch.cases.push_back({copy_node(case_.expression, new_parent), copy_node(case_.block, new_node)});
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_tuple(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->tuple.clear();
+  for (auto value : node->tuple) {
+    new_node->tuple.push_back(copy_node(value, new_parent));
+  }
+  return new_node;
+}
+
+AST *ASTCopier::copy_tuple_deconstruction(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->tuple_deconstruction.idens.clear();
+  for (auto iden : node->tuple_deconstruction.idens) {
+    new_node->tuple_deconstruction.idens.push_back(copy_node(iden, new_parent));
+  }
+  new_node->tuple_deconstruction.right = copy_node(node->tuple_deconstruction.right, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_impl(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->impl.target = copy_node(node->impl.target, new_parent);
+  if (new_node->impl.interface) {
+    new_node->impl.interface = copy_node(new_node->impl.interface.get(), new_node);
+  }
+  new_node->scope = copy_scope(new_node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  new_node->impl.methods.clear();
+  if (node->impl.where_clause) {
+    new_node->impl.where_clause = copy_node(node->impl.where_clause.get(), new_node);
+  }
+  for (const auto &method : node->impl.methods) {
+    new_node->impl.methods.push_back(copy_node(method, new_node));
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+AST *ASTCopier::copy_cast(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->cast.expression = copy_node(node->cast.expression, new_parent);
+  new_node->cast.target_type = copy_node(node->cast.target_type, new_parent);
+  return new_node;
+}
+
+AST *ASTCopier::copy_where(AST *node, AST *new_parent) {
+  auto new_node = copy(node, new_parent);
+  new_node->where.predicate = copy_node(node->where.predicate, new_parent);
+  new_node->where.target_type = copy_node(node->where.target_type, new_parent);
+  return new_node;
+}
+
+
 AST *ASTCopier::copy_alias(AST *node, AST *new_parent) {
   auto new_node = copy(node, new_parent);
-  new_node->alias.type = copy_node(node->alias.type, new_node);
+  new_node->alias.type = copy_node(node->alias.type, new_parent);
   return new_node;
 }
 
 AST *ASTCopier::copy_sizeof(AST *node, AST *new_parent) {
   auto new_node = copy(node, new_parent);
-  new_node->size_of = copy_node(node->size_of, new_node);
+  new_node->size_of = copy_node(node->size_of, new_parent);
   return new_node;
 }
 
 AST *ASTCopier::copy_defer(AST *node, AST *new_parent) {
   auto new_node = copy(node, new_parent);
-  new_node->defer = copy_node(node->defer, new_node);
+  new_node->defer = copy_node(node->defer, new_parent);
   return new_node;
 }
 
@@ -565,16 +568,16 @@ AST *ASTCopier::copy_lambda(AST *node, AST *new_parent) {
   for (auto param : node->lambda.parameters) {
     new_node->lambda.parameters.push_back(param);
   }
-  new_node->lambda.return_type = copy_node(node->lambda.return_type, new_node);
+  new_node->lambda.return_type = copy_node(node->lambda.return_type, new_parent);
   new_node->lambda.block = copy_node(node->lambda.block, new_node);
   return new_node;
 }
 
 AST *ASTCopier::copy_statement_list(AST *node, AST *new_parent) {
   auto new_node = copy(node, new_parent);
-  new_node->statements.clear();
-  for (auto stmt : node->statements) {
-    new_node->statements.push_back(copy_node(stmt, new_node));
+  new_node->program_statements.clear();
+  for (auto stmt : node->program_statements) {
+    new_node->program_statements.push_back(copy_node(stmt, new_parent));
   }
   return new_node;
 }

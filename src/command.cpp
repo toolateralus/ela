@@ -99,7 +99,7 @@ int CompileCommand::compile() {
 
     cpp.begin();
     result = system(compilation_string.c_str());
-    cpp.end("invoking `clang` C compiler and `lld` linker");
+    cpp.end("invoking `clang`");
     if (!has_flag("s")) {
       std::filesystem::remove(output_path);
     }

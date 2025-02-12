@@ -310,6 +310,7 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     // again, we ony do this once.
     for (const auto &param : node->$struct.generic_parameters) {
       type->info.scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+      node->scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
     }
 
     if (node->$struct.is_union) {
@@ -332,8 +333,6 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     throw_error("ICE: failed", node->source_range);
   }
   auto &info = type->info.$struct;
-  
-  type->info.scope = node->scope;
 
   // if we made it this far, we're definitely not forward declared.
   info.flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
@@ -350,12 +349,11 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
   }
 
   type->info.scope = node->scope;
+  type->declaring_node = node;
 
   if ($struct.where_clause) {
     visit_where($struct.where_clause.get());
   }
-
-  type->declaring_node = node;
 
   for (auto subunion : $struct.subtypes) {
     for (const auto &field : subunion->$struct.members) {
@@ -376,14 +374,14 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
 }
 
 void Typer::visit_program(AST *node) {
-  for (auto &statement : node->statements) {
+  for (auto &statement : node->program_statements) {
     visit(statement);
   }
 }
 
 void Typer::visit_block(AST *node) {
   int statement_idx = 0;
-  for (auto &statement : node->statements) {
+  for (auto &statement : node->block.statements) {
     visit(statement);
     auto &stmnt_cf = statement->control_flow;
     auto &block_cf = node->control_flow;
@@ -1077,13 +1075,15 @@ void Typer::visit_type(AST *node) {
     return;
   }
 
-  // ! I have to check if the base is null because for some reason it's just null sometimes.
   if (node->type.kind == AST_TYPE_NORMAL) {
     auto &normal_ty = node->type.normal;
+
+    #warning this just crashes for some reason
+
     auto symbol = get_symbol(normal_ty.base).get();
 
     if (!symbol || !symbol->is_type()) 
-      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
+      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", normal_ty.base->source_range);
     
 
     auto declaring_node = symbol->type.declaration.get();
