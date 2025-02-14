@@ -96,7 +96,17 @@ int Typer::find_generic_type_of(const Interned_String &base, const std::vector<i
 /*
   TODO: these require some more intense refactoring, due to the lack of Arguments/Parameters nodes now.
 */
-AST *Typer::resolve_generic_function_call(AST *call, AST *func) {
+AST *Typer::resolve_generic_function_call(AST *call, Symbol *symbol) {
+  auto decl = symbol->declaration.get();
+  // doing this so self will get the right type when we call generic methods
+  // TODO: handle this in the function decl itself, maybe insert self into symbol table
+  auto old_type = type_context;
+  Defer _([&] { type_context = old_type; });
+  AST func_type_ast(AST_TYPE);
+  if (decl->function.declaring_type != Type::INVALID_TYPE_ID) {
+    func_type_ast.resolved_type = decl->function.declaring_type;
+    type_context = &func_type_ast;
+  }
   std::vector<int> generic_args;
   if (call->call.generic_arguments.empty()) {
     auto resolved_argument_types = visit_arguments(call->source_range, call, call->call.arguments);
@@ -116,12 +126,12 @@ AST *Typer::resolve_generic_function_call(AST *call, AST *func) {
         * I tried to mke it safer, not sure if i did.
       */
 
-      if (gen_t->meta.is_pointer() && !func->function.parameters.empty()) {
+      if (gen_t->meta.is_pointer() && !decl->function.parameters.empty()) {
         // if it == 1, then we skip zero. works out.
-        int param_infer_index = func->function.parameters[0].tag == AST_PARAM_SELF;
-        if (param_infer_index < func->function.parameters.size() &&
-            func->function.parameters[param_infer_index].normal.type != nullptr &&
-            !func->function.parameters[param_infer_index].normal.type->type.extensions.empty()) {
+        int param_infer_index = decl->function.parameters[0].tag == AST_PARAM_SELF;
+        if (param_infer_index < decl->function.parameters.size() &&
+            decl->function.parameters[param_infer_index].normal.type != nullptr &&
+            !decl->function.parameters[param_infer_index].normal.type->type.extensions.empty()) {
           type->resolved_type = gen_t->get_element_type();
         } else {
           type->resolved_type = generic_arg;
@@ -135,34 +145,18 @@ AST *Typer::resolve_generic_function_call(AST *call, AST *func) {
   } else {
     generic_args = get_generic_arg_types(call->call.generic_arguments);
   }
-  auto instantiation = visit_generic(&Typer::visit_function_header, func, get_function_variant, generic_args);
-  if (!instantiation) {
-    throw_error("Template instantiation argument count mismatch", call->source_range);
-  }
+  auto instantiation = visit_generic(&Typer::visit_function_header, symbol, generic_args);
   instantiation->function.generic_arguments = generic_args;
   visit_function_body(static_cast<AST *>(instantiation));
   return instantiation;
 }
 
-// The 'variant' arg is a reference to the variant of our AST union which has the .generic_parameters,
-// .generic_instantations etc. the 'definition_node' is the parent of that variant.
-
-AST *Typer::visit_generic(VisitorMethod visit_method, AST *definition_node, auto &(*get_variant)(AST *parent),
-                          std::vector<int> args) {
-  auto variant = get_variant(definition_node);
-
-  if (variant.generic_parameters.size() != args.size()) {
-    return nullptr;
-  }
-  auto instantiation = find_generic_instance(variant.generic_instantiations, args);
+AST *Typer::visit_generic(VisitorMethod visit_method, Symbol *symbol, std::vector<int> args) {
+  auto instantiation = find_generic_instance(symbol->generic_instantiations, args);
   if (!instantiation) {
-    instantiation = deep_copy_ast(definition_node);
-    variant.generic_instantiations.push_back({args, instantiation});
+    instantiation = deep_copy_ast(symbol->declaration.get());
+    symbol->generic_instantiations.push_back({args, instantiation});
     (this->*visit_method)(instantiation, true, args);
-
-    auto instantation_variant = get_variant(instantiation);
-    instantation_variant.generic_parameters.clear();
-    instantation_variant.generic_instantiations.clear();
   }
   return instantiation;
 }
@@ -191,11 +185,9 @@ void Typer::type_check_args_from_params(AST *call, AST *function, bool skip_firs
   size_t param_index = skip_first; // if true, start at 1
   size_t arg_index = 0;
 
-
-// ! Somehow type checking the varargs functions has totally broken here?
+  // ! Somehow type checking the varargs functions has totally broken here?
   for (size_t arg_index = 0; arg_index < args_ct; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
-
       expected_type = function->function.parameters[param_index].resolved_type;
 
       visit(call->call.arguments[arg_index]);
@@ -291,43 +283,21 @@ std::vector<int> Typer::get_generic_arg_types(const std::vector<AST *> &args) {
 void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto type_id = node->find_type_id(node->$struct.name, {});
   node->resolved_type = type_id;
-
-  if (type_id != Type::INVALID_TYPE_ID) {
-    auto type = global_get_type(type_id);
-    if (type->is_kind(TYPE_STRUCT)) {
-      auto info = type->info.$struct;
-      if ((info.flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
-        throw_error("Redefinition of struct", node->source_range);
-      }
-    } else {
-      throw_error("cannot redefine already existing type", node->source_range);
-    }
-  } else {
-    type_id = node->parent->scope.create_struct_type(node->$struct.name, node, node->scope);
-    node->resolved_type = type_id;
-    auto type = global_get_type(type_id);
-
-    // again, we ony do this once.
-    for (const auto &param : node->$struct.generic_parameters) {
-      type->info.scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
-      node->scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
-    }
-
-    if (node->$struct.is_union) {
-      // we only do this once so that we can't do funky stuff and rewrite whether this type was a union or not.
-      type->info.$struct.flags |= STRUCT_FLAG_IS_UNION;
-    }
-    if (node->$struct.is_fwd_decl) {
-      // We only mark a forward declaration if it's the first occurence of that type.
-      // Otherwise if you used a forward declaration in a latter translation unit, you'd like erase
-      // the type and make a defined type unusable.
-      type->info.$struct.flags |= STRUCT_FLAG_FORWARD_DECLARED;
-      return;
-    }
-  }
+  auto type = global_get_type(node->resolved_type);
 
   auto &$struct = node->$struct;
-  auto type = global_get_type(node->resolved_type);
+
+  if (generic_instantiation) {
+    node->resolved_type = global_create_struct_type($struct.name, node->scope, node, generic_args);
+    type = global_get_type(node->resolved_type);
+    auto generic_arg = generic_args.begin();
+    for (const auto &param : $struct.generic_parameters) {
+      auto kind = global_get_type(*generic_arg)->kind;
+      node->scope.create_type_alias(param, *generic_arg, node);
+      type->info.scope.create_type_alias(param, *generic_arg, node);
+      generic_arg++;
+    }
+  }
 
   if (!type) {
     throw_error("ICE: failed", node->source_range);
@@ -336,18 +306,6 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
 
   // if we made it this far, we're definitely not forward declared.
   info.flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-
-  if (generic_instantiation) {
-    auto generic_arg = generic_args.begin();
-    for (const auto &param : $struct.generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      node->scope.create_type_alias(param, *generic_arg, kind, node);
-      type->info.scope.create_type_alias(param, *generic_arg, kind, node);
-      generic_arg++;
-    }
-    node->resolved_type = global_create_struct_type($struct.name, node->scope, node, generic_args);
-    type = global_get_type(node->resolved_type);
-  }
 
   type->info.scope = node->scope;
   type->declaring_node = node;
@@ -370,7 +328,7 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
     node->scope.insert_variable(member.name, member.type->resolved_type, nullptr);
   }
   node->resolved_type = type->id;
-  
+
   type->info.scope = node->scope;
 }
 
@@ -453,7 +411,7 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->impl.generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      node->scope.create_type_alias(param, *generic_arg, kind, node);
+      node->scope.create_type_alias(param, *generic_arg, node);
       generic_arg++;
     }
   }
@@ -561,7 +519,7 @@ void Typer::visit_function_header(AST *node, bool generic_instantiation, std::ve
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->function.generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      node->scope.create_type_alias(param, *generic_arg, kind, node);
+      node->scope.create_type_alias(param, *generic_arg, node);
       generic_arg++;
     }
   }
@@ -792,7 +750,7 @@ void Typer::visit_interface_declaration(AST *node, bool generic_instantiation, s
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->interface.generic_parameters) {
       auto kind = global_get_type(*generic_arg)->kind;
-      node->scope.create_type_alias(param, *generic_arg, kind, node);
+      node->scope.create_type_alias(param, *generic_arg, node);
       generic_arg++;
     }
   }
@@ -810,15 +768,48 @@ void Typer::visit_interface_declaration(AST *node) {
     node->parent->declare_interface(node->interface.name, node);
   } else {
     visit_interface_declaration(node, false);
-    node->parent->scope.create_type_alias(node->interface.name, node->resolved_type, TYPE_INTERFACE, node);
+    node->parent->scope.create_type_alias(node->interface.name, node->resolved_type, node);
   }
   return;
 }
 
 void Typer::visit_struct_declaration(AST *node) {
   if (!node->$struct.generic_parameters.empty()) {
-    node->parent->scope.create_type_alias(node->$struct.name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT, node);
+    node->parent->scope.create_type_alias(node->$struct.name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);
   } else {
+    auto type_id = node->find_type_id(node->$struct.name, {});
+    if (type_id != Type::INVALID_TYPE_ID) {
+      auto type = global_get_type(type_id);
+      if (type->is_kind(TYPE_STRUCT)) {
+        auto info = type->info.$struct;
+        if ((info.flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+          throw_error("Redefinition of struct", node->source_range);
+        }
+      } else {
+        throw_error("cannot redefine already existing type", node->source_range); 
+      }
+    } else {
+      type_id = node->parent->scope.create_struct_type(node->$struct.name, node, node->scope);
+      auto type = global_get_type(type_id);
+
+      // again, we ony do this once.
+      for (const auto &param : node->$struct.generic_parameters) {
+        type->info.scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+        node->scope.forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+      }
+
+      if (node->$struct.is_union) {
+        // we only do this once so that we can't do funky stuff and rewrite whether this type was a union or not.
+        type->info.$struct.flags |= STRUCT_FLAG_IS_UNION;
+      }
+      if (node->$struct.is_fwd_decl) {
+        // We only mark a forward declaration if it's the first occurence of that type.
+        // Otherwise if you used a forward declaration in a latter translation unit, you'd like erase
+        // the type and make a defined type unusable.
+        type->info.$struct.flags |= STRUCT_FLAG_FORWARD_DECLARED;
+        return;
+      }
+    }
     visit_struct_declaration(node, false);
   }
 }
@@ -834,7 +825,7 @@ void Typer::visit_enum_declaration(AST *node) {
   for (const auto &[key, value] : node->$enum.key_values) {
     visit(value);
     auto node_ty = value->resolved_type;
-    info.scope.insert(Symbol::create_variable(key, node_ty, value, node));
+    info.scope.insert(Symbol(key, node_ty, node, SYMBOL_IS_VARIABLE, value));
     if (elem_type == Type::INVALID_TYPE_ID) {
       elem_type = node_ty;
     } else {
@@ -1081,11 +1072,10 @@ void Typer::visit_type(AST *node) {
 
     auto symbol = get_symbol(normal_ty.base).get();
 
-    if (!symbol || !symbol->is_type()) 
+    if (!symbol || !symbol->is_type())
       throw_error("use of undeclared type, or cannot use a non-type symbol as a type", normal_ty.base->source_range);
-    
 
-    auto declaring_node = symbol->type.declaration.get();
+    auto declaring_node = symbol->declaration.get();
 
     if (declaring_node && !normal_ty.generic_arguments.empty()) {
       std::vector<int> generic_args;
@@ -1102,16 +1092,13 @@ void Typer::visit_type(AST *node) {
           {
             switch (decl_node_type) {
               case AST_STRUCT:
-                instantiation =
-                    visit_generic(&Typer::visit_struct_declaration, declaring_node, get_struct_variant, generic_args);
+                instantiation = visit_generic(&Typer::visit_struct_declaration, symbol, generic_args);
                 break;
               case AST_FUNCTION:
-                instantiation =
-                    visit_generic(&Typer::visit_function_header, declaring_node, get_function_variant, generic_args);
+                instantiation = visit_generic(&Typer::visit_function_header, symbol, generic_args);
                 break;
               case AST_INTERFACE:
-                instantiation = visit_generic(&Typer::visit_interface_declaration, declaring_node,
-                                              get_interface_variant, generic_args);
+                instantiation = visit_generic(&Typer::visit_interface_declaration, symbol, generic_args);
                 break;
               default:
                 throw_error("Invalid target to generic args", node->source_range);
@@ -1138,7 +1125,7 @@ void Typer::visit_type(AST *node) {
                   // setting target resolved_type so that when target's visited it won't try to
                   // instatiate the impls again. otherwise, it visits them in reverse order.
                   node->impl.target->resolved_type = instantiation->resolved_type;
-                  visit_generic(&Typer::visit_impl_declaration, node, get_impl_variant, generic_args);
+                  visit_generic(&Typer::visit_impl_declaration, symbol, generic_args);
                 }
               }
             }
@@ -1226,26 +1213,13 @@ void Typer::visit_call(AST *node) {
       type = global_get_type(symbol->type_id);
     }
 
-    auto declaring_node = symbol->function.declaration;
-    if (declaring_node && declaring_node->node_type == AST_FUNCTION) {
-      func_decl = static_cast<AST *>(declaring_node);
-
+    auto decl = symbol->declaration.get();
+    if (decl && decl->node_type == AST_FUNCTION) {
       // resolve a generic call.
-      if (!node->call.generic_arguments.empty() || !func_decl->function.generic_parameters.empty()) {
-        // doing this so self will get the right type when we call generic methods
-        // TODO: handle this in the function decl itself, maybe insert self into symbol table
-        auto old_type = type_context;
-        Defer _([&] { type_context = old_type; });
-        AST func_type_ast(AST_TYPE);
-        if (func_decl->function.declaring_type != Type::INVALID_TYPE_ID) {
-          func_type_ast.resolved_type = func_decl->function.declaring_type;
-          type_context = &func_type_ast;
-        }
-
-        GENERIC_PANIC_HANDLER(
-            data, 1, { func_decl = resolve_generic_function_call(node, func_decl); }, node->source_range);
+      if (!node->call.generic_arguments.empty() || !decl->function.generic_parameters.empty()) {
+        GENERIC_PANIC_HANDLER(data, 1, { decl = resolve_generic_function_call(node, symbol); }, node->source_range);
       }
-      type = global_get_type(func_decl->resolved_type);
+      type = global_get_type(decl->resolved_type);
     }
   } else {
     visit(node->call.callee);
@@ -1689,7 +1663,7 @@ void Typer::visit_alias(AST *node) {
     throw_error("Redeclaration of type", node->source_range);
   }
   auto type = global_get_type(node->alias.type->resolved_type);
-  node->parent->scope.create_type_alias(node->alias.name, node->alias.type->resolved_type, type->kind, node);
+  node->parent->scope.create_type_alias(node->alias.name, node->alias.type->resolved_type, node);
 }
 
 void Typer::visit_impl(AST *node) {
@@ -1700,7 +1674,8 @@ void Typer::visit_impl(AST *node) {
       throw_error("generic `impl![...]` can only be used on types.", node->source_range);
     }
 
-    auto declaring_node = symbol_nullable.get()->type.declaration.get();
+    auto symbol = symbol_nullable.get();
+    auto declaring_node = symbol->declaration.get();
 
     if (declaring_node->node_type != AST_STRUCT) {
       throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
@@ -1709,8 +1684,8 @@ void Typer::visit_impl(AST *node) {
     GENERIC_PANIC_HANDLER(
         data, 1,
         {
-          for (auto instantiations : declaring_node->$struct.generic_instantiations) {
-            visit_generic(&Typer::visit_impl_declaration, node, get_impl_variant, instantiations.arguments);
+          for (auto instantiations : symbol->generic_instantiations) {
+            visit_generic(&Typer::visit_impl_declaration, symbol, instantiations.arguments);
           }
         },
         node->source_range);

@@ -563,7 +563,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   // We do this for dot expressions that do tuple.1 etc.
   // Only in the base type.
   for (const auto [i, type] : types | std::ranges::views::enumerate) {
-    info.scope.insert(Symbol::create_variable(std::to_string(i), type, nullptr, nullptr));
+    info.scope.insert(Symbol(std::to_string(i), type, nullptr, SYMBOL_IS_VARIABLE));
   }
   info.tuple.types = types;
   type_table.push_back(new Type(get_tuple_type_name(types), TYPE_TUPLE, std::move(info)));

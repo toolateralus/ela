@@ -104,7 +104,7 @@ struct Typer {
   int expected_type = -1;
 
   using VisitorMethod = void (Typer::*)(AST *, bool, std::vector<int>);
-  AST *visit_generic(VisitorMethod visit_method, AST *declaring_node, auto &(*subtype)(AST *), std::vector<int> args);
+  AST *visit_generic(VisitorMethod visit_method, Symbol* symbol, std::vector<int> args);
   void compiler_mock_function_call_visit_impl(Scope scope, int left_type, const Interned_String &method_name);
   void visit_impl_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
@@ -116,7 +116,7 @@ struct Typer {
   void visit_function_body(AST *node);
   void visit_function_header(AST *node, bool generic_instantiation, std::vector<int> generic_args = {});
 
-  AST *resolve_generic_function_call(AST *node, AST *function);
+  AST *resolve_generic_function_call(AST *node, Symbol *symbol);
   int find_generic_type_of(const Interned_String &base, const std::vector<int> &generic_args,
                            const Source_Range &source_range);
   std::vector<int> get_generic_arg_types(const std::vector<AST *> &args);

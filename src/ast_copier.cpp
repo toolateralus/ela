@@ -252,7 +252,6 @@ AST *ASTCopier::copy_function_declaration(AST *node, AST *new_parent) {
     new_node->function.parameters.push_back(param);
   }
   new_node->function.return_type = copy_node(node->function.return_type, new_node);
-  new_node->function.generic_instantiations.clear();
 
   auto old_scope = current_scope;
   new_node->scope = copy_scope(node->scope);

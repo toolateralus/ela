@@ -148,13 +148,13 @@ void DependencyEmitter::visit_identifier(AST *node) {
     visit(type->declaring_node.get());
   }
   if (auto symbol = node->scope.lookup(node->identifier)) {
-    if (symbol->is_variable() && symbol->variable.declaration) {
-      auto decl = symbol->variable.declaration.get();
+    if (symbol->is_variable() && symbol->declaration) {
+      auto decl = symbol->declaration.get();
       if (!decl->declaring_block) {
         visit(decl);
       }
     } else if (symbol->is_function()) {
-      visit(symbol->function.declaration);
+      visit(symbol->declaration.get());
     }
   }
 }
@@ -177,13 +177,14 @@ void DependencyEmitter::visit_call(AST *node) {
   }
   auto symbol_nullable = emitter.typer.get_symbol(node->call.callee);
   if (symbol_nullable.is_not_null()) {
-    auto decl = symbol_nullable.get()->function.declaration;
+    auto symbol = symbol_nullable.get();
+    auto decl = symbol->declaration;
     if (!node->call.generic_arguments.empty()) {
       auto generic_args = emitter.typer.get_generic_arg_types(node->call.generic_arguments);
-      decl = find_generic_instance(decl->function.generic_instantiations, generic_args);
+      decl = find_generic_instance(symbol->generic_instantiations, generic_args);
     }
     if (decl) {
-      visit(decl);
+      visit(decl.get());
     }
   } else {
     visit(node->call.callee);
@@ -222,11 +223,11 @@ void DependencyEmitter::visit_for(AST *node) {
   switch (node->$for.iteration_kind) {
     case Iteration_Kind::ITERABLE: {
       auto iter_sym = range_scope.lookup("iter");
-      visit(iter_sym->function.declaration);
+      visit(iter_sym->declaration.get());
     } break;
     case Iteration_Kind::ENUMERABLE: {
       auto enum_sym = range_scope.lookup("enumerator");
-      visit(enum_sym->function.declaration);
+      visit(enum_sym->declaration.get());
     } break;
     case Iteration_Kind::ENUMERATOR:
     case Iteration_Kind::ITERATOR:
@@ -234,13 +235,13 @@ void DependencyEmitter::visit_for(AST *node) {
   }
 
   auto done_sym = iter_scope.lookup("done");
-  visit(done_sym->function.declaration);
+  visit(done_sym->declaration.get());
 
   auto current_sym = iter_scope.lookup("current");
-  visit(current_sym->function.declaration);
+  visit(current_sym->declaration.get());
 
   auto next_sym = iter_scope.lookup("next");
-  visit(next_sym->function.declaration);
+  visit(next_sym->declaration.get());
 
   visit(node->$for.block);
 }

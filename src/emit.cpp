@@ -268,7 +268,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     auto symbol = parent_type->info.scope.lookup(name);
     // We don't check the nullable here because it's an absolute guarantee that enum variables all have
     // a value always.
-    auto value = evaluate_constexpr(symbol->variable.initial_value.get());
+    auto value = evaluate_constexpr(symbol->initial_value.get());
     ss << std::format(".enum_value = {}", value.integer);
   }
 
@@ -977,7 +977,7 @@ void Emitter ::visit_call(AST *node) {
       throw_error("can't call a non-function", node->source_range);
     }
 
-    auto func = symbol->function.declaration;
+    auto func = symbol->declaration.get();
 
     auto method_call = (func->function.flags & FUNCTION_IS_METHOD) != 0;
     auto static_method = (func->function.flags & FUNCTION_IS_STATIC) != 0;
@@ -999,7 +999,7 @@ void Emitter ::visit_call(AST *node) {
     Type *function_type = global_get_type(symbol->type_id);
     // if generic function
     if (!function_type) {
-      auto instance = find_generic_instance(func->function.generic_instantiations,
+      auto instance = find_generic_instance(symbol->generic_instantiations,
                                             typer.get_generic_arg_types(node->call.generic_arguments));
       function_type = global_get_type(instance->resolved_type);
     }

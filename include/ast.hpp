@@ -123,11 +123,6 @@ struct AST_Parameter_Declaration {
   };
 };
 
-struct GenericInstance {
-  std::vector<int> arguments;
-  AST *node;
-};
-
 // for the for loops,
 // copy is `for i in ...`
 // pointer is `for *v in ...`
@@ -280,9 +275,9 @@ struct AST {
     std::vector<AST *> tuple;
 
     struct {
+      // should remove this
       std::vector<int> generic_arguments;
       std::vector<GenericParameter> generic_parameters;
-      std::vector<GenericInstance> generic_instantiations;
       std::vector<AST_Parameter_Declaration> parameters;
       Interned_String name;
       Nullable<AST> where_clause; // where T: ... type constraint.
@@ -305,7 +300,6 @@ struct AST {
       std::vector<AST *> aliases;
       std::vector<ASTStructMember> members;
       std::vector<GenericParameter> generic_parameters;
-      std::vector<GenericInstance> generic_instantiations;
       std::vector<AST *> impls;
       Interned_String name;
       Nullable<AST> where_clause;
@@ -384,7 +378,6 @@ struct AST {
       Nullable<AST> where_clause;
       Interned_String name;
       std::vector<GenericParameter> generic_parameters;
-      std::vector<GenericInstance> generic_instantiations;
       std::vector<AST *> methods;
     } interface;
 
@@ -422,7 +415,6 @@ struct AST {
       AST *target;
       Nullable<AST> interface;
       std::vector<GenericParameter> generic_parameters;
-      std::vector<GenericInstance> generic_instantiations;
       // methods / static methods this is implementing for the type.
       std::vector<AST *> methods;
     } impl;
@@ -598,7 +590,7 @@ struct AST {
   Symbol *local_lookup(const Interned_String &name) { return scope.lookup(name); }
 
   void declare_interface(const Interned_String &name, AST *node) {
-    scope.insert(Symbol::create_type(-1, name, TYPE_INTERFACE, node));
+    scope.insert(Symbol(name, -1, node, SYMBOL_IS_TYPE));
   }
 
   int find_type_id(const Interned_String &name, const Type_Metadata &meta) {

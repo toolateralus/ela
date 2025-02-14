@@ -9,7 +9,7 @@ Value evaluate_constexpr(AST *node) {
       if (!symbol || symbol->is_function()) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
-      auto initial_value = symbol->variable.initial_value;
+      auto initial_value = symbol->initial_value;
       if (!initial_value) {
         throw_error(
             std::format("Couldn't evaluate symbol {}, it didn't have a value. Make sure it's a constant, such as "

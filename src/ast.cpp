@@ -592,7 +592,7 @@ AST *Parser::parse() {
     if (type_table[i]->kind == TYPE_FUNCTION) {
       continue;
     }
-    program->scope.create_type_alias(type_table[i]->base, i, type_table[i]->kind, nullptr);
+    program->scope.create_type_alias(type_table[i]->base, i, nullptr);
   }
 
   while (true) {
