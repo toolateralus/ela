@@ -47,7 +47,6 @@
     These are the 'List' like functions for dynamic strings.
   */
   impl String {
-
     resize :: fn(self*, new_size: u64) {
       if new_size < self.length then self.length = new_size;
       self.capacity = new_size;

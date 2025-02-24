@@ -810,6 +810,35 @@ void Emitter::visit(ASTProgram *node) {
 
   static const auto testing = compile_command.has_flag("test");
 
+  if (!is_freestanding) {
+    code << "#define USE_STD_LIB 1\n";
+  } else {
+    if (compile_command.has_flag("test")) {
+      throw_error("You cannot use unit tests in a freestanding or nostlib "
+                  "environment due to lack of exception handling",
+                  {});
+    }
+  }
+
+  if (compile_command.has_flag("test-verbose")) {
+    code << "#define TEST_VERBOSE;\n";
+    std ::cout << "adding TEST_VERBOSE\n";
+  }
+
+  code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
+
+  if (!is_freestanding) {
+    code << "typedef struct Type Type;\n";
+    auto type_ptr_id = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
+                        type_ptr_id);
+  }
+
+  if (testing) {
+    code << "#define TESTING\n";
+  }
+
+
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
