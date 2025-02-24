@@ -267,6 +267,23 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->end_node(function, range);
         return function;
     }},
+    {
+      .identifier = "location",
+      .kind = DIRECTIVE_KIND_EXPRESSION,
+      .run = [](Parser *parser) {
+        auto location = parser->peek().location;
+        auto formatted = std::format("{}:{}:{}", SourceLocation::files()[location.file], location.line, location.column);
+        auto literal = ast_alloc<ASTLiteral>();
+        literal->tag = ASTLiteral::String;
+        literal->value = formatted;
+        if (parser->peek().type == TType::LogicalNot) {
+          literal->is_c_string = true;
+          parser->eat();
+        }
+        return literal;
+      }
+    },
+
     // #error, for throwing compiler errors.
     {.identifier = "error",
       .kind = DIRECTIVE_KIND_STATEMENT,

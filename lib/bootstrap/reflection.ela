@@ -123,6 +123,15 @@ impl Type  {
     }
     return null;
   }
+  
+  offset :: fn(self*, member: str) -> u64 {
+    for field in self.fields {
+      if strncmp(field.name, member.data, member.length as s32) == 0  {
+        return field.offset;
+      }
+    }
+    return -1;
+  }
 }
 
 impl any {

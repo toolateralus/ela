@@ -19,11 +19,16 @@ String :: struct {
   capacity: u64,
 }
 
+// This is what is produced when you do 
+// .[0, 1, 2, 3] (or {0, 1, 2, 3})
+// it is stack allocated and does not need to be freed, nor
+// should it ever be held on to.
 Init_List :: struct![Value_Type] {
   data:   Value_Type*,
   length: u64,
 }
 
+// A collection of items.
 List :: struct![Value_Type] {
   data:     Value_Type*,
   length:   u64,
@@ -32,11 +37,16 @@ List :: struct![Value_Type] {
 
 Type :: struct;
 
+// A semi-type-erased pointer that carries the RTTI (Runtime type information)
+// with it for a way to do "duck typing" in a way.
 any :: struct {
   ptr: void*,
   type: Type*
 };
 
+// A non-owning fat pointer. This should just be a view into a pointer, that tracks length.
+// very useful for efficiently passing arrays of data to functions for quick usage with a known lifetime,
+// iterating over subarrays, etc.
 Slice :: struct![Value_Type] {
   data: Value_Type*,
   length: u64,

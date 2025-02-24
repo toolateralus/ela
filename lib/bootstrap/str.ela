@@ -14,6 +14,7 @@ impl str {
   empty :: fn() -> #self {
     return {};
   }
+
   subscript :: fn(self*, idx: s64) -> u8 {
     return self.data[idx];
   }
@@ -49,10 +50,7 @@ impl str {
       length: length,
     };
   }
-  
-  
 }
-
 
 // This iterator is over the bytes.
 impl Iterable![u8] for str { 
