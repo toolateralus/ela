@@ -1,6 +1,7 @@
 #pragma once
 
 #include <unordered_set>
+#include <vector>
 
 #include "arena.hpp"
 #include "constexpr.hpp"
@@ -26,66 +27,38 @@ enum SymbolFlags : unsigned char {
 
 struct AST;
 
+struct GenericInstance {
+  std::vector<int> arguments;
+  AST *node;
+};
+
 struct Symbol {
   Symbol *next = nullptr;
   Interned_String name;
   int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
+  bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
+  std::vector<GenericInstance> generic_instantiations;
+  // This is nullable purely because `tuple` types do not have a declaring node!
+  // Otherwise, all other nodes have this property, and must.
+  Nullable<AST> declaration;
+  // This is null for almost every variable besides constant declarations,
+  // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
+  Nullable<AST> initial_value;
+
+
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
   bool is_variable() const { return (flags & SYMBOL_IS_VARIABLE) != 0; }
   bool is_type() const { return (flags & SYMBOL_IS_TYPE) != 0; }
-  bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
 
-  union {
-    struct {
-      Nullable<AST> declaration;
-      Value value;
-      // This is null for almost every variable besides constant declarations,
-      // i.e `CONSTANT_DECLARATION :: 100 * 2` or whatever
-      Nullable<AST> initial_value;
-    } variable;
-    struct {
-      AST *declaration;
-    } function;
-    struct {
-      // This is nullable purely because `tuple` types do not have a declaring node!
-      // Otherwise, all other nodes have this property, and must.
-      Nullable<AST> declaration;
-      Type_Kind kind;
-    } type;
-  };
-
-  Symbol() {}
+  Symbol(const Interned_String &name, int type_id, AST *decl, SymbolFlags flags, AST *initial_value = nullptr) {
+    this->name = name;
+    this->type_id = type_id;
+    this->flags = flags;
+    this->initial_value = initial_value;
+    this->declaration = decl;
+  }
   ~Symbol() {}
-
-  static Symbol create_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl) {
-    Symbol symbol;
-    symbol.name = name;
-    symbol.type_id = type_id;
-    symbol.flags = SYMBOL_IS_VARIABLE;
-    symbol.variable.initial_value = initial_value;
-    symbol.variable.declaration = decl;
-    return symbol;
-  }
-
-  static Symbol create_function(const Interned_String &name, const int type_id, AST *declaration, SymbolFlags flags) {
-    Symbol symbol;
-    symbol.type_id = type_id;
-    symbol.name = name;
-    symbol.flags = flags;
-    symbol.function.declaration = declaration;
-    return symbol;
-  }
-
-  static Symbol create_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration) {
-    Symbol symbol;
-    symbol.name = name;
-    symbol.flags = SYMBOL_IS_TYPE;
-    symbol.type.kind = kind;
-    symbol.type.declaration = declaration;
-    symbol.type_id = type_id;
-    return symbol;
-  }
 };
 
 struct Scope {
@@ -98,14 +71,14 @@ struct Scope {
   int create_interface_type(const Interned_String &name, const std::vector<int> &generic_args, AST *declaration,
                             Scope scope);
   int create_struct_type(const Interned_String &name, AST *declaration, Scope scope);
-  void create_type_alias(const Interned_String &name, int type_id, Type_Kind kind, AST *declaring_node);
+  void create_type_alias(const Interned_String &name, int type_id, AST *declaring_node);
   void forward_declare_type(const Interned_String &name, int default_id);
   int create_enum_type(const Interned_String &name, bool flags, AST *declaration, Scope scope);
   int create_tuple_type(const std::vector<int> &types);
   void insert_variable(const Interned_String &name, int type_id, AST *initial_value, AST *decl = nullptr);
   void insert_function(const Interned_String &name, const int type_id, AST *declaration,
                        SymbolFlags flags = SYMBOL_IS_FUNCTION);
-  void insert_type(const int type_id, const Interned_String &name, Type_Kind kind, AST *declaration);
+  void insert_type(const int type_id, const Interned_String &name, AST *declaration);
 
   // get the count of non-function variables in this scope.
   inline int fields_count() const {
