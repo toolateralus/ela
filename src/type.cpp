@@ -233,6 +233,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     return CONVERT_IMPLICIT;
   }
 
+  // allow casting from number types to pointers explicitly
+  if (type_is_numerical(from) && to->get_ext().is_pointer()) {
+    return CONVERT_EXPLICIT;
+  }
+
+
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow in if (...)
   // cast all numerical types and pointers to booleans implicitly.
   if ((type_is_numerical(from) || from->get_ext().is_pointer()) && to->id == bool_type()) {

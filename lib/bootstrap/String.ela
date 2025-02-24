@@ -50,21 +50,24 @@
     resize :: fn(self*, new_size: u64) {
       if new_size < self.length then self.length = new_size;
       self.capacity = new_size;
-      self.data = realloc(self.data, new_size * sizeof(u8));
+      self.data = realloc(self.data, new_size * sizeof(u8) + 1);
+      self.data[self.length] = 0; // Maintain null terminator
     }
     
     push :: fn(self*, ch: u8) {
       if self.capacity == 0 then self.capacity = 256 / 3;
       if self.length + 1 >= self.capacity {
-        self.resize(self.capacity * 3);
+      self.resize(self.capacity * 3 + 1);
       }
       self.data[self.length] = ch;
       self.length++;
+      self.data[self.length] = '\0';
     }
 
     pop :: fn(self*) -> u8 {
       if self.length == 0 then return '\0' as u8;
       ch := self.data[--self.length];
+      self.data[self.length] = '\0';
       return ch;
     }
 
@@ -73,6 +76,7 @@
       ch := self.data[0];
       memmove(self.data, self.data + 1, self.length - 1);
       self.length--;
+      self.data[self.length] = '\0';
       return ch;
     }
 
@@ -84,6 +88,7 @@
       memmove(self.data + 1, self.data, self.length);
       self.data[0] = ch;
       self.length++;
+      self.data[self.length] = '\0'; // Maintain null terminator
     }
   }
 
@@ -162,7 +167,7 @@ impl As_Char_Slice for String {
   as_char_slice :: fn(self) -> Slice![u32] {
     return {
       data: self.data,
-      length: self.length,
+      length: self.length / 4, // we do this because we're reinterpreting a u8* as a u32* which effectively packs it and quarters the "length"
     }
   }
 }

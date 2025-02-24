@@ -26,13 +26,13 @@ UTF8_ERROR : u32 = 0xFFFD;
 /* SPDX-License-Identifier: MIT */
 
 // returns a tuple representing:
-// .0: a u32 code point, 
+// .0: a u32 code point,
 // .1: the 'advance' which is the number of bytes this codepoint consumed.
 utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
-  if sequence.length == 0 
+  if sequence.length == 0
     then return (UTF8_ERROR, 1);
 
-  if sequence[0] <= 0x7F 
+  if sequence[0] <= 0x7F
     then return (sequence[0] as u32, 1);
 
   /* Multibyte sequence. We assume valid sequences appear more
@@ -40,7 +40,7 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   max_length : u32;
   min_code_point: u32;
   code_point: u32;
-  
+
   byte_0 := sequence[0];
 
   if (byte_0 & 0xF0) < 0xE0 {
@@ -52,7 +52,7 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   } else if ((byte_0 & 0xF0) == 0xE0) {
     max_length = 3;
     min_code_point = 0x0800;
-    code_point = (byte_0 - 0xE0) as u32; 
+    code_point = (byte_0 - 0xE0) as u32;
   } else {
     max_length = 4;
     min_code_point = 0x10000;
@@ -63,17 +63,17 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   while index < sequence.length {
     index++;
     byte := sequence[index];
-    
+
     max_length -= 1;
 
-    if max_length == 0 
+    if max_length == 0
       then break;
 
     offset : u32 = byte - 0x80;
 
-    /* 
+    /*
       (*sequence) points to the byte where the next sequence may begin.
-      The next sequence may be valid or invalid. 
+      The next sequence may be valid or invalid.
     */
     if offset > 0x3F {
       return (UTF8_ERROR, 1);
@@ -85,22 +85,22 @@ utf8_to_code_point :: fn(sequence: Slice![u8]) -> (u32, s8) {
   if code_point < min_code_point {
     return (UTF8_ERROR, 1);
   }
-  
-  /* 
+
+  /*
     UTF-16 surrogates are invalid in UTF-8.
-    They are used in CESU-8, which is a different encoding. 
+    They are used in CESU-8, which is a different encoding.
   */
   if code_point >= 0xD800 && code_point <= 0xDFFF {
     return (UTF8_ERROR, 1);
   }
 
-  /* 
+  /*
     Any value outside the [0x00, 0x10FFFF] range indicates an invalid sequence.
   */
   if code_point > 0x10FFFF {
     return (UTF8_ERROR, 1);
   }
-  
+
   return (code_point, index as s8);
 }
 
@@ -182,7 +182,7 @@ to_string :: fn![T](value: T) -> String {
   buffer: u8[64];
   type := #type(T);
   format : str;
-  
+
   if type.is_bool() {
     if value {
       return "true".as_string();
@@ -212,11 +212,11 @@ to_string :: fn![T](value: T) -> String {
     format = "%p";
   } else {
     format = "(unsupported type)";  // * do we throw an error here? format = null?
-  } 
+  }
 
   snprintf(buffer, 64 * sizeof(u8), format.data, value);
   return String::from(strdup(buffer));
-} 
+}
 
 format :: fn(fmt : str, list: Init_List![any]) -> String {
   if fmt.length == 0 {
@@ -237,33 +237,38 @@ format :: fn(fmt : str, list: Init_List![any]) -> String {
       value := list.data[value_index];
       if value.ptr == null {
         builder.append("null");
-      } else if value.type == #type(u8*) { 
-        builder.append(String::from(value.unwrap![u8*]())); 
+      } else if value.type == #type(u8*) {
+        builder.append(String::from(value.unwrap![u8*]()));
       } else if value.type.is_pointer() {
         builder.append_then_free(to_string(value.ptr));
       } else if value.type.is_enum() {
         builder.append_then_free(to_string(value.unwrap![s32]()));
       } else {
         switch value.type {
-          #type(u8):  { builder.append_then_free(to_string(value.unwrap![u8]()));  }
-          #type(u16): { builder.append_then_free(to_string(value.unwrap![u16]())); }
-          #type(u32): { builder.append_then_free(to_string(value.unwrap![u32]())); }
-          #type(u64): { builder.append_then_free(to_string(value.unwrap![u64]())); }
+          #type(u8):      { builder.append_then_free(to_string(value.unwrap![u8]()));  }
+          #type(u16):     { builder.append_then_free(to_string(value.unwrap![u16]())); }
+          #type(u32):     { builder.append_then_free(to_string(value.unwrap![u32]())); }
+          #type(u64):     { builder.append_then_free(to_string(value.unwrap![u64]())); }
 
-          #type(s8):  { builder.append_then_free(to_string(value.unwrap![s8]()));  }
-          #type(s16): { builder.append_then_free(to_string(value.unwrap![s16]())); }
-          #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
-          #type(s64): { builder.append_then_free(to_string(value.unwrap![s64]())); }
+          #type(s8):      { builder.append_then_free(to_string(value.unwrap![s8]()));  }
+          #type(s16):     { builder.append_then_free(to_string(value.unwrap![s16]())); }
+          #type(s32):     { builder.append_then_free(to_string(value.unwrap![s32]())); }
+          #type(s64):     { builder.append_then_free(to_string(value.unwrap![s64]())); }
 
-          #type(s32): { builder.append_then_free(to_string(value.unwrap![s32]())); }
+          #type(s32):     { builder.append_then_free(to_string(value.unwrap![s32]())); }
 
-          #type(f32):    { builder.append_then_free(to_string(value.unwrap![f32]()));    }
-          #type(f32):  { builder.append_then_free(to_string(value.unwrap![f32]()));  }
-          #type(f64):  { builder.append_then_free(to_string(value.unwrap![f64]()));  }
+          #type(f32):     { builder.append_then_free(to_string(value.unwrap![f32]()));    }
+          #type(f32):     { builder.append_then_free(to_string(value.unwrap![f32]()));  }
+          #type(f64):     { builder.append_then_free(to_string(value.unwrap![f64]()));  }
 
-          #type(bool): { builder.append_then_free(to_string(value.unwrap![bool]())); }
-          #type(String): { builder.append(*(value.ptr as String*));   }
-          #type(str): { builder.append((*(value.ptr as str*)).as_string());   }
+          #type(bool):    { builder.append_then_free(to_string(value.unwrap![bool]())); }
+
+          #type(String):  {
+            string := *(value.ptr as String*);
+            // printf("%s\n"c, string.data);
+            builder.append(string);
+          }
+          #type(str):     { builder.append_then_free((*(value.ptr as str*)).as_string());   }
         }
       }
       value_index++;

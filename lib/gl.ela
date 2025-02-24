@@ -1,3 +1,5 @@
+#import math;
+
 
 // TODO: pack these with GL, we need a system for storing .so/.a files with these modules & linking with them properly?
 // TODO Or do we leave it up the the user to do that?
@@ -21,6 +23,8 @@ GLFWwindow :: struct;
 #foreign glBufferData :: fn(target: s32, size: s64, data: void*, usage: s32);
 #foreign glEnableVertexAttribArray :: fn(index: s32);
 #foreign glVertexAttribPointer :: fn(index: s32, size: s64, type: s32, normalized: bool, stride: s64, pointer: void*);
+#foreign glVertexAttribIPointer :: fn(index: s32, size: s32, type: s32, stride: s64, pointer: void*);
+#foreign glVertexAttribDivisor :: fn(index: u32, divisor: u32);
 #foreign glDrawArrays :: fn(mode: u32, first, count);
 #foreign glClearColor :: fn(red: f32, green: f32, blue: f32, alpha: f32);
 #foreign glClear :: fn(mask: u32);
@@ -747,7 +751,7 @@ compile_shader :: fn(kind: u32, source: u8*) -> u32 {
     glGetShaderInfoLog(shader, length, &length, info_log);
     printf("Shader compilation failed: %s\n"c, info_log);
     free(info_log);
-    return 0 as u32;
+    return 0;
   }
   return shader;
 }
@@ -843,6 +847,51 @@ impl Vec3 {
   zero :: fn() -> Vec3 {
     return { x: 0.0, y: 0.0, z: 0.0 };
   }
+  normalize :: fn(self) -> #self {
+    mag: f32 = sqrt(self.x * self.x + self.y * self.y + self.z * self.z) as f32;
+    return { x: self.x / mag, y: self.y / mag, z: self.z / mag };
+  }
+  cross :: fn(self, other: Vec3) -> Vec3 {
+    return {
+      x: self.y * other.z - self.z * other.y,
+      y: self.z * other.x - self.x * other.z,
+      z: self.x * other.y - self.y * other.x,
+    };
+  }
+  dot :: fn(self, other: Vec3) -> f32 {
+    return self.x * other.x + self.y * other.y + self.z * other.z;
+  }
+}
+
+impl Vec3 {
+  add :: fn(self, other: Vec3) -> Vec3 {
+    return {
+      x: self.x + other.x,
+      y: self.y + other.y,
+      z: self.z + other.z,
+    };
+  }
+  sub :: fn(self, other: Vec3) -> Vec3 {
+    return {
+      x: self.x - other.x,
+      y: self.y - other.y,
+      z: self.z - other.z,
+    };
+  }
+  mul :: fn(self, scalar: f32) -> Vec3 {
+    return {
+      x: self.x * scalar,
+      y: self.y * scalar,
+      z: self.z * scalar,
+    };
+  }
+  div :: fn(self, scalar: f32) -> Vec3 {
+    return {
+      x: self.x / scalar,
+      y: self.y / scalar,
+      z: self.z / scalar,
+    };
+  }
 }
 
 Vec2 :: union {
@@ -862,6 +911,10 @@ impl Vec2 {
   }
   zero  :: fn() -> #self {
     return { x: 0.0, y: 0.0 };
+  }
+  normalize :: fn(self*) -> #self {
+    mag: f32 = sqrt(self.x * self.x + self.y * self.y) as f32;
+    return { x: self.x / mag, y: self.y / mag };
   }
 }
 
@@ -910,7 +963,17 @@ Mat4 :: union {
   // }
 }
 
+
 impl Mat4 {
+  zero :: fn() -> #self {
+    return {
+      M00: 0.0, M01: 0.0, M02: 0.0, M03: 0.0,
+      M10: 0.0, M11: 0.0, M12: 0.0, M13: 0.0,
+      M20: 0.0, M21: 0.0, M22: 0.0, M23: 0.0,
+      M30: 0.0, M31: 0.0, M32: 0.0, M33: 0.0
+    };
+  }
+
   scale :: fn(self*, factor: f32) -> #self {
     matrix: #self;
     matrix.M00 = self.M00 * factor;
@@ -930,6 +993,14 @@ impl Mat4 {
     matrix.M32 = self.M32 * factor;
     matrix.M33 = self.M33 * factor;
     return matrix;
+  }
+
+  normalize :: fn(self*) -> #self {
+    mag: f32 = sqrt(self.M00 * self.M00 + self.M01 * self.M01 + self.M02 * self.M02 + self.M03 * self.M03 +
+                   self.M10 * self.M10 + self.M11 * self.M11 + self.M12 * self.M12 + self.M13 * self.M13 +
+                   self.M20 * self.M20 + self.M21 * self.M21 + self.M22 * self.M22 + self.M23 * self.M23 +
+                   self.M30 * self.M30 + self.M31 * self.M31 + self.M32 * self.M32 + self.M33 * self.M33) as f32;
+    return self.scale(1.0 / mag);
   }
 
   determinant :: fn(self*) -> f32 {
@@ -960,6 +1031,42 @@ impl Mat4 {
     matrix.M33 = 1.0;
     return matrix;
   }
+
+  look_at :: fn(eye: Vec3, center: Vec3, up: Vec3) -> #self {
+    f: Vec3 = center.sub(eye).normalize();
+    s: Vec3 = f.cross(up).normalize();
+    u: Vec3 = s.cross(f);
+
+    matrix: #self = Mat4::identity();
+    matrix.M00 = s.x;
+    matrix.M01 = s.y;
+    matrix.M02 = s.z;
+    matrix.M10 = u.x;
+    matrix.M11 = u.y;
+    matrix.M12 = u.z;
+    matrix.M20 = -f.x;
+    matrix.M21 = -f.y;
+    matrix.M22 = -f.z;
+    matrix.M03 = -s.dot(eye);
+    matrix.M13 = -u.dot(eye);
+    matrix.M23 = f.dot(eye);
+
+    return matrix;
+  }
+
+  perspective :: fn(fov: f32, aspect: f32, near: f32, far: f32) -> #self {
+    tan_half_fov: f32 = tan(fov / 2.0) as f32;
+
+    matrix: #self = Mat4::zero();
+    matrix.M00 = 1.0 / (aspect * tan_half_fov);
+    matrix.M11 = 1.0 / tan_half_fov;
+    matrix.M22 = -(far + near) / (far - near);
+    matrix.M23 = -1.0;
+    matrix.M32 = -(2.0 * far * near) / (far - near);
+
+    return matrix;
+  }
+
 }
 
 Shader :: struct {
@@ -967,56 +1074,63 @@ Shader :: struct {
 }
 
 impl Shader {
-  // *fixme
-  // #dtor :: fn(self*) {
-  //   glDeleteProgram(self.handle);
-  // }
+
+  deinit :: fn(self*) {
+    glDeleteProgram(self.handle);
+  }
+
   use :: fn(self*) {
     glUseProgram(self.handle);
   }
-  create :: fn(vertexSource: u8*, fragSource: u8*) -> #self {
+  
+  create :: fn(vertexSource: String, fragSource: String) -> #self {
     v: #self;
-    v.handle = create_program(vertexSource, fragSource);
+    v.handle = create_program(vertexSource.data, fragSource.data);
     return v;
   }
-  set_Mat4 :: fn(self*, name: u8*, v: Mat4*) {
-    index := glGetUniformLocation(self.handle, name);
+  
+  set_mat4 :: fn(self*, name: str, v: Mat4*) {
+    index := glGetUniformLocation(self.handle, name.data);
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n"c, name.data);
     }
   }
-  set_Vec4 :: fn(self*, name: u8*, v: Vec4*) {
-    index := glGetUniformLocation(self.handle, name);
+  
+  set_vec4 :: fn(self*, name: str, v: Vec4*) {
+    index := glGetUniformLocation(self.handle, name.data);
     if index != -1 {
       glUniform4fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n"c, name.data);
     }
   }
-  set_Vec3 :: fn(self*, name: u8*, v: Vec3*) {
-    index := glGetUniformLocation(self.handle, name);
+  
+  set_vec3 :: fn(self*, name: str, v: Vec3*) {
+    index := glGetUniformLocation(self.handle, name.data);
     if index != -1 {
       glUniform3fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n"c, name.data);
     }
   }
-  set_Vec2 :: fn(self*, name: u8*, v: Vec2*) {
-    index := glGetUniformLocation(self.handle, name);
+  
+  set_vec2 :: fn(self*, name: str, v: Vec2*) {
+    index := glGetUniformLocation(self.handle, name.data);
     if index != -1 {
       glUniform2fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n"c, name.data);
     }
   }
-  set_float :: fn(self*, name: u8*, v: f32) {
-    index := glGetUniformLocation(self.handle, name);
+  
+  set_float :: fn(self*, name: str, v: f32) {
+    index := glGetUniformLocation(self.handle, name.data);
     if index != -1 {
       glUniform1f(index, v);
     } else {
-      printf("failed to get uniform : %s\n"c, name);
+      printf("failed to get uniform : %s\n"c, name.data);
     }
   }
 }
@@ -1026,33 +1140,42 @@ Window :: struct {
 }
 
 impl Window {
-  create :: fn(width: s32, height: s32, title: u8*) -> #self {
+  create :: fn(width: s32, height: s32, title: str) -> #self {
     self: #self;
+    
     if !glfwInit() {
       printf("Failed to initialize glfw\n"c);
       return self;
     }
-    self.handle = glfwCreateWindow(width, height, title, null, null);
+    
+    self.handle = glfwCreateWindow(width, height, title.data, null, null);
+    
     if self.handle == null {
       printf("Failed to create window\n"c);
       glfwTerminate();
       return self;
     }
+    
     glfwMakeContextCurrent(self.handle);
+    
     if glewInit() != 0 {
       printf("Failed to initialize glew\n"c);
       glfwTerminate();
       return self;
     }
+    
     return self;
   }
+  
   should_close :: fn(self*) -> bool {
     return glfwWindowShouldClose(self.handle);
   }
+  
   present :: fn(self*) {
     glfwSwapBuffers(self.handle);
     glfwPollEvents();
   }
+  
   clear :: fn(flags: GL) {
     glClear(flags);
   }

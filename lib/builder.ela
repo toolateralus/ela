@@ -13,6 +13,7 @@ impl String_Builder_Block {
   new :: fn() -> #self* {
     self : #self* =  malloc(sizeof(String_Builder_Block));
     self.data = calloc(sizeof(u8), STRING_BUILDER_BLOCK_MAX_LEN);
+    self.next = null;
     return self;
   }
   deinit :: fn(self*) {
@@ -33,6 +34,11 @@ String_Builder :: struct {
 }
 
 impl String_Builder {
+  init :: fn(self*) {
+    self.root = null;
+    self.current = null;
+  }
+
   deinit :: fn(self*) {
     if self.root then self.root.deinit();
     self.root = null;

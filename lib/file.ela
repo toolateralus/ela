@@ -1,3 +1,5 @@
+#import format;
+
 _IO_FILE :: struct;
 #alias FILE :: _IO_FILE;
 
@@ -55,26 +57,23 @@ impl File {
     return len as u32;
   }
 
-  read_all :: fn(filename: str) -> (FileError, String) {
+  read_all :: fn(filename: str) -> (String, FileError) {
     file := fopen(filename.data, "r"c);
-    if !file then return ("Couldn't open file", {});
-    
+    if !file then return ({}, "Couldn't open file");
     string: String;
     string.resize(1024);
-
     while {
       c := fgetc(file);
       if c == EOF then break;
       string.push(c);
     }
-    
     fclose(file);
-    return ({}, string);
+    return (string, {});
   }
   
-  read_bytes :: fn(filename: str) -> (FileError, u8[]) {
+  read_bytes :: fn(filename: str) -> (u8[], FileError) {
     file := fopen(filename.data, "r"c);
-    if !file then return ("Couldn't open file", {});
+    if !file then return ({}, "Couldn't open file");
     
     bytes: u8[];
     bytes.resize(1024);
@@ -86,7 +85,7 @@ impl File {
     }
     
     fclose(file);
-    return ({}, bytes);
+    return (bytes, {});
   }
   
   write_all :: fn(filename: str, data: str) -> FileError {

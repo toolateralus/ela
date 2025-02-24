@@ -9,13 +9,27 @@
 #foreign cos :: fn(f: f64) -> f64;
 #foreign sin :: fn(f: f64) -> f64;
 
+#foreign tan :: fn(f: f64) -> f64;
+#foreign acos :: fn(f: f64) -> f64;
+#foreign asin :: fn(f: f64) -> f64;
+#foreign atan :: fn(f: f64) -> f64;
+#foreign atan2 :: fn(y: f64, x: f64) -> f64;
+#foreign ceil :: fn(f: f64) -> f64;
+#foreign floor :: fn(f: f64) -> f64;
+#foreign exp :: fn(f: f64) -> f64;
+#foreign log :: fn(f: f64) -> f64;
+#foreign log10 :: fn(f: f64) -> f64;
+#foreign sinh :: fn(f: f64) -> f64;
+#foreign cosh :: fn(f: f64) -> f64;
+#foreign tanh :: fn(f: f64) -> f64;
 
 // We use this struct for namespacing.
 Random :: struct;
 
 impl Random {
   next :: fn(max: f32) -> f32 {
-    return (rand() as f32) / (2147483647 as f32) * max; // ! HACK:: replace this magic number with Random::Max when we fix that problen.
+    // ! HACK:: replace this magic number with Random::Max when we fix that problen.
+    return (rand() as f32) / (2147483647 as f32) * max;
   }
 }
 
