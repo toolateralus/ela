@@ -36,7 +36,6 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
 
-
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_id != Type::INVALID_TYPE_ID) {
     type = global_get_type(type->base_id);
@@ -419,7 +418,7 @@ void Emitter::visit(ASTLiteral *node) {
       break;
     // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
     // that's why we have fat u32 chars anyway.
-    case ASTLiteral::Char: 
+    case ASTLiteral::Char:
       output = '\'' + node->value.get_str() + '\'';
       break;
     case ASTLiteral::Integer:
@@ -810,35 +809,6 @@ void Emitter::visit(ASTProgram *node) {
 
   static const auto testing = compile_command.has_flag("test");
 
-  if (!is_freestanding) {
-    code << "#define USE_STD_LIB 1\n";
-  } else {
-    if (compile_command.has_flag("test")) {
-      throw_error("You cannot use unit tests in a freestanding or nostlib "
-                  "environment due to lack of exception handling",
-                  {});
-    }
-  }
-
-  if (compile_command.has_flag("test-verbose")) {
-    code << "#define TEST_VERBOSE;\n";
-    std ::cout << "adding TEST_VERBOSE\n";
-  }
-
-  code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
-
-  if (!is_freestanding) {
-    code << "typedef struct Type Type;\n";
-    auto type_ptr_id = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
-    code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
-                        type_ptr_id);
-  }
-
-  if (testing) {
-    code << "#define TESTING\n";
-  }
-
-
   for (const auto &statement : node->statements) {
     statement->accept(this);
     semicolon();
@@ -868,21 +838,18 @@ void Emitter::visit(ASTProgram *node) {
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-
     code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
-    code << std::format("__COMPILER_GENERATED_TEST tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
-
+    code << std::format("$ela_test tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-#define FORMAT_STR "int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n"
-      // I made that macro because the formatting goes CRAZY with a raw string as an arg
-      code << std::format(FORMAT_STR, ctx.scope->find_type_id("Env", {}),
+      code << std::format("int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n",
+                          ctx.scope->find_type_id("Env", {}),
                           ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
                                                             : "{/* no reflection present in module */};");
-    } // C calls main() for freestanding
+    }
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for #type().
@@ -1410,7 +1377,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   }
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
-    visitor->test_functions << "(__COMPILER_GENERATED_TEST){.name = \"" << node->name.get_str() << "\", .function = &"
+    visitor->test_functions << "($ela_test){.name = \"" << node->name.get_str() << "\", .function = &"
                             << node->name.get_str() << "},";
     visitor->num_tests++;
   }
@@ -1855,6 +1822,4 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   call.accept(this);
 }
 
-Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {
-  ss = &code;
-}
+Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }

@@ -18,6 +18,5 @@
 #import rayui;
 #import reflection;
 #import time;
-#import utf8;
 
 main :: fn() {}

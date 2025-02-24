@@ -110,3 +110,16 @@ impl As_Char_Slice for u32 {
     }
   }
 }
+
+impl As_Byte_Slice for u32 {
+  as_byte_slice :: fn(self) -> Slice![u8] {
+    #static chars : u8[2] = {
+      '\0', '\0'
+    };
+    chars[0] = self;
+    return {
+      data: chars,
+      length: 1,
+    }
+  }
+}
