@@ -1,4 +1,3 @@
-;
 
 // TODO: pack these with GL, we need a system for storing .so/.a files with these modules & linking with them properly?
 // TODO Or do we leave it up the the user to do that?
@@ -746,7 +745,7 @@ compile_shader :: fn(kind: u32, source: u8*) -> u32 {
     glGetShaderiv(shader, GL::INFO_LOG_LENGTH, &length);
     info_log: u8* = malloc(sizeof(u8*) * length);
     glGetShaderInfoLog(shader, length, &length, info_log);
-    printf("Shader compilation failed: %s\n", info_log);
+    printf("Shader compilation failed: %s\n"c, info_log);
     free(info_log);
     return 0 as u32;
   }
@@ -773,7 +772,7 @@ create_program :: fn(vert_source: u8*, frag_source: u8*) -> u32 {
     glGetProgramiv(program, GL::INFO_LOG_LENGTH, &length);
     info_log: u8* = malloc(sizeof(u8*) * length);
     glGetProgramInfoLog(program, length, &length, info_log);
-    printf("Program linking failed: %s\n", info_log);
+    printf("Program linking failed: %s\n"c, info_log);
     free(info_log);
     return 0 as u32;
   }
@@ -787,19 +786,19 @@ create_program :: fn(vert_source: u8*, frag_source: u8*) -> u32 {
 check_error :: fn(location: u8*) {
   err: s32 = glGetError();
   if err == GL::INVALID_ENUM {
-    printf("error: %s, from: %s\n", "GL::INVALID_ENUM", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_ENUM"c, location);
   } else if err == GL::INVALID_VALUE {
-    printf("error: %s, from: %s\n", "GL::INVALID_VALUE", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_VALUE"c, location);
   } else if err == GL::INVALID_OPERATION {
-    printf("error: %s, from: %s\n", "GL::INVALID_OPERATION", location);
+    printf("error: %s, from: %s\n"c, "GL::INVALID_OPERATION"c, location);
   } else if err == GL::STACK_OVERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_OVERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_OVERFLOW"c, location);
   } else if err == GL::STACK_UNDERFLOW {
-    printf("error: %s, from: %s\n", "GL::STACK_UNDERFLOW", location);
+    printf("error: %s, from: %s\n"c, "GL::STACK_UNDERFLOW"c, location);
   } else if err == GL::OUT_OF_MEMORY {
-    printf("error: %s, from: %s\n", "GL::OUT_OF_MEMORY", location);
+    printf("error: %s, from: %s\n"c, "GL::OUT_OF_MEMORYc", location);
   } else if err != 0 {
-    printf("unknown gl error: %d, from: %s\n", err, location);
+    printf("unknown gl error: %d, from: %s\n"c, err, location);
   }
 }
 
@@ -811,42 +810,6 @@ Vec4 :: union {
     z: f32,
     w: f32,
   }
-
-  // #operator(+) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x += x;
-  //   output.y += y;
-  //   output.z += z;
-  //   output.w += w;
-  //   return output;
-  // }
-
-  // #operator(*) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x *= x;
-  //   output.y *= y;
-  //   output.z *= z;
-  //   output.w *= w;
-  //   return output;
-  // }
-
-  // #operator(/) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x /= x;
-  //   output.y /= y;
-  //   output.z /= z;
-  //   output.w /= w;
-  //   return output;
-  // }
-
-  // #operator(-) :: fn(other: #self) -> #self {
-  //   output := other
-  //   output.x -= x;
-  //   output.y -= y;
-  //   output.z -= z;
-  //   output.w -= w;
-  //   return output;
-  // }
 }
 
 impl Vec4 {
@@ -867,41 +830,7 @@ Vec3 :: union {
     x: f32,
     y: f32,
     z: f32,
-  }
-
-  // #operator(+) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x += x;
-  //   output.y += y;
-  //   output.z += z;
-  //   return output;
-  // }
-
-  // #operator(*) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x *= x;
-  //   output.y *= y;
-  //   output.z *= z;
-  //   return output;
-  // }
-
-  // #operator(/) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x /= x;
-  //   output.y /= y;
-  //   output.z /= z;
-  //   return output;
-  // }
-
-  // #operator(-) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x -= x;
-  //   output.y -= y;
-  //   output.z -= z;
-  //   return output;
-  // }
-
-  
+  }  
 }
 
 impl Vec3 {
@@ -922,34 +851,6 @@ Vec2 :: union {
     x: f32,
     y: f32,
   }
-
-  // #operator(+) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x += x;
-  //   output.y += y;
-  //   return output;
-  // }
-
-  // #operator(*) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x *= x;
-  //   output.y *= y;
-  //   return output;
-  // }
-
-  // #operator(/) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x /= x;
-  //   output.y /= y;
-  //   return output;
-  // }
-
-  // #operator(-) :: fn(other: #self) -> #self {
-  //   output := other;
-  //   output.x -= x;
-  //   output.y -= y;
-  //   return output;
-  // }
 }
 
 impl Vec2 {
@@ -1083,7 +984,7 @@ impl Shader {
     if index != -1 {
       glUniformMatrix4fv(index, 1, false, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec4 :: fn(self*, name: u8*, v: Vec4*) {
@@ -1091,7 +992,7 @@ impl Shader {
     if index != -1 {
       glUniform4fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec3 :: fn(self*, name: u8*, v: Vec3*) {
@@ -1099,7 +1000,7 @@ impl Shader {
     if index != -1 {
       glUniform3fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_Vec2 :: fn(self*, name: u8*, v: Vec2*) {
@@ -1107,7 +1008,7 @@ impl Shader {
     if index != -1 {
       glUniform2fv(index, 1, v.values as f32*);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
   set_float :: fn(self*, name: u8*, v: f32) {
@@ -1115,7 +1016,7 @@ impl Shader {
     if index != -1 {
       glUniform1f(index, v);
     } else {
-      printf("failed to get uniform : %s\n", name);
+      printf("failed to get uniform : %s\n"c, name);
     }
   }
 }
@@ -1128,18 +1029,18 @@ impl Window {
   create :: fn(width: s32, height: s32, title: u8*) -> #self {
     self: #self;
     if !glfwInit() {
-      printf("Failed to initialize glfw\n");
+      printf("Failed to initialize glfw\n"c);
       return self;
     }
     self.handle = glfwCreateWindow(width, height, title, null, null);
     if self.handle == null {
-      printf("Failed to create window\n");
+      printf("Failed to create window\n"c);
       glfwTerminate();
       return self;
     }
     glfwMakeContextCurrent(self.handle);
     if glewInit() != 0 {
-      printf("Failed to initialize glew\n");
+      printf("Failed to initialize glew\n"c);
       glfwTerminate();
       return self;
     }
@@ -1152,7 +1053,7 @@ impl Window {
     glfwSwapBuffers(self.handle);
     glfwPollEvents();
   }
-  clear :: fn(flags: GL = (GL::COLOR_BUFFER_BIT  | GL::DEPTH_BUFFER_BIT) as GL) {
+  clear :: fn(flags: GL) {
     glClear(flags);
   }
 }

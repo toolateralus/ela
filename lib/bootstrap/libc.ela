@@ -40,23 +40,8 @@
   // When I implement this myself, we get a `std::bad_alloc` in my nvidia driver.
   // I'm pretty sure the implementation was correct, but, whatever.
   #foreign memmove :: fn(dest: void*, src: void*, nbytes: s64) -> s32;
-}
-
-memcpy :: fn(dest: void*, src: void*, n: u64) -> void* {
-  d : u8* = dest;
-  s : u8* = src;
-  for i in 0..n {
-    d[i] = s[i];
-  }
-  return dest;
-}
-
-memset :: fn(dest: void*, c: s32, n: u64) -> void* {
-  d := dest as u8*;
-  for i in 0..n {
-    d[i] = c as u8;
-  }
-  return dest;
+  #foreign memcpy :: fn(dest: void*, src: void*, n: u64) -> void*;
+  #foreign memset :: fn(dest: void*, c: s32, n: u64) -> void*;
 }
 
 strncmp :: fn(s: u8*, str2: u8*, len: s32) -> s32 {
