@@ -306,6 +306,7 @@ struct AST {
       bool is_fwd_decl : 1 = false;
       bool is_extern : 1 = false;
       bool is_union : 1 = false;
+      bool is_anon : 1 = false;
     } $struct; // todo: optimize for size.
 
     struct {

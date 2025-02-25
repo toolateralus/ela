@@ -59,6 +59,9 @@ void assert_return_type_is_valid(int &return_type, int new_type, AST *node) {
   }
 };
 
+/*
+  Temporarily disabling this because the long jumps make debugging the compiler next to impossible.
+*/
 #ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
   GenericInstantiationErrorUserData data_name;                                                                         \
@@ -82,6 +85,8 @@ int Typer::find_generic_type_of(const Interned_String &base, const std::vector<i
   AST ident(AST_IDENTIFIER);
   ident.identifier = base;
   type.type.normal.base = &ident;
+  type.type.normal.base->source_range = source_range;
+  type.source_range = source_range;
   type.type.kind = AST_TYPE_NORMAL;
   AST args[generic_args.size()];
   size_t i = 0;
@@ -310,6 +315,10 @@ void Typer::visit_struct_declaration(AST *node, bool generic_instantiation, std:
   type->info.scope = node->scope;
   type->declaring_node = node;
 
+  if ($struct.is_anon) {
+    type->info.$struct.flags |= STRUCT_FLAG_IS_ANONYMOUS;
+  }
+
   if ($struct.where_clause) {
     visit_where($struct.where_clause.get());
   }
@@ -441,46 +450,60 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
   Scope impl_scope = {};
   for (const auto &method : node->impl.methods) {
     method->function.declaring_type = target_ty->id;
+
     if (!method->function.generic_parameters.empty()) {
-      // TODO: actually generate a signature for a generic function so that you can compare them
       type_scope.insert_function(method->function.name, method->resolved_type, method);
       impl_scope.insert(*type_scope.lookup(method->function.name));
       continue;
     }
+    
     visit_function_header(method, false);
+
     auto func_ty_id = method->resolved_type;
+
     if (auto symbol = type_scope.lookup(method->function.name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
         throw_error("Redefinition of method", method->source_range);
       } else {
         symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
       }
-    } else {
-      if ((method->function.flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
-        type_scope.insert_function(method->function.name, method->resolved_type, method,
-                                   SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
-      } else {
-        type_scope.insert_function(method->function.name, method->resolved_type, method);
-      }
-      impl_scope.insert(*type_scope.lookup(method->function.name));
-      if (method->function.flags & FUNCTION_IS_FOREIGN || method->function.flags & FUNCTION_IS_FORWARD_DECLARED) {
-        continue;
-      }
     }
+
+    if ((method->function.flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      type_scope.insert_function(method->function.name, method->resolved_type, method,
+                                 SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+    } else {
+      type_scope.insert_function(method->function.name, method->resolved_type, method);
+    }
+
+    impl_scope.insert(*type_scope.lookup(method->function.name));
+    if (method->function.flags & FUNCTION_IS_FOREIGN || method->function.flags & FUNCTION_IS_FORWARD_DECLARED) {
+      continue;
+    }
+
     visit_function_body(method);
   }
 
+
   if (interface_ty) {
     auto interface = interface_ty->declaring_node.get();
+
+    for (auto sym : impl_scope) {
+      printf("impl'ing interface %s, sym.name=%s ty_id=%d\n", interface->interface.name.get_str().c_str(),
+            sym.name.get_str().c_str(), sym.type_id);
+    }
+
     if (!interface || interface->node_type != AST_INTERFACE) {
       throw_error(
           std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
           node->source_range);
     }
+
     interface = deep_copy_ast(interface);
     for (auto &method : interface->interface.methods) {
       visit_function_declaration(method);
     }
+
     for (auto &interface_sym : interface->scope) {
       if (!interface_sym.is_function())
         continue;
@@ -786,7 +809,7 @@ void Typer::visit_struct_declaration(AST *node) {
           throw_error("Redefinition of struct", node->source_range);
         }
       } else {
-        throw_error("cannot redefine already existing type", node->source_range); 
+        throw_error("cannot redefine already existing type", node->source_range);
       }
     } else {
       type_id = node->parent->scope.create_struct_type(node->$struct.name, node, node->scope);
@@ -1073,7 +1096,7 @@ void Typer::visit_type(AST *node) {
     auto symbol = get_symbol(normal_ty.base).get();
 
     if (!symbol || !symbol->is_type())
-      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", normal_ty.base->source_range);
+      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
 
     auto declaring_node = symbol->declaration.get();
 

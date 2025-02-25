@@ -515,7 +515,7 @@ update_game :: fn() {
     now : f32 = GetTime() as f32;
     if now - round_finish_start_time < 2.0 {
       v := round_index + 1;
-      text := format("Round: %...", {any::new(&v)});
+      text := format("Round: %...", .[any::new(&v)]);
       defer free(text);
 
       style := jiggly_text_style;
@@ -528,7 +528,7 @@ update_game :: fn() {
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
 
       v = round_base_num_enemies_to_advance * round_index;
-      text = format("Requires % enemies to pass.", {any::new(&v)});
+      text = format("Requires % enemies to pass.", .[any::new(&v)]);
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
 
     } else {

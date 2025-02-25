@@ -339,7 +339,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<AST> {
         NODE_ALLOC(AST_TYPE, outer, range, parser, _)
         parser->expect(Token_Type::LParen);
-        outer->type.pointing_to = parser->parse_expr();
+        outer->type.pointing_to = parser->parse_type();
         parser->expect(Token_Type::RParen);
 
         // TODO: Refactor how this works, the #type() should probably just be it's own node.
@@ -408,9 +408,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<AST> {
         auto tok = parser->expect(Token_Type::DoubleColon);
         if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
-          auto decl = parser->parse_struct_declaration(get_unique_identifier());
-          auto t = global_get_type(decl->resolved_type);
-          t->info.$struct.flags |= STRUCT_FLAG_IS_ANONYMOUS;
+          AST* decl = parser->parse_struct_declaration(get_unique_identifier());
+          decl->$struct.is_anon = true;
           return decl;
         } else {
           auto range = parser->begin_node();
@@ -985,7 +984,6 @@ AST *Parser::parse_type() {
     append_type_extensions(node);
     return node;
   }
-
   // parse #self types.
   if (peek().type == Token_Type::Directive) {
     auto range = begin_node();
@@ -997,7 +995,6 @@ AST *Parser::parse_type() {
     }
     return expr;
   }
-
   if (peek().type == Token_Type::Fn) {
     return parse_function_type();
   }
@@ -1007,16 +1004,13 @@ AST *Parser::parse_type() {
   type->type.kind = AST_TYPE_NORMAL;
   type->type.normal.base = ast_alloc(AST_IDENTIFIER, parent());
   type->type.normal.base->identifier = base;
-  type->type.normal.base->source_range = range;
+
+  Defer _defer([&]() {
+    this->end_node(type->type.normal.base, range);
+  });
 
   if (peek().type == Token_Type::GenericBrace) {
     type->type.normal.generic_arguments = parse_generic_arguments();
-  }
-
-  if (peek().type == Token_Type::DoubleColon && lookahead_buf()[1].type == Token_Type::Identifier &&
-      lookahead_buf()[2].type == Token_Type::LParen) {
-    // this is a function call to a static, single depth function.
-    return type;
   }
 
   while (peek().type == Token_Type::DoubleColon) {
@@ -1028,48 +1022,6 @@ AST *Parser::parse_type() {
   }
 
   append_type_extensions(type);
-
-  if (peek().type == Token_Type::Dot) {
-    if (lookahead_buf()[1].type == Token_Type::LCurly) {
-      eat(); // eat .
-      eat(); // eat {
-      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
-      if (peek().type == Token_Type::RCurly) {
-        init_list->initializer.tag = INITIALIZER_EMPTY;
-      } else {
-        init_list->initializer.tag = INITIALIZER_NAMED;
-        while (peek().type != Token_Type::RCurly) {
-          auto identifier = expect(Token_Type::Identifier).value;
-          expect(Token_Type::Colon);
-          init_list->initializer.key_values.push_back({identifier, parse_expr()});
-          if (peek().type == Token_Type::Comma) {
-            eat();
-          }
-        }
-      }
-      expect(Token_Type::RCurly);
-      end_node(init_list, range);
-      init_list->initializer.target_type = type;
-      return init_list;
-    } else if (lookahead_buf()[1].type == Token_Type::LBrace) {
-      eat(); // eat .
-      eat(); // eat [
-      NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
-      init_list->initializer.tag = INITIALIZER_COLLECTION;
-      while (peek().type != Token_Type::RBrace) {
-        init_list->initializer.values.push_back(parse_expr());
-        if (peek().type == Token_Type::Comma) {
-          eat();
-        }
-      }
-      expect(Token_Type::RBrace);
-      end_node(init_list, range);
-      init_list->initializer.target_type = type; // This is wholly inaccurate, and gets corrected in the typer.
-      // i32.[0,1,2] will produce a Init_List![i32];
-      return init_list;
-    }
-  }
-
   end_node(type, range);
   return type;
 }
@@ -1699,7 +1651,7 @@ AST *Parser::parse_interface_declaration(Token name) {
 
   auto block = parse_block(&node->scope);
 
-  for (const auto &stmt : block->program_statements) {
+  for (const auto &stmt : block->block.statements) {
     if (stmt->node_type == AST_FUNCTION) {
       // TODO: we should definitely allow methods in impls that are "not overriden", meaning the interface provides
       // a default implementation until the consumer of the interface provides a new one. This wouldn't be virtual
@@ -1707,6 +1659,7 @@ AST *Parser::parse_interface_declaration(Token name) {
         throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
       }
       interface.methods.push_back(stmt);
+      node->scope.insert_function(stmt->function.name, Type::INVALID_TYPE_ID, stmt);
     }
   }
   return node;
