@@ -51,6 +51,7 @@ main :: fn() {
 )__";
 
 constexpr auto MAIN_INIT_CODE = R"__(
+
 main :: fn() {
   // 'Env::args()' returns a `u8*[]` of the C runtime's arguments
   // We do this instead of taking `(int argc, char** argv)` in the main function, main _CANNOT_ take args.
@@ -64,6 +65,7 @@ main :: fn() {
 
 
 static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
+#line 0 "boilerplate.hpp"
   #ifdef TESTING
   #define __TEST_RUNNER_MAIN                                                                                             \
     int main() {                                                                                                         \
@@ -76,7 +78,7 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   
   // This is stuff we just can't really get rid of while using a transpiled backend.
   static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
-  
+  #line 0 "boilerplate.hpp"
   typedef unsigned long long int u64;
   typedef signed long long int s64;
   

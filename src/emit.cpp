@@ -823,14 +823,15 @@ void Emitter::visit(ASTProgram *node) {
       type_info << str.get_str() << ";\n";
     }
 
-    code << "void $initialize_reflection_system() {\n";
+
+    code << "#line 0 \"boilerplate.h\"\nvoid $initialize_reflection_system() {\n";
     {
       // we don't bother doing pushes into type info, it's easier for us to do it this way.
       code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
       code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
       code << type_info.str() << ";\n";
     }
-    code << "}\n";
+    code << "}\n#line 0 \"boilerplate.h\"\n";
   }
 
   if (testing) {
@@ -845,7 +846,7 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-      code << std::format("int main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n",
+      code << std::format("#line 0 \"boilerplate.h\"\nint main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n",
                           ctx.scope->find_type_id("Env", {}),
                           ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
                                                             : "{/* no reflection present in module */};");
@@ -1002,9 +1003,7 @@ void Emitter::visit(ASTTuple *node) {
 
 void Emitter::visit(ASTTupleDeconstruction *node) {
   emit_line_directive(node);
-
   auto type = global_get_type(node->resolved_type);
-
   if (type->is_kind(TYPE_TUPLE)) {
     auto block = node->declaring_block;
     if (!block) {
@@ -1016,7 +1015,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     (*ss) << "auto " << temp_id << " = ";
     node->right->accept(this);
     (*ss) << ";\n";
-
+    emit_line_directive(node);
     if (node->op == TType::ColonEquals) {
       for (size_t i = 0; i < node->idens.size(); ++i) {
         (*ss) << "auto " << node->idens[i]->value.get_str() << " = ";
@@ -1028,6 +1027,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
         (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
       }
     }
+    emit_line_directive(node);
   } else {
     auto scope = type->get_info()->scope;
     auto index = 0;
@@ -1036,7 +1036,7 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     (*ss) << to_cpp_string(type) << " " << identifier << " = ";
     node->right->accept(this);
     semicolon();
-
+    emit_line_directive(node);
     for (const auto name : scope->ordered_symbols) {
       auto symbol = scope->local_lookup(name);
       if (symbol->is_function()) {
@@ -1051,7 +1051,10 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
         (*ss) << identifier << "." << name.get_str() << ";\n";
       }
     }
+    emit_line_directive(node);
   }
+
+  emit_line_directive(node);
 }
 
 std::string Emitter::get_declaration_type_signature_and_identifier(const std::string &name, Type *type) {
@@ -1746,7 +1749,7 @@ void Emitter::visit(ASTBlock *node) {
   defer_blocks.emplace_back();
 
   for (const auto &statement : node->statements) {
-    emit_line_directive(node);
+    emit_line_directive(statement);
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }

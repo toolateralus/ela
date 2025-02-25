@@ -166,7 +166,7 @@ struct Emitter : VisitorBase {
       return;
     }
     auto loc = node->source_range.begin_location.line;
-    if (loc != last_loc) {
+    // if (loc != last_loc) {
       auto filename = get_source_filename(node->source_range);
       if (filename.empty()) {
         printf("Empty filename for line directive.\n");
@@ -174,7 +174,7 @@ struct Emitter : VisitorBase {
       }
       (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
-    }
+    // }
   }
   void emit_tuple(int type);
   void emit_lambda(ASTLambda *node);
