@@ -631,8 +631,46 @@ AST *Parser::parse_postfix() {
       NODE_ALLOC(AST_DOT, dot, range, this, _)
       eat();
       dot->dot.base = left;
+
       if (peek().type == Token_Type::Integer || peek().type == Token_Type::Identifier) {
         dot->dot.member_name = eat().value;
+      } else if (peek().type == Token_Type::LCurly) {
+        // .{} initializer lists.
+        if (peek().type == Token_Type::LCurly) {
+          eat(); // eat {
+          NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+          init_list->initializer.target_type = left;
+          if (peek().type == Token_Type::RCurly) {
+            init_list->initializer.tag = INITIALIZER_EMPTY;
+          } else {
+            init_list->initializer.tag = INITIALIZER_NAMED;
+            while (peek().type != Token_Type::RCurly) {
+              auto identifier = expect(Token_Type::Identifier).value;
+              expect(Token_Type::Colon);
+              init_list->initializer.key_values.push_back({identifier, parse_expr()});
+              if (peek().type == Token_Type::Comma) {
+                eat();
+              }
+            }
+          }
+          expect(Token_Type::RCurly);
+          end_node(init_list, range);
+          return init_list;
+        } else if (peek().type == Token_Type::LBrace) {
+          eat(); // eat [
+          NODE_ALLOC(AST_INITIALIZER, init_list, range, this, _)
+          init_list->initializer.target_type = left;
+          init_list->initializer.tag = INITIALIZER_COLLECTION;
+          while (peek().type != Token_Type::RBrace) {
+            init_list->initializer.values.push_back(parse_expr());
+            if (peek().type == Token_Type::Comma) {
+              eat();
+            }
+          }
+          expect(Token_Type::RBrace);
+          end_node(init_list, range);
+          return init_list;
+        }
       } else {
         end_node(left, range);
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
@@ -650,6 +688,15 @@ AST *Parser::parse_postfix() {
       unary->unary.op = eat().type;
       return unary;
     } else if (peek().type == Token_Type::LBrace) {
+      // if we get some ident and [], we treat it as a type.
+      if (lookahead_buf()[1].type == Token_Type::RBrace) {
+        eat();
+        eat();
+        NODE_ALLOC(AST_TYPE, type, range, this, _);
+        type->type.normal.base = left;
+        left = type;
+        continue;
+      }
       NODE_ALLOC(AST_SUBSCRIPT, subscript, range, this, _)
       subscript->subscript.left = left;
       eat();
@@ -1077,6 +1124,8 @@ AST *Parser::parse_statement() {
     }
   }
 
+  // iden::other / iden::other![ / iden::other(
+  // this is really unreliable.
   if (peek().type == Token_Type::Identifier && lookahead_buf()[1].type == Token_Type::DoubleColon &&
       lookahead_buf()[2].type == Token_Type::Identifier &&
       (lookahead_buf()[3].type == Token_Type::GenericBrace || lookahead_buf()[3].type == Token_Type::LParen)) {
@@ -1118,11 +1167,11 @@ AST *Parser::parse_statement() {
     return decl;
   }
 
-  // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
   // * Expression statements.
   {
     auto next = lookahead_buf()[1];
     auto next_next = lookahead_buf()[2];
+
     // Both postfix and prefix (inc/dec)rement
     const bool is_increment_or_decrement = (next.type == Token_Type::Increment ||
                                             next.type == Token_Type::Decrement && next_next.type != Token_Type::Semi) ||
@@ -1155,7 +1204,6 @@ AST *Parser::parse_statement() {
   end_node(nullptr, parent_range);
 
   //*  Failure to parse errors
-
   {
     if (tok.family == TFamily::Operator) {
       throw_error(std::format("Unexpected operator: {} '{}'", Token_Type_To_String(tok.type), tok.value), parent_range);

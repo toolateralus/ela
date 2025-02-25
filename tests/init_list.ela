@@ -15,8 +15,8 @@ New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
 }
 
 #test test_init_list_as_implicit_parameter :: fn() {
-  v := New({x: 0.0, y: 0.0});
-  v1 := New(XarBarInitListTestStruct{x: 0.0, y: 0.0});
+  v := New(.{x: 0.0, y: 0.0});
+  v1 := New(XarBarInitListTestStruct.{x: 0.0, y: 0.0});
   assert("failed", v.x == 0.0 && v.y == 0.0);
   assert("failed", v1.x == 0.0 && v1.y == 0.0);
 }
