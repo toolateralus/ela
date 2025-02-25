@@ -1593,29 +1593,39 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     ASTExpr *value = nullptr;
 
     if (peek().type == TType::Assign) {
-      expect(TType::Assign);
-      value = parse_expr();
+        expect(TType::Assign);
+        value = parse_expr();
     } else {
-      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
-          static_cast<ASTLiteral *>(last_value)->value == "0") {
-        value = zero;
-        was_zero = false;
-      } else {
-        NODE_ALLOC(ASTBinExpr, bin, range, _, this)
-        bin->left = last_value;
-        bin->right = one;
-        bin->op = add_token;
-        last_value = bin;
-        value = bin;
-        end_node(bin, range);
-      }
+        if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
+            static_cast<ASTLiteral *>(last_value)->value == "0") {
+            value = zero;
+            was_zero = false;
+        } else {
+            NODE_ALLOC(ASTBinExpr, bin, range, _, this)
+            bin->left = last_value;
+            bin->right = one;
+            bin->op = add_token;
+            last_value = bin;
+            value = bin;
+            end_node(bin, range);
+        }
     }
+
+    // Evaluate the expression using the constexpr evaluator
+    if (value != nullptr) {
+        auto evaluated_value = evaluate_constexpr(value, this->ctx);
+        NODE_ALLOC(ASTLiteral, literal, range, _, this)
+        literal->value = std::to_string(evaluated_value.integer);
+        value = literal;
+        end_node(literal, range);
+    }
+
     if (peek().type == TType::Comma) {
-      eat();
+        eat();
     }
     node->key_values.push_back({iden, value});
     last_value = value;
-  }
+}
   end_node(node, range);
   std::vector<InternedString> keys;
   std::set<InternedString> keys_set;
