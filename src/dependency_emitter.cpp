@@ -4,6 +4,7 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
+#include <ostream>
 
 [[nodiscard]] std::string DependencyEmitter::decl_type(int type_id) {
   auto type = global_get_type(type_id);
@@ -215,22 +216,27 @@ void DependencyEmitter::visit(ASTCall *node) {
   for (auto generic_arg : node->generic_arguments) {
     generic_arg->accept(this);
   }
+
   node->arguments->accept(this);
   auto symbol_nullable = emitter->typer.get_symbol(node->function);
+
   if (symbol_nullable.is_not_null()) {
     auto decl = symbol_nullable.get()->function.declaration;
+
     if (!node->generic_arguments.empty()) {
       auto generic_args = emitter->typer.get_generic_arg_types(node->generic_arguments);
       decl = find_generic_instance(decl->generic_instantiations, generic_args);
     }
     // only accept if not a fn ptr
+    // else, we do the other way
     if (decl) {
       decl->accept(this);
       decl->accept(emitter);
+      return;
     }
-  } else {
-    node->function->accept(this);
-  }
+  } 
+  
+  node->function->accept(this);
 }
 
 void DependencyEmitter::visit(ASTArguments *node) {
