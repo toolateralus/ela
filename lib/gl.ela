@@ -1049,7 +1049,7 @@ impl Mat4 {
 
     return matrix;
   }
-  
+
   perspective :: fn(fov: f32, aspect: f32, near: f32, far: f32) -> #self {
     tan_half_fov: f32 = tan(fov / 2.0) as f32;
 
@@ -1097,25 +1097,26 @@ impl Mat4 {
     return matrix;
   }
 
-  rotation :: fn(angle: f32, axis: Vec3) -> #self {
-    c: f32 = cos(angle) as f32;
-    s: f32 = sin(angle) as f32;
-    one_minus_c: f32 = 1.0 - c;
-
-    axis = axis.normalize();
+  rotation :: fn(rotation: Vec3) -> #self {
+    cx: f32 = cos(rotation.x) as f32;
+    sx: f32 = sin(rotation.x) as f32;
+    cy: f32 = cos(rotation.y) as f32;
+    sy: f32 = sin(rotation.y) as f32;
+    cz: f32 = cos(rotation.z) as f32;
+    sz: f32 = sin(rotation.z) as f32;
 
     matrix: #self = Mat4::identity();
-    matrix.M00 = c + axis.x * axis.x * one_minus_c;
-    matrix.M01 = axis.x * axis.y * one_minus_c - axis.z * s;
-    matrix.M02 = axis.x * axis.z * one_minus_c + axis.y * s;
+    matrix.M00 = cy * cz;
+    matrix.M01 = -cy * sz;
+    matrix.M02 = sy;
 
-    matrix.M10 = axis.y * axis.x * one_minus_c + axis.z * s;
-    matrix.M11 = c + axis.y * axis.y * one_minus_c;
-    matrix.M12 = axis.y * axis.z * one_minus_c - axis.x * s;
+    matrix.M10 = sx * sy * cz + cx * sz;
+    matrix.M11 = -sx * sy * sz + cx * cz;
+    matrix.M12 = -sx * cy;
 
-    matrix.M20 = axis.z * axis.x * one_minus_c - axis.y * s;
-    matrix.M21 = axis.z * axis.y * one_minus_c + axis.x * s;
-    matrix.M22 = c + axis.z * axis.z * one_minus_c;
+    matrix.M20 = -cx * sy * cz + sx * sz;
+    matrix.M21 = cx * sy * sz + sx * cz;
+    matrix.M22 = cx * cy;
 
     return matrix;
   }
@@ -1128,6 +1129,26 @@ impl Mat4 {
     return matrix;
   }
 
+  get_translation :: fn(self) -> Vec3 {
+    return { x: self.M03, y: self.M13, z: self.M23 };
+  }
+
+  get_scale :: fn(self) -> Vec3 {
+    return {
+      x: sqrt(self.M00 * self.M00 + self.M01 * self.M01 + self.M02 * self.M02) as f32,
+      y: sqrt(self.M10 * self.M10 + self.M11 * self.M11 + self.M12 * self.M12) as f32,
+      z: sqrt(self.M20 * self.M20 + self.M21 * self.M21 + self.M22 * self.M22) as f32,
+    };
+  }
+
+  get_rotation :: fn(self) -> Vec3 {
+    scale := self.get_scale();
+    return {
+      x: atan2(self.M21 / scale.z, self.M22 / scale.z) as f32,
+      y: atan2(-self.M20 / scale.z, sqrt(self.M21 * self.M21 + self.M22 * self.M22) / scale.z) as f32,
+      z: atan2(self.M10 / scale.y, self.M00 / scale.x) as f32,
+    };
+  }
 
 }
 
