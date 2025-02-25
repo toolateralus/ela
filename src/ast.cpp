@@ -733,6 +733,44 @@ ASTExpr *Parser::parse_primary() {
     return directive_expr.get();
   }
 
+    // .{} initializer lists.
+  if (tok.type == TType::Dot) {
+    eat(); // eat .
+    if (peek().type == TType::LCurly) {
+      eat(); // eat {
+      NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
+      if (peek().type == TType::RCurly) {
+        init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
+      } else {
+        init_list->tag = ASTInitializerList::INIT_LIST_NAMED;
+        while (peek().type != TType::RCurly) {
+          auto identifier = expect(TType::Identifier).value;
+          expect(TType::Colon);
+          init_list->key_values.push_back({identifier, parse_expr()});
+          if (peek().type == TType::Comma) {
+            eat();
+          }
+        }
+      }
+      expect(TType::RCurly);
+      end_node(init_list, range);
+      return init_list;
+    } else if (peek().type == TType::LBrace) {
+      eat(); // eat [
+      NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
+      init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+      while (peek().type != TType::RBrace) {
+        init_list->values.push_back(parse_expr());
+        if (peek().type == TType::Comma) {
+          eat();
+        }
+      }
+      expect(TType::RBrace);
+      end_node(init_list, range);
+      return init_list;
+    }
+  }
+
   switch (tok.type) {
     case TType::Size_Of: {
       NODE_ALLOC(ASTSize_Of, node, range, _, this);
@@ -773,34 +811,6 @@ ASTExpr *Parser::parse_primary() {
       node->value = tok.value;
       end_node(node, range);
       return node;
-    }
-    case TType::LCurly: {
-      NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
-      eat();
-      if (peek().type == TType::RCurly) {
-        init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
-      } else if (lookahead_buf()[1].type != TType::Colon) {
-        init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
-        while (peek().type != TType::RCurly) {
-          init_list->values.push_back(parse_expr());
-          if (peek().type == TType::Comma) {
-            eat();
-          }
-        }
-      } else {
-        init_list->tag = ASTInitializerList::INIT_LIST_NAMED;
-        while (peek().type != TType::RCurly) {
-          auto identifier = expect(TType::Identifier).value;
-          expect(TType::Colon);
-          init_list->key_values.push_back({identifier, parse_expr()});
-          if (peek().type == TType::Comma) {
-            eat();
-          }
-        }
-      }
-      expect(TType::RCurly);
-      end_node(init_list, range);
-      return init_list;
     }
     case TType::Identifier: {
       if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
