@@ -772,7 +772,7 @@ ASTExpr *Parser::parse_primary() {
     return directive_expr.get();
   }
 
-    // .{} initializer lists.
+  // .{} initializer lists.
   if (tok.type == TType::Dot) {
     eat(); // eat .
     if (peek().type == TType::LCurly) {
@@ -1637,14 +1637,15 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   ASTExpr *last_value = zero;
   bool was_zero = true;
   Token add_token(tok.location, "+", TType::Add, TFamily::Operator);
-
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
+    bool explicitly_assigned = false;
 
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
+      explicitly_assigned = true;
     } else {
       if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
           static_cast<ASTLiteral *>(last_value)->value == "0") {
@@ -1661,8 +1662,8 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
       }
     }
 
-    // Evaluate the expression using the constexpr evaluator
-    if (value != nullptr) {
+    // Evaluate the expression using the constexpr evaluator only if not explicitly assigned
+    if (value != nullptr && !explicitly_assigned) {
       auto evaluated_value = evaluate_constexpr(value, this->ctx);
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
       literal->value = std::to_string(evaluated_value.integer);
