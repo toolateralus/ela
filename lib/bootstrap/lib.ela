@@ -123,3 +123,45 @@ impl As_Byte_Slice for u32 {
     }
   }
 }
+
+impl![_Ok, _Err] Result![_Ok, _Err] {
+  Ok :: fn(v: _Ok) -> #self {
+    return {
+      index: RESULT_IS_OK,
+      ok: v,
+    };
+  }
+  Err :: fn(v: _Err) -> #self {
+    return {
+      index: RESULT_IS_ERR,
+      err: v
+    }
+  }
+  unwrap :: fn(self) -> _Ok {
+    if self.index == RESULT_IS_ERR {
+      panic("called 'unwrap' on an Err result");
+    }
+    return self.ok;
+  }
+}
+
+impl![_Some] Option![_Some] {
+  unwrap :: fn(self) -> _Some {
+    if self.is_some {
+      return s;
+    } else {
+      panic("unwrapped a 'none' option");
+    }
+  }
+  Some :: fn(v: _Some) -> #self {
+    return {
+      s: v,
+      is_some: true
+    };
+  }
+  None :: fn() -> #self {
+    return {
+      is_some: false
+    }
+  }
+}

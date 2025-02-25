@@ -51,3 +51,22 @@ Slice :: struct![Value_Type] {
   data: Value_Type*,
   length: u64,
 }
+
+
+RESULT_IS_ERR : u8 =  0;
+RESULT_IS_OK  : u8 =  1;
+
+Result :: struct![_Ok, _Err] {
+  index: u8,
+  #anon :: union {
+    err:  _Err,
+    ok:   _Ok,
+  },
+}
+
+Option :: struct![_Some] {
+  #anon :: union {
+    s: _Some
+  },
+  is_some: bool,
+}

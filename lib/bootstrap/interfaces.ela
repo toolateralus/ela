@@ -135,6 +135,12 @@ Deinit :: interface {
   deinit :: fn(self*);
 }
 
+// just a free function version for those who might prefer a C like 'free' style api.
+deinit :: fn![T](t: T) where T is Deinit {
+  t.deinit();
+}
+
+
 Hash :: interface {
   hash :: fn(self) -> u64;
 }

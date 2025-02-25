@@ -1029,7 +1029,7 @@ impl Mat4 {
   }
 
   look_at :: fn(eye: Vec3, center: Vec3, up: Vec3) -> #self {
-    f: Vec3 = center.sub(eye).normalize();
+    f: Vec3 = (center - eye).normalize();
     s: Vec3 = f.cross(up).normalize();
     u: Vec3 = s.cross(f);
 
@@ -1088,7 +1088,6 @@ impl Mat4 {
     return matrix;
   }
   
-
   translation :: fn(translation: Vec3) -> #self {
     matrix: #self = Mat4::identity();
     matrix.M03 = translation.x;

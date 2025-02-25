@@ -1,0 +1,279 @@
+#import file;
+#import format;
+#import builder;
+
+JsonTokenType :: enum {
+  Invalid,
+  True,
+  False,
+  Null,
+  Eof,
+  Colon,
+  Number,
+  String,
+  LCurly,
+  RCurly,
+  LBracket,
+  RBracket,
+  Comma,
+}
+
+JsonToken :: struct {
+  type : s32,
+  value : String,
+  line: s32,
+  column: s32,
+}
+
+impl JsonToken {
+  Invalid :: fn() -> #self {
+    v: #self;
+    return v;
+  }
+}
+
+#static json_token_type_names := Init_List![str] {
+  "Invalid",
+  "True",
+  "False",
+  "Null",
+  "Eof",
+  "Colon",
+  "Number",
+  "String",
+  "LCurly",
+  "RCurly",
+  "LBracket",
+  "RBracket",
+  "Comma",
+};
+
+JsonLexer :: struct {
+  line_start: s32,
+  cur_line: s32,
+  // filename/source of input.
+  file: String,
+  // input data.
+  input: String,
+  // position in input stream.
+  position: u32,
+  // lookahead buffer
+  lookahead_buffer : List![JsonToken],
+}
+
+impl JsonLexer {
+  create :: fn(file: String, input: String) -> #self {
+    return {
+      file: file,
+      input: input,
+    };
+  }
+  
+  get_location_string :: fn(self) -> String {
+    column := self.position - self.line_start;
+    line := self.cur_line + 1;
+    return format("%:%:%", {any::new(&self.file), any::new(&line), any::new(&column)})
+  }
+
+  get_token :: fn(self*) -> Result![JsonToken, String] {
+    #alias Result :: Result![JsonToken, String];
+
+    token : JsonToken;
+    token.type = JsonTokenType::Eof;
+    token.column = self.position - self.line_start;
+    token.line = self.cur_line + 1;
+
+    if self.position >= self.input.length || self.input[self.position] == 0 {
+      return Result::Ok(token);
+    }
+
+    // TODO: handle UTF8.
+    c : u8 = self.input[self.position];
+
+    // whitespace
+    // TODO: this should handle tabs, no?
+    while self.position < self.input.length {
+      if c == '\n' || c == '\r' {
+        self.line_start = self.position;
+        self.cur_line++;
+      } else if !isspace(c) {
+        break;
+      }
+      self.position++;
+      c = self.input[self.position];
+    }
+
+    token.column = self.position - self.line_start;
+    token.line = self.cur_line + 1;
+
+    if self.position >= self.input.length || self.input[self.position] == 0 {
+      return Result::Ok(token);
+    }
+
+    // comments
+    if c == '/' {
+      self.position++;
+      if self.position >= self.input.length {
+        location := self.get_location_string();
+        return Result::Err(format("at \"%\" unexpected end of input %", {any::new(&location), any::new(&c)}))
+      }
+      c = self.input[self.position];
+      if c != '/' {
+        location := self.get_location_string();
+        return Result::Err(format("at \"%\" expected /, got %", {any::new(&location), any::new(&c)}))
+      }
+      while c != '\n' && c != '\r' {
+        self.position++;
+        if self.position >= self.input.length || self.input[self.position] == 0 {
+          token.type = JsonTokenType::Eof;
+          return Result::Ok(token);
+        }
+        c = self.input[self.position];
+      }
+      return self.get_token();
+    }
+
+    if isdigit(c) {
+      // numbers
+      len : s32;
+      start : s32 = self.position;
+      while (isdigit(c) || c == '.') && self.position < self.input.length {
+        len++;
+        self.position++;
+        c = self.input[self.position];
+      }
+      token.value = String::from_ptr(self.input.data + start, self.input.data + start + len);
+      token.type = JsonTokenType::Number;
+      return Result::Ok(token);
+      // operators
+    } else if c == ':' {
+      token.value = String::from(":"c);
+      token.type = JsonTokenType::Colon;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == '{' {
+      token.value = String::from("{"c);
+      token.type = JsonTokenType::LCurly;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == '}' {
+      token.value = String::from("}"c);
+      token.type = JsonTokenType::RCurly;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == '[' {
+      token.value = String::from("["c);
+      token.type = JsonTokenType::LBracket;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == ']' {
+      token.value = String::from("]"c);
+      token.type = JsonTokenType::RBracket;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == ',' {
+      token.value = String::from(","c);
+      token.type = JsonTokenType::Comma;
+      self.position++;
+      return Result::Ok(token);
+    } else if c == '\"' {
+      self.position++;
+      c = self.input[self.position];
+      len : s32;
+      start : s32 = self.position;
+      while c != '\"' && self.position < self.input.length {
+        if c == '\n' || c == '\r' {
+          self.line_start = self.position;
+          self.cur_line++;
+        }
+        len++;
+        self.position++;
+        c = self.input[self.position];
+      }
+      self.position++;
+      token.value = String::from_ptr(self.input.data + start, self.input.data + start + len);
+      token.type = JsonTokenType::String;
+      return Result::Ok(token);
+    } else if self.position + 4 <= self.input.length && strncmp(self.input.data + self.position, "true"c, 4) == 0 {
+      token.value = String::from("true"c); 
+      token.type = JsonTokenType::True;
+      self.position += 4;
+      return Result::Ok(token);
+    } else if self.position + 5 <= self.input.length && strncmp(self.input.data + self.position, "false"c, 5) == 0 {
+      token.value = String::from("false"c);
+      token.type = JsonTokenType::False;
+      self.position += 5;
+      return Result::Ok(token);
+    } else if self.position + 4 <= self.input.length && strncmp(self.input.data + self.position, "null"c, 4) == 0 {
+      token.value = String::from("null"c);
+      token.type = JsonTokenType::Null;
+      self.position += 4;
+      return Result::Ok(token);
+    } else {
+      return Result::Ok(token);
+    }
+  }
+
+  ensure_buffer_is_full :: fn(self*) {
+    while self.lookahead_buffer.length < 8 {
+      self.lookahead_buffer.push(self.get_token().unwrap());
+    }
+  }
+
+  eat :: fn(self*) -> JsonToken {
+    self.ensure_buffer_is_full();
+    token := self.lookahead_buffer[0];
+    for i in 0..self.lookahead_buffer.length - 1 {
+      self.lookahead_buffer.data[i] = self.lookahead_buffer.data[i + 1];
+    }
+    self.lookahead_buffer.length--;
+    return token;
+  }
+
+  peek :: fn(self*) -> JsonToken {
+    self.ensure_buffer_is_full();
+    return self.lookahead_buffer[0];
+  }
+
+  expect_types :: fn(self*, types: Init_List![s32]) -> Result![JsonToken, String] {
+    token := self.peek();
+
+    // this should never happen.
+    // we are the consumer of this API, but I guess maybe someone might want to use this?
+    if types.length == 0 {
+      loc := #location;
+      panic(format("json lexer's `expect_types` got an empty set of types to expect, at '%'", {any::new(&loc)}).as_str());
+    }
+
+    // We do this without the string building so that we can only do that expensive heavy allocating procedure if we
+    // fail. this should be much more performant.
+    for i in 0..types.length {
+      type := types.data[i];
+      if token.type == type {
+        return Result![JsonToken, String]::Ok(token);
+      }
+    }
+
+    builder: String_Builder;
+    defer builder.deinit();
+
+    for i in 0..types.length {
+      builder.append_then_free(format("| %", {any::new(&json_token_type_names.data[types.data[i]])}));
+    }
+
+    types_string := builder.get_string();
+
+    error := format("at: \"%:%:%\" :: unexpected token, expected \"%\", got \"%\"", {
+      any::new(&self.file), any::new(&token.line), any::new(&token.column),
+      any::new(&types_string),
+      any::new(&json_token_type_names.data[token.type])});
+
+    return Result![JsonToken, String]::Err(error);
+  }
+
+  expect_type :: fn(self*, type: s32) -> Result![JsonToken, String] {
+    // TODO: it's much cheaper if we just check this, instead of making list lol.
+    // saves a stack alloc and a function call.
+    return self.expect_types({type});
+  }
+}
