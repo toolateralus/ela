@@ -188,356 +188,252 @@ void Parser::parse_parameters(AST *node, const std::vector<GenericParameter> &ge
 // }
 
 // clang-format off
-std::vector<DirectiveRoutine> Parser:: directive_routines = {
-    // #include
-    // Just like C's include, just paste a text file right above where the
-    // include is used.
-    {.identifier = "include",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) {
-        auto filename = parser->expect(Token_Type::String).value;
-        if (!std::filesystem::exists(filename.get_str())) {
+std::vector<DirectiveRoutine> directive_routines = {
+  {"include", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto filename = parser->expect(Token_Type::String).value;
+      if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
-                                  std::filesystem::current_path().string()),
-                      {});
-        }
-        if (import_set.contains(filename)) {
+                                  std::filesystem::current_path().string()), {});
+      }
+      if (import_set.contains(filename)) {
           return nullptr;
-        }
-        import_set.insert(filename);
-        parser->states.push_back(Lexer::State::from_file(filename.get_str()));
-        parser->fill_buffer_if_needed();
-        return nullptr;
-    }},
-    // #import
-    // Imports from usr/local/lib/ela by identifier and no file meta.
-    {.identifier = "import",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto iden = parser->expect(Token_Type::Identifier).value;
-        parser->import(iden.get_str());
-        return nullptr;
-    }},
-    // This is only used for debugging the compiler in rare cases.
-    {.identifier = "print",
-     .kind = DIRECTIVE_KIND_STATEMENT,
-     .run = [](Parser *parser) -> Nullable<AST> {
-        auto str = parser->expect(Token_Type::String);
-        std::cout << str.value.get_str() << "\n";
-        return nullptr;
-     }
-    },
-    // #read
-    // Read a file into a string at compile time. Nice for embedding resources
-    // into your program.
-    // FEATURE: add a binary mode, where its just an array of chars or
-    // something.
-    {.identifier = "read",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) {
-        parser->expect(Token_Type::LParen);
-        auto filename = parser->expect(Token_Type::String).value;
+      }
+      import_set.insert(filename);
+      parser->states.push_back(Lexer::State::from_file(filename.get_str()));
+      parser->fill_buffer_if_needed();
+      return nullptr;
+  }},
+  {"import", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto iden = parser->expect(Token_Type::Identifier).value;
+      parser->import(iden.get_str());
+      return nullptr;
+  }},
+  {"print", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto str = parser->expect(Token_Type::String);
+      std::cout << str.value.get_str() << "\n";
+      return nullptr;
+  }},
+  {"read", DIRECTIVE_KIND_EXPRESSION, [](Parser *parser) -> Nullable<AST> {
+      parser->expect(Token_Type::LParen);
+      auto filename = parser->expect(Token_Type::String).value;
 
-        Interned_String mode = "text";
-        if (parser->peek().type == Token_Type::Comma) {
+      Interned_String mode = "text";
+      if (parser->peek().type == Token_Type::Comma) {
           parser->eat();
-          // could be binary, and whatever other options
           mode = parser->eat().value; 
-        }
-        if (!std::filesystem::exists(filename.get_str())) {
+      }
+      if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
-        }
-        
-        parser->expect(Token_Type::RParen);
-        NODE_ALLOC(AST_LITERAL, string, range, parser, _);
-        string->literal.tag = LITERAL_STRING;
-        std::stringstream ss;
-        if (mode == "binary") {
+      }
+
+      parser->expect(Token_Type::RParen);
+      NODE_ALLOC(AST_LITERAL, string, range, parser, _);
+      string->literal.tag = LITERAL_STRING;
+      std::stringstream ss;
+      if (mode == "binary") {
           std::ifstream isftr(filename.get_str(), std::ios::binary);
           ss << isftr.rdbuf();
           string->literal.value = ss.str();
           return string;
-        } else {
+      } else {
           std::ifstream isftr(filename.get_str());
           ss << isftr.rdbuf();
           string->literal.value = ss.str();
           return string;
-        }
-    }},
-    // #test
-    // declare a test function. Only gets compiled into --test builds, and
-    // produces a test main, a builtin test suite.
-    // FEATURE: add categories and extra naming stuff to these. would be nice
-    // for
-    // filtering etc.
-    {.identifier = "test",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        // Issue 2
-        // TODO: implement something so we can do
-        // * #test(group: "My Test Group", expects: false) *
-        // so we can have tests that expect to fail, and so we can use
-        // --filter="My Test Group" // run only test group
-        // --filter=* - "My Test Group" // run all but test group
+      }
+  }},
+  {"test", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto name = parser->expect(Token_Type::Identifier);
+      parser->expect(Token_Type::DoubleColon);
+      auto func = parser->parse_function_declaration(name);
+      func->function.flags |= (int)Function_Instance_Flags::FUNCTION_IS_TEST;
 
-        auto name = parser->expect(Token_Type::Identifier);
-        parser->expect(Token_Type::DoubleColon);
-        auto func = parser->parse_function_declaration(name);
-        func->function.flags |= (int)Function_Instance_Flags::FUNCTION_IS_TEST;
-
-        if (compile_command.has_flag("test")) {
+      if (compile_command.has_flag("test")) {
           return func;
-        } else {
+      } else {
           func->parent->scope.erase(func->function.name);
           return GLOBAL_NOOP;
-        }
-    }},
-    // #foreign
-    // Declare a foreign function, like C's extern.
-    {.identifier = "foreign",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) {
-        NODE_ALLOC(AST_FUNCTION, function, range, parser, _)
-        auto name = parser->expect(Token_Type::Identifier);
-        auto last_func_decl = parser->current_func_decl;
-        parser->current_func_decl = function;
+      }
+  }},
+  {"foreign", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_FUNCTION, function, range, parser, _)
+      auto name = parser->expect(Token_Type::Identifier);
+      auto last_func_decl = parser->current_func_decl;
+      parser->current_func_decl = function;
 
-        Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
+      Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
 
-        parser->expect(Token_Type::DoubleColon);
-        parser->expect(Token_Type::Fn);
+      parser->expect(Token_Type::DoubleColon);
+      parser->expect(Token_Type::Fn);
 
-        parser->parse_parameters(function);
-        function->function.name = name.value;
-        if (parser->peek().type == Token_Type::Arrow) {
+      parser->parse_parameters(function);
+      function->function.name = name.value;
+      if (parser->peek().type == Token_Type::Arrow) {
           parser->expect(Token_Type::Arrow);
           function->function.return_type = parser->parse_type();
-        } else {
+      } else {
           function->function.return_type = ast_get_void_type();
-        }
-        function->function.flags |= FUNCTION_IS_FOREIGN;
-        parser->expect(Token_Type::Semi);
-        return function;
-    }},
-    // #error, for throwing compiler errors.
-    {.identifier = "error",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) {
-        auto error = parser->parse_primary();
-        if (error->node_type != AST_LITERAL) {
+      }
+      function->function.flags |= FUNCTION_IS_FOREIGN;
+      parser->expect(Token_Type::Semi);
+      return function;
+  }},
+  {"location", DIRECTIVE_KIND_EXPRESSION, [](Parser *parser) -> Nullable<AST> {
+      auto location = parser->peek().location;
+      auto formatted = std::format("{}:{}:{}", SourceLocation::files()[location.file], location.line, location.column);
+      NODE_ALLOC(AST_LITERAL, literal, range, parser, _);
+      literal->literal.tag = LITERAL_STRING;
+      literal->literal.value = formatted;
+      if (parser->peek().type == Token_Type::LogicalNot) {
+          literal->literal.is_c_string = true;
+          parser->eat();
+      }
+      return literal;
+  }},
+  {"error", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto error = parser->parse_primary();
+      if (error->node_type != AST_LITERAL) {
           throw_error("Can only throw a literal as a error", error->source_range);
-        }
-        auto literal = error->literal;
-        throw_error(literal.value.get_str(), error->source_range);
-        return nullptr;
-    }},
-    // #type
-    // get a 'Type *' struct ptr to reflect on a given type.
-    // has .fields and .size only currently
-    {.identifier = "type",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_TYPE, outer, range, parser, _)
-        parser->expect(Token_Type::LParen);
-        outer->type.pointing_to = parser->parse_type();
-        parser->expect(Token_Type::RParen);
+      }
+      auto literal = error->literal;
+      throw_error(literal.value.get_str(), error->source_range);
+      return nullptr;
+  }},
+  {"type", DIRECTIVE_KIND_EXPRESSION, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_TYPE, outer, range, parser, _)
+      parser->expect(Token_Type::LParen);
+      outer->type.pointing_to = parser->parse_type();
+      parser->expect(Token_Type::RParen);
 
-        // TODO: Refactor how this works, the #type() should probably just be it's own node.
-        // It would vastly simplify a ton of stuff.
-
-        outer->type.kind = AST_TYPE_REFLECTION;
-        outer->type.normal.base = ast_alloc(AST_IDENTIFIER, parser->parent());
-        outer->type.normal.base->identifier = "Type";
-        outer->type.extensions.push_back({TYPE_EXT_POINTER});
-        return outer;
-    }},
-    // #c_flags, for adding stuff like linker options, -g etc from within
-    // your program or header.
-    {.identifier = "c_flags",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto string = parser->expect(Token_Type::String).value;
-        if (string == "-g") {
+      outer->type.kind = AST_TYPE_REFLECTION;
+      outer->type.normal.base = ast_alloc(AST_IDENTIFIER, parser->parent());
+      outer->type.normal.base->identifier = "Type";
+      outer->type.extensions.push_back({TYPE_EXT_POINTER});
+      return outer;
+  }},
+  {"c_flags", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto string = parser->expect(Token_Type::String).value;
+      if (string == "-g") {
           compile_command.flags[string.get_str()] = true;
-        }
-        compile_command.add_compilation_flag(string.get_str());
-        return nullptr;
-    }},
-    // #flags, for making an enum declaration auto increment with a flags value.
-    // #flags MyEnum :: enum {...};
-    {.identifier = "flags",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto name = parser->expect(Token_Type::Identifier);
-        parser->expect(Token_Type::DoubleColon);
-        auto enum_decl = parser->parse_enum_declaration(name);
-        int index = 0;
-        for (auto &key_value : enum_decl->$enum.key_values) {
+      }
+      compile_command.add_compilation_flag(string.get_str());
+      return nullptr;
+  }},
+  {"flags", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto name = parser->expect(Token_Type::Identifier);
+      parser->expect(Token_Type::DoubleColon);
+      auto enum_decl = parser->parse_enum_declaration(name);
+      int index = 0;
+      for (auto &key_value : enum_decl->$enum.key_values) {
           NODE_ALLOC(AST_LITERAL, literal, range, parser, _);
           literal->literal.tag = LITERAL_INTEGER;
           literal->literal.value = std::to_string(1 << index);
           key_value.second = literal;
           index++;
-        }
-        enum_decl->$enum.is_flags = true;
-        return enum_decl;
-    }},
-    // #alias for making type aliases. #alias NewName :: OldName;
-    {.identifier = "alias",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_ALIAS, alias, range, parser, _)
-        alias->alias.name = parser->expect(Token_Type::Identifier).value;
-        parser->expect(Token_Type::DoubleColon);
-        alias->alias.type = parser->parse_type();
-        return alias;
       }
-    },
-    // #self, return the type of the current declaring struct or union
-    {.identifier = "self",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_TYPE, type, range, parser, defer);
-        type->type.kind = AST_TYPE_SELF;
-        parser->append_type_extensions(type);
-        return type;
-    }},
-    // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
-    {.identifier = "anon",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto tok = parser->expect(Token_Type::DoubleColon);
-        if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
+      enum_decl->$enum.is_flags = true;
+      return enum_decl;
+  }},
+  {"alias", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_ALIAS, alias, range, parser, _)
+      alias->alias.name = parser->expect(Token_Type::Identifier).value;
+      parser->expect(Token_Type::DoubleColon);
+      alias->alias.type = parser->parse_type();
+      return alias;
+  }},
+  {"self", DIRECTIVE_KIND_DONT_CARE, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_TYPE, type, range, parser, defer);
+      type->type.kind = AST_TYPE_SELF;
+      parser->append_type_extensions(type);
+      return type;
+  }},
+  {"anon", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto tok = parser->expect(Token_Type::DoubleColon);
+      if (parser->peek().type == Token_Type::Struct || parser->peek().type == Token_Type::Union) {
           AST* decl = parser->parse_struct_declaration(get_unique_identifier());
           decl->$struct.is_anon = true;
           return decl;
-        } else {
+      } else {
           auto range = parser->begin_node();
           parser->eat();
           parser->end_node(nullptr, range);
           throw_error("Expected struct or union after #anon ::...", range);
           return nullptr;
-        }
-    }},
-    // #export, for exporting a non-mangled name to a dll or C library
-    // primarily.
-    // Equivalent to marking a function extern "C" in C++.
-    {.identifier = "export",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto node = parser->parse_statement();
-        if (node->node_type == AST_STRUCT) {
+      }
+  }},
+  {"export", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto node = parser->parse_statement();
+      if (node->node_type == AST_STRUCT) {
           auto &$struct = node->$struct;
           $struct.is_extern = true;
-        } else if (node->node_type == AST_DECLARATION) {
+      } else if (node->node_type == AST_DECLARATION) {
           auto &decl = node->declaration;
           decl.is_extern = true;
-        } else if (node->node_type == AST_FUNCTION) {
+      } else if (node->node_type == AST_FUNCTION) {
           auto &function = node->function;
           function.flags |= FUNCTION_IS_EXPORTED;
-        }
-        return node;
-    }},
-    
-    // TODO: rewrite #typeid.
-
-    // #bitfield, for declaring bitfields. Pretty much only to interop with C:
-    // most cases for bitfields are completely useless, and can be replaced with
-    // a
-    // set of flags.
-    {.identifier = "bitfield",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        if (parser->current_struct_decl.is_null()) {
+      }
+      return node;
+  }},
+  {"bitfield", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      if (parser->current_struct_decl.is_null()) {
           throw_error("Cannot declare bitfields outside of a struct declaration.", {});
-        }
-        parser->expect(Token_Type::LParen);
-        auto size = parser->expect(Token_Type::Integer);
-        parser->expect(Token_Type::RParen);
-        AST *decl = parser->parse_declaration();
-        decl->declaration.is_bitfield = true;
-        decl->declaration.bitsize = size.value;
-        return decl;
-    }}, 
-
-    // #static, used exclusively for static globals, and static locals.
-    // We do not support static methods or static members.
-    {.identifier = "static",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        auto statement = parser->parse_statement();
-        if (statement->node_type == AST_DECLARATION) {
+      }
+      parser->expect(Token_Type::LParen);
+      auto size = parser->expect(Token_Type::Integer);
+      parser->expect(Token_Type::RParen);
+      AST *decl = parser->parse_declaration();
+      decl->declaration.is_bitfield = true;
+      decl->declaration.bitsize = size.value;
+      return decl;
+  }},
+  {"static", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      auto statement = parser->parse_statement();
+      if (statement->node_type == AST_DECLARATION) {
           statement->declaration.is_static = true;
-        } else if (statement->node_type == AST_FUNCTION) {
+      } else if (statement->node_type == AST_FUNCTION) {
           statement->function.flags |= FUNCTION_IS_STATIC;
-        }
-        return statement;
-    }},
-
-    // #def, define a compile time flag, like C #define but cannot be a macro.
-    {.identifier = "def",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        add_def(parser->expect(Token_Type::Identifier).value);
-        while (parser->peek().type == Token_Type::Semi) parser->eat();
-        return GLOBAL_NOOP;
-    }},
-
-    // #undef, remove a #def
-    {.identifier = "undef",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        undef(parser->expect(Token_Type::Identifier).value);
-        while (parser->peek().type == Token_Type::Semi) parser->eat();
-        return GLOBAL_NOOP;
-    }},
-
-    // #ifdef, conditional compilation based on a #def being present.
-    {.identifier = "ifdef",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
-        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
-        return list;
-    }},
-
-    // #ifndef, conditional compilation based on a #def not being present.
-    {.identifier = "ifndef",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
-        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
-        return list;
-    }},
-
-    // #if, conditional compilation based on compile time value.
-    {.identifier = "if",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
-        parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
-        return list;
-    }},
-
-    // #region, for named/unnnamed regions. just for organization, has no compilation implications.
-    // can have anything between the #region directive and the {} block
-    // #region My code region 1 {...} is legal.
-    {.identifier = "region",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<AST> {
-        NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
-        while (parser->peek().type != Token_Type::LCurly) {
+      }
+      return statement;
+  }},
+  {"def", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      add_def(parser->expect(Token_Type::Identifier).value);
+      while (parser->peek().type == Token_Type::Semi) parser->eat();
+      return GLOBAL_NOOP;
+  }},
+  {"undef", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      undef(parser->expect(Token_Type::Identifier).value);
+      while (parser->peek().type == Token_Type::Semi) parser->eat();
+      return GLOBAL_NOOP;
+  }},
+  {"ifdef", DIRECTIVE_KIND_DONT_CARE, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
+      parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
+      return list;
+  }},
+  {"ifndef", DIRECTIVE_KIND_DONT_CARE, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
+      parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
+      return list;
+  }},
+  {"if", DIRECTIVE_KIND_DONT_CARE, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
+      parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
+      return list;
+  }},
+  {"region", DIRECTIVE_KIND_STATEMENT, [](Parser *parser) -> Nullable<AST> {
+      NODE_ALLOC(AST_STATEMENT_LIST, list, range, parser, _)
+      while (parser->peek().type != Token_Type::LCurly) {
           parser->eat();
-        }
-        parser->expect(Token_Type::LCurly);
-        while (parser->peek().type != Token_Type::RCurly) {
+      }
+      parser->expect(Token_Type::LCurly);
+      while (parser->peek().type != Token_Type::RCurly) {
           list->program_statements.push_back(parser->parse_statement());
           while (parser->peek().type == Token_Type::Semi) parser->eat();
-        }
-        parser->expect(Token_Type::RCurly);
-        return list;
       }
-    },
+      parser->expect(Token_Type::RCurly);
+      return list;
+  }},
 };
 // clang-format on
 
@@ -560,7 +456,6 @@ Nullable<AST> Parser::process_directive(DirectiveKind kind, const Interned_Strin
 }
 
 AST *Parser::parse() {
-
   // Program node has special initialization.
   AST *program = ast_alloc(AST_PROGRAM, nullptr);
   auto range = this->begin_node();
@@ -1005,9 +900,7 @@ AST *Parser::parse_type() {
   type->type.normal.base = ast_alloc(AST_IDENTIFIER, parent());
   type->type.normal.base->identifier = base;
 
-  Defer _defer([&]() {
-    this->end_node(type->type.normal.base, range);
-  });
+  Defer _defer([&]() { this->end_node(type->type.normal.base, range); });
 
   if (peek().type == Token_Type::GenericBrace) {
     type->type.normal.generic_arguments = parse_generic_arguments();
@@ -1533,6 +1426,16 @@ AST *Parser::parse_enum_declaration(Token tok) {
         end_node(node, range);
       }
     }
+
+    // Evaluate the expression using the constexpr evaluator
+    if (value != nullptr) {
+      auto evaluated_value = evaluate_constexpr(value);
+      NODE_ALLOC(AST_LITERAL, literal, range, this, _);
+      literal->literal.value = std::to_string(evaluated_value.integer);
+      value = literal;
+      end_node(literal, range);
+    }
+
     if (peek().type == Token_Type::Comma) {
       eat();
     }

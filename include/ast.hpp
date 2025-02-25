@@ -194,7 +194,6 @@ struct AST {
   // TODO: we can definitely do some work to get rid of a lot of these vectors, and at the very least write a super
   // TODO: compact vector, if not just remove a TON of the bloat in the AST.
 
-
   union {
     std::vector<AST *> program_statements;
 
@@ -489,7 +488,7 @@ struct AST {
         new (&literal) decltype(literal)();
         break;
       case AST_TYPE:
-        memset((void*)&type, 0, sizeof(decltype(type)));
+        memset((void *)&type, 0, sizeof(decltype(type)));
         break;
       case AST_TUPLE:
         new (&tuple) decltype(tuple)();
@@ -528,7 +527,7 @@ struct AST {
         new (&subscript) decltype(subscript)();
         break;
       case AST_INITIALIZER:
-        memset((void*)&initializer, 0, sizeof(decltype(initializer)));
+        memset((void *)&initializer, 0, sizeof(decltype(initializer)));
         break;
       case AST_ENUM:
         new (&$enum) decltype($enum)();
@@ -612,11 +611,14 @@ enum DirectiveKind : unsigned char {
 };
 
 struct Parser;
+
 struct DirectiveRoutine {
-  ~DirectiveRoutine() = default;
   Interned_String identifier;
-  DirectiveKind kind;
-  std::function<Nullable<AST>(Parser *parser)> run;
+  DirectiveKind kind = DIRECTIVE_KIND_DONT_CARE;
+  std::function<Nullable<AST>(Parser *parser)> run = nullptr;
+  
+  DirectiveRoutine(const std::string &id, DirectiveKind k, std::function<Nullable<AST>(Parser *)> r)
+      : identifier(id), kind(k), run(r) {}
 };
 
 enum Precedence : unsigned char {
@@ -641,6 +643,8 @@ static Precedence get_operator_precedence(Token token);
 
 struct Typer;
 
+extern std::vector<DirectiveRoutine> directive_routines;
+
 struct Parser {
   Typer *typer;
   Lexer lexer{};
@@ -649,14 +653,11 @@ struct Parser {
   Nullable<AST> current_func_decl = nullptr;
   Nullable<AST> current_impl_decl = nullptr;
   Nullable<AST> current_interface_decl = nullptr;
-  static std::vector<DirectiveRoutine> directive_routines;
   int64_t token_idx{};
   static Nullable<AST> current_block;
   std::stack<AST *> parent_stack;
 
-  AST * parent() {
-    return parent_stack.top();
-  }
+  AST *parent() { return parent_stack.top(); }
 
   Defer set_parent(AST *parent) {
     parent_stack.push(parent);
@@ -734,12 +735,12 @@ static inline AST *find_generic_instance(std::vector<GenericInstance> instantiat
 }
 
 #define NODE_ALLOC(type, node, range, parser, defer)                                                                   \
-  AST *node = ast_alloc(type, parser->parent());                                                                    \
+  AST *node = ast_alloc(type, parser->parent());                                                                       \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] { parser->end_node(node, range); });
 
 #define NODE_ALLOC_EXTRA_DEFER(type, node, range, defer, parser, deferred)                                             \
-  AST *node = ast_alloc(type, parser->parent());                                                                    \
+  AST *node = ast_alloc(type, parser->parent());                                                                       \
   auto range = parser->begin_node();                                                                                   \
   Defer defer([&] {                                                                                                    \
     parser->end_node(node, range);                                                                                     \

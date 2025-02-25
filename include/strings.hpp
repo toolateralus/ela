@@ -67,8 +67,8 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   #ifdef TESTING
   #define __TEST_RUNNER_MAIN                                                                                             \
     int main() {                                                                                                         \
-      for (int i = 0; i < sizeof(tests) / sizeof(__COMPILER_GENERATED_TEST); i++) {                                      \
-        __COMPILER_GENERATED_TEST_RUN(&tests[i]);                                                                        \
+      for (int i = 0; i < sizeof(tests) / sizeof($ela_test); i++) {                                      \
+        $ela_test_run(&tests[i]);                                                                        \
       }                                                                                                                  \
     }                                                                                                                     
   #endif
@@ -100,19 +100,22 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   #endif
   
   #ifdef TESTING
-    int printf(u8 *, ...);
-    void exit(s32);
+    #if TEST_VERBOSE
+      int printf(u8 *, ...);
+    #endif
     
     typedef struct {
       const char *name;
       void (*function)();
-    } __COMPILER_GENERATED_TEST;
-    static void __COMPILER_GENERATED_TEST_RUN(__COMPILER_GENERATED_TEST *test) {
+    } $ela_test;
+
+    static void $ela_test_run($ela_test *test) {
       #if TEST_VERBOSE 
         printf("running %s\n", test->name);
       #endif
       test->function();
     }
+
   #endif
   )__";
   

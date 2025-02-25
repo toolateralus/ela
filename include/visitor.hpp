@@ -2,6 +2,7 @@
 
 #include <csetjmp>
 #include <deque>
+#include <set>
 #include <vector>
 
 #include "ast.hpp"
