@@ -79,6 +79,11 @@ int main(int argc, char *argv[]) {
     run_on_finished = true;
   }
 
+  if (argc >= 2 && (strcmp(argv[1], "build") == 0 || strcmp(argv[1], "b") == 0)) {
+    argv[1] = (char *)"main.ela";
+    argc = 2;
+  }
+
   bool run_tests = false;
   if (argc >= 2 && (strcmp(argv[1], "test") == 0 || strcmp(argv[1], "t") == 0)) {
     run_tests = true;
