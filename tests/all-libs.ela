@@ -16,7 +16,6 @@
 #import pthread;
 // #import gl; This has conflicting definitions with raylib. It's less maintained than raylib, so we just ignore it.
 #import rayui;
-#import reflection;
 #import time;
 
 main :: fn() {}

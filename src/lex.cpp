@@ -124,21 +124,47 @@ void Lexer::get_token(State &state) {
       return;
     }
 
-    if (std::isalpha(c) || c == '_') {
-      while (pos < len && (std::isalnum(c) || c == '_')) {
-        token.put(c);
-        pos++;
-        col++;
-        c = input[pos];
+    if (std::isalpha(c) || c == '_' ||
+        (c & 0x80) != 0) { // Check if the character is alphabetic, underscore, or a UTF-8 start byte
+      while (pos < len) {
+        if (std::isalnum(c) || c == '_') {
+          token << c;
+          pos++;
+          col++;
+          c = input[pos];
+        } else if ((c & 0x80) != 0) { // Check if the character is a UTF-8 start byte
+          int num_bytes = 0;
+          if ((c & 0xE0) == 0xC0)
+            num_bytes = 2;
+          else if ((c & 0xF0) == 0xE0)
+            num_bytes = 3;
+          else if ((c & 0xF8) == 0xF0)
+            num_bytes = 4;
+          else
+            break; // Stop processing if it's not a valid UTF-8 start byte
+
+          for (int i = 0; i < num_bytes; ++i) {
+            if (pos >= len || (i > 0 && (input[pos] & 0xC0) != 0x80)) {
+              break; // Stop processing if it's not a valid UTF-8 continuation byte
+            }
+            token << input[pos];
+            pos++;
+            col++;
+          }
+
+          c = input[pos];
+        } else {
+          break; // Stop processing if it's not a valid identifier character
+        }
       }
+
       string value = token.str();
       if (keywords.contains(value)) {
         state.lookahead_buffer.push_back(Token(location, value, keywords.at(value), TFamily::Keyword));
-        return;
       } else {
         state.lookahead_buffer.push_back(Token(location, value, TType::Identifier, TFamily::Identifier));
-        return;
       }
+      return;
     } else if (std::ispunct(c)) {
       std::string longest_match;
       std::string current_match;

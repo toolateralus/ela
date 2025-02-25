@@ -1,5 +1,3 @@
-#import reflection;
-
 Reflector :: struct {
   n: s32,
 }
