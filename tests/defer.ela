@@ -67,7 +67,7 @@ defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
 
 #test test_defer_cleanup_routine :: fn() {
   ptr := malloc(8);
-  cleanup := DeferCleanup {
+  cleanup := DeferCleanup .{
     ptr: ptr
   };
   ptr_as_int : u64 = ptr as u64;

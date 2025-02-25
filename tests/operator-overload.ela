@@ -9,7 +9,7 @@ Add :: interface![Right, Result] {
 
 impl Add![Vec2, Vec2] for Vec2 {
   add :: fn(self*, right: Vec2) -> Vec2 {
-    return {
+    return .{
       x: self.x + right.x,
       y: self.y + right.y
     };
@@ -17,7 +17,7 @@ impl Add![Vec2, Vec2] for Vec2 {
 }
 
 #test test_main :: fn() {
-  a, b := (Vec2{x: 1, y: 1}, Vec2{x: 1, y: 1});
+  a, b := (Vec2.{x: 1, y: 1}, Vec2.{x: 1, y: 1});
   
   result := a.add(b);
   assert("+ failed",  result.x == 2 && result.y == 2);
@@ -29,7 +29,7 @@ Sub :: interface![Right, Result] {
 
 impl Sub![Vec2, Vec2] for Vec2 {
   sub :: fn(self*, right: Vec2) -> Vec2 {
-    return {
+    return .{
       x: self.x - right.x,
       y: self.y - right.y
     };
@@ -42,7 +42,7 @@ Neg :: interface![Result] {
 
 impl Neg![Vec2] for Vec2 {
   neg :: fn(self*) -> Vec2 {
-    return {
+    return .{
       x: -self.x,
       y: -self.y
     };
@@ -60,21 +60,21 @@ impl Vec2 {
 }
 
 #test test_sub :: fn() {
-  a, b := (Vec2{x: 3, y: 2}, Vec2{x: 1, y: 1});
+  a, b := (Vec2.{x: 3, y: 2}, Vec2.{x: 1, y: 1});
   
   result := a.sub(b);
   assert("- failed",  result.x == 2 && result.y == 1);
 }
 
 #test test_neg :: fn() {
-  a := Vec2{x: 3, y: 2};
+  a := Vec2.{x: 3, y: 2};
   
   result := a.neg();
   assert("neg failed",  result.x == -3 && result.y == -2);
 }
 
 #test test_index :: fn() {
-  a := Vec2{x: 3, y: 2};
+  a := Vec2.{x: 3, y: 2};
   
   assert("index 0 failed", a[0] == 3);
   assert("index 1 failed", a[1] == 2);

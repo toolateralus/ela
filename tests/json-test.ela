@@ -1,6 +1,7 @@
 #import json;
 #import directory;
 
+JsonValue :: struct {}
 
 JsonValueDeleter :: struct {
   vals: List![JsonValue*],

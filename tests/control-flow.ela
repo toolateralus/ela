@@ -96,7 +96,7 @@
 
   n = 0;
   arr : List![s8]* = malloc(sizeof(List![s8])); 
-  *arr = {};
+  *arr = .{};
   for i in 0..4 {
     arr.push(i as s8);
   }
@@ -204,7 +204,7 @@ switch_helper :: fn() -> s32 {
 
 
 #test test_iterate_iter :: fn() {
-  list: s32[] = s32[]::init({0,1,2,3,4,5,6,7,8,9,10});
+  list: s32[] = s32[]::init(.[0,1,2,3,4,5,6,7,8,9,10]);
   idx := 0;
   for v in list.iter() {
     assert("list.iter() for loop failed", v == idx);

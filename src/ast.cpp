@@ -683,6 +683,45 @@ ASTExpr *Parser::parse_postfix() {
       dot->base = left;
       if (peek().type == TType::Integer || peek().type == TType::Identifier) {
         dot->member_name = eat().value;
+      } else if (peek().type == TType::LCurly) {
+        // .{} initializer lists.
+        if (peek().type == TType::LCurly) {
+          eat(); // eat {
+          NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
+          init_list->target_type = ast_alloc<ASTType>();
+          init_list->target_type.get()->normal.base = left;
+          if (peek().type == TType::RCurly) {
+            init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
+          } else {
+            init_list->tag = ASTInitializerList::INIT_LIST_NAMED;
+            while (peek().type != TType::RCurly) {
+              auto identifier = expect(TType::Identifier).value;
+              expect(TType::Colon);
+              init_list->key_values.push_back({identifier, parse_expr()});
+              if (peek().type == TType::Comma) {
+                eat();
+              }
+            }
+          }
+          expect(TType::RCurly);
+          end_node(init_list, range);
+          return init_list;
+        } else if (peek().type == TType::LBrace) {
+          eat(); // eat [
+          NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
+          init_list->target_type = ast_alloc<ASTType>();
+          init_list->target_type.get()->normal.base = left;
+          init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
+          while (peek().type != TType::RBrace) {
+            init_list->values.push_back(parse_expr());
+            if (peek().type == TType::Comma) {
+              eat();
+            }
+          }
+          expect(TType::RBrace);
+          end_node(init_list, range);
+          return init_list;
+        }
       } else {
         end_node(left, range);
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);

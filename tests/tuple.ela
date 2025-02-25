@@ -9,7 +9,7 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
 
 
 #test test_tuple_array :: fn() {
-  array : (s32, s32)[1] = {(10, 10)};
+  array : (s32, s32)[1] = .[(10, 10)];
   a, b := array[0];
   assert("Storing tuple in array failed", a == 10 && b == 10);
 }

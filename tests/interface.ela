@@ -26,10 +26,10 @@
       return self.a
     }
     method_get_self :: fn(self*) -> #self {
-      return {a: 100};
+      return .{a: 100};
     }
     static_get_self :: fn() -> #self {
-      return {a: 100};
+      return .{a: 100};
     }
   }
 }
@@ -69,10 +69,10 @@
       return self.a
     }
     method_get_self :: fn(self*) -> #self {
-      return Struct1 {a: 100};
+      return Struct1 .{a: 100};
     }
     static_get_self :: fn() -> #self {
-      return Struct1 {a: 100};
+      return Struct1 .{a: 100};
     }
   }
 }
@@ -106,11 +106,11 @@
     }
     method_get_self :: fn(self*) -> #self {
       t: T;
-      return {n: t};
+      return .{n: t};
     }
     static_get_self :: fn() -> #self {
       t: T;
-      return {n: t};
+      return .{n: t};
     }
   }
 }
