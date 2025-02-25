@@ -456,7 +456,7 @@ void Typer::visit_impl_declaration(AST *node, bool generic_instantiation, std::v
       impl_scope.insert(*type_scope.lookup(method->function.name));
       continue;
     }
-    
+
     visit_function_header(method, false);
 
     auto func_ty_id = method->resolved_type;
@@ -591,7 +591,6 @@ void Typer::visit_parameters(Source_Range source_range, std::vector<AST_Paramete
       if (param.self.is_pointer) {
         param.resolved_type = global_get_type(param.resolved_type)->take_pointer_to();
       }
-      return;
     } else {
       visit(param.normal.type);
       int id = param.normal.type->resolved_type;
@@ -1095,8 +1094,13 @@ void Typer::visit_type(AST *node) {
 
     auto symbol = get_symbol(normal_ty.base).get();
 
-    if (!symbol || !symbol->is_type())
-      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
+    if (!symbol) {
+      throw_error("use of undeclared type", node->source_range);
+    }
+
+    if (!symbol->is_type()) {
+      throw_error("expected a type, got a non-type symbol.", node->source_range);
+    }
 
     auto declaring_node = symbol->declaration.get();
 

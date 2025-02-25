@@ -177,7 +177,7 @@ struct Type_Info {
   template <class Info> Type_Info(Info info) {
     if constexpr (std::is_same_v<Info, Function_Info>) {
       kind = TYPE_FUNCTION;
-      function = info;
+      new (&function) decltype(info)(info);
     } else if constexpr (std::is_same_v<Info, Interface_Info>) {
       kind = TYPE_INTERFACE;
       interface = info;

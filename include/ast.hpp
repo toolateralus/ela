@@ -111,7 +111,7 @@ enum AST_Parameter_Tag : unsigned char {
 };
 struct AST_Parameter_Declaration {
   AST_Parameter_Tag tag;
-  size_t resolved_type;
+  size_t resolved_type = Type::INVALID_TYPE_ID;
   union {
     struct {
       AST *type;
