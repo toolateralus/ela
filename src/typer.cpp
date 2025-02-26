@@ -1819,6 +1819,12 @@ void Typer::visit(ASTSwitch *node) {
       assert_types_can_cast_or_equal(expr_type, type_id, node->source_range, "Invalid switch case.");
     }
   }
+
+  if (node->default_case) {
+    auto _case = node->default_case.get();
+    _case->accept(this);
+  }
+
   node->resolved_type = node->return_type = return_type;
   if (node->is_statement) {
     node->control_flow = ControlFlow{flags, return_type};

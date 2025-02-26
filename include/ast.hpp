@@ -593,7 +593,7 @@ struct ASTSwitch : ASTExpr {
   bool is_statement = false;
   int return_type = void_type();
   ASTExpr *target;
-  ASTBlock* default_case;
+  Nullable<ASTBlock> default_case;
   std::vector<SwitchCase> cases;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SWITCH; }

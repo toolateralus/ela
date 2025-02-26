@@ -1020,12 +1020,19 @@ void Emitter::visit(ASTSwitch *node) {
     emit_line_directive(_case.block);
     _case.block->accept(this);
   };
-  
+
   bool first = true;
   for (const auto &_case : node->cases) {
     emit_switch_case(node->target, _case, first);
     first = false;
   }
+
+  if (node->default_case.is_not_null()) {
+    (*ss) << "else {\n";
+    node->default_case.get()->accept(this);
+    (*ss) << "}\n";
+  }
+
 }
 void Emitter::visit(ASTTuple *node) {
   auto type = global_get_type(node->resolved_type);
