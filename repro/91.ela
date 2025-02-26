@@ -1,0 +1,12 @@
+
+#alias fun :: fn * () -> s32;
+
+
+fun_return_fun :: fn() -> fun {
+  return null;
+}
+
+main :: fn() { 
+
+
+}

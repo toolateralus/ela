@@ -1,29 +1,34 @@
 {
-    "name": "ela",
-    "displayName": "Ela",
-    "description": "Ela syntax highlighting.",
-    "version": "0.0.1",
-    "publisher": "toolateralus",
-    "repository": {
-        "type": "git",
-        "url": "https://github.com/toolateralus/ela.git"
-    },
-    "engines": {
-        "vscode": "^1.42.0"
-    },
-    "categories": [
-        "Programming Languages"
+  "name": "ela",
+  "displayName": "Ela",
+  "description": "Ela syntax highlighting.",
+  "version": "0.0.1",
+  "publisher": "toolateralus",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/toolateralus/ela.git"
+  },
+  "engines": {
+    "vscode": "^1.42.0"
+  },
+  "categories": [
+    "Programming Languages"
+  ],
+  "contributes": {
+    "languages": [
+      {
+        "id": "ela",
+        "aliases": ["Ela", "ela"],
+        "extensions": [".ela"],
+        "configuration": "./language-configuration.json"
+      }
     ],
-    "contributes": {
-        "languages": [{
-            "id": "ela",
-            "extensions": [".ela"],
-            "configuration": "./language-configuration.json"
-        }],
-        "grammars": [{
-            "language": "ela",
-            "scopeName": "source.ela",
-            "path": "./syntaxes/ela.tmLanguage"
-        }]
-    }
+    "grammars": [
+      {
+        "language": "ela",
+        "scopeName": "source.ela",
+        "path": "./syntaxes/ela.tmLanguage"
+      }
+    ]
+  }
 }

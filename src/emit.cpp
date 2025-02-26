@@ -604,8 +604,6 @@ void Emitter::visit(ASTDeclaration *node) {
 }
 
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  emit_default_args = true;
-
   if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
     (*ss) << "extern  ";
   }
@@ -614,8 +612,8 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   (*ss) << ' ' << node->name.get_str() << ' ';
   node->params->accept(this);
   (*ss) << ";\n";
-  emit_default_args = false;
 }
+
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   if (node->name == "main") {
     throw_error("main function cannot be foreign", node->source_range);
@@ -823,21 +821,30 @@ void Emitter::visit(ASTProgram *node) {
       type_info << str.get_str() << ";\n";
     }
 
+    if (!compile_command.has_flag("release")) {
+      code << "#line 0 \"boilerplate.h\"";
+    }
 
-    code << "#line 0 \"boilerplate.h\"\nvoid $initialize_reflection_system() {\n";
+    code << "\nvoid $initialize_reflection_system() {\n";
     {
       // we don't bother doing pushes into type info, it's easier for us to do it this way.
       code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
       code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
       code << type_info.str() << ";\n";
     }
-    code << "}\n#line 0 \"boilerplate.h\"\n";
+
+    if (!compile_command.has_flag("release")) {
+      code << "#line 0 \"boilerplate.h\"";
+    }
   }
 
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
+    }
+    if (!compile_command.has_flag("release")) {
+      code << "#line 0 \"boilerplate.hpp\"";
     }
     code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
@@ -846,7 +853,13 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-      code << std::format("#line 0 \"boilerplate.h\"\nint main (int argc, char** argv) {{\n${}_initialize(argc, argv);\n{}\n__ela_main_();\n}}\n",
+
+      if (!compile_command.has_flag("release")) {
+        code << "#line 0 \"boilerplate.h\"";
+      }
+
+      code << std::format("\nint main (int argc, char** argv) {{\n${}_initialize(argc, "
+                          "argv);\n{}\n__ela_main_();\n}}\n",
                           ctx.scope->find_type_id("Env", {}),
                           ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
                                                             : "{/* no reflection present in module */};");
@@ -1584,13 +1597,22 @@ void Emitter::emit_lambda(ASTLambda *node) {
   newline();
 }
 
+#define let auto
+
 void Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
-    node->return_type->accept(this);
-    (*ss) << " " + name;
-    emit_default_args = true;
-    node->params->accept(this);
-    emit_default_args = false;
+    let returns = global_get_type(node->return_type->resolved_type);
+
+    if (returns->is_kind(TYPE_FUNCTION)) {
+      auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
+      (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "(*" << name;
+      node->params->accept(this);
+      (*ss) << ")";
+    } else {
+      node->return_type->accept(this);
+      (*ss) << " " + name;
+      node->params->accept(this);
+    }
     defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
       auto block = node->block.get();

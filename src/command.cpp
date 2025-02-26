@@ -32,6 +32,10 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor) {
     std ::cout << "adding TEST_VERBOSE\n";
   }
 
+  if (!compile_command.has_flag("release")) {
+    emit.code << "#line 0 \"boilerplate.hpp\"";
+  }
+  
   emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {

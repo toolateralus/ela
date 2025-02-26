@@ -65,7 +65,6 @@ main :: fn() {
 
 
 static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
-#line 0 "boilerplate.hpp"
   #ifdef TESTING
   #define __TEST_RUNNER_MAIN                                                                                             \
     int main() {                                                                                                         \
@@ -78,7 +77,6 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   
   // This is stuff we just can't really get rid of while using a transpiled backend.
   static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
-  #line 0 "boilerplate.hpp"
   typedef unsigned long long int u64;
   typedef signed long long int s64;
   
