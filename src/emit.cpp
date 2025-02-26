@@ -833,6 +833,8 @@ void Emitter::visit(ASTProgram *node) {
       code << type_info.str() << ";\n";
     }
 
+    code << "}\n";
+
     if (!compile_command.has_flag("release")) {
       code << "#line 0 \"boilerplate.h\"";
     }
@@ -844,7 +846,7 @@ void Emitter::visit(ASTProgram *node) {
       test_init.pop_back();
     }
     if (!compile_command.has_flag("release")) {
-      code << "#line 0 \"boilerplate.hpp\"";
+      code << "#line 0 \"boilerplate.hpp\"\n";
     }
     code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
@@ -855,10 +857,10 @@ void Emitter::visit(ASTProgram *node) {
     if (has_user_defined_main && !is_freestanding) {
 
       if (!compile_command.has_flag("release")) {
-        code << "#line 0 \"boilerplate.h\"";
+        code << "#line 0 \"boilerplate.h\"\n";
       }
 
-      code << std::format("\nint main (int argc, char** argv) {{\n${}_initialize(argc, "
+      code << std::format("int main (int argc, char** argv) {{\n${}_initialize(argc, "
                           "argv);\n{}\n__ela_main_();\n}}\n",
                           ctx.scope->find_type_id("Env", {}),
                           ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
