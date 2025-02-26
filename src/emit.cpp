@@ -299,9 +299,12 @@ void Emitter::visit(ASTCall *node) {
       function_type = global_get_type(instance->resolved_type);
     }
     auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
+
     if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
       // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
       (*ss) << "&";
+    } else if (!param_0_ty->get_ext().is_pointer() && base_type->get_ext().is_pointer()) {
+      (*ss) << "*";
     }
 
     ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
@@ -992,6 +995,14 @@ void Emitter::visit(ASTSwitch *node) {
     use_eq_operator = false;
   }
 
+  static size_t index =0;
+  auto target_unique_id = "$switch_target$" + std::to_string(index++);
+  
+  (*ss) << "auto " << target_unique_id << " = ";
+  node->target->accept(this);
+  semicolon();
+  newline();
+
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
     if (!first) {
       (*ss) << " else ";
@@ -999,7 +1010,7 @@ void Emitter::visit(ASTSwitch *node) {
     emit_line_directive(target);
     (*ss) << " if (";
     if (use_eq_operator) {
-      target->accept(this);
+      (*ss) << target_unique_id;    
       (*ss) << " == ";
       _case.expression->accept(this);
     } else {
@@ -1009,6 +1020,7 @@ void Emitter::visit(ASTSwitch *node) {
     emit_line_directive(_case.block);
     _case.block->accept(this);
   };
+  
   bool first = true;
   for (const auto &_case : node->cases) {
     emit_switch_case(node->target, _case, first);

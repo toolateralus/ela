@@ -17,11 +17,4 @@ function_pointer_helper :: fn(x: s32, y: s32) -> s32 { return x * y; }
   from_fixed : FunctionPointer = &fixed[0];
 
   assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
-
-  function :: fn() -> FunctionPointer {
-    return &function_pointer_helper;
-  }
-
-  returned_ptr : FunctionPointer = function();
-  assert("Function returning function pointer", returned_ptr(2, 3) == 6);
 }

@@ -18,14 +18,7 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-// TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
-// TODO: we should not have reserved words from host language leak into this langauge.
-static std::set<std::string> reserved = {
-    "asm",     "double",   "new",      "switch",   "auto",      "else",    "operator", "template", "break",  "enum",
-    "private", "this",     "case",     "extern",   "protected", "throw",   "catch",    "float",    "public", "try",
-    "char",    "for",      "register", "typedef",  "class",     "friend",  "return",   "union",    "const",  "goto",
-    "short",   "unsigned", "continue", "if",       "signed",    "virtual", "default",  "inline",   "sizeof", "void",
-    "delete",  "int",      "static",   "volatile", "do",        "long",    "struct",   "while"};
+
 
 enum PreprocKind {
   PREPROC_IF,
@@ -828,6 +821,15 @@ ASTExpr *Parser::parse_primary() {
       node->target = parse_expr();
       expect(TType::LCurly);
       while (peek().type != TType::RCurly) {
+        if (peek().type == TType::Else) {
+          eat();
+          if (peek().type != TType::ExpressionBody) {
+            expect(TType::Colon);
+          }
+          node->default_case = parse_block();
+          if (peek().type == TType::Comma) eat();
+          continue;
+        }
         SwitchCase _case{
             .expression = parse_expr(),
         };
@@ -1236,8 +1238,7 @@ ASTStatement *Parser::parse_statement() {
     decl->value = parse_expr();
     decl->is_constexpr = true;
 
-    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str()) ||
-        reserved.contains(tok.value.get_str())) {
+    if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
                   "that name,",
@@ -1381,8 +1382,7 @@ ASTDeclaration *Parser::parse_declaration() {
   auto iden = eat();
   decl->name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str()) ||
-      reserved.contains(iden.value.get_str())) {
+  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
                 "that name,",

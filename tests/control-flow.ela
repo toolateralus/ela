@@ -202,6 +202,15 @@ switch_helper :: fn() -> s32 {
   assert("Returns in switched failed", switch_helper() == 5);
 }
 
+#test test_switch_with_else :: fn() {
+  n := 0;
+  case := switch n {
+    1 => false,
+    else => true,
+  }
+  assert("switch with else case failed", case);
+}
+
 
 #test test_iterate_iter :: fn() {
   list: s32[] = s32[]::init(.[0,1,2,3,4,5,6,7,8,9,10]);
