@@ -618,8 +618,8 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
 }
 
 void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
-  if (node->name == "main") {
-    throw_error("main function cannot be foreign", node->source_range);
+  if (node->name == "main" || node->name == "маин") {
+    throw_error("main/маин function cannot be foreign", node->source_range);
   }
 
   auto emit_params = [&] {
@@ -795,9 +795,12 @@ void Emitter::visit(ASTParamDecl *node) {
       node->normal.type->accept(this);
       (*ss) << ' ' << node->normal.name.get_str();
     }
-  } else {
+  } else if (node->tag == ASTParamDecl::Self) {
     (*ss) << ' ' << to_cpp_string(type) << " self";
+  } else {
+    (*ss) << ' ' << to_cpp_string(type) << " себя";
   }
+  
   return;
 }
 void Emitter::visit(ASTParamsDecl *node) {
@@ -1433,7 +1436,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
-  if (test_flag && node->name == "main") {
+  if (test_flag && (node->name == "main" || node->name == "маин")) {
     return false;
   }
   return true;
@@ -1666,7 +1669,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       int x = 0;
     }
 
-    if (node->name != "main") {
+    if (node->name != "main" && node->name != "маин") {
       if ((node->flags & FUNCTION_IS_STATIC) != 0) {
         (*ss) << "static ";
       }
@@ -1689,8 +1692,9 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       name += mangled_type_args(node->generic_arguments);
     }
 
-    if (node->name == "main" && !is_freestanding) {
+    if (node->name == "main" || node->name == "маин" && !is_freestanding) {
       has_user_defined_main = true;
+      user_defined_entry_point = node->name;
       node->return_type->accept(this);
       (*ss) << " __ela_main_()"; // We use Env::args() to get args now.
       node->block.get()->accept(this);

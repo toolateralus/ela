@@ -358,6 +358,15 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->append_type_extensions(type);
         return type;
     }},
+    // #self, return the type of the current declaring struct or union
+    {.identifier = "себя",
+      .kind = DIRECTIVE_KIND_DONT_CARE,
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
+        NODE_ALLOC(ASTType, type, range, defer, parser);
+        type->kind = ASTType::SELF;
+        parser->append_type_extensions(type);
+        return type;
+    }},
     // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -1488,13 +1497,18 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     auto name = expect(TType::Identifier).value;
 
-    if (name == "self") {
+    if (name == "self" || name == "себя") {
       if (!params->params.empty()) {
         end_node(nullptr, range);
         throw_error("\"self\" must appear first in method parameters.", range);
       }
+
+      if (name == "self") {
+        param->tag = ASTParamDecl::Self;
+      } else {
+        param->tag = ASTParamDecl::Себя;
+      }
       params->has_self = true;
-      param->tag = ASTParamDecl::Self;
       params->params.push_back(param);
 
       if (peek().type == TType::Mul) {

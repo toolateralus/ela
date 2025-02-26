@@ -124,6 +124,9 @@ struct DependencyEmitter;
 struct Emitter : VisitorBase {
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
+
+  InternedString user_defined_entry_point;
+
   bool emit_default_init = true;
   bool emit_default_value = true;
   int num_tests = 0;

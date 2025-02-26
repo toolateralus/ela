@@ -305,6 +305,7 @@ struct ASTParamDecl : ASTNode {
   enum {
     Normal,
     Self,
+    Себя,
   } tag;
   union {
     struct {

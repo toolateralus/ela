@@ -260,33 +260,79 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
     // control flow
     {"in", TType::In},
+    {"в", TType::In},
+
     {"where", TType::Where},
+    {"где", TType::Where},
+
     {"is", TType::Is},
+    {"является", TType::Is},
+
     {"sizeof", TType::Size_Of},
+    {"кегль", TType::Size_Of},
+
     {"fn", TType::Fn},
+    {"фн", TType::Fn},
+
     {"switch", TType::Switch},
+    {"матч", TType::Switch},
+
     {"then", TType::Then},
+    {"тогда", TType::Then},
+
     {"return", TType::Return},
+    {"возврат", TType::Return},
+
     {"break", TType::Break},
+    {"прерв", TType::Break},
+
     {"continue", TType::Continue},
+    {"продолжать", TType::Continue},
+
     {"for", TType::For},
+    {"для", TType::For},
+
     {"while", TType::While},
+    {"пока", TType::While},
+
     {"if", TType::If},
+    {"если", TType::If},
+
     {"else", TType::Else},
+    {"ещё", TType::Else},
+
     // type declarations
     {"struct", TType::Struct},
+    {"структ", TType::Struct},
+    
     {"union", TType::Union},
+    {"союз", TType::Union},
+
     {"enum", TType::Enum},
+    {"перечень", TType::Enum},
+
     // literals
     {"true", TType::True},
+    {"правда", TType::True},
+
     {"false", TType::False},
+    {"неверим", TType::False},
+
     {"null", TType::Null},
+    {"нулевой", TType::Null},
 
     // miscellaneous
     {"as", TType::As},
+    {"как", TType::As},
+
     {"impl", TType::Impl},
+    {"реализуйте", TType::Impl},
+
     {"defer", TType::Defer},
+    {"отложить", TType::Defer},
+
     {"interface", TType::Interface},
+    {"интерфейс", TType::Interface},
 };
 
 static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},

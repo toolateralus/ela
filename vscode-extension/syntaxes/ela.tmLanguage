@@ -152,25 +152,25 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|then|else|for|while|defer|return|switch)\b</string>
+					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(break|continue)\b</string>
+					<string>\b(break|прерв|continue|продолжать)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
 				<dict>
           <key>match</key>
-          <string>\b(self)\b</string>
+          <string>\b(self|себя)\b</string>
           <key>name</key>
           <string>variable.language.ela</string>
         </dict>
 				<dict>
 					<key>match</key>
-					<string>\b(null|true|false)\b</string>
+					<string>\b(null|нулевой|true|правда|неверим|false)\b</string>
 					<key>name</key>
 					<string>constant.language.ela</string>
 				</dict>
@@ -194,13 +194,13 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum|fn|union)\b</string>
+					<string>\b(struct|структ|enum|перечень|fn|фн|союз|union)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(as|in|is)\b</string>
+					<string>\b(где|where|as|как|in|в|is|является)\b</string>
 					<key>name</key>
 					<string>keyword.function.ela</string>
 				</dict>
@@ -224,7 +224,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|enum|union|interface|impl)\b(?:(\{)(\}))?</string>
+					<string>\b(struct|структ|enum|перечень|union|союз|interface|интерфейс|impl|реализуйте)\b(?:(\{)(\}))?</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -279,7 +279,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(sizeof)\b\s*\(</string>
+					<string>\b(sizeof|кегль)\b\s*\(</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
