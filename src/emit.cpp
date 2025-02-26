@@ -422,7 +422,7 @@ void Emitter::visit(ASTLiteral *node) {
     // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
     // that's why we have fat u32 chars anyway.
     case ASTLiteral::Char:
-      output = '\'' + node->value.get_str() + '\'';
+      output = node->value.get_str();
       break;
     case ASTLiteral::Integer:
       output = node->value.get_str();

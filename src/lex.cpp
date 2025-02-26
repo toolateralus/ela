@@ -7,10 +7,10 @@ using std::stringstream;
 
 // TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
 // TODO: we should not have reserved words from host language leak into this langauge.
-static std::set<std::string> reserved = {
-    "auto",  "break",  "case",   "const",   "continue", "default",  "do",       "double",   "else",
-    "enum",  "extern", "float",  "for",    "goto",    "if",       "int",      "long",     "register", "return",
-    "short", "signed", "struct", "switch", "typedef", "union",    "unsigned", "volatile", "while"};
+static std::set<std::string> reserved = {"auto",   "break",  "case",    "const",    "continue", "default",  "do",
+                                         "double", "else",   "enum",    "extern",   "float",    "for",      "goto",
+                                         "if",     "int",    "long",    "register", "return",   "short",    "signed",
+                                         "struct", "switch", "typedef", "union",    "unsigned", "volatile", "while"};
 
 void Lexer::get_token(State &state) {
   size_t &pos = state.pos;
@@ -74,28 +74,99 @@ void Lexer::get_token(State &state) {
     SourceLocation location{state.line, state.col, state.file_idx};
 
     if (c == '\'') {
-      auto start = pos;
-      pos++; // move past '
-      col++;
-      c = input[pos];
-      std::string value;
-      if (c == '\\') {
-        value += c; // eat escape characters if present
-        pos++;
+        auto start = pos;
+        pos++; // move past '
         col++;
         c = input[pos];
-      }
-      value += c;
-      pos++; // move past character
-      col++;
-      c = input[pos];
-      if (c != '\'') {
-        throw_error("invalid char literal: too many characters", {location});
-      }
-      pos++; // move past '
-      col++;
-      state.lookahead_buffer.push_back(Token(location, value, TType::Char, TFamily::Literal));
-      return;
+        uint32_t codepoint = 0;
+    
+        if (c == '\\') {
+            // Handle escape sequences
+            pos++;
+            col++;
+            c = input[pos];
+            pos++;
+            col++;
+            switch (c) {
+                case 'n': codepoint = '\n'; break;
+                case 'v': codepoint = '\v'; break;
+                case 'b': codepoint = '\b'; break;
+                case 't': codepoint = '\t'; break;
+                case 'f': codepoint = '\f'; break;
+                case 'r': codepoint = '\r'; break;
+                case '\\': codepoint = '\\'; break;
+                case '\'': codepoint = '\''; break;
+                case '\"': codepoint = '\"'; break;
+                case '0': codepoint = '\0'; break;
+                case 'x':
+                case 'u':
+                case 'U': {
+                    int num_digits = (c == 'x') ? 2 : (c == 'u') ? 4 : 8;
+                    pos++;
+                    col++;
+                    codepoint = 0;
+                    for (int i = 0; i < num_digits; ++i) {
+                        if (pos >= input.size() || !std::isxdigit(input[pos])) {
+                            throw_error("invalid hexadecimal escape sequence", {location});
+                        }
+                        codepoint = (codepoint << 4) | std::stoi(std::string(1, input[pos]), nullptr, 16);
+                        pos++;
+                        col++;
+                    }
+                    break;
+                }
+                default:
+                    if (c >= '0' && c <= '7') { // Octal escape sequence
+                        codepoint = 0;
+                        for (int i = 0; i < 3 && c >= '0' && c <= '7'; ++i) {
+                            codepoint = (codepoint << 3) | (c - '0');
+                            pos++;
+                            col++;
+                            c = input[pos];
+                        }
+                    } else {
+                        throw_error(std::format("invalid escape sequence {}", c), {location});
+                    }
+                    break;
+            }
+        } else if ((c & 0x80) == 0) {
+            // ASCII character
+            codepoint = c;
+            pos++;
+            col++;
+        } else {
+            // UTF-8 character
+            int num_bytes = 0;
+            if ((c & 0xE0) == 0xC0)
+                num_bytes = 2;
+            else if ((c & 0xF0) == 0xE0)
+                num_bytes = 3;
+            else if ((c & 0xF8) == 0xF0)
+                num_bytes = 4;
+            else
+                throw_error("invalid UTF-8 start byte", {location});
+    
+            for (int i = 0; i < num_bytes; ++i) {
+                if (pos >= input.size() || (i > 0 && (input[pos] & 0xC0) != 0x80)) {
+                    throw_error("invalid UTF-8 continuation byte", {location});
+                }
+                codepoint = (codepoint << 6) | (input[pos] & 0x3F);
+                pos++;
+                col++;
+            }
+        }
+    
+        c = input[pos];
+        if (c != '\'') {
+            throw_error(std::format("invalid char literal: too many characters {}", codepoint), {location});
+        }
+        pos++; // move past '
+        col++;
+    
+        std::stringstream ss;
+        ss << "0x" << std::hex << codepoint;
+        state.lookahead_buffer.push_back(Token(location, ss.str(), TType::Char, TFamily::Literal));
+        return;
     }
 
     if (c == '"') {
