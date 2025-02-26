@@ -1,10 +1,6 @@
+#alias fun :: fn * (s32, s32) -> s32;
 
-#alias fun :: fn * () -> s32;
-
-
-fun_return_fun :: fn() -> fun {
-  return null;
-}
+#foreign fun_return_fun :: fn() -> fun;
 
 main :: fn() { 
 

@@ -619,22 +619,37 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
     throw_error("main function cannot be foreign", node->source_range);
   }
 
-  (*ss) << "extern ";
-  (*ss) << get_cpp_scalar_type(node->return_type->resolved_type);
-  space();
-  (*ss) << node->name.get_str() << '(';
-  for (const auto &param : node->params->params) {
-    (*ss) << get_cpp_scalar_type(param->resolved_type);
-    if (param != node->params->params.back()) {
-      (*ss) << ", ";
+  auto emit_params = [&] {
+    (*ss) << '(';
+    for (const auto &param : node->params->params) {
+      (*ss) << get_cpp_scalar_type(param->resolved_type);
+      if (param != node->params->params.back()) {
+        (*ss) << ", ";
+      }
     }
+    if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
+      (*ss) << ", ...);";
+    } else {
+      (*ss) << ")";
+    }
+  };
+
+  (*ss) << "extern ";
+  auto returns = global_get_type(node->return_type->resolved_type);
+  if (returns->is_kind(TYPE_FUNCTION)) {
+    auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
+    (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "(*" << node->name.get_str();
+    emit_params();
+    (*ss) << ")";
+  } else {
+    (*ss) << to_cpp_string(returns);
+    space();
+    (*ss) << " " + node->name.get_str();
+    emit_params();  
   }
 
-  if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
-    (*ss) << ", ...);";
-  } else {
-    (*ss) << ");";
-  }
+  semicolon();
+  space();
 }
 
 void Emitter::visit(ASTStructDeclaration *node) {
@@ -855,7 +870,6 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-
       if (!compile_command.has_flag("release")) {
         code << "#line 0 \"boilerplate.h\"\n";
       }
