@@ -268,8 +268,10 @@ struct DependencyEmitter : VisitorBase {
   std::set<ASTFunctionDeclaration*> visitedFunctions = {};
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
-  std::string define_type(int type_id);
-  std::string decl_type(int type_id);
+  void define_type(int type_id);
+  void decl_type(int type_id);
+  
+  Nullable<Symbol> get_symbol(ASTNode *node);
 
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
