@@ -539,6 +539,8 @@ ASTProgram *Parser::parse() {
       states.pop_back();
       if (!states.empty()) {
         std::filesystem::current_path(states.back().path.parent_path());
+      } else {
+        break;
       }
     }
 
