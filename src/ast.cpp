@@ -1050,6 +1050,15 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+
+  // #self::fn() or some thing.
+  if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
+    NODE_ALLOC(ASTExprStatement, statment, range, _, this)
+    statment->expression = parse_expr();
+    end_node(statment, range);
+    return statment;
+  }
+
   // * '#' Directives.
   if (tok.type == TType::Directive) {
     auto range = begin_node();
@@ -1065,6 +1074,7 @@ ASTStatement *Parser::parse_statement() {
     end_node(statement, range);
     return statement;
   }
+
 
   if (peek().type == TType::Defer) {
     return parse_defer();

@@ -1591,16 +1591,25 @@ void Typer::visit(ASTSubscript *node) {
   if (overload != -1) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+
+    auto type = global_get_type(node->resolved_type);
+    if (!type->get_ext().is_pointer()) {
+      throw_error("subscript methods MUST return a pointer!\nthis is because we have to be able to assign though it, "
+                  "so `*$13_subscript$1(obj, index) = 10` has to be possible\n"
+                  "example: subscript :: fn(self*, index: u32) -> s32* { return &self.data[index]; }\n"
+                  "obviously this is somewhat limiting. we have yet to find a better solution to this.",
+                  node->source_range);
+    }
+
+    node->resolved_type = type->get_element_type();
+    
     return;
   }
 
-  // * Todo: reimplement operator overloads with interfaces.
-
   auto ext = left_ty->get_ext();
-
   if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
     throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: "
-                            "fn(self*, idx: u32)' method. {}",
+                            "fn(self*, idx: u32) -> T*' method. {}",
                             left_ty->to_string()),
                 node->source_range);
   }

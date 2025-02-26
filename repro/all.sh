@@ -33,7 +33,7 @@ echo -e "\e[0mFixed: \e[1;32m${fixed[@]}\e[0m"
 echo -e "\e[0mUnfixed: \e[1;31m${unfixed[@]}\e[0m"
 
 for test in "${fixed[@]}"; do
-	read -p "Do you want to move the fixed test '$test'? [y/n] " choice
+	read -p "Do you want to move the fixed repro '$test'? [y/n] " choice
 	case "$choice" in 
 		y|Y ) mv "$test".ela fixed/"$test".ela; echo "Moved $test";;
 		n|N ) echo "Kept $test";;
@@ -41,7 +41,7 @@ for test in "${fixed[@]}"; do
 	esac
 done
 for test in "${unfixed[@]}"; do
-	read -p "Do you want to move the unfixed test '$test'? [y/n] " choice
+	read -p "Do you want to move the unfixed repro '$test'? [y/n] " choice
 	case "$choice" in 
 		y|Y ) mv fixed/"$test".ela "$test".ela; echo "Moved $test";;
 		n|N ) echo "Kept $test";;

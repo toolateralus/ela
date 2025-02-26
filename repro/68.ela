@@ -5,6 +5,13 @@ Struct :: struct {
   c: Struct*,
 };
 
+// This problem is very hard to fix, we need some serious semantic analysis to figure out 
+// when this occurs and how to report it.
+
+// One idea is to just ban initializing global variables, but it can be useful.
+// We could just ban global variables since we offer statics and singletons, 
+
+// but statics share the same problem where a non-constant initialization is an error in c.
 error: Struct = {
   a: 0,
   b: 0,

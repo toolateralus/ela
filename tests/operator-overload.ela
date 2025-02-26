@@ -50,11 +50,11 @@ impl Neg![Vec2] for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(self*, index: s32) -> f32 {
+  subscript :: fn(self*, index: s32) -> f32* {
     if index == 0 {
-        return self.x;
+      return &self.x;
     } else {
-        return self.y;
+      return &self.y;
     }
   }
 }

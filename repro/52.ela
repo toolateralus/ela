@@ -3,7 +3,12 @@ Strukt :: struct {}
 impl Strukt {
   statik :: fn() {}
 }
+/* 
+  We should probably just disallow taking function pointers to methods?
+  or at least figure out why it doesn't work.
 
+  since we have no vtables we should easily be able to do so.
+*/
 main :: fn() {
   n := &Strukt::statik;
 //   /home/cooper/repos/languages/ela/ela_source/dummy.ela:8:33: error: expected expression

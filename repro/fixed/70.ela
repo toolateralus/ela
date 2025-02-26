@@ -12,7 +12,7 @@ generic :: fn![T]() {
   }
 
   // * This just straight up crashes the compiler when trying to read from the lambda's unique id.
-  lambda := fn() { 
+  lambda1 := fn() { 
     printf("%s\n", "alloo"); 
   }
 }

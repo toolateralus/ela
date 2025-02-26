@@ -1,8 +1,0 @@
-
-Struct :: struct![T] {
-  n: T
-}
-
-main :: fn() {
-  n: Struct; // This passes our compiler, but clearly it's not possible.
-}
