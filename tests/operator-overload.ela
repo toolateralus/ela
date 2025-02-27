@@ -3,11 +3,11 @@ Vec2 :: struct {
   y: f32,
 }
 
-Add :: interface![Right, Result] {
+Add :: interface!<Right, Result> {
   add :: fn(self*, right: Right) -> Result;
 }
 
-impl Add![Vec2, Vec2] for Vec2 {
+impl Add!<Vec2, Vec2> for Vec2 {
   add :: fn(self*, right: Vec2) -> Vec2 {
     return .{
       x: self.x + right.x,
@@ -23,11 +23,11 @@ impl Add![Vec2, Vec2] for Vec2 {
   assert("+ failed",  result.x == 2 && result.y == 2);
 }
 
-Sub :: interface![Right, Result] {
+Sub :: interface!<Right, Result> {
   sub :: fn(self*, right: Right) -> Result;
 }
 
-impl Sub![Vec2, Vec2] for Vec2 {
+impl Sub!<Vec2, Vec2> for Vec2 {
   sub :: fn(self*, right: Vec2) -> Vec2 {
     return .{
       x: self.x - right.x,
@@ -36,11 +36,10 @@ impl Sub![Vec2, Vec2] for Vec2 {
   }
 }
 
-Neg :: interface![Result] {
-  neg :: fn(self*) -> Result;
+Neg :: interface!<Result> {  neg :: fn(self*) -> Result;
 }
 
-impl Neg![Vec2] for Vec2 {
+impl Neg!<Vec2> for Vec2 {
   neg :: fn(self*) -> Vec2 {
     return .{
       x: -self.x,

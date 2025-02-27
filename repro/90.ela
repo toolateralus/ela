@@ -1,5 +1,5 @@
-impl![T] List![T] {
-  order_by :: fn(self, predicate: fn* (T*, T*) -> bool) -> List![T] {
+impl!<T> List!<T> {
+  order_by :: fn(self, predicate: fn* (T*, T*) -> bool) -> List!<T> {
     new_list := self.clone();
     for i in 0..new_list.length {
       for j in (i+1)..new_list.length {
@@ -15,7 +15,7 @@ impl![T] List![T] {
 }
 
 main :: fn() { 
-  type := typeof(List![s32]);
+  type := typeof(List!<s32>);
   ordered_fields := type.fields.order_by(fn(a: Field*, b) -> bool {
     return a.offset < b.offset;
   });

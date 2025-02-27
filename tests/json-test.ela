@@ -4,7 +4,7 @@
 JsonValue :: struct {}
 
 JsonValueDeleter :: struct {
-  vals: List![JsonValue*],
+  vals: List!<JsonValue*>,
 }
 
 impl JsonValueDeleter {

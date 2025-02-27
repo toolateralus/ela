@@ -1,5 +1,5 @@
 
-Struct :: struct![T] {
+Struct :: struct!<T> {
   n: T
 }
 

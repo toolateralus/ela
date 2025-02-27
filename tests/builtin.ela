@@ -16,13 +16,13 @@ Xaryu :: struct {
 }
 
 #test test_array_concat_operator :: fn() {
-  array: List![s32];
+  array: List!<s32>;
   array.push(10);
   assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
-  array: List![s32];
+  array: List!<s32>;
   for i in 0..100 {
     array.push(10);
   }
@@ -46,7 +46,7 @@ Xaryu :: struct {
 }
 
 #test test_slicing_array :: fn() {
-  arr := List![s32]::init(.[
+  arr := List!<s32>::init(.[
     0, 0, 0,
     0, 0, 0,
     0, 0, 0,
@@ -84,7 +84,7 @@ Xaryu :: struct {
 //     }
 //   }
 
-//   dynamic : List![List![s64]];
+//   dynamic : List!<List><s64]>;
 //   for x in 0..5 {
 //     dynamic.push({});
 //     for y in 0..5 {

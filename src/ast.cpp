@@ -609,13 +609,40 @@ ASTCall *Parser::parse_call(ASTExpr *function) {
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
+    auto op = peek();
+
     Precedence token_precedence = get_operator_precedence(peek());
+
+    if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GT) {
+      token_precedence = PRECEDENCE_SHIFT;
+    }
+
+    if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GE) {
+      token_precedence = PRECEDENCE_ASSIGNMENT;
+    }
+
     if (token_precedence <= precedence)
       break;
+
+
+    if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GT) {
+      op.type = TType::SHR;
+      op.value = ">>";
+      eat();
+      eat();
+    } else if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GE) {
+      op.type = TType::CompSHR;
+      op.value = ">>=";
+      eat();
+      eat();
+    } else {
+      eat();
+    }
+
     ASTBinExpr *binexpr = ast_alloc<ASTBinExpr>();
     binexpr->source_range = left->source_range;
-    auto op = eat();
     auto right = parse_expr(token_precedence);
+
     binexpr->left = left;
     binexpr->right = right;
     binexpr->op = op;
@@ -1215,6 +1242,7 @@ ASTStatement *Parser::parse_statement() {
     return expr;
   }
 
+
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1283,7 +1311,8 @@ ASTStatement *Parser::parse_statement() {
     const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
 
     const bool is_assignment_or_compound =
-        next.type == TType::Assign || next.type == TType::Comma || next.is_comp_assign();
+        next.type == TType::Assign || next.type == TType::Comma || next.is_comp_assign() || 
+        (tok.type == TType::Identifier && next.is_relational());
 
     const bool is_deref = tok.type == TType::Mul;
 
@@ -1998,12 +2027,12 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
   auto range = begin_node();
   expect(TType::GenericBrace);
   std::vector<ASTType *> params;
-  while (peek().type != TType::RBrace) {
+  while (peek().type != TType::GT) {
     params.push_back(parse_type());
-    if (peek().type != TType::RBrace)
+    if (peek().type != TType::GT)
       expect(TType::Comma);
   }
-  expect(TType::RBrace);
+  expect(TType::GT);
   end_node(nullptr, range);
   if (params.empty()) {
     throw_error("![] generic arguments cannot be empty!", range);
@@ -2016,12 +2045,12 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   auto range = begin_node();
   expect(TType::GenericBrace);
   std::vector<GenericParameter> params;
-  while (peek().type != TType::RBrace) {
+  while (peek().type != TType::GT) {
     params.emplace_back(expect(TType::Identifier).value);
-    if (peek().type != TType::RBrace)
+    if (peek().type != TType::GT)
       expect(TType::Comma);
   }
-  expect(TType::RBrace);
+  expect(TType::GT);
   end_node(nullptr, range);
   if (params.empty()) {
     throw_error("![] generic parameters cannot be empty!", range);
@@ -2262,9 +2291,6 @@ Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
   import("bootstrap");
-  // auto &state = states.back();
-  // state.input = "#import bootstrap;\n" + state.input; // TODO: do this in a more structured way. this works, but meh.
-  // state.input_len = state.input.length();
   typer = new Typer(context);
 }
 

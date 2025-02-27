@@ -962,7 +962,6 @@ void Typer::visit(ASTWhile *node) {
 void Typer::visit(ASTCall *node) {
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
-
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
   auto symbol = get_symbol(node->function).get();
@@ -970,17 +969,18 @@ void Typer::visit(ASTCall *node) {
     if (!type) {
       type = global_get_type(symbol->type_id);
     }
-
     auto declaring_node = symbol->function.declaration;
     if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
-
+      
       // resolve a generic call.
       if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
+
         auto old_type = type_context;
         Defer _([&] { type_context = old_type; });
+
         ASTType func_type_ast;
         if (func_decl->declaring_type != Type::INVALID_TYPE_ID) {
           func_type_ast.resolved_type = func_decl->declaring_type;
@@ -990,6 +990,7 @@ void Typer::visit(ASTCall *node) {
         GENERIC_PANIC_HANDLER(
             data, 1, { func_decl = resolve_generic_function_call(node, func_decl); }, node->source_range);
       }
+
       type = global_get_type(func_decl->resolved_type);
     }
   } else {
@@ -997,8 +998,9 @@ void Typer::visit(ASTCall *node) {
     type = global_get_type(node->function->resolved_type);
   }
 
-  if (!type)
+  if (!type) {
     throw_error("use of undeclared function", node->source_range);
+  }
 
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error(std::format("unable to call a non-function, got {}", type->to_string()), node->source_range);
@@ -1020,6 +1022,7 @@ void Typer::visit(ASTCall *node) {
   } else {
     type_check_args_from_info(node->arguments, info);
   }
+
   node->resolved_type = info->return_type;
 }
 

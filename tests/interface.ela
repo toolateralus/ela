@@ -44,7 +44,7 @@
 }
 
 #region generic_interface_regular_struct {
-  GenericInterface :: interface![T] {
+  GenericInterface :: interface!<T> {
     static_get :: fn() -> T;
     method_get :: fn(self) -> T;
     method_get_ptr :: fn(self*) -> T;
@@ -58,7 +58,7 @@
     c: bool,
   }
 
-  impl GenericInterface![s32] for Struct1 {
+  impl GenericInterface!<s32> for Struct1 {
     static_get :: fn() -> s32 {
       return 0;
     }
@@ -87,11 +87,11 @@
 }
 
 #region generic interface generic struct {
-  Struct2 :: struct![T] {
+  Struct2 :: struct!<T> {
     n: T
   }  
 
-  impl![T] GenericInterface![T] for Struct2![T] {
+  impl!<T> GenericInterface!<T> for Struct2!<T> {
     static_get :: fn() -> T {
       t: T;
       return t;
@@ -116,18 +116,18 @@
 }
 
 #test generic_struct_generic_interface :: fn() {
-  assert("interface failed", Struct2![s32]::static_get() == 0);
-  assert("interface failed", Struct2![s32]::static_get_self().n == 0);
-  instance: Struct2![s32];
+  assert("interface failed", Struct2!<s32>::static_get() == 0);
+  assert("interface failed", Struct2!<s32>::static_get_self().n == 0);
+  instance: Struct2!<s32>;
   assert("interface failed", instance.method_get() == 0);
   assert("interface failed", instance.method_get_ptr() == 0);
   assert("interface failed", instance.method_get_self().n == 0);
 }
 
 #region uninstantiated generic {
-  GenericWithoutInstance :: struct![T] { }
+  GenericWithoutInstance :: struct!<T> { }
 
-  impl![T] GenericWithoutInstance![T] {
+  impl!<T> GenericWithoutInstance!<T> {
     thing :: fn(self*, t: T) { }
   }
 }

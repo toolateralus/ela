@@ -1,0 +1,12 @@
+#alias Tuple :: (s32, Type*);
+
+// ! We can not do this, unless we have some scratch field like
+// * _: Tuple;
+
+Pack :: struct {
+  tuples: Tuple[],
+}
+
+main :: fn() { 
+
+}

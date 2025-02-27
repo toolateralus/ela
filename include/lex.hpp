@@ -150,8 +150,8 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Semi);
     TTYPE_CASE(Or);
     TTYPE_CASE(And);
-    TTYPE_CASE(SHL);
     TTYPE_CASE(SHR);
+    TTYPE_CASE(SHL);
     TTYPE_CASE(Xor);
     TTYPE_CASE(LogicalOr);
     TTYPE_CASE(LogicalAnd);
@@ -369,7 +369,6 @@ static std::unordered_map<std::string, TType> operators{{"=>", TType::Expression
                                                         {"||", TType::LogicalOr},
                                                         {"&&", TType::LogicalAnd},
                                                         {"<<", TType::SHL},
-                                                        {">>", TType::SHR},
                                                         {"^", TType::Xor},
                                                         {"<", TType::LT},
                                                         {">", TType::GT},
@@ -391,7 +390,7 @@ static std::unordered_map<std::string, TType> operators{{"=>", TType::Expression
                                                         {"^=", TType::CompXor},
                                                         {"<<=", TType::CompSHL},
                                                         {">>=", TType::CompSHR},
-                                                        {"![", TType::GenericBrace}};
+                                                        {"!<", TType::GenericBrace}};
 
 struct Lexer {
   struct State {

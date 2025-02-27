@@ -7,7 +7,7 @@ function_pointer_helper :: fn(x: s32, y: s32) -> s32 { return x * y; }
   ptr := &function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 
-  array: List![FunctionPointer];
+  array: List!<FunctionPointer>;
   array.push(&function_pointer_helper)
   from_arr : FunctionPointer = &array[0];
   assert("Array of function pointers", from_arr(2, 3) == 6);

@@ -22,7 +22,7 @@ Reflector :: struct {
   reflector.n = 100;
   type := typeof(Reflector);
   field := type.fields[0];
-  n := *(field.get![Reflector*](&reflector) as s32*);
+  n := *(field.get!<Reflector*>(&reflector) as s32*);
   assert("reflection field.set() failed.", n == 100);
 }
 
@@ -37,7 +37,7 @@ Reflector :: struct {
 //     ++index;
 //   }
 
-//   dynamic := List![s32]::init({3, 2, 1});
+//   dynamic := List!<s32>::init({3, 2, 1});
 //   dynamic_type := typeof(dynamic);
 //   index = 0;
 //   dynamic_elements := dynamic_type.elements((&dynamic) as u8*);

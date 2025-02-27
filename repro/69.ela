@@ -1,5 +1,5 @@
 
-generic :: fn![T]() {
+generic :: fn!<T>() {
   t := #typeid(T) // this doesn't work. T isn't available at parse time, when this is executed.
 }
 
