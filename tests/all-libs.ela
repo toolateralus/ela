@@ -4,7 +4,6 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-#import builder;
 #import directory;
 #import dlfcn;
 #import file;

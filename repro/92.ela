@@ -1,0 +1,26 @@
+
+#import format;
+
+Vec2 :: struct {
+  x: f32,
+  y: f32,
+}
+
+impl Vec2 {
+  format :: fn(self, builder: String_Builder*) {
+    builder.append_then_free(format("Vec2 { x: %, y: % }", .[
+      any::from(&self.x),
+      any::from(&self.y),
+    ]));
+  }
+}
+
+main :: fn() {
+  builder: String_Builder;
+  
+  vec2: Vec2;
+  vec2.format(&builder);
+
+  println(builder.get_string());
+}
+
