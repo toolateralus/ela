@@ -53,16 +53,14 @@ void Emitter::forward_decl_type(Type *type) {
       }
       forward_decl_type(global_get_type(info->return_type));
     } break;
+    case TYPE_TUPLE:
+    case TYPE_TAGGED_UNION:
     case TYPE_STRUCT: {
       auto info = type->get_info()->as<StructTypeInfo>();
       std::string kw = "typedef struct ";
       if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
         kw = "typedef union ";
-      (*ss) << kw << type->get_base().get_str() << " " << type->get_base().get_str() << ";\n";
-    } break;
-    case TYPE_TUPLE:
-    case TYPE_TAGGED_UNION: {
-      (*ss) << "struct " << to_cpp_string(type) << ";\n";
+      (*ss) << kw << to_cpp_string(type) << " " << to_cpp_string(type) << ";\n";
     } break;
     default:
       return;
