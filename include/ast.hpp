@@ -84,6 +84,7 @@ struct ControlFlow {
     result += #flag " ";
 
 struct ASTBlock;
+
 struct ASTNode {
   ControlFlow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
