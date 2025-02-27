@@ -237,11 +237,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
 
-        if (parser->ctx.scope != root_scope)
-          throw_error(
-              std::format("cannot declare a non-top level foreign function:: {}", name.value),
-              range);
-
         parser->expect(TType::DoubleColon);
         parser->expect(TType::Fn);
 
@@ -2034,10 +2029,6 @@ std::vector<ASTType *> Parser::parse_generic_arguments() {
   }
   expect(TType::GT);
   end_node(nullptr, range);
-  if (params.empty()) {
-    throw_error("![] generic arguments cannot be empty!", range);
-    ;
-  }
   return params;
 }
 
@@ -2052,10 +2043,6 @@ std::vector<GenericParameter> Parser::parse_generic_parameters() {
   }
   expect(TType::GT);
   end_node(nullptr, range);
-  if (params.empty()) {
-    throw_error("![] generic parameters cannot be empty!", range);
-    ;
-  }
   return params;
 }
 

@@ -332,7 +332,7 @@ static std::string get_unmangled_name(const Type *type) {
     base = base.substr(0, first);
   }
   if (!type->generic_args.empty()) {
-    base += "![";
+    base += "!<";
     auto it = 0;
     for (auto id: type->generic_args) {
       base += get_unmangled_name(global_get_type(id));

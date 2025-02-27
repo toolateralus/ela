@@ -1,20 +1,23 @@
 
 
 AST :: enum(union) {
-  Identifier :: str;
-  Float :: f64;
-  Integer :: s64;
-  Binary :: struct {
+  Identifier(str),
+  Float(f64),
+  Integer(s64),
+
+  Binary {
     left: AST*,
     right: AST*,
     op: Operator,
-  };
-  Unary :: struct {
+  }
+
+  Unary{
     operand: AST*,
     op: Operator,
-  };
-  Program :: struct {
-    statements: List![AST];
+  }
+  
+  Program {
+    statements: List![AST],
   }
 }
 

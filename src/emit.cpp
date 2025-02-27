@@ -1235,7 +1235,7 @@ std::string get_type_flags(Type *type) {
   // TODO: refactor this for new String/str types?
   // And C string.
   // For now we'll just say it's u8* only.
-  if (type->id == root_scope->find_type_id("u8", {{{TYPE_EXT_POINTER}}})) {
+  if (type->id == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}})) {
     return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
   }
   switch (type->kind) {

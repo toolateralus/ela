@@ -418,7 +418,7 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   type->set_base(name);
   type->set_info(info);
   if (!info->scope) {
-    info->scope = create_child(root_scope);
+    info->scope = create_child(nullptr);
   }
   return type->id;
 }
@@ -679,7 +679,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   info->types = types;
 
   type->set_info(info);
-  info->scope = create_child(root_scope);
+  info->scope = create_child(nullptr);
 
   // We do this for dot expressions that do tuple.1 etc.
   // Only in the base type.

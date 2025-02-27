@@ -1,5 +1,7 @@
 # Keywords
 
+Dear russian speakers, please help make these make sense :D
+
 | English    | Russian       | Description        |
 |------------|---------------|--------------------|
 | in         | в             | iteration          |

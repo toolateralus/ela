@@ -90,7 +90,6 @@ struct Symbol {
 struct ASTFunctionDeclaration;
 struct ASTInterfaceDeclaration;
 
-extern Scope *root_scope;
 
 struct Scope {
   std::vector<InternedString> ordered_symbols;
@@ -101,16 +100,14 @@ struct Scope {
     return defines;
   };
 
-  bool add_def(const InternedString &define) { return defines().insert(define).second; }
-
-  bool has_def(const InternedString &define) const {
+  static bool add_def(const InternedString &define) { return defines().insert(define).second; }
+  static bool has_def(const InternedString &define) {
     if (defines().contains(define)) {
       return true;
     }
     return false;
   }
-
-  void undef(const InternedString &define) { defines().erase(define); }
+  static void undef(const InternedString &define) { defines().erase(define); }
 
   Scope *parent = nullptr;
   Scope(Scope *parent = nullptr) : symbols({}), parent(parent) {}
@@ -236,9 +233,6 @@ struct Context {
     scope = in_scope;
   }
   inline Scope *exit_scope() {
-    if (scope == root_scope) {
-      throw_error("internal compiler error: attempted to exit the global scope.", {});
-    }
     auto old_scope = scope;
     if (scope) {
       scope = scope->parent;

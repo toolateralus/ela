@@ -5,27 +5,27 @@
 #include <format>
 
 Context::Context() {
-  root_scope = scope;
+  scope = create_child(nullptr);
 
 #if defined(__linux)
-  root_scope->defines().insert("PLATFORM_LINUX");
+  scope->defines().insert("PLATFORM_LINUX");
 #elif defined(_WIN32)
-  root_scope->defines().insert("PLATFORM_WINDOWS");
+  scope->defines().insert("PLATFORM_WINDOWS");
 #elif defined(__APPLE__)
-  root_scope->defines().insert("PLATFORM_MACOS");
+  scope->defines().insert("PLATFORM_MACOS");
 #elif defined(__ANDROID__)
-  root_scope->defines().insert("PLATFORM_ANDROID");
+  scope->defines().insert("PLATFORM_ANDROID");
 #elif defined(__unix__)
-  root_scope->defines().insert("PLATFORM_UNIX");
+  scope->defines().insert("PLATFORM_UNIX");
 #elif defined(__FreeBSD__)
-  root_scope->defines().insert("PLATFORM_FREEBSD");
+  scope->defines().insert("PLATFORM_FREEBSD");
 #endif
 
   if (compile_command.has_flag("freestanding"))
-    root_scope->defines().insert("FREESTANDING");
+    Scope::defines().insert("FREESTANDING");
 
   if (compile_command.has_flag("test")) {
-    root_scope->add_def("TESTING");
+    Scope::add_def("TESTING");
   }
 
   { // For this compiler intrinsic operator,
@@ -42,10 +42,10 @@ Context::Context() {
       continue;
     }
     if (type_table[i]->get_info()->scope) {
-      type_table[i]->get_info()->scope->parent = root_scope;
+      type_table[i]->get_info()->scope->parent = scope;
     }
 
-    root_scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
+    scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
   }
 }
 
