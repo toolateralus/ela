@@ -99,6 +99,9 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
+  for (auto subtype : node->subtypes) {
+    subtype->accept(this);
+  }
   for (auto member : node->members) {
     decl_type(member.type->resolved_type);
   }
