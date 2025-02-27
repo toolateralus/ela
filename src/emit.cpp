@@ -1841,7 +1841,7 @@ void Emitter::emit_tuple(int type_id) {
   }
   auto name = to_cpp_string(type);
 
-  (*ss) << "typedef struct {";
+  (*ss) << "typedef struct " << name << " {";
   auto info = type->get_info()->as<TupleTypeInfo>();
   for (int i = 0; i < info->types.size(); ++i) {
     auto type = global_get_type(info->types[i]);
