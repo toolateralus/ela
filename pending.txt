@@ -20,7 +20,7 @@
 
 ::: IMPLICIT CASTING ROUTINES :::
   We should be able to do some routine on an implicit cast, say from Init_List![T] to whatever takes it,
-  or implicitly cast any value to any without calling any::new(&value)
+  or implicitly cast any value to any without calling any::from(&value)
 :::::::::::::::::::::::::::::::::
 
 ::: 

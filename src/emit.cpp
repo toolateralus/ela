@@ -1350,14 +1350,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       int it = 0;
       for (const auto &tuple : info->scope->symbols) {
         auto &[name, sym] = tuple;
-
-        if (name == "this")
-          continue;
-
+        if (sym.is_type() || sym.is_function()) continue; 
         auto t = global_get_type(sym.type_id);
-        // TODO: handle methods separately
-        if (t->is_kind(TYPE_FUNCTION) || (sym.flags & SYMBOL_IS_FUNCTION))
-          continue;
 
         if (!t)
           throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});

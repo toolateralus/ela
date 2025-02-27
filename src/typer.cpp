@@ -1624,6 +1624,21 @@ void Typer::visit(ASTInitializerList *node) {
   } else {
     node->target_type.get()->accept(this);
     target_type = global_get_type(node->target_type.get()->resolved_type);
+
+    if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
+      auto expected = global_get_type(declaring_or_assigning_type);
+
+      if (expected && expected->get_ext().is_fixed_sized_array()) {
+        auto elem = expected->get_element_type();
+        auto rule = type_conversion_rule(target_type, global_get_type(elem));
+        if (rule == CONVERT_PROHIBITED) {
+          throw_error("invalid initializer list element type", node->source_range);
+        }
+        target_type = expected;
+      } else {
+        target_type = global_get_type(find_generic_type_of("Init_List", {target_type->id}, node->source_range));
+      }
+    }
   }
   if (!target_type) {
     throw_error("Can't use initializer list, no target type was provided", node->source_range);

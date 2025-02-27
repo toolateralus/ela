@@ -687,7 +687,7 @@ ASTExpr *Parser::parse_postfix() {
       dot->base = left;
       if (peek().type == TType::Integer || peek().type == TType::Identifier) {
         dot->member_name = eat().value;
-      } else if (peek().type == TType::LCurly) {
+      } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
         if (peek().type == TType::LCurly) {
           eat(); // eat {

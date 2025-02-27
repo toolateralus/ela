@@ -515,7 +515,7 @@ update_game :: fn() {
     now : f32 = GetTime() as f32;
     if now - round_finish_start_time < 2.0 {
       v := round_index + 1;
-      text := format("Round: %...", {any::new(&v)});
+      text := format("Round: %...", {any::from(&v)});
       defer free(text);
 
       style := jiggly_text_style;
@@ -528,7 +528,7 @@ update_game :: fn() {
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
 
       v = round_base_num_enemies_to_advance * round_index;
-      text = format("Requires % enemies to pass.", {any::new(&v)});
+      text = format("Requires % enemies to pass.", {any::from(&v)});
       jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
 
     } else {
@@ -657,7 +657,7 @@ update_game :: fn() {
         score += amount
         ui_text_color.a = 255 as u8;
         
-        make_text_particle(String::from(format("+%", {any::new(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        make_text_particle(String::from(format("+%", {any::from(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
         break;
       }
     }
@@ -855,15 +855,15 @@ draw_main_menu :: fn() {
     style.foreground = CYAN;
     style.jiggle_intensity = 3.0;
     style.jiggle_rate = 1.0;
-    text := format("reached round %,", {any::new(&round_index)});
+    text := format("reached round %,", {any::from(&round_index)});
     jiggly_text(text, rect, style);
     free(text);
     rect.y += 64;
-    text = format("% targets taken down", {any::new(&targets_destroyed)});
+    text = format("% targets taken down", {any::from(&targets_destroyed)});
     jiggly_text(text, rect, style);
     free(text);
     rect.y += 64;
-    text = format("scored % points", {any::new(&score)});
+    text = format("scored % points", {any::from(&score)});
     jiggly_text(text, rect, style);
     free(text);
   }
