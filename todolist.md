@@ -9,8 +9,6 @@ To search for all info comments in the source just use vscodes regex search with
 
 #### Fix any type and add ability to do implicit casting routine stuff.
 
-#### typeof needs to be it's own node, not ride on the back of ASTType
-
 #### instead of just # stuff BEGINNING statements, we should be using them as attributes
 
 such as
@@ -88,15 +86,6 @@ like
   }
 
 ```
-
-
-#### change ![] to !<>. much kinder to read.
-```rust
-default :: fn!<T>() -> T {
-  return .{}
-}
-```
-
 
 #### allow tuple/struct destructure in for loop
 ```rust
