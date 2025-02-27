@@ -18,7 +18,7 @@ impl Vector2 {
 
 main :: fn() {
   // get the Type* that represents Vector2.
-  type := #type(Vector2);
+  type := typeof(Vector2);
   instance: Vector2;
   println($"default value, instance={instance}");
   

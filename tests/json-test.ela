@@ -118,7 +118,7 @@ impl JsonValueDeleter {
 
 // #test test_scalar_deserialization :: fn() {
 //   n : s32 = 100;
-//   err, json := json_serialize(&n, #type(s32));
+//   err, json := json_serialize(&n, typeof(s32));
 //   if err.has_value {
 //     assert($"{err.message} serialize s32".data, false);
 //   }
@@ -126,7 +126,7 @@ impl JsonValueDeleter {
 //   deleter.add(json);
 //   n = 0;
 //   assert("json serialize scalar", json.is_number());
-//   err = json_deserialize_scalar(json, &n, #type(s32));
+//   err = json_deserialize_scalar(json, &n, typeof(s32));
 //   assert($"json error {err}".data, !err.has_value);
 //   assert("json deserialize scalar, s32", n == 100);
 // }
@@ -146,7 +146,7 @@ impl JsonValueDeleter {
 //     n: 100,
 //     b: 200.0
 //   };
-//   err, json := json_serialize(&n, #type(MyJsonStruct));
+//   err, json := json_serialize(&n, typeof(MyJsonStruct));
 //   if err.has_value {
 //     assert($"{err.message}".data, false);
 //   }
@@ -154,7 +154,7 @@ impl JsonValueDeleter {
 //   deleter.add(json);
 //   n = {};
 //   assert("json  serialize  object", json.is_object());
-//   err = json_deserialize(json, &n, #type(MyJsonStruct));
+//   err = json_deserialize(json, &n, typeof(MyJsonStruct));
 //   assert("json error", !err.has_value);
 //   assert("json deserialize object", n.n == 100 && n.b == 200.0);
 // }

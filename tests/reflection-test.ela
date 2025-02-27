@@ -2,9 +2,15 @@ Reflector :: struct {
   n: s32,
 }
 
+#test test_reflection_names :: fn() {
+  f := typeof(Reflector);
+  assert("field count wrong", f.fields.length == 1);
+  assert("name wrong", strcmp(f.name, "Reflector"c) as bool);
+}
+
 #test test_set_field_with_reflection :: fn() {
   reflector: Reflector;
-  type := #type(Reflector);
+  type := typeof(Reflector);
   field := type.fields[0];
   integer: s32 = 100;
   field.set(&reflector, integer);
@@ -14,7 +20,7 @@ Reflector :: struct {
 #test test_get_field_with_reflection :: fn() {
   reflector: Reflector;
   reflector.n = 100;
-  type := #type(Reflector);
+  type := typeof(Reflector);
   field := type.fields[0];
   n := *(field.get![Reflector*](&reflector) as s32*);
   assert("reflection field.set() failed.", n == 100);
@@ -22,7 +28,7 @@ Reflector :: struct {
 
 // #test test_array_reflection :: fn() {
 //   fixed: s32[3] = {1, 2, 3};
-//   fixed_type := #type(fixed);
+//   fixed_type := typeof(fixed);
 //   index: s32 = 0;
 //   fixed_elements := fixed_type.elements((&fixed) as u8*);
 //   assert("Fixed array length mismatch", fixed_elements.length == 3);
@@ -32,7 +38,7 @@ Reflector :: struct {
 //   }
 
 //   dynamic := List![s32]::init({3, 2, 1});
-//   dynamic_type := #type(dynamic);
+//   dynamic_type := typeof(dynamic);
 //   index = 0;
 //   dynamic_elements := dynamic_type.elements((&dynamic) as u8*);
 //   assert("Dynamic array length mismatch", dynamic_elements.length == 3);

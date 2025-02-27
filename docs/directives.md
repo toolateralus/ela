@@ -61,13 +61,13 @@
   #import MyModule;
   ```
 
-#### `#type`
+#### `typeof`
 - **Kind**: `Expression`
 - **Usage**: 
   - Gets a `Type *` struct pointer to reflect on a given type.
 - **Example**:
   ```cpp
-  #type(MyType)
+  typeof(MyType)
   ```
 
 

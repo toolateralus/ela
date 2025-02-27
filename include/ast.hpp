@@ -57,6 +57,7 @@ enum ASTNodeType {
   AST_NODE_IMPL,
   AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_SIZE_OF,
+  AST_NODE_TYPE_OF,
   AST_NODE_DEFER,
   AST_NODE_CAST,
   AST_NODE_LAMBDA,
@@ -172,7 +173,6 @@ struct ASTTypeExtension {
 struct ASTType : ASTExpr {
   enum Kind {
     NORMAL,
-    REFLECTION,
     TUPLE,
     FUNCTION,
     SELF,
@@ -196,11 +196,9 @@ struct ASTType : ASTExpr {
   ASTType(const ASTType &other) {
     extensions = other.extensions;
     kind = other.kind;
-    pointing_to = other.pointing_to;
     switch (kind) {
       case NORMAL:
       case SELF:
-      case REFLECTION:
         normal = decltype(normal)(other.normal);
         break;
       case TUPLE:
@@ -214,10 +212,9 @@ struct ASTType : ASTExpr {
   }
 
   ~ASTType() {}
-  // [], *, [string] etc.
+
+  // [100], *, etc.
   std::vector<ASTTypeExtension> extensions;
-  // special info for reflection
-  Nullable<ASTExpr> pointing_to;
 
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE; }
   static ASTType *get_void();
@@ -511,6 +508,13 @@ struct ASTSize_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+struct ASTType_Of : ASTExpr {
+  ASTExpr *target;
+  ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
+  void accept(VisitorBase *visitor) override;
+};
+
+
 struct ASTInterfaceDeclaration : ASTStatement {
   Nullable<ASTWhere> where_clause;
   InternedString name;
@@ -701,7 +705,8 @@ struct ASTWhere : ASTExpr {
   void visit(ASTCast *node) override {};                                                                               \
   void visit(ASTTaggedUnionDeclaration *node) override {};                                                             \
   void visit(ASTInterfaceDeclaration *node) override {};                                                               \
-  void visit(ASTSize_Of *node) override {};
+  void visit(ASTSize_Of *node) override {};\
+  void visit(ASTType_Of *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   void visit(ASTNoop *noop) { return; }                                                                                \
@@ -744,7 +749,8 @@ struct ASTWhere : ASTExpr {
   virtual void visit(ASTTupleDeconstruction *node) = 0;                                                                \
   virtual void visit(ASTDefer *node) = 0;                                                                              \
   virtual void visit(ASTInterfaceDeclaration *node) = 0;                                                               \
-  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;\
+  virtual void visit(ASTType_Of *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,

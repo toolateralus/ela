@@ -202,20 +202,18 @@ void Emitter::visit(ASTArguments *node) {
   return;
 }
 
+void Emitter::visit(ASTType_Of *node) {
+  auto id = node->target->resolved_type;
+  if (id == -1)
+    throw_error("Invalid type in typeof() node", node->source_range);
+  auto type = global_get_type(id);
+  (*ss) << to_type_struct(type, ctx);
+}
+
 void Emitter::visit(ASTType *node) {
   auto type = global_get_type(node->resolved_type);
   if (!type) {
     throw_error("internal compiler error: ASTType* resolved to null in emitter.", node->source_range);
-  }
-
-  // For reflection
-  if (node->kind == ASTType::REFLECTION) {
-    auto id = node->pointing_to.get()->resolved_type;
-    if (id == -1)
-      throw_error("Invalid type in #type() node", node->source_range);
-    auto type = global_get_type(id);
-    (*ss) << to_type_struct(type, ctx);
-    return;
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
@@ -648,7 +646,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
     (*ss) << to_cpp_string(returns);
     space();
     (*ss) << " " + node->name.get_str();
-    emit_params();  
+    emit_params();
   }
 
   semicolon();
@@ -800,7 +798,7 @@ void Emitter::visit(ASTParamDecl *node) {
   } else {
     (*ss) << ' ' << to_cpp_string(type) << " себя";
   }
-  
+
   return;
 }
 void Emitter::visit(ASTParamsDecl *node) {
@@ -888,11 +886,11 @@ void Emitter::visit(ASTProgram *node) {
     }
   }
 
-  // TODO: if we're freestanding, we should just emit ID's only for #type().
+  // TODO: if we're freestanding, we should just emit ID's only for typeof().
   if (is_freestanding && !ctx.type_info_strings.empty()) {
     throw_error("You cannot use runtime type reflection in a freestanding or "
                 "nostdlib environment, due to a lack of allocators. To compare "
-                "types, use #typeid.",
+                "types, use typeid.",
                 {});
   }
 
@@ -1000,9 +998,9 @@ void Emitter::visit(ASTSwitch *node) {
     use_eq_operator = false;
   }
 
-  static size_t index =0;
+  static size_t index = 0;
   auto target_unique_id = "$switch_target$" + std::to_string(index++);
-  
+
   (*ss) << "auto " << target_unique_id << " = ";
   node->target->accept(this);
   semicolon();
@@ -1015,7 +1013,7 @@ void Emitter::visit(ASTSwitch *node) {
     emit_line_directive(target);
     (*ss) << " if (";
     if (use_eq_operator) {
-      (*ss) << target_unique_id;    
+      (*ss) << target_unique_id;
       (*ss) << " == ";
       _case.expression->accept(this);
     } else {
@@ -1037,7 +1035,6 @@ void Emitter::visit(ASTSwitch *node) {
     node->default_case.get()->accept(this);
     (*ss) << "}\n";
   }
-
 }
 void Emitter::visit(ASTTuple *node) {
   auto type = global_get_type(node->resolved_type);
@@ -1350,7 +1347,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       int it = 0;
       for (const auto &tuple : info->scope->symbols) {
         auto &[name, sym] = tuple;
-        if (sym.is_type() || sym.is_function()) continue; 
+        if (sym.is_type() || sym.is_function())
+          continue;
         auto t = global_get_type(sym.type_id);
 
         if (!t)

@@ -15,7 +15,7 @@ impl![T] List![T] {
 }
 
 main :: fn() { 
-  type := #type(List![s32]);
+  type := typeof(List![s32]);
   ordered_fields := type.fields.order_by(fn(a: Field*, b) -> bool {
     return a.offset < b.offset;
   });

@@ -226,6 +226,10 @@ void DependencyEmitter::visit(ASTType *node) {
   decl_type(node->resolved_type);
 }
 
+void DependencyEmitter::visit(ASTType_Of *node) {
+  node->target->accept(this);
+}
+
 void DependencyEmitter::visit(ASTCall *node) {
   for (auto generic_arg : node->generic_arguments) {
     generic_arg->accept(this);

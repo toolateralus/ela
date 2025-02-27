@@ -57,6 +57,7 @@ struct Typer : VisitorBase {
   void visit(ASTScopeResolution *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTSize_Of *node) override;
+  void visit(ASTType_Of *node) override;
 
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
@@ -212,6 +213,7 @@ struct Emitter : VisitorBase {
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   int get_expr_left_type_sr_dot(ASTNode *node);
+  void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTBlock *node) override;
@@ -274,7 +276,7 @@ struct DependencyEmitter : VisitorBase {
   void decl_type(int type_id);
   
   Nullable<Symbol> get_symbol(ASTNode *node);
-
+  void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTBlock *node) override;

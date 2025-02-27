@@ -289,22 +289,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         throw_error(literal->value.get_str(), error->source_range);
         return nullptr;
     }},
-    // #type
-    // get a 'Type *' struct ptr to reflect on a given type.
-    // has .fields and .size only currently
-    {.identifier = "type",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTType, outer, range, _, parser)
-        parser->expect(TType::LParen);
-        outer->pointing_to = parser->parse_expr();
-        parser->expect(TType::RParen);
-        
-        outer->kind = ASTType::REFLECTION;
-        outer->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier("Type");
-        outer->extensions.push_back({TYPE_EXT_POINTER});
-        return outer;
-    }},
     // #c_flags, for adding stuff like linker options, -g etc from within
     // your program or header.
     {.identifier = "c_flags",
@@ -405,7 +389,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return node;
     }},
-    // #typeid, integer version of #type. can be used to compare types without
+    // #typeid, integer version of typeof. can be used to compare types without
     // the pointers.
     {.identifier = "typeid",
       .kind = DIRECTIVE_KIND_EXPRESSION,
@@ -815,6 +799,14 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Type_Of: {
+      expect(TType::Type_Of);
+      NODE_ALLOC(ASTType_Of, type_of, range, _, this)
+      expect(TType::LParen);
+      type_of->target = parse_expr();
+      expect(TType::RParen);
+      return type_of;
+    }
     case TType::Size_Of: {
       NODE_ALLOC(ASTSize_Of, node, range, _, this);
       eat();

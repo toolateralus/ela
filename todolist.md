@@ -5,14 +5,11 @@ To search for all info comments in the source just use vscodes regex search with
 
 ### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
 
-
-#### Tagged Unions & Pattern Matching.
-
 #### Drop interface and "destructors"
 
 #### Fix any type and add ability to do implicit casting routine stuff.
 
-#### #type needs to be it's own node, not ride on the back of ASTType
+#### typeof needs to be it's own node, not ride on the back of ASTType
 
 #### instead of just # stuff BEGINNING statements, we should be using them as attributes
 
@@ -121,7 +118,7 @@ default :: fn!<T>() -> T {
     builder.set_allocator(std::mem::temp_allocator.{});
     defer builder.deinit();
     #for (t, v) in pack {
-      builder.rtti_append(#type(t), v);
+      builder.rtti_append(typeof(t), v);
     }
     return builder.string();
   }

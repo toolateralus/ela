@@ -1,5 +1,6 @@
 #include "ast_copier.hpp"
 #include "ast.hpp"
+#include "type.hpp"
 
 Scope *ASTCopier::copy_scope(Scope *old) {
   auto scope = new (scope_arena.allocate(sizeof(Scope))) Scope(*old);
@@ -106,12 +107,10 @@ ASTLiteral *ASTCopier::copy_literal(ASTLiteral *node) {
 ASTType *ASTCopier::copy_type(ASTType *node) {
   auto new_node = copy(node);
   new_node->resolved_type = node->resolved_type;
-  if (node->pointing_to)
-    new_node->pointing_to = static_cast<ASTType *>(copy_node(node->pointing_to.get()));
+
   switch (new_node->kind) {
     case ASTType::NORMAL:
     case ASTType::SELF:
-    case ASTType::REFLECTION:
       new_node->normal.generic_arguments.clear();
       for (auto arg : node->normal.generic_arguments) {
         new_node->normal.generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
@@ -423,7 +422,15 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_lambda(static_cast<ASTLambda *>(node));
     case AST_NODE_STATEMENT_LIST:
       return copy_statement_list(static_cast<ASTStatementList *>(node));
+    case AST_NODE_TYPE_OF:
+      return copy_type_of(static_cast<ASTType_Of *>(node));
   }
+}
+
+ASTType_Of *ASTCopier::copy_type_of(ASTType_Of *node) {
+  auto new_node = copy(node);
+  new_node->target = (ASTExpr *)copy_node((ASTNode *)node->target);
+  return new_node;
 }
 
 ASTNode *deep_copy_ast(ASTNode *root) {
