@@ -1,0 +1,10 @@
+
+
+// We are not able to do this properly, because we don't have order of operations in our 
+// constraint expressions.
+
+// We need to be able to at least parenthesize the subexpressions, and treat | as a seperate expression probably.
+Constraint :: interface!<T> where T is Is_Numerical & Is_Float | Compare {}
+
+
+main :: fn() { }

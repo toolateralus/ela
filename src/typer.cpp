@@ -24,6 +24,8 @@ static size_t get_uid() {
   return n++;
 }
 
+#define USE_GENERIC_PANIC_HANDLER
+
 #ifdef USE_GENERIC_PANIC_HANDLER
 #define GENERIC_PANIC_HANDLER(data_name, uid, block, source_range)                                                     \
   GenericInstantiationErrorUserData data_name;                                                                         \
@@ -1633,7 +1635,6 @@ void Typer::visit(ASTInitializerList *node) {
 
     if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
       auto expected = global_get_type(declaring_or_assigning_type);
-
       if (expected && expected->get_ext().is_fixed_sized_array()) {
         auto elem = expected->get_element_type();
         auto rule = type_conversion_rule(target_type, global_get_type(elem));
@@ -2058,7 +2059,6 @@ void Typer::visit(ASTWhere *node) {
   node->target_type->accept(this);
   auto type = global_get_type(node->target_type->resolved_type);
   auto satisfied = visit_where_predicate(type, node->predicate);
-
   if (!satisfied) {
     throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)),
                 node->source_range);

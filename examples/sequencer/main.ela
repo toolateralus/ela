@@ -12,10 +12,10 @@ subdivisions: s32 = 1;
 beats: s32 = 4;
 total_notes: s32 = 4;
 
-bpm_slider : Slider![f32] = {
-  text: "bpm", 
-  rect: {x: 0, y: 0, width: 150, height: 40}, 
-  style: Style { 
+bpm_slider : Slider!<f32> = .{
+  text: String::from("bpm"), 
+  rect: .{x: 0, y: 0, width: 150, height: 40}, 
+  style: .{ 
     foreground: WHITE.with_alpha(75), 
     background: BLACK,
     highlighted: GREEN,
@@ -30,10 +30,10 @@ bpm_slider : Slider![f32] = {
   held: false, 
 };
 
-subdivision_slider : Slider![s32] = {
-  text: "subdivisions", 
-  rect: Rectangle{x: 0, y: 110, width: 150, height: 40}, 
-  style: Style { 
+subdivision_slider : Slider!<s32> = .{
+  text: String::from("subdivisions"), 
+  rect: .{x: 0, y: 110, width: 150, height: 40}, 
+  style: .{ 
     foreground: WHITE.with_alpha(75),
     background: BLACK,
     highlighted: GREEN,
@@ -50,10 +50,10 @@ subdivision_slider : Slider![s32] = {
 
 bg_color := LIGHTCYAN;
 
-beats_slider : Slider![s32] = {
-  text: "beats", 
-  rect: {x: 150, y: 110, width: 150, height: 40}, 
-  style: Style { 
+beats_slider : Slider!<s32> = .{
+  text: String::from("beats"), 
+  rect: .{x: 150, y: 110, width: 150, height: 40}, 
+  style: .{ 
     foreground: WHITE.with_alpha(75),
     background: BLACK,
     highlighted: GREEN,
@@ -68,7 +68,7 @@ beats_slider : Slider![s32] = {
   held: false 
 };
 
-play_button_style : Style = {
+play_button_style : Style = .{
   foreground: WHITE,
   background: CLEAR,
   highlighted: GREEN,
@@ -78,7 +78,7 @@ play_button_style : Style = {
   jiggle_rate: 2.0,
 };
 
-file_dropdown_style : Style = {
+file_dropdown_style : Style = .{
   foreground: WHITE,
   background: GRAY,
   highlighted: GREEN,
@@ -88,7 +88,7 @@ file_dropdown_style : Style = {
   jiggle_rate: 2.0,
 }
 
-sequence_channel_style : Style = {
+sequence_channel_style : Style = .{
   foreground: WHITE,
   background: GRAY,
   highlighted: GREEN,
@@ -98,9 +98,9 @@ sequence_channel_style : Style = {
   jiggle_rate: 2.0,
 }
 
-check_buttons: List![CheckButton];
+check_buttons: CheckButton[];
 
-check_button_style: Style = {
+check_button_style: Style = .{
   foreground: WHITE,
   background: RED,
   highlighted: GREEN,
@@ -110,7 +110,7 @@ check_button_style: Style = {
   jiggle_rate: 2.0,
 }
 
-reset_button_style : Style = {
+reset_button_style : Style = .{
   foreground: WHITE,
   background: RED,
   highlighted: GREEN,
@@ -121,8 +121,6 @@ reset_button_style : Style = {
 };
 
 index : s32 = 0;
-
-
 color_index: s32;
 
 get_sequencer_style :: fn(style: Style) -> Style {
@@ -130,30 +128,30 @@ get_sequencer_style :: fn(style: Style) -> Style {
   color_index++;
   index := color_index % All_Colors.length;
   index_1 := index + 4 % All_Colors.length;
-  copy.foreground = All_Colors[index];
-  copy.background = All_Colors[index_1].with_alpha(75).scaled_rgb(0.5);
+  copy.foreground = All_Colors.data[index];
+  copy.background = All_Colors.data[index_1].with_alpha(75).scaled_rgb(0.5);
   copy.highlighted = copy.background.with_alpha(255);
   return copy;
 }
 
 SequenceChannel :: struct {
-  check_buttons: List![CheckButton],
+  check_buttons: CheckButton[],
   sound: Sound,
   active: bool,
   style: Style,
   volume : s32,
   old_volume : s32,
-  volume_slider: Slider![s32],
+  volume_slider: Slider!<s32>,
 }
 
 impl SequenceChannel {
-  create :: fn(_sound: Sound, _style: Style, name: u8*) -> #self {
+  create :: fn(_sound: Sound, _style: Style, name: str) -> #self {
     self: #self;
     self.sound = _sound;
     self.style = _style;
-    self.volume_slider = {
-      text: name,                     // text
-      rect: {x: 0, y: 0, width: 146, height: 36}, // rectangle
+    self.volume_slider = .{
+      text: String::from(name),                     // text
+      rect: .{x: 0, y: 0, width: 146, height: 36}, // rectangle
       style: _style,                   // style
       min_value: 0,                        // min
       max_value: 100,                      // max
@@ -164,9 +162,9 @@ impl SequenceChannel {
     if total_notes != self.check_buttons.length {
       while total_notes > self.check_buttons.length {
         _x : f32 = x + 150 + ((self.check_buttons.length * 40) as f32) + 2;
-        self.check_buttons.push({
+        self.check_buttons.push(.{
           value:      false,
-          rect:       Rectangle{x: _x, y: y, width: 36, height: 36},
+          rect:       .{x: _x, y: y, width: 36, height: 36},
           style:      self.style,
           text:       null,
           allow_hold: true,
@@ -199,22 +197,24 @@ impl SequenceChannel {
   }
 }
 
-channels: List![SequenceChannel];
+channels: SequenceChannel[];
 
 on_file_selected :: fn(index: s32);
 
-file_dropdown : DropDown = {
-  options: {},
-  rect: {x: 0, y: 250, width: 125, height: 30},
+file_dropdown : DropDown = .{
+  rect: .{x: 0, y: 250, width: 125, height: 30},
   style: file_dropdown_style,
   on_selected: &on_file_selected,
-  label: "New Channel"
+  label: "New Channel"c
 };
 
 on_file_selected :: fn(index: s32) {
-  fileName := file_dropdown.options[index];
+  fileName := str.{ 
+    data: file_dropdown.options[index],
+    length: strlen(file_dropdown.options[index])
+  };
   channels.push(SequenceChannel::create(
-    LoadSound(fileName),
+    LoadSound(fileName.data),
     get_sequencer_style(check_button_style),
     fileName
   ));
@@ -234,22 +234,22 @@ main :: fn() {
   bg_color.g -= 175;
   bg_color.b -= 175;
 
-  dir := Directory::open(".");
+  dir := Directory::open("."c);
   defer dir.deinit();
 
   InitAudioDevice();
-  InitWindow(800, 600, "Sequencer");
+  InitWindow(800, 600, "Sequencer"c);
 
   SetWindowState(ConfigFlags::FLAG_WINDOW_RESIZABLE);
   SetTargetFPS(1000);
 
   for file in dir.files { 
     if file.length <= 4 then continue;
-    #static extensions: String[3] = {
+    #static extensions: String[3] = .[
       String::from(".wav"),
       String::from(".mp3"),
       String::from(".ogg"),
-    }
+    ];
     
     for idx in 0..3 {
       if extensions[idx] == file {
@@ -275,9 +275,9 @@ main :: fn() {
         label_x := seq_x + 150.0 + (note as f32) * 40.0;
         beat := (note * beats) / total_notes + 1;
         subdiv := note % subdivisions + 1;
-        text := $"{beat}.{subdiv}";
-        DrawText(text, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
-        free(text);
+        text := format("%.%", .[any::from(&beat), any::from(&subdiv)], Format_Options::default());
+        DrawText(text.data, label_x as s32, (seq_y - 40.0) as s32, 12, WHITE);
+        text.deinit();
       }
 
       if playing {
@@ -296,12 +296,12 @@ main :: fn() {
       subdivision_slider.draw();
       beats_slider.draw();
 
-      if button("reset (no undo)", {x: (GetScreenWidth() as f32) - 210.0, y: 10, width: 200, height: 40}, reset_button_style) {
+      if button("reset (no undo)"c, .{x: (GetScreenWidth() as f32) - 210.0, y: 10, width: 200, height: 40}, reset_button_style) {
         while channels.length > 0 {
           channels.pop();
         }
       }
-      if button("remove channel", {x: 0, y: 215, width: 125, height: 30}, reset_button_style) {
+      if button("remove channel"c, .{x: 0, y: 215, width: 125, height: 30}, reset_button_style) {
         if channels.length > 0 then channels.pop();
       }
 
@@ -318,7 +318,7 @@ main :: fn() {
         } else {
           play_button_style.highlighted = GREEN;
         }
-        if button("play", {x: 0, y: 50, width: 100, height: 40}, play_button_style) {
+        if button("play"c, .{x: 0, y: 50, width: 100, height: 40}, play_button_style) {
           playing = !playing;
           timer.last_tick_time = 0;
           index = 0;
