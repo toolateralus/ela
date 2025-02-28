@@ -1,13 +1,13 @@
 ; 
 
 #test test_type_alias :: fn() {
-  #alias XaryuBarSchnar :: s32;
+  alias XaryuBarSchnar :: s32;
   i: XaryuBarSchnar = 0;
   assert("type alias failed", i == 0);
 }
 
 #test test_ptr_alias :: fn() {
-  #alias int_ptr :: s32*;
+  alias int_ptr :: s32*;
   p: s32* = malloc(sizeof(s32));
   other: int_ptr  = p;
   assert("alias failed to equal pointed to type field.", p == other);
@@ -19,7 +19,7 @@ Funky :: fn() -> s32 {
 }
 
 #test test_fn_alias :: fn() {
-  #alias func :: fn* () -> s32;
+  alias func :: fn* () -> s32;
   f: func = &Funky;
   assert("function pointer failed", f() == 102);
 }

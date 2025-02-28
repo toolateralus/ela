@@ -102,9 +102,11 @@ enum struct TType {
   Interface, // interface
   Where,
   Is,
-  
+
   Size_Of,
   Type_Of,
+
+  Alias,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -114,6 +116,8 @@ enum struct TType {
 static inline std::string TTypeToString(TType type) {
   switch (type) {
     TTYPE_CASE(Size_Of);
+    TTYPE_CASE(Type_Of);
+
     TTYPE_CASE(Interface);
     TTYPE_CASE(Where);
     TTYPE_CASE(Defer);
@@ -197,7 +201,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompSHR);
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
-    TTYPE_CASE(Type_Of);
+    TTYPE_CASE(Alias);
   }
   return "Unknown";
 }
@@ -261,6 +265,9 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"alias", TType::Alias},
+    {"псевдоним", TType::Alias},
+
     // control flow
     {"in", TType::In},
     {"в", TType::In},
@@ -310,7 +317,7 @@ static std::unordered_map<std::string, TType> keywords{
     // type declarations
     {"struct", TType::Struct},
     {"структ", TType::Struct},
-    
+
     {"union", TType::Union},
     {"союз", TType::Union},
 

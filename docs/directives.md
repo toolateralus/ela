@@ -91,13 +91,13 @@
   #flags MyEnum :: enum { ... }
   ```
 
-#### `#alias`
+#### `alias`
 - **Kind**: `Statement`
 - **Usage**: 
   - Creates type aliases.
 - **Example**:
   ```cpp
-  #alias NewName :: OldName
+  alias NewName :: OldName
 
   ```
 #### `#self`

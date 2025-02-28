@@ -19,4 +19,4 @@ impl DrawContext {
   }
 }
 
-#alias function :: fn* (DrawContext*);
+alias function :: fn* (DrawContext*);

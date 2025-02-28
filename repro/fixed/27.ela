@@ -1,4 +1,4 @@
-#alias Alias :: s64;
+alias Alias :: s64;
 
 // Impl on an alias crashes.
 // probably a null scope.

@@ -1905,9 +1905,9 @@ void Typer::visit(ASTTuple *node) {
   node->resolved_type = global_find_type_id(types, extensions);
 }
 void Typer::visit(ASTAlias *node) {
-  node->type->accept(this);
+  node->source_type->accept(this);
 
-  if (node->type->resolved_type == Type::INVALID_TYPE_ID) {
+  if (node->source_type->resolved_type == Type::INVALID_TYPE_ID) {
     throw_error("Declaration of a variable with a non-existent type.", node->source_range);
   }
 
@@ -1915,9 +1915,9 @@ void Typer::visit(ASTAlias *node) {
     throw_error("Redeclaration of type", node->source_range);
   }
 
-  auto type = global_get_type(node->type->resolved_type);
+  auto type = global_get_type(node->source_type->resolved_type);
 
-  ctx.scope->create_type_alias(node->name, node->type->resolved_type, type->kind, node);
+  ctx.scope->create_type_alias(node->name, node->source_type->resolved_type, type->kind, node);
 
   return;
 }

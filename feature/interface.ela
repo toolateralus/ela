@@ -149,7 +149,7 @@ Iter :: interface![T] {
 }
 
 RangeIterator :: struct {
-  #alias  value_type :: s32;
+  alias  value_type :: s32;
   value:  value_type;
   min:    value_type;
   max:    value_type;

@@ -612,7 +612,9 @@ struct ASTNoop : ASTStatement {
 
 struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic aliases?
   InternedString name;
-  ASTType *type;
+  ASTType *source_type;
+  std::vector<ASTType*> generic_arguments;
+  std::vector<GenericParameter> generic_parameters;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
   void accept(VisitorBase *visitor) override;
 };

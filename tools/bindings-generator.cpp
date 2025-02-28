@@ -153,7 +153,6 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
   CXString name = clang_getCursorSpelling(cursor);
   std::string typeName = clang_getCString(name);
   clang_disposeString(name);
-
   if (clang_getCursorKind(cursor) == CXCursor_TypedefDecl) {
     CXType underlyingType = clang_getTypedefDeclUnderlyingType(cursor);
     std::string underlyingTypeName = wrapgen_get_type_name(underlyingType);
@@ -180,7 +179,7 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         args += wrapgen_get_type_name(clang_getArgType(pointeeType, i));
       }
 
-      data->output << "#alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+      data->output << "alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
     } else if (underlyingType.kind == CXType_FunctionProto) {
       std::string returnType = wrapgen_get_type_name(clang_getResultType(underlyingType));
       std::string args;
@@ -191,12 +190,10 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
         }
         args += wrapgen_get_type_name(clang_getArgType(underlyingType, i));
       }
-      data->output << "#alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
+      data->output << "alias " << typeName << " :: fn*(" << args << ") -> " << returnType << ";\n";
     } else {
-      data->output << "#alias " << typeName << " :: " << underlyingTypeName << ";\n";
+      data->output << "alias " << typeName << " :: " << underlyingTypeName << ";\n";
     }
-  } else {
-    data->output << "type " << typeName << ";\n";
   }
 }
 // Helper function to visit the children of a struct, union, or enum declaration

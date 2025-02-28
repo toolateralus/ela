@@ -18,8 +18,6 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-
-
 enum PreprocKind {
   PREPROC_IF,
   PREPROC_IFDEF,
@@ -316,18 +314,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         enum_decl->is_flags = true;
         return enum_decl;
-    }},
-    // #alias for making type aliases. #alias NewName :: OldName;
-    {.identifier = "alias",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTAlias, alias, range, _, parser)
-        alias->name = parser->expect(TType::Identifier).value;
-        parser->expect(TType::DoubleColon);
-        alias->type = parser->parse_type();
-        return alias;
-      }
-    },
+    }},    
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -619,7 +606,6 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     if (token_precedence <= precedence)
       break;
 
-
     if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GT) {
       op.type = TType::SHR;
       op.value = ">>";
@@ -852,7 +838,8 @@ ASTExpr *Parser::parse_primary() {
             expect(TType::Colon);
           }
           node->default_case = parse_block();
-          if (peek().type == TType::Comma) eat();
+          if (peek().type == TType::Comma)
+            eat();
           continue;
         }
         SwitchCase _case{
@@ -1066,7 +1053,6 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
-
   // #self::fn() or some thing.
   if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)
@@ -1091,13 +1077,24 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
-
   if (peek().type == TType::Defer) {
     return parse_defer();
   }
 
   if (peek().type == TType::Impl) {
     return parse_impl();
+  }
+
+  if (peek().type == TType::Alias) {
+    eat();
+    NODE_ALLOC(ASTAlias, alias, range, _, this)
+    if (peek().type == TType::GenericBrace) {
+      alias->generic_parameters = parse_generic_parameters();
+    }
+    alias->name = expect(TType::Identifier).value;
+    expect(TType::DoubleColon);
+    alias->source_type = parse_type();
+    return alias;
   }
 
   // * Tuple destructure.
@@ -1237,7 +1234,6 @@ ASTStatement *Parser::parse_statement() {
     return expr;
   }
 
-
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -1305,9 +1301,9 @@ ASTStatement *Parser::parse_statement() {
 
     const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
 
-    const bool is_assignment_or_compound =
-        next.type == TType::Assign || next.type == TType::Comma || next.is_comp_assign() || 
-        (tok.type == TType::Identifier && next.is_relational());
+    const bool is_assignment_or_compound = next.type == TType::Assign || next.type == TType::Comma ||
+                                           next.is_comp_assign() ||
+                                           (tok.type == TType::Identifier && next.is_relational());
 
     const bool is_deref = tok.type == TType::Mul;
 
