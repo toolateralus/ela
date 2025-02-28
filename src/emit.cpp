@@ -103,6 +103,7 @@ void Emitter::visit(ASTElse *node) {
   }
   return;
 }
+
 void Emitter::visit(ASTFor *node) {
   emit_line_directive(node);
   auto old_scope = ctx.scope;
@@ -127,7 +128,7 @@ void Emitter::visit(ASTFor *node) {
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE:
       (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
-      node->range->accept(this);
+      node->right->accept(this);
       (*ss) << ";\n";
       (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type)
             << "_iter(&" << range_unique_id << ");\n";
@@ -135,7 +136,7 @@ void Emitter::visit(ASTFor *node) {
 
     case ASTFor::ENUMERABLE:
       (*ss) << indent() << range_type_str << " " << range_unique_id << " = ";
-      node->range->accept(this);
+      node->right->accept(this);
       (*ss) << ";\n";
       (*ss) << indent() << iterable_type_str << " " << unique_id << " = $" << std::to_string(node->range_type)
             << "_enumerator(&" << range_unique_id << ");\n";
@@ -143,13 +144,13 @@ void Emitter::visit(ASTFor *node) {
 
     case ASTFor::ENUMERATOR:
       (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
-      node->range->accept(this);
+      node->right->accept(this);
       (*ss) << ";\n";
       break;
 
     case ASTFor::ITERATOR:
       (*ss) << indent() << iterable_type_str << " " << unique_id << " = ";
-      node->range->accept(this);
+      node->right->accept(this);
       (*ss) << ";\n";
       break;
   }
@@ -157,17 +158,95 @@ void Emitter::visit(ASTFor *node) {
   (*ss) << indent() << "while (!$" << std::to_string(node->iterable_type) << "_done(" << unique_id << ")) {\n";
   indent_level++;
 
-  (*ss) << indent() << identifier_type_str << " ";
-  node->iter_identifier->accept(this);
-  (*ss) << " = ";
-  if (node->value_semantic == VALUE_SEMANTIC_POINTER) {
-    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
-  } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
-    (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
-  } else {
-    (*ss) << "*" << iterable_method_str << "_current(" << unique_id << ");\n";
-  }
+  if (node->left_tag == ASTFor::IDENTIFIER) {
+    (*ss) << indent() << identifier_type_str << " ";
+    node->left.identifier->accept(this);
+    (*ss) << " = ";
+    if (node->left.semantic == VALUE_SEMANTIC_POINTER) {
+      (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+    } else if (node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR) {
+      (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+    } else {
+      (*ss) << "*" << iterable_method_str << "_current(" << unique_id << ");\n";
+    }
+  } else if (node->left_tag == ASTFor::DESTRUCTURE) {
+    auto type = global_get_type(node->identifier_type);
 
+    if (type->is_kind(TYPE_TUPLE)) {
+      auto info = type->get_info()->as<TupleTypeInfo>();
+      auto block = node->block;
+      if (!block) {
+        throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
+                    node->source_range);
+      }
+      auto id = block->temp_iden_idx++;
+      std::string temp_id = "$temp_tuple$" + std::to_string(id++);
+      (*ss) << indent() << "auto " << temp_id << " = ";
+      (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+      for (size_t i = 0; i < node->left.destructure.size(); ++i) {
+        auto &destruct = node->left.destructure[i];
+        auto iden = destruct.identifier;
+
+        (*ss) << indent() << "auto ";
+        iden->accept(this);
+        (*ss) << " = ";
+
+        if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
+          if (type->get_ext().is_pointer()) {
+            (*ss) << "&" << temp_id << "->$" << std::to_string(i) << ";\n";
+          } else {
+            (*ss) << "&" << temp_id << ".$" << std::to_string(i) << ";\n";
+          }
+        } else {
+           if (type->get_ext().is_pointer()) {
+            (*ss) << temp_id << "->$" << std::to_string(i) << ";\n";
+          } else {
+            (*ss) << temp_id << ".$" << std::to_string(i) << ";\n";
+          }
+        }
+      }
+    } else {
+      auto scope = type->get_info()->scope;
+      if (type->get_ext().is_pointer()) {
+        auto t = global_get_type(type->get_element_type());
+        scope = t->get_info()->scope;
+      }
+      auto block = node->block;
+      if (!block) {
+        throw_error("internal compiler error: couldn't generate temporary variable because declaring block was null",
+                    node->source_range);
+      }
+      auto id = block->temp_iden_idx++;
+      std::string temp_id = "$deconstruction$" + std::to_string(id++);
+      (*ss) << indent() << to_cpp_string(type) << " " << temp_id << " = ";
+      (*ss) << iterable_method_str << "_current(" << unique_id << ");\n";
+      int i = 0;
+      for (const auto &[name, symbol] : scope->symbols) {
+        if (symbol.is_function() || symbol.is_type()) {
+          continue;
+        }
+        auto &destruct = node->left.destructure[i];
+        auto iden = destruct.identifier;
+        (*ss) << indent() << "auto ";
+        iden->accept(this);
+        (*ss) << " = ";
+        if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
+          if (type->get_ext().is_pointer()) {
+            (*ss) << "&" << temp_id << "->" << name.get_str() << ";\n";
+          } else {
+            (*ss) << "&" << temp_id << "." << name.get_str() << ";\n";
+          }
+        } else {
+          if (type->get_ext().is_pointer()) {
+            (*ss) << temp_id << "->" << name.get_str() << ";\n";
+          } else {
+            (*ss) << temp_id << "." << name.get_str() << ";\n";
+          }
+        }
+        i++;
+      }
+    }
+  }
   // this MUST happen before the block or continue will cause a permanent hangup!!!
   (*ss) << indent() << iterable_method_str << "_next(&" << unique_id << ");\n";
 

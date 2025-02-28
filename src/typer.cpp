@@ -593,7 +593,7 @@ void Typer::visit(ASTDeclaration *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
-        throw_error("Cannot use a type as a value.", node->value.get()->source_range);
+      throw_error("Cannot use a type as a value.", node->value.get()->source_range);
     }
     node->value.get()->accept(this);
     auto value_ty = node->value.get()->resolved_type;
@@ -782,10 +782,8 @@ void Typer::compiler_mock_function_call_visit_impl(int left_type, const Interned
 void Typer::visit(ASTFor *node) {
   ctx.set_scope(node->block->scope);
 
-  auto iden = static_cast<ASTIdentifier *>(node->iter_identifier);
-  node->range->accept(this);
-  // auto range_node_ty = node->range->get_node_type();
-  int range_type_id = node->range->resolved_type;
+  node->right->accept(this);
+  int range_type_id = node->right->resolved_type;
   Type *range_type = global_get_type(range_type_id);
   node->range_type = range_type->id;
 
@@ -878,14 +876,16 @@ void Typer::visit(ASTFor *node) {
   auto is_enumerator_or_enumerable =
       node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
 
-  if (is_enumerator_or_enumerable && node->value_semantic == VALUE_SEMANTIC_POINTER) {
+  if (is_enumerator_or_enumerable && node->left_tag == ASTFor::IDENTIFIER &&
+      node->left.semantic == VALUE_SEMANTIC_POINTER) {
     throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
                 "'Enumerable'. This is because the enumerable()'s return type is not restricted to being a pointer, "
                 "and we can't guarantee "
                 "that taking a reference to it is safe or even valid.",
                 node->source_range);
 
-  } else if (!is_enumerator_or_enumerable && node->value_semantic != VALUE_SEMANTIC_POINTER) {
+  } else if (!is_enumerator_or_enumerable &&
+             (node->left_tag == ASTFor::IDENTIFIER && node->left.semantic != VALUE_SEMANTIC_POINTER)) {
     // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit
     // dereference.
     auto type = global_get_type(iter_ty);
@@ -897,14 +897,63 @@ void Typer::visit(ASTFor *node) {
   }
 
   node->identifier_type = iter_ty;
-  ctx.scope->insert_variable(iden->value, iter_ty, node->iter_identifier);
-  node->iter_identifier->accept(this);
-  node->range->accept(this);
+
+  if (node->left_tag == ASTFor::IDENTIFIER) {
+    auto iden = node->left.identifier;
+    ctx.scope->insert_variable(iden->value, iter_ty, iden);
+    node->left.identifier->accept(this);
+  } else {
+    auto type = global_get_type(iter_ty);
+    // because of the way iterators work, this is neccesary.
+    if (type->get_ext().is_pointer()) {
+      type = global_get_type(type->get_element_type());
+    }
+    if (type->is_kind(TYPE_TUPLE)) {
+      auto info = type->get_info()->as<TupleTypeInfo>();
+      if (node->left.destructure.size() != info->types.size()) {
+        throw_error(std::format("Cannot currently partially deconstruct a tuple. "
+                                "expected {} identifiers to assign, got {}",
+                                info->types.size(), node->left.destructure.size()),
+                    node->source_range);
+      }
+      for (int i = 0; i < node->left.destructure.size(); ++i) {
+        auto type = info->types[i];
+        auto iden = node->left.destructure[i].identifier;
+        if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
+          ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
+        } else {
+          ctx.scope->insert_variable(iden->value, type, iden);
+        }
+      }
+    } else {
+      auto scope = type->get_info()->scope;
+      if (node->left.destructure.size() != scope->fields_count()) {
+        throw_error(std::format("Cannot currently partially deconstruct a struct. "
+                                "expected {} identifiers to assign, got {}, for type {}",
+                                scope->symbols.size(), node->left.destructure.size(), type->to_string()),
+                    node->source_range);
+      }
+      int i = 0;
+      for (const auto &[name, symbol] : scope->symbols) {
+        if (symbol.is_function() || symbol.is_type()) {
+          continue;
+        }
+        auto iden = node->left.destructure[i].identifier;
+        if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
+          ctx.scope->insert_variable(iden->value, global_get_type(symbol.type_id)->take_pointer_to(), iden);
+        } else {
+          ctx.scope->insert_variable(iden->value, symbol.type_id, iden);
+        }
+        i++;
+      }
+    }
+  }
+
+  node->right->accept(this);
 
   ctx.exit_scope();
   node->block->accept(this);
 
-  //? Is this correct???
   auto control_flow = node->block->control_flow;
   control_flow.flags &= ~BLOCK_FLAGS_BREAK;
   control_flow.flags &= ~BLOCK_FLAGS_CONTINUE;
@@ -975,7 +1024,7 @@ void Typer::visit(ASTCall *node) {
     auto declaring_node = symbol->function.declaration;
     if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
-      
+
       // resolve a generic call.
       if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
@@ -1195,7 +1244,7 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   return extensions;
 }
 
-/* 
+/*
 else if (node->kind == ASTType::REFLECTION) {
     auto &normal_ty = node->normal;
     normal_ty.base->accept(this);
@@ -1205,7 +1254,7 @@ else if (node->kind == ASTType::REFLECTION) {
     }
     node->pointing_to.get()->accept(this);
     node->resolved_type = global_find_type_id(base_ty->id, extensions);
-  } 
+  }
    */
 
 void Typer::visit(ASTType_Of *node) {
@@ -1610,7 +1659,7 @@ void Typer::visit(ASTSubscript *node) {
     }
 
     node->resolved_type = type->get_element_type();
-    
+
     return;
   }
 

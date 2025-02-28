@@ -408,6 +408,8 @@ struct ASTRange : ASTExpr {
 };
 
 struct ASTFor : ASTStatement {
+
+
   enum {
     // implicitly pulled an iter() off a type that implements Iterable![T]
     ITERABLE,
@@ -427,12 +429,54 @@ struct ASTFor : ASTStatement {
   int identifier_type = Type::INVALID_TYPE_ID;
   
   // this is the 'i' in `for i in 0..100`
-  ASTExpr *iter_identifier;
+  // this can also be a a, b destructure.
+
+  struct Destructure {
+    ValueSemantic semantic;
+    ASTIdentifier *identifier;
+  };
+
+  union Left {
+    Left() {}
+    ~Left() {}
+    struct {
+      ASTIdentifier *identifier;
+      ValueSemantic semantic;
+    };
+    std::vector<Destructure> destructure;
+  } left;
+
+  ASTFor() {}
+  ~ASTFor() {}
+  ASTFor(const ASTFor &other) {
+    iteration_kind = other.iteration_kind;
+    range_type = other.range_type;
+    iterable_type = other.iterable_type;
+    identifier_type = other.identifier_type;
+    left_tag = other.left_tag;
+    right = other.right;
+    block = other.block;
+    switch (left_tag) {
+      case IDENTIFIER:
+        left.identifier = other.left.identifier;
+        left.semantic = other.left.semantic;
+        break;
+      case DESTRUCTURE:
+        left.destructure = other.left.destructure;
+        break;
+    }
+  }
+
+
+  enum {
+    IDENTIFIER,
+    DESTRUCTURE,
+  } left_tag = IDENTIFIER;
+
   // this is the '0..100' or any thing on the right hand side of the 'in'
   // `for i in 0..100`
   //           ^^^^^^^ <- this is the `range`
-  ASTExpr *range;
-  ValueSemantic value_semantic;
+  ASTExpr *right;
   ASTBlock *block;
 
   void accept(VisitorBase *visitor) override;

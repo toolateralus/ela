@@ -1151,22 +1151,53 @@ ASTStatement *Parser::parse_statement() {
       NODE_ALLOC(ASTFor, node, range, _, this)
       eat();
 
-      node->value_semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+      // Parse the variables in the for loop
+      std::vector<ASTFor::Destructure> destructure;
 
-      // reference semantic for iterating over list
-      if (peek().type == TType::Mul) {
-        node->value_semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
-        eat();
+      while (true) {
+        ASTFor::Destructure destruct;
+        if (peek().type == TType::Mul) {
+          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
+          eat();
+        } else {
+          destruct.semantic = ValueSemantic::VALUE_SEMANTIC_COPY;
+        }
+
+        auto identifier = parse_primary();
+
+        if (identifier->get_node_type() != AST_NODE_IDENTIFIER) {
+          throw_error("you can only have identifiers (even in destructures) in for loops\n 'for i in ...', 'for *i in "
+                      "...' 'for *i, v in ...' etc",
+                      node->source_range);
+        }
+
+        destruct.identifier = (ASTIdentifier *)identifier;
+        destructure.push_back(destruct);
+
+        if (peek().type == TType::Comma) {
+          eat();
+        } else {
+          break;
+        }
       }
 
-      if (lookahead_buf()[1].type == TType::In) {
-        node->iter_identifier = parse_primary();
-        expect(TType::In);
-        auto expr = parse_expr();
-        node->range = expr;
+      // Set the left_tag and left union based on the parsed variables
+      if (destructure.size() > 1) {
+        node->left_tag = ASTFor::DESTRUCTURE;
+        node->left.destructure = destructure;
       } else {
-        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in "
-                    "iterable || for *elem in iterable",
+        node->left_tag = ASTFor::IDENTIFIER;
+        node->left.identifier = destructure[0].identifier;
+        node->left.semantic = destructure[0].semantic;
+      }
+
+      // Ensure the 'in' keyword is present
+      if (peek().type == TType::In) {
+        eat();
+        auto expr = parse_expr();
+        node->right = expr;
+      } else {
+        throw_error("Invalid for syntax. expected 'for i in 0..10 || for elem in iterable || for *elem in iterable'",
                     range);
       }
 

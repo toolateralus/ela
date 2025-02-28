@@ -162,8 +162,22 @@ ASTContinue *ASTCopier::copy_continue(ASTContinue *node) { return new (ast_alloc
 ASTBreak *ASTCopier::copy_break(ASTBreak *node) { return new (ast_alloc<ASTBreak>()) ASTBreak(*node); }
 ASTFor *ASTCopier::copy_for(ASTFor *node) {
   auto new_node = copy(node);
-  new_node->iter_identifier = static_cast<ASTIdentifier *>(copy_node(node->iter_identifier));
-  new_node->range = static_cast<ASTRange *>(copy_node(node->range));
+  switch (node->left_tag) {
+    case ASTFor::IDENTIFIER: {
+      new_node->left.identifier = static_cast<ASTIdentifier *>(copy_node(node->left.identifier));
+      new_node->left.semantic = node->left.semantic;
+    } break;
+    case ASTFor::DESTRUCTURE: {
+      new_node->left.destructure.clear();
+      for (auto destructure: node->left.destructure) {
+        new_node->left.destructure.push_back({
+          .semantic = destructure.semantic,
+          .identifier = (ASTIdentifier*)copy_node(destructure.identifier),
+        });
+      }
+    } break;
+  }
+  new_node->right = static_cast<ASTRange *>(copy_node(node->right));
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
 }

@@ -278,7 +278,7 @@ void DependencyEmitter::visit(ASTFor *node) {
   define_type(node->range_type);
   define_type(node->identifier_type);
 
-  node->range->accept(this);
+  node->right->accept(this);
 
   auto range_scope = global_get_type(node->range_type)->get_info()->scope;
   auto iter_scope = global_get_type(node->iterable_type)->get_info()->scope;
