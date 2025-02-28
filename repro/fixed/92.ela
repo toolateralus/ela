@@ -11,7 +11,7 @@ impl Vec2 {
     builder.append_then_free(format("Vec2 { x: %, y: % }", .[
       any::from(&self.x),
       any::from(&self.y),
-    ]));
+    ], Format_Options::default()));
   }
 }
 
