@@ -53,7 +53,7 @@ impl LinearAlloc {
     data := &self.mem[self.ptr];
     self.ptr += size;
     if (self.ptr > LINEAR_ALLOCATOR_SIZE) {
-      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n");
+      print("\e[031mLinear allocator ran out of memory \e[033m(expected for demo)\n"c);
       exit(1);
     }
     return data;
@@ -80,7 +80,7 @@ Vector2 :: struct {
   allocator := LinearAlloc::create();
 
   // say hello!
-  print("\e[1;4;32mHello (free-standing) World!\e[0m\n");
+  print("\e[1;4;32mHello (free-standing) World!\e[0m\n"c);
   
   // example of getting a 'dynamically allocated' struct.
   // intentionally run the allocator out of memory, so we can 'panic' with exit(1);
@@ -89,8 +89,4 @@ Vector2 :: struct {
     v1: Vector2* = allocator.alloc(sizeof(Vector2));
     memcpy((&v1) as u8**, v as u8*, sizeof(Vector2));
   }
-}
-
-#export _start :: fn() {
-  main();
 }

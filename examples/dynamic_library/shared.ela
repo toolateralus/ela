@@ -7,7 +7,7 @@ DrawCommand :: struct {
 }
 
 DrawContext :: struct {
-  commands: List![DrawCommand],
+  commands: DrawCommand[],
   inputState: bool[256],
 }
 impl DrawContext {

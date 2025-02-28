@@ -367,13 +367,50 @@
 				</dict>
 			</array>
 		</dict>
+    <key>char</key>
+    <dict>
+      <key>patterns</key>
+      <array>
+        <dict>
+          <key>begin</key>
+          <string>'</string>
+          <key>beginCaptures</key>
+          <dict>
+            <key>0</key>
+            <dict>
+              <key>name</key>
+              <string>punctuation.definition.char.begin.ela</string>
+            </dict>
+          </dict>
+          <key>end</key>
+          <string>'</string>
+          <key>endCaptures</key>
+          <dict>
+            <key>0</key>
+            <dict>
+              <key>name</key>
+              <string>punctuation.definition.char.end.ela</string>
+            </dict>
+          </dict>
+          <key>name</key>
+          <string>string.quoted.single.ela</string>
+          <key>patterns</key>
+          <array>
+            <dict>
+              <key>include</key>
+              <string>#string_escaped_char</string>
+            </dict>
+          </array>
+        </dict>
+      </array>
+    </dict>
 		<key>strings</key>
 		<dict>
 			<key>patterns</key>
 			<array>
 				<dict>
 					<key>begin</key>
-					<string>"|'</string>
+					<string>"</string>
 					<key>beginCaptures</key>
 					<dict>
 						<key>0</key>
@@ -383,7 +420,7 @@
 						</dict>
 					</dict>
 					<key>end</key>
-					<string>"|'</string>
+					<string>"</string>
 					<key>endCaptures</key>
 					<dict>
 						<key>0</key>

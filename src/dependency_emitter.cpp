@@ -247,7 +247,7 @@ void DependencyEmitter::visit(ASTCall *node) {
     }
     // only accept if not a fn ptr
     // else, we do the other way
-    if (decl) {
+    if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       decl->accept(this);
       decl->accept(emitter);
       return;

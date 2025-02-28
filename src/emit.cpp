@@ -1684,7 +1684,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       name += mangled_type_args(node->generic_arguments);
     }
 
-    if (node->name == "main" || node->name == "маин" && !is_freestanding) {
+    if ((node->name == "main" || node->name == "маин") && !is_freestanding) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);
