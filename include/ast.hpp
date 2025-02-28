@@ -285,8 +285,17 @@ struct ASTLiteral : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_LITERAL; }
 };
 
+enum ValueSemantic {
+  VALUE_SEMANTIC_COPY,
+  VALUE_SEMANTIC_POINTER,
+};
+struct Destructure {
+  ValueSemantic semantic;
+  ASTIdentifier *identifier;
+};
+
 struct ASTTupleDeconstruction : ASTStatement {
-  std::vector<ASTIdentifier *> idens;
+  std::vector<Destructure> identifiers;
   ASTExpr *right;
   TType op;
   void accept(VisitorBase *visitor) override;
@@ -395,10 +404,6 @@ struct ASTContinue : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_CONTINUE; }
 };
 
-enum ValueSemantic {
-  VALUE_SEMANTIC_COPY,
-  VALUE_SEMANTIC_POINTER,
-};
 
 struct ASTRange : ASTExpr {
   ASTExpr *left;
@@ -431,10 +436,6 @@ struct ASTFor : ASTStatement {
   // this is the 'i' in `for i in 0..100`
   // this can also be a a, b destructure.
 
-  struct Destructure {
-    ValueSemantic semantic;
-    ASTIdentifier *identifier;
-  };
 
   union Left {
     Left() {}

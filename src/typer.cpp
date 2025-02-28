@@ -1984,16 +1984,21 @@ void Typer::visit(ASTTupleDeconstruction *node) {
 
   if (type->is_kind(TYPE_TUPLE)) {
     auto info = (type->get_info()->as<TupleTypeInfo>());
-    if (node->idens.size() != info->types.size()) {
+    if (node->identifiers.size() != info->types.size()) {
       throw_error(std::format("Cannot currently partially deconstruct a tuple. "
                               "expected {} identifiers to assign, got {}",
-                              info->types.size(), node->idens.size()),
+                              info->types.size(), node->identifiers.size()),
                   node->source_range);
     }
-    for (int i = 0; i < node->idens.size(); ++i) {
+
+    for (int i = 0; i < node->identifiers.size(); ++i) {
       auto type = info->types[i];
-      auto iden = node->idens[i];
-      ctx.scope->insert_variable(iden->value, type, iden);
+      auto iden = node->identifiers[i].identifier;
+      if (node->identifiers[i].semantic == VALUE_SEMANTIC_POINTER) {
+                ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
+      } else {
+        ctx.scope->insert_variable(iden->value, type, iden);
+      }
     }
   } else {
     auto scope = type->get_info()->scope;

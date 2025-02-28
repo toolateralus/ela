@@ -1098,7 +1098,8 @@ ASTStatement *Parser::parse_statement() {
   }
 
   // * Tuple destructure.
-  if (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) {
+  if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
+      (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::Comma)) {
     return parse_multiple_asssignment();
   }
 
@@ -1152,10 +1153,10 @@ ASTStatement *Parser::parse_statement() {
       eat();
 
       // Parse the variables in the for loop
-      std::vector<ASTFor::Destructure> destructure;
+      std::vector<Destructure> destructure;
 
       while (true) {
-        ASTFor::Destructure destruct;
+        Destructure destruct;
         if (peek().type == TType::Mul) {
           destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
           eat();
@@ -1336,7 +1337,8 @@ ASTStatement *Parser::parse_statement() {
                                            next.is_comp_assign() ||
                                            (tok.type == TType::Identifier && next.is_relational());
 
-    const bool is_deref = tok.type == TType::Mul;
+    // .2 != comma for tuple destrucutre.
+    const bool is_deref = tok.type == TType::Mul && lookahead_buf()[2].type != TType::Comma;
 
     const bool is_special_case = tok.type == TType::LParen || // possible parenthesized dereference or something.
                                  tok.type == TType::Switch;
@@ -1395,46 +1397,67 @@ ASTStatement *Parser::parse_statement() {
 
 ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
+
+
+  Destructure destruct;
+  if (peek().type == TType::Mul) {
+    destruct.semantic = VALUE_SEMANTIC_POINTER;
+    eat();
+  } else {
+    destruct.semantic = VALUE_SEMANTIC_COPY;
+  }
   auto first = parse_primary();
-  node->idens.push_back(static_cast<ASTIdentifier *>(first));
+
+  if (auto iden = dynamic_cast<ASTIdentifier *>(first)) {
+    destruct.identifier = iden;
+    node->identifiers.push_back(destruct);
+  } else {
+    end_node(nullptr, range);
+    throw_error("Can only have identifiers on the left hand side of a tuple deconstruction expressions", range);
+  }
+
   while (peek().type == TType::Comma) {
     eat();
+
+    Destructure destruct;
+    if (peek().type == TType::Mul) {
+      destruct.semantic = VALUE_SEMANTIC_POINTER;
+      eat();
+    } else {
+      destruct.semantic = VALUE_SEMANTIC_COPY;
+    }
     auto expr = parse_primary();
+
     if (auto iden = dynamic_cast<ASTIdentifier *>(expr)) {
-      node->idens.push_back(iden);
+      destruct.identifier = iden;
+      node->identifiers.push_back(destruct);
     } else {
       end_node(nullptr, range);
-      throw_error("Can only have identifiers on the left hand side of a tuple "
-                  "deconstruction expressions",
-                  range);
+      throw_error("Can only have identifiers on the left hand side of a tuple deconstruction expressions", range);
     }
   }
+
   if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
     node->op = eat().type;
     node->right = parse_expr();
   } else {
     // TODO: allow typed tuple deconstructions.
     end_node(nullptr, range);
-    throw_error("Currently, you cannot have an explicitly typed tuple "
-                "deconstruction. Use a, b, c := ....",
-                range);
+    throw_error("Currently, you cannot have an explicitly typed tuple deconstruction. Use a, b, c := ....", range);
   }
 
   end_node(node, range);
 
-  for (const auto &iden : node->idens) {
-    auto symbol = ctx.scope->local_lookup(iden->value);
+  for (const auto &destruct : node->identifiers) {
+    auto symbol = ctx.scope->local_lookup(destruct.identifier->value);
     if (node->op == TType::ColonEquals) {
       if (symbol)
-        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
-                    "the identifiers",
-                    node->source_range);
-      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
+        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
+      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
-      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
-      // already exist", node->source_range);
-      ctx.scope->insert_variable(iden->value, Type::INVALID_TYPE_ID, nullptr);
+      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
     }
   }
 

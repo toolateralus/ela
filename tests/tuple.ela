@@ -48,11 +48,6 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
   }
 }
 
-
-/* 
-  TODO: Fix this!!
-  Having pointers to tuples completely breaks the emitters.
-*/
 #test test_tuple_ptr :: fn () {
   ptr : (s32, s32)* = malloc(32) as (s32, s32)*;
   *ptr = (10, 10);
@@ -70,3 +65,14 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
 
   free(ptr);
 }
+
+#test test_tuple_destructure_with_ptr :: fn() {
+  *x, *y := (10, 20);
+
+  *x = 100;
+  *y = 200;
+
+  assert("tdr fail", *x == 100 && *y == 200);
+}
+
+

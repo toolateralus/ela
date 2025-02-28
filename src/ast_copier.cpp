@@ -303,9 +303,12 @@ ASTTuple *ASTCopier::copy_tuple(ASTTuple *node) {
 }
 ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruction *node) {
   auto new_node = copy(node);
-  new_node->idens.clear();
-  for (auto iden : node->idens) {
-    new_node->idens.push_back(static_cast<ASTIdentifier *>(copy_node(iden)));
+  new_node->identifiers.clear();
+  for (const auto &destruct : node->identifiers) {
+    Destructure new_destruct;
+    new_destruct.semantic = destruct.semantic;
+    new_destruct.identifier = static_cast<ASTIdentifier *>(copy_node(destruct.identifier));
+    new_node->identifiers.push_back(new_destruct);
   }
   new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
   return new_node;
