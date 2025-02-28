@@ -132,6 +132,61 @@
   assert("Range based for loop failed.", n == 9);
 }
 
+#test test_tuple_destructure_in_for_loop :: fn() {
+  list: (s32, s32)[];
+  list.push((0, 0));
+  list.push((1, 1));
+  list.push((2, 2));
+  list.push((3, 3));
+
+  i := 0;
+  for x, y in list {
+    assert("failed", x == i && y == i);
+    ++i;
+  }
+
+  for *x, *y in list {
+    *x *= 2;
+    *y *= 2;
+  }
+
+  i = 0;
+  for x, y in list {
+    assert("failed on set", x == i * 2 && y == i * 2);
+    i++;
+  }
+}
+
+__Struct :: struct {
+  x: s32,
+  y: s32,
+}
+
+#test test_struct_destructure_in_for_loop :: fn() {
+  list: __Struct[];
+  list.push(.{x: 0, y: 0});
+  list.push(.{x: 1, y: 1});
+  list.push(.{x: 2, y: 2});
+  list.push(.{x: 3, y: 3});
+
+  i := 0;
+  for x, y in list {
+    assert("failed", x == i && y == i);
+    ++i;
+  }
+
+  for *x, *y in list {
+    *x *= 2;
+    *y *= 2;
+  }
+
+  i = 0;
+  for x, y in list {
+    assert("failed on set", x == i * 2 && y == i * 2);
+    i++;
+  }
+}
+
 SwitchCaseEnum :: enum {
   SwitchVariant0,
   SwitchVariant1,
