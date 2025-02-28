@@ -269,7 +269,7 @@ struct Emitter : VisitorBase {
 struct DependencyEmitter : VisitorBase {
   Context &ctx;
   Emitter *emitter;
-  std::set<ASTFunctionDeclaration*> visitedFunctions = {};
+  std::set<ASTFunctionDeclaration*> visited_functions = {};
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
   void define_type(int type_id);

@@ -1,4 +1,5 @@
 
+#include <algorithm>
 #include <cassert>
 #include <csetjmp>
 #include <format>
@@ -1083,12 +1084,11 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   std::vector<int> generic_args;
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
-    generic_args = node->arguments->resolved_argument_types;
     auto index = 0;
-    for (auto generic_arg : generic_args) {
+    for (auto arg_ty_id : node->arguments->resolved_argument_types) {
       auto type = ast_alloc<ASTType>();
       type->source_range = node->source_range;
-      auto gen_t = global_get_type(generic_arg);
+      auto gen_t = global_get_type(arg_ty_id);
 
       /*
         * This is auto dereferencing an inferred generic argument when you have a parameter such as T*
@@ -1108,17 +1108,16 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
             !func->params->params[param_infer_index]->normal.type->extensions.empty()) {
           type->resolved_type = gen_t->get_element_type();
         } else {
-          type->resolved_type = generic_arg;
+          type->resolved_type = arg_ty_id;
         }
       } else {
-        type->resolved_type = generic_arg;
+        type->resolved_type = arg_ty_id;
       }
       node->generic_arguments.push_back(type);
       index++;
     }
-  } else {
-    generic_args = get_generic_arg_types(node->generic_arguments);
   }
+  generic_args = get_generic_arg_types(node->generic_arguments);
   auto instantiation = visit_generic(&Typer::visit_function_header, func, generic_args);
   if (!instantiation) {
     throw_error("Template instantiation argument count mismatch", node->source_range);
