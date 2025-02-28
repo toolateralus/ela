@@ -1099,7 +1099,8 @@ ASTStatement *Parser::parse_statement() {
 
   // * Tuple destructure.
   if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
-      (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[2].type == TType::Comma)) {
+      (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
+       lookahead_buf()[2].type == TType::Comma)) {
     return parse_multiple_asssignment();
   }
 
@@ -1398,7 +1399,6 @@ ASTStatement *Parser::parse_statement() {
 ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
 
-
   Destructure destruct;
   if (peek().type == TType::Mul) {
     destruct.semantic = VALUE_SEMANTIC_POINTER;
@@ -1452,11 +1452,14 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
     auto symbol = ctx.scope->local_lookup(destruct.identifier->value);
     if (node->op == TType::ColonEquals) {
       if (symbol)
-        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of the identifiers", node->source_range);
+        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
+                    "the identifiers",
+                    node->source_range);
       ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
     } else {
       // TODO: reimplement this error in a sane way.
-      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
+      // already exist", node->source_range);
       ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
     }
   }
@@ -1831,8 +1834,10 @@ ASTImpl *Parser::parse_impl() {
     if (statement->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       auto function = static_cast<ASTFunctionDeclaration *>(statement);
       node->methods.push_back(function);
+    } else if (statement->get_node_type() == AST_NODE_ALIAS) {
+      node->aliases.push_back(static_cast<ASTAlias *>(statement));
     } else {
-      throw_error("invalid statement: only methods are allowed in 'impl's", statement->source_range);
+      throw_error("invalid statement: only methods and aliases are allowed in 'impl's", statement->source_range);
     }
   }
   return node;
@@ -1961,8 +1966,6 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           member.bitsize = _node->bitsize;
           member.type = _node->type;
           node->members.push_back(member);
-        } else if (directive && directive.get()->get_node_type() == AST_NODE_ALIAS) {
-          node->aliases.push_back(static_cast<ASTAlias *>(directive.get()));
         } else {
           end_node(node, range);
           throw_error("right now, only `#anon :: struct/union` and `#bitfield(n_bits) name: type` definitions are the "

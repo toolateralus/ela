@@ -180,9 +180,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       node->scope->insert_variable(field.name, field.type->resolved_type, nullptr);
     }
   }
-  for (auto alias : node->aliases) {
-    alias->accept(this);
-  }
+  
   for (auto decl : node->members) {
     decl.type->accept(this);
     ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr);
@@ -405,6 +403,16 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
+
+  for (const auto &alias: node->aliases) {
+    // auto old_scope = ctx.scope;
+    // Defer _([&]{
+    //   ctx.scope = old_scope;
+    // });
+    // ctx.set_scope(type_scope); // is this correct?
+    alias->accept(this);
+  }
+
   for (const auto &method : node->methods) {
     method->declaring_type = target_ty->id;
     if (!method->generic_parameters.empty()) {
@@ -438,18 +446,23 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
+    
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
       throw_error(
           std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
           node->source_range);
     }
+
     auto interface = static_cast<ASTInterfaceDeclaration *>(declaring_node);
     interface = (ASTInterfaceDeclaration *)deep_copy_ast(interface);
     ctx.set_scope(interface->scope);
+
     for (auto &decl : interface->methods) {
       decl->accept(this);
     }
+
     ctx.set_scope(node->scope);
+
     for (auto &[name, interface_sym] : interface->scope->symbols) {
       if (!interface_sym.is_function())
         continue;
@@ -471,11 +484,13 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
                     node->source_range);
       }
     }
+
     for (auto &[name, impl_sym] : impl_scope.symbols) {
       if (!interface->scope->local_lookup(name)) {
         throw_error(std::format("impl method \"{}\" not found in interface", name), node->source_range);
       }
     }
+    
     target_ty->interfaces.push_back(interface_ty->id);
   }
 

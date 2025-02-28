@@ -341,7 +341,7 @@ static std::string get_unmangled_name(const Type *type) {
       }
       it++;
     }
-    base += "]";
+    base += ">";
   }
   base += type->get_ext().to_string();
   return base;

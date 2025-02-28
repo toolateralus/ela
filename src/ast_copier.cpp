@@ -327,10 +327,17 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  new_node->methods.clear();
+  
   if (node->where_clause) {
     new_node->where_clause = (ASTWhere *)copy_node(node->where_clause.get());
   }
+
+  new_node->aliases.clear();
+  for (const auto &alias: node->aliases) {
+    new_node->aliases.push_back(copy_alias(alias));
+  }
+
+  new_node->methods.clear();
   for (const auto &method : node->methods) {
     new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
   }

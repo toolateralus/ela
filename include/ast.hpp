@@ -536,7 +536,6 @@ struct ASTStructDeclaration : ASTStatement {
   bool is_union = false;
 
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
-  std::vector<ASTAlias *> aliases; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;
 
   std::vector<GenericParameter> generic_parameters;
@@ -675,6 +674,7 @@ struct ASTImpl : ASTStatement {
   Scope *scope;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
+  std::vector<ASTAlias *> aliases;
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
   void accept(VisitorBase *visitor) override;
 };

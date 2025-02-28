@@ -1277,7 +1277,16 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
-    ss << std::format(".offset = offsetof({}, {})", parent_type->get_base().get_str(), name);
+
+    if (parent_type->is_kind(TYPE_TUPLE)) {
+      ss << std::format(
+          ".offset = offsetof({}, {})",
+          to_cpp_string(global_get_type(parent_type->base_id == -1 ? parent_type->id : parent_type->base_id)), "$" + name);
+    } else {
+      ss << std::format(
+          ".offset = offsetof({}, {})",
+          to_cpp_string(global_get_type(parent_type->base_id == -1 ? parent_type->id : parent_type->base_id)), name);
+    }
   }
 
   if (parent_type->is_kind(TYPE_ENUM)) {
@@ -1428,7 +1437,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   auto get_fields_init_statements = [&] {
     std::stringstream fields_ss;
-    if (type->kind == TYPE_STRUCT) {
+    if (!type->is_kind(TYPE_FUNCTION) && !type->is_kind(TYPE_ENUM)) {
       auto info = type->get_info();
       if (info->scope->symbols.empty()) {
         return std::string("{}");

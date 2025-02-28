@@ -417,6 +417,9 @@ void DependencyEmitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
+  for (const auto &alias: node->aliases) {
+    alias->accept(this);
+  }
   for (const auto &method : node->methods) {
     method->accept(this);
   }
