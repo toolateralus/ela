@@ -4,11 +4,11 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-// #import directory;
-// #import dlfcn;
-// #import file;
+#import directory;
+#import dlfcn;
+#import file;
 #import format;
-// #import json;
+#import json;
 #import math;
 #import memory;
 #import net;
