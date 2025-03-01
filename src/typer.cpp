@@ -1228,14 +1228,14 @@ void Typer::visit(ASTExprStatement *node) {
 }
 
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range) {
-  if (definition->generic_parameters.size() != args.size()) {
-    throw_error("Template instantiation argument count mismatch", source_range);
-  }
   GenericInstantiationErrorUserData data;
   set_panic_handler(generic_instantiation_panic_handler);
   set_error_user_data(&data);
   Defer defer_1([] { reset_panic_handler(); });
   if (_setjmp(data.save_state) == 0) {
+    if (definition->generic_parameters.size() != args.size()) {
+      throw_error("Template instantiation argument count mismatch", definition->source_range);
+    }
     auto instantiation = find_generic_instance(definition->generic_instantiations, args);
     if (!instantiation) {
       instantiation = static_cast<ASTDeclaration *>(deep_copy_ast(definition));
