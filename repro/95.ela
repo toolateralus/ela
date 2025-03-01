@@ -6,5 +6,6 @@
 // We need to be able to at least parenthesize the subexpressions, and treat | as a seperate expression probably.
 Constraint :: interface!<T> where T is Is_Numerical & Is_Float | Compare {}
 
+#error ""
 
 main :: fn() { }
