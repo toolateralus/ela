@@ -1,7 +1,7 @@
 impl!<T> List!<T> {
   alias Ordering_Predicate :: fn * (T*, T*) -> bool;
 
-  order_by :: fn(self, predicate: Ordering_Predicate) -> T[] {
+  order_by_2 :: fn(self, predicate: Ordering_Predicate) -> T[] {
     new_list := self.clone();
     for i in 0..new_list.length {
       for j in (i+1)..new_list.length {
