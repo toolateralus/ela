@@ -180,6 +180,12 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       node->scope->insert_variable(field.name, field.type->resolved_type, nullptr);
     }
   }
+
+  auto old_type_context = type_context;
+  ASTType ast_type;
+  ast_type.resolved_type = type->id;
+  type_context = &ast_type;
+  Defer _([&]{ type_context = old_type_context; });
   
   for (auto decl : node->members) {
     decl.type->accept(this);
@@ -188,10 +194,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   ctx.set_scope(old_scope);
   node->resolved_type = type->id;
-
-  if (type->is_kind(TYPE_SCALAR)) {
-    throw_error("struct declaration was a scalar???", node->source_range);
-  }
 }
 
 void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,

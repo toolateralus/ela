@@ -1,4 +1,0 @@
-main :: fn() { 
-  list : s32[];
-  list[0xFFFFFFF] = 10;
-}
