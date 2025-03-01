@@ -1207,31 +1207,24 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
-
     if (ext.is_fixed_sized_array()) {
       identifier += ext.to_string();
     }
-
     return get_function_pointer_type_string(type, &identifier);
   }
-  auto base = type->get_base().get_str();
-  ;
-  tss << to_cpp_string(global_get_type(type->get_element_type()));
-  if (!type->get_ext().is_fixed_sized_array()) {
-    tss << name << ' ';
-  }
-  bool emitted_iden = false;
-  for (const auto ext : type->get_ext().extensions) {
+
+  std::string base_type_str = to_cpp_string(global_get_type(type->base_id == -1 ? type->id : type->base_id));
+  std::string identifier = name;
+
+  for (const auto &ext : type->get_ext().extensions) {
     if (ext.type == TYPE_EXT_POINTER) {
-      tss << "*";
+      base_type_str += "*";
     } else if (ext.type == TYPE_EXT_ARRAY) {
-      if (!emitted_iden) {
-        emitted_iden = true;
-        tss << ' ' << name;
-      }
-      tss << "[" << std::to_string(ext.array_size) << "]";
+      identifier += "[" + std::to_string(ext.array_size) + "]";
     }
   }
+
+  tss << base_type_str << " " << identifier;
   return tss.str();
 }
 
