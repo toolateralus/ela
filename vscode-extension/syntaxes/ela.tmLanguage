@@ -194,7 +194,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|структ|enum|перечень|fn|фн|союз|union)\b</string>
+					<string>\b(alias|struct|структ|enum|перечень|fn|фн|союз|union)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
