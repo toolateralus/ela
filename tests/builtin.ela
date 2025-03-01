@@ -69,40 +69,39 @@ Xaryu :: struct {
 }
 
 
+#test test_multidimensional_arrays :: fn() {
+  array: s32[5][5];
+  for x in 0..5 {
+    for y in 0..5 {
+      array[x][y] = x * y;
+    }
+  }
 
-// #test test_multidimensional_arrays :: fn() {
-//   array: s32[5][5];
-//   for x in 0..5 {
-//     for y in 0..5 {
-//       array[x][y] = x * y;
-//     }
-//   }
+  for x in 0..5 {
+    for y in 0..5 {
+      assert("multidimensional failure", array[x][y] == x * y);
+    }
+  }
 
-//   for x in 0..5 {
-//     for y in 0..5 {
-//       assert("multidimensional failure", array[x][y] == x * y);
-//     }
-//   }
+  dynamic : s32[][];
+  for x in 0..5 {
+    dynamic.push(.{});
+    for y in 0..5 {
+      dynamic[x].push(x * y);
+    }
+  }
 
-//   dynamic : List!<List><s64]>;
-//   for x in 0..5 {
-//     dynamic.push({});
-//     for y in 0..5 {
-//       dynamic[x].push(x * y);
-//     }
-//   }
+  assert("length failed", dynamic.length == 5);
 
-//   assert("length failed", dynamic.length == 5);
+  for x in 0..5 {
+    for y in 0..5 {
+      assert("multidimensional failure", dynamic[x][y] == x * y);
+    }
+  }
+}
 
-//   for x in 0..5 {
-//     for y in 0..5 {
-//       assert("multidimensional failure", dynamic[x][y] == x * y);
-//     }
-//   }
-// }
-
-// #test subscript_string :: fn() {
-//   s: str = str::from("0,1,2,3");
-//   s[0] = 10;
-//   assert("subscript assign str failed", s[0] == (10 as u8));
-// }
+#test subscript_string :: fn() {
+  s: str = "0,1,2,3,4";
+  s[0] = 10;
+  assert("subscript assign str failed", s[0] == (10 as u8));
+}
