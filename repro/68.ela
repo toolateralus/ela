@@ -19,6 +19,9 @@ error: Struct = {
 }
 
 main :: fn() { 
+  n : Struct;
+
+  
 
 }
 
