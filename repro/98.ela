@@ -1,0 +1,46 @@
+// move this somwhere it belongs
+Test_Enumerator :: struct!<Index, Value_Type> {
+  slice: Slice!<Value_Type>,
+  index: Index,
+}
+
+impl!<Value_Type> Enumerator!<(u32, Value_Type)> for Test_Enumerator!<u32, Value_Type> {
+  current :: fn(self) -> (u32, Value_Type) {
+    return (self.index, self.slice.data[self.index]);
+  }
+  done :: fn(self) -> bool {
+    return self.index >= self.slice.length;
+  }
+  next :: fn(self*) -> void { 
+    self.index++;
+  }
+}
+
+impl!<Value_Type> Value_Type[] {
+  failure :: fn(self*) -> Test_Enumerator!<u32, Value_Type> {
+    return .{
+      index: 0,
+      slice: .{
+        data: self.data,
+        length: self.length
+      },
+    };
+  }
+}
+
+#import format;
+
+
+main :: fn() { 
+  list := s32[]::init(.[
+    0,1,2,3,4
+  ]);
+
+  enumerator: Test_Enumerator!<u32, s32> = list.failure();
+
+  for i, v in enumerator {
+    println(i);
+    println(v);
+    printf("%s\n"c, typeof(v).name);
+  }
+}
