@@ -406,7 +406,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
 
-  for (const auto &alias: node->aliases) {
+  for (const auto &alias : node->aliases) {
     // auto old_scope = ctx.scope;
     // Defer _([&]{
     //   ctx.scope = old_scope;
@@ -448,7 +448,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   if (interface_ty) {
     auto declaring_node = interface_ty->declaring_node.get();
-    
+
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
       throw_error(
           std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
@@ -492,7 +492,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         throw_error(std::format("impl method \"{}\" not found in interface", name), node->source_range);
       }
     }
-    
+
     target_ty->interfaces.push_back(interface_ty->id);
   }
 
@@ -1956,6 +1956,9 @@ void Typer::visit(ASTTuple *node) {
   for (const auto &v : node->values) {
     auto old = declaring_or_assigning_type;
     Defer _([&] { declaring_or_assigning_type = old; });
+
+
+    bool declaring_type_set = false;
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
       auto info = declaring_tuple->get_info()->as<TupleTypeInfo>();
       if (info->types.size() < type_index) {
@@ -1963,8 +1966,17 @@ void Typer::visit(ASTTuple *node) {
                     v->source_range);
       }
       declaring_or_assigning_type = info->types[type_index];
+      declaring_type_set = true;
     }
+
     v->accept(this);
+
+    if (declaring_type_set) {
+      assert_types_can_cast_or_equal(v->resolved_type, declaring_or_assigning_type, v->source_range,
+                                                "tuple value was incapable of casting to expected tuple element type");
+      v->resolved_type = declaring_or_assigning_type;
+    }
+
     types.push_back(v->resolved_type);
     type_index++;
   }
@@ -2012,7 +2024,7 @@ void Typer::visit(ASTTupleDeconstruction *node) {
       auto type = info->types[i];
       auto iden = node->identifiers[i].identifier;
       if (node->identifiers[i].semantic == VALUE_SEMANTIC_POINTER) {
-                ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
+        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
       } else {
         ctx.scope->insert_variable(iden->value, type, iden);
       }
