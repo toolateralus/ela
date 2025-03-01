@@ -22,7 +22,7 @@ void ASTProgram::accept(VisitorBase *visitor) {visitor->visit(this); }
 void ASTBlock::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTType::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTExprStatement::accept(VisitorBase *visitor) {visitor->visit(this); }
-void ASTDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTVariable::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTBinExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTUnaryExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTIdentifier::accept(VisitorBase *visitor) { visitor->visit(this); }
@@ -65,4 +65,3 @@ void ASTSize_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
-

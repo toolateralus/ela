@@ -363,7 +363,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           auto struct$ = static_cast<ASTStructDeclaration*>(node);
           struct$->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_DECLARATION) {
-          auto decl = static_cast<ASTDeclaration*>(node);
+          auto decl = static_cast<ASTVariable*>(node);
           decl->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
           auto func = static_cast<ASTFunctionDeclaration*>(node);
@@ -400,7 +400,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::LParen);
         auto size = parser->expect(TType::Integer);
         parser->expect(TType::RParen);
-        ASTDeclaration *decl = parser->parse_declaration();
+        ASTVariable *decl = parser->parse_declaration();
         decl->is_bitfield = true;
         decl->bitsize = size.value;
         return decl;
@@ -411,7 +411,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto statement = parser->parse_statement();
-        if (auto decl = dynamic_cast<ASTDeclaration *>(statement)) {
+        if (auto decl = dynamic_cast<ASTVariable *>(statement)) {
           decl->is_static = true;
         } else if (auto decl = dynamic_cast<ASTFunctionDeclaration *>(statement)) {
           decl->flags |= FUNCTION_IS_STATIC;
@@ -1298,7 +1298,7 @@ ASTStatement *Parser::parse_statement() {
       return enum_decl;
     }
 
-    NODE_ALLOC(ASTDeclaration, decl, range, _, this);
+    NODE_ALLOC(ASTVariable, decl, range, _, this);
     decl->name = tok.value;
     decl->value = parse_expr();
     decl->is_constexpr = true;
@@ -1467,8 +1467,8 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   return node;
 }
 
-ASTDeclaration *Parser::parse_declaration() {
-  NODE_ALLOC(ASTDeclaration, decl, range, _, this);
+ASTVariable *Parser::parse_declaration() {
+  NODE_ALLOC(ASTVariable, decl, range, _, this);
   auto iden = eat();
   decl->name = iden.value;
 
@@ -1960,7 +1960,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
         } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
           ASTStructMember member{};
-          auto _node = static_cast<ASTDeclaration *>(directive.get());
+          auto _node = static_cast<ASTVariable *>(directive.get());
           member.name = _node->name;
           member.is_bitfield = true;
           member.bitsize = _node->bitsize;
@@ -2141,6 +2141,15 @@ void Parser::append_type_extensions(ASTType *&node) {
       break;
     }
   }
+}
+
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<int> &gen_args) {
+  for (auto &instantiation : instantiations) {
+    if (instantiation.arguments == gen_args) {
+      return instantiation.declaration;
+    }
+  }
+  return nullptr;
 }
 
 ASTType *Parser::parse_function_type() {

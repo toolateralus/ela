@@ -227,7 +227,7 @@ struct ASTExprStatement : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_EXPR_STATEMENT; }
 };
 
-struct ASTDeclaration : ASTStatement {
+struct ASTVariable : ASTStatement {
   InternedString name;
   InternedString bitsize;
 
@@ -337,22 +337,28 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
-template <typename T> struct GenericInstance {
+struct ASTDeclaration;
+
+struct GenericInstance {
   std::vector<int> arguments;
-  T *node;
+  ASTDeclaration *declaration;
+};
+
+struct ASTDeclaration : ASTStatement {
+  std::vector<GenericParameter> generic_parameters;
+  std::vector<GenericInstance> generic_instantiations;
+  virtual ASTNodeType get_node_type() const = 0;
 };
 
 struct ASTWhere;
 struct ASTLambda;
 
-struct ASTFunctionDeclaration : ASTStatement {
+struct ASTFunctionDeclaration : ASTDeclaration {
   size_t flags = 0;
   bool has_defer = false;
   int declaring_type = Type::INVALID_TYPE_ID;
-  std::vector<int> generic_arguments;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance<ASTFunctionDeclaration>> generic_instantiations;
   Nullable<ASTWhere> where_clause;
+  std::vector<int> generic_arguments;
   Scope *scope;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
@@ -404,7 +410,6 @@ struct ASTContinue : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_CONTINUE; }
 };
 
-
 struct ASTRange : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
@@ -413,14 +418,12 @@ struct ASTRange : ASTExpr {
 };
 
 struct ASTFor : ASTStatement {
-
-
   enum {
     // implicitly pulled an iter() off a type that implements Iterable![T]
     ITERABLE,
     // implicitly pulled an enumerator() off a type that implements Enumerable![T]
     ENUMERABLE,
-    // got an Enumerator![T] object directly 
+    // got an Enumerator![T] object directly
     ENUMERATOR,
     // got an Iter![T] object directly
     ITERATOR,
@@ -428,14 +431,13 @@ struct ASTFor : ASTStatement {
 
   // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
   int range_type = Type::INVALID_TYPE_ID;
-    // This is either the type of that implements Enumerator![T], or is Iter![T];
+  // This is either the type of that implements Enumerator![T], or is Iter![T];
   int iterable_type = Type::INVALID_TYPE_ID;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
   int identifier_type = Type::INVALID_TYPE_ID;
-  
+
   // this is the 'i' in `for i in 0..100`
   // this can also be a a, b destructure.
-
 
   union Left {
     Left() {}
@@ -467,7 +469,6 @@ struct ASTFor : ASTStatement {
         break;
     }
   }
-
 
   enum {
     IDENTIFIER,
@@ -527,7 +528,7 @@ struct ASTStructMember {
 
 struct ASTAlias;
 
-struct ASTStructDeclaration : ASTStatement {
+struct ASTStructDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   InternedString name;
@@ -537,9 +538,6 @@ struct ASTStructDeclaration : ASTStatement {
 
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;
-
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance<ASTStructDeclaration>> generic_instantiations;
   std::vector<ASTImpl *> impls;
 
   void accept(VisitorBase *visitor) override;
@@ -558,13 +556,10 @@ struct ASTType_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-
-struct ASTInterfaceDeclaration : ASTStatement {
+struct ASTInterfaceDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   InternedString name;
   Scope *scope;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance<ASTInterfaceDeclaration>> generic_instantiations;
   std::vector<ASTFunctionDeclaration *> methods;
   ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
   void accept(VisitorBase *visitor) override;
@@ -586,17 +581,15 @@ struct ASTTaggedUnionVariant {
     STRUCT,
   } kind;
   ASTType *tuple;
-  std::vector<ASTDeclaration *> struct_declarations;
+  std::vector<ASTVariable *> struct_declarations;
   InternedString name;
 };
 
-struct ASTTaggedUnionDeclaration : ASTStatement {
+struct ASTTaggedUnionDeclaration : ASTDeclaration {
   InternedString name;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
   std::vector<ASTTaggedUnionVariant> variants;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance<ASTTaggedUnionDeclaration>> generic_instantiations;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
 };
@@ -657,20 +650,18 @@ struct ASTNoop : ASTStatement {
 struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic aliases?
   InternedString name;
   ASTType *source_type;
-  std::vector<ASTType*> generic_arguments;
+  std::vector<ASTType *> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
   void accept(VisitorBase *visitor) override;
 };
 
 // TODO: add interface field, once we have interfaces lol.
-struct ASTImpl : ASTStatement {
+struct ASTImpl : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   // impl 'target' or impl *interface for 'target'
   ASTType *target;
   Nullable<ASTType> interface;
-  std::vector<GenericParameter> generic_parameters;
-  std::vector<GenericInstance<ASTImpl>> generic_instantiations;
   Scope *scope;
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
@@ -722,7 +713,7 @@ struct ASTWhere : ASTExpr {
   void visit(ASTFunctionDeclaration *node) override {}                                                                 \
   void visit(ASTParamsDecl *node) override {}                                                                          \
   void visit(ASTParamDecl *node) override {}                                                                           \
-  void visit(ASTDeclaration *node) override {}                                                                         \
+  void visit(ASTDeclarVariable) override {}                                                                            \
   void visit(ASTExprStatement *node) override {}                                                                       \
   void visit(ASTBinExpr *node) override {}                                                                             \
   void visit(ASTUnaryExpr *node) override {}                                                                           \
@@ -752,7 +743,7 @@ struct ASTWhere : ASTExpr {
   void visit(ASTCast *node) override {};                                                                               \
   void visit(ASTTaggedUnionDeclaration *node) override {};                                                             \
   void visit(ASTInterfaceDeclaration *node) override {};                                                               \
-  void visit(ASTSize_Of *node) override {};\
+  void visit(ASTSize_Of *node) override {};                                                                            \
   void visit(ASTType_Of *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
@@ -767,7 +758,7 @@ struct ASTWhere : ASTExpr {
   virtual void visit(ASTFunctionDeclaration *node) = 0;                                                                \
   virtual void visit(ASTParamsDecl *node) = 0;                                                                         \
   virtual void visit(ASTParamDecl *node) = 0;                                                                          \
-  virtual void visit(ASTDeclaration *node) = 0;                                                                        \
+  virtual void visit(ASTVariable *node) = 0;                                                                           \
   virtual void visit(ASTExprStatement *node) = 0;                                                                      \
   virtual void visit(ASTBinExpr *node) = 0;                                                                            \
   virtual void visit(ASTUnaryExpr *node) = 0;                                                                          \
@@ -796,7 +787,7 @@ struct ASTWhere : ASTExpr {
   virtual void visit(ASTTupleDeconstruction *node) = 0;                                                                \
   virtual void visit(ASTDefer *node) = 0;                                                                              \
   virtual void visit(ASTInterfaceDeclaration *node) = 0;                                                               \
-  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;\
+  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;                                                             \
   virtual void visit(ASTType_Of *node) = 0;
 
 enum DirectiveKind {
@@ -847,7 +838,7 @@ struct Parser {
   ASTInterfaceDeclaration *parse_interface_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
-  ASTDeclaration *parse_declaration();
+  ASTVariable *parse_declaration();
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTType *> parse_generic_arguments();
@@ -915,15 +906,7 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   return node;
 }
 
-template <typename T>
-T *find_generic_instance(std::vector<GenericInstance<T>> instantiations, const std::vector<int> &gen_args) {
-  for (auto &instantiation : instantiations) {
-    if (instantiation.arguments == gen_args) {
-      return instantiation.node;
-    }
-  }
-  return nullptr;
-}
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<int> &gen_args);
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
   type *node = ast_alloc<type>();                                                                                      \

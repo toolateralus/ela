@@ -30,7 +30,6 @@ impl!<Value_Type> Value_Type[] {
 
 #import format;
 
-#error ""
 
 main :: fn() { 
   list := s32[]::init(.[

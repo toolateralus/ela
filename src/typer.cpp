@@ -174,12 +174,12 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   type->declaring_node = node;
   node->resolved_type = type->id;
-  
+
   auto old_type_context = type_context;
   ASTType ast_type;
   ast_type.resolved_type = type->id;
   type_context = &ast_type;
-  Defer _([&]{ type_context = old_type_context; });
+  Defer _([&] { type_context = old_type_context; });
 
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->members) {
@@ -187,7 +187,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       node->scope->insert_variable(field.name, field.type->resolved_type, nullptr);
     }
   }
-  
+
   for (auto decl : node->members) {
     decl.type->accept(this);
     ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr);
@@ -606,7 +606,7 @@ bool expr_is_literal(ASTExpr *expr) {
   }
 }
 
-void Typer::visit(ASTDeclaration *node) {
+void Typer::visit(ASTVariable *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
     if (node->value.get()->get_node_type() == AST_NODE_TYPE) {
@@ -1056,8 +1056,7 @@ void Typer::visit(ASTCall *node) {
           type_context = &func_type_ast;
         }
 
-        GENERIC_PANIC_HANDLER(
-            data, 1, { func_decl = resolve_generic_function_call(node, func_decl); }, node->source_range);
+        func_decl = resolve_generic_function_call(node, func_decl);
       }
 
       type = global_get_type(func_decl->resolved_type);
@@ -1186,13 +1185,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     }
   }
   generic_args = get_generic_arg_types(node->generic_arguments);
-  auto instantiation = visit_generic(&Typer::visit_function_header, func, generic_args);
-  if (!instantiation) {
-    throw_error("Template instantiation argument count mismatch", node->source_range);
-  }
-  instantiation->generic_arguments = generic_args;
-  visit_function_body(static_cast<ASTFunctionDeclaration *>(instantiation));
-  return instantiation;
+  return (ASTFunctionDeclaration *)visit_generic(func, generic_args, node->source_range);
 }
 
 void Typer::visit(ASTArguments *node) {
@@ -1230,19 +1223,56 @@ void Typer::visit(ASTExprStatement *node) {
   }
 }
 
-template <typename T> T Typer::visit_generic(VisitorMethod<T> visit_method, T definition, std::vector<int> args) {
+ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range) {
   if (definition->generic_parameters.size() != args.size()) {
+    throw_error("Template instantiation argument count mismatch", source_range);
+  }
+  GenericInstantiationErrorUserData data;
+  set_panic_handler(generic_instantiation_panic_handler);
+  set_error_user_data(&data);
+  Defer defer_1([] { reset_panic_handler(); });
+  if (_setjmp(data.save_state) == 0) {
+    auto instantiation = find_generic_instance(definition->generic_instantiations, args);
+    if (!instantiation) {
+      instantiation = static_cast<ASTDeclaration *>(deep_copy_ast(definition));
+      definition->generic_instantiations.push_back({args, instantiation});
+      switch (definition->get_node_type()) {
+        case AST_NODE_STRUCT_DECLARATION: {
+          visit_struct_declaration((ASTStructDeclaration *)instantiation, true, args);
+          auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
+          for (auto impl : struct_decl->impls) {
+            if (impl->resolved_type == Type ::INVALID_TYPE_ID) {
+              visit_generic(impl, args, source_range);
+            }
+          }
+        } break;
+        case AST_NODE_FUNCTION_DECLARATION: {
+          visit_function_header((ASTFunctionDeclaration *)instantiation, true, args);
+          auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
+          func->generic_arguments = args;
+          visit_function_body(func);
+        } break;
+        case AST_NODE_INTERFACE_DECLARATION:
+          visit_interface_declaration((ASTInterfaceDeclaration *)instantiation, true, args);
+          break;
+        case AST_NODE_TAGGED_UNION_DECLARATION: {
+          visit_tagged_union_declaration((ASTTaggedUnionDeclaration *)instantiation, true, args);
+        } break;
+        case AST_NODE_IMPL: {
+          visit_impl_declaration((ASTImpl *)instantiation, true, args);
+        } break;
+        default:
+          throw_error("Invalid target to generic args", source_range);
+          break;
+      }
+      instantiation->generic_parameters.clear();
+      instantiation->generic_instantiations.clear();
+    }
+    return instantiation;
+  } else {
+    handle_generic_error(&data, source_range);
     return nullptr;
   }
-  auto instantiation = find_generic_instance(definition->generic_instantiations, args);
-  if (!instantiation) {
-    instantiation = static_cast<T>(deep_copy_ast(definition));
-    definition->generic_instantiations.push_back({args, instantiation});
-    (this->*visit_method)(instantiation, true, args);
-    instantiation->generic_parameters.clear();
-    instantiation->generic_instantiations.clear();
-  }
-  return instantiation;
 }
 
 std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension> ast_extensions) {
@@ -1319,62 +1349,18 @@ void Typer::visit(ASTType *node) {
         generic_args.push_back(arg->resolved_type);
       }
 
-      ASTStatement *instantiation = nullptr;
-      auto decl_node_type = declaring_node->get_node_type();
-
-      GENERIC_PANIC_HANDLER(
-          data, 1,
-          {
-            switch (decl_node_type) {
-              case AST_NODE_STRUCT_DECLARATION:
-                instantiation = visit_generic(&Typer::visit_struct_declaration, (ASTStructDeclaration *)declaring_node,
-                                              generic_args);
-                break;
-              case AST_NODE_FUNCTION_DECLARATION:
-                instantiation = visit_generic(&Typer::visit_function_header, (ASTFunctionDeclaration *)declaring_node,
-                                              generic_args);
-                break;
-              case AST_NODE_INTERFACE_DECLARATION:
-                instantiation = visit_generic(&Typer::visit_interface_declaration,
-                                              (ASTInterfaceDeclaration *)declaring_node, generic_args);
-                break;
-              case AST_NODE_TAGGED_UNION_DECLARATION: {
-                instantiation = visit_generic(&Typer::visit_tagged_union_declaration,
-                                              (ASTTaggedUnionDeclaration *)declaring_node, generic_args);
-              } break;
-              default:
-                throw_error("Invalid target to generic args", node->source_range);
-                break;
-            }
-          },
-          node->source_range);
-
-      if (!instantiation) {
-        throw_error("Template instantiation argument count mismatch", node->source_range);
+      switch (declaring_node->get_node_type()) {
+        case AST_NODE_STRUCT_DECLARATION:
+        case AST_NODE_FUNCTION_DECLARATION:
+        case AST_NODE_INTERFACE_DECLARATION:
+        case AST_NODE_TAGGED_UNION_DECLARATION:
+          break;
+        default:
+          throw_error("Invalid target to generic args", node->source_range);
+          break;
       }
-
-      GENERIC_PANIC_HANDLER(
-          other_data, 2,
-          {
-            if (decl_node_type == AST_NODE_FUNCTION_DECLARATION) {
-              auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
-              func->generic_arguments = generic_args;
-              visit_function_body(func);
-            } else if (decl_node_type == AST_NODE_STRUCT_DECLARATION) {
-              auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
-              for (auto impl : struct_decl->impls) {
-                if (impl->resolved_type == Type::INVALID_TYPE_ID) {
-                  // setting target resolved_type so that when target's visited it won't try to
-                  // instatiate the impls again. otherwise, it visits them in reverse order.
-                  impl->target->resolved_type = instantiation->resolved_type;
-                  visit_generic(&Typer::visit_impl_declaration, impl, generic_args);
-                }
-              }
-            }
-            node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
-          },
-          node->source_range);
-
+      auto instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, node->source_range);
+      node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
     } else {
       normal_ty.base->accept(this);
       auto base_ty = global_get_type(normal_ty.base->resolved_type);
@@ -1957,7 +1943,6 @@ void Typer::visit(ASTTuple *node) {
     auto old = declaring_or_assigning_type;
     Defer _([&] { declaring_or_assigning_type = old; });
 
-
     bool declaring_type_set = false;
     if (declaring_tuple && declaring_tuple->is_kind(TYPE_TUPLE)) {
       auto info = declaring_tuple->get_info()->as<TupleTypeInfo>();
@@ -1973,7 +1958,7 @@ void Typer::visit(ASTTuple *node) {
 
     if (declaring_type_set) {
       assert_types_can_cast_or_equal(v->resolved_type, declaring_or_assigning_type, v->source_range,
-                                                "tuple value was incapable of casting to expected tuple element type");
+                                     "tuple value was incapable of casting to expected tuple element type");
       v->resolved_type = declaring_or_assigning_type;
     }
 
@@ -2060,14 +2045,9 @@ void Typer::visit(ASTImpl *node) {
 
     auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
     node_as_struct->impls.push_back(node);
-    GENERIC_PANIC_HANDLER(
-        data, 1,
-        {
-          for (auto instantiations : node_as_struct->generic_instantiations) {
-            visit_generic(&Typer::visit_impl_declaration, node, instantiations.arguments);
-          }
-        },
-        node->source_range);
+    for (auto instantiations : node_as_struct->generic_instantiations) {
+      visit_generic(node, instantiations.arguments, instantiations.declaration->source_range);
+    }
   } else {
     visit_impl_declaration(node, false);
   }
@@ -2164,53 +2144,16 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
     throw_error("internal compiler error: unable to find type's declaring node", source_range);
   }
 
-  auto decl_node_type = declaring_node->get_node_type();
-
-  GENERIC_PANIC_HANDLER(
-      data, 1,
-      {
-        switch (decl_node_type) {
-          case AST_NODE_STRUCT_DECLARATION:
-            instantiation =
-                visit_generic(&Typer::visit_struct_declaration, (ASTStructDeclaration *)declaring_node, generic_args);
-            break;
-          case AST_NODE_FUNCTION_DECLARATION:
-            instantiation =
-                visit_generic(&Typer::visit_function_header, (ASTFunctionDeclaration *)declaring_node, generic_args);
-            break;
-          case AST_NODE_INTERFACE_DECLARATION:
-            instantiation = visit_generic(&Typer::visit_interface_declaration,
-                                          (ASTInterfaceDeclaration *)declaring_node, generic_args);
-            break;
-          default:
-            throw_error("Invalid target to generic args", source_range);
-            break;
-        }
-      },
-      source_range);
-
-  if (!instantiation) {
-    throw_error("Template instantiation argument count mismatch", source_range);
+  switch (declaring_node->get_node_type()) {
+    case AST_NODE_STRUCT_DECLARATION:
+    case AST_NODE_FUNCTION_DECLARATION:
+    case AST_NODE_INTERFACE_DECLARATION:
+      break;
+    default:
+      throw_error("Invalid target to generic args", source_range);
+      break;
   }
-
-  GENERIC_PANIC_HANDLER(
-      other_data, 2,
-      {
-        if (decl_node_type == AST_NODE_FUNCTION_DECLARATION) {
-          auto func = static_cast<ASTFunctionDeclaration *>(instantiation);
-          func->generic_arguments = generic_args;
-          visit_function_body(func);
-        } else if (decl_node_type == AST_NODE_STRUCT_DECLARATION) {
-          auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
-          for (auto impl : struct_decl->impls) {
-            if (impl->resolved_type == Type::INVALID_TYPE_ID) {
-              visit_generic(&Typer::visit_impl_declaration, impl, generic_args);
-            }
-          }
-        }
-      },
-      source_range);
-
+  instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, source_range);
   return global_find_type_id(instantiation->resolved_type, {});
 }
 

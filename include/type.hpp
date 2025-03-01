@@ -16,7 +16,7 @@
 
 // fwd
 struct Type;
-struct ASTDeclaration;
+struct ASTVariable;
 struct Scope;
 struct Context;
 
