@@ -390,7 +390,11 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   node->target->accept(this);
   auto target_ty = global_get_type(node->target->resolved_type);
   if (!target_ty) {
-    throw_error("use of undeclared type", node->target->source_range);
+    if (node->target->resolved_type == Type::INVALID_TYPE_ID) {
+      throw_error("use of undeclared type", node->target->source_range);
+    } else if (node->target->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+      throw_error("use of unresolved generic type", node->target->source_range);
+    }
   }
   Type *interface_ty = nullptr;
 
@@ -1291,19 +1295,6 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   return extensions;
 }
 
-/*
-else if (node->kind == ASTType::REFLECTION) {
-    auto &normal_ty = node->normal;
-    normal_ty.base->accept(this);
-    auto base_ty = global_get_type(normal_ty.base->resolved_type);
-    if (!base_ty) {
-      throw_error("use of undeclared type", node->source_range);
-    }
-    node->pointing_to.get()->accept(this);
-    node->resolved_type = global_find_type_id(base_ty->id, extensions);
-  }
-   */
-
 void Typer::visit(ASTType_Of *node) {
   static auto type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
   node->target->accept(this);
@@ -1336,8 +1327,10 @@ void Typer::visit(ASTType *node) {
     auto &normal_ty = node->normal;
     auto symbol = get_symbol(normal_ty.base).get();
 
-    if (!symbol || !symbol->is_type()) {
-      throw_error("use of undeclared type, or cannot use a non-type symbol as a type", node->source_range);
+    if (!symbol) {
+      throw_error("use of undeclared type", node->source_range);
+    } else if (!symbol->is_type()) {
+      throw_error("cannot use a non-type symbol as a type", node->source_range);
     }
 
     auto declaring_node = symbol->type.declaration.get();
@@ -1365,7 +1358,11 @@ void Typer::visit(ASTType *node) {
       normal_ty.base->accept(this);
       auto base_ty = global_get_type(normal_ty.base->resolved_type);
       if (!base_ty) {
-        throw_error(std::format("use of undeclared type", normal_ty.base->resolved_type), node->source_range);
+        if (normal_ty.base->resolved_type == Type::INVALID_TYPE_ID) {
+          throw_error("use of undeclared type", node->source_range);
+        } else if (normal_ty.base->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+          throw_error("use of unresolved generic type", node->source_range);
+        }
       }
       node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }

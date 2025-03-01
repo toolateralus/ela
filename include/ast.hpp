@@ -194,6 +194,7 @@ struct ASTType : ASTExpr {
   ASTType() {}
 
   ASTType(const ASTType &other) {
+    source_range = other.source_range;
     extensions = other.extensions;
     kind = other.kind;
     switch (kind) {
@@ -452,6 +453,7 @@ struct ASTFor : ASTStatement {
   ASTFor() {}
   ~ASTFor() {}
   ASTFor(const ASTFor &other) {
+    source_range = other.source_range;
     iteration_kind = other.iteration_kind;
     range_type = other.range_type;
     iterable_type = other.iterable_type;
@@ -598,6 +600,7 @@ struct ASTInitializerList : ASTExpr {
   ASTInitializerList() {}
   ~ASTInitializerList() {}
   ASTInitializerList(const ASTInitializerList &other) {
+    source_range = other.source_range;
     tag = other.tag;
     switch (tag) {
       case INIT_LIST_NAMED:
