@@ -107,6 +107,7 @@ enum struct TType {
   Type_Of,
 
   Alias,
+  Import,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -202,6 +203,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
     TTYPE_CASE(Alias);
+    TTYPE_CASE(Import);
   }
   return "Unknown";
 }
@@ -265,6 +267,9 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"import", TType::Import},
+    {"импорт", TType::Import},
+
     {"alias", TType::Alias},
     {"псевдоним", TType::Alias},
 

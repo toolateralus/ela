@@ -41,6 +41,7 @@ struct Typer : VisitorBase {
  
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
+  void visit(ASTImport *node) override;
   void visit(ASTFunctionDeclaration *node) override;
   void visit(ASTBlock *node) override;
   void visit(ASTParamsDecl *node) override;
@@ -212,6 +213,7 @@ struct Emitter : VisitorBase {
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   int get_expr_left_type_sr_dot(ASTNode *node);
+  void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;

@@ -138,16 +138,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
     }},
 
-    // #import
-    // Imports from usr/local/lib/ela by identifier and no file ext.
-    {.identifier = "import",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto iden = parser->expect(TType::Identifier).value;
-        parser->import(iden.get_str());
-        return nullptr;
-    }},
-
     // This is only used for debugging the compiler in rare cases.
     {.identifier = "print",
      .kind = DIRECTIVE_KIND_STATEMENT,
@@ -1075,6 +1065,39 @@ ASTStatement *Parser::parse_statement() {
 
     end_node(statement, range);
     return statement;
+  }
+
+  if (tok.type == TType::Import) {
+    NODE_ALLOC(ASTImport, import, range, _, this);
+    auto module_name = expect(TType::Identifier).value;
+
+    import->module_name = module_name;
+    if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Mul) {
+      eat();
+      eat();
+      import->tag = ASTImport::IMPORT_ALL;
+    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::LCurly) {
+      eat();
+      eat();
+      while (peek().type != TType::RCurly) {
+        // TODO: support :: imports here too, like
+        // import mod::{submod::symbol, submod::submod::symbol};
+        import->symbols.push_back(expect(TType::Identifier).value);
+        if (peek().type != TType::RCurly) {
+          expect(TType::Comma);
+        }
+      }
+      expect(TType::RCurly);
+      import->tag = ASTImport::IMPORT_NAMED;
+    } else if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier) {
+      // TODO: support :: imports here also, like
+      // import mod::submod::symbol; etc
+      eat();
+      import->symbols.push_back(expect(TType::Identifier).value);
+      import->tag = ASTImport::IMPORT_NAMED;
+    }
+    // import(module_name.get_str()); // Do this later?
+    return import;
   }
 
   if (peek().type == TType::Defer) {

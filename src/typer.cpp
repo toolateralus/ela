@@ -1151,6 +1151,10 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   }
 }
 
+void Typer::visit(ASTImport *node) {
+  
+}
+
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
   if (node->generic_arguments.empty()) {
