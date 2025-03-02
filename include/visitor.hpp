@@ -277,6 +277,7 @@ struct DependencyEmitter : VisitorBase {
   void decl_type(int type_id);
   
   Nullable<Symbol> get_symbol(ASTNode *node);
+  void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;

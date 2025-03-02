@@ -1958,6 +1958,10 @@ void Emitter::visit(ASTSize_Of *node) {
   (*ss) << ")";
 }
 
+void Emitter::visit(ASTImport *node) {
+  
+}
+
 void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
   auto call = ASTCall{};
