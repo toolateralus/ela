@@ -71,7 +71,7 @@ int CompileCommand::compile() {
   original_path = std::filesystem::current_path();
   parse.begin();
   Parser parser(input_path.string(), context);
-  ASTProgram *root = parser.parse();
+  ASTProgram *root = parser.parse_program();
   parse.end("parsing done.");
 
   lower.begin();

@@ -141,6 +141,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         parser->expect(TType::Eof);
         parser->states.pop_back();
+        std::filesystem::current_path(parser->states.back().path.parent_path());
         return list;
     }},
 
@@ -494,26 +495,28 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
   return nullptr;
 }
 
-ASTProgram *Parser::parse() {
+
+ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
 
+  // put bootstrap on root scope
+  import("bootstrap");
+  while (peek().type != TType::Eof) {
+    program->statements.push_back(parse_statement());
+  }
+  expect(TType::Eof);
+  states.pop_back();
+  std::filesystem::current_path(states.back().path.parent_path());
+  
+  // put the rest on the program scope
+  ctx.set_scope();
+  program->scope = ctx.scope;
   while (true) {
-    if (peek().type == TType::Eof && !states.empty()) {
-      states.pop_back();
-      if (!states.empty()) {
-        std::filesystem::current_path(states.back().path.parent_path());
-      } else {
-        break;
-      }
+    while (semicolon()) {
+      eat();
     }
-
-    while (semicolon())
-      eat();
-
-    if (peek().type == TType::Eof && states.empty()) {
+    if (peek().is_eof()) {
       break;
-    } else if (peek().type == TType::Eof) {
-      eat();
     }
 
     if (peek().type == TType::Directive) {
@@ -522,13 +525,11 @@ ASTProgram *Parser::parse() {
       auto result = process_directive(DIRECTIVE_KIND_STATEMENT, identifier);
       if (result.is_not_null()) {
         auto statement = static_cast<ASTStatement *>(result.get());
-        if (statement) {
-          program->statements.push_back(statement);
-        }
+        program->statements.push_back(statement);
       }
-      if (semicolon())
+      if (semicolon()) {
         eat();
-
+      }
       continue;
     }
 
@@ -553,9 +554,6 @@ ASTProgram *Parser::parse() {
     }
 
     program->statements.push_back(statement);
-
-    while (semicolon())
-      eat();
   }
   end_node(program, range);
   return program;
@@ -1109,8 +1107,7 @@ ASTStatement *Parser::parse_statement() {
     expect(TType::Semi);
 
     auto old_scope = ctx.scope;
-    import->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
-    ctx.set_scope(import->scope);
+    ctx.set_scope(import->scope = create_child(ctx.root_scope));
 
     if (this->import(module_name.get_str())) {
       while (peek().type != TType::Eof) {
@@ -2272,7 +2269,6 @@ ASTType *ASTType::get_void() {
 Token Parser::eat() {
   token_idx++;
   fill_buffer_if_needed();
-  
   auto tok = peek();
   lookahead_buf().pop_front();
   lexer.get_token(states.back());
@@ -2383,8 +2379,6 @@ Token Parser::peek() const {
 Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
-  import("bootstrap");
-
   typer = new Typer(context);
 }
 

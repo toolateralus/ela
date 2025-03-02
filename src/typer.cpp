@@ -122,9 +122,9 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
 }
 
 void Typer::visit(ASTProgram *node) {
-  for (auto &statement : node->statements)
+  for (auto &statement : node->statements) {
     statement->accept(this);
-  return;
+  }
 }
 
 std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
@@ -276,7 +276,6 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
                                  std::format("invalid return type", node->name.get_str()));
 }
 
-void Typer::visit(ASTFile *node) {}
 
 void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);

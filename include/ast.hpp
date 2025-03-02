@@ -24,7 +24,6 @@ extern std::unordered_set<InternedString> import_set;
 
 enum ASTNodeType {
   AST_NODE_PROGRAM,
-  AST_NODE_FILE,
   AST_NODE_BLOCK,
   AST_NODE_FUNCTION_DECLARATION,
   AST_NODE_PARAMS_DECL,
@@ -175,14 +174,9 @@ struct ASTBlock : ASTStatement {
 
 struct ASTProgram : ASTNode {
   std::vector<ASTStatement *> statements;
+  Scope *scope;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
-};
-
-struct ASTFile : ASTNode {
-  std::vector<ASTStatement *> statements;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_FILE; }
 };
 
 struct ASTExpr : ASTNode {
@@ -777,7 +771,6 @@ struct ASTWhere : ASTExpr {
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   void visit(ASTNoop *noop) { return; }                                                                                \
   virtual void visit(ASTScopeResolution *node) = 0;                                                                    \
-  virtual void visit(ASTFile *node) = 0;                                                                    \
   virtual void visit(ASTSize_Of *node) = 0;                                                                            \
   virtual void visit(ASTImport *node) = 0;                                                                            \
   virtual void visit(ASTCast *node) = 0;                                                                               \
@@ -861,7 +854,7 @@ struct Typer;
 struct Parser {
   Typer *typer;
   static Nullable<ASTBlock> current_block;
-  ASTProgram *parse();
+  ASTProgram *parse_program();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
 
