@@ -1109,7 +1109,8 @@ ASTStatement *Parser::parse_statement() {
     expect(TType::Semi);
 
     auto old_scope = ctx.scope;
-    ctx.set_scope(import->scope = create_child(ctx.scope));
+    import->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+    ctx.set_scope(import->scope);
 
     if (this->import(module_name.get_str())) {
       while (peek().type != TType::Eof) {
@@ -1118,9 +1119,8 @@ ASTStatement *Parser::parse_statement() {
       expect(TType::Eof);
     }
 
-    Defer __([&]{
-      ctx.set_scope(old_scope);
-    });
+    old_scope->create_module(module_name, import);
+    ctx.set_scope(old_scope);
 
     return import;
   }
