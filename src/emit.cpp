@@ -588,7 +588,7 @@ void Emitter::visit(ASTExprStatement *node) {
   return;
 }
 
-void Emitter::visit(ASTDeclaration *node) {
+void Emitter::visit(ASTVariable *node) {
   if (node->is_emitted) {
     return;
   } else {

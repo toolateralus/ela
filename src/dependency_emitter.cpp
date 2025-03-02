@@ -151,7 +151,7 @@ void DependencyEmitter::visit(ASTParamDecl *node) {
   decl_type(node->resolved_type);
 }
 
-void DependencyEmitter::visit(ASTDeclaration *node) {
+void DependencyEmitter::visit(ASTVariable *node) {
   node->type->accept(this);
   if (node->value) {
     node->value.get()->accept(this);
@@ -243,7 +243,7 @@ void DependencyEmitter::visit(ASTCall *node) {
 
     if (!node->generic_arguments.empty()) {
       auto generic_args = emitter->typer.get_generic_arg_types(node->generic_arguments);
-      decl = find_generic_instance(decl->generic_instantiations, generic_args);
+      decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);
     }
     // only accept if not a fn ptr
     // else, we do the other way

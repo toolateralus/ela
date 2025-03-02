@@ -27,8 +27,7 @@ struct Typer : VisitorBase {
   int current_block_statement_idx;
   int declaring_or_assigning_type = -1;
 
-  template <typename T> using VisitorMethod = void (Typer::*)(T, bool, std::vector<int>);
-  template <typename T> T visit_generic(VisitorMethod<T> visit_method, T declaring_node, std::vector<int> args);
+  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
@@ -46,7 +45,7 @@ struct Typer : VisitorBase {
   void visit(ASTBlock *node) override;
   void visit(ASTParamsDecl *node) override;
   void visit(ASTParamDecl *node) override;
-  void visit(ASTDeclaration *node) override;
+  void visit(ASTVariable *node) override;
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
@@ -221,7 +220,7 @@ struct Emitter : VisitorBase {
   void visit(ASTParamsDecl *node) override;
   void visit(ASTParamDecl *node) override;
 
-  void visit(ASTDeclaration *node) override;
+  void visit(ASTVariable *node) override;
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
@@ -283,7 +282,7 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTFunctionDeclaration *node) override;
   void visit(ASTParamsDecl *node) override;
   void visit(ASTParamDecl *node) override;
-  void visit(ASTDeclaration *node) override;
+  void visit(ASTVariable *node) override;
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;

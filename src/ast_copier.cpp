@@ -71,7 +71,7 @@ ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   }
   return new_node;
 }
-ASTDeclaration *ASTCopier::copy_declaration(ASTDeclaration *node) {
+ASTVariable *ASTCopier::copy_declaration(ASTVariable *node) {
   auto new_node = copy(node);
   if (node->type)
     new_node->type = static_cast<ASTType *>(copy_node(node->type));
@@ -380,7 +380,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_PARAM_DECL:
       return copy_param_decl(static_cast<ASTParamDecl *>(node));
     case AST_NODE_DECLARATION:
-      return copy_declaration(static_cast<ASTDeclaration *>(node));
+      return copy_declaration(static_cast<ASTVariable *>(node));
     case AST_NODE_EXPR_STATEMENT:
       return copy_expr_statement(static_cast<ASTExprStatement *>(node));
     case AST_NODE_BIN_EXPR:
@@ -508,7 +508,7 @@ ASTTaggedUnionDeclaration *ASTCopier::copy_tagged_union_declaration(ASTTaggedUni
       case ASTTaggedUnionVariant::STRUCT:
         new_variant.struct_declarations.clear();
         for (auto field : variant.struct_declarations) {
-          new_variant.struct_declarations.push_back(static_cast<ASTDeclaration *>(copy_node(field)));
+          new_variant.struct_declarations.push_back(static_cast<ASTVariable *>(copy_node(field)));
         }
         break;
     }
