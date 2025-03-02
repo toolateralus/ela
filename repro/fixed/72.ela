@@ -1,4 +1,4 @@
-
+// !NO_COMPILE
 
 // Another test that we cannot actuall test for regression because it needs to NOT compile.
 

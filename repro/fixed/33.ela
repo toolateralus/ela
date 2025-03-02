@@ -1,12 +1,9 @@
+// !NO_COMPILE
 
 Struct :: struct!<T> {
   n: T
 }
 
 main :: fn() {
-  // ! this is commented out because the fact that it did work at one point
-  // ! means that it didn't regress. we need a way to state that this repro should NOT compile
-
-  // however, consider this fixed.
-  // n: Struct; // This passes our compiler, but clearly it's not possible.
+  n: Struct; // This passes our compiler, but clearly it's not possible.
 }
