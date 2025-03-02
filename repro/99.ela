@@ -1,3 +1,5 @@
+// !NO_COMPILE
+
 go :: fn(a: s32) {
 
 }

@@ -1,3 +1,5 @@
+// !FEATURE
+
 main :: fn() { 
   // Again, range needs a == or .contains function applied for switches.
   switch 0 {

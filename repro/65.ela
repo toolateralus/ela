@@ -1,3 +1,5 @@
+// !FEATURE
+
 // We need to implement generic specialization to support this kind of nice behaviour.
 impl From!<s32> for s32 {
   from :: fn(n : s32) -> s32 {

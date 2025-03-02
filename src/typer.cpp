@@ -1103,27 +1103,27 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
   Defer _([&]() { declaring_or_assigning_type = old_type; });
   auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
-  auto largest = args_ct > params_ct ? args_ct : params_ct;
   int param_index = skip_first ? 1 : 0;
-  for (int arg_index = 0; arg_index < largest; ++arg_index, ++param_index) {
+  for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
     if (param_index < params_ct) {
+      auto &param = params->params[param_index];
       if (arg_index < args_ct) {
-        declaring_or_assigning_type = params->params[param_index]->resolved_type;
+        declaring_or_assigning_type = param->resolved_type;
         node->arguments[arg_index]->accept(this);
         assert_types_can_cast_or_equal(
-            node->arguments[arg_index]->resolved_type, params->params[param_index]->resolved_type,
-            node->arguments[arg_index]->source_range,
+            node->arguments[arg_index]->resolved_type, param->resolved_type, node->arguments[arg_index]->source_range,
             std::format("unexpected argument type.. parameter #{} of function",
                         arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+      } else {
+        // TODO: handle default params here
+        throw_error("Too few arguments to function", node->source_range);
       }
     } else {
-      if (arg_index < args_ct) {
-        declaring_or_assigning_type = Type::INVALID_TYPE_ID;
-        node->arguments[arg_index]->accept(this);
-        if (!params->is_varargs) {
-          throw_error("Too many arguments to function", node->source_range);
-        }
+      if (!params->is_varargs) {
+        throw_error("Too many arguments to function", node->source_range);
       }
+      declaring_or_assigning_type = Type::INVALID_TYPE_ID;
+      node->arguments[arg_index]->accept(this);
     }
   }
 }
@@ -1176,7 +1176,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         int param_infer_index = func->params->params[0]->tag == ASTParamDecl::Self;
         if (param_infer_index < func->params->params.size() &&
             func->params->params[param_infer_index]->normal.type != nullptr &&
-            !func->params->params[param_infer_index]->normal.type->extensions.empty() && 
+            !func->params->params[param_infer_index]->normal.type->extensions.empty() &&
             func->params->params[param_infer_index]->normal.type->extensions.back().type == TYPE_EXT_POINTER) {
           type->resolved_type = gen_t->get_element_type();
         } else {

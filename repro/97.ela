@@ -1,3 +1,5 @@
+// !NO_COMPILE
+
 // move this somwhere it belongs
 Test_Enumerator :: struct!<Index, Value_Type> {
   slice: Slice!<Value_Type>,
