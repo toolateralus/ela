@@ -276,6 +276,8 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
                                  std::format("invalid return type", node->name.get_str()));
 }
 
+void Typer::visit(ASTFile *node) {}
+
 void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);
   node->params->accept(this);

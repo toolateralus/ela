@@ -973,6 +973,9 @@ void Emitter::visit(ASTProgram *node) {
 
   return;
 }
+
+void Emitter::visit(ASTFile *node) {}
+
 void Emitter::visit(ASTDotExpr *node) {
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);

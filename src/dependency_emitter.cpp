@@ -230,6 +230,8 @@ void DependencyEmitter::visit(ASTType_Of *node) {
   node->target->accept(this);
 }
 
+void DependencyEmitter::visit(ASTFile *node) {}
+
 void DependencyEmitter::visit(ASTCall *node) {
   for (auto generic_arg : node->generic_arguments) {
     generic_arg->accept(this);

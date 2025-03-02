@@ -2272,12 +2272,7 @@ ASTType *ASTType::get_void() {
 Token Parser::eat() {
   token_idx++;
   fill_buffer_if_needed();
-  if (peek().is_eof() && states.size() > 1) {
-    states.pop_back();
-    std::filesystem::current_path(states.back().path.parent_path());
-    fill_buffer_if_needed();
-    return peek();
-  }
+  
   auto tok = peek();
   lookahead_buf().pop_front();
   lexer.get_token(states.back());
