@@ -324,6 +324,7 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   if (new_node->interface) {
     new_node->interface = static_cast<ASTType *>(copy_node(new_node->interface.get()));
   }
+
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;

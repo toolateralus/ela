@@ -1819,10 +1819,10 @@ ASTImpl *Parser::parse_impl() {
   }
 
   node->target->resolved_type = Type::INVALID_TYPE_ID;
-
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
+
   auto block = parse_block(node->scope);
   end_node(node, range);
 

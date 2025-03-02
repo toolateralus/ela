@@ -1173,7 +1173,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         int param_infer_index = func->params->params[0]->tag == ASTParamDecl::Self;
         if (param_infer_index < func->params->params.size() &&
             func->params->params[param_infer_index]->normal.type != nullptr &&
-            !func->params->params[param_infer_index]->normal.type->extensions.empty()) {
+            !func->params->params[param_infer_index]->normal.type->extensions.empty() && 
+            func->params->params[param_infer_index]->normal.type->extensions.back().type == TYPE_EXT_POINTER) {
           type->resolved_type = gen_t->get_element_type();
         } else {
           type->resolved_type = arg_ty_id;
