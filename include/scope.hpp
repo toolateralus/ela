@@ -23,6 +23,7 @@ struct ASTStructDeclaration;
 struct ASTFunctionDeclaration;
 struct ASTTaggedUnionDeclaration;
 struct ASTEnumDeclaration;
+struct ASTImport;
 
 struct Symbol {
   InternedString name;
@@ -46,6 +47,9 @@ struct Symbol {
     struct {
       ASTFunctionDeclaration *declaration;
     } function;
+    struct {
+      ASTImport *declaration;
+    } module;
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
@@ -83,6 +87,14 @@ struct Symbol {
     symbol.type.kind = kind;
     symbol.type.declaration = declaration;
     symbol.type_id = type_id;
+    return symbol;
+  }
+
+  static Symbol create_module(const InternedString &name, ASTImport *declaration) {
+    Symbol symbol;
+    symbol.name = name;
+    symbol.flags = SYMBOL_IS_MODULE;
+    symbol.module.declaration = declaration;
     return symbol;
   }
 };
@@ -189,6 +201,10 @@ struct Scope {
     auto id = global_create_enum_type(name, scope, flags);
     symbols.insert_or_assign(name, Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode*)declaration));
     return id;
+  }
+
+  void create_module(const InternedString &name, ASTImport *declaration) {
+    symbols.insert_or_assign(name, Symbol::create_module(name, declaration));
   }
 
   int create_tuple_type(const std::vector<int> &types) {
