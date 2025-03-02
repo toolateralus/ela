@@ -538,6 +538,7 @@ ASTProgram *Parser::parse() {
       case AST_NODE_DECLARATION:
       case AST_NODE_NOOP:
       case AST_NODE_IMPL:
+      case AST_NODE_IMPORT:
         break;
       default:
       err:
@@ -1068,6 +1069,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.type == TType::Import) {
+    expect(TType::Import);
     NODE_ALLOC(ASTImport, import, range, _, this);
     auto module_name = expect(TType::Identifier).value;
 

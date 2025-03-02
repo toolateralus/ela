@@ -1,6 +1,6 @@
-#import rayui;
-#import raylib;
-#import file;
+import rayui;
+import raylib;
+import file;
 
 list_erase :: fn![T](list: List![T], value: T) -> bool {
   if list.length == 0 {

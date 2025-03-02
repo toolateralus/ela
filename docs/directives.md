@@ -52,13 +52,13 @@
   #foreign foreign_function :: fn(int) -> int;
   ```
 
-#### `#import`
+#### `import`
 - **Kind**: `Statement`
 - **Usage**: 
   - Imports from `/usr/local/lib/ela` by identifier and no file extension.
 - **Example**:
   ```cpp
-  #import MyModule;
+  import MyModule;
   ```
 
 #### `typeof`

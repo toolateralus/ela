@@ -1,5 +1,5 @@
 
-#import format;
+import format;
 
 Vec2 :: struct {
   x: f32,
