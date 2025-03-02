@@ -1099,14 +1099,17 @@ ASTStatement *Parser::parse_statement() {
       import->tag = ASTImport::IMPORT_NAMED;
     }
 
+    expect(TType::Semi);
+
     auto old_scope = ctx.scope;
     ctx.set_scope(import->scope = create_child(ctx.scope));
-    
-    this->import(module_name.get_str());
-    while (peek().type != TType::Eof) {
-      import->statements.push_back(parse_statement());
+
+    if (this->import(module_name.get_str())) {
+      while (peek().type != TType::Eof) {
+        import->statements.push_back(parse_statement());
+      }
+      expect(TType::Eof);
     }
-    expect(TType::Eof);
 
     Defer __([&]{
       ctx.set_scope(old_scope);
@@ -2280,7 +2283,7 @@ void Parser::fill_buffer_if_needed() {
   }
 }
 
-void Parser::import(InternedString name) {
+bool Parser::import(InternedString name) {
   std::string ela_lib_path;
   if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     ela_lib_path = env_p;
@@ -2296,7 +2299,7 @@ void Parser::import(InternedString name) {
   auto filename = std::filesystem::path(ela_lib_path) / name.get_str();
   // Right now, we just return noop if we're double including.
   if (import_set.contains(module_name)) {
-    return;
+    return false;
   }
   if (std::filesystem::is_directory(filename)) {
     filename += std::filesystem::path::preferred_separator;
@@ -2315,6 +2318,7 @@ void Parser::import(InternedString name) {
   import_set.insert(module_name);
   states.push_back(Lexer::State::from_file(filename));
   fill_buffer_if_needed();
+  return true;
 }
 
 Token Parser::expect(TType type) {

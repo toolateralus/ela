@@ -449,6 +449,9 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_statement_list(static_cast<ASTStatementList *>(node));
     case AST_NODE_TYPE_OF:
       return copy_type_of(static_cast<ASTType_Of *>(node));
+    case AST_NODE_IMPORT:
+      return copy_import(static_cast<ASTImport*>(node));
+      break;
   }
 }
 
@@ -523,6 +526,15 @@ ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
   new_node->statements.clear();
   for (auto stmt : node->statements) {
     new_node->statements.push_back(copy_node(stmt));
+  }
+  return new_node;
+}
+
+ASTImport *ASTCopier::copy_import(ASTImport *node) {
+  auto new_node = copy(node);
+  new_node->statements.clear();
+  for (const auto &statement: node->statements) {
+    new_node->statements.push_back((ASTStatement*)copy_node(statement));
   }
   return new_node;
 }
