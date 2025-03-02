@@ -6,6 +6,7 @@
 
 Context::Context() {
   scope = create_child(nullptr);
+  root_scope = scope;
 
 #if defined(__linux)
   scope->defines().insert("PLATFORM_LINUX");
@@ -48,7 +49,6 @@ Context::Context() {
     scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
   }
 }
-
 
 Symbol *Scope::lookup(const InternedString &name) {
   if (symbols.find(name) != symbols.end()) {

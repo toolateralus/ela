@@ -122,7 +122,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     // include is used.
     {.identifier = "include",
       .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) {
+      .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto filename = parser->expect(TType::String).value;
         if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find included file: {}, current path: {}", filename,
@@ -135,7 +135,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         import_set.insert(filename);
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
         parser->fill_buffer_if_needed();
-        return nullptr;
+        NODE_ALLOC(ASTStatementList, list, range, _, parser)
+        while (parser->peek().type != TType::Eof) {
+          list->statements.push_back(parser->parse_statement());
+        }
+        parser->expect(TType::Eof);
+        parser->states.pop_back();
+        return list;
     }},
 
     // This is only used for debugging the compiler in rare cases.
@@ -490,6 +496,7 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
 
 ASTProgram *Parser::parse() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
+
   while (true) {
     if (peek().type == TType::Eof && !states.empty()) {
       states.pop_back();
@@ -2382,6 +2389,7 @@ Parser::Parser(const std::string &filename, Context &context)
     : ctx(context), states({Lexer::State::from_file(filename)}) {
   fill_buffer_if_needed();
   import("bootstrap");
+
   typer = new Typer(context);
 }
 

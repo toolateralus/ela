@@ -223,7 +223,7 @@ struct Context {
   // This type_info_strings field should be in the emit visitor.
   // That's the only place it's used anyway.
   std::vector<InternedString> type_info_strings;
-
+  Scope *root_scope;
   Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   Context();
   inline void set_scope(Scope *in_scope = nullptr) {
