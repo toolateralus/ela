@@ -146,6 +146,8 @@ inline static std::string block_flags_to_string(int flags) {
 struct ASTImport : ASTStatement {
   InternedString module_name;
   std::vector<InternedString> symbols;
+  std::vector<ASTStatement*> statements;
+  Scope *scope;
   enum {
     IMPORT_NORMAL,
     IMPORT_ALL,

@@ -1096,7 +1096,16 @@ ASTStatement *Parser::parse_statement() {
       import->symbols.push_back(expect(TType::Identifier).value);
       import->tag = ASTImport::IMPORT_NAMED;
     }
-    // import(module_name.get_str()); // Do this later?
+
+    auto old_scope = ctx.scope;
+    ctx.set_scope(import->scope = create_child(ctx.scope));
+    this->import(module_name.get_str());
+    while (peek().type != TType::Eof) {
+      import->statements.push_back(parse_statement());
+    }
+    Defer __([&]{
+      ctx.set_scope(old_scope);
+    });
     return import;
   }
 
