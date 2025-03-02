@@ -173,6 +173,7 @@ struct ASTBlock : ASTStatement {
 };
 
 struct ASTProgram : ASTNode {
+  size_t end_of_bootstrap_index = -1;
   std::vector<ASTStatement *> statements;
   Scope *scope;
   void accept(VisitorBase *visitor) override;

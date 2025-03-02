@@ -505,6 +505,9 @@ ASTProgram *Parser::parse_program() {
     program->statements.push_back(parse_statement());
   }
   expect(TType::Eof);
+
+  program->end_of_bootstrap_index = program->statements.size();
+  
   states.pop_back();
   std::filesystem::current_path(states.back().path.parent_path());
   

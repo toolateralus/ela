@@ -122,9 +122,16 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
 }
 
 void Typer::visit(ASTProgram *node) {
+  ctx.set_scope(ctx.root_scope);
+  size_t index = 0;
   for (auto &statement : node->statements) {
+    if (index == node->end_of_bootstrap_index) {
+      ctx.set_scope(node->scope);
+    }
     statement->accept(this);
+    index++;
   }
+  ctx.set_scope(ctx.root_scope);
 }
 
 std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
