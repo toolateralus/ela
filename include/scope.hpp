@@ -1,12 +1,10 @@
 #pragma once
 
-#include <string>
 #include <unordered_map>
 #include <unordered_set>
 
 #include "arena.hpp"
 #include "constexpr.hpp"
-#include "error.hpp"
 #include "interned_string.hpp"
 #include "type.hpp"
 
@@ -17,6 +15,7 @@ enum SymbolFlags {
   SYMBOL_IS_FUNCTION = 1 << 1,
   SYMBOL_IS_FORWARD_DECLARED = 1 << 2,
   SYMBOL_IS_TYPE = 1 << 3,
+  SYMBOL_IS_MODULE = 1 << 4,
 };
 
 struct ASTNode;
@@ -33,6 +32,7 @@ struct Symbol {
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
   bool is_variable() const { return (flags & SYMBOL_IS_VARIABLE) != 0; }
   bool is_type() const { return (flags & SYMBOL_IS_TYPE) != 0; }
+  bool is_module() const { return (flags & SYMBOL_IS_TYPE) != 0; }
   bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
 
   union {
