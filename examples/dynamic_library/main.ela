@@ -1,5 +1,5 @@
 
-#import dlfcn;
+import dlfcn;
 #include "shared.ela";
 
 // Use this flag for machines that don't have '.' or '$(pwd)' in 

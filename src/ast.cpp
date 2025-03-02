@@ -538,6 +538,7 @@ ASTProgram *Parser::parse() {
       case AST_NODE_DECLARATION:
       case AST_NODE_NOOP:
       case AST_NODE_IMPL:
+      case AST_NODE_IMPORT:
         break;
       default:
       err:
@@ -1068,6 +1069,7 @@ ASTStatement *Parser::parse_statement() {
   }
 
   if (tok.type == TType::Import) {
+    expect(TType::Import);
     NODE_ALLOC(ASTImport, import, range, _, this);
     auto module_name = expect(TType::Identifier).value;
 
@@ -1099,13 +1101,17 @@ ASTStatement *Parser::parse_statement() {
 
     auto old_scope = ctx.scope;
     ctx.set_scope(import->scope = create_child(ctx.scope));
+    
     this->import(module_name.get_str());
     while (peek().type != TType::Eof) {
       import->statements.push_back(parse_statement());
     }
+    expect(TType::Eof);
+
     Defer __([&]{
       ctx.set_scope(old_scope);
     });
+
     return import;
   }
 

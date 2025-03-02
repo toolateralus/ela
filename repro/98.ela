@@ -30,7 +30,7 @@ impl!<Value_Type> Value_Type[] {
   }
 }
 
-#import format;
+import format;
 
 
 main :: fn() { 

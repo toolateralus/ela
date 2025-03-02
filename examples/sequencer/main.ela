@@ -1,7 +1,7 @@
-#import rayui;
+import rayui;
 
-#import directory;
-#import file;
+import directory;
+import file;
 
 #c_flags  " -fsanitize=address,leak,undefined "
 

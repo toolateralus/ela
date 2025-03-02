@@ -410,6 +410,8 @@ void DependencyEmitter::visit(ASTScopeResolution *node) { node->base->accept(thi
 
 void DependencyEmitter::visit(ASTAlias *node) { }
 
+void DependencyEmitter::visit(ASTImport *node) { }
+
 void DependencyEmitter::visit(ASTImpl *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);

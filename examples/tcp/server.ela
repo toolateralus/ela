@@ -1,6 +1,6 @@
 
 ;
-#import net;
+import net;
 
 PORT : u16 = 8080;
 

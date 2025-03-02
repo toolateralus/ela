@@ -152,10 +152,11 @@ struct ASTImport : ASTStatement {
     IMPORT_NORMAL,
     IMPORT_ALL,
     IMPORT_NAMED,
-  } tag;
+  } tag = IMPORT_NAMED;
   ASTNodeType get_node_type() const override {
     return AST_NODE_IMPORT;
   }
+  void accept(VisitorBase *visitor) override;
 };
 
 struct ASTBlock : ASTStatement {

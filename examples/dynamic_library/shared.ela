@@ -1,5 +1,5 @@
 ;
-#import raylib;
+import raylib;
 
 DrawCommand :: struct {
   rect: Rectangle,
