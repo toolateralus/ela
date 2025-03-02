@@ -103,6 +103,7 @@ struct Typer : VisitorBase {
   void visit(ASTDefer *node) override;
   void visit(ASTTaggedUnionDeclaration *node) override;
   void visit(ASTLambda *node) override;
+  void visit(ASTFile *node) override;
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
 
@@ -256,7 +257,7 @@ struct Emitter : VisitorBase {
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
-
+  void visit(ASTFile *node) override;
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       emit_line_directive(stmt);
@@ -278,6 +279,7 @@ struct DependencyEmitter : VisitorBase {
   
   Nullable<Symbol> get_symbol(ASTNode *node);
   void visit(ASTImport *node) override;
+  void visit(ASTFile *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
