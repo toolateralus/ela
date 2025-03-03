@@ -12,8 +12,8 @@ import math::*;
 import memory::*;
 import net::*;
 import pthread::*;
-// import gl; This has conflicting definitions with raylib. It's less maintained than raylib, so we just ignore it.
-import rayui::*;
+import gl::*; //This has conflicting definitions with raylib. It's less maintained than raylib, so we just ignore it.
+// import rayui::*;
 import time::*;
 
 
