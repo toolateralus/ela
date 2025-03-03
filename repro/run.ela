@@ -21,8 +21,8 @@ import memory::Tracking_Allocator;
 main :: fn() {
   directory := Directory::open(".").unwrap();
 
-  entries := directory.files.filter(fn(file: String*) -> bool {
-    return switch file.as_str() {
+  entries := directory.entries.filter(fn(entry: String*) -> bool {
+    return switch entry.as_str() {
       ".." => false,
       "." => false,
       ".gitignore" => false,
@@ -39,11 +39,15 @@ main :: fn() {
   allocator: Tracking_Allocator;
 
   for entry in entries {
-    file := fopen(entry.data, "rw"c);
-    stat := Stat::new(file).unwrap();
-    printlnf("is_dir = %", .[any::new(stat.is_dir(), allocator)]);
-    printlnf("is_file = %", .[any::new(stat.is_file(), allocator)]);
-    fclose(file);
-    println(entry);
+    file := File::open!<String>(entry, FileOpenFlags::Read);
+    stat := file.stat().unwrap();
+
+    if stat.is_dir() {
+      printlnf("'%' :: is dir", .[any::from(&entry)])
+    } else {
+      printlnf("'%' :: is file", .[any::from(&entry)])
+    }
+
+    defer file.deinit();
   }
 }

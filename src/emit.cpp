@@ -1277,7 +1277,16 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
-    ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+
+    if (type->is_kind(TYPE_STRUCT)) {
+      if ((type->get_info()->as<StructTypeInfo>()->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+        ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+      } else {
+        ss << ".size = 0"; // non sized type
+      }
+    } else {
+      ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
+    }
 
     if (parent_type->is_kind(TYPE_TUPLE)) {
       ss << std::format(

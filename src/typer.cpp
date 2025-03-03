@@ -3,7 +3,9 @@
 #include <cassert>
 #include <csetjmp>
 #include <format>
+#include <print>
 #include <iostream>
+#include <ostream>
 #include <ranges>
 #include <string>
 #include <vector>
@@ -282,7 +284,6 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   assert_types_can_cast_or_equal(control_flow.type, node->return_type->resolved_type, node->source_range,
                                  std::format("invalid return type", node->name.get_str()));
 }
-
 
 void Typer::visit(ASTLambda *node) {
   node->unique_identifier = "$lambda$" + std::to_string(LAMBDA_UNIQUE_ID++);
@@ -1162,70 +1163,107 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
 void Typer::visit(ASTImport *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
-  for (auto statement: node->statements) {
+  for (auto statement : node->statements) {
     statement->accept(this);
   }
   ctx.set_scope(old_scope);
   switch (node->tag) {
-    case ASTImport::IMPORT_NORMAL: 
+    case ASTImport::IMPORT_NORMAL:
       // do nothing
       break;
     case ASTImport::IMPORT_ALL: {
-      for (const auto &symbol: node->scope->symbols) {
+      for (const auto &symbol : node->scope->symbols) {
         ctx.scope->symbols.insert(symbol);
       }
     } break;
     case ASTImport::IMPORT_NAMED: {
-      for (const auto &symbol: node->symbols) {
+      for (const auto &symbol : node->symbols) {
         if (node->scope->local_lookup(symbol)) {
           ctx.scope->symbols[symbol] = *node->scope->local_lookup(symbol);
         } else {
-          throw_error(std::format("unable to import \"{}\".. not found in module \"{}\"", symbol.get_str(), node->module_name.get_str()), node->source_range);
+          throw_error(std::format("unable to import \"{}\".. not found in module \"{}\"", symbol.get_str(),
+                                  node->module_name.get_str()),
+                      node->source_range);
         }
       }
     } break;
   }
 }
-
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
+
   if (node->generic_arguments.empty()) {
     node->arguments->accept(this);
-    auto index = 0;
-    for (auto arg_ty_id : node->arguments->resolved_argument_types) {
+
+    auto arguments = node->arguments->resolved_argument_types;
+    auto parameters = func->params->params;
+    auto generics = func->generic_parameters;
+
+    std::vector<std::pair<bool, int>> arg_to_generic_map(parameters.size());
+
+    for (size_t i = 0; i < parameters.size(); ++i) {
+      auto &param = parameters[i];
+      switch (param->tag) {
+        case ASTParamDecl::Self:
+        case ASTParamDecl::Себя: {
+          arg_to_generic_map[i] = {false, -1};
+        } break;
+        case ASTParamDecl::Normal: {
+          bool is_generic = false;
+          int generic_index = 0;
+
+          for (const auto &generic : generics) {
+            auto identifier = dynamic_cast<ASTIdentifier *>(param->normal.type->normal.base);
+            if (identifier && generic == identifier->value) {
+              is_generic = true;
+              break;
+            }
+            ++generic_index;
+          }
+
+          arg_to_generic_map[i] = {is_generic, generic_index};
+        } break;
+      }
+    }
+
+    std::vector<int> inferred_generics(generics.size(), Type::INVALID_TYPE_ID);
+
+    auto start_index = (parameters[0]->tag == ASTParamDecl::Self || parameters[0]->tag == ASTParamDecl::Себя) ? 1 : 0;
+
+    for (size_t i = 0; i < arguments.size(); ++i) {
+      auto arg_ty_id = arguments[i];
+      auto [is_generic, generic_index] = arg_to_generic_map[i + start_index];
+
+      if (is_generic) {
+        auto extensions = parameters[i + start_index]->normal.type->extensions;
+
+        int pointer_levels = 0;
+        while (!extensions.empty() && extensions.back().type == TYPE_EXT_POINTER) {
+          pointer_levels++;
+          extensions.pop_back();
+        }
+
+        auto type = global_get_type(arg_ty_id);
+        while (pointer_levels > 0 && type->get_ext().is_pointer()) {
+          arg_ty_id = type->get_element_type();
+          type = global_get_type(arg_ty_id);
+          pointer_levels--;
+        }
+
+        inferred_generics[generic_index] = arg_ty_id;
+      }
+    }
+
+    for (auto i = 0; i < generics.size(); ++i) {
       auto type = ast_alloc<ASTType>();
       type->source_range = node->source_range;
-      auto gen_t = global_get_type(arg_ty_id);
-
-      /*
-        * This is auto dereferencing an inferred generic argument when you have a parameter such as T*
-        * We do this because it's strange to pass T as s32* if i do func(&s32);
-        * it makes it hard to do certain things, and if you wanted to take T as s32*, you'd just not give it a T* in
-        your
-        * parameter signature.
-
-        * I tried to mke it safer, not sure if i did.
-      */
-
-      if (gen_t->get_ext().is_pointer() && !func->params->params.empty()) {
-        // if it == 1, then we skip zero. works out.
-        int param_infer_index = func->params->params[0]->tag == ASTParamDecl::Self;
-        if (param_infer_index < func->params->params.size() &&
-            func->params->params[param_infer_index]->normal.type != nullptr &&
-            !func->params->params[param_infer_index]->normal.type->extensions.empty() &&
-            func->params->params[param_infer_index]->normal.type->extensions.back().type == TYPE_EXT_POINTER) {
-          type->resolved_type = gen_t->get_element_type();
-        } else {
-          type->resolved_type = arg_ty_id;
-        }
-      } else {
-        type->resolved_type = arg_ty_id;
-      }
+      type->resolved_type = inferred_generics[i];
       node->generic_arguments.push_back(type);
-      index++;
     }
   }
+
   generic_args = get_generic_arg_types(node->generic_arguments);
+
   return (ASTFunctionDeclaration *)visit_generic(func, generic_args, node->source_range);
 }
 
@@ -2199,7 +2237,7 @@ void Typer::visit(ASTSize_Of *node) {
 void Typer::visit(ASTModule *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
-  for (auto statement: node->statements) {
+  for (auto statement : node->statements) {
     statement->accept(this);
   }
   ctx.set_scope(old_scope);
