@@ -495,7 +495,6 @@ Nullable<ASTNode> Parser::process_directive(DirectiveKind kind, const InternedSt
   return nullptr;
 }
 
-
 ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
 
@@ -508,10 +507,10 @@ ASTProgram *Parser::parse_program() {
   expect(TType::Eof);
 
   program->end_of_bootstrap_index = program->statements.size();
-  
+
   states.pop_back();
   std::filesystem::current_path(states.back().path.parent_path());
-  
+
   // put the rest on the program scope
   ctx.set_scope();
   program->scope = ctx.scope;
@@ -1111,6 +1110,7 @@ ASTStatement *Parser::parse_statement() {
     expect(TType::Semi);
 
     auto old_scope = ctx.scope;
+    // TODO: fix the wasteful double allocation that may happen here.
     ctx.set_scope(import->scope = create_child(ctx.root_scope));
 
     if (this->import(module_name.get_str(), &import->scope)) {
@@ -1120,7 +1120,7 @@ ASTStatement *Parser::parse_statement() {
       expect(TType::Eof);
       states.pop_back();
       std::filesystem::current_path(states.back().path.parent_path());
-    } 
+    }
 
     old_scope->create_module(module_name, import);
     ctx.set_scope(old_scope);
@@ -1571,6 +1571,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     block->statements = {$return};
     block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
                                      // anyway when entering it.
+    if (peek().type == TType::Semi) eat();
     return block;
   }
 
@@ -2301,11 +2302,17 @@ bool Parser::import(InternedString name, Scope **scope) {
 
   auto module_name = name;
   auto filename = std::filesystem::path(ela_lib_path) / name.get_str();
-  // Right now, we just return noop if we're double including.
+
+  if (std::filesystem::exists(module_name.get_str()) || std::filesystem::exists(module_name.get_str() + ".ela")) {
+    filename = module_name.get_str();
+  }
+
+  // Right now, we just return false if we're double including.
   if (import_map.contains(module_name)) {
     *scope = import_map[module_name];
     return false;
   }
+
   if (std::filesystem::is_directory(filename)) {
     filename += std::filesystem::path::preferred_separator;
     filename.append("lib.ela");

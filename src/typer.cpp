@@ -1179,6 +1179,8 @@ void Typer::visit(ASTImport *node) {
       for (const auto &symbol: node->symbols) {
         if (node->scope->local_lookup(symbol)) {
           ctx.scope->symbols[symbol] = *node->scope->local_lookup(symbol);
+        } else {
+          throw_error(std::format("unable to import \"{}\".. not found in module \"{}\"", symbol.get_str(), node->module_name.get_str()), node->source_range);
         }
       }
     } break;

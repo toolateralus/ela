@@ -220,6 +220,7 @@ ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
   auto new_node = copy(node);
   new_node->key_values.clear();
+  new_node->values.clear();
   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
     for (auto expr : node->values) {
       new_node->values.push_back(static_cast<ASTExpr *>(copy_node(expr)));
