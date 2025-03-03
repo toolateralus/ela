@@ -1117,6 +1117,8 @@ ASTStatement *Parser::parse_statement() {
         import->statements.push_back(parse_statement());
       }
       expect(TType::Eof);
+      states.pop_back();
+      std::filesystem::current_path(states.back().path.parent_path());
     }
 
     old_scope->create_module(module_name, import);
