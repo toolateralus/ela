@@ -9,7 +9,7 @@
 #include <vector>
 
 #include "ast.hpp"
-#include "ast_copier.hpp"
+#include "copier.hpp"
 #include "constexpr.hpp"
 #include "core.hpp"
 #include "error.hpp"
@@ -2194,4 +2194,14 @@ int Typer::find_generic_type_of(const InternedString &base, const std::vector<in
 void Typer::visit(ASTSize_Of *node) {
   node->target_type->accept(this);
   node->resolved_type = u64_type();
+}
+
+void Typer::visit(ASTModule *node) {
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  for (auto statement: node->statements) {
+    statement->accept(this);
+  }
+  ctx.set_scope(old_scope);
+  ctx.scope->create_module(node->module_name, node);
 }

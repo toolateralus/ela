@@ -38,7 +38,7 @@ struct Typer : VisitorBase {
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
- 
+  void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
   void visit(ASTImport *node) override;
@@ -213,6 +213,7 @@ struct Emitter : VisitorBase {
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   int get_expr_left_type_sr_dot(ASTNode *node);
+  void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
@@ -276,6 +277,7 @@ struct DependencyEmitter : VisitorBase {
   void decl_type(int type_id);
   
   Nullable<Symbol> get_symbol(ASTNode *node);
+  void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;

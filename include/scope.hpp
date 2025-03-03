@@ -48,7 +48,7 @@ struct Symbol {
       ASTFunctionDeclaration *declaration;
     } function;
     struct {
-      ASTImport *declaration;
+      ASTNode *declaration;
     } module;
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
@@ -90,7 +90,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_module(const InternedString &name, ASTImport *declaration) {
+  static Symbol create_module(const InternedString &name, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_MODULE;
@@ -203,7 +203,7 @@ struct Scope {
     return id;
   }
 
-  void create_module(const InternedString &name, ASTImport *declaration) {
+  void create_module(const InternedString &name, ASTNode *declaration) {
     symbols.insert_or_assign(name, Symbol::create_module(name, declaration));
   }
 

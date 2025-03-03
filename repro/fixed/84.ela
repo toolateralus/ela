@@ -1,9 +1,10 @@
-import format;
+import fmt::*;
 
 main :: fn() { 
   builder: String_Builder;
   defer builder.deinit();
   builder.append('c');
+
   // ! there is a problem with String_Builder and As_Char_Slice![u32]
   // ! where slices have to be null terminated, or they'll spew junk.
   assert("builder.get_string().data[0] != 'c'", builder.get_string().data[0] == 'c');

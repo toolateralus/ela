@@ -53,6 +53,8 @@ int ignored_warnings = WarningNone;
 
 static bool run_on_finished = false;
 
+#include <string>
+
 int main(int argc, char *argv[]) {
   for (int i = 0; i < argc; ++i) {
     if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {

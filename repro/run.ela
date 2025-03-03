@@ -1,0 +1,49 @@
+
+import fs::*;
+import fmt::*;
+
+
+impl!<T> T[] {
+  filter :: fn(self, predicate: fn *(T*) -> bool) -> #self {
+    copy: #self;
+    copy.resize(self.length);
+    for *value in self {
+      if predicate(value) {
+        copy.push(*value);
+      }
+    }
+    return copy;
+  }
+}
+
+import memory::Tracking_Allocator;
+
+main :: fn() {
+  directory := Directory::open(".").unwrap();
+
+  entries := directory.files.filter(fn(file: String*) -> bool {
+    return switch file.as_str() {
+      ".." => false,
+      "." => false,
+      ".gitignore" => false,
+      "counter" => false,
+      "all.sh" => false,
+      "new.sh" => false,
+      "run.sh" => false,
+      "run.ela" => false,
+      "run" => false,
+      else => true,
+    };
+  });
+
+  allocator: Tracking_Allocator;
+
+  for entry in entries {
+    file := fopen(entry.data, "rw"c);
+    stat := Stat::new(file).unwrap();
+    printlnf("is_dir = %", .[any::new(stat.is_dir(), allocator)]);
+    printlnf("is_file = %", .[any::new(stat.is_file(), allocator)]);
+    fclose(file);
+    println(entry);
+  }
+}

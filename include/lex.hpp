@@ -108,6 +108,7 @@ enum struct TType {
 
   Alias,
   Import,
+  Module,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -116,24 +117,11 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
-    TTYPE_CASE(Size_Of);
-    TTYPE_CASE(Type_Of);
 
-    TTYPE_CASE(Interface);
-    TTYPE_CASE(Where);
-    TTYPE_CASE(Defer);
-    TTYPE_CASE(Is);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
-    TTYPE_CASE(Fn);
     TTYPE_CASE(Colon);
-    TTYPE_CASE(Switch);
-    TTYPE_CASE(In);
-    TTYPE_CASE(Then);
-    TTYPE_CASE(Union);
-    TTYPE_CASE(Directive);
-    TTYPE_CASE(Enum);
     TTYPE_CASE(ColonEquals);
     TTYPE_CASE(Varargs);
     TTYPE_CASE(True);
@@ -181,15 +169,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Increment);
     TTYPE_CASE(Decrement);
 
-    TTYPE_CASE(Return);
-    TTYPE_CASE(Break);
-    TTYPE_CASE(Continue);
-    TTYPE_CASE(Struct);
-    TTYPE_CASE(For);
-    TTYPE_CASE(While);
-    TTYPE_CASE(If);
-    TTYPE_CASE(Else);
-
+    
     TTYPE_CASE(CompAdd);
     TTYPE_CASE(CompSub);
     TTYPE_CASE(CompMul);
@@ -200,10 +180,36 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(CompXor);
     TTYPE_CASE(CompSHL);
     TTYPE_CASE(CompSHR);
+
     TTYPE_CASE(As);
     TTYPE_CASE(Impl);
     TTYPE_CASE(Alias);
     TTYPE_CASE(Import);
+    TTYPE_CASE(Module);
+    TTYPE_CASE(Return);
+    TTYPE_CASE(Break);
+    TTYPE_CASE(Continue);
+    TTYPE_CASE(Struct);
+    TTYPE_CASE(For);
+    TTYPE_CASE(While);
+    TTYPE_CASE(If);
+    TTYPE_CASE(Else);
+
+    TTYPE_CASE(Size_Of);
+    TTYPE_CASE(Type_Of);
+
+    TTYPE_CASE(Interface);
+    TTYPE_CASE(Where);
+    TTYPE_CASE(Defer);
+    TTYPE_CASE(Is);
+    TTYPE_CASE(Fn);
+    TTYPE_CASE(Switch);
+    TTYPE_CASE(In);
+    TTYPE_CASE(Then);
+    TTYPE_CASE(Union);
+    TTYPE_CASE(Directive);
+    TTYPE_CASE(Enum);
+
   }
   return "Unknown";
 }
@@ -267,6 +273,8 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"module", TType::Module},
+
     {"import", TType::Import},
     {"импорт", TType::Import},
 

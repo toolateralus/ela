@@ -473,3 +473,5 @@ void DependencyEmitter::visit(ASTWhere *node) {
   node->target_type->accept(this);
   node->predicate->accept(this);
 }
+
+void DependencyEmitter::visit(ASTModule *node) {}

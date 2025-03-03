@@ -1,4 +1,4 @@
-#include "ast_copier.hpp"
+#include "copier.hpp"
 #include "ast.hpp"
 #include "type.hpp"
 
@@ -452,7 +452,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_type_of(static_cast<ASTType_Of *>(node));
     case AST_NODE_IMPORT:
       return copy_import(static_cast<ASTImport*>(node));
-      break;
+    case AST_NODE_MODULE:
+      return copy_module(static_cast<ASTModule*>(node));
   }
 }
 
@@ -534,8 +535,24 @@ ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
 ASTImport *ASTCopier::copy_import(ASTImport *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
+  new_node->scope = copy_scope(node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
   for (const auto &statement: node->statements) {
     new_node->statements.push_back((ASTStatement*)copy_node(statement));
   }
+  current_scope = old_scope;
+  return new_node;
+}
+
+ASTModule *ASTCopier::copy_module(ASTModule *node) {
+  auto new_node = copy(node);
+  new_node->scope = copy_scope(node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  for (const auto &statement: node->statements) {
+    new_node->statements.push_back((ASTStatement*)copy_node(statement));
+  }
+  current_scope = old_scope;
   return new_node;
 }

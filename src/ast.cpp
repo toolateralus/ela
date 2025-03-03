@@ -550,6 +550,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_NOOP:
       case AST_NODE_IMPL:
       case AST_NODE_IMPORT:
+      case AST_NODE_MODULE:
         break;
       default:
       err:
@@ -1109,6 +1110,17 @@ ASTStatement *Parser::parse_statement() {
 
     expect(TType::Semi);
 
+
+    auto symbol = ctx.scope->lookup(module_name);
+
+    // Import a module that's been defined by a 'module ... {}' statement.
+    // this is somewhat problematic because these arent really yet.
+    if (symbol && symbol->is_module()) {
+      printf("importing existing module %s\n", module_name.get_str().c_str());
+      import->scope = ((ASTModule*)symbol->module.declaration)->scope;
+      return import;
+    }
+
     auto old_scope = ctx.scope;
     // TODO: fix the wasteful double allocation that may happen here.
     ctx.set_scope(import->scope = create_child(ctx.root_scope));
@@ -1126,6 +1138,22 @@ ASTStatement *Parser::parse_statement() {
     ctx.set_scope(old_scope);
 
     return import;
+  }
+
+  if (tok.type == TType::Module) {
+    NODE_ALLOC(ASTModule, module, range, _, this);
+    eat();
+    module->module_name = expect(TType::Identifier).value;
+    expect(TType::LCurly);
+    auto old_scope = ctx.scope;
+    ctx.set_scope();
+    module->scope = ctx.scope;
+    while (peek().type != TType::RCurly) {
+      module->statements.push_back(parse_statement());
+    }
+    ctx.set_scope(old_scope);
+    expect(TType::RCurly);
+    return module;
   }
 
   if (peek().type == TType::Defer) {

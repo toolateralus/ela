@@ -1,5 +1,5 @@
-import json;
-import directory;
+import json::*;
+import fs::*;
 
 JsonValue :: struct {}
 

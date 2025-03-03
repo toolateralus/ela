@@ -1990,3 +1990,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
 }
 
 Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
+
+void Emitter::visit(ASTModule *node) {}
+
+

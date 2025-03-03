@@ -20,7 +20,7 @@ extern jstl::Arena ast_arena;
 struct VisitorBase;
 
 // used to prevent double includes.
-extern std::unordered_map<InternedString, Scope*> import_map;
+extern std::unordered_map<InternedString, Scope *> import_map;
 extern std::unordered_set<InternedString> include_set;
 
 enum ASTNodeType {
@@ -57,6 +57,7 @@ enum ASTNodeType {
   AST_NODE_ALIAS,
   AST_NODE_IMPL,
   AST_NODE_IMPORT,
+  AST_NODE_MODULE,
   AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_SIZE_OF,
   AST_NODE_TYPE_OF,
@@ -144,19 +145,41 @@ inline static std::string block_flags_to_string(int flags) {
   return result;
 }
 
+struct ASTModule : ASTStatement {
+  InternedString module_name;
+  std::vector<ASTStatement *> statements;
+  Scope *scope;
+  ASTNodeType get_node_type() const override { return AST_NODE_MODULE; }
+  void accept(VisitorBase *visitor) override;
+};
+
 struct ASTImport : ASTStatement {
   InternedString module_name;
+  // We need to have a more complex way to represent these 'symbols', which could be any of these,
+  // where we could be ::{}, ::*, or ::identifier.
+  /* 
+    import fs::{
+      file::*,
+      directory::prober::*,
+      directory::Directory::open,
+    };
+
+    import fs::file::*;
+
+    import fs::*;
+  */
+
   std::vector<InternedString> symbols;
-  std::vector<ASTStatement*> statements;
+  std::vector<ASTStatement *> statements;
   Scope *scope;
+
   enum {
     IMPORT_NORMAL,
     IMPORT_ALL,
     IMPORT_NAMED,
   } tag = IMPORT_NAMED;
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_IMPORT;
-  }
+
+  ASTNodeType get_node_type() const override { return AST_NODE_IMPORT; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -730,7 +753,7 @@ struct ASTWhere : ASTExpr {
 // it.
 #define DECLARE_VISIT_METHODS()                                                                                        \
   void visit(ASTProgram *node) override {}                                                                             \
-  void visit(ASTImport *node) override {}                                                                             \
+  void visit(ASTImport *node) override {}                                                                              \
   void visit(ASTLambda *node) override {}                                                                              \
   void visit(ASTWhere *node) override {}                                                                               \
   void visit(ASTBlock *node) override {}                                                                               \
@@ -768,13 +791,14 @@ struct ASTWhere : ASTExpr {
   void visit(ASTTaggedUnionDeclaration *node) override {};                                                             \
   void visit(ASTInterfaceDeclaration *node) override {};                                                               \
   void visit(ASTSize_Of *node) override {};                                                                            \
+  void visit(ASTModule *node) override {};                                                                            \
   void visit(ASTType_Of *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
   void visit(ASTNoop *noop) { return; }                                                                                \
   virtual void visit(ASTScopeResolution *node) = 0;                                                                    \
   virtual void visit(ASTSize_Of *node) = 0;                                                                            \
-  virtual void visit(ASTImport *node) = 0;                                                                            \
+  virtual void visit(ASTImport *node) = 0;                                                                             \
   virtual void visit(ASTCast *node) = 0;                                                                               \
   virtual void visit(ASTWhere *node) = 0;                                                                              \
   virtual void visit(ASTLambda *node) = 0;                                                                             \
@@ -813,6 +837,7 @@ struct ASTWhere : ASTExpr {
   virtual void visit(ASTDefer *node) = 0;                                                                              \
   virtual void visit(ASTInterfaceDeclaration *node) = 0;                                                               \
   virtual void visit(ASTTaggedUnionDeclaration *node) = 0;                                                             \
+  virtual void visit(ASTModule *node) = 0;                                                                             \
   virtual void visit(ASTType_Of *node) = 0;
 
 enum DirectiveKind {
