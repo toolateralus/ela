@@ -20,7 +20,8 @@ extern jstl::Arena ast_arena;
 struct VisitorBase;
 
 // used to prevent double includes.
-extern std::unordered_set<InternedString> import_set;
+extern std::unordered_map<InternedString, Scope*> import_map;
+extern std::unordered_set<InternedString> include_set;
 
 enum ASTNodeType {
   AST_NODE_PROGRAM,
@@ -907,7 +908,7 @@ struct Parser {
   void end_node(ASTNode *node, SourceRange &range);
 
   // returns true if successful, false if already included
-  bool import(InternedString name);
+  bool import(InternedString name, Scope **scope);
 
   Parser(const std::string &filename, Context &context);
   ~Parser();

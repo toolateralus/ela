@@ -41,7 +41,8 @@ PanicHandler panic_handler = get_default_panic_handler();
 
 CompileCommand compile_command;
 
-std::unordered_set<InternedString> import_set;
+std::unordered_map<InternedString, Scope*> import_map;
+std::unordered_set<InternedString> include_set;
 /*
   #########################
   ### PROVIDING EXTERNS ###

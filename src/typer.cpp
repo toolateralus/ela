@@ -1160,7 +1160,29 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
 }
 
 void Typer::visit(ASTImport *node) {
-  
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+  for (auto statement: node->statements) {
+    statement->accept(this);
+  }
+  ctx.set_scope(old_scope);
+  switch (node->tag) {
+    case ASTImport::IMPORT_NORMAL: 
+      // do nothing
+      break;
+    case ASTImport::IMPORT_ALL: {
+      for (const auto &symbol: node->scope->symbols) {
+        ctx.scope->symbols.insert(symbol);
+      }
+    } break;
+    case ASTImport::IMPORT_NAMED: {
+      for (const auto &symbol: node->symbols) {
+        if (node->scope->local_lookup(symbol)) {
+          ctx.scope->symbols[symbol] = *node->scope->local_lookup(symbol);
+        }
+      }
+    } break;
+  }
 }
 
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {

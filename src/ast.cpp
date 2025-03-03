@@ -129,10 +129,10 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
                                   std::filesystem::current_path().string()),
                       {});
         }
-        if (import_set.contains(filename)) {
+        if (include_set.contains(filename)) {
           return nullptr;
         }
-        import_set.insert(filename);
+        include_set.insert(filename);
         parser->states.push_back(Lexer::State::from_file(filename.get_str()));
         parser->fill_buffer_if_needed();
         NODE_ALLOC(ASTStatementList, list, range, _, parser)
@@ -500,7 +500,8 @@ ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
 
   // put bootstrap on root scope
-  import("bootstrap");
+  import("bootstrap", &ctx.root_scope);
+
   while (peek().type != TType::Eof) {
     program->statements.push_back(parse_statement());
   }
@@ -1112,14 +1113,14 @@ ASTStatement *Parser::parse_statement() {
     auto old_scope = ctx.scope;
     ctx.set_scope(import->scope = create_child(ctx.root_scope));
 
-    if (this->import(module_name.get_str())) {
-      while (peek().type != TType::Eof) {
+    if (this->import(module_name.get_str(), &import->scope)) {
+      while (!peek().is_eof()) {
         import->statements.push_back(parse_statement());
       }
       expect(TType::Eof);
       states.pop_back();
       std::filesystem::current_path(states.back().path.parent_path());
-    }
+    } 
 
     old_scope->create_module(module_name, import);
     ctx.set_scope(old_scope);
@@ -2286,7 +2287,7 @@ void Parser::fill_buffer_if_needed() {
   }
 }
 
-bool Parser::import(InternedString name) {
+bool Parser::import(InternedString name, Scope **scope) {
   std::string ela_lib_path;
   if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     ela_lib_path = env_p;
@@ -2301,7 +2302,8 @@ bool Parser::import(InternedString name) {
   auto module_name = name;
   auto filename = std::filesystem::path(ela_lib_path) / name.get_str();
   // Right now, we just return noop if we're double including.
-  if (import_set.contains(module_name)) {
+  if (import_map.contains(module_name)) {
+    *scope = import_map[module_name];
     return false;
   }
   if (std::filesystem::is_directory(filename)) {
@@ -2318,7 +2320,7 @@ bool Parser::import(InternedString name) {
                 {});
   }
 
-  import_set.insert(module_name);
+  import_map.insert({module_name, *scope});
   states.push_back(Lexer::State::from_file(filename));
   fill_buffer_if_needed();
   return true;
