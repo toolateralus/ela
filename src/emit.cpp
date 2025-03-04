@@ -334,7 +334,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 }
 
 void Emitter::visit(ASTCall *node) {
-  auto base_symbol = typer.get_symbol(node->function);
+  auto base_symbol = ctx.get_symbol(node->function);
 
   std::vector<int> generic_args;
   for (const auto arg : node->generic_arguments) {
