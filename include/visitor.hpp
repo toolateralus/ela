@@ -25,7 +25,7 @@ struct VisitorBase {
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
   int current_block_statement_idx;
-  int declaring_or_assigning_type = -1;
+  int expected_type = -1;
 
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range);
 
