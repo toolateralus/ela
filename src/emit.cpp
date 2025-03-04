@@ -625,9 +625,9 @@ void Emitter::visit(ASTVariable *node) {
     } else if (emit_default_init) {
       auto type = global_get_type(node->type->resolved_type);
       if (type->is_kind(TYPE_STRUCT)) {
-        (*ss) << "= (" + to_cpp_string(type) + ") {}";
+        (*ss) << "= {}";
       } else {
-        (*ss) << "= (" + to_cpp_string(type) + ") {0}";
+        (*ss) << "= {0}";
       }
     }
     (*ss) << ";\n";
@@ -1215,9 +1215,6 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   if (type->is_kind(TYPE_FUNCTION)) {
     std::string identifier = name;
     auto &ext = type->get_ext();
-    if (ext.is_fixed_sized_array()) {
-      identifier += ext.to_string();
-    }
     return get_function_pointer_type_string(type, &identifier);
   }
 
@@ -1239,8 +1236,6 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
 std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
-  auto type_prefix = std::string{"*"};
-
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error("internal compiler error: tried to get a function pointer from "
                 "a non-function type",
@@ -1248,6 +1243,18 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   }
 
   std::stringstream ss;
+
+  int pointer_depth = 0;
+  TypeExtensions other_extensions;
+  for (auto ext : type->get_ext().extensions) {
+    if (ext.type == TYPE_EXT_POINTER)
+      pointer_depth++;
+    else
+      other_extensions.extensions.push_back(ext);
+  }
+
+  auto type_prefix = std::string(pointer_depth, '*');
+  auto type_postfix = other_extensions.to_string();
 
   auto info = (type->get_info()->as<FunctionTypeInfo>());
   auto return_type = global_get_type(info->return_type);
@@ -1257,6 +1264,8 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   if (identifier) {
     ss << *identifier.get();
   }
+
+  ss << type_postfix;
 
   ss << ")(";
 
@@ -1277,7 +1286,6 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
-
     if (type->is_kind(TYPE_STRUCT)) {
       if ((type->get_info()->as<StructTypeInfo>()->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
         ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
@@ -1291,7 +1299,8 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
     if (parent_type->is_kind(TYPE_TUPLE)) {
       ss << std::format(
           ".offset = offsetof({}, {})",
-          to_cpp_string(global_get_type(parent_type->base_id == -1 ? parent_type->id : parent_type->base_id)), "$" + name);
+          to_cpp_string(global_get_type(parent_type->base_id == -1 ? parent_type->id : parent_type->base_id)),
+          "$" + name);
     } else {
       ss << std::format(
           ".offset = offsetof({}, {})",
@@ -1751,7 +1760,14 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 
     if (returns->is_kind(TYPE_FUNCTION)) {
       auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
-      (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "(*" << name;
+
+
+      // we take fixed array extensions as pointer here because it's invalid and would get casted off anyway.
+      auto depth = returns->get_ext().extensions.size();
+      auto extensions = std::string(depth, '*');
+
+      (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "("
+            << extensions << name;
       node->params->accept(this);
       (*ss) << ")";
     } else {
@@ -1975,9 +1991,7 @@ void Emitter::visit(ASTSize_Of *node) {
   (*ss) << ")";
 }
 
-void Emitter::visit(ASTImport *node) {
-  
-}
+void Emitter::visit(ASTImport *node) {}
 
 void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
@@ -2001,5 +2015,3 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
 Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) { ss = &code; }
 
 void Emitter::visit(ASTModule *node) {}
-
-

@@ -1,20 +1,21 @@
 function_pointer_helper :: fn(x: s32, y: s32) -> s32 { return x * y; }
 
-#error "Still broken!";
+// #error "Still broken!";
+
+alias FunctionPointer :: fn* (s32, s32) -> s32;
 
 #test test_function_pointer_alias :: fn() {
-  alias FunctionPointer :: fn* (s32, s32) -> s32;
   ptr := &function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 
   array: List!<FunctionPointer>;
   array.push(&function_pointer_helper)
-  from_arr : FunctionPointer = &array[0];
+  from_arr : FunctionPointer = array[0];
   assert("Array of function pointers", from_arr(2, 3) == 6);
 
   fixed: FunctionPointer[12];
   fixed[0] = &function_pointer_helper;
-  from_fixed : FunctionPointer = &fixed[0];
+  from_fixed : FunctionPointer = fixed[0];
 
   assert("Fixed array of function pointers", from_fixed(2, 3) == 6);
 }
