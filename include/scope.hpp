@@ -23,7 +23,7 @@ struct ASTStructDeclaration;
 struct ASTFunctionDeclaration;
 struct ASTTaggedUnionDeclaration;
 struct ASTEnumDeclaration;
-struct ASTImport;
+struct ASTModule;
 
 struct Symbol {
   InternedString name;
@@ -33,7 +33,7 @@ struct Symbol {
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
   bool is_variable() const { return (flags & SYMBOL_IS_VARIABLE) != 0; }
   bool is_type() const { return (flags & SYMBOL_IS_TYPE) != 0; }
-  bool is_module() const { return (flags & SYMBOL_IS_TYPE) != 0; }
+  bool is_module() const { return (flags & SYMBOL_IS_MODULE) != 0; }
   bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
 
   union {
@@ -48,7 +48,7 @@ struct Symbol {
       ASTFunctionDeclaration *declaration;
     } function;
     struct {
-      ASTNode *declaration;
+      ASTModule *declaration;
     } module;
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
@@ -90,7 +90,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_module(const InternedString &name, ASTNode *declaration) {
+  static Symbol create_module(const InternedString &name, ASTModule *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_MODULE;
@@ -203,7 +203,7 @@ struct Scope {
     return id;
   }
 
-  void create_module(const InternedString &name, ASTNode *declaration) {
+  void create_module(const InternedString &name, ASTModule *declaration) {
     symbols.insert_or_assign(name, Symbol::create_module(name, declaration));
   }
 
@@ -255,4 +255,6 @@ struct Context {
     }
     return old_scope;
   }
+  Nullable<Symbol> get_symbol(ASTNode *node);
+  Nullable<Scope> get_scope(ASTNode *node);
 };

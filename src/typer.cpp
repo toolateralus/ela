@@ -83,45 +83,6 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
   }
 };
 
-Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
-  switch (node->get_node_type()) {
-    case AST_NODE_SUBSCRIPT:
-      return nullptr;
-    case AST_NODE_TYPE: {
-      auto type_node = static_cast<ASTType *>(node);
-      if (type_node->kind != ASTType::NORMAL) {
-        return nullptr;
-      }
-      return get_symbol(type_node->normal.base);
-    }
-    case AST_NODE_IDENTIFIER:
-      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value);
-    case AST_NODE_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
-      dotnode->base->accept(this);
-      auto type = global_get_type(dotnode->base->resolved_type);
-      auto symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      // Implicit dereference, we look at the base scope.
-      if (!symbol && type->get_ext().is_pointer()) {
-        type = global_get_type(type->get_element_type());
-        symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      }
-      return symbol;
-    } break;
-    case AST_NODE_SCOPE_RESOLUTION: {
-      auto srnode = static_cast<ASTScopeResolution *>(node);
-      srnode->base->accept(this);
-      auto type = global_get_type(srnode->base->resolved_type);
-      auto scope = type->get_info()->scope;
-      return scope->local_lookup(srnode->member_name);
-    } break;
-
-    default:
-      return nullptr; // TODO: verify this isn't strange.
-  }
-  return nullptr;
-}
-
 void Typer::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
@@ -1045,7 +1006,8 @@ void Typer::visit(ASTCall *node) {
   ASTFunctionDeclaration *func_decl = nullptr;
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
-  auto symbol = get_symbol(node->function).get();
+  node->function->accept(this);
+  auto symbol = ctx.get_symbol(node->function).get();
   if (symbol && symbol->is_function()) {
     if (!type) {
       type = global_get_type(symbol->type_id);
@@ -1412,7 +1374,8 @@ void Typer::visit(ASTType *node) {
   // ! I have to check if the base is null because for some reason it's just null sometimes.
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
-    auto symbol = get_symbol(normal_ty.base).get();
+    normal_ty.base->accept(this);
+    auto symbol = ctx.get_symbol(normal_ty.base).get();
 
     if (!symbol) {
       throw_error("use of undeclared type", node->source_range);
@@ -1704,12 +1667,11 @@ void Typer::visit(ASTDotExpr *node) {
 
 void Typer::visit(ASTScopeResolution *node) {
   node->base->accept(this);
-  auto id = node->base->resolved_type;
-  auto base_ty = global_get_type(id);
-  Scope *scope = base_ty->get_info()->scope;
-  if (!scope) {
+  auto scope_nullable = ctx.get_scope(node->base);
+  if (scope_nullable.is_null()) {
     throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
   }
+  auto scope = scope_nullable.get();
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     return;
@@ -1720,7 +1682,7 @@ void Typer::visit(ASTScopeResolution *node) {
     return;
   } else {
   ERROR_CASE:
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+    throw_error(std::format("Member \"{}\" not found in base", node->member_name),
                 node->source_range);
   }
 }
@@ -2115,7 +2077,7 @@ void Typer::visit(ASTTupleDeconstruction *node) {
 
 void Typer::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
-    auto symbol_nullable = get_symbol(node->target);
+    auto symbol_nullable = ctx.get_symbol(node->target);
 
     if (symbol_nullable.is_null() || !symbol_nullable.get()->is_type()) {
       throw_error("generic `impl![...]` can only be used on types.", node->source_range);

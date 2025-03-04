@@ -4,46 +4,6 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
-Nullable<Symbol> DependencyEmitter::get_symbol(ASTNode *node) {
-  switch (node->get_node_type()) {
-    case AST_NODE_SUBSCRIPT:
-      return nullptr;
-    case AST_NODE_TYPE: {
-      auto type_node = static_cast<ASTType *>(node);
-      if (type_node->kind != ASTType::NORMAL) {
-        return nullptr;
-      }
-      type_node->accept(this);
-      return get_symbol(type_node->normal.base);
-    }
-    case AST_NODE_IDENTIFIER:
-      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value);
-    case AST_NODE_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
-      dotnode->base->accept(this);
-      auto type = global_get_type(dotnode->base->resolved_type);
-      auto symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      // Implicit dereference, we look at the base scope.
-      if (!symbol && type->get_ext().is_pointer()) {
-        type = global_get_type(type->get_element_type());
-        symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      }
-      return symbol;
-    } break;
-    case AST_NODE_SCOPE_RESOLUTION: {
-      auto srnode = static_cast<ASTScopeResolution *>(node);
-      srnode->base->accept(this);
-      auto type = global_get_type(srnode->base->resolved_type);
-      auto scope = type->get_info()->scope;
-      return scope->local_lookup(srnode->member_name);
-    } break;
-
-    default:
-      return nullptr; // TODO: verify this isn't strange.
-  }
-  return nullptr;
-}
-
 void DependencyEmitter::decl_type(int type_id) {
   auto type = global_get_type(type_id);
   auto extensions = type->get_ext().extensions;
@@ -243,7 +203,8 @@ void DependencyEmitter::visit(ASTCall *node) {
   }
 
   node->arguments->accept(this);
-  auto symbol_nullable = get_symbol(node->function);
+  node->function->accept(this);
+  auto symbol_nullable = ctx.get_symbol(node->function);
 
   if (symbol_nullable.is_not_null()) {
     auto decl = symbol_nullable.get()->function.declaration;

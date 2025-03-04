@@ -153,8 +153,7 @@ struct ASTModule : ASTStatement {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTImport : ASTStatement {
-  InternedString module_name;
+struct ASTImport : ASTModule {
   // We need to have a more complex way to represent these 'symbols', which could be any of these,
   // where we could be ::{}, ::*, or ::identifier.
   /* 
@@ -170,8 +169,6 @@ struct ASTImport : ASTStatement {
   */
 
   std::vector<InternedString> symbols;
-  std::vector<ASTStatement *> statements;
-  Scope *scope;
 
   enum {
     IMPORT_NORMAL,
@@ -970,3 +967,4 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                                                                     \
     deferred;                                                                                                          \
   });
+  
