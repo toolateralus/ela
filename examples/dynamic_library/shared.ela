@@ -1,5 +1,4 @@
-;
-import raylib;
+import raylib::{Rectangle, Color, DrawRectangle};
 
 DrawCommand :: struct {
   rect: Rectangle,
@@ -19,4 +18,4 @@ impl DrawContext {
   }
 }
 
-alias function :: fn* (DrawContext*);
+alias function :: fn* (DrawContext*)

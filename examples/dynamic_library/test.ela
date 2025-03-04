@@ -1,6 +1,11 @@
+#def RAYLIB_LINK_SHARED
+
 #include "shared.ela";
 
+
 #c_flags "-fPIC -shared -o test.so"
+
+import raylib::{Vector2, KeyboardKey, WHITE};
 
 position : Vector2;
 
@@ -11,7 +16,7 @@ position : Vector2;
   if ctx.inputState[KeyboardKey::KEY_D] then position.x += 1;
     
   command: DrawCommand;
-  command.rect = {
+  command.rect = .{
     x: position.x, y: position.y
     width: 60.0, height: 60.0,
   };
