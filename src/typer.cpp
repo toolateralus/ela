@@ -85,8 +85,6 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
 
 Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
   switch (node->get_node_type()) {
-    case AST_NODE_SUBSCRIPT:
-      return nullptr;
     case AST_NODE_TYPE: {
       auto type_node = static_cast<ASTType *>(node);
       if (type_node->kind != ASTType::NORMAL) {
@@ -107,15 +105,49 @@ Nullable<Symbol> Typer::get_symbol(ASTNode *node) {
         symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
       }
       return symbol;
-    } break;
+    }
     case AST_NODE_SCOPE_RESOLUTION: {
       auto srnode = static_cast<ASTScopeResolution *>(node);
-      srnode->base->accept(this);
-      auto type = global_get_type(srnode->base->resolved_type);
-      auto scope = type->get_info()->scope;
-      return scope->local_lookup(srnode->member_name);
-    } break;
+      auto scope = get_scope(srnode->base);
+      if (scope.is_null()) {
+        return nullptr;
+      }
+      return scope.get()->local_lookup(srnode->member_name);
+    }
+    default:
+      return nullptr; // TODO: verify this isn't strange.
+  }
+  return nullptr;
+}
 
+Nullable<Scope> Typer::get_scope(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_TYPE: {
+      node->accept(this);
+      auto type = global_get_type(node->resolved_type);
+      return type->get_info()->scope;
+    }
+    case AST_NODE_IDENTIFIER: {
+      auto symbol = ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value);
+      if (symbol->is_module()) {
+        return symbol->module.declaration->scope;
+      } else {
+        return nullptr;
+      }
+    }
+    case AST_NODE_SCOPE_RESOLUTION: {
+      auto srnode = static_cast<ASTScopeResolution *>(node);
+      auto scope = get_scope(srnode->base);
+      if (scope.is_null()) {
+        return nullptr;
+      }
+      auto member = scope.get()->local_lookup(srnode->member_name);
+      if (member->is_module()) {
+        return member->module.declaration->scope;
+      } else {
+        return nullptr;
+      }
+    }
     default:
       return nullptr; // TODO: verify this isn't strange.
   }

@@ -32,6 +32,7 @@ struct Typer : VisitorBase {
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   Nullable<Symbol> get_symbol(ASTNode *);
+  Nullable<Scope> get_scope(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
 
