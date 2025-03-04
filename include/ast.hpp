@@ -885,7 +885,7 @@ struct Parser {
   ASTInterfaceDeclaration *parse_interface_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
-  ASTVariable *parse_declaration();
+  ASTVariable *parse_variable();
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTType *> parse_generic_arguments();

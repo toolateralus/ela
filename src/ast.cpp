@@ -397,7 +397,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->expect(TType::LParen);
         auto size = parser->expect(TType::Integer);
         parser->expect(TType::RParen);
-        ASTVariable *decl = parser->parse_declaration();
+        ASTVariable *decl = parser->parse_variable();
         decl->is_bitfield = true;
         decl->bitsize = size.value;
         return decl;
@@ -1193,7 +1193,7 @@ ASTStatement *Parser::parse_statement() {
       lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals;
 
   if (tok.type == TType::Identifier && is_colon_or_colon_equals) {
-    auto decl = parse_declaration();
+    auto decl = parse_variable();
     return decl;
   }
 
@@ -1546,7 +1546,7 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   return node;
 }
 
-ASTVariable *Parser::parse_declaration() {
+ASTVariable *Parser::parse_variable() {
   NODE_ALLOC(ASTVariable, decl, range, _, this);
   auto iden = eat();
   decl->name = iden.value;
@@ -1576,12 +1576,6 @@ ASTVariable *Parser::parse_declaration() {
   }
 
   end_node(decl, range);
-  if (ctx.scope->local_lookup(iden.value)) {
-    throw_error(std::format("re-definition of '{}'", iden.value), decl->source_range);
-  }
-
-  ctx.scope->insert_variable(iden.value, Type::INVALID_TYPE_ID, decl->value.get(), decl);
-
   return decl;
 }
 
@@ -2101,7 +2095,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       variant.kind = ASTTaggedUnionVariant::STRUCT;
       eat();
       while (peek().type != TType::RCurly) {
-        variant.struct_declarations.push_back(parse_declaration());
+        variant.struct_declarations.push_back(parse_variable());
         if (peek().type == TType::Comma) {
           eat();
         }

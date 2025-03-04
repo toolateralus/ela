@@ -628,18 +628,21 @@ void Typer::visit(ASTVariable *node) {
                                    "invalid type in declaration");
   }
 
-  auto symbol = ctx.scope->lookup(node->name);
-  symbol->type_id = node->type->resolved_type;
-  auto type = global_get_type(node->type->resolved_type);
+  // if (ctx.scope->local_lookup(node->name)) {
+  //   throw_error(std::format("re-definition of '{}'", node->name), node->source_range);
+  // }
 
-  if (symbol->type_id == void_type() || node->type->resolved_type == void_type()) {
+  auto variable_type = node->type->resolved_type;
+  ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node);
+  auto type = global_get_type(variable_type);
+
+  if (variable_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
   }
 
   if (node->is_constexpr) {
     // TODO: we should probably improve this.
     // Our interpreter can't handle structs, but we want structs.
-
     // auto type = global_get_type(node->type->resolved_type);
     // if ((!type->is_kind(TYPE_SCALAR) || type->get_ext().has_extensions())) {
     //   throw_error(std::format("Can only use scalar types (integers, floats, "
