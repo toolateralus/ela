@@ -743,7 +743,34 @@ void Typer::visit(ASTContinue *node) { node->control_flow = ControlFlow{BLOCK_FL
 
 void Typer::visit(ASTBreak *node) { node->control_flow = ControlFlow{BLOCK_FLAGS_BREAK, Type::INVALID_TYPE_ID}; }
 
-void Typer::compiler_mock_function_call_visit_impl(int left_type, const InternedString &method_name) {
+void Typer::compiler_mock_associated_function_call_visit_impl(int left_type, const InternedString &method_name) {
+  auto old_call_state = in_call;
+  in_call = true;
+  Defer _([&]{
+    in_call = old_call_state;
+  });
+  ASTCall call;
+  ASTArguments arguments;
+  call.arguments = &arguments;
+
+  // Type.
+  ASTIdentifier left;
+  left.value = global_get_type(left_type)->get_base();
+
+  ASTScopeResolution sr;
+  sr.base = &left;
+  sr.member_name = method_name;
+
+  call.function = &sr;
+  call.accept(this);
+}
+
+void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedString &method_name) {
+  auto old_call_state = in_call;
+  in_call = true;
+  Defer _([&]{
+    in_call = old_call_state;
+  });
   ASTCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -790,7 +817,7 @@ void Typer::visit(ASTFor *node) {
   if (range_type->implements("Iterable")) {
     node->iteration_kind = ASTFor::ITERABLE;
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(range_type_id, "iter");
+    compiler_mock_method_call_visit_impl(range_type_id, "iter");
 
     auto symbol = scope->local_lookup("iter");
     if (!symbol || !symbol->is_function()) {
@@ -804,7 +831,7 @@ void Typer::visit(ASTFor *node) {
     node->iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+    compiler_mock_method_call_visit_impl(iter_return_ty->id, "current");
 
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
@@ -816,7 +843,7 @@ void Typer::visit(ASTFor *node) {
   } else if (range_type->implements("Enumerable")) {
     node->iteration_kind = ASTFor::ENUMERABLE;
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(range_type_id, "enumerator");
+    compiler_mock_method_call_visit_impl(range_type_id, "enumerator");
 
     auto symbol = scope->local_lookup("enumerator");
     if (!symbol || !symbol->is_function()) {
@@ -829,7 +856,7 @@ void Typer::visit(ASTFor *node) {
     node->iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_function_call_visit_impl(iter_return_ty->id, "current");
+    compiler_mock_method_call_visit_impl(iter_return_ty->id, "current");
 
     symbol = iter_return_ty->get_info()->scope->local_lookup("current");
     if (!symbol || !symbol->is_function()) {
@@ -840,7 +867,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
   } else if (range_type->implements("Enumerator")) {
     node->iteration_kind = ASTFor::ENUMERATOR;
-    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    compiler_mock_method_call_visit_impl(range_type_id, "current");
     auto symbol = scope->local_lookup("current");
 
     if (!symbol || !symbol->is_function()) {
@@ -853,7 +880,7 @@ void Typer::visit(ASTFor *node) {
   } else if (range_type->get_base().get_str().starts_with("Iter$")) {
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
-    compiler_mock_function_call_visit_impl(range_type_id, "current");
+    compiler_mock_method_call_visit_impl(range_type_id, "current");
     iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to();
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
@@ -1002,6 +1029,8 @@ void Typer::visit(ASTWhile *node) {
 }
 
 void Typer::visit(ASTCall *node) {
+
+
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
@@ -1165,7 +1194,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
           node->generic_arguments.push_back(type);
         }
       }
-    } else {  // Infer generic parameter(S) from arguments.
+    } else { // Infer generic parameter(S) from arguments.
       node->arguments->accept(this);
 
       auto arguments = node->arguments->resolved_argument_types;
@@ -1671,19 +1700,40 @@ void Typer::visit(ASTScopeResolution *node) {
   if (scope_nullable.is_null()) {
     throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
   }
+
   auto scope = scope_nullable.get();
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
-    return;
+    auto type = global_get_type(member->type_id);
+    // force visit impls even if the function isnt called.
+    auto symbol = ctx.get_symbol(node->base);
+
+    // @Cooper-Pilot
+    //! We mock call functions here??
+    //! I don't know how else to force impls to work.
+
+    //! if we do T::some_method/some_associated_function
+    //! we need to be able to get that method and make sure it's implemented.
+    //! but we only do that for calls.
+
+    //! if (!in_call && symbol && type->is_kind(TYPE_FUNCTION) && type->get_ext().has_no_extensions()) {
+    //!   auto left = symbol.get()->type_id;
+    //!   auto left_ty = global_get_type(left);
+    //!   auto func_info = type->get_info()->as<FunctionTypeInfo>();
+    //!   if (func_info->params_len > 0 && func_info->parameter_types[0] == left) {
+    //!     compiler_mock_method_call_visit_impl(left, node->member_name);
+    //!   } else {
+    //!     compiler_mock_associated_function_call_visit_impl(left, node->member_name);
+    //!   }
+    //! }
+
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type == Type::INVALID_TYPE_ID)
-      goto ERROR_CASE;
+    if (type == Type::INVALID_TYPE_ID) {
+      throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
+    }
     node->resolved_type = type;
-    return;
   } else {
-  ERROR_CASE:
-    throw_error(std::format("Member \"{}\" not found in base", node->member_name),
-                node->source_range);
+    throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
   }
 }
 

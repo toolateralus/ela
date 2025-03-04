@@ -104,8 +104,8 @@ struct ASTInterfaceDeclaration;
 
 
 struct Scope {
-  std::vector<InternedString> ordered_symbols;
-  std::unordered_map<InternedString, Symbol> symbols;
+  std::vector<InternedString> ordered_symbols = {};
+  std::unordered_map<InternedString, Symbol> symbols = {};
 
   static std::unordered_set<InternedString> &defines() {
     static std::unordered_set<InternedString> defines;
@@ -238,9 +238,9 @@ struct Context {
   // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
   // This type_info_strings field should be in the emit visitor.
   // That's the only place it's used anyway.
-  std::vector<InternedString> type_info_strings;
-  Scope *root_scope;
-  Scope *scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  std::vector<InternedString> type_info_strings {};
+  Scope *root_scope = nullptr;
+  Scope *scope = nullptr;
   Context();
   inline void set_scope(Scope *in_scope = nullptr) {
     if (!in_scope) {

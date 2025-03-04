@@ -30,6 +30,7 @@ jstl::Arena scope_arena{MB(10)};
 jstl::Arena ast_arena{MB(10)};
 
 std::vector<Type *> type_table{};
+
 size_t LAMBDA_UNIQUE_ID = 0;
 
 // TODO: remove me, we want file scopes.

@@ -25,6 +25,7 @@ struct VisitorBase {
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
   int current_block_statement_idx;
+  bool in_call = false;
   int expected_type = -1;
 
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range);
@@ -77,7 +78,7 @@ struct Typer : VisitorBase {
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
 
-  void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
+  void compiler_mock_method_call_visit_impl(int type, const InternedString &method_name);
 
   void visit(ASTCall *node) override;
   void visit(ASTArguments *node) override;
@@ -105,6 +106,7 @@ struct Typer : VisitorBase {
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
 
+  void compiler_mock_associated_function_call_visit_impl(int left_type, const InternedString &method_name);
   InternedString type_name(ASTExpr *node);
 };
 

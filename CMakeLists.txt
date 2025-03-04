@@ -34,8 +34,10 @@ set_target_properties(ela PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_DIR}
 )
 
+
 # Set compiler flags based on the compiler and platform
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
+    # -fsanitize=address,leak
     set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
     set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto")
 elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
