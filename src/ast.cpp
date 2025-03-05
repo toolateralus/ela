@@ -1199,8 +1199,7 @@ ASTStatement *Parser::parse_statement() {
                                                                     lookahead_buf()[1].type == TType::ColonEquals);
 
   bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
-                         lookahead_buf()[2].type == TType::Colon ||
-                     lookahead_buf()[2].type == TType::ColonEquals;
+                     (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
 
   if (is_mut_decl || is_colon_or_colon_equals) {
     auto decl = parse_variable();
@@ -1674,6 +1673,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     Mutability mutability = CONST;
 
     if (peek().type == TType::Mut) {
+      eat();
       mutability = MUT;
     }
 
