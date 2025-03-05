@@ -47,17 +47,11 @@ Xaryu :: struct {
 
 #test test_slicing_array :: fn() {
   arr := List!<s32>::init(.[
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
   ]);
   
   assert("Length", arr.length == 11);
-
-  // for i in 0..10 {
-  //   arr[i] = 100;
-  // }
 
   subarr := arr.subarray(0..10);
 

@@ -109,6 +109,8 @@ enum struct TType {
   Alias,
   Import,
   Module,
+
+  Attribute,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -209,6 +211,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Union);
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
+    TTYPE_CASE(Attribute);
 
   }
   return "Unknown";
@@ -363,6 +366,7 @@ static std::unordered_map<std::string, TType> keywords{
 
 static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},
                                                         {":", TType::Colon},
+                                                        {"@", TType::Attribute},
                                                         {":=", TType::ColonEquals},
                                                         {"...", TType::Varargs},
                                                         {"#", TType::Directive},

@@ -1752,11 +1752,9 @@ void Emitter::emit_lambda(ASTLambda *node) {
   newline();
 }
 
-#define let auto
-
 void Emitter::visit(ASTFunctionDeclaration *node) {
   auto emit_function_signature_and_body = [&](const std::string &name) {
-    let returns = global_get_type(node->return_type->resolved_type);
+    auto returns = global_get_type(node->return_type->resolved_type);
 
     if (returns->is_kind(TYPE_FUNCTION)) {
       auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
