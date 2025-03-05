@@ -111,6 +111,9 @@ enum struct TType {
   Module,
 
   Attribute,
+
+  Mut,
+  Const
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -212,6 +215,9 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
     TTYPE_CASE(Attribute);
+    
+    TTYPE_CASE(Mut);
+    TTYPE_CASE(Const);
 
   }
   return "Unknown";
@@ -276,6 +282,9 @@ struct Token {
 };
 
 static std::unordered_map<std::string, TType> keywords{
+    {"const", TType::Const},
+    {"mut", TType::Mut},
+
     {"module", TType::Module},
 
     {"import", TType::Import},

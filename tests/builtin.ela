@@ -26,7 +26,7 @@ Xaryu :: struct {
   for i in 0..100 {
     array.push(10);
   }
-  n: s32;
+  mut n: s32;
   for i in 0..100 {
     n = array.pop();
   }

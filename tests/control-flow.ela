@@ -30,30 +30,30 @@
 
 #test test_if_1 :: fn() {
   v: bool = true;
-  hit: bool = false;
+  mut hit: bool = false;
   if v {
-      assert("v should be true", v == true);
-      hit = true;
+    assert("v should be true", v == true);
+    hit = true;
   } else {
-      assert("Unexpected case", false);
+    assert("Unexpected case", false);
   }
   assert("failed to fall through if statement", hit);
 }
 
 #test test_if_2 :: fn() {
   v: bool = false;
-  hit: bool = true;
+  mut hit: bool = true;
   if v {
       assert("Unexpected case", false);
   } else if !v {
-      hit = true;
+    hit = true;
   }
   assert("fell through if else, but didn't set the variable", hit);
 }
 
 #test test_if_3 :: fn() {
   v: bool = false;
-  hit: bool = true;
+  mut hit: bool = true;
   if v {
       assert("Unexpected case", false);
   } else if v {
@@ -84,18 +84,18 @@
 }
 
 #test test_iterate_array :: fn() {
-  array: List!<s8>;
+  mut array: List!<s8>;
   for i in 0..4 {
     array.push(i as s8);
   }
-  n: s32 ;
+  mut n: s32 ;
   for *v in array {
     assert("", n == *v);
     ++n;
   }
 
   n = 0;
-  arr : List!<s8>* = malloc(sizeof(List!<s8>)); 
+  mut arr : List!<s8>* = malloc(sizeof(List!<s8>)); 
   *arr = .{};
   for i in 0..4 {
     arr.push(i as s8);
@@ -109,7 +109,7 @@
 }
 
 #test test_range_based_for_loop_exclusive :: fn() {
-  n: s32;
+  mut n: s32;
   ten := 10;
   zero := 0;
 
@@ -139,7 +139,7 @@
   list.push((2, 2));
   list.push((3, 3));
 
-  i := 0;
+  mut i := 0;
   for x, y in list {
     assert("failed", x == i && y == i);
     ++i;
@@ -163,13 +163,13 @@ __Struct :: struct {
 }
 
 #test test_struct_destructure_in_for_loop :: fn() {
-  list: __Struct[];
+  mut list: __Struct[];
   list.push(.{x: 0, y: 0});
   list.push(.{x: 1, y: 1});
   list.push(.{x: 2, y: 2});
   list.push(.{x: 3, y: 3});
 
-  i := 0;
+  mut i := 0;
   for x, y in list {
     assert("failed", x == i && y == i);
     ++i;
@@ -206,7 +206,7 @@ switch_helper :: fn() -> s32 {
 #test test_switch_statements :: fn() {
   integer: s32;
 
-  passed := false;
+  mut passed := false;
   switch integer {
     0: { passed = true; }
     1: { assert("Switch on s32 case failed", false);  }
@@ -269,7 +269,7 @@ switch_helper :: fn() -> s32 {
 
 #test test_iterate_iter :: fn() {
   list: s32[] = s32[]::init(.[0,1,2,3,4,5,6,7,8,9,10]);
-  idx := 0;
+  mut idx := 0;
   for v in list.iter() {
     assert("list.iter() for loop failed", v == idx);
     idx++;
@@ -283,7 +283,7 @@ switch_helper :: fn() -> s32 {
 
 #test test_iterate_enumerator :: fn() {
   range := 0..10;
-  idx := 0;
+  mut idx := 0;
   for v in range.enumerator() {
     assert("range.enumerator() for loop failed", v == idx);
     idx++;

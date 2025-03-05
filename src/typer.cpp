@@ -153,13 +153,13 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->members) {
       field.type->accept(this);
-      node->scope->insert_variable(field.name, field.type->resolved_type, nullptr);
+      node->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
     }
   }
 
   for (auto decl : node->members) {
     decl.type->accept(this);
-    ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr);
+    ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr, MUT);
   }
 
   ctx.set_scope(old_scope);
@@ -262,7 +262,7 @@ void Typer::visit(ASTLambda *node) {
   for (const auto &param : node->params->params) {
     info.parameter_types[parameter_index] = param->resolved_type;
     info.params_len++;
-    node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr);
+    node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr, param->mutability);
     parameter_index++;
   }
 
@@ -307,7 +307,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   for (const auto &param : node->params->params) {
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
-      ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr);
+      ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability);
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
       auto type = get_self_type();
@@ -316,9 +316,9 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
       }
 
       if (param->tag == ASTParamDecl::Себя) {
-        ctx.scope->insert_variable("себя", type, nullptr);
+        ctx.scope->insert_variable("себя", type, nullptr, param->mutability);
       } else {
-        ctx.scope->insert_variable("self", type, nullptr);
+        ctx.scope->insert_variable("self", type, nullptr, param->mutability);
       }
       info.parameter_types[info.params_len] = type;
     }
@@ -525,7 +525,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
   for (const auto &[key, value] : node->key_values) {
     value->accept(this);
     auto node_ty = value->resolved_type;
-    info->scope->insert_variable(key, node_ty, value);
+    info->scope->insert_variable(key, node_ty, value, CONST);
     if (elem_type == Type::INVALID_TYPE_ID) {
       elem_type = node_ty;
     } else {
@@ -633,7 +633,7 @@ void Typer::visit(ASTVariable *node) {
   // }
 
   auto variable_type = node->type->resolved_type;
-  ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node);
+  ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node->mutability, node);
   auto type = global_get_type(variable_type);
 
   if (variable_type == void_type()) {
@@ -749,9 +749,7 @@ void Typer::visit(ASTBreak *node) { node->control_flow = ControlFlow{BLOCK_FLAGS
 void Typer::compiler_mock_associated_function_call_visit_impl(int left_type, const InternedString &method_name) {
   auto old_call_state = in_call;
   in_call = true;
-  Defer _([&]{
-    in_call = old_call_state;
-  });
+  Defer _([&] { in_call = old_call_state; });
   ASTCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -771,9 +769,7 @@ void Typer::compiler_mock_associated_function_call_visit_impl(int left_type, con
 void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedString &method_name) {
   auto old_call_state = in_call;
   in_call = true;
-  Defer _([&]{
-    in_call = old_call_state;
-  });
+  Defer _([&] { in_call = old_call_state; });
   ASTCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
@@ -783,7 +779,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   static int depth = 0;
 
   left.value = "$$temp$$" + std::to_string(depth++);
-  ctx.scope->insert_variable(left.value, left_type, nullptr);
+  ctx.scope->insert_variable(left.value, left_type, nullptr, MUT);
 
   Defer erase_temp_symbol([&] {
     depth--;
@@ -920,7 +916,7 @@ void Typer::visit(ASTFor *node) {
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     auto iden = node->left.identifier;
-    ctx.scope->insert_variable(iden->value, iter_ty, iden);
+    ctx.scope->insert_variable(iden->value, iter_ty, iden, MUT);
     node->left.identifier->accept(this);
   } else {
     auto type = global_get_type(iter_ty);
@@ -940,9 +936,9 @@ void Typer::visit(ASTFor *node) {
         auto type = info->types[i];
         auto iden = node->left.destructure[i].identifier;
         if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
+          ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden, MUT);
         } else {
-          ctx.scope->insert_variable(iden->value, type, iden);
+          ctx.scope->insert_variable(iden->value, type, iden, MUT);
         }
       }
     } else {
@@ -960,9 +956,9 @@ void Typer::visit(ASTFor *node) {
         }
         auto iden = node->left.destructure[i].identifier;
         if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(iden->value, global_get_type(symbol.type_id)->take_pointer_to(), iden);
+          ctx.scope->insert_variable(iden->value, global_get_type(symbol.type_id)->take_pointer_to(), iden, MUT);
         } else {
-          ctx.scope->insert_variable(iden->value, symbol.type_id, iden);
+          ctx.scope->insert_variable(iden->value, symbol.type_id, iden, MUT);
         }
         i++;
       }
@@ -1032,8 +1028,6 @@ void Typer::visit(ASTWhile *node) {
 }
 
 void Typer::visit(ASTCall *node) {
-
-
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
   // Try to find the function via a dot expression, scope resolution, identifier, etc.
@@ -1497,7 +1491,17 @@ void Typer::visit(ASTBinExpr *node) {
 
   if (node->op.type == TType::Assign) {
     if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
-      ctx.scope->insert_variable(((ASTIdentifier *)node->left)->value, node->left->resolved_type, node->right);
+      auto name = ((ASTIdentifier *)node->left)->value;
+      if (auto symbol = ctx.scope->lookup(name)) {
+        if (symbol->mutability == CONST) {
+          throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
+                      node->source_range);
+        }
+      } else {
+        throw_error("can't assign a non-existent variable (TODO verify this error is correct)", node->source_range);
+      }
+      // we assume this is mutable since we made it past that?
+      ctx.scope->insert_variable(name, node->left->resolved_type, node->right, MUT);
     }
   }
 
@@ -2097,30 +2101,37 @@ void Typer::visit(ASTTupleDeconstruction *node) {
 
   if (type->is_kind(TYPE_TUPLE)) {
     auto info = (type->get_info()->as<TupleTypeInfo>());
-    if (node->identifiers.size() != info->types.size()) {
+    if (node->elements.size() != info->types.size()) {
       throw_error(std::format("Cannot currently partially deconstruct a tuple. "
                               "expected {} identifiers to assign, got {}",
-                              info->types.size(), node->identifiers.size()),
+                              info->types.size(), node->elements.size()),
                   node->source_range);
     }
 
-    for (int i = 0; i < node->identifiers.size(); ++i) {
+    for (int i = 0; i < node->elements.size(); ++i) {
       auto type = info->types[i];
-      auto iden = node->identifiers[i].identifier;
-      if (node->identifiers[i].semantic == VALUE_SEMANTIC_POINTER) {
-        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden);
+      auto iden = node->elements[i].identifier;
+      if (node->elements[i].semantic == VALUE_SEMANTIC_POINTER) {
+        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden,
+                                   node->elements[i].mutability);
       } else {
-        ctx.scope->insert_variable(iden->value, type, iden);
+        ctx.scope->insert_variable(iden->value, type, iden, node->elements[i].mutability);
       }
     }
   } else {
     auto scope = type->get_info()->scope;
     for (const auto &[name, symbol] : scope->symbols) {
+      if (symbol.mutability == CONST) {
+         throw_error(
+            "cannot assign a constant variable, consider adding 'mut' to the parameter or variable declaration",
+            node->source_range);
+      }
+
       if (symbol.is_function()) {
         continue;
       }
       if (symbol.is_variable()) {
-        ctx.scope->insert_variable(name, symbol.type_id, symbol.variable.initial_value.get());
+        ctx.scope->insert_variable(name, symbol.type_id, symbol.variable.initial_value.get(), symbol.mutability);
       }
     }
   }

@@ -1110,14 +1110,13 @@ ASTStatement *Parser::parse_statement() {
 
     expect(TType::Semi);
 
-
     auto symbol = ctx.scope->lookup(module_name);
 
     // Import a module that's been defined by a 'module ... {}' statement.
     // this is somewhat problematic because these arent really yet.
     if (symbol && symbol->is_module()) {
       printf("importing existing module %s\n", module_name.get_str().c_str());
-      import->scope = ((ASTModule*)symbol->module.declaration)->scope;
+      import->scope = ((ASTModule *)symbol->module.declaration)->scope;
       return import;
     }
 
@@ -1176,10 +1175,17 @@ ASTStatement *Parser::parse_statement() {
     return alias;
   }
 
-  // * Tuple destructure.
-  if ((tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
-      (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
-       lookahead_buf()[2].type == TType::Comma)) {
+  bool is_const_multiple_assign = (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
+                                  (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
+                                   lookahead_buf()[2].type == TType::Comma);
+
+  bool is_mut_multiple_assign =
+      (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
+       lookahead_buf()[2].type == TType::Comma) ||
+      (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul &&
+       lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
+
+  if (is_const_multiple_assign || is_mut_multiple_assign) {
     return parse_multiple_asssignment();
   }
 
@@ -1189,10 +1195,14 @@ ASTStatement *Parser::parse_statement() {
   // * 'const_n :: 10;' (remove me from here)
   // TODO: this condition seems excessively complicated.
 
-  bool is_colon_or_colon_equals =
-      lookahead_buf()[1].type == TType::Colon || lookahead_buf()[1].type == TType::ColonEquals;
+  bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
+                                                                    lookahead_buf()[1].type == TType::ColonEquals);
 
-  if (tok.type == TType::Identifier && is_colon_or_colon_equals) {
+  bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
+                         lookahead_buf()[2].type == TType::Colon ||
+                     lookahead_buf()[2].type == TType::ColonEquals;
+
+  if (is_mut_decl || is_colon_or_colon_equals) {
     auto decl = parse_variable();
     return decl;
   }
@@ -1377,23 +1387,22 @@ ASTStatement *Parser::parse_statement() {
       return enum_decl;
     }
 
+    // CT constant.
     NODE_ALLOC(ASTVariable, decl, range, _, this);
     decl->name = tok.value;
     decl->value = parse_expr();
     decl->is_constexpr = true;
-
     if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
                   "that name,",
                   range);
     }
-
     end_node(decl, range);
     if (ctx.scope->local_lookup(tok.value)) {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
-    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get(), decl);
+    ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get(), CONST, decl);
     return decl;
   }
 
@@ -1478,18 +1487,31 @@ ASTStatement *Parser::parse_statement() {
 ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
 
-  Destructure destruct;
-  if (peek().type == TType::Mul) {
-    destruct.semantic = VALUE_SEMANTIC_POINTER;
-    eat();
-  } else {
-    destruct.semantic = VALUE_SEMANTIC_COPY;
-  }
+  auto parse_destructure = [this]() -> Destructure {
+    Destructure destruct;
+    destruct.mutability = CONST;
+
+    if (peek().type == TType::Mut) {
+      destruct.mutability = MUT;
+      eat();
+    }
+
+    if (peek().type == TType::Mul) {
+      destruct.semantic = VALUE_SEMANTIC_POINTER;
+      eat();
+    } else {
+      destruct.semantic = VALUE_SEMANTIC_COPY;
+    }
+
+    return destruct;
+  };
+
+  auto destruct = parse_destructure();
   auto first = parse_primary();
 
   if (auto iden = dynamic_cast<ASTIdentifier *>(first)) {
     destruct.identifier = iden;
-    node->identifiers.push_back(destruct);
+    node->elements.push_back(destruct);
   } else {
     end_node(nullptr, range);
     throw_error("Can only have identifiers on the left hand side of a tuple deconstruction expressions", range);
@@ -1498,18 +1520,12 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   while (peek().type == TType::Comma) {
     eat();
 
-    Destructure destruct;
-    if (peek().type == TType::Mul) {
-      destruct.semantic = VALUE_SEMANTIC_POINTER;
-      eat();
-    } else {
-      destruct.semantic = VALUE_SEMANTIC_COPY;
-    }
+    auto destruct = parse_destructure();
     auto expr = parse_primary();
 
     if (auto iden = dynamic_cast<ASTIdentifier *>(expr)) {
       destruct.identifier = iden;
-      node->identifiers.push_back(destruct);
+      node->elements.push_back(destruct);
     } else {
       end_node(nullptr, range);
       throw_error("Can only have identifiers on the left hand side of a tuple deconstruction expressions", range);
@@ -1527,19 +1543,19 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
   end_node(node, range);
 
-  for (const auto &destruct : node->identifiers) {
+  for (const auto &destruct : node->elements) {
     auto symbol = ctx.scope->local_lookup(destruct.identifier->value);
     if (node->op == TType::ColonEquals) {
       if (symbol)
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
+      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
     } else {
       // TODO: reimplement this error in a sane way.
       // if (!symbol) throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers
       // already exist", node->source_range);
-      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr);
+      ctx.scope->insert_variable(destruct.identifier->value, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
     }
   }
 
@@ -1548,6 +1564,10 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
 ASTVariable *Parser::parse_variable() {
   NODE_ALLOC(ASTVariable, decl, range, _, this);
+  if (peek().type == TType::Mut) {
+    eat();
+    decl->mutability = MUT;
+  }
   auto iden = eat();
   decl->name = iden.value;
 
@@ -1593,7 +1613,8 @@ ASTBlock *Parser::parse_block(Scope *scope) {
     block->statements = {$return};
     block->scope = ctx.exit_scope(); // we do this, even though it owns no scope, because it would get created later
                                      // anyway when entering it.
-    if (peek().type == TType::Semi) eat();
+    if (peek().type == TType::Semi)
+      eat();
     return block;
   }
 
@@ -1650,6 +1671,12 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       continue;
     }
 
+    Mutability mutability = CONST;
+
+    if (peek().type == TType::Mut) {
+      mutability = MUT;
+    }
+
     auto name = expect(TType::Identifier).value;
 
     if (name == "self" || name == "себя") {
@@ -1684,6 +1711,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     param->tag = ASTParamDecl::Normal;
     param->normal.type = type;
+    param->mutability = mutability;
     param->normal.name = name;
 
     if (peek().type == TType::Assign) {

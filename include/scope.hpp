@@ -25,10 +25,17 @@ struct ASTTaggedUnionDeclaration;
 struct ASTEnumDeclaration;
 struct ASTModule;
 
+enum Mutability {
+  CONST,
+  MUT,
+};
+
 struct Symbol {
   InternedString name;
   int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
+
+  Mutability mutability = CONST;
 
   bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
   bool is_variable() const { return (flags & SYMBOL_IS_VARIABLE) != 0; }
@@ -61,13 +68,14 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode* decl) {
+  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode* decl, Mutability mutability) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
     symbol.flags = SYMBOL_IS_VARIABLE;
     symbol.variable.initial_value = initial_value;
     symbol.variable.declaration = decl;
+    symbol.mutability = mutability;
     return symbol;
   }
 
@@ -134,8 +142,8 @@ struct Scope {
     return fields;
   }
 
-  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode* decl = nullptr) {
-    symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value, decl));
+  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, Mutability mutability, ASTNode* decl = nullptr) {
+    symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value, decl, mutability));
   }
 
   void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {

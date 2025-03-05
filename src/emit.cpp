@@ -1161,8 +1161,8 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     }
     emit_line_directive(node);
     if (node->op == TType::ColonEquals) {
-      for (size_t i = 0; i < node->identifiers.size(); ++i) {
-        auto &destruct = node->identifiers[i];
+      for (size_t i = 0; i < node->elements.size(); ++i) {
+        auto &destruct = node->elements[i];
         (*ss) << "auto " << destruct.identifier->value.get_str() << " = ";
         if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
           (*ss) << "&" << temp_id << "->$" << std::to_string(i) << ";\n";
@@ -1171,8 +1171,8 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
         }
       }
     } else {
-      for (size_t i = 0; i < node->identifiers.size(); ++i) {
-        auto &destruct = node->identifiers[i];
+      for (size_t i = 0; i < node->elements.size(); ++i) {
+        auto &destruct = node->elements[i];
         (*ss) << destruct.identifier->value.get_str() << " = ";
         if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
           (*ss) << "&" << temp_id << "->$" << std::to_string(i) << ";\n";
@@ -1197,10 +1197,10 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
         continue;
       }
       if (node->op == TType::ColonEquals) {
-        (*ss) << "auto " << node->identifiers[index++].identifier->value.get_str() << " = ";
+        (*ss) << "auto " << node->elements[index++].identifier->value.get_str() << " = ";
         (*ss) << identifier << "." << name.get_str() << ";\n";
       } else {
-        (*ss) << node->identifiers[index++].identifier->value.get_str() << " = ";
+        (*ss) << node->elements[index++].identifier->value.get_str() << " = ";
         (*ss) << identifier << "." << name.get_str() << ";\n";
       }
     }

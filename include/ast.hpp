@@ -126,7 +126,6 @@ struct ASTNode {
   }
 };
 
-
 enum AttributeTag {
   // @inline / @[inline]                   : inlined function
   ATTRIBUTE_INLINE,
@@ -297,6 +296,7 @@ struct ASTExprStatement : ASTStatement {
 struct ASTVariable : ASTStatement {
   InternedString name;
   InternedString bitsize;
+  Mutability mutability = CONST;
 
   bool is_extern = false;
 
@@ -359,10 +359,11 @@ enum ValueSemantic {
 struct Destructure {
   ValueSemantic semantic;
   ASTIdentifier *identifier;
+  Mutability mutability;
 };
 
 struct ASTTupleDeconstruction : ASTStatement {
-  std::vector<Destructure> identifiers;
+  std::vector<Destructure> elements;
   ASTExpr *right;
   TType op;
   void accept(VisitorBase *visitor) override;
@@ -381,6 +382,7 @@ struct ASTParamDecl : ASTNode {
     Self,
     Себя,
   } tag;
+  Mutability mutability;
   union {
     struct {
       ASTType *type;

@@ -2,7 +2,7 @@
 ; 
 
 #test test_malloc :: fn() {
-  ptr: s32* = malloc(4);
+  mut ptr: s32* = malloc(4);
   assert("malloc'd pointer was null", ptr != null);
   free(ptr);
   ptr = null;
