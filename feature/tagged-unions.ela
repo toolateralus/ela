@@ -45,7 +45,7 @@ c: {
 }
 
 impl AST {
-  add :: fn(self*, right: AST*) -> AST* {
+  add :: fn(*mut self, right: AST*) -> AST* {
     return null;
   }
 }

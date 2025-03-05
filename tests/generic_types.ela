@@ -4,7 +4,7 @@ GenericStruct :: struct!<T> {
 }
 
 impl!<T> GenericStruct!<T> {
-  add :: fn(self*) -> T {
+  add :: fn(*mut self) -> T {
     return self.a + self.b;
   }
 }

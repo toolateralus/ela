@@ -9,13 +9,13 @@ Struct :: struct {
   // abstract interface.
   // each method has to be implemented or compiler errors.
   Format :: interface![T] {
-    to_string :: fn(self*) -> u8*;
+    to_string :: fn(*mut self) -> u8*;
     parse     :: fn(input: str) -> #self;
   }
 
   // impl generic Format interface for Struct.
   impl Format![Struct] for Struct {
-    to_string :: fn(self*)         -> str {
+    to_string :: fn(*mut self)         -> str {
       return $"Struct {{x: {self.x}, y: {self.y}}}";
     }
     parse     :: fn(input: str) -> #self {
@@ -28,10 +28,10 @@ Struct :: struct {
 } else if AUTO_INTERFACE {
   // non-abstract interface, can be partially or completely automatically implemented.
   Format :: interface![T] {
-    to_string :: fn(self*) -> u8* {
+    to_string :: fn(*mut self) -> u8* {
       return $"{*self}";              // omitted for simplicity.
     }
-    parse     :: fn(self*) -> #self {
+    parse     :: fn(*mut self) -> #self {
       return std::parse![T](self);    // again, omitted for simplicity.
     }
   }
@@ -53,14 +53,14 @@ Struct :: struct {
 // #### ################################# ###
 
 Speak :: interface {
-  greet :: fn(self*);
+  greet :: fn(*mut self);
 }
 
 Dog :: struct {}
 Cat :: struct {}
 
 impl Speak for Dog {
-  greet :: fn(self*) {
+  greet :: fn(*mut self) {
     println("woof");
   }
 }
@@ -71,7 +71,7 @@ dyn Speak {
 }
 
 impl Speak for Cat {
-  greet :: fn(self*) {
+  greet :: fn(*mut self) {
     println("meow");
   }
 }
@@ -131,7 +131,7 @@ From :: interface![From, To] {
 }
 
 Copy :: interface![T] {
-  copy :: fn(self*) -> T;
+  copy :: fn(*mut self) -> T;
 }
 
 Arithmetic :: interface![Left, Right, Result] {
@@ -143,9 +143,9 @@ Arithmetic :: interface![Left, Right, Result] {
 }
 
 Iter :: interface![T] {
-  reset :: fn(self*);
-  current :: fn(self*) -> T::value_type;
-  next :: fn(self*) -> (bool, T::value_type);
+  reset :: fn(*mut self);
+  current :: fn(*mut self) -> T::value_type;
+  next :: fn(*mut self) -> (bool, T::value_type);
 }
 
 RangeIterator :: struct {
@@ -156,13 +156,13 @@ RangeIterator :: struct {
 }
 
 impl Iter![RangeIterator] for RangeIterator {
-  reset :: fn(self*){
+  reset :: fn(*mut self){
     self.value = self.min;
   }
-  current :: fn(self*) -> s32 {
+  current :: fn(*mut self) -> s32 {
     return self.value;
   }
-  next :: fn(self*) -> (bool, s32) {
+  next :: fn(*mut self) -> (bool, s32) {
     self.current++;
     return (self.current >= self.max, self.current);
   }

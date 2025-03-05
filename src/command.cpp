@@ -1,5 +1,6 @@
 #include "core.hpp"
 #include "strings.hpp"
+#include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
 #include <filesystem>
@@ -40,7 +41,8 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor) {
 
   if (!is_freestanding) {
     emit.code << "typedef struct Type Type;\n";
-    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
+    type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
     emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
                         type_ptr_id);
   }

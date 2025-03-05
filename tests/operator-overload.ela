@@ -4,11 +4,11 @@ Vec2 :: struct {
 }
 
 Add :: interface!<Right, Result> {
-  add :: fn(self*, right: Right) -> Result;
+  add :: fn(*mut self, right: Right) -> Result;
 }
 
 impl Add!<Vec2, Vec2> for Vec2 {
-  add :: fn(self*, right: Vec2) -> Vec2 {
+  add :: fn(*mut self, right: Vec2) -> Vec2 {
     return .{
       x: self.x + right.x,
       y: self.y + right.y
@@ -24,11 +24,11 @@ impl Add!<Vec2, Vec2> for Vec2 {
 }
 
 Sub :: interface!<Right, Result> {
-  sub :: fn(self*, right: Right) -> Result;
+  sub :: fn(*mut self, right: Right) -> Result;
 }
 
 impl Sub!<Vec2, Vec2> for Vec2 {
-  sub :: fn(self*, right: Vec2) -> Vec2 {
+  sub :: fn(*mut self, right: Vec2) -> Vec2 {
     return .{
       x: self.x - right.x,
       y: self.y - right.y
@@ -36,11 +36,11 @@ impl Sub!<Vec2, Vec2> for Vec2 {
   }
 }
 
-Neg :: interface!<Result> {  neg :: fn(self*) -> Result;
+Neg :: interface!<Result> {  neg :: fn(*mut self) -> Result;
 }
 
 impl Neg!<Vec2> for Vec2 {
-  neg :: fn(self*) -> Vec2 {
+  neg :: fn(*mut self) -> Vec2 {
     return .{
       x: -self.x,
       y: -self.y
@@ -49,7 +49,7 @@ impl Neg!<Vec2> for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(self*, index: s32) -> f32* {
+  subscript :: fn(*mut self, index: s32) -> f32* {
     if index == 0 {
       return &self.x;
     } else {

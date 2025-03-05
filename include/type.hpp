@@ -61,7 +61,8 @@ enum TypeKind {
 
 enum TypeExtEnum {
   TYPE_EXT_INVALID,
-  TYPE_EXT_POINTER,
+  TYPE_EXT_POINTER_CONST,
+  TYPE_EXT_POINTER_MUT,
   TYPE_EXT_ARRAY,
 };
 
@@ -114,7 +115,7 @@ struct TypeExtensions {
 
   inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
 
-  inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER; }
+  inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT; }
 
   inline bool operator==(const TypeExtensions &other) const { return equals(other); }
 
@@ -213,7 +214,6 @@ struct TupleTypeInfo : TypeInfo {
 };
 
 // helpers to get scalar types for fast comparison
-int voidptr_type();
 int bool_type();
 int void_type();
 int s8_type();
@@ -306,7 +306,7 @@ public:
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
   int get_element_type() const;
-  int take_pointer_to() const;
+  int take_pointer_to(bool) const;
 
   constexpr static int UNRESOLVED_GENERIC_TYPE_ID = -2;
   constexpr static int INVALID_TYPE_ID = -1;

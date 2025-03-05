@@ -13,13 +13,13 @@ impl!<Value_Type> Enumerator!<(u32, Value_Type)> for Test_Enumerator!<u32, Value
   done :: fn(self) -> bool {
     return self.index >= self.slice.length;
   }
-  next :: fn(self*) -> void { 
+  next :: fn(*mut self) -> void { 
     self.index++;
   }
 }
 
 impl!<Value_Type> Value_Type[] {
-  failure :: fn(self*) -> Test_Enumerator!<u32, Value_Type> {
+  failure :: fn(*mut self) -> Test_Enumerator!<u32, Value_Type> {
     return .{
       index: 0,
       slice: .{

@@ -8,7 +8,7 @@ void DependencyEmitter::decl_type(int type_id) {
   auto type = global_get_type(type_id);
   auto extensions = type->get_ext().extensions;
   for (auto ext : extensions) {
-    if (ext.type == TYPE_EXT_POINTER) {
+    if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter->forward_decl_type(type);
       return;
     }

@@ -269,7 +269,7 @@ void Typer::visit(ASTLambda *node) {
   node->block->accept(this);
   info.return_type = node->return_type->resolved_type;
   auto type = global_find_function_type_id(info, {});
-  node->resolved_type = global_get_type(type)->take_pointer_to();
+  node->resolved_type = global_get_type(type)->take_pointer_to(MUT);
 
   // w????
   // std::cout << global_get_type(node->resolved_type)->to_string() << '\n';
@@ -312,7 +312,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     } else {
       auto type = get_self_type();
       if (param->self.is_pointer) {
-        type = global_get_type(type)->take_pointer_to();
+        type = global_get_type(type)->take_pointer_to(param->mutability);
       }
 
       if (param->tag == ASTParamDecl::Себя) {
@@ -696,7 +696,7 @@ void Typer::visit(ASTParamDecl *node) {
     }
     node->resolved_type = get_self_type();
     if (node->self.is_pointer) {
-      node->resolved_type = global_get_type(node->resolved_type)->take_pointer_to();
+      node->resolved_type = global_get_type(node->resolved_type)->take_pointer_to(node->mutability);
     }
     return;
   } else {
@@ -720,7 +720,7 @@ void Typer::visit(ASTParamDecl *node) {
       // for s8[] to s8*
       {
         auto element = type->get_element_type();
-        node->resolved_type = global_get_type(element)->take_pointer_to();
+        node->resolved_type = global_get_type(element)->take_pointer_to(CONST);
       }
     }
 
@@ -803,7 +803,7 @@ void Typer::visit(ASTFor *node) {
   Type *range_type = global_get_type(range_type_id);
   node->range_type = range_type->id;
 
-  if (range_type->get_ext().has_extensions() && range_type->get_ext().extensions.back().type == TYPE_EXT_POINTER) {
+  if (range_type->get_ext().is_pointer()) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
                             "pointer to an array, range or struct? got type {}",
                             range_type->to_string()),
@@ -880,7 +880,7 @@ void Typer::visit(ASTFor *node) {
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
     compiler_mock_method_call_visit_impl(range_type_id, "current");
-    iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to();
+    iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to(MUT);
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
                 "'Enumerable' interface. "
@@ -936,7 +936,8 @@ void Typer::visit(ASTFor *node) {
         auto type = info->types[i];
         auto iden = node->left.destructure[i].identifier;
         if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden, MUT);
+          ctx.scope->insert_variable(
+              iden->value, global_get_type(type)->take_pointer_to(node->left.destructure[i].mutability), iden, MUT);
         } else {
           ctx.scope->insert_variable(iden->value, type, iden, MUT);
         }
@@ -956,7 +957,9 @@ void Typer::visit(ASTFor *node) {
         }
         auto iden = node->left.destructure[i].identifier;
         if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(iden->value, global_get_type(symbol.type_id)->take_pointer_to(), iden, MUT);
+          ctx.scope->insert_variable(
+              iden->value, global_get_type(symbol.type_id)->take_pointer_to(node->left.destructure[i].mutability), iden,
+              MUT);
         } else {
           ctx.scope->insert_variable(iden->value, symbol.type_id, iden, MUT);
         }
@@ -1237,7 +1240,9 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
           auto extensions = parameters[i + start_index]->normal.type->extensions;
 
           int pointer_levels = 0;
-          while (!extensions.empty() && extensions.back().type == TYPE_EXT_POINTER) {
+
+          while (!extensions.empty() &&
+                 (extensions.back().type == TYPE_EXT_POINTER_CONST || extensions.back().type == TYPE_EXT_POINTER_MUT)) {
             pointer_levels++;
             extensions.pop_back();
           }
@@ -1371,7 +1376,7 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
 }
 
 void Typer::visit(ASTType_Of *node) {
-  static auto type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER}}});
+  static auto type_ptr = ctx.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
   node->target->accept(this);
   node->resolved_type = type_ptr;
 }
@@ -1557,7 +1562,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 
   // Address-Of.
   if (node->op.type == TType::And) {
-    node->resolved_type = global_get_type(operand_ty)->take_pointer_to();
+    node->resolved_type = global_get_type(operand_ty)->take_pointer_to(node->mutability);
     return;
   }
 
@@ -1640,8 +1645,7 @@ void Typer::visit(ASTLiteral *node) {
       return;
     case ASTLiteral::String: {
       if (node->is_c_string) {
-        static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}});
-        ;
+        static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
         node->resolved_type = type;
       } else {
         static size_t uid_idx = 0;
@@ -1659,7 +1663,7 @@ void Typer::visit(ASTLiteral *node) {
         node->resolved_type = expected_type;
         return;
       }
-      node->resolved_type = voidptr_type();
+      node->resolved_type = ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}});
       return;
     case ASTLiteral::Char:
       node->resolved_type = u32_type();
@@ -2112,7 +2116,7 @@ void Typer::visit(ASTTupleDeconstruction *node) {
       auto type = info->types[i];
       auto iden = node->elements[i].identifier;
       if (node->elements[i].semantic == VALUE_SEMANTIC_POINTER) {
-        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(), iden,
+        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(node->elements[i].mutability), iden,
                                    node->elements[i].mutability);
       } else {
         ctx.scope->insert_variable(iden->value, type, iden, node->elements[i].mutability);
@@ -2122,9 +2126,8 @@ void Typer::visit(ASTTupleDeconstruction *node) {
     auto scope = type->get_info()->scope;
     for (const auto &[name, symbol] : scope->symbols) {
       if (symbol.mutability == CONST) {
-         throw_error(
-            "cannot assign a constant variable, consider adding 'mut' to the parameter or variable declaration",
-            node->source_range);
+        throw_error("cannot assign a constant variable, consider adding 'mut' to the parameter or variable declaration",
+                    node->source_range);
       }
 
       if (symbol.is_function()) {

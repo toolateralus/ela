@@ -985,9 +985,11 @@ void Emitter::visit(ASTDotExpr *node) {
   auto base_ty_id = node->base->resolved_type;
   auto base_ty = global_get_type(base_ty_id);
   auto op = ".";
-  if (base_ty->get_ext().back_type() == TYPE_EXT_POINTER) {
+
+  if (base_ty->get_ext().is_pointer()) {
     op = "->";
   }
+
   node->base->accept(this);
   (*ss) << op;
   if (base_ty->is_kind(TYPE_TUPLE)) {
@@ -1222,7 +1224,7 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
   std::string identifier = name;
 
   for (const auto &ext : type->get_ext().extensions) {
-    if (ext.type == TYPE_EXT_POINTER) {
+    if (ext.type == TYPE_EXT_POINTER_MUT || ext.type == TYPE_EXT_POINTER_CONST) {
       base_type_str += "*";
     } else if (ext.type == TYPE_EXT_ARRAY) {
       identifier += "[" + std::to_string(ext.array_size) + "]";
@@ -1247,7 +1249,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   int pointer_depth = 0;
   TypeExtensions other_extensions;
   for (auto ext : type->get_ext().extensions) {
-    if (ext.type == TYPE_EXT_POINTER)
+    if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT)
       pointer_depth++;
     else
       other_extensions.extensions.push_back(ext);
@@ -1355,12 +1357,6 @@ std::string Emitter::get_elements_function(Type *type) {
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
-  // TODO: refactor this for new String/str types?
-  // And C string.
-  // For now we'll just say it's u8* only.
-  if (type->id == global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER}}})) {
-    return std::format(".flags = {}\n", TYPE_FLAGS_STRING);
-  }
   switch (type->kind) {
     case TYPE_SCALAR: {
       auto sint = type->id == s32_type() || type->id == s8_type() || type->id == s16_type() || type->id == s32_type() ||
@@ -1409,7 +1405,9 @@ std::string get_type_flags(Type *type) {
   }
   for (const auto &ext : type->get_ext().extensions) {
     switch (ext.type) {
-      case TYPE_EXT_POINTER:
+      // TODO: add specific type flags for mut / const pointers?
+      case TYPE_EXT_POINTER_MUT:
+      case TYPE_EXT_POINTER_CONST:
         kind_flags |= TYPE_FLAGS_POINTER;
         break;
       case TYPE_EXT_ARRAY:
@@ -1565,7 +1563,7 @@ std::string Emitter::to_cpp_string(const TypeExtensions &extensions, const std::
   for (const auto ext : extensions.extensions) {
     if (ext.type == TYPE_EXT_ARRAY) {
       ss << "[" << std::to_string(ext.array_size) << "]";
-    } else if (ext.type == TYPE_EXT_POINTER) {
+    } else if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       ss << "*";
     }
   }
@@ -1759,13 +1757,11 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     if (returns->is_kind(TYPE_FUNCTION)) {
       auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
 
-
       // we take fixed array extensions as pointer here because it's invalid and would get casted off anyway.
       auto depth = returns->get_ext().extensions.size();
       auto extensions = std::string(depth, '*');
 
-      (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "("
-            << extensions << name;
+      (*ss) << to_cpp_string(global_get_type(return_function_type->return_type)) << "(" << extensions << name;
       node->params->accept(this);
       (*ss) << ")";
     } else {

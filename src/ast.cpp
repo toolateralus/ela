@@ -317,6 +317,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
+        parser->parse_pointer_extensions(type);
         type->kind = ASTType::SELF;
         parser->append_type_extensions(type);
         return type;
@@ -326,6 +327,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
+        parser->parse_pointer_extensions(type);
         type->kind = ASTType::SELF;
         parser->append_type_extensions(type);
         return type;
@@ -499,17 +501,19 @@ ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
 
   // put bootstrap on root scope
-  import("bootstrap", &ctx.root_scope);
+  if (true) {
+    import("bootstrap", &ctx.root_scope);
 
-  while (peek().type != TType::Eof) {
-    program->statements.push_back(parse_statement());
+    while (peek().type != TType::Eof) {
+      program->statements.push_back(parse_statement());
+    }
+    expect(TType::Eof);
+    states.pop_back();
+    std::filesystem::current_path(states.back().path.parent_path());
   }
-  expect(TType::Eof);
 
   program->end_of_bootstrap_index = program->statements.size();
 
-  states.pop_back();
-  std::filesystem::current_path(states.back().path.parent_path());
 
   // put the rest on the program scope
   ctx.set_scope();
@@ -640,6 +644,22 @@ ASTExpr *Parser::parse_unary() {
       peek().type == TType::Mul || peek().type == TType::And || peek().type == TType::Not) {
     NODE_ALLOC(ASTUnaryExpr, unaryexpr, range, _, this)
     auto op = eat();
+
+    Mutability mutability;
+    if (op.type == TType::And) {
+      if (peek().type == TType::Mut) {
+        mutability = MUT;
+        eat();
+      } else if (peek().type == TType::Const) {
+        mutability = CONST;
+        eat();
+      } else {
+        end_node(unaryexpr, range);
+        throw_error("taking an address-of a variable requires '&mut/&const' to determine the mutability of the pointer",
+                    unaryexpr->source_range);
+      }
+    }
+
     auto expr = parse_unary();
 
     // TODO: make a more comprehensive rvalue evaluator.
@@ -655,6 +675,8 @@ ASTExpr *Parser::parse_unary() {
                   "statement completed executing",
                   range);
     }
+
+    unaryexpr->mutability = mutability;
     unaryexpr->op = op;
     unaryexpr->operand = expr;
     end_node(unaryexpr, range);
@@ -980,8 +1002,14 @@ ASTExpr *Parser::parse_primary() {
 }
 
 ASTType *Parser::parse_type() {
+  if (peek().type == TType::Fn) {
+    return parse_function_type();
+  }
+
+  NODE_ALLOC(ASTType, node, range, _, this)
+  parse_pointer_extensions(node);
+
   if (peek().type == TType::LParen) {
-    NODE_ALLOC(ASTType, node, range, _, this)
     node->resolved_type = Type::INVALID_TYPE_ID;
     node->kind = ASTType::TUPLE;
     eat();
@@ -991,7 +1019,6 @@ ASTType *Parser::parse_type() {
         eat();
     }
     expect(TType::RParen);
-    // grab up more extensions if they exist.
     append_type_extensions(node);
     return node;
   }
@@ -1006,14 +1033,10 @@ ASTType *Parser::parse_type() {
                   range);
     }
     auto type = static_cast<ASTType *>(expr);
+    type->extensions.insert(type->extensions.begin(), node->extensions.begin(), node->extensions.end());
     return type;
   }
 
-  if (peek().type == TType::Fn) {
-    return parse_function_type();
-  }
-
-  NODE_ALLOC(ASTType, node, range, _, this)
   auto base = eat().value;
   node->kind = ASTType::NORMAL;
   node->normal.base = new (ast_alloc<ASTIdentifier>()) ASTIdentifier(base);
@@ -1023,9 +1046,9 @@ ASTType *Parser::parse_type() {
     node->normal.generic_arguments = parse_generic_arguments();
   }
 
+  // Todo: do we need this?
   if (peek().type == TType::DoubleColon && lookahead_buf()[1].type == TType::Identifier &&
       lookahead_buf()[2].type == TType::LParen) {
-    // this is a function call to a static, single depth function.
     return node;
   }
 
@@ -1649,15 +1672,15 @@ ASTBlock *Parser::parse_block(Scope *scope) {
 ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_params) {
   NODE_ALLOC(ASTParamsDecl, params, range, defer, this);
   expect(TType::LParen);
-  ASTType *type = nullptr;
+
   while (peek().type != TType::RParen) {
     NODE_ALLOC(ASTParamDecl, param, range, _, this)
     if (params->is_varargs) {
       end_node(nullptr, range);
       throw_error("var args \"...\" must be the last parameter", range);
     }
-    auto subrange = begin_node();
 
+    auto subrange = begin_node();
     if (peek().type == TType::Varargs) {
       eat();
       if (!current_func_decl) {
@@ -1670,47 +1693,61 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
       continue;
     }
 
-    Mutability mutability = CONST;
+    auto next = peek();
+    // parse self parameters.
+    if (next.type == TType::Mul || next.value == "self" || next.value == "себя") {
+      Mutability mutability = CONST;
+      bool is_pointer = false;
 
+      if (next.type == TType::Mul) {
+        eat();
+        is_pointer = true;
+        if (peek().type == TType::Const) {
+          eat();
+          mutability = CONST;
+        } else if (peek().type == TType::Mut) {
+          eat();
+          mutability = MUT;
+        }
+      }
+
+      auto ident = expect(TType::Identifier);
+      param->self.is_pointer = is_pointer;
+      param->mutability = mutability;
+
+      if (ident.value == "self") {
+        param->tag = ASTParamDecl::Self;
+      } else if (ident.value == "себя") {
+        param->tag = ASTParamDecl::Себя;
+      } else {
+        end_node(nullptr, range);
+        throw_error("when we got *mut/*const, we expected \'self\', since the parameter was not named", range);
+      }
+
+      if (params->params.size() != 0) {
+        end_node(nullptr, range);
+        throw_error("'self/себя' must be the first parameter in the signature", range);
+      }
+
+      params->has_self = true;
+      params->params.push_back(param);
+
+      if (peek().type != TType::RParen) {
+        expect(TType::Comma);
+      }
+      continue;
+    }
+
+    Mutability mutability = CONST;
     if (peek().type == TType::Mut) {
       eat();
       mutability = MUT;
     }
 
     auto name = expect(TType::Identifier).value;
-
-    if (name == "self" || name == "себя") {
-      if (!params->params.empty()) {
-        end_node(nullptr, range);
-        throw_error("\"self\" must appear first in method parameters.", range);
-      }
-
-      if (name == "self") {
-        param->tag = ASTParamDecl::Self;
-      } else {
-        param->tag = ASTParamDecl::Себя;
-      }
-      params->has_self = true;
-      params->params.push_back(param);
-
-      if (peek().type == TType::Mul) {
-        eat();
-        param->self.is_pointer = true;
-      }
-
-      if (peek().type != TType::RParen)
-        expect(TType::Comma);
-
-      continue;
-    }
-
-    if (peek().type == TType::Colon) {
-      expect(TType::Colon);
-      type = parse_type();
-    }
-
+    expect(TType::Colon);
+    param->normal.type = parse_type();
     param->tag = ASTParamDecl::Normal;
-    param->normal.type = type;
     param->mutability = mutability;
     param->normal.name = name;
 
@@ -1724,9 +1761,11 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     if (peek().type != TType::RParen) {
       expect(TType::Comma);
-    } else
+    } else {
       break;
+    }
   }
+
   expect(TType::RParen);
   end_node(params, range);
   return params;
@@ -2223,7 +2262,7 @@ void Parser::append_type_extensions(ASTType *&node) {
       expect(TType::LBrace);
       if (peek().type != TType::RBrace) {
         auto expression = parse_expr();
-        node->extensions.push_back({TYPE_EXT_ARRAY, expression});
+        node->extensions.insert(node->extensions.begin(), {TYPE_EXT_ARRAY, expression});
       } else {
         // Syntactic sugar for doing int[] instead of List![int];
         auto type = ast_alloc<ASTType>();
@@ -2236,9 +2275,6 @@ void Parser::append_type_extensions(ASTType *&node) {
         node = type;
       }
       expect(TType::RBrace);
-    } else if (peek().type == TType::Mul) {
-      expect(TType::Mul);
-      node->extensions.push_back({TYPE_EXT_POINTER});
     } else {
       break;
     }
@@ -2258,6 +2294,12 @@ ASTType *Parser::parse_function_type() {
   NODE_ALLOC(ASTType, output_type, range, _, this)
   expect(TType::Fn);
   output_type->kind = ASTType::FUNCTION;
+
+  if (peek().type == TType::Mul) {
+    eat();
+    output_type->extensions.insert(output_type->extensions.begin(), {TYPE_EXT_POINTER_MUT});
+  }
+
   append_type_extensions(output_type);
   FunctionTypeInfo info{};
   output_type->function.parameter_types = parse_parameter_types();

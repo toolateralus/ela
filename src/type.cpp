@@ -264,7 +264,8 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (!to->get_ext().is_pointer())
       return false;
 
-    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to());
+    // not sure how to handle the mutability here. we will assume it's const?
+    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(CONST));
     auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
 
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
@@ -518,11 +519,6 @@ int f64_type() {
   return type;
 }
 
-int voidptr_type() {
-  static int type = global_find_type_id(void_type(), {.extensions = {{TYPE_EXT_POINTER}}});
-  return type;
-}
-
 bool get_function_type_parameter_signature(Type *type, std::vector<int> &out) {
   out.clear();
   if (!type->is_kind(TYPE_FUNCTION)) {
@@ -656,7 +652,8 @@ std::string TypeExtensions::to_string() const {
   std::stringstream ss;
   for (const auto ext : extensions) {
     switch (ext.type) {
-      case TYPE_EXT_POINTER:
+      case TYPE_EXT_POINTER_MUT:
+      case TYPE_EXT_POINTER_CONST:
         ss << "*";
         break;
       case TYPE_EXT_ARRAY:
@@ -705,9 +702,9 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ")";
   return ss.str();
 }
-int Type::take_pointer_to() const {
+int Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
-  ext.extensions.push_back({TYPE_EXT_POINTER});
+  ext.extensions.push_back({is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
   return global_find_type_id(base_id == -1 ? id : base_id, ext);
 }
 

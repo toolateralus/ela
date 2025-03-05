@@ -456,7 +456,7 @@ BulletRoutine :: struct {
 }
 
 impl BulletRoutine {
-  spawn :: fn(self*) -> bool {
+  spawn :: fn(*mut self) -> bool {
     self.timer.interval = self.interval;
     if self.timer.tick() {
       self.count -= 1;

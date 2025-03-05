@@ -49,7 +49,7 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
 }
 
 #test test_tuple_ptr :: fn () {
-  ptr : (s32, s32)* = malloc(32) as (s32, s32)*;
+  ptr : *mut (s32, s32) = malloc(32) as (s32, s32)*;
   *ptr = (10, 10);
   {
     a, b := *ptr; 

@@ -324,6 +324,7 @@ struct ASTBinExpr : ASTExpr {
 };
 struct ASTUnaryExpr : ASTExpr {
   bool is_operator_overload = false;
+  Mutability mutability = CONST;
   ASTExpr *operand;
   Token op;
   void accept(VisitorBase *visitor) override;
@@ -400,7 +401,10 @@ struct ASTParamDecl : ASTNode {
 
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
+  
   bool has_self = false;
+  bool self_is_pointer = false;
+
   bool is_varargs = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
@@ -932,6 +936,9 @@ struct Parser {
 
   // ASTType* parsing routines
   ASTType *parse_type();
+
+  void parse_pointer_extensions(ASTType *type);
+
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *&type);
 

@@ -49,7 +49,7 @@ impl LinearAlloc {
     memset(self.mem as u8*, 0, LINEAR_ALLOCATOR_SIZE);
     return self;
   }
-  alloc :: fn(self*, size: u64) -> u8* {
+  alloc :: fn(*mut self, size: u64) -> u8* {
     data := &self.mem[self.ptr];
     self.ptr += size;
     if (self.ptr > LINEAR_ALLOCATOR_SIZE) {

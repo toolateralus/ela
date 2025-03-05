@@ -103,7 +103,7 @@ impl Sequence_Channel {
     };
     return self;
   }
-  draw :: fn(self*, x: f32, y: f32) {
+  draw :: fn(*mut self, x: f32, y: f32) {
     if total_notes != self.check_buttons.length {
       while total_notes > self.check_buttons.length {
         _x : f32 = x + 150 + ((self.check_buttons.length * 40) as f32) + 2;
@@ -131,7 +131,7 @@ impl Sequence_Channel {
       button.draw();
     }
   }
-  update :: fn(self*, index: s32) {
+  update :: fn(*mut self, index: s32) {
     if self.volume != self.old_volume {
       self.old_volume = self.volume;
       SetSoundVolume(self.sound, (self.volume as f32) / 100.0);

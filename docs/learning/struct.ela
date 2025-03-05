@@ -21,7 +21,7 @@ impl MyStruct {
     return self.field;
   }
 
-  my_method_by_ptr :: fn(self*) -> f32 {
+  my_method_by_ptr :: fn(*mut self) -> f32 {
     return self.field;
   }
   
