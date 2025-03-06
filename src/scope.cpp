@@ -2,7 +2,6 @@
 #include "scope.hpp"
 #include "core.hpp"
 #include "type.hpp"
-#include <format>
 
 Context::Context() {
   scope = create_child(nullptr);
