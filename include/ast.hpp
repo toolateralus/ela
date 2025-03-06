@@ -417,9 +417,12 @@ struct GenericInstance {
   ASTDeclaration *declaration;
 };
 
+struct ASTImpl;
+
 struct ASTDeclaration : ASTStatement {
   std::vector<GenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
+  std::vector<ASTImpl *> impls;
   virtual ASTNodeType get_node_type() const = 0;
 };
 
@@ -604,7 +607,6 @@ struct ASTStructDeclaration : ASTDeclaration {
 
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;
-  std::vector<ASTImpl *> impls;
 
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_STRUCT_DECLARATION; }

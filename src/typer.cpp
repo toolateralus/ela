@@ -439,8 +439,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
+    
     visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
+    
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
         throw_error("Redefinition of method", method->source_range);
@@ -459,6 +461,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         continue;
       }
     }
+
     visit_function_body(method);
   }
 
@@ -1294,12 +1297,6 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
       switch (definition->get_node_type()) {
         case AST_NODE_STRUCT_DECLARATION: {
           visit_struct_declaration((ASTStructDeclaration *)instantiation, true, args);
-          auto struct_decl = static_cast<ASTStructDeclaration *>(instantiation);
-          for (auto impl : struct_decl->impls) {
-            if (impl->resolved_type == Type ::INVALID_TYPE_ID) {
-              visit_generic(impl, args, source_range);
-            }
-          }
         } break;
         case AST_NODE_FUNCTION_DECLARATION: {
           visit_function_header((ASTFunctionDeclaration *)instantiation, true, args);
@@ -1319,6 +1316,11 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
         default:
           throw_error("Invalid target to generic args", source_range);
           break;
+      }
+      for (auto impl : instantiation->impls) {
+        if (impl->resolved_type == Type ::INVALID_TYPE_ID) {
+          visit_generic(impl, args, source_range);
+        }
       }
       instantiation->generic_parameters.clear();
       instantiation->generic_instantiations.clear();
@@ -2104,14 +2106,9 @@ void Typer::visit(ASTImpl *node) {
     }
 
     auto declaring_node = symbol_nullable.get()->type.declaration.get();
-
-    if (declaring_node->get_node_type() != AST_NODE_STRUCT_DECLARATION) {
-      throw_error("generic `impl![...]` can only be used on structs, currently.", node->source_range);
-    }
-
-    auto node_as_struct = static_cast<ASTStructDeclaration *>(declaring_node);
-    node_as_struct->impls.push_back(node);
-    for (auto instantiations : node_as_struct->generic_instantiations) {
+    auto node_as_decl = static_cast<ASTDeclaration *>(declaring_node);
+    node_as_decl->impls.push_back(node);
+    for (auto instantiations : node_as_decl->generic_instantiations) {
       visit_generic(node, instantiations.arguments, instantiations.declaration->source_range);
     }
   } else {

@@ -2036,9 +2036,6 @@ ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
   auto block = parse_block(scope);
   for (const auto &stmt : block->statements) {
     if (auto function = dynamic_cast<ASTFunctionDeclaration *>(stmt)) {
-      if (function->block.is_not_null()) {
-        throw_error("Only forward declarations are allowed in interfaces currently", node->source_range);
-      }
       node->methods.push_back(function);
     }
   }
