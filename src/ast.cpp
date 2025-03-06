@@ -962,7 +962,14 @@ ASTExpr *Parser::parse_primary() {
     case TType::LParen: {
       auto range = begin_node();
       expect(TType::LParen); // (
-      const auto lookahead = lookahead_buf();
+
+      if (peek().type == TType::RParen) {
+        NODE_ALLOC(ASTTuple, tuple, range, _, this);
+        eat();
+        tuple->values = {};
+        return tuple;
+      }
+
       auto expr = parse_expr();
       if (peek().type == TType::Comma) {
         ASTTuple *tuple = ast_alloc<ASTTuple>();
@@ -1745,6 +1752,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     }
 
     auto name = expect(TType::Identifier).value;
+    
     expect(TType::Colon);
     param->normal.type = parse_type();
     param->tag = ASTParamDecl::Normal;

@@ -49,11 +49,11 @@ impl Neg!<Vec2> for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(*mut self, index: s32) -> f32* {
+  subscript :: fn(*mut self, index: s32) -> *mut f32 {
     if index == 0 {
-      return &self.x;
+      return &mut self.x;
     } else {
-      return &self.y;
+      return &mut self.y;
     }
   }
 }

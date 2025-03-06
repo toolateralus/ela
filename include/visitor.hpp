@@ -275,7 +275,7 @@ struct DependencyEmitter : VisitorBase {
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
   void define_type(int type_id);
-  void decl_type(int type_id);
+  void declare_type(int type_id);
   
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;

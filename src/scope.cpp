@@ -29,15 +29,6 @@ Context::Context() {
     Scope::add_def("TESTING");
   }
 
-  { // For this compiler intrinsic operator,
-    // We have to do this. However, in the future, we will implement our own sizer,
-    // and we won't have this problem.
-    FunctionTypeInfo sizeof_info{};
-    sizeof_info.return_type = u32_type();
-    sizeof_info.is_varargs = true;
-    scope->insert_function("sizeof", global_find_function_type_id(sizeof_info, {}), nullptr);
-  }
-
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->kind == TYPE_FUNCTION) {
       continue;

@@ -653,14 +653,13 @@ std::string TypeExtensions::to_string() const {
   for (const auto ext : extensions) {
     switch (ext.type) {
       case TYPE_EXT_POINTER_MUT:
+        ss << "*mut";
+        break;
       case TYPE_EXT_POINTER_CONST:
-        ss << "*";
+        ss << "*const";
         break;
       case TYPE_EXT_ARRAY:
         ss << "[]";
-        break;
-      case TYPE_EXT_INVALID:
-        throw_error("internal compiler error: extension type invalid", {});
         break;
     }
   }

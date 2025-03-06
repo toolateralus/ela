@@ -82,6 +82,7 @@ void Emitter::visit(ASTWhile *node) {
   defer_blocks.pop_back();
   return;
 }
+
 void Emitter::visit(ASTIf *node) {
   emit_line_directive(node);
   (*ss) << indent() << "if (";
@@ -93,6 +94,7 @@ void Emitter::visit(ASTIf *node) {
   }
   return;
 }
+
 void Emitter::visit(ASTElse *node) {
   emit_line_directive(node);
   (*ss) << " else ";
@@ -1412,9 +1414,6 @@ std::string get_type_flags(Type *type) {
         break;
       case TYPE_EXT_ARRAY:
         kind_flags |= TYPE_FLAGS_ARRAY;
-        break;
-      case TYPE_EXT_INVALID:
-        throw_error("internal compiler error: Extension type not set.", {});
         break;
     }
   }

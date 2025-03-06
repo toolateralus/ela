@@ -95,7 +95,7 @@
   }
 
   n = 0;
-  mut arr : List!<s8>* = malloc(sizeof(List!<s8>)); 
+  mut arr : *mut List!<s8> = malloc(sizeof(List!<s8>)); 
   *arr = .{};
   for i in 0..4 {
     arr.push(i as s8);

@@ -2,18 +2,18 @@
 ; 
 
 #test test_malloc :: fn() {
-  mut ptr: s32* = malloc(4);
+  mut ptr: *const s32 = malloc(4);
   assert("malloc'd pointer was null", ptr != null);
   free(ptr);
   ptr = null;
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: fn(a: f32, b, c, d) -> f32 {
+many_params :: fn(a: f32, b: f32, c: f32, d : f32) -> f32 {
   return a * b * c * d;
 }
 
-mul_params :: fn(n: f32, f) -> f32 {
+mul_params :: fn(n: f32, f: f32) -> f32 {
   return n * f;
 }
 

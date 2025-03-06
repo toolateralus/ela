@@ -10,9 +10,10 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-void emit(ASTNode *root, Context& context, Typer &type_visitor) {
+void emit(ASTNode *root, Context& context, Typer &type_visitor, int type_list) {
   Emitter emit(context, type_visitor);
   DependencyEmitter dependencyEmitter(context, &emit);
+
 
   static const auto testing = compile_command.has_flag("test");
   const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
@@ -40,11 +41,10 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor) {
   emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
   if (!is_freestanding) {
+    dependencyEmitter.declare_type(type_list);
+    dependencyEmitter.define_type(type_list);
     emit.code << "typedef struct Type Type;\n";
-    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
-    type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
-    emit.code << std::format("typedef struct List${} List${};\nextern List${} _type_info;\n", type_ptr_id, type_ptr_id,
-                        type_ptr_id);
+    emit.code << std::format("extern {} _type_info;\n", emit.to_cpp_string(global_get_type(type_list)));
   }
 
   if (testing) {
@@ -77,10 +77,12 @@ int CompileCommand::compile() {
   parse.end("parsing done.");
 
   lower.begin();
+  auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
   Typer type_visitor{context};
+  auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
   type_visitor.visit(root);
 
-  emit(root, context, type_visitor);
+  emit(root, context, type_visitor, type_list);
   
   lower.end("lowering to cpp complete");
 

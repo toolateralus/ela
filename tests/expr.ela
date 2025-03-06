@@ -83,7 +83,7 @@
 
 #test test_address_of :: fn() {
   mut v: s32 = 0;
-  addr_of_v: s32* = &v;
+  addr_of_v: *const s32 = &const v;
   assert("address of grabbed a non-null ptr", addr_of_v != null);
   v = *addr_of_v;
   assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
@@ -115,7 +115,7 @@
 }
 
 Node :: struct {
-  next: Node*
+  next: *const Node
 }
 
 Array :: struct {
@@ -127,8 +127,8 @@ Array :: struct {
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
 
-  n: Node ;
-  a.ptr[0].next = &n;
+  n: Node;
+  a.ptr[0].next = &const n;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
@@ -144,7 +144,7 @@ Array :: struct {
   node: Node;
   node.next = malloc(sizeof(Node));
   other: Node;
-  node.next.next = &other;
+  node.next.next = &const other;
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
   free(node.next);

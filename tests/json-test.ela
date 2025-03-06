@@ -4,11 +4,11 @@ import fs::*;
 JsonValue :: struct {}
 
 JsonValueDeleter :: struct {
-  vals: List!<JsonValue*>,
+  vals: List!<*const JsonValue>,
 }
 
 impl JsonValueDeleter {
-  add :: fn(*mut self, val: JsonValue*) {
+  add :: fn(*mut self, val: *const JsonValue) {
     self.vals.push(val);
   }
   // *fixme

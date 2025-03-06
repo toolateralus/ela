@@ -92,6 +92,6 @@ void Parser::parse_pointer_extensions(ASTType *type) {
   }
 
   for (int i = 0; i < pointer_depth; ++i) {
-    type->extensions.push_back({mutability ? TYPE_EXT_POINTER_CONST : TYPE_EXT_POINTER_MUT});
+    type->extensions.push_back({mutability ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
   }
 }

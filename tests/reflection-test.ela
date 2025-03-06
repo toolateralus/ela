@@ -13,7 +13,7 @@ Reflector :: struct {
   type := typeof(Reflector);
   field := type.fields[0];
   integer: s32 = 100;
-  field.set(&reflector, integer);
+  field.set(&mut reflector, integer);
   assert("reflection field.set() failed.", reflector.n == 100);
 }
 
@@ -22,7 +22,7 @@ Reflector :: struct {
   reflector.n = 100;
   type := typeof(Reflector);
   field := type.fields[0];
-  n := *(field.get!<Reflector*>(&reflector) as s32*);
+  n := *(field.get!<*mut Reflector>(&mut reflector) as *const s32);
   assert("reflection field.set() failed.", n == 100);
 }
 

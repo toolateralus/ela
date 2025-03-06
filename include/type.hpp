@@ -60,7 +60,6 @@ enum TypeKind {
 };
 
 enum TypeExtEnum {
-  TYPE_EXT_INVALID,
   TYPE_EXT_POINTER_CONST,
   TYPE_EXT_POINTER_MUT,
   TYPE_EXT_ARRAY,
@@ -107,7 +106,7 @@ struct TypeExtensions {
 
   TypeExtEnum back_type() const {
     if (extensions.empty()) {
-      return TYPE_EXT_INVALID;
+      return (TypeExtEnum)-1;
     } else {
       return extensions.back().type;
     }
@@ -343,6 +342,9 @@ static std::string get_unmangled_name(const Type *type) {
     }
     base += ">";
   }
-  base += type->get_ext().to_string();
-  return base;
+
+  auto output = type->get_ext().to_string();
+  output += " " + base;
+
+  return output;
 }

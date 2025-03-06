@@ -4,7 +4,7 @@
 #include "type.hpp"
 #include "visitor.hpp"
 
-void DependencyEmitter::decl_type(int type_id) {
+void DependencyEmitter::declare_type(int type_id) {
   auto type = global_get_type(type_id);
   auto extensions = type->get_ext().extensions;
   for (auto ext : extensions) {
@@ -24,10 +24,10 @@ void DependencyEmitter::define_type(int type_id) {
   switch (type->kind) {
     case TYPE_FUNCTION: {
       auto info = type->get_info()->as<FunctionTypeInfo>();
-      decl_type(info->return_type);
+      declare_type(info->return_type);
       for (int index = 0; index < info->params_len; index++) {
         auto param_ty = info->parameter_types[index];
-        decl_type(param_ty);
+        declare_type(param_ty);
       }
     } break;
     case TYPE_TAGGED_UNION:
@@ -63,7 +63,7 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
     subtype->accept(this);
   }
   for (auto member : node->members) {
-    decl_type(member.type->resolved_type);
+    declare_type(member.type->resolved_type);
   }
 }
 
@@ -101,7 +101,7 @@ void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
-  decl_type(node->return_type->resolved_type);
+  declare_type(node->return_type->resolved_type);
   node->params->accept(this);
   if (node->block.is_not_null()) {
     node->block.get()->accept(this);
@@ -115,7 +115,7 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
 }
 
 void DependencyEmitter::visit(ASTParamDecl *node) {
-  decl_type(node->resolved_type);
+  declare_type(node->resolved_type);
 }
 
 void DependencyEmitter::visit(ASTVariable *node) {
@@ -190,7 +190,7 @@ void DependencyEmitter::visit(ASTIdentifier *node) {
 void DependencyEmitter::visit(ASTLiteral *node) {}
 
 void DependencyEmitter::visit(ASTType *node) {
-  decl_type(node->resolved_type);
+  declare_type(node->resolved_type);
 }
 
 void DependencyEmitter::visit(ASTType_Of *node) {
