@@ -62,7 +62,7 @@ defer_cleanup_routine :: fn(c: *const DeferCleanup) -> u64 {
     c.ptr = null;
   }
   assert("defer cleanup got null input", c.ptr != null);
-  return c.ptr as u64;
+  return (c.ptr as *mut u64) as u64;
 }
 
 #test test_defer_cleanup_routine :: fn() {

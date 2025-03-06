@@ -230,9 +230,6 @@ void Emitter::visit(ASTFor *node) {
     }
   }
 
-  // this MUST happen before the block or continue will cause a permanent hangup!!!
-  (*ss) << indent() << iterable_method_str << "_next(&" << unique_id << ");\n";
-
   node->block->accept(this);
 
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
