@@ -334,6 +334,7 @@ static std::string get_unmangled_name(const Type *type) {
   if (first != std::string::npos) {
     base = base.substr(0, first);
   }
+  
   if (!type->generic_args.empty()) {
     base += "!<";
     auto it = 0;
@@ -348,7 +349,10 @@ static std::string get_unmangled_name(const Type *type) {
   }
 
   auto output = type->get_ext().to_string();
-  output += " " + base;
+  if (!output.empty()) {
+    output += " ";
+  }
+  output += base;
 
   return output;
 }
