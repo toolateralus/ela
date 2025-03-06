@@ -257,28 +257,12 @@ void DependencyEmitter::visit(ASTFor *node) {
       iter_sym->function.declaration->accept(this);
       iter_sym->function.declaration->accept(emitter);
     } break;
-    case ASTFor::ENUMERABLE: {
-      auto enum_sym = range_scope->local_lookup("enumerator");
-      enum_sym->function.declaration->accept(this);
-      enum_sym->function.declaration->accept(emitter);
-    } break;
-    case ASTFor::ENUMERATOR:
-    case ASTFor::ITERATOR:
-      break;
+    case ASTFor::ITERATOR: break;
   }
 
-  auto done_sym = iter_scope->local_lookup("done");
+  auto done_sym = iter_scope->local_lookup("next");
   done_sym->function.declaration->accept(this);
   done_sym->function.declaration->accept(emitter);
-
-  auto current_sym = iter_scope->local_lookup("current");
-  current_sym->function.declaration->accept(this);
-  current_sym->function.declaration->accept(emitter);
-
-  auto next_sym = iter_scope->local_lookup("next");
-  next_sym->function.declaration->accept(this);
-  next_sym->function.declaration->accept(emitter);
-
   node->block->accept(this);
 }
 

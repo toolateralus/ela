@@ -116,6 +116,10 @@ struct TypeExtensions {
 
   inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT; }
 
+  inline bool is_const_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST; }
+  
+  inline bool is_mut_pointer() const { return back_type() == TYPE_EXT_POINTER_MUT; }
+
   inline bool operator==(const TypeExtensions &other) const { return equals(other); }
 
   bool equals(const TypeExtensions &other) const;

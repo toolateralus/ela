@@ -147,7 +147,7 @@ enum AttributeTag {
 
 struct Attribute {
   AttributeTag tag;
-  std::vector<ASTExpr*> arguments;
+  std::vector<ASTExpr *> arguments;
 };
 
 struct ASTStatement : ASTNode {
@@ -181,7 +181,7 @@ struct ASTModule : ASTStatement {
 struct ASTImport : ASTModule {
   // We need to have a more complex way to represent these 'symbols', which could be any of these,
   // where we could be ::{}, ::*, or ::identifier.
-  /* 
+  /*
     import fs::{
       file::*,
       directory::prober::*,
@@ -401,7 +401,7 @@ struct ASTParamDecl : ASTNode {
 
 struct ASTParamsDecl : ASTStatement {
   std::vector<ASTParamDecl *> params;
-  
+
   bool has_self = false;
   bool self_is_pointer = false;
 
@@ -494,10 +494,6 @@ struct ASTFor : ASTStatement {
   enum {
     // implicitly pulled an iter() off a type that implements Iterable![T]
     ITERABLE,
-    // implicitly pulled an enumerator() off a type that implements Enumerable![T]
-    ENUMERABLE,
-    // got an Enumerator![T] object directly
-    ENUMERATOR,
     // got an Iter![T] object directly
     ITERATOR,
   } iteration_kind;
@@ -508,10 +504,7 @@ struct ASTFor : ASTStatement {
   int iterable_type = Type::INVALID_TYPE_ID;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
   int identifier_type = Type::INVALID_TYPE_ID;
-
-  // this is the 'i' in `for i in 0..100`
-  // this can also be a a, b destructure.
-
+  bool needs_dereference = false;
   union Left {
     Left() {}
     ~Left() {}
@@ -522,6 +515,19 @@ struct ASTFor : ASTStatement {
     std::vector<Destructure> destructure;
   } left;
 
+  enum {
+    IDENTIFIER,
+    DESTRUCTURE,
+  } left_tag = IDENTIFIER;
+
+  // this is the '0..100' or any thing on the right hand side of the 'in'
+  // `for i in 0..100`
+  //           ^^^^^^^ <- this is the `range`
+  ASTExpr *right;
+  ASTBlock *block;
+
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_FOR; }
   ASTFor() {}
   ~ASTFor() {}
   ASTFor(const ASTFor &other) {
@@ -543,20 +549,6 @@ struct ASTFor : ASTStatement {
         break;
     }
   }
-
-  enum {
-    IDENTIFIER,
-    DESTRUCTURE,
-  } left_tag = IDENTIFIER;
-
-  // this is the '0..100' or any thing on the right hand side of the 'in'
-  // `for i in 0..100`
-  //           ^^^^^^^ <- this is the `range`
-  ASTExpr *right;
-  ASTBlock *block;
-
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_FOR; }
 };
 
 struct ASTElse;
@@ -820,7 +812,7 @@ struct ASTWhere : ASTExpr {
   void visit(ASTTaggedUnionDeclaration *node) override {};                                                             \
   void visit(ASTInterfaceDeclaration *node) override {};                                                               \
   void visit(ASTSize_Of *node) override {};                                                                            \
-  void visit(ASTModule *node) override {};                                                                            \
+  void visit(ASTModule *node) override {};                                                                             \
   void visit(ASTType_Of *node) override {};
 
 #define DECLARE_VISIT_BASE_METHODS()                                                                                   \
@@ -1002,4 +994,3 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                                                                     \
     deferred;                                                                                                          \
   });
-  

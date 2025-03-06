@@ -40,6 +40,7 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor, int type_list) {
   
   emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
+
   if (!is_freestanding) {
     dependencyEmitter.declare_type(type_list);
     dependencyEmitter.define_type(type_list);

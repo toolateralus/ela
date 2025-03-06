@@ -284,8 +284,8 @@ switch_helper :: fn() -> s32 {
 #test test_iterate_enumerator :: fn() {
   range := 0..10;
   mut idx := 0;
-  for v in range.enumerator() {
-    assert("range.enumerator() for loop failed", v == idx);
+  for v in range.iter() {
+    assert("range.iter() for loop failed", v == idx);
     idx++;
   }
 }

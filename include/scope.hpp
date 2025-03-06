@@ -144,14 +144,17 @@ struct Scope {
 
   void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, Mutability mutability, ASTNode* decl = nullptr) {
     symbols.insert_or_assign(name, Symbol::create_variable(name, type_id, initial_value, decl, mutability));
+    ordered_symbols.push_back(name);
   }
 
   void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration, SymbolFlags flags = SYMBOL_IS_FUNCTION) {
     symbols.insert_or_assign(name, Symbol::create_function(name, type_id, declaration, flags));
+    ordered_symbols.push_back(name);
   }
 
   void insert_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
     symbols.insert_or_assign(name, Symbol::create_type(type_id, name, kind, declaration));
+    ordered_symbols.push_back(name);
   }
 
 

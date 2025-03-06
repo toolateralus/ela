@@ -191,7 +191,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
   }
 
   // We didn't find the tuple type. Return a new one.
-  auto base_id =  global_create_tuple_type(tuple_types);
+  auto base_id = global_create_tuple_type(tuple_types);
   return global_find_type_id(base_id, type_extensions);
 }
 
@@ -226,7 +226,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
-  const auto from_is_scalar_ptr = from->get_ext().is_pointer();
+  const auto from_is_scalar_ptr = from->get_ext().is_mut_pointer();
   const auto to_is_non_ptr_number = type_is_numerical(to) && to->get_ext().has_no_extensions();
 
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
@@ -237,7 +237,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   if (type_is_numerical(from) && to->get_ext().is_pointer()) {
     return CONVERT_EXPLICIT;
   }
-
 
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow in if (...)
   // cast all numerical types and pointers to booleans implicitly.
@@ -250,7 +249,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // ! This needs to be re-evaluated. We should not be able to cast any pointer, to any other pointer.
-  const auto implicit_ptr_cast = from->get_ext().is_pointer() && to->get_ext().is_pointer();
+  const auto implicit_ptr_cast = (from->get_ext().is_const_pointer() && to->get_ext().is_const_pointer()) ||
+                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) || 
+                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_const_pointer());
 
   // If we have a fixed array such as
   // char[5] and the argument takes void*
@@ -270,6 +271,14 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
+
+
+  // We basically have to allow *const to *mut to allow for pointer arithmetic,
+  // you can't traverse a const array without this.
+  if (from->get_ext().is_const_pointer() && to->get_ext().is_mut_pointer()) {
+    return CONVERT_EXPLICIT;
+  }
+
 
   // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C
   // interop. This is far too C-like and highly unsafe.
@@ -627,10 +636,9 @@ void init_type_system() {
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == s32_type() || t->id == s8_type() ||
-         t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
-         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == f32_type() ||
-         t->id == f64_type();
+  return t->id == s32_type() || t->id == s8_type() || t->id == s16_type() || t->id == s32_type() ||
+         t->id == s64_type() || t->id == u8_type() || t->id == u16_type() || t->id == u32_type() ||
+         t->id == u64_type() || t->id == f32_type() || t->id == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {

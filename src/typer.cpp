@@ -332,6 +332,49 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   node->resolved_type = global_find_function_type_id(info, {});
 }
 
+bool impl_method_matches_interface(int interface_method, int impl_method) {
+  auto interface = global_get_type(interface_method)->get_info()->as<FunctionTypeInfo>();
+  auto impl = global_get_type(impl_method)->get_info()->as<FunctionTypeInfo>();
+
+  if (interface->params_len != impl->params_len) {
+    return false;
+  }
+
+  for (int i = 0; i < interface->params_len; ++i) {
+    auto interface_param = global_get_type(interface->parameter_types[i]);
+    auto impl_param = global_get_type(impl->parameter_types[i]);
+    if (interface_param->is_kind(TYPE_INTERFACE)) {
+      auto base = interface_param->get_base();
+      if (!impl_param->implements(base)) {
+        return false;
+      }
+      if (interface_param->generic_args != impl_param->generic_args) {
+        return false;
+      }
+    } else if (interface_param != impl_param) {
+      return false;
+    }
+  }
+
+  {
+    auto interface_return = global_get_type(interface->return_type);
+    auto impl_return = global_get_type(impl->return_type);
+    if (interface_return->is_kind(TYPE_INTERFACE)) {
+      auto base = interface_return->get_base();
+      if (!impl_return->implements(base)) {
+        return false;
+      }
+      if (interface_return->generic_args != impl_return->generic_args) {
+        return false;
+      }
+    } else if (interface_return != impl_return) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
   auto old_type = type_context;
@@ -443,7 +486,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         continue;
 
       if (auto impl_symbol = impl_scope.local_lookup(name)) {
-        if (interface_sym.type_id != impl_symbol->type_id) {
+        if (!impl_method_matches_interface(interface_sym.type_id, impl_symbol->type_id)) {
           if (interface_sym.type_id != Type::INVALID_TYPE_ID && impl_symbol->type_id != Type::INVALID_TYPE_ID) {
             throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
                                     global_get_type(interface_sym.type_id)->to_string(),
@@ -813,103 +856,46 @@ void Typer::visit(ASTFor *node) {
   int iter_ty = Type::INVALID_TYPE_ID;
   auto scope = range_type->get_info()->scope;
 
-  if (range_type->implements("Iterable")) {
+  if (range_type->implements("Iterable")) { // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
-    // make sure the impl is actually emitted if this is generic.
+
     compiler_mock_method_call_visit_impl(range_type_id, "iter");
-
     auto symbol = scope->local_lookup("iter");
-    if (!symbol || !symbol->is_function()) {
-      throw_error("internal compiler error: type implements 'Iterable' but no 'iter' function was found when "
-                  "attempting to iterate, or it was a non-function symbol named 'iter'",
-                  node->source_range);
-    }
-
     auto symbol_ty = global_get_type(symbol->type_id);
     auto iter_return_ty = global_get_type(symbol_ty->get_info()->as<FunctionTypeInfo>()->return_type);
     node->iterable_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
-    compiler_mock_method_call_visit_impl(iter_return_ty->id, "current");
-
-    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
-    if (!symbol || !symbol->is_function()) {
-      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
-                  "attempting to iterate, or it was a non-function symbol named 'current'",
-                  node->source_range);
-    }
+    compiler_mock_method_call_visit_impl(iter_return_ty->id, "next");
+    symbol = iter_return_ty->get_info()->scope->local_lookup("next");
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
-  } else if (range_type->implements("Enumerable")) {
-    node->iteration_kind = ASTFor::ENUMERABLE;
-    // make sure the impl is actually emitted if this is generic.
-    compiler_mock_method_call_visit_impl(range_type_id, "enumerator");
-
-    auto symbol = scope->local_lookup("enumerator");
-    if (!symbol || !symbol->is_function()) {
-      throw_error("internal compiler error: type implements 'Enumerable' but no 'enumerator' function was found when "
-                  "attempting to enumerate, or it was a non-function symbol named 'enumerator'",
-                  node->source_range);
-    }
-    auto iter_return_ty =
-        global_get_type(global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type);
-    node->iterable_type = iter_return_ty->id;
-
-    // make sure the impl is actually emitted if this is generic.
-    compiler_mock_method_call_visit_impl(iter_return_ty->id, "current");
-
-    symbol = iter_return_ty->get_info()->scope->local_lookup("current");
-    if (!symbol || !symbol->is_function()) {
-      throw_error("internal compiler error: type implements 'Iterable' but no 'current' function was found when "
-                  "attempting to iterate, or it was a non-function symbol named 'current'",
-                  node->source_range);
-    }
-    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
-  } else if (range_type->implements("Enumerator")) {
-    node->iteration_kind = ASTFor::ENUMERATOR;
-    compiler_mock_method_call_visit_impl(range_type_id, "current");
-    auto symbol = scope->local_lookup("current");
-
-    if (!symbol || !symbol->is_function()) {
-      throw_error("internal compiler error: type implements 'Enumerator' but no 'current' function was found when "
-                  "attempting to enumerate, or it was a non-function symbol named 'current'",
-                  node->source_range);
-    }
-    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
-    node->iterable_type = range_type_id;
-  } else if (range_type->get_base().get_str().starts_with("Iter$")) {
+    auto option = global_get_type(iter_ty);
+    iter_ty = option->generic_args[0];
+  } else if (range_type->implements("Iter")) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
-    compiler_mock_method_call_visit_impl(range_type_id, "current");
-    iter_ty = global_get_type(range_type->generic_args[0])->take_pointer_to(MUT);
+
+    // make sure the impl is actually emitted if this is generic.
+    auto range_type = global_get_type(range_type_id);
+    compiler_mock_method_call_visit_impl(range_type_id, "next");
+    auto symbol = range_type->get_info()->scope->local_lookup("next");
+    iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
+    auto option = global_get_type(iter_ty);
+    iter_ty = option->generic_args[0];
+
   } else {
-    throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable' or the "
-                "'Enumerable' interface. "
-                "Please implement at least one of these, note that 'Iterable'/'iter()' will be selected before "
-                "'Enumerable'/'enumerator()', mainly for performance reasons, but also ambiguity",
+    throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
+                "'Iter!<T>' interface. ",
                 node->source_range);
   }
 
-  auto is_enumerator_or_enumerable =
-      node->iteration_kind == ASTFor::ENUMERABLE || node->iteration_kind == ASTFor::ENUMERATOR;
-
-  if (is_enumerator_or_enumerable && node->left_tag == ASTFor::IDENTIFIER &&
-      node->left.semantic == VALUE_SEMANTIC_POINTER) {
-    throw_error("Cannot use the 'for *i in ...' \"pointer semantic\" style for loop with objects that implement "
-                "'Enumerable'. This is because the enumerable()'s return type is not restricted to being a pointer, "
-                "and we can't guarantee "
-                "that taking a reference to it is safe or even valid.",
-                node->source_range);
-
-  } else if (!is_enumerator_or_enumerable &&
-             (node->left_tag == ASTFor::IDENTIFIER && node->left.semantic != VALUE_SEMANTIC_POINTER)) {
-    // * for a type that implements Iter, we always return T*, so if we don't use the semantic, we assume an implicit
-    // dereference.
+  { // if we do 'for v in ...' and the iter returns a pointer, we dereference.
     auto type = global_get_type(iter_ty);
-    if (!type->get_ext().is_pointer()) {
-      throw_error("internal compiler error: got `for *.. in ...` but the iter() did not return a pointer type?",
-                  node->source_range);
+    if (node->left_tag == ASTFor::IDENTIFIER && node->left.semantic == VALUE_SEMANTIC_COPY &&
+        type->get_ext().is_pointer()) {
+      iter_ty = type->get_element_type();
+      node->needs_dereference = true;
     }
-    iter_ty = type->get_element_type();
   }
 
   node->identifier_type = iter_ty;
@@ -920,51 +906,36 @@ void Typer::visit(ASTFor *node) {
     node->left.identifier->accept(this);
   } else {
     auto type = global_get_type(iter_ty);
-    // because of the way iterators work, this is neccesary.
+
+    // if our iterable type returns a pointer, we "dereference" here because of the way destructuring needs to be done
+    // it doesn't actually get generated as a dereference but we need to analyze the scope of the base type.
     if (type->get_ext().is_pointer()) {
       type = global_get_type(type->get_element_type());
     }
-    if (type->is_kind(TYPE_TUPLE)) {
-      auto info = type->get_info()->as<TupleTypeInfo>();
-      if (node->left.destructure.size() != info->types.size()) {
-        throw_error(std::format("Cannot currently partially deconstruct a tuple. "
-                                "expected {} identifiers to assign, got {}",
-                                info->types.size(), node->left.destructure.size()),
-                    node->source_range);
+
+    auto scope = type->get_info()->scope;
+    if (node->left.destructure.size() != scope->fields_count()) {
+      throw_error(std::format("Cannot currently partially deconstruct a struct. "
+                              "expected {} identifiers to assign, got {}, for type {}",
+                              scope->symbols.size(), node->left.destructure.size(), type->to_string()),
+                  node->source_range);
+    }
+    int i = 0;
+    for (auto name : scope->ordered_symbols) {
+      auto symbol = scope->local_lookup(name);
+      if (symbol->is_function() || symbol->is_type()) {
+        continue;
       }
-      for (int i = 0; i < node->left.destructure.size(); ++i) {
-        auto type = info->types[i];
-        auto iden = node->left.destructure[i].identifier;
-        if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(
-              iden->value, global_get_type(type)->take_pointer_to(node->left.destructure[i].mutability), iden, MUT);
-        } else {
-          ctx.scope->insert_variable(iden->value, type, iden, MUT);
-        }
+
+      auto &destructure = node->left.destructure[i];
+      auto iden = destructure.identifier;
+      if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
+        auto pointer = global_get_type(symbol->type_id)->take_pointer_to(destructure.mutability);
+        ctx.scope->insert_variable(iden->value, pointer, iden, MUT);
+      } else {
+        ctx.scope->insert_variable(iden->value, symbol->type_id, iden, MUT);
       }
-    } else {
-      auto scope = type->get_info()->scope;
-      if (node->left.destructure.size() != scope->fields_count()) {
-        throw_error(std::format("Cannot currently partially deconstruct a struct. "
-                                "expected {} identifiers to assign, got {}, for type {}",
-                                scope->symbols.size(), node->left.destructure.size(), type->to_string()),
-                    node->source_range);
-      }
-      int i = 0;
-      for (const auto &[name, symbol] : scope->symbols) {
-        if (symbol.is_function() || symbol.is_type()) {
-          continue;
-        }
-        auto iden = node->left.destructure[i].identifier;
-        if (node->left.destructure[i].semantic == VALUE_SEMANTIC_POINTER) {
-          ctx.scope->insert_variable(
-              iden->value, global_get_type(symbol.type_id)->take_pointer_to(node->left.destructure[i].mutability), iden,
-              MUT);
-        } else {
-          ctx.scope->insert_variable(iden->value, symbol.type_id, iden, MUT);
-        }
-        i++;
-      }
+      i++;
     }
   }
 
@@ -2096,50 +2067,32 @@ void Typer::visit(ASTAlias *node) {
 void Typer::visit(ASTTupleDeconstruction *node) {
   node->right->accept(this);
   node->resolved_type = node->right->resolved_type;
-
   auto type = global_get_type(node->right->resolved_type);
 
-  if (type->get_ext().has_extensions()) {
+  if (type->get_ext().has_extensions())
     throw_error("Cannot destructure pointer or array type.", node->source_range);
+
+  auto scope = type->get_info()->scope;
+  int i = 0;
+  for (const auto name : scope->ordered_symbols) {
+    auto symbol = scope->local_lookup(name);
+
+    if (symbol->is_function() || symbol->is_type())
+      continue;
+
+    if (i > node->elements.size())
+      break;
+
+    auto destructure = node->elements[i];
+    auto type = symbol->type_id;
+
+    if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
+      type = global_get_type(symbol->type_id)->take_pointer_to(MUT);
+    }
+    ctx.scope->insert_variable(destructure.identifier->value, type, symbol->variable.initial_value.get(),
+                               destructure.mutability);
+    ++i;
   }
-
-  if (type->is_kind(TYPE_TUPLE)) {
-    auto info = (type->get_info()->as<TupleTypeInfo>());
-    if (node->elements.size() != info->types.size()) {
-      throw_error(std::format("Cannot currently partially deconstruct a tuple. "
-                              "expected {} identifiers to assign, got {}",
-                              info->types.size(), node->elements.size()),
-                  node->source_range);
-    }
-
-    for (int i = 0; i < node->elements.size(); ++i) {
-      auto type = info->types[i];
-      auto iden = node->elements[i].identifier;
-      if (node->elements[i].semantic == VALUE_SEMANTIC_POINTER) {
-        ctx.scope->insert_variable(iden->value, global_get_type(type)->take_pointer_to(node->elements[i].mutability), iden,
-                                   node->elements[i].mutability);
-      } else {
-        ctx.scope->insert_variable(iden->value, type, iden, node->elements[i].mutability);
-      }
-    }
-  } else {
-    auto scope = type->get_info()->scope;
-    for (const auto &[name, symbol] : scope->symbols) {
-      if (symbol.mutability == CONST) {
-        throw_error("cannot assign a constant variable, consider adding 'mut' to the parameter or variable declaration",
-                    node->source_range);
-      }
-
-      if (symbol.is_function()) {
-        continue;
-      }
-      if (symbol.is_variable()) {
-        ctx.scope->insert_variable(name, symbol.type_id, symbol.variable.initial_value.get(), symbol.mutability);
-      }
-    }
-  }
-
-  return;
 };
 
 void Typer::visit(ASTImpl *node) {
