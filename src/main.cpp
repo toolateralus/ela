@@ -91,7 +91,7 @@ int main(int argc, char *argv[]) {
   bool run_tests = false;
   if (argc >= 2 && (strcmp(argv[1], "test") == 0 || strcmp(argv[1], "t") == 0)) {
     run_tests = true;
-    argv[1] = (char *)"main.ela";
+    argv[1] = (char *)"test.ela";
     argc = 2;
     run_on_finished = true;
   }
@@ -135,6 +135,11 @@ int main(int argc, char *argv[]) {
       std::cout << "Running: " << command << std::endl;
       system(command.c_str());
     }
+  }
+
+  if (run_tests) {
+    // remove the binaryj after.
+    system("rm test");
   }
 
   return result != 0;
