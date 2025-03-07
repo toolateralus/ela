@@ -387,11 +387,17 @@ bool impl_method_matches_interface(int interface_method, int impl_method) {
     auto interface_return = global_get_type(interface->return_type);
     auto impl_return = global_get_type(impl->return_type);
     if (interface_return->is_kind(TYPE_INTERFACE)) {
-      if (!impl_return->implements(interface_return->id)) {
-        return false;
-      }
-      if (interface_return->generic_args != impl_return->generic_args) {
-        return false;
+      if (interface_return->generic_base_id != Type::INVALID_TYPE_ID) {
+        if (!impl_return->implements(interface_return->generic_base_id)) {
+          return false;
+        }
+        if (interface_return->generic_args != impl_return->generic_args) {
+          return false;
+        }
+      } else {
+        if (!impl_return->implements(interface_return->id)) {
+          return false;
+        }
       }
     } else if (interface_return != impl_return) {
       return false;
@@ -400,6 +406,7 @@ bool impl_method_matches_interface(int interface_method, int impl_method) {
 
   return true;
 }
+
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
