@@ -35,6 +35,19 @@ struct Typer : VisitorBase {
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
 
+  int iter_interface() {
+    static int iter_id = ctx.scope->lookup("Iter")->type_id;
+    return iter_id;
+  }
+  int iterable_interface() {
+    static int iterable_id = ctx.scope->lookup("Iterable")->type_id;
+    return iterable_id;
+  }
+  int init_interface() {
+    static int init_id = ctx.scope->lookup("Init")->type_id;
+    return init_id;
+  }
+
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
