@@ -9,7 +9,7 @@ Reflector :: struct {
 }
 
 #test test_set_field_with_reflection :: fn() {
-  reflector: Reflector;
+  mut reflector: Reflector;
   type := typeof(Reflector);
   field := type.fields[0];
   integer: s32 = 100;

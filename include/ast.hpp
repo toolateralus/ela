@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "arena.hpp"
@@ -223,8 +224,31 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
+struct ImplicitConversion {
+  int to = Type::INVALID_TYPE_ID;
+  int from = Type::INVALID_TYPE_ID;
+  enum {
+    /* 
+      this is for things like:
+        `n : any = 100;`
+
+      where we need to construct & reflect to create the instance.
+    */
+    TO_ANY,
+    /* 
+      this is when we do like:
+
+        `n : Option = Option::Some(x);`
+
+      we are convertion Option::Some to Option technically.
+    */
+    VARIANT_TO_TAGGED_UNION,
+  } kind;
+};
+
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
+  std::optional<ImplicitConversion> conversion = std::nullopt;
 };
 
 struct ASTTypeExtension {

@@ -1675,7 +1675,17 @@ void Typer::visit(ASTUnaryExpr *node) {
 
   // Address-Of.
   if (node->op.type == TType::And) {
-    node->resolved_type = global_get_type(operand_ty)->take_pointer_to(node->mutability);
+    auto symbol = ctx.get_symbol(node->operand);
+    auto op_ty = global_get_type(operand_ty);
+
+    if (symbol) {
+      auto sym = symbol.get();
+      if (sym->is_const() && node->mutability == MUT && !op_ty->get_ext().is_mut_pointer() && !op_ty->is_kind(TYPE_FUNCTION)) {
+        throw_error("cannot take a mutable pointer to a non-mutable variable", node->source_range);
+      }
+    }
+
+    node->resolved_type = op_ty->take_pointer_to(node->mutability);
     return;
   }
 
