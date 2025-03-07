@@ -11,7 +11,6 @@
 #include "interned_string.hpp"
 #include "scope.hpp"
 #include "type.hpp"
-#include "strings.hpp"
 
 /*
   #########################
@@ -81,8 +80,9 @@ int main(int argc, char *argv[]) {
       args += arg + " ";
     }
     std::string command = invocation + " " + args;
-    std::cout << "Running: " << command << std::endl;
+    std::cout << "running: " << command << std::endl;
     auto status = system(command.c_str());
+
     if (status == -1) {
       perror("system");
       exit(1);
@@ -90,15 +90,16 @@ int main(int argc, char *argv[]) {
       if (WIFEXITED(status)) {
         int exit_status = WEXITSTATUS(status);
         if (exit_status != 0) {
-          std::cerr << "failed with exit status " << exit_status << std::endl;
+          std::cerr << "\033[1;31mexited with code " << exit_status << "\033[0m\n";
         }
       } else if (WIFSIGNALED(status)) {
         int signal_number = WTERMSIG(status);
-        std::cerr << "terminated by signal " << signal_number << std::endl;
+        std::cerr << "\033[1;31mterminated by signal\033[1;34m " << strsignal(signal_number) << "\033[0m\n";
       } else {
-        std::cerr << "failed with unknown status" << std::endl;
+        std::cerr << "\033[1;31mfailed with unknown status\033[0m\n";
       }
     }
+
   }
 
   if (run_tests) {

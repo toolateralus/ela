@@ -11,62 +11,6 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-void emit(ASTNode *root, Context &context, Typer &type_visitor, int type_list) {
-  Emitter emit(context, type_visitor);
-  DependencyEmitter dependencyEmitter(context, &emit);
-
-  static const auto testing = compile_command.has_flag("test");
-  const bool is_freestanding =
-      compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
-
-  if (!is_freestanding) {
-    emit.code << "#define USE_STD_LIB 1\n";
-  } else {
-    if (compile_command.has_flag("test")) {
-      throw_error("You cannot use unit tests in a freestanding or nostlib "
-                  "environment due to lack of exception handling",
-                  {});
-    }
-  }
-
-  if (compile_command.has_flag("test-verbose")) {
-    emit.code << "#define TEST_VERBOSE;\n";
-    std ::cout << "adding TEST_VERBOSE\n";
-  }
-
-  if (!compile_command.has_flag("release")) {
-    emit.code << "#line 0 \"boilerplate.hpp\"";
-  }
-
-  emit.code << BOILERPLATE_C_CODE << '\n';
-
-  if (!is_freestanding) {
-    dependencyEmitter.declare_type(type_list);
-    dependencyEmitter.define_type(type_list);
-    emit.code << "typedef struct Type Type;\n";
-    emit.code << std::format("extern {} _type_info;\n", emit.to_cpp_string(global_get_type(type_list)));
-  }
-
-  if (testing) {
-    emit.code << "#define TESTING\n";
-  }
-
-  root->accept(&dependencyEmitter);
-  root->accept(&emit);
-
-  std::filesystem::current_path(compile_command.original_path);
-  std::ofstream output(compile_command.output_path);
-
-  std::string program;
-  if (compile_command.has_flag("test")) {
-    output << "#define TESTING\n";
-  }
-
-  output << emit.code.str();
-  output.flush();
-  output.close();
-}
-
 int CompileCommand::compile() {
   init_type_system();
   Lexer lexer{};
@@ -83,7 +27,61 @@ int CompileCommand::compile() {
   auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
   type_visitor.visit(root);
 
-  emit(root, context, type_visitor, type_list);
+  {
+    Emitter emit(context, type_visitor);
+    DependencyEmitter dependencyEmitter(context, &emit);
+
+    static const auto testing = compile_command.has_flag("test");
+    const bool is_freestanding =
+        compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
+
+    if (!is_freestanding) {
+      emit.code << "#define USE_STD_LIB 1\n";
+    } else {
+      if (compile_command.has_flag("test")) {
+        throw_error("You cannot use unit tests in a freestanding or nostlib "
+                    "environment due to lack of exception handling",
+                    {});
+      }
+    }
+
+    if (compile_command.has_flag("test-verbose")) {
+      emit.code << "#define TEST_VERBOSE;\n";
+      std ::cout << "adding TEST_VERBOSE\n";
+    }
+
+    if (!compile_command.has_flag("release")) {
+      emit.code << "#line 0 \"boilerplate.hpp\"";
+    }
+
+    emit.code << BOILERPLATE_C_CODE << '\n';
+
+    if (!is_freestanding) {
+      dependencyEmitter.declare_type(type_list);
+      dependencyEmitter.define_type(type_list);
+      emit.code << "typedef struct Type Type;\n";
+      emit.code << std::format("extern {} _type_info;\n", emit.to_cpp_string(global_get_type(type_list)));
+    }
+
+    if (testing) {
+      emit.code << "#define TESTING\n";
+    }
+
+    root->accept(&dependencyEmitter);
+    root->accept(&emit);
+
+    std::filesystem::current_path(compile_command.original_path);
+    std::ofstream output(compile_command.output_path);
+
+    std::string program;
+    if (compile_command.has_flag("test")) {
+      output << "#define TESTING\n";
+    }
+
+    output << emit.code.str();
+    output.flush();
+    output.close();
+  }
 
   lower.end("lowering to cpp complete");
 
@@ -121,34 +119,25 @@ int CompileCommand::compile() {
   return result;
 }
 
-void CompileCommand::setup_ignored_warnings() {
-  if (has_flag("--Wignore-all")) {
-    ignored_warnings |= WarningIgnoreAll;
-  }
-  if (has_flag("--Wno-arrow-operator")) {
-    ignored_warnings |= WarningUseDotNotArrowOperatorOverload;
-  }
-  if (has_flag("--Wno-inaccessible-decl")) {
-    ignored_warnings |= WarningInaccessibleDeclaration;
-  }
-  if (has_flag("--Wno-empty-string-interp")) {
-    ignored_warnings |= WarningEmptyStringInterpolation;
-  }
-  if (has_flag("--Wno-non-null-deleted")) {
-    ignored_warnings |= WarningNonNullDeletedPointer;
-  }
-  if (has_flag("--Wno-ambiguous-variant")) {
-    ignored_warnings |= WarningAmbigousVariants;
-  }
-  if (has_flag("--Wno-switch-break")) {
-    ignored_warnings |= WarningSwitchBreak;
-  }
-  if (has_flag("--Wno-array-param")) {
-    ignored_warnings |= WarningDownCastFixedArrayParam;
+void CompileCommand::add_c_flag(const std::string &flags) {
+  this->c_flags += flags;
+  if (!this->c_flags.ends_with(' ')) {
+    this->c_flags += ' ';
   }
 }
 
-CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests) {
+void CompileCommand::print_command() const {
+  std::cout << "\033[1;32mInput Path:\033[0m " << input_path << std::endl;
+  std::cout << "\033[1;32mOutput Path:\033[0m " << output_path << std::endl;
+  std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;
+  std::cout << "\033[1;32mFlags:\033[0m" << std::endl;
+  for (const auto &flag : flags) {
+    std::cout << "  \033[1;34m--" << flag.first << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
+  }
+}
+
+CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args,
+                               bool &run_on_finished, bool &run_tests) {
   for (size_t i = 0; i < args.size(); ++i) {
     std::string arg = args[i];
     if (arg == "run" || arg == "r") {
@@ -222,23 +211,30 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
     print_command();
   }
 
-  setup_ignored_warnings();
-
-}
-
-void CompileCommand::add_c_flag(const std::string &flags) {
-  this->c_flags += flags;
-  if (!this->c_flags.ends_with(' ')) {
-    this->c_flags += ' ';
-  }
-}
-
-void CompileCommand::print_command() const {
-  std::cout << "\033[1;32mInput Path:\033[0m " << input_path << std::endl;
-  std::cout << "\033[1;32mOutput Path:\033[0m " << output_path << std::endl;
-  std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;
-  std::cout << "\033[1;32mFlags:\033[0m" << std::endl;
-  for (const auto &flag : flags) {
-    std::cout << "  \033[1;34m--" << flag.first << "\033[0m: " << (flag.second ? "true" : "false") << std::endl;
+  {
+    if (has_flag("--Wignore-all")) {
+      ignored_warnings |= WarningIgnoreAll;
+    }
+    if (has_flag("--Wno-arrow-operator")) {
+      ignored_warnings |= WarningUseDotNotArrowOperatorOverload;
+    }
+    if (has_flag("--Wno-inaccessible-decl")) {
+      ignored_warnings |= WarningInaccessibleDeclaration;
+    }
+    if (has_flag("--Wno-empty-string-interp")) {
+      ignored_warnings |= WarningEmptyStringInterpolation;
+    }
+    if (has_flag("--Wno-non-null-deleted")) {
+      ignored_warnings |= WarningNonNullDeletedPointer;
+    }
+    if (has_flag("--Wno-ambiguous-variant")) {
+      ignored_warnings |= WarningAmbigousVariants;
+    }
+    if (has_flag("--Wno-switch-break")) {
+      ignored_warnings |= WarningSwitchBreak;
+    }
+    if (has_flag("--Wno-array-param")) {
+      ignored_warnings |= WarningDownCastFixedArrayParam;
+    }
   }
 }
