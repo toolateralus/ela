@@ -241,7 +241,7 @@ switch_helper :: fn() -> s32 {
 
   assert("Return value of switch statement failed", new_int == integer);
 
-  // // test range based shiz.
+  // test range based shiz.
   // passed = false;
   // switch 0 {
   //   0..10: {
@@ -262,7 +262,8 @@ switch_helper :: fn() -> s32 {
     1 => false,
     else => true,
   }
-  assert("switch with else case failed", case);
+  printf("%s\n", typeof(case).name);
+  assert("switch with else case failed", case as bool);
 }
 
 

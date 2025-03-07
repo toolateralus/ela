@@ -67,7 +67,6 @@ struct VisitorBase {
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
-  int current_block_statement_idx;
   bool in_call = false;
   int expected_type = -1;
 
