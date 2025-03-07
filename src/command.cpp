@@ -10,14 +10,13 @@ bool CompileCommand::has_flag(const std::string &flag) const {
   return it != flags.end() && it->second;
 }
 
-void emit(ASTNode *root, Context& context, Typer &type_visitor, int type_list) {
+void emit(ASTNode *root, Context &context, Typer &type_visitor, int type_list) {
   Emitter emit(context, type_visitor);
   DependencyEmitter dependencyEmitter(context, &emit);
 
-
   static const auto testing = compile_command.has_flag("test");
-  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
-                               compile_command.compilation_flags.contains("-nostdlib");
+  const bool is_freestanding = compile_command.c_flags.contains("-ffreestanding") ||
+                               compile_command.c_flags.contains("-nostdlib");
 
   if (!is_freestanding) {
     emit.code << "#define USE_STD_LIB 1\n";
@@ -37,9 +36,8 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor, int type_list) {
   if (!compile_command.has_flag("release")) {
     emit.code << "#line 0 \"boilerplate.hpp\"";
   }
-  
-  emit.code << INESCAPABLE_BOILERPLATE_AAAGHHH << '\n';
 
+  emit.code << BOILERPLATE_C_CODE << '\n';
 
   if (!is_freestanding) {
     dependencyEmitter.declare_type(type_list);
@@ -69,6 +67,7 @@ void emit(ASTNode *root, Context& context, Typer &type_visitor, int type_list) {
 }
 
 int CompileCommand::compile() {
+  init_type_system();
   Lexer lexer{};
   Context context{};
   original_path = std::filesystem::current_path();
@@ -84,13 +83,13 @@ int CompileCommand::compile() {
   type_visitor.visit(root);
 
   emit(root, context, type_visitor, type_list);
-  
+
   lower.end("lowering to cpp complete");
 
   int result = 0;
 
   if (!has_flag("no-compile")) {
-    std::string extra_flags = compilation_flags;
+    std::string extra_flags = c_flags;
 
     if (has_flag("release"))
       extra_flags += " -O3 ";
@@ -99,10 +98,10 @@ int CompileCommand::compile() {
 
     static std::string ignored_warnings = "-w";
 
-    std::string output_flag = (compilation_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
+    std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
 
-    auto compilation_string = std::format("clang -std=c23 {} {} {} {}", ignored_warnings,
-                                          output_path.string(), output_flag, extra_flags);
+    auto compilation_string =
+        std::format("clang -std=c23 {} {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
 
     if (compile_command.has_flag("x"))
       printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
@@ -147,20 +146,38 @@ void CompileCommand::setup_ignored_warnings() {
   }
 }
 
-CompileCommand::CompileCommand(int argc, char *argv[]) {
-  if (argc < 2) {
-    printf("\033[31mUsage: <input.ela> (optional)::[-o "
-           "<output.cpp>] [--flag]\033[0m\n");
-  }
+CompileCommand::CompileCommand(const std::vector<std::string> &args) {
+  std::vector<std::string> runtime_args;
+  bool run_on_finished;
+  bool run_tests;
 
-  for (int i = 1; i < argc; ++i) {
-    std::string arg = argv[i];
-    if (arg == "-o" && i + 1 < argc) {
-      output_path = argv[++i];
-    } else if (arg.rfind("--", 0) == 0) {
+  for (size_t i = 0; i < args.size(); ++i) {
+    std::string arg = args[i];
+    if (arg == "run" || arg == "r") {
+      input_path = "main.ela";
+      run_on_finished = true;
+    } else if (arg == "build" || arg == "b") {
+      input_path = "main.ela";
+    } else if (arg == "test" || arg == "t") {
+      run_tests = true;
+      input_path = "test.ela";
+      run_on_finished = true;
+    } else if (arg == "init") {
+      std::ofstream file("main.ela");
+      if (i + 1 < args.size() && args[i + 1] == "raylib") {
+        file << RAYLIB_INIT_CODE;
+      } else {
+        file << MAIN_INIT_CODE;
+      }
+      exit(0);
+    } else if (arg == "-o" && i + 1 < args.size()) {
+      output_path = args[++i];
+    } else if (arg.ends_with(".ela") && input_path.empty()) {
+      input_path = arg;
+    } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;
     } else {
-      input_path = arg;
+      runtime_args.push_back(arg);
     }
   }
 
@@ -170,7 +187,6 @@ CompileCommand::CompileCommand(int argc, char *argv[]) {
   }
 
   std::filesystem::path input_fs_path(input_path);
-
   if (!std::filesystem::exists(input_fs_path)) {
     printf("%s\n", (std::format("\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
     exit(1);
@@ -195,27 +211,30 @@ CompileCommand::CompileCommand(int argc, char *argv[]) {
     }
     output_path = filename;
   }
-}
 
-std::string CompileCommand::read_input_file() {
-  std::ifstream stream(std::filesystem::canonical(input_path));
-  std::stringstream ss;
-  ss << stream.rdbuf();
-  if (ss.str().empty()) {
-    printf("%s\n", std::format("\033[31mError: {} is empty.\033[0m", input_path.string()).c_str());
-    exit(1);
+  if (run_tests) {
+    flags["test"] = true;
   }
-  return ss.str();
+
+  if (flags["freestanding"]) {
+    c_flags += " -ffreestanding -nostdlib ";
+  }
+
+  if (has_flag("x")) {
+    print_command();
+  }
+
+  setup_ignored_warnings();
 }
 
-void CompileCommand::add_compilation_flag(const std::string &flags) {
-  this->compilation_flags += flags;
-  if (!this->compilation_flags.ends_with(' ')) {
-    this->compilation_flags += ' ';
+void CompileCommand::add_c_flag(const std::string &flags) {
+  this->c_flags += flags;
+  if (!this->c_flags.ends_with(' ')) {
+    this->c_flags += ' ';
   }
 }
 
-void CompileCommand::print() const {
+void CompileCommand::print_command() const {
   std::cout << "\033[1;32mInput Path:\033[0m " << input_path << std::endl;
   std::cout << "\033[1;32mOutput Path:\033[0m " << output_path << std::endl;
   std::cout << "\033[1;32mBinary Path:\033[0m " << binary_path << std::endl;

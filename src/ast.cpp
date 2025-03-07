@@ -288,7 +288,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (string == "-g") {
           compile_command.flags[string.get_str()] = true;
         }
-        compile_command.add_compilation_flag(string.get_str());
+        compile_command.add_c_flag(string.get_str());
         return nullptr;
     }},
     // #flags, for making an enum declaration auto increment with a flags value.

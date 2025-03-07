@@ -70,7 +70,7 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   )__";
   
   // This is stuff we just can't really get rid of while using a transpiled backend.
-  static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
+  static constexpr auto BOILERPLATE_C_CODE = R"__(
   typedef unsigned long long int u64;
   typedef signed long long int s64;
   

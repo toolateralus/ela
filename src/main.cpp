@@ -57,12 +57,10 @@ static bool run_on_finished = false;
 #include <string>
 
 int main(int argc, char *argv[]) {
-  for (int i = 0; i < argc; ++i) {
-    if (strcmp(argv[i], "--h") == 0 || strcmp(argv[i], "--help") == 0) {
-      printf(HELP_STRING);
-      return 0;
-    }
-  }
+  std::vector<std::string> compiler_args;
+  std::vector<std::string> runtime_args;
+  bool run_on_finished = false;
+  bool run_tests = false;
 
   if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     if (terminal_supports_color) {
@@ -75,70 +73,22 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  vector<string> original_args(argv + (argc >= 2 ? 2 : 1), argv + argc);
+  compile_command = CompileCommand(std::vector<string>(argv, argc + argv));
 
-  if (argc >= 2 && (strcmp(argv[1], "run") == 0 || strcmp(argv[1], "r") == 0)) {
-    argv[1] = (char *)"main.ela";
-    argc = 2;
-    run_on_finished = true;
-  }
-
-  if (argc >= 2 && (strcmp(argv[1], "build") == 0 || strcmp(argv[1], "b") == 0)) {
-    argv[1] = (char *)"main.ela";
-    argc = 2;
-  }
-
-  bool run_tests = false;
-  if (argc >= 2 && (strcmp(argv[1], "test") == 0 || strcmp(argv[1], "t") == 0)) {
-    run_tests = true;
-    argv[1] = (char *)"test.ela";
-    argc = 2;
-    run_on_finished = true;
-  }
-
-  if (argc >= 2 && (strcmp(argv[1], "init") == 0)) {
-    std::ofstream file("main.ela");
-    if (argc > 2 && (strcmp(argv[2], "raylib") == 0)) {
-      file << RAYLIB_INIT_CODE;
-    } else {
-      file << MAIN_INIT_CODE;
-    }
-    return 0;
-  }
-
-  compile_command = CompileCommand(argc, argv);
-
-  if (run_tests) {
-    compile_command.flags["test"] = true;
-  }
-
-  if (compile_command.has_flag("freestanding")) {
-    compile_command.compilation_flags += " -ffreestanding -nostdlib ";
-  }
-
-  if (compile_command.has_flag("x"))
-    compile_command.print();
-
-  compile_command.setup_ignored_warnings();
-
-  init_type_system();
   auto result = compile_command.compile();
 
-  if (run_on_finished) {
-    if (result == 0) {
-      string invocation = ("./" + compile_command.binary_path.string());
-      string args = "";
-      for (const auto &arg : original_args) {
-        args += arg + " ";
-      }
-      auto command = invocation + " " + args;
-      std::cout << "Running: " << command << std::endl;
-      system(command.c_str());
+  if (run_on_finished && result == 0) {
+    std::string invocation = "./" + compile_command.binary_path.string();
+    std::string args;
+    for (const auto &arg : runtime_args) {
+      args += arg + " ";
     }
+    std::string command = invocation + " " + args;
+    std::cout << "Running: " << command << std::endl;
+    system(command.c_str());
   }
 
   if (run_tests) {
-    // remove the binaryj after.
     system("rm test");
   }
 
