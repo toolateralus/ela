@@ -1627,7 +1627,7 @@ void Typer::visit(ASTBinExpr *node) {
   node->right->accept(this);
   auto right = node->right->resolved_type;
 
-  if (node->op.type == TType::Assign) {
+  if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
     if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
       auto name = ((ASTIdentifier *)node->left)->value;
       if (auto symbol = ctx.scope->lookup(name)) {

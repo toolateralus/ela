@@ -8,7 +8,7 @@
 
 
 nested_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   if (true) {
     defer x += 2;
@@ -21,7 +21,7 @@ nested_defer_test :: fn() -> s32 {
 }
 
 loop_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += i;
   }
@@ -33,7 +33,7 @@ loop_defer_test :: fn() -> s32 {
 }
 
 early_return_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   if (true) {
     defer x += 2;
@@ -78,7 +78,7 @@ defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
 
 // Additional comprehensive tests
 continue_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {
@@ -94,7 +94,7 @@ continue_defer_test :: fn() -> s32 {
 }
 
 break_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {
@@ -110,7 +110,7 @@ break_defer_test :: fn() -> s32 {
 }
 
 multiple_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   defer x += 2;
   return x;
@@ -121,7 +121,7 @@ multiple_defer_test :: fn() -> s32 {
 }
 
 nested_control_flow_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {
