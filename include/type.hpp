@@ -260,6 +260,7 @@ struct ASTNode;
 struct Type {
   int id = INVALID_TYPE_ID;
   int base_id = INVALID_TYPE_ID;
+  int generic_base_id = INVALID_TYPE_ID;
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
@@ -277,16 +278,14 @@ struct Type {
   TypeExtensions const get_ext_no_compound() const { return extensions; }
   TypeInfo *get_info() const { return info; }
 
-  bool implements(const InternedString &interface) {
-    for (auto id : interfaces) {
-      auto iface = global_get_type(id);
-      std::string iface_base_str = iface->base.get_str();
-      std::string interface_str = interface.get_str();
-      auto pos = iface_base_str.find('$');
-      if (pos != std::string::npos) {
-        iface_base_str = iface_base_str.substr(0, pos);
-      }
-      if (iface_base_str == interface_str) {
+  bool implements(const int interface) {
+    auto found = std::ranges::find(interfaces, interface);
+    if (found != interfaces.end()) {
+      return true;
+    }
+    for (auto &interface_id : interfaces) {
+      auto type = global_get_type(interface_id);
+      if (type->generic_base_id == interface) {
         return true;
       }
     }

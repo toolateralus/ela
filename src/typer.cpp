@@ -80,48 +80,6 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, const int to, const SourceRan
   }
 }
 
-bool impl_method_matches_interface(int interface_method, int impl_method) {
-  auto interface = global_get_type(interface_method)->get_info()->as<FunctionTypeInfo>();
-  auto impl = global_get_type(impl_method)->get_info()->as<FunctionTypeInfo>();
-
-  if (interface->params_len != impl->params_len) {
-    return false;
-  }
-
-  for (int i = 0; i < interface->params_len; ++i) {
-    auto interface_param = global_get_type(interface->parameter_types[i]);
-    auto impl_param = global_get_type(impl->parameter_types[i]);
-    if (interface_param->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_param->get_base();
-      if (!impl_param->implements(base)) {
-        return false;
-      }
-      if (interface_param->generic_args != impl_param->generic_args) {
-        return false;
-      }
-    } else if (interface_param != impl_param) {
-      return false;
-    }
-  }
-
-  {
-    auto interface_return = global_get_type(interface->return_type);
-    auto impl_return = global_get_type(impl->return_type);
-    if (interface_return->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_return->get_base();
-      if (!impl_return->implements(base)) {
-        return false;
-      }
-      if (interface_return->generic_args != impl_return->generic_args) {
-        return false;
-      }
-    } else if (interface_return != impl_return) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 bool expr_is_literal(const ASTExpr *expr) {
   switch (expr->get_node_type()) {
@@ -205,7 +163,7 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
       ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
-    type = global_get_type(global_create_tagged_union_type(node->name, node->scope, generic_args));
+    type = global_get_type(global_create_tagged_union_type(node->name.get_str(), node->scope, generic_args));
   }
 
   type->declaring_node = node;
@@ -402,6 +360,47 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   node->resolved_type = global_find_function_type_id(info, {});
 }
 
+bool impl_method_matches_interface(int interface_method, int impl_method) {
+  auto interface = global_get_type(interface_method)->get_info()->as<FunctionTypeInfo>();
+  auto impl = global_get_type(impl_method)->get_info()->as<FunctionTypeInfo>();
+
+  if (interface->params_len != impl->params_len) {
+    return false;
+  }
+
+  for (int i = 0; i < interface->params_len; ++i) {
+    auto interface_param = global_get_type(interface->parameter_types[i]);
+    auto impl_param = global_get_type(impl->parameter_types[i]);
+    if (interface_param->is_kind(TYPE_INTERFACE)) {
+      if (!impl_param->implements(interface_param->id)) {
+        return false;
+      }
+      if (interface_param->generic_args != impl_param->generic_args) {
+        return false;
+      }
+    } else if (interface_param != impl_param) {
+      return false;
+    }
+  }
+
+  {
+    auto interface_return = global_get_type(interface->return_type);
+    auto impl_return = global_get_type(impl->return_type);
+    if (interface_return->is_kind(TYPE_INTERFACE)) {
+      if (!impl_return->implements(interface_return->id)) {
+        return false;
+      }
+      if (interface_return->generic_args != impl_return->generic_args) {
+        return false;
+      }
+    } else if (interface_return != impl_return) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
   auto old_type = type_context;
@@ -575,6 +574,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     target_ty->interfaces.push_back(interface_ty->id);
   }
 
+  for (auto &[name, impl_sym] : impl_scope.symbols) {
+    ctx.scope->symbols[name] = type_scope->symbols[name];
+  }
+
   node->resolved_type = target_ty->id;
 }
 
@@ -595,6 +598,8 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
+  auto type = global_get_type(global_create_interface_type(node->name.get_str(), ctx.scope, generic_args));
+
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -602,13 +607,13 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
       ctx.scope->create_type_alias(param, *generic_arg, kind, node);
       generic_arg++;
     }
+    type->generic_base_id = ctx.scope->lookup(node->name)->type_id;
   }
 
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
 
-  auto type = global_get_type(global_create_interface_type(node->name, ctx.scope, generic_args));
   type->declaring_node = node;
   node->resolved_type = type->id;
 }
@@ -1218,7 +1223,7 @@ void Typer::visit(ASTFor *node) {
   int iter_ty = Type::INVALID_TYPE_ID;
   auto scope = range_type->get_info()->scope;
 
-  if (range_type->implements("Iterable")) { // can return an iterator.
+  if (range_type->implements(iterable_interface())) { // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
 
     compiler_mock_method_call_visit_impl(range_type_id, "iter");
@@ -1233,7 +1238,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-  } else if (range_type->implements("Iter")) { // directly an iterator.
+  } else if (range_type->implements(iter_interface())) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
 
@@ -2282,7 +2287,11 @@ void Typer::visit(ASTCast *node) {
 
 void Typer::visit(ASTInterfaceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->declare_interface(node->name, node);
+    std::vector<int> args;
+    for (auto &param : node->generic_parameters) {
+      args.push_back(Type::UNRESOLVED_GENERIC_TYPE_ID);
+    }
+    ctx.scope->create_interface_type(node->name, node->scope, args, node);
   } else {
     visit_interface_declaration(node, false);
     ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE, node);
