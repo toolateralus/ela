@@ -43,6 +43,9 @@ struct Symbol {
   bool is_module() const { return (flags & SYMBOL_IS_MODULE) != 0; }
   bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
 
+  bool is_const() const { return mutability == CONST; }
+  bool is_mut() const { return mutability == MUT; }
+
   union {
     struct {
       Nullable<ASTNode> declaration;

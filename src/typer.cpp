@@ -1518,6 +1518,65 @@ void Typer::visit(ASTBinExpr *node) {
 
   auto left_ty = global_get_type(left);
 
+  // Do checks for constness.
+  if (node->op.type == TType::Assign) {
+    if (node->left->get_node_type() == AST_NODE_UNARY_EXPR) {
+      auto unary = (ASTUnaryExpr*)node->left;
+      auto unary_operand_ty = global_get_type(unary->operand->resolved_type);
+      if (unary->op.type == TType::Mul && unary_operand_ty->get_ext().is_const_pointer()) {
+        throw_error("cannot dereference into a const pointer!", node->source_range);
+      }
+  
+      auto left_ty = global_get_type(unary->operand->resolved_type);
+      auto symbol = ctx.get_symbol(unary->operand);
+      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->get_ext().is_mut_pointer()) {
+        throw_error("cannot assign into a const variable!", node->source_range);
+      }
+  
+    } else if (node->left->get_node_type() == AST_NODE_SUBSCRIPT) {
+      auto subscript = (ASTSubscript*)node->left;
+      
+      auto subscript_left_ty = global_get_type(subscript->left->resolved_type);
+      if (subscript_left_ty->get_ext().is_const_pointer()) {
+        throw_error("cannot subscript-assign into a const pointer!", node->source_range);
+      }
+  
+      auto symbol = ctx.get_symbol(subscript->left);
+      if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->get_ext().is_mut_pointer()) {
+        throw_error("cannot subscript-assign into a const variable!", node->source_range);
+      }
+  
+    } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
+      auto dot = (ASTDotExpr*)node->left;
+  
+      auto symbol = ctx.get_symbol(dot->base);
+      auto left_ty = global_get_type(dot->base->resolved_type);
+      
+      if (left_ty->get_ext().is_const_pointer()) {
+        throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
+      }
+
+      if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->get_ext().is_mut_pointer()) {
+        throw_error("cannot dot-assign into a const variable!", node->source_range);
+      }
+
+      /* 
+        We have to check all the way down the left of the dot expression.
+      */
+      while (dot->base->get_node_type() == AST_NODE_DOT_EXPR) {
+        dot = (ASTDotExpr*)dot->base;
+        auto left_ty = global_get_type(dot->base->resolved_type);
+        if (left_ty->get_ext().is_const_pointer()) {
+          throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
+        }
+        auto symbol = ctx.get_symbol(dot->base);
+        if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->get_ext().is_mut_pointer()) {
+          throw_error("cannot dot-assign into a const variable!", dot->base->source_range);
+        }
+      }
+    }
+  }
+
   auto operator_overload_ty = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
   if (operator_overload_ty != -1) {
     node->is_operator_overload = true;
@@ -1575,6 +1634,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   // Dereference.
   if (node->op.type == TType::Mul) {
     auto type = global_get_type(operand_ty);
+
     if (type->get_ext().is_pointer()) {
       node->resolved_type = type->get_element_type();
       return;

@@ -47,7 +47,7 @@ early_return_defer_test :: fn() -> s32 {
 }
 
 DeferCleanup :: struct {
-  ptr : *const void
+  ptr : *mut void
 }
 
 // Return statements are evaluated BEFORE the defer, so
@@ -56,7 +56,7 @@ DeferCleanup :: struct {
 
 // here we show that the ptr as a u64 is passed back to the caller before it's set to null
 // in the defer block. which is absolutely expected behaviour.
-defer_cleanup_routine :: fn(c: *const DeferCleanup) -> u64 {
+defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
   defer {
     free(c.ptr);
     c.ptr = null;
@@ -71,7 +71,7 @@ defer_cleanup_routine :: fn(c: *const DeferCleanup) -> u64 {
     ptr: ptr
   };
   ptr_as_int : u64 = ptr as u64;
-  n := defer_cleanup_routine(&const cleanup);
+  n := defer_cleanup_routine(&mut cleanup);
   assert("yep", n == ptr_as_int);
   assert("leanup on defer failed", cleanup.ptr == null);
 }

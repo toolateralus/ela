@@ -39,7 +39,7 @@ impl _Vec2 {
 
 
 #test test_union_type :: fn() {
-  test_union: Union;
+  mut test_union: Union;
   test_union.a = 10;
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
   test_union.method(10);
@@ -53,7 +53,7 @@ AnonSubUnion :: struct {
 }
 
 #test test_anon_union_in_struct :: fn() {
-  anon: AnonSubUnion;
+  mut anon: AnonSubUnion;
   anon.a = 100;
   assert("Anon sub union failed", anon.a == 100);
 }

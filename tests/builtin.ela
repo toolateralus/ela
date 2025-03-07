@@ -95,7 +95,7 @@ Xaryu :: struct {
 }
 
 #test subscript_string :: fn() {
-  s: str = "0,1,2,3,4";
+  mut s: str = "0,1,2,3,4";
   s[0] = 10;
   assert("subscript assign str failed", s[0] == (10 as u8));
 }
