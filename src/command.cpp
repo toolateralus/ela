@@ -3,6 +3,7 @@
 #include "type.hpp"
 #include "visitor.hpp"
 #include "ast.hpp"
+#include <cstdlib>
 #include <filesystem>
 
 bool CompileCommand::has_flag(const std::string &flag) const {
@@ -15,8 +16,8 @@ void emit(ASTNode *root, Context &context, Typer &type_visitor, int type_list) {
   DependencyEmitter dependencyEmitter(context, &emit);
 
   static const auto testing = compile_command.has_flag("test");
-  const bool is_freestanding = compile_command.c_flags.contains("-ffreestanding") ||
-                               compile_command.c_flags.contains("-nostdlib");
+  const bool is_freestanding =
+      compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
   if (!is_freestanding) {
     emit.code << "#define USE_STD_LIB 1\n";
@@ -116,6 +117,7 @@ int CompileCommand::compile() {
 
   std::filesystem::current_path(original_path);
   print_metrics();
+
   return result;
 }
 
@@ -146,11 +148,7 @@ void CompileCommand::setup_ignored_warnings() {
   }
 }
 
-CompileCommand::CompileCommand(const std::vector<std::string> &args) {
-  std::vector<std::string> runtime_args;
-  bool run_on_finished;
-  bool run_tests;
-
+CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests) {
   for (size_t i = 0; i < args.size(); ++i) {
     std::string arg = args[i];
     if (arg == "run" || arg == "r") {
@@ -225,6 +223,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args) {
   }
 
   setup_ignored_warnings();
+
 }
 
 void CompileCommand::add_c_flag(const std::string &flags) {

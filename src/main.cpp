@@ -42,7 +42,7 @@ PanicHandler panic_handler = get_default_panic_handler();
 
 CompileCommand compile_command;
 
-std::unordered_map<InternedString, Scope*> import_map;
+std::unordered_map<InternedString, Scope *> import_map;
 std::unordered_set<InternedString> include_set;
 /*
   #########################
@@ -57,11 +57,6 @@ static bool run_on_finished = false;
 #include <string>
 
 int main(int argc, char *argv[]) {
-  std::vector<std::string> compiler_args;
-  std::vector<std::string> runtime_args;
-  bool run_on_finished = false;
-  bool run_tests = false;
-
   if (const char *env_p = std::getenv("ELA_LIB_PATH")) {
     if (terminal_supports_color) {
       std::cout << "\033[1;34mnote\033[0m: environment variable 'ELA_LIB_PATH' is set, loading import libraries "
@@ -73,7 +68,9 @@ int main(int argc, char *argv[]) {
     }
   }
 
-  compile_command = CompileCommand(std::vector<string>(argv, argc + argv));
+  std::vector<std::string> runtime_args;
+  bool run_on_finished = false, run_tests = false;
+  compile_command = CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests);
 
   auto result = compile_command.compile();
 
@@ -85,7 +82,23 @@ int main(int argc, char *argv[]) {
     }
     std::string command = invocation + " " + args;
     std::cout << "Running: " << command << std::endl;
-    system(command.c_str());
+    auto status = system(command.c_str());
+    if (status == -1) {
+      perror("system");
+      exit(1);
+    } else {
+      if (WIFEXITED(status)) {
+        int exit_status = WEXITSTATUS(status);
+        if (exit_status != 0) {
+          std::cerr << "failed with exit status " << exit_status << std::endl;
+        }
+      } else if (WIFSIGNALED(status)) {
+        int signal_number = WTERMSIG(status);
+        std::cerr << "terminated by signal " << signal_number << std::endl;
+      } else {
+        std::cerr << "failed with unknown status" << std::endl;
+      }
+    }
   }
 
   if (run_tests) {

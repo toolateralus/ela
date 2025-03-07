@@ -76,7 +76,7 @@ struct CompileCommand {
   void add_c_flag(const std::string &flags);
 
   void setup_ignored_warnings();
-  CompileCommand(const std::vector<std::string> &args);
+  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests);
   bool has_flag(const std::string &flag) const;
 
   void print_metrics() {
