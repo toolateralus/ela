@@ -4,7 +4,7 @@ thing :: struct!<T> {
 
 main :: fn() {
 	mut a: thing!<s32>;
-	b: thing!<s32>;
+	mut b: thing!<s32>;
 	a.next = &mut b;
 	a.next.next = &mut a;
 }
