@@ -330,9 +330,8 @@ void Emitter::visit(ASTCall *node) {
     auto func = symbol->function.declaration;
 
     auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
-    auto static_method = (func->flags & FUNCTION_IS_STATIC) != 0;
 
-    if (!method_call || static_method) {
+    if (!method_call) {
       throw_error("cannot call a static method from an instance", node->source_range);
     }
 

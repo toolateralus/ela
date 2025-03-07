@@ -1828,12 +1828,8 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   ctx.set_scope();
 
-  if (current_impl_decl) {
-    if (function->params->has_self) {
-      function->flags |= FUNCTION_IS_METHOD;
-    } else {
-      function->flags |= FUNCTION_IS_STATIC;
-    }
+  if (function->params->has_self) {
+    function->flags |= FUNCTION_IS_METHOD;
   }
 
   // TODO: find a better solution to this.

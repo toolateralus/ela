@@ -499,6 +499,39 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
           }
         }
+      } else if (!(interface_sym.function.declaration->flags & FUNCTION_IS_FORWARD_DECLARED)) {
+        auto method = (ASTFunctionDeclaration *)deep_copy_ast(interface_sym.function.declaration);
+        method->declaring_type = target_ty->id;
+        if (!method->generic_parameters.empty()) {
+          // TODO: actually generate a signature for a generic function so that you can compare them
+          type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
+          impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+          continue;
+        }
+        
+        visit_function_header(method, false);
+        auto func_ty_id = method->resolved_type;
+        
+        if (auto symbol = type_scope->local_lookup(method->name)) {
+          if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
+            throw_error("Redefinition of method", method->source_range);
+          } else {
+            symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
+          }
+        } else {
+          if ((method->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+            type_scope->insert_function(method->name, method->resolved_type, method,
+                                        SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+          } else {
+            type_scope->insert_function(method->name, method->resolved_type, method);
+          }
+          impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+          if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+            continue;
+          }
+        }
+    
+        visit_function_body(method);
       } else {
         throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
                                 interface_ty->to_string()),
