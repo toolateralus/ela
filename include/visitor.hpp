@@ -13,7 +13,50 @@
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
-  DECLARE_VISIT_BASE_METHODS()
+  void visit(ASTNoop *noop) { return; }
+  virtual void visit(ASTScopeResolution *node) = 0;
+  virtual void visit(ASTSize_Of *node) = 0;
+  virtual void visit(ASTImport *node) = 0;
+  virtual void visit(ASTCast *node) = 0;
+  virtual void visit(ASTWhere *node) = 0;
+  virtual void visit(ASTLambda *node) = 0;
+  virtual void visit(ASTProgram *node) = 0;
+  virtual void visit(ASTBlock *node) = 0;
+  virtual void visit(ASTFunctionDeclaration *node) = 0;
+  virtual void visit(ASTParamsDecl *node) = 0;
+  virtual void visit(ASTParamDecl *node) = 0;
+  virtual void visit(ASTVariable *node) = 0;
+  virtual void visit(ASTExprStatement *node) = 0;
+  virtual void visit(ASTBinExpr *node) = 0;
+  virtual void visit(ASTUnaryExpr *node) = 0;
+  virtual void visit(ASTIdentifier *node) = 0;
+  virtual void visit(ASTLiteral *node) = 0;
+  virtual void visit(ASTType *node) = 0;
+  virtual void visit(ASTCall *node) = 0;
+  virtual void visit(ASTArguments *node) = 0;
+  virtual void visit(ASTReturn *node) = 0;
+  virtual void visit(ASTContinue *node) = 0;
+  virtual void visit(ASTBreak *node) = 0;
+  virtual void visit(ASTFor *node) = 0;
+  virtual void visit(ASTIf *node) = 0;
+  virtual void visit(ASTElse *node) = 0;
+  virtual void visit(ASTWhile *node) = 0;
+  virtual void visit(ASTStructDeclaration *node) = 0;
+  virtual void visit(ASTDotExpr *node) = 0;
+  virtual void visit(ASTSubscript *node) = 0;
+  virtual void visit(ASTInitializerList *node) = 0;
+  virtual void visit(ASTEnumDeclaration *node) = 0;
+  virtual void visit(ASTRange *node) = 0;
+  virtual void visit(ASTSwitch *node) = 0;
+  virtual void visit(ASTTuple *node) = 0;
+  virtual void visit(ASTAlias *node) = 0;
+  virtual void visit(ASTImpl *node) = 0;
+  virtual void visit(ASTTupleDeconstruction *node) = 0;
+  virtual void visit(ASTDefer *node) = 0;
+  virtual void visit(ASTInterfaceDeclaration *node) = 0;
+  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTModule *node) = 0;
+  virtual void visit(ASTType_Of *node) = 0;
   virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);

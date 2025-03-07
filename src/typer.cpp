@@ -83,6 +83,74 @@ void assert_return_type_is_valid(int &return_type, int new_type, ASTNode *node) 
   }
 };
 
+bool impl_method_matches_interface(int interface_method, int impl_method) {
+  auto interface = global_get_type(interface_method)->get_info()->as<FunctionTypeInfo>();
+  auto impl = global_get_type(impl_method)->get_info()->as<FunctionTypeInfo>();
+
+  if (interface->params_len != impl->params_len) {
+    return false;
+  }
+
+  for (int i = 0; i < interface->params_len; ++i) {
+    auto interface_param = global_get_type(interface->parameter_types[i]);
+    auto impl_param = global_get_type(impl->parameter_types[i]);
+    if (interface_param->is_kind(TYPE_INTERFACE)) {
+      auto base = interface_param->get_base();
+      if (!impl_param->implements(base)) {
+        return false;
+      }
+      if (interface_param->generic_args != impl_param->generic_args) {
+        return false;
+      }
+    } else if (interface_param != impl_param) {
+      return false;
+    }
+  }
+
+  {
+    auto interface_return = global_get_type(interface->return_type);
+    auto impl_return = global_get_type(impl->return_type);
+    if (interface_return->is_kind(TYPE_INTERFACE)) {
+      auto base = interface_return->get_base();
+      if (!impl_return->implements(base)) {
+        return false;
+      }
+      if (interface_return->generic_args != impl_return->generic_args) {
+        return false;
+      }
+    } else if (interface_return != impl_return) {
+      return false;
+    }
+  }
+
+  return true;
+}
+
+bool expr_is_literal(ASTExpr *expr) {
+  switch (expr->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin_expr = static_cast<ASTBinExpr *>(expr);
+      return expr_is_literal(bin_expr->left) && expr_is_literal(bin_expr->right);
+    }
+    case AST_NODE_UNARY_EXPR:
+      return expr_is_literal(static_cast<ASTUnaryExpr *>(expr)->operand);
+    case AST_NODE_LITERAL:
+      return true;
+    default:
+      return false;
+  }
+}
+
+std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
+  std::vector<int> generic_args;
+  for (const auto &arg : args) {
+    arg->accept(this);
+    generic_args.push_back(arg->resolved_type);
+  }
+  return generic_args;
+}
+
+
 void Typer::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
@@ -94,15 +162,6 @@ void Typer::visit(ASTProgram *node) {
     index++;
   }
   ctx.set_scope(ctx.root_scope);
-}
-
-std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
-  std::vector<int> generic_args;
-  for (const auto &arg : args) {
-    arg->accept(this);
-    generic_args.push_back(arg->resolved_type);
-  }
-  return generic_args;
 }
 
 void Typer::visit(ASTTaggedUnionDeclaration *node) {
@@ -333,48 +392,6 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   node->resolved_type = global_find_function_type_id(info, {});
 }
 
-bool impl_method_matches_interface(int interface_method, int impl_method) {
-  auto interface = global_get_type(interface_method)->get_info()->as<FunctionTypeInfo>();
-  auto impl = global_get_type(impl_method)->get_info()->as<FunctionTypeInfo>();
-
-  if (interface->params_len != impl->params_len) {
-    return false;
-  }
-
-  for (int i = 0; i < interface->params_len; ++i) {
-    auto interface_param = global_get_type(interface->parameter_types[i]);
-    auto impl_param = global_get_type(impl->parameter_types[i]);
-    if (interface_param->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_param->get_base();
-      if (!impl_param->implements(base)) {
-        return false;
-      }
-      if (interface_param->generic_args != impl_param->generic_args) {
-        return false;
-      }
-    } else if (interface_param != impl_param) {
-      return false;
-    }
-  }
-
-  {
-    auto interface_return = global_get_type(interface->return_type);
-    auto impl_return = global_get_type(impl->return_type);
-    if (interface_return->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_return->get_base();
-      if (!impl_return->implements(base)) {
-        return false;
-      }
-      if (interface_return->generic_args != impl_return->generic_args) {
-        return false;
-      }
-    } else if (interface_return != impl_return) {
-      return false;
-    }
-  }
-
-  return true;
-}
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
@@ -644,21 +661,6 @@ void Typer::visit(ASTFunctionDeclaration *node) {
   visit_function_body(node);
 }
 
-bool expr_is_literal(ASTExpr *expr) {
-  switch (expr->get_node_type()) {
-    case AST_NODE_BIN_EXPR: {
-      auto bin_expr = static_cast<ASTBinExpr *>(expr);
-      return expr_is_literal(bin_expr->left) && expr_is_literal(bin_expr->right);
-    }
-    case AST_NODE_UNARY_EXPR:
-      return expr_is_literal(static_cast<ASTUnaryExpr *>(expr)->operand);
-    case AST_NODE_LITERAL:
-      return true;
-    default:
-      return false;
-  }
-}
-
 void Typer::visit(ASTVariable *node) {
   // Inferred declaration.
   if (node->type == nullptr) {
@@ -873,6 +875,103 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
 
   call.function = &dot;
   call.accept(this);
+}
+
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable) {
+  auto old_type = expected_type;
+  Defer _([&]() { expected_type = old_type; });
+  auto args_ct = node->arguments.size();
+  auto params_ct = params->params.size();
+  int param_index = self_nullable.is_not_null() ? 1 : 0;
+
+  { // Check the other parameters, besides self.
+    for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
+      if (param_index < params_ct) {
+        auto &param = params->params[param_index];
+        if (arg_index < args_ct) {
+          expected_type = param->resolved_type;
+          node->arguments[arg_index]->accept(this);
+          assert_types_can_cast_or_equal(
+              node->arguments[arg_index]->resolved_type, param->resolved_type, node->arguments[arg_index]->source_range,
+              std::format("unexpected argument type.. parameter #{} of function",
+                          arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+        } else {
+          // TODO: handle default params here
+          throw_error("Too few arguments to function", node->source_range);
+        }
+      } else {
+        if (!params->is_varargs) {
+          throw_error("Too many arguments to function", node->source_range);
+        }
+        expected_type = Type::INVALID_TYPE_ID;
+        node->arguments[arg_index]->accept(this);
+      }
+    }
+  }
+
+  // TODO: @Cooper-Pilot we need a more structured way to type check the self parameter, now that
+  // we support const/mut var, and const/mut pointers, theres a billion combinations.
+  if (false && self_nullable.is_not_null()) {
+    auto self = self_nullable.get();
+    auto first = global_get_type(params->params[0]->resolved_type);
+    auto self_symbol = ctx.get_symbol(self);
+    auto self_type = global_get_type(self->resolved_type);
+
+    if (self_symbol.is_not_null() && self_symbol.get()->is_const()) {
+      if (!self_type->get_ext().is_pointer()) {
+        // self is a const non-pointer variable
+        if (first->get_ext().is_mut_pointer()) {
+          throw_error("cannot pass a const variable to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
+      } else {
+        // self is a const pointer
+        if (!first->get_ext().is_const_pointer()) {
+          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
+      }
+    } else {
+      if (!self_type->get_ext().is_pointer()) {
+        // self is a mutable non-pointer variable
+        if (!first->get_ext().is_mut_pointer() && !first->get_ext().is_const_pointer()) {
+          throw_error("invalid function parameter type for self", node->source_range);
+        }
+      } else {
+        // self is a non-const pointer
+        if (!first->get_ext().is_pointer()) {
+          throw_error("cannot pass a pointer to a function expecting a non-pointer type!",
+                      node->source_range);
+        } else if (first->get_ext().is_mut_pointer() && self_symbol.is_not_null() && self_symbol.get()->is_const()) {
+          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
+      }
+    }
+  }
+}
+
+void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
+  auto old_type = expected_type;
+  Defer _([&]() { expected_type = old_type; });
+  auto args_ct = node->arguments.size();
+  // TODO: rewrite this. this is so hard tor read.
+  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
+    throw_error(
+        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
+                    info->params_len, args_ct, info->to_string()),
+        node->source_range);
+  }
+
+  for (int i = 0; i < args_ct; ++i) {
+    auto arg = node->arguments[i];
+    expected_type = info->parameter_types[i];
+    arg->accept(this);
+    if (i < info->params_len) {
+      assert_types_can_cast_or_equal(arg->resolved_type, info->parameter_types[i], arg->source_range,
+                                     std::format("invalid argument type for parameter #{}", i + 1));
+    }
+  }
 }
 
 void Typer::visit(ASTFor *node) {
@@ -1105,103 +1204,6 @@ void Typer::visit(ASTCall *node) {
   node->resolved_type = info->return_type;
 }
 
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable) {
-  auto old_type = expected_type;
-  Defer _([&]() { expected_type = old_type; });
-  auto args_ct = node->arguments.size();
-  auto params_ct = params->params.size();
-  int param_index = self_nullable.is_not_null() ? 1 : 0;
-
-  { // Check the other parameters, besides self.
-    for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
-      if (param_index < params_ct) {
-        auto &param = params->params[param_index];
-        if (arg_index < args_ct) {
-          expected_type = param->resolved_type;
-          node->arguments[arg_index]->accept(this);
-          assert_types_can_cast_or_equal(
-              node->arguments[arg_index]->resolved_type, param->resolved_type, node->arguments[arg_index]->source_range,
-              std::format("unexpected argument type.. parameter #{} of function",
-                          arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
-        } else {
-          // TODO: handle default params here
-          throw_error("Too few arguments to function", node->source_range);
-        }
-      } else {
-        if (!params->is_varargs) {
-          throw_error("Too many arguments to function", node->source_range);
-        }
-        expected_type = Type::INVALID_TYPE_ID;
-        node->arguments[arg_index]->accept(this);
-      }
-    }
-  }
-
-  // TODO: @Cooper-Pilot we need a more structured way to type check the self parameter, now that
-  // we support const/mut var, and const/mut pointers, theres a billion combinations.
-  if (false && self_nullable.is_not_null()) {
-    auto self = self_nullable.get();
-    auto first = global_get_type(params->params[0]->resolved_type);
-    auto self_symbol = ctx.get_symbol(self);
-    auto self_type = global_get_type(self->resolved_type);
-
-    if (self_symbol.is_not_null() && self_symbol.get()->is_const()) {
-      if (!self_type->get_ext().is_pointer()) {
-        // self is a const non-pointer variable
-        if (first->get_ext().is_mut_pointer()) {
-          throw_error("cannot pass a const variable to a function expecting a mutable pointer!",
-                      node->source_range);
-        }
-      } else {
-        // self is a const pointer
-        if (!first->get_ext().is_const_pointer()) {
-          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
-                      node->source_range);
-        }
-      }
-    } else {
-      if (!self_type->get_ext().is_pointer()) {
-        // self is a mutable non-pointer variable
-        if (!first->get_ext().is_mut_pointer() && !first->get_ext().is_const_pointer()) {
-          throw_error("invalid function parameter type for self", node->source_range);
-        }
-      } else {
-        // self is a non-const pointer
-        if (!first->get_ext().is_pointer()) {
-          throw_error("cannot pass a pointer to a function expecting a non-pointer type!",
-                      node->source_range);
-        } else if (first->get_ext().is_mut_pointer() && self_symbol.is_not_null() && self_symbol.get()->is_const()) {
-          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
-                      node->source_range);
-        }
-      }
-    }
-  }
-}
-
-void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info) {
-  auto old_type = expected_type;
-  Defer _([&]() { expected_type = old_type; });
-  auto args_ct = node->arguments.size();
-  // TODO: rewrite this. this is so hard tor read.
-  if ((args_ct > info->params_len && !info->is_varargs) || args_ct < info->params_len) {
-    throw_error(
-        std::format("Function call has incorrect number of arguments. Expected: {}, Found: {}... function type: {}",
-                    info->params_len, args_ct, info->to_string()),
-        node->source_range);
-  }
-
-  for (int i = 0; i < args_ct; ++i) {
-    auto arg = node->arguments[i];
-    expected_type = info->parameter_types[i];
-    arg->accept(this);
-    if (i < info->params_len) {
-      assert_types_can_cast_or_equal(arg->resolved_type, info->parameter_types[i], arg->source_range,
-                                     std::format("invalid argument type for parameter #{}", i + 1));
-    }
-  }
-}
-
 void Typer::visit(ASTImport *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
@@ -1231,6 +1233,7 @@ void Typer::visit(ASTImport *node) {
     } break;
   }
 }
+
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
 
@@ -1726,18 +1729,6 @@ void Typer::visit(ASTIdentifier *node) {
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
-      int base = 10;
-      auto value = node->value.get_str();
-      if (value.starts_with("0x")) {
-        base = 0;
-      }
-
-      if (value.starts_with("0b")) {
-        value = value.substr(2, value.length());
-        base = 2;
-      }
-      auto n = std::strtoll(value.c_str(), nullptr, base);
-
       if (expected_type != Type::INVALID_TYPE_ID) {
         auto type = global_get_type(expected_type);
         if (type->is_kind(TYPE_SCALAR) && type_is_numerical(type)) {
@@ -2067,6 +2058,7 @@ void Typer::visit(ASTInitializerList *node) {
   }
   node->resolved_type = target_type->id;
 }
+
 void Typer::visit(ASTRange *node) {
   node->left->accept(this);
   node->right->accept(this);
@@ -2096,6 +2088,7 @@ void Typer::visit(ASTRange *node) {
                 node->source_range);
   }
 }
+
 void Typer::visit(ASTSwitch *node) {
   node->target->accept(this);
   auto type_id = node->target->resolved_type;
@@ -2186,6 +2179,7 @@ void Typer::visit(ASTTuple *node) {
   TypeExtensions extensions;
   node->resolved_type = global_find_type_id(types, extensions);
 }
+
 void Typer::visit(ASTAlias *node) {
   node->source_type->accept(this);
 
