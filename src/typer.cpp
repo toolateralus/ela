@@ -344,8 +344,7 @@ bool impl_method_matches_interface(int interface_method, int impl_method) {
     auto interface_param = global_get_type(interface->parameter_types[i]);
     auto impl_param = global_get_type(impl->parameter_types[i]);
     if (interface_param->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_param->get_base();
-      if (!impl_param->implements(base)) {
+      if (!impl_param->implements(interface_param->id)) {
         return false;
       }
       if (interface_param->generic_args != impl_param->generic_args) {
@@ -360,12 +359,17 @@ bool impl_method_matches_interface(int interface_method, int impl_method) {
     auto interface_return = global_get_type(interface->return_type);
     auto impl_return = global_get_type(impl->return_type);
     if (interface_return->is_kind(TYPE_INTERFACE)) {
-      auto base = interface_return->get_base();
-      if (!impl_return->implements(base)) {
+      if (interface_return->generic_base_id != Type::INVALID_TYPE_ID) {
+        if (!impl_return->implements(interface_return->generic_base_id)) {
         return false;
       }
       if (interface_return->generic_args != impl_return->generic_args) {
         return false;
+        }
+      } else {
+        if (!impl_return->implements(interface_return->id)) {
+          return false;
+        }
       }
     } else if (interface_return != impl_return) {
       return false;
@@ -892,7 +896,7 @@ void Typer::visit(ASTFor *node) {
   int iter_ty = Type::INVALID_TYPE_ID;
   auto scope = range_type->get_info()->scope;
 
-  if (range_type->implements("Iterable")) { // can return an iterator.
+  if (range_type->implements(iterable_interface())) { // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
 
     compiler_mock_method_call_visit_impl(range_type_id, "iter");
@@ -907,7 +911,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-  } else if (range_type->implements("Iter")) { // directly an iterator.
+  } else if (range_type->implements(iter_interface())) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
 
@@ -1918,7 +1922,7 @@ void Typer::visit(ASTInitializerList *node) {
             "Failed to assign element type from value passed into collection-style initializer list");
         node->resolved_type = target_type->id;
       } else {
-        if (!target_type->implements("Init") && !target_type->get_base().get_str().contains("Init_List$")) {
+        if (!target_type->implements(init_interface()) && !target_type->get_base().get_str().contains("Init_List$")) {
           throw_error("Unable to use 'collection style' initalizer lists on non fixed array types that don't implement "
                       "Init![T] interface",
                       node->source_range);
@@ -2170,7 +2174,11 @@ void Typer::visit(ASTCast *node) {
 
 void Typer::visit(ASTInterfaceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->declare_interface(node->name, node);
+    std::vector<int> args;
+    for (auto &param : node->generic_parameters) {
+      args.push_back(Type::UNRESOLVED_GENERIC_TYPE_ID);
+    }
+    ctx.scope->create_interface_type(node->name, node->scope, args, node);
   } else {
     visit_interface_declaration(node, false);
     ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE, node);
