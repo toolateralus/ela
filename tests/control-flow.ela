@@ -262,7 +262,7 @@ switch_helper :: fn() -> s32 {
     1 => false,
     else => true,
   }
-  printf("%s\n", typeof(case).name);
+  printf("%s\n"c, typeof(case).name);
   assert("switch with else case failed", case as bool);
 }
 

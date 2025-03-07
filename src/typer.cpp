@@ -1200,7 +1200,10 @@ void Typer::visit(ASTReturn *node) {
   if (node->expression.is_not_null()) {
     node->expression.get()->accept(this);
     type = node->expression.get()->resolved_type;
-    assert_types_can_cast_or_equal(node->expression.get(), expected_type, node->source_range, "invalid return type");
+
+    if (expected_type != Type::INVALID_TYPE_ID && expected_type != void_type()) {
+      assert_types_can_cast_or_equal(node->expression.get(), expected_type, node->source_range, "invalid return type");
+    }
   } else {
     type = ctx.scope->find_type_id("void", {});
   }
@@ -2131,6 +2134,15 @@ void Typer::visit(ASTSwitch *node) {
           node->target->source_range);
     }
   }
+
+
+  auto old_expected_type = expected_type;
+  if (!node->is_statement) {
+    expected_type = -1;
+  }
+  Defer _([&]{
+    expected_type = old_expected_type;
+  });
 
   int return_type = void_type();
   int flags = BLOCK_FLAGS_FALL_THROUGH;
