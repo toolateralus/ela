@@ -302,6 +302,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     }
   }
 
+  // tagged union stuffz.
+  {
+    if (to->is_kind(TYPE_TAGGED_UNION)) {
+      auto info = to->get_info()->as<TaggedUnionTypeInfo>();
+      for (const auto &variant: info->variants) {
+        if (from->id == variant.type) {
+          return CONVERT_IMPLICIT;
+        }
+      }
+    } 
+  }
+
   // * if the type extensions are equal, return the conversion rule for the bases.
   {
     // this allows int[] to cast to s8[] etc;

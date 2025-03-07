@@ -1620,6 +1620,12 @@ void Emitter::visit(ASTCast *node) {
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
+
+
   if (node->is_emitted) {
     return;
   }
@@ -1630,6 +1636,9 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
 
   (*ss) << "typedef struct " << node->name.get_str() << " " << node->name.get_str() << ";\n";
   auto name = node->name.get_str();
+
+  auto old_init = emit_default_init;
+  emit_default_init = false;
 
   for (const auto &variant : node->variants) {
     if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
@@ -1647,6 +1656,8 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
       (*ss) << " " << subtype_name << ";\n";
     }
   }
+
+  emit_default_init = old_init;
 
   (*ss) << "typedef struct " << node->name.get_str() << " {\n";
   (*ss) << "  int index;\n";

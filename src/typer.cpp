@@ -190,17 +190,18 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
   }
 
   auto info = type->get_info()->as<TaggedUnionTypeInfo>();
+  info->scope = node->scope;  
 
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTTaggedUnionVariant::NORMAL: {
-        // TODO: is this how we want to do this?
         info->variants.push_back({variant.name, void_type()});
       } break;
       case ASTTaggedUnionVariant::TUPLE: {
         variant.tuple->accept(this);
         auto type = variant.tuple->resolved_type;
         info->variants.push_back({variant.name, type});
+        info->scope->create_type_alias(variant.name, type, TYPE_TUPLE, variant.tuple);
       } break;
       case ASTTaggedUnionVariant::STRUCT: {
         auto scope = create_child(ctx.scope);
@@ -209,7 +210,7 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
           field->accept(this);
         }
         ctx.exit_scope();
-        auto type = global_create_struct_type(variant.name, scope);
+        auto type = info->scope->create_struct_type(variant.name, scope, nullptr);
         info->variants.push_back({variant.name, type});
       } break;
     }
@@ -439,10 +440,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
-    
+
     visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
-    
+
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
         throw_error("Redefinition of method", method->source_range);
@@ -508,10 +509,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
           continue;
         }
-        
+
         visit_function_header(method, false);
         auto func_ty_id = method->resolved_type;
-        
+
         if (auto symbol = type_scope->local_lookup(method->name)) {
           if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
             throw_error("Redefinition of method", method->source_range);
@@ -530,7 +531,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             continue;
           }
         }
-    
+
         visit_function_body(method);
       } else {
         throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
@@ -1089,14 +1090,14 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    bool skip_first = false;
     if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
       if (!func_decl->params->has_self) {
         throw_error("Calling static methods with instance not allowed", node->source_range);
       }
-      skip_first = true;
+      type_check_args_from_params(node->arguments, func_decl->params, ((ASTDotExpr *)node->function)->base);
+    } else {
+      type_check_args_from_params(node->arguments, func_decl->params, nullptr);
     }
-    type_check_args_from_params(node->arguments, func_decl->params, skip_first);
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -1104,32 +1105,76 @@ void Typer::visit(ASTCall *node) {
   node->resolved_type = info->return_type;
 }
 
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first) {
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
   auto params_ct = params->params.size();
-  int param_index = skip_first ? 1 : 0;
-  for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
-    if (param_index < params_ct) {
-      auto &param = params->params[param_index];
-      if (arg_index < args_ct) {
-        expected_type = param->resolved_type;
-        node->arguments[arg_index]->accept(this);
-        assert_types_can_cast_or_equal(
-            node->arguments[arg_index]->resolved_type, param->resolved_type, node->arguments[arg_index]->source_range,
-            std::format("unexpected argument type.. parameter #{} of function",
-                        arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+  int param_index = self_nullable.is_not_null() ? 1 : 0;
+
+  { // Check the other parameters, besides self.
+    for (int arg_index = 0; arg_index < args_ct || param_index < params_ct; ++arg_index, ++param_index) {
+      if (param_index < params_ct) {
+        auto &param = params->params[param_index];
+        if (arg_index < args_ct) {
+          expected_type = param->resolved_type;
+          node->arguments[arg_index]->accept(this);
+          assert_types_can_cast_or_equal(
+              node->arguments[arg_index]->resolved_type, param->resolved_type, node->arguments[arg_index]->source_range,
+              std::format("unexpected argument type.. parameter #{} of function",
+                          arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
+        } else {
+          // TODO: handle default params here
+          throw_error("Too few arguments to function", node->source_range);
+        }
       } else {
-        // TODO: handle default params here
-        throw_error("Too few arguments to function", node->source_range);
+        if (!params->is_varargs) {
+          throw_error("Too many arguments to function", node->source_range);
+        }
+        expected_type = Type::INVALID_TYPE_ID;
+        node->arguments[arg_index]->accept(this);
+      }
+    }
+  }
+
+  // TODO: @Cooper-Pilot we need a more structured way to type check the self parameter, now that
+  // we support const/mut var, and const/mut pointers, theres a billion combinations.
+  if (false && self_nullable.is_not_null()) {
+    auto self = self_nullable.get();
+    auto first = global_get_type(params->params[0]->resolved_type);
+    auto self_symbol = ctx.get_symbol(self);
+    auto self_type = global_get_type(self->resolved_type);
+
+    if (self_symbol.is_not_null() && self_symbol.get()->is_const()) {
+      if (!self_type->get_ext().is_pointer()) {
+        // self is a const non-pointer variable
+        if (first->get_ext().is_mut_pointer()) {
+          throw_error("cannot pass a const variable to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
+      } else {
+        // self is a const pointer
+        if (!first->get_ext().is_const_pointer()) {
+          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
       }
     } else {
-      if (!params->is_varargs) {
-        throw_error("Too many arguments to function", node->source_range);
+      if (!self_type->get_ext().is_pointer()) {
+        // self is a mutable non-pointer variable
+        if (!first->get_ext().is_mut_pointer() && !first->get_ext().is_const_pointer()) {
+          throw_error("invalid function parameter type for self", node->source_range);
+        }
+      } else {
+        // self is a non-const pointer
+        if (!first->get_ext().is_pointer()) {
+          throw_error("cannot pass a pointer to a function expecting a non-pointer type!",
+                      node->source_range);
+        } else if (first->get_ext().is_mut_pointer() && self_symbol.is_not_null() && self_symbol.get()->is_const()) {
+          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!",
+                      node->source_range);
+        }
       }
-      expected_type = Type::INVALID_TYPE_ID;
-      node->arguments[arg_index]->accept(this);
     }
   }
 }
@@ -1521,37 +1566,37 @@ void Typer::visit(ASTBinExpr *node) {
   // Do checks for constness.
   if (node->op.type == TType::Assign) {
     if (node->left->get_node_type() == AST_NODE_UNARY_EXPR) {
-      auto unary = (ASTUnaryExpr*)node->left;
+      auto unary = (ASTUnaryExpr *)node->left;
       auto unary_operand_ty = global_get_type(unary->operand->resolved_type);
       if (unary->op.type == TType::Mul && unary_operand_ty->get_ext().is_const_pointer()) {
         throw_error("cannot dereference into a const pointer!", node->source_range);
       }
-  
+
       auto left_ty = global_get_type(unary->operand->resolved_type);
       auto symbol = ctx.get_symbol(unary->operand);
       if (symbol.is_not_null() && symbol.get()->is_const() && !left_ty->get_ext().is_mut_pointer()) {
         throw_error("cannot assign into a const variable!", node->source_range);
       }
-  
+
     } else if (node->left->get_node_type() == AST_NODE_SUBSCRIPT) {
-      auto subscript = (ASTSubscript*)node->left;
-      
+      auto subscript = (ASTSubscript *)node->left;
+
       auto subscript_left_ty = global_get_type(subscript->left->resolved_type);
       if (subscript_left_ty->get_ext().is_const_pointer()) {
         throw_error("cannot subscript-assign into a const pointer!", node->source_range);
       }
-  
+
       auto symbol = ctx.get_symbol(subscript->left);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->get_ext().is_mut_pointer()) {
         throw_error("cannot subscript-assign into a const variable!", node->source_range);
       }
-  
+
     } else if (node->left->get_node_type() == AST_NODE_DOT_EXPR) {
-      auto dot = (ASTDotExpr*)node->left;
-  
+      auto dot = (ASTDotExpr *)node->left;
+
       auto symbol = ctx.get_symbol(dot->base);
       auto left_ty = global_get_type(dot->base->resolved_type);
-      
+
       if (left_ty->get_ext().is_const_pointer()) {
         throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);
       }
@@ -1560,11 +1605,11 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("cannot dot-assign into a const variable!", node->source_range);
       }
 
-      /* 
+      /*
         We have to check all the way down the left of the dot expression.
       */
       while (dot->base->get_node_type() == AST_NODE_DOT_EXPR) {
-        dot = (ASTDotExpr*)dot->base;
+        dot = (ASTDotExpr *)dot->base;
         auto left_ty = global_get_type(dot->base->resolved_type);
         if (left_ty->get_ext().is_const_pointer()) {
           throw_error("cannot dot-assign into a const pointer!", dot->base->source_range);

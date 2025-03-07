@@ -2141,8 +2141,10 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
+
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
+
   }
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
