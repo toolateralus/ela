@@ -238,15 +238,15 @@ int Typer::get_self_type() {
   return Type::INVALID_TYPE_ID;
 }
 
-bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
-  switch (node->get_node_type()) {
+std::string print_where_predicate(ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
-      auto bin = static_cast<ASTBinExpr *>(node);
+      auto bin = static_cast<ASTBinExpr *>(predicate);
       auto op = bin->op.type;
       if (op == TType::And) {
-        return visit_where_predicate(type, bin->left) && visit_where_predicate(type, bin->right);
+        return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
       } else if (op == TType::Or) {
-        return visit_where_predicate(type, bin->left) || visit_where_predicate(type, bin->right);
+        return print_where_predicate(bin->left) + " | " + print_where_predicate(bin->right);
       } else {
         throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
                     "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
@@ -254,14 +254,40 @@ bool Typer::visit_where_predicate(Type *type, ASTExpr *node) {
       }
     } break;
     case AST_NODE_TYPE: {
-      node->accept(this);
-      // return whether this type implements this trait or not.
-      // also can be used to assert whether it's equal to the type provided or not.
-      return std::ranges::find(type->interfaces, node->resolved_type) != type->interfaces.end() ||
-             type->id == node->resolved_type;
+      return global_get_type(predicate->resolved_type)->to_string();
     } break;
     default:
-      throw_error("Invalid node in 'where' clause predicate", node->source_range);
+      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
+  }
+  return "";
+}
+
+bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
+  switch (predicate->get_node_type()) {
+    case AST_NODE_BIN_EXPR: {
+      auto bin = static_cast<ASTBinExpr *>(predicate);
+      auto op = bin->op.type;
+      if (op == TType::And) {
+        return visit_where_predicate(target_type, bin->left) && visit_where_predicate(target_type, bin->right);
+      } else if (op == TType::Or) {
+        return visit_where_predicate(target_type, bin->left) || visit_where_predicate(target_type, bin->right);
+        return true;
+      } else {
+        throw_error("Invalid operator in 'where' clause predicate, only And/Or allowed: '&' / '|'.\nNote: these use "
+                    "'bitwise' operators for brevity, they're effectively '&&' and '||'.",
+                    bin->source_range);
+      }
+    } break;
+    case AST_NODE_TYPE: {
+      // make sure the type is fixed up.
+      predicate->accept(this);
+      // return whether this type implements this trait or not.
+      // also can be used to assert whether it's equal to the type provided or not.
+      return std::ranges::find(target_type->interfaces, predicate->resolved_type) != target_type->interfaces.end() ||
+                    target_type->id == predicate->resolved_type;
+    } break;
+    default:
+      throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
   }
   return false;
 }
@@ -271,7 +297,7 @@ void Typer::visit(ASTWhere *node) {
   auto type = global_get_type(node->target_type->resolved_type);
   auto satisfied = visit_where_predicate(type, node->predicate);
   if (!satisfied) {
-    throw_error(std::format("'where' clause type constraint not satified for {}", get_unmangled_name(type)),
+    throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(node->predicate), get_unmangled_name(type)),
                 node->source_range);
   }
 }
@@ -881,9 +907,13 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
   if (_setjmp(data.save_state) == 0) {
     if (definition->generic_parameters.size() != args.size()) {
       if (definition->generic_parameters.size() > args.size()) {
-        throw_error(std::format("too few generic arguments. expected {}, got {}", definition->generic_parameters.size(), args.size()), definition->source_range);
+        throw_error(std::format("too few generic arguments. expected {}, got {}", definition->generic_parameters.size(),
+                                args.size()),
+                    definition->source_range);
       } else {
-        throw_error(std::format("too many generic arguments. expected {}, got {}", definition->generic_parameters.size(), args.size()), definition->source_range);
+        throw_error(std::format("too many generic arguments. expected {}, got {}",
+                                definition->generic_parameters.size(), args.size()),
+                    definition->source_range);
       }
     }
     auto instantiation = find_generic_instance(definition->generic_instantiations, args);
@@ -1862,7 +1892,8 @@ void Typer::visit(ASTLiteral *node) {
         // errno = 0;
         // auto parsed_signed = strtoll(value.c_str(), nullptr, 10);
         // if (errno == ERANGE && (parsed_signed == LLONG_MAX || parsed_signed == LLONG_MIN)) {
-        //   throw_error("Signed integer literal is too large to be represented by a 64 bit integer.", node->source_range);
+        //   throw_error("Signed integer literal is too large to be represented by a 64 bit integer.",
+        //   node->source_range);
         // }
       }
 
@@ -2271,7 +2302,7 @@ void Typer::visit(ASTAlias *node) {
   }
 
   if (symbol && node->source_node->get_node_type() != AST_NODE_TYPE) {
-    ctx.scope->symbols[node->name]= *symbol.get();
+    ctx.scope->symbols[node->name] = *symbol.get();
   } else {
     auto type = global_get_type(node->source_node->resolved_type);
     if (type == nullptr) {

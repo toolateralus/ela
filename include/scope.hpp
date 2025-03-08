@@ -154,7 +154,7 @@ struct Scope {
   inline int fields_count() const {
     auto fields = 0;
     for (const auto &[name, sym] : symbols) {
-      if (!sym.is_function())
+      if (!sym.is_function() && !sym.is_type())
         fields++;
     }
     return fields;

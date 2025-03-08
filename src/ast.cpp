@@ -2470,6 +2470,7 @@ ASTLambda *Parser::parse_lambda() {
   } else {
     node->return_type = ASTType::get_void();
   }
+  
   node->block = parse_block();
 
   if (current_func_decl.is_null()) {
