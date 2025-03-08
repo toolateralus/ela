@@ -470,7 +470,7 @@ ASTNode *deep_copy_ast(ASTNode *root) {
 
 ASTAlias *ASTCopier::copy_alias(ASTAlias *node) {
   auto new_node = copy(node);
-  new_node->source_type = static_cast<ASTType *>(copy_node(node->source_type));
+  new_node->source_node = static_cast<ASTType *>(copy_node(node->source_node));
   return new_node;
 }
 

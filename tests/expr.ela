@@ -174,5 +174,5 @@ XaryuStruct :: struct {
 
 #test test_underscores_in_number_literals :: fn() {
   n: s32 = 1_000_000;
-  assert("number literal with underscores failed to equal expected value", n == 1000000)
+  assert("number literal with underscores failed to equal expected value", n == 1000000);
 }

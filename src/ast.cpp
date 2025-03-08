@@ -1201,7 +1201,11 @@ ASTStatement *Parser::parse_statement() {
     }
     alias->name = expect(TType::Identifier).value;
     expect(TType::DoubleColon);
-    alias->source_type = parse_type();
+    if (peek().type == TType::Mul || peek().type == TType::Fn) {
+      alias->source_node = parse_type();
+    } else {
+      alias->source_node = parse_expr();
+    }
     return alias;
   }
 
@@ -1440,7 +1444,6 @@ ASTStatement *Parser::parse_statement() {
     return decl;
   }
 
-  // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
   // * Expression statements.
   {
     auto next = lookahead_buf()[1];
@@ -1470,11 +1473,11 @@ ASTStatement *Parser::parse_statement() {
         is_deref || is_special_case) {
       NODE_ALLOC(ASTExprStatement, statement, range, _, this)
       statement->expression = parse_expr();
-
       if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
         _switch->is_statement = true;
+      } else {
+        expect(TType::Semi);
       }
-
       end_node(statement, range);
       return statement;
     }
@@ -2147,10 +2150,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
-
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
-
   }
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();

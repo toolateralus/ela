@@ -196,7 +196,7 @@ switch_helper :: fn() -> s32 {
   switch number {
     0: { return 0; }
     5: { return 5; }
-  }
+  };
   return 1;
 }
 
@@ -209,7 +209,7 @@ switch_helper :: fn() -> s32 {
   switch integer {
     0: { passed = true; }
     1: { assert("Switch on s32 case failed", false);  }
-  }
+  };
 
   assert("Failed to hit positive switch case for integer", passed);
   s := "Hello!";
