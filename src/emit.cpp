@@ -1397,11 +1397,6 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   ss << get_type_flags(type) << ",\n";
 
-  // ! We can't use this either: it uses a lambda.
-  //   if (type->get_ext().is_fixed_sized_array()) {
-  //     ss << get_elements_function(type) << ",\n";
-  //   }
-
   if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
     ss << ".element_type = " << to_type_struct(global_get_type(type->get_element_type()), context) << ",\n";
   } else {
@@ -1424,11 +1419,13 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
 
       int it = 0;
-      for (const auto &tuple : info->scope->symbols) {
-        auto &[name, sym] = tuple;
-        if (sym.is_type() || sym.is_function())
+      for (const auto &name : info->scope->ordered_symbols) {
+        auto sym = info->scope->local_lookup(name);
+        
+        if (sym->is_type() || sym->is_function())
           continue;
-        auto t = global_get_type(sym.type_id);
+
+        auto t = global_get_type(sym->type_id);
 
         if (!t)
           throw_error("internal compiler error: Type was null in reflection 'to_type_struct()'", {});
