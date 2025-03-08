@@ -250,7 +250,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   // ! This needs to be re-evaluated. We should not be able to cast any pointer, to any other pointer.
   const auto implicit_ptr_cast = (from->get_ext().is_const_pointer() && to->get_ext().is_const_pointer()) ||
-                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) || 
+                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) ||
                                  (from->get_ext().is_mut_pointer() && to->get_ext().is_const_pointer());
 
   // If we have a fixed array such as
@@ -272,13 +272,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
 
-
   // We basically have to allow *const to *mut to allow for pointer arithmetic,
   // you can't traverse a const array without this.
   if (from->get_ext().is_const_pointer() && to->get_ext().is_mut_pointer()) {
     return CONVERT_EXPLICIT;
   }
-
 
   // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C
   // interop. This is far too C-like and highly unsafe.
@@ -306,12 +304,12 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     if (to->is_kind(TYPE_TAGGED_UNION)) {
       auto info = to->get_info()->as<TaggedUnionTypeInfo>();
-      for (const auto &variant: info->variants) {
+      for (const auto &variant : info->variants) {
         if (from->id == variant.type) {
           return CONVERT_IMPLICIT;
         }
       }
-    } 
+    }
   }
 
   // * if the type extensions are equal, return the conversion rule for the bases.
@@ -439,6 +437,17 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   type->set_ext(extensions);
   type->set_base(name);
   type->set_info(info);
+
+  if (extensions.is_pointer() &&
+      std::ranges::find(type->interfaces, is_pointer_interface()) == type->interfaces.end()) {
+    type->interfaces.push_back(is_pointer_interface());
+    if (extensions.is_const_pointer()) {
+      type->interfaces.push_back(is_const_pointer_interface());
+    } else {
+      type->interfaces.push_back(is_mut_pointer_interface());
+    }
+  }
+
   if (!info->scope) {
     info->scope = create_child(nullptr);
   }
@@ -644,6 +653,13 @@ void init_type_system() {
     bool_type();
     void_type();
   }
+
+  is_const_pointer_interface();
+  is_mut_pointer_interface();
+  is_pointer_interface();
+
+  is_tuple_interface();
+
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
@@ -830,4 +846,24 @@ std::string mangled_type_args(const std::vector<int> &args) {
     i++;
   }
   return s;
+}
+
+int is_tuple_interface() {
+  static int id = global_create_interface_type("Is_Tuple", create_child(nullptr), {});
+  return id;
+}
+
+int is_pointer_interface() {
+  static int id = global_create_interface_type("Is_Pointer", create_child(nullptr), {});
+  return id;
+}
+
+int is_mut_pointer_interface() {
+  static int id = global_create_interface_type("Is_Mut_Pointer", create_child(nullptr), {});
+  return id;
+}
+
+int is_const_pointer_interface() {
+  static int id = global_create_interface_type("Is_Const_Pointer", create_child(nullptr), {});
+  return id;
 }

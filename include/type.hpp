@@ -20,7 +20,7 @@ struct ASTVariable;
 struct Scope;
 struct Context;
 
-extern std::vector<Type*> type_table;
+extern std::vector<Type *> type_table;
 extern jstl::Arena type_info_arena;
 
 enum ConversionRule {
@@ -114,10 +114,12 @@ struct TypeExtensions {
 
   inline bool is_fixed_sized_array() const { return back_type() == TYPE_EXT_ARRAY; }
 
-  inline bool is_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT; }
+  inline bool is_pointer() const {
+    return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT;
+  }
 
   inline bool is_const_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST; }
-  
+
   inline bool is_mut_pointer() const { return back_type() == TYPE_EXT_POINTER_MUT; }
 
   inline bool operator==(const TypeExtensions &other) const { return equals(other); }
@@ -130,7 +132,7 @@ struct TypeExtensions {
 
   inline TypeExtensions append(const TypeExtensions &to_append) const {
     auto these = *this;
-    for (const auto &ext: to_append.extensions) {
+    for (const auto &ext : to_append.extensions) {
       these.extensions.push_back({ext});
     }
     return these;
@@ -205,7 +207,6 @@ struct EnumTypeInfo : TypeInfo {
   EnumTypeInfo() {};
 };
 
-
 struct StructTypeInfo : TypeInfo {
   int flags;
   virtual std::string to_string() const override { return ""; }
@@ -230,17 +231,22 @@ int u64_type();
 int f64_type();
 int f32_type();
 
+int is_tuple_interface();
+int is_pointer_interface();
+int is_mut_pointer_interface();
+int is_const_pointer_interface();
+
 Type *global_get_type(const int id);
 InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
 int global_create_struct_type(const InternedString &, Scope *, std::vector<int> generic_args = {});
 
-int global_create_interface_type(const InternedString &name, Scope *scope,
-                                 std::vector<int> generic_args);
+int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args);
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args);
 int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
+
 int global_create_tuple_type(const std::vector<int> &types);
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
 // char *
@@ -302,7 +308,10 @@ public:
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
   Type() = default;
-  Type(const int id, const TypeKind kind) : id(id), kind(kind) {}
+  Type(const int id, const TypeKind kind) : id(id), kind(kind) {
+    if (kind == TYPE_TUPLE)
+      interfaces.push_back(is_tuple_interface());
+  }
   bool is_kind(const TypeKind kind) const { return this->kind == kind; }
   std::string to_string() const;
 
@@ -333,11 +342,11 @@ static std::string get_unmangled_name(const Type *type) {
   if (first != std::string::npos) {
     base = base.substr(0, first);
   }
-  
+
   if (!type->generic_args.empty()) {
     base += "!<";
     auto it = 0;
-    for (auto id: type->generic_args) {
+    for (auto id : type->generic_args) {
       base += get_unmangled_name(global_get_type(id));
       if (it != type->generic_args.size() - 1) {
         base += ", ";
