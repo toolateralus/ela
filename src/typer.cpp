@@ -80,7 +80,6 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, const int to, const SourceRan
   }
 }
 
-
 bool expr_is_literal(const ASTExpr *expr) {
   switch (expr->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
@@ -225,7 +224,6 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
     throw_error("Keyword \"break\" must be in a loop.", node->source_range);
   if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && node->return_type->resolved_type != void_type())
     throw_error("Not all code paths return a value.", node->source_range);
-
 }
 
 int Typer::get_self_type() {
@@ -406,7 +404,6 @@ bool impl_method_matches_interface(int interface_method, int impl_method) {
 
   return true;
 }
-
 
 void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args) {
   auto previous = ctx.scope;
@@ -869,7 +866,11 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
   Defer defer_1([] { reset_panic_handler(); });
   if (_setjmp(data.save_state) == 0) {
     if (definition->generic_parameters.size() != args.size()) {
-      throw_error("Template instantiation argument count mismatch", definition->source_range);
+      if (definition->generic_parameters.size() > args.size()) {
+        throw_error(std::format("too few generic arguments. expected {}, got {}", definition->generic_parameters.size(), args.size()), definition->source_range);
+      } else {
+        throw_error(std::format("too many generic arguments. expected {}, got {}", definition->generic_parameters.size(), args.size()), definition->source_range);
+      }
     }
     auto instantiation = find_generic_instance(definition->generic_instantiations, args);
     if (!instantiation) {
@@ -966,9 +967,7 @@ void Typer::visit(ASTLambda *node) {
 
   auto old_expected = expected_type;
 
-  Defer _([&]{
-    expected_type = old_expected;
-  });
+  Defer _([&] { expected_type = old_expected; });
 
   expected_type = node->return_type->resolved_type;
 
@@ -1819,6 +1818,30 @@ void Typer::visit(ASTIdentifier *node) {
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
+      auto value = node->value.get_str();
+      if (value.starts_with("0x")) {
+        if (value.length() > 18) {
+          throw_error("Hexidecimal literal is too large to be represented by a 64 bit integer.", node->source_range);
+        }
+      } else if (value.starts_with("0b")) {
+        if (value.length() > 64 + 2) {
+          throw_error("Binary literal is too large to be represented by a 64 bit integer", node->source_range);
+        }
+      } else {
+        // errno = 0;
+        // auto parsed_unsigned = strtoull(value.c_str(), nullptr, 10);
+        // if (errno == ERANGE && parsed_unsigned == ULLONG_MAX) {
+        //   throw_error("Unsigned integer literal is too large to be represented by a 64 bit integer.",
+        //               node->source_range);
+        // }
+
+        // errno = 0;
+        // auto parsed_signed = strtoll(value.c_str(), nullptr, 10);
+        // if (errno == ERANGE && (parsed_signed == LLONG_MAX || parsed_signed == LLONG_MIN)) {
+        //   throw_error("Signed integer literal is too large to be represented by a 64 bit integer.", node->source_range);
+        // }
+      }
+
       if (expected_type != Type::INVALID_TYPE_ID && type_is_numerical(global_get_type(expected_type))) {
         node->resolved_type = expected_type;
         return;
@@ -2135,14 +2158,11 @@ void Typer::visit(ASTSwitch *node) {
     }
   }
 
-
   auto old_expected_type = expected_type;
   if (!node->is_statement) {
     expected_type = -1;
   }
-  Defer _([&]{
-    expected_type = old_expected_type;
-  });
+  Defer _([&] { expected_type = old_expected_type; });
 
   int return_type = void_type();
   int flags = BLOCK_FLAGS_FALL_THROUGH;
@@ -2218,20 +2238,23 @@ void Typer::visit(ASTTuple *node) {
 }
 
 void Typer::visit(ASTAlias *node) {
-  node->source_type->accept(this);
+  node->source_node->accept(this);
 
-  if (node->source_type->resolved_type == Type::INVALID_TYPE_ID) {
-    throw_error("Declaration of a variable with a non-existent type.", node->source_range);
-  }
+  auto symbol = ctx.get_symbol(node->source_node);
 
   if (ctx.scope->symbols.contains(node->name)) {
-    throw_error("Redeclaration of type", node->source_range);
+    throw_error("redefinition in alias", node->source_range);
   }
 
-  auto type = global_get_type(node->source_type->resolved_type);
-
-  ctx.scope->create_type_alias(node->name, node->source_type->resolved_type, type->kind, node);
-
+  if (symbol && node->source_node->get_node_type() != AST_NODE_TYPE) {
+    ctx.scope->symbols[node->name]= *symbol.get();
+  } else {
+    auto type = global_get_type(node->source_node->resolved_type);
+    if (type == nullptr) {
+      throw_error("cannot alias a non-existent type or symbol", node->source_range);
+    }
+    ctx.scope->create_type_alias(node->name, type->id, type->kind, node);
+  }
   return;
 }
 
