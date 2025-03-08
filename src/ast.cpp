@@ -288,7 +288,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (string == "-g") {
           compile_command.flags[string.get_str()] = true;
         }
-        compile_command.add_compilation_flag(string.get_str());
+        compile_command.add_c_flag(string.get_str());
         return nullptr;
     }},
     // #flags, for making an enum declaration auto increment with a flags value.
@@ -2147,8 +2147,10 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
 ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
+
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
+
   }
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();

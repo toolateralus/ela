@@ -382,6 +382,9 @@ void DependencyEmitter::visit(ASTImpl *node) {
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
 void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });

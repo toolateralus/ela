@@ -17,9 +17,7 @@
 #include <stddef.h>
 #include <stdio.h>
 #include <stdlib.h>
-
 #include <cstddef>
-#include <stdexcept>
 
 namespace jstl {
 struct Arena final {

@@ -3,5 +3,5 @@
 main :: fn() { 
   t := typeof(s32[]);
   s : s32[];
-  t.fields[0].get(&s);
+  t.fields[0].get(&const s);
 }

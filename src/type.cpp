@@ -161,6 +161,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   assert(info && "Copying type info for extended type failed");
 
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  info->scope->parent = base_t->get_info()->scope->parent;
 
   return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
@@ -300,6 +301,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
       auto enum_info = (to->get_info()->as<EnumTypeInfo>());
       return type_conversion_rule(from, global_get_type(enum_info->element_type), source_range);
     }
+  }
+
+  // tagged union stuffz.
+  {
+    if (to->is_kind(TYPE_TAGGED_UNION)) {
+      auto info = to->get_info()->as<TaggedUnionTypeInfo>();
+      for (const auto &variant: info->variants) {
+        if (from->id == variant.type) {
+          return CONVERT_IMPLICIT;
+        }
+      }
+    } 
   }
 
   // * if the type extensions are equal, return the conversion rule for the bases.

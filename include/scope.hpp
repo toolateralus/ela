@@ -47,6 +47,9 @@ struct Symbol {
   bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
   bool is_local() const { return (flags & SYMBOL_IS_LOCAL) != 0; }
 
+  bool is_const() const { return mutability == CONST; }
+  bool is_mut() const { return mutability == MUT; }
+
   union {
     struct {
       Nullable<ASTNode> declaration;
@@ -122,10 +125,12 @@ struct Scope {
 
   std::string full_name() {
     if (parent) {
-      return parent->full_name() + name.get_str();
-    } else {
-      return name.get_str();
+      auto parent_name = parent->full_name();
+      if (!parent_name.empty()) {
+        return parent->full_name() + "$" + name.get_str();
+      }
     }
+    return name.get_str();
   }
 
   static std::unordered_set<InternedString> &defines() {

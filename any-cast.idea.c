@@ -7,7 +7,7 @@ struct any {
 
 int main(void) {
   
-  any = (struct any) {
+  auto any = (struct any) {
     .data = (int[]){0}, // We can use this trick to take pointers to literals.
     .type = nullptr,
   };

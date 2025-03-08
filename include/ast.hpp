@@ -4,6 +4,7 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
+#include <optional>
 #include <vector>
 
 #include "arena.hpp"
@@ -14,12 +15,8 @@
 #include "type.hpp"
 
 extern size_t LAMBDA_UNIQUE_ID;
-
 extern jstl::Arena ast_arena;
-
 struct VisitorBase;
-
-// used to prevent double includes.
 extern std::unordered_map<InternedString, Scope *> import_map;
 extern std::unordered_set<InternedString> include_set;
 
@@ -82,10 +79,6 @@ struct ControlFlow {
   int flags;
   int type;
 };
-
-#define BLOCK_FLAG_TO_STRING(flag)                                                                                     \
-  if (flags & flag)                                                                                                    \
-    result += #flag " ";
 
 struct ASTBlock;
 
@@ -163,10 +156,15 @@ struct ASTStatementList : ASTStatement {
 
 inline static std::string block_flags_to_string(int flags) {
   std::string result;
-  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_FALL_THROUGH)
-  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_RETURN)
-  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_CONTINUE)
-  BLOCK_FLAG_TO_STRING(BLOCK_FLAGS_BREAK)
+
+#define X(flag)                                                                                     \
+  if (flags & flag)                                                                                                    \
+    result += #flag " ";
+
+  X(BLOCK_FLAGS_FALL_THROUGH)
+  X(BLOCK_FLAGS_RETURN)
+  X(BLOCK_FLAGS_CONTINUE)
+  X(BLOCK_FLAGS_BREAK)
   return result;
 }
 
@@ -211,7 +209,6 @@ struct ASTBlock : ASTStatement {
   int flags = BLOCK_FLAGS_FALL_THROUGH;
   bool has_defer = false;
   int defer_count = 0;
-  int return_type = Type::INVALID_TYPE_ID;
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;
@@ -226,8 +223,31 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
+struct ImplicitConversion {
+  int to = Type::INVALID_TYPE_ID;
+  int from = Type::INVALID_TYPE_ID;
+  enum {
+    /* 
+      this is for things like:
+        `n : any = 100;`
+
+      where we need to construct & reflect to create the instance.
+    */
+    TO_ANY,
+    /* 
+      this is when we do like:
+
+        `n : Option = Option::Some(x);`
+
+      we are convertion Option::Some to Option technically.
+    */
+    VARIANT_TO_TAGGED_UNION,
+  } kind;
+};
+
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
+  std::optional<ImplicitConversion> conversion = std::nullopt;
 };
 
 struct ASTTypeExtension {
@@ -323,6 +343,7 @@ struct ASTBinExpr : ASTExpr {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
 };
+
 struct ASTUnaryExpr : ASTExpr {
   bool is_operator_overload = false;
   Mutability mutability = CONST;
@@ -331,6 +352,7 @@ struct ASTUnaryExpr : ASTExpr {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
+
 struct ASTIdentifier : ASTExpr {
   ASTIdentifier() {}
   ASTIdentifier(const InternedString &value) : value(value) {}
@@ -358,6 +380,7 @@ enum ValueSemantic {
   VALUE_SEMANTIC_COPY,
   VALUE_SEMANTIC_POINTER,
 };
+
 struct Destructure {
   ValueSemantic semantic;
   ASTIdentifier *identifier;
@@ -459,6 +482,7 @@ struct ASTCall : ASTExpr {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
+
 struct ASTDotExpr : ASTExpr {
   ASTExpr *base;
   InternedString member_name;
@@ -478,10 +502,12 @@ struct ASTReturn : ASTStatement {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_RETURN; }
 };
+
 struct ASTBreak : ASTStatement {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BREAK; }
 };
+
 struct ASTContinue : ASTStatement {
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CONTINUE; }
@@ -763,106 +789,16 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-// where Type impl SomeInterface
-// where Type impl SomeInterface & AnotherInterface
-// where Type impl SomeInterface | SomeOtherInterface
+// type constraint:
+// `where Type impl SomeInterface`
+// `where Type impl SomeInterface & AnotherInterface`
+// `where Type impl SomeInterface | SomeOtherInterface`
 struct ASTWhere : ASTExpr {
   ASTType *target_type;
   ASTExpr *predicate;
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
   void accept(VisitorBase *visitor) override;
 };
-
-// Use this only for implementing the methods, so you can use the IDE to expand
-// it.
-#define DECLARE_VISIT_METHODS()                                                                                        \
-  void visit(ASTProgram *node) override {}                                                                             \
-  void visit(ASTImport *node) override {}                                                                              \
-  void visit(ASTLambda *node) override {}                                                                              \
-  void visit(ASTWhere *node) override {}                                                                               \
-  void visit(ASTBlock *node) override {}                                                                               \
-  void visit(ASTFunctionDeclaration *node) override {}                                                                 \
-  void visit(ASTParamsDecl *node) override {}                                                                          \
-  void visit(ASTParamDecl *node) override {}                                                                           \
-  void visit(ASTDeclarVariable) override {}                                                                            \
-  void visit(ASTExprStatement *node) override {}                                                                       \
-  void visit(ASTBinExpr *node) override {}                                                                             \
-  void visit(ASTUnaryExpr *node) override {}                                                                           \
-  void visit(ASTIdentifier *node) override {}                                                                          \
-  void visit(ASTLiteral *node) override {}                                                                             \
-  void visit(ASTType *node) override {}                                                                                \
-  void visit(ASTCall *node) override {}                                                                                \
-  void visit(ASTArguments *node) override {}                                                                           \
-  void visit(ASTReturn *node) override {}                                                                              \
-  void visit(ASTContinue *node) override {}                                                                            \
-  void visit(ASTBreak *node) override {}                                                                               \
-  void visit(ASTFor *node) override {}                                                                                 \
-  void visit(ASTIf *node) override {}                                                                                  \
-  void visit(ASTElse *node) override {}                                                                                \
-  void visit(ASTWhile *node) override {}                                                                               \
-  void visit(ASTStructDeclaration *node) override {}                                                                   \
-  void visit(ASTDotExpr *node) override {}                                                                             \
-  void visit(ASTSubscript *node) override {}                                                                           \
-  void visit(ASTInitializerList *node) override {}                                                                     \
-  void visit(ASTEnumDeclaration *node) override {}                                                                     \
-  void visit(ASTRange *node) override {};                                                                              \
-  void visit(ASTSwitch *node) override {};                                                                             \
-  void visit(ASTTuple *node) override {};                                                                              \
-  void visit(ASTAlias *node) override {};                                                                              \
-  void visit(ASTTupleDeconstruction *node) override {};                                                                \
-  void visit(ASTDefer *node) override {};                                                                              \
-  void visit(ASTCast *node) override {};                                                                               \
-  void visit(ASTTaggedUnionDeclaration *node) override {};                                                             \
-  void visit(ASTInterfaceDeclaration *node) override {};                                                               \
-  void visit(ASTSize_Of *node) override {};                                                                            \
-  void visit(ASTModule *node) override {};                                                                             \
-  void visit(ASTType_Of *node) override {};
-
-#define DECLARE_VISIT_BASE_METHODS()                                                                                   \
-  void visit(ASTNoop *noop) { return; }                                                                                \
-  virtual void visit(ASTScopeResolution *node) = 0;                                                                    \
-  virtual void visit(ASTSize_Of *node) = 0;                                                                            \
-  virtual void visit(ASTImport *node) = 0;                                                                             \
-  virtual void visit(ASTCast *node) = 0;                                                                               \
-  virtual void visit(ASTWhere *node) = 0;                                                                              \
-  virtual void visit(ASTLambda *node) = 0;                                                                             \
-  virtual void visit(ASTProgram *node) = 0;                                                                            \
-  virtual void visit(ASTBlock *node) = 0;                                                                              \
-  virtual void visit(ASTFunctionDeclaration *node) = 0;                                                                \
-  virtual void visit(ASTParamsDecl *node) = 0;                                                                         \
-  virtual void visit(ASTParamDecl *node) = 0;                                                                          \
-  virtual void visit(ASTVariable *node) = 0;                                                                           \
-  virtual void visit(ASTExprStatement *node) = 0;                                                                      \
-  virtual void visit(ASTBinExpr *node) = 0;                                                                            \
-  virtual void visit(ASTUnaryExpr *node) = 0;                                                                          \
-  virtual void visit(ASTIdentifier *node) = 0;                                                                         \
-  virtual void visit(ASTLiteral *node) = 0;                                                                            \
-  virtual void visit(ASTType *node) = 0;                                                                               \
-  virtual void visit(ASTCall *node) = 0;                                                                               \
-  virtual void visit(ASTArguments *node) = 0;                                                                          \
-  virtual void visit(ASTReturn *node) = 0;                                                                             \
-  virtual void visit(ASTContinue *node) = 0;                                                                           \
-  virtual void visit(ASTBreak *node) = 0;                                                                              \
-  virtual void visit(ASTFor *node) = 0;                                                                                \
-  virtual void visit(ASTIf *node) = 0;                                                                                 \
-  virtual void visit(ASTElse *node) = 0;                                                                               \
-  virtual void visit(ASTWhile *node) = 0;                                                                              \
-  virtual void visit(ASTStructDeclaration *node) = 0;                                                                  \
-  virtual void visit(ASTDotExpr *node) = 0;                                                                            \
-  virtual void visit(ASTSubscript *node) = 0;                                                                          \
-  virtual void visit(ASTInitializerList *node) = 0;                                                                    \
-  virtual void visit(ASTEnumDeclaration *node) = 0;                                                                    \
-  virtual void visit(ASTRange *node) = 0;                                                                              \
-  virtual void visit(ASTSwitch *node) = 0;                                                                             \
-  virtual void visit(ASTTuple *node) = 0;                                                                              \
-  virtual void visit(ASTAlias *node) = 0;                                                                              \
-  virtual void visit(ASTImpl *node) = 0;                                                                               \
-  virtual void visit(ASTTupleDeconstruction *node) = 0;                                                                \
-  virtual void visit(ASTDefer *node) = 0;                                                                              \
-  virtual void visit(ASTInterfaceDeclaration *node) = 0;                                                               \
-  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;                                                             \
-  virtual void visit(ASTModule *node) = 0;                                                                             \
-  virtual void visit(ASTType_Of *node) = 0;
 
 enum DirectiveKind {
   DIRECTIVE_KIND_STATEMENT,

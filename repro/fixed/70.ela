@@ -6,7 +6,7 @@ generic :: fn!<T>() {
 
     * this error occurs on `u8*` ?? 
   */
-  lambda := fn() -> u8* { 
+  lambda := fn() -> *const u8 { 
     printf("%s\n", "alloo"); 
     return null;
   }

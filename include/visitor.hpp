@@ -13,7 +13,50 @@
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
-  DECLARE_VISIT_BASE_METHODS()
+  void visit(ASTNoop *noop) { return; }
+  virtual void visit(ASTScopeResolution *node) = 0;
+  virtual void visit(ASTSize_Of *node) = 0;
+  virtual void visit(ASTImport *node) = 0;
+  virtual void visit(ASTCast *node) = 0;
+  virtual void visit(ASTWhere *node) = 0;
+  virtual void visit(ASTLambda *node) = 0;
+  virtual void visit(ASTProgram *node) = 0;
+  virtual void visit(ASTBlock *node) = 0;
+  virtual void visit(ASTFunctionDeclaration *node) = 0;
+  virtual void visit(ASTParamsDecl *node) = 0;
+  virtual void visit(ASTParamDecl *node) = 0;
+  virtual void visit(ASTVariable *node) = 0;
+  virtual void visit(ASTExprStatement *node) = 0;
+  virtual void visit(ASTBinExpr *node) = 0;
+  virtual void visit(ASTUnaryExpr *node) = 0;
+  virtual void visit(ASTIdentifier *node) = 0;
+  virtual void visit(ASTLiteral *node) = 0;
+  virtual void visit(ASTType *node) = 0;
+  virtual void visit(ASTCall *node) = 0;
+  virtual void visit(ASTArguments *node) = 0;
+  virtual void visit(ASTReturn *node) = 0;
+  virtual void visit(ASTContinue *node) = 0;
+  virtual void visit(ASTBreak *node) = 0;
+  virtual void visit(ASTFor *node) = 0;
+  virtual void visit(ASTIf *node) = 0;
+  virtual void visit(ASTElse *node) = 0;
+  virtual void visit(ASTWhile *node) = 0;
+  virtual void visit(ASTStructDeclaration *node) = 0;
+  virtual void visit(ASTDotExpr *node) = 0;
+  virtual void visit(ASTSubscript *node) = 0;
+  virtual void visit(ASTInitializerList *node) = 0;
+  virtual void visit(ASTEnumDeclaration *node) = 0;
+  virtual void visit(ASTRange *node) = 0;
+  virtual void visit(ASTSwitch *node) = 0;
+  virtual void visit(ASTTuple *node) = 0;
+  virtual void visit(ASTAlias *node) = 0;
+  virtual void visit(ASTImpl *node) = 0;
+  virtual void visit(ASTTupleDeconstruction *node) = 0;
+  virtual void visit(ASTDefer *node) = 0;
+  virtual void visit(ASTInterfaceDeclaration *node) = 0;
+  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTModule *node) = 0;
+  virtual void visit(ASTType_Of *node) = 0;
   virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -24,7 +67,6 @@ struct VisitorBase {
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
-  int current_block_statement_idx;
   bool in_call = false;
   int expected_type = -1;
 
@@ -87,7 +129,7 @@ struct Typer : VisitorBase {
 
   int get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
 
@@ -170,8 +212,8 @@ struct Emitter : VisitorBase {
   Context &ctx;
 
   int type_list_id = -1;
-  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
-                               compile_command.compilation_flags.contains("-nostdlib");
+  const bool is_freestanding = compile_command.c_flags.contains("-ffreestanding") ||
+                               compile_command.c_flags.contains("-nostdlib");
 
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly

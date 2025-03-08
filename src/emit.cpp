@@ -572,6 +572,7 @@ void Emitter::visit(ASTVariable *node) {
     node->is_emitted = true;
   }
   emit_line_directive(node);
+  auto name = emit_symbol(ctx.scope->lookup(node->name));
 
   // Emit switch / if expressions.
   if (node->value &&
@@ -584,7 +585,7 @@ void Emitter::visit(ASTVariable *node) {
 
     (*ss) << to_cpp_string(type) << " " << str << ";\n";
     node->value.get()->accept(this);
-    (*ss) << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << node->name.get_str() << " = " << str;
+    (*ss) << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str;
     return;
   }
 
@@ -624,7 +625,7 @@ void Emitter::visit(ASTVariable *node) {
   }
 
   if (type->is_kind(TYPE_FUNCTION)) {
-    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(name, type);
     handle_initialization();
     return;
   }
@@ -632,7 +633,7 @@ void Emitter::visit(ASTVariable *node) {
   if (node->is_bitfield) {
     node->type->accept(this);
     space();
-    (*ss) << node->name.get_str();
+    (*ss) << name;
     space();
     (*ss) << ": " << node->bitsize.get_str();
     handle_initialization();
@@ -640,7 +641,7 @@ void Emitter::visit(ASTVariable *node) {
   }
 
   if (type->get_ext().is_fixed_sized_array()) {
-    (*ss) << get_declaration_type_signature_and_identifier(node->name.get_str(), type);
+    (*ss) << get_declaration_type_signature_and_identifier(name, type);
     if (node->value.is_not_null()) {
       (*ss) << " = ";
       node->value.get()->accept(this);
@@ -652,7 +653,7 @@ void Emitter::visit(ASTVariable *node) {
 
   node->type->accept(this);
   space();
-  (*ss) << node->name.get_str();
+  (*ss) << name;
   space();
   handle_initialization();
   return;
@@ -1502,8 +1503,12 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   if (!test_flag && node->flags & FUNCTION_IS_TEST) {
     return false;
   }
-
-  auto sym_name = emit_symbol(ctx.scope->lookup(node->name));
+  
+  auto sym = ctx.scope->lookup(node->name);
+  if (node->declaring_type != Type::INVALID_TYPE_ID) {
+    sym = global_get_type(node->declaring_type)->get_info()->scope->local_lookup(node->name);
+  }
+  auto sym_name = emit_symbol(sym);
 
   // generate a test based on this function pointer.
   if (test_flag && node->flags & FUNCTION_IS_TEST) {
@@ -1609,6 +1614,12 @@ void Emitter::visit(ASTCast *node) {
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+
+  if (!node->generic_parameters.empty()) {
+    return;
+  }
+
+
   if (node->is_emitted) {
     return;
   }
@@ -1619,6 +1630,9 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
 
   auto name = emit_symbol(ctx.scope->lookup(node->name));
   (*ss) << "typedef struct " << name << " " << name << ";\n";
+
+  auto old_init = emit_default_init;
+  emit_default_init = false;
 
   for (const auto &variant : node->variants) {
     if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
@@ -1637,6 +1651,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
     }
   }
 
+  emit_default_init = old_init;
   (*ss) << "typedef struct " << name << " {\n";
   (*ss) << "  int index;\n";
   (*ss) << "  union {\n";

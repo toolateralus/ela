@@ -115,7 +115,7 @@
 }
 
 Node :: struct {
-  next: *const Node
+  next: *mut Node
 }
 
 Array :: struct {
@@ -127,13 +127,13 @@ Array :: struct {
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
 
-  n: Node;
-  a.ptr[0].next = &const n;
+  mut n: Node;
+  a.ptr[0].next = &mut n;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
 #test test_subscript :: fn() {
-  arr: s32[100];
+  mut arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
   n: s32;
@@ -141,10 +141,10 @@ Array :: struct {
 }
 
 #test test_referencing_pointer :: fn() {
-  node: Node;
+  mut node: Node;
   node.next = malloc(sizeof(Node));
-  other: Node;
-  node.next.next = &const other;
+  mut other: Node;
+  node.next.next = &mut other;
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
   free(node.next);
@@ -161,7 +161,7 @@ XaryuStruct :: struct {
 }
 
 #test test_comp_assign_non_iden :: fn() {
-  arr: f32[12];
+  mut arr: f32[12];
   arr[0] = 10;
   arr[0] += 10;
   assert("omp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
