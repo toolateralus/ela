@@ -1439,7 +1439,6 @@ ASTStatement *Parser::parse_statement() {
     return decl;
   }
 
-  // ! BUG:: Somehow we broke 'a.b++' expressions here, it parses the dot then hits the ++; as if that's valid.
   // * Expression statements.
   {
     auto next = lookahead_buf()[1];
@@ -1469,11 +1468,11 @@ ASTStatement *Parser::parse_statement() {
         is_deref || is_special_case) {
       NODE_ALLOC(ASTExprStatement, statement, range, _, this)
       statement->expression = parse_expr();
-
       if (ASTSwitch *_switch = dynamic_cast<ASTSwitch *>(statement->expression)) {
         _switch->is_statement = true;
+      } else {
+        expect(TType::Semi);
       }
-
       end_node(statement, range);
       return statement;
     }

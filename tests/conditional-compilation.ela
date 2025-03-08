@@ -101,7 +101,6 @@
   } else {
     n = 0;
   }
-
-  assert("#if V(200) > 199 failed", n == 1)
-
+  
+  assert("#if V(200) > 199 failed", n == 1);
 }
