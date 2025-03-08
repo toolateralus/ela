@@ -160,6 +160,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   for (auto decl : node->members) {
     decl.type->accept(this);
     ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr, MUT);
+    auto sym = ctx.scope->local_lookup(decl.name);
+    if (sym->is_variable()) {
+      sym->flags |= SYMBOL_IS_LOCAL;
+    }
   }
 
   ctx.set_scope(old_scope);
@@ -263,6 +267,7 @@ void Typer::visit(ASTLambda *node) {
     info.parameter_types[parameter_index] = param->resolved_type;
     info.params_len++;
     node->block->scope->insert_variable(param->normal.name, param->resolved_type, nullptr, param->mutability);
+    node->block->scope->local_lookup(param->normal.name)->flags |= SYMBOL_IS_LOCAL;
     parameter_index++;
   }
 
@@ -292,6 +297,10 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     }
   }
 
+  if ((node->flags & (FUNCTION_IS_FORWARD_DECLARED | FUNCTION_IS_FOREIGN)) == 0) {
+    node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
+  }
+
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
@@ -308,6 +317,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
       ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability);
+      ctx.scope->local_lookup(normal.name)->flags |= SYMBOL_IS_LOCAL;
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
       auto type = get_self_type();
@@ -317,8 +327,10 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
 
       if (param->tag == ASTParamDecl::Себя) {
         ctx.scope->insert_variable("себя", type, nullptr, param->mutability);
+        ctx.scope->local_lookup("себя")->flags |= SYMBOL_IS_LOCAL;
       } else {
         ctx.scope->insert_variable("self", type, nullptr, param->mutability);
+        ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
       }
       info.parameter_types[info.params_len] = type;
     }
@@ -404,6 +416,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   node->target->accept(this);
+  node->scope->name = std::to_string(node->target->resolved_type) + "impl";
+
   auto target_ty = global_get_type(node->target->resolved_type);
   if (!target_ty) {
     if (node->target->resolved_type == Type::INVALID_TYPE_ID) {
@@ -416,11 +430,13 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   if (node->interface) {
     node->interface.get()->accept(this);
-    auto type_id = node->interface.get()->resolved_type;
-    if (type_id == Type::INVALID_TYPE_ID) {
+    auto interface_id = node->interface.get()->resolved_type;
+    if (interface_id == Type::INVALID_TYPE_ID) {
       throw_error("internal compiler error: type of impl interface was invalid", node->source_range);
     }
-    interface_ty = global_get_type(type_id);
+    interface_ty = global_get_type(interface_id);
+    node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(interface_id);
+  } else {
   }
 
   auto type_scope = target_ty->get_info()->scope;
@@ -443,10 +459,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
-    
+
     visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
-    
+
     if (auto symbol = type_scope->local_lookup(method->name)) {
       if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
         throw_error("Redefinition of method", method->source_range);
@@ -512,10 +528,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
           continue;
         }
-        
+
         visit_function_header(method, false);
         auto func_ty_id = method->resolved_type;
-        
+
         if (auto symbol = type_scope->local_lookup(method->name)) {
           if (!(symbol->flags & SYMBOL_IS_FORWARD_DECLARED)) {
             throw_error("Redefinition of method", method->source_range);
@@ -534,7 +550,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             continue;
           }
         }
-    
+
         visit_function_body(method);
       } else {
         throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
@@ -587,6 +603,8 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
     }
     type->generic_base_id = ctx.scope->lookup(node->name)->type_id;
   }
+
+  node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
 
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
@@ -723,7 +741,9 @@ void Typer::visit(ASTVariable *node) {
 
   auto variable_type = node->type->resolved_type;
   ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node->mutability, node);
-  auto type = global_get_type(variable_type);
+  if (node->is_local) {
+    ctx.scope->local_lookup(node->name)->flags |= SYMBOL_IS_LOCAL;
+  }
 
   if (variable_type == void_type()) {
     throw_error(std::format("cannot assign variable to type 'void' :: {}", node->name.get_str()), node->source_range);
@@ -869,6 +889,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
 
   left.value = "$$temp$$" + std::to_string(depth++);
   ctx.scope->insert_variable(left.value, left_type, nullptr, MUT);
+  ctx.scope->local_lookup(left.value)->flags |= SYMBOL_IS_LOCAL;
 
   Defer erase_temp_symbol([&] {
     depth--;
@@ -949,6 +970,7 @@ void Typer::visit(ASTFor *node) {
   if (node->left_tag == ASTFor::IDENTIFIER) {
     auto iden = node->left.identifier;
     ctx.scope->insert_variable(iden->value, iter_ty, iden, MUT);
+    ctx.scope->local_lookup(iden->value)->flags |= SYMBOL_IS_LOCAL;
     node->left.identifier->accept(this);
   } else {
     auto type = global_get_type(iter_ty);
@@ -975,12 +997,12 @@ void Typer::visit(ASTFor *node) {
 
       auto &destructure = node->left.destructure[i];
       auto iden = destructure.identifier;
+      auto type_id = symbol->type_id;
       if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
-        auto pointer = global_get_type(symbol->type_id)->take_pointer_to(destructure.mutability);
-        ctx.scope->insert_variable(iden->value, pointer, iden, MUT);
-      } else {
-        ctx.scope->insert_variable(iden->value, symbol->type_id, iden, MUT);
+        type_id = global_get_type(type_id)->take_pointer_to(destructure.mutability);
       }
+      ctx.scope->insert_variable(iden->value, type_id, iden, MUT);
+      ctx.scope->local_lookup(iden->value)->flags |= SYMBOL_IS_LOCAL;
       i++;
     }
   }
@@ -1170,6 +1192,7 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
 void Typer::visit(ASTImport *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
+  node->scope->name = node->module_name;
   for (auto statement : node->statements) {
     statement->accept(this);
   }
@@ -1522,7 +1545,12 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("can't assign a non-existent variable (TODO verify this error is correct)", node->source_range);
       }
       // we assume this is mutable since we made it past that?
-      ctx.scope->insert_variable(name, node->left->resolved_type, node->right, MUT);
+      auto symbol = ctx.scope->lookup(name);
+      if (symbol->is_variable()) {
+        symbol->variable.initial_value = node->right;
+      } else {
+        throw_error("Cannot assign to non-variable symbol", node->source_range);
+      }
     }
   }
 
@@ -2136,6 +2164,7 @@ void Typer::visit(ASTTupleDeconstruction *node) {
     }
     ctx.scope->insert_variable(destructure.identifier->value, type, symbol->variable.initial_value.get(),
                                destructure.mutability);
+    ctx.scope->local_lookup(destructure.identifier->value)->flags |= SYMBOL_IS_LOCAL;
     ++i;
   }
 };
@@ -2275,6 +2304,7 @@ void Typer::visit(ASTSize_Of *node) {
 void Typer::visit(ASTModule *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
+  node->scope->name = node->module_name;
   for (auto statement : node->statements) {
     statement->accept(this);
   }

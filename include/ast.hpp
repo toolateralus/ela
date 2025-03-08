@@ -296,9 +296,6 @@ struct ASTExprStatement : ASTStatement {
 struct ASTVariable : ASTStatement {
   InternedString name;
   InternedString bitsize;
-  Mutability mutability = CONST;
-
-  bool is_extern = false;
 
   // This isn't nullable, even though it can be null for part of compilation.
   // That's because if it ever was null, when it's done typing it will have been created.
@@ -306,12 +303,16 @@ struct ASTVariable : ASTStatement {
   ASTType *type = nullptr;
   Nullable<ASTExpr> value;
 
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
+  Mutability mutability = CONST;
 
+  bool is_local = false;
+  bool is_extern = false;
   bool is_constexpr = false;
   bool is_static = false;
   bool is_bitfield = false;
+
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
 };
 
 struct ASTBinExpr : ASTExpr {

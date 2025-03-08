@@ -375,11 +375,16 @@ std::string Type::to_string() const {
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
   Type *type = type_table.back();
-  type->set_base(name);
+  std::string base = name.get_str();
+  if (!generic_args.empty()) {
+    base += mangled_type_args(generic_args);
+  }
+  type->set_base(base);
   type->generic_args = generic_args;
   InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
   info->scope = scope;
   type->set_info(info);
+  info->scope->name = name;
   return type->id;
 }
 
@@ -394,6 +399,7 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
   info->scope = scope;
+  info->scope->name = base;
   type->set_info(info);
   return type->id;
 }
@@ -401,10 +407,15 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
-  type->set_base(name.get_str() + mangled_type_args(generic_args));
+  std::string base = name.get_str();
+  if (!generic_args.empty()) {
+    base += mangled_type_args(generic_args);
+  }
+  type->set_base(base);
   type->generic_args = generic_args;
   TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
   info->scope = scope;
+  info->scope->name = base;
   type->set_info(info);
   return type->id;
 }
@@ -416,6 +427,7 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
   info->scope = scope;
+  info->scope->name = name;
   type->set_info(info);
   return type->id;
 }
@@ -430,6 +442,7 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   if (!info->scope) {
     info->scope = create_child(nullptr);
   }
+  info->scope->name = name;
   return type->id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
