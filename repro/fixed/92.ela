@@ -7,10 +7,10 @@ Vec2 :: struct {
 
 impl Vec2 {
   format :: fn(self, builder: *mut String_Builder) {
-    builder.append_then_free(format("Vec2 { x: %, y: % }", .[
-      any::from(&mut self.x),
-      any::from(&mut self.y),
-    ], Format_Options::default()));
+    builder.append_then_free(format("Vec2 { x: %, y: % }", (
+      self.x,
+      self.y,
+    ), Format_Options::default()));
   }
 }
 

@@ -55,5 +55,7 @@ void Scope::erase(const InternedString &name) {
 }
 
 void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
-  symbols.insert({name, Symbol::create_type(-1, name, TYPE_INTERFACE, node)});
+  auto sym = Symbol::create_type(-1, name, TYPE_INTERFACE, node);
+  sym.scope = this;
+  symbols.insert({name, sym});
 }

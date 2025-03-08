@@ -236,6 +236,7 @@ struct Emitter : VisitorBase {
     // }
   }
   void emit_tuple(int type);
+  std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
   void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);

@@ -1425,6 +1425,7 @@ ASTStatement *Parser::parse_statement() {
     decl->name = tok.value;
     decl->value = parse_expr();
     decl->is_constexpr = true;
+    decl->mutability = Mutability::CONST;
     if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(tok.value.get_str())) {
       end_node(nullptr, range);
       throw_error("Invalid variable declaration: a type or keyword exists with "
@@ -1436,6 +1437,10 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("re-definition of '{}'", tok.value), decl->source_range);
     }
     ctx.scope->insert_variable(tok.value, Type::INVALID_TYPE_ID, decl->value.get(), CONST, decl);
+    if (current_func_decl) {
+      ctx.scope->local_lookup(tok.value)->flags |= SYMBOL_IS_LOCAL;
+      decl->is_local = true;
+    }
     return decl;
   }
 
@@ -1596,6 +1601,9 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
 
 ASTVariable *Parser::parse_variable() {
   NODE_ALLOC(ASTVariable, decl, range, _, this);
+  if (current_func_decl) {
+    decl->is_local = true;
+  }
   if (peek().type == TType::Mut) {
     eat();
     decl->mutability = MUT;
@@ -2071,21 +2079,21 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = (type->get_info()->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0 && info->scope != nullptr) {
+      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
         throw_error("Redefinition of struct", range);
       }
     } else {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = ctx.scope->create_struct_type(name.value, nullptr, node);
+    type_id = ctx.scope->create_struct_type(name.value, create_child(ctx.scope), node);
   }
 
   node->name = name.value;
   node->resolved_type = type_id;
   auto type = global_get_type(type_id);
   auto info = type->get_info()->as<StructTypeInfo>();
-  info->scope = node->scope = create_child(ctx.scope);
+  node->scope = info->scope;
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
 
@@ -2129,9 +2137,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       }
     }
     expect(TType::RCurly);
-    node->scope = scope;
     info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
-    info->scope = node->scope;
   } else {
     info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     node->is_fwd_decl = true;
@@ -2150,9 +2156,12 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
-  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, nullptr, node));
   auto scope = create_child(ctx.scope);
+  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, scope, node));
   ctx.set_scope(scope);
+  node->name = name.value;
+  node->scope = scope;
+  node->resolved_type = type->id;
 
   expect(TType::LCurly);
 
@@ -2185,10 +2194,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
     if (peek().type != TType::RCurly)
       expect(TType::Comma);
   }
-  node->name = name.value;
-  node->scope = ctx.exit_scope();
-  type->get_info()->scope = scope;
-  node->resolved_type = type->id;
+  ctx.exit_scope();
   expect(TType::RCurly);
   end_node(node, range);
   return node;
