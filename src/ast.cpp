@@ -1083,6 +1083,67 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+  if (tok.type == TType::Attribute) {
+    std::vector<Attribute> attributes;
+    {
+      eat();
+      expect(TType::LBrace);
+      while (peek().type != TType::RBrace) {
+        Attribute attribute;
+        if (peek().type == TType::Impl) {
+          eat();
+          attribute.tag = ATTRIBUTE_IMPL;
+          expect(TType::LParen);
+          while (peek().type != TType::RParen) {
+            attribute.arguments.push_back(parse_type());
+            if (peek().type != TType::RParen) expect(TType::Comma);
+          }
+          expect(TType::RParen);
+        } else if (peek().type == TType::Const) {
+          eat();
+          attribute.tag = ATTRIBUTE_CONST;
+        } else {
+          auto ident = expect(TType::Identifier).value.get_str();
+          if (ident == "pub") {
+            attribute.tag = ATTRIBUTE_PUB;
+          } else if (ident == "foreign") {
+            attribute.tag = ATTRIBUTE_FOREIGN;
+            if (peek().type == TType::LParen) {
+              eat();
+              // expect a string literal.
+              attribute.arguments.push_back(parse_primary());
+              expect(TType::RParen);
+            }
+          } else if (ident == "entry") {
+            attribute.tag = ATTRIBUTE_ENTRY;
+          } else if (ident == "impl") {
+            attribute.tag = ATTRIBUTE_IMPL;
+          } else if (ident == "export") {
+            attribute.tag = ATTRIBUTE_EXPORT;
+          } else if (ident == "no_mangle") {
+            attribute.tag = ATTRIBUTE_NO_MANGLE;
+          } else if (ident == "inline") {
+            attribute.tag = ATTRIBUTE_INLINE;
+          } else {
+            throw_error(std::format("invalid attribute {}", ident), {peek().location});
+          }
+        }
+        if (peek().type != TType::RBrace) {
+          expect(TType::Comma);
+        }
+        attributes.push_back(std::move(attribute));
+      }
+      expect(TType::RBrace);
+    }
+
+    if (peek().type == TType::Attribute) {
+      throw_error("doubling up attributes declarations leads to an overwrite. just use one @[...]", {peek().location});
+    }
+    auto statement = parse_statement();
+    statement->attributes = std::move(attributes);
+    return statement;
+  }
+
   // #self::fn() or some thing.
   if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)

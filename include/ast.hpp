@@ -120,22 +120,22 @@ struct ASTNode {
 };
 
 enum AttributeTag {
-  // @inline / @[inline]                   : inlined function
+  //  / @[inline]                           : inlined function
   ATTRIBUTE_INLINE,
-  // @foreign(external_fn_name) / @[foreign(external_fn_name)]
-  //                                       : extern function import
+  // @[foreign(external_fn_name)]           : extern function import
   ATTRIBUTE_FOREIGN,
-  // @entry                                : program entry point
+  // @[entry]                               : program entry point
   ATTRIBUTE_ENTRY,
-  // @impl(Clone, ...) / @[impl(Clone, Format, ...)]
-  //                                       : auto implement interface on type declaration
+  // @[impl(Clone, Format, ...)]            : auto implement interface on type declaration
   ATTRIBUTE_IMPL,
-  // @const / @[const]                     : make a function/struct compile-time-compatible
+  // @[const]                               : make a function/struct compile-time-compatible
   ATTRIBUTE_CONST,
-  // @pub / @[pub]                         : make a symbol publicly visible to all importing modules
+  // @[pub]                                 : make a symbol publicly visible to all importing modules
   ATTRIBUTE_PUB,
-  // @export / @[export]                   : make a symbol visible to any translation unit, even assembly / C code
-  ATTRIBUTE_EXPORT
+  // @[export]                              : make a symbol visible to any translation unit, even assembly / C code
+  ATTRIBUTE_EXPORT,
+  // @[no_mangle]                           : don't mangle a symbols name ever.
+  ATTRIBUTE_NO_MANGLE,
 };
 
 struct Attribute {
