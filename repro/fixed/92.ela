@@ -16,10 +16,8 @@ impl Vec2 {
 
 main :: fn() {
   mut builder: String_Builder;
-  
   vec2: Vec2;
   vec2.format(&mut builder);
-
   println(builder.get_string());
 }
 

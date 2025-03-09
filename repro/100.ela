@@ -1,0 +1,21 @@
+
+import raylib::{
+  InitWindow,
+  ClearBackground,
+  WindowShouldClose,
+  BeginDrawing,
+  EndDrawing
+  // ! Or, WHITE here. but raylib::WHITE should work.
+};
+
+// ! use of undeclared identifier, WHITE
+// ! unless we do `import raylib::*;`
+
+main :: fn() {
+  InitWindow(800, 600, "Hello, World!"c);
+  while !WindowShouldClose() {
+    BeginDrawing();
+      ClearBackground(raylib::WHITE); 
+    EndDrawing();
+  }
+}

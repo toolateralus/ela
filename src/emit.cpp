@@ -1255,7 +1255,7 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
       if (HAS_FLAG(flags, STRUCT_FLAG_FORWARD_DECLARED)) {
         ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
       } else {
-        ss << ".size = 0"; // non sized type
+        ss << ".size = 0, "; // non sized type
       }
     } else {
       ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
