@@ -753,33 +753,16 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
     auto self_symbol = ctx.get_symbol(self);
     auto self_type = global_get_type(self->resolved_type);
 
-    if (self_symbol.is_not_null() && self_symbol.get()->is_const()) {
-      if (!self_type->get_ext().is_pointer()) {
-        // self is a const non-pointer variable
-        if (first->get_ext().is_mut_pointer()) {
-          throw_error("cannot pass a const variable to a function expecting a mutable pointer!", node->source_range);
-        }
-      } else {
-        // self is a const pointer
-        if (!first->get_ext().is_const_pointer()) {
-          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!", node->source_range);
-        }
+    if (first->get_ext().is_mut_pointer()) {
+      if (!self_type->get_ext().is_pointer() && self_symbol && self_symbol.get()->is_const()) {
+        throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.", node->source_range);
       }
-    } else {
-      if (!self_type->get_ext().is_pointer()) {
-        // self is a mutable non-pointer variable
-        if (!first->get_ext().is_mut_pointer() && !first->get_ext().is_const_pointer()) {
-          throw_error("invalid function parameter type for self", node->source_range);
-        }
-      } else {
-        // self is a non-const pointer
-        if (!first->get_ext().is_pointer()) {
-          throw_error("cannot pass a pointer to a function expecting a non-pointer type!", node->source_range);
-        } else if (first->get_ext().is_mut_pointer() && self_symbol.is_not_null() && self_symbol.get()->is_const()) {
-          throw_error("cannot pass a const pointer to a function expecting a mutable pointer!", node->source_range);
-        }
+      if (self_type->get_ext().is_const_pointer()) {
+        throw_error("cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however you obtained this pointer)", node->source_range);
       }
+
     }
+
   }
 }
 
