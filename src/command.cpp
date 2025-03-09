@@ -156,6 +156,8 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       } else {
         file << MAIN_INIT_CODE;
       }
+      file.flush();
+      file.close();
       exit(0);
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];

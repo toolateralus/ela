@@ -3,14 +3,14 @@
   * We have a nice set of number types, most of them sized, other common aliases.
 */
 
-x8 : s8;      xchar: char;  // s8 is same as 'char'
+x8 : s8;      
 x16: s16;
 x32: s32;     xint: s32;    // s32 is the same as 's32'
 x64: s64;
 
 y8 : u8;
 y16: u16;
-y32: u32;
+y32: u32;    xchar: char;  // u32 is same as 'char', unless the expected / inferred type is u8.
 y64: u64;
 
 f32: f32; ffloat: f32; // f32 is the same as 'f32'

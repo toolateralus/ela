@@ -17,10 +17,10 @@ MyEnum :: enum {
 
 
 main :: fn() {
-  n: MyEnum;
+  mut n: MyEnum;
   n = 10; // at the time of writing this, this is legal. To be changed.
   n = MyEnum::Zero;
 
-  f: Flags;
+  mut f: Flags;
   f |= Flags::One | Flags::Three;
 }

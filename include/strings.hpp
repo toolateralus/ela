@@ -15,18 +15,15 @@ Ela compiler:
 )_";
 
 constexpr auto RAYLIB_INIT_CODE = R"__(
-import raylib;
+import raylib::*;
 
 main :: fn() {
-  // Silence the raylib console output spewage
+  // Silence the raylib console output
   SetTraceLogLevel(TraceLogLevel::LOG_NONE);
 
-  InitWindow(800, 600, "Hello, Raylib!");
+  InitWindow(800, 600, "Hello, Raylib!"c);
 
-  // Allow resizable window
   SetConfigFlags(ConfigFlags::FLAG_WINDOW_RESIZABLE);
-
-  // 60 fps cap.
   SetTargetFPS(60);
 
   while !WindowShouldClose() {
@@ -39,21 +36,40 @@ main :: fn() {
     DrawRectangle(rect_x, rect_y, 300, 300, BLACK);
 
     // Draw text.
-    text := "Hello, Raylib!"c; // the little 'c' denotes a c string, u8*
+    text := "Hello, Raylib!"c; // the little 'c' denotes a c string, *const u8
     text_x := (GetScreenWidth() / 2) - (MeasureText(text, 24) / 2);
     text_y := GetScreenHeight() / 2;
     DrawText(text, text_x, text_y, 24, WHITE);
 
-    // Отлично! (excellent!)
     EndDrawing();
   }
 }
 )__";
 
 constexpr auto MAIN_INIT_CODE = R"__(
-import format;
+import fmt;
+
 main :: fn() {
-  println("Hello, World! |\nПривет, Мир! |\nHola, Mundo! |\nBonjour, le Monde! |\nHallo, Welt! |\nCiao, Mondo! |\nこんにちは、世界！ |\n안녕하세요, 세계! |\nمرحبا بالعالم! |\n你好，世界！ |\nHola, Mundo! |\nสวัสดี, โลก! |\nΓειά σου, Κόσμε! |\nสวัสดีโลก! |\nவணக்கம், உலகம்! |\nسلام، دنیا! |\nHei, Maailma! |\nOlá, Mundo! |\nAhoj, světe! |\nHelló, Világ! |\nสวัสดีครับ/ค่ะ, โลก! |\nこんにちは世界! |\nनमस्ते, दुनिया! |\nCześć, świecie! |\nสวัสดีโลก! |\nHei, maailma! |\nHola, món! |\nHallo, wêreld! |\nこんにちは、世界！ |\nHoi, Wêreld! |\nสวัสดีครับ, โลก!");
+  hellos := str[]::init(.[
+    "Hello, World!",
+    "Привет, Мир!",
+    "Hola, Mundo!",
+    "Bonjour, le Monde!",
+    "Hallo, Welt!",
+    "Ciao, Mondo!",
+    "こんにちは、世界！",
+    "안녕하세요, 세계!",
+    "Olá, Mundo!",
+    "你好，世界！",
+    "Hej, Världen!",
+    "Salve, Mundi!"
+  ]);
+
+  defer hellos.deinit();
+
+  for hello in hellos {
+    fmt::println(hello);
+  }
 }
 )__";
 

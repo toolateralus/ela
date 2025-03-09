@@ -1,0 +1,35 @@
+
+
+/* 
+  In Ela, by default, any file loaded with "import" will be treated as an independent module.
+
+  However, in some cases, you may want to have explicit submodules within a single file, and for that we
+  have the 'module' keyword.
+*/
+
+
+// for example, assume we're in the file `math.ela`
+
+// Here, you could organize tests. This is not needed, and could be replaced with a 
+// #region if you just wanted to have a collapsable region, as the output code will be the same.
+module tests {
+  #test test_addition :: fn() {
+    c := 10 + 20;
+    assert_eq("addition failed!", c, 30);
+  }
+}
+
+/* 
+  here we declare a module adder. to use this we need to import it, even in this file.
+*/
+module adder {
+  add :: fn!<T>(a: T, b: T) -> T {
+    return a + b;
+  }
+}
+
+import adder::add;
+import fmt::println;
+main :: fn() {
+  println(add(1, 2)); // print 3, I hope :D
+}

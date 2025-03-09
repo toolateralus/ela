@@ -1,0 +1,59 @@
+
+/* 
+  Importing modules is pretty simple in ela.
+
+  just use the import keyword with the syntax that matches your needs.
+*/
+
+/* 
+  this will import the module fmt and compile the code,
+  but all references to things from fmt will have to be prefixed with
+
+  `fmt::<symbol>`
+
+  such as 
+
+  `fmt::println(10)`
+*/
+import fmt;
+
+main :: fn() {
+  // note this little comma in our tuple, is how we use a single value tuple.
+  // it's just our way of doing `anonymous` structs.
+  fmt::printlnf("Hello!, I am %", ("<Your Name Here>",));
+}
+
+/* 
+  If you only need one symbol or submodule from a module, you can simply do that as such:
+*/
+import fmt::printlnf;
+main :: fn() {
+  printlnf("Hello!, I am %", ("<Your Name Here>",));
+}
+
+
+/* 
+  you can also import specific symbols, that will get pulled into your scope (which basically must be file scope, i.e "global")
+  so that you do not have to reference them by `fmt::<symbol>`
+*/
+import fmt::{
+  printlnf,
+  println,
+  Format_Options,
+};
+
+main :: fn() {
+  Format_Options::current().quote_strings = true;
+  printlnf("Hello!, I am %", ("<Your Name Here>",));
+}
+
+
+/* 
+  additionally, you can just outright pull in every symbol from a module in with `::*;`
+*/
+
+import fmt::*;
+
+main :: fn() {
+  printlnf("Hello!, I am NOT %", ("<Evil Name Here>"))
+}

@@ -1,4 +1,3 @@
-; 
 
 #test test_type_alias :: fn() {
   alias XaryuBarSchnar :: s32;

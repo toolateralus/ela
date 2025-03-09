@@ -1,27 +1,16 @@
+/* 
+  Main can never take arguments, nor can it ever return a value (effectively, it will just discard the value if it has one).
 
+  Always use 'Env::args()' to get cmd line arguments,
 
-// Main can never take arguments, nor can it ever return a value.
-// Always use 'Env::args()' to get cmd line arguments,
-// and use 'exit(return_code)' for returning an exit code.
-
-/* So this is valid.. */
-main :: fn() {
-  if 1 then return;
-  return;
-}
-
-/* As well as this.. */
-main :: fn() { 
-  
-}
-
+  and use 'exit(return_code)' for returning an exit code.
+*/
 
 main :: fn() {
   args := Env::args();
   if args.length > 2 { 
     exit(1); 
-  }
-  else { 
-    exit(244); 
+  } else { 
+    exit(244);
   }
 }
