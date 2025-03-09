@@ -1,7 +1,7 @@
 ;
 
 #test test_comp_assign :: fn() {
-  deref: s32 = 1;
+  mut deref: s32 = 1;
   deref += deref;
   assert("+=", deref == 2);
   deref -= deref;
@@ -27,10 +27,10 @@
 }
 
 #test test_operators :: fn() {
-  left: s32 = 1;
-  right: s32 = 1;
-  result: s32;
-  result_bool: bool;
+  mut left: s32 = 1;
+  mut right: s32 = 1;
+  mut result: s32;
+  mut result_bool: bool;
   result_bool = left == right;
   assert("left should equal right", result_bool == true);
   result_bool = left != right;
@@ -82,8 +82,8 @@
 }
 
 #test test_address_of :: fn() {
-  v: s32 = 0;
-  addr_of_v: s32* = &v;
+  mut v: s32 = 0;
+  addr_of_v: *const s32 = &const v;
   assert("address of grabbed a non-null ptr", addr_of_v != null);
   v = *addr_of_v;
   assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
@@ -115,7 +115,7 @@
 }
 
 Node :: struct {
-  next: Node*
+  next: *mut Node
 }
 
 Array :: struct {
@@ -127,13 +127,13 @@ Array :: struct {
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
 
-  n: Node ;
-  a.ptr[0].next = &n;
+  mut n: Node;
+  a.ptr[0].next = &mut n;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
 #test test_subscript :: fn() {
-  arr: s32[100];
+  mut arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
   n: s32;
@@ -141,10 +141,10 @@ Array :: struct {
 }
 
 #test test_referencing_pointer :: fn() {
-  node: Node;
+  mut node: Node;
   node.next = malloc(sizeof(Node));
-  other: Node;
-  node.next.next = &other;
+  mut other: Node;
+  node.next.next = &mut other;
   assert("mallocing 'next' of 'Node' failed.", node.next != null);
   assert("dereferencing other into node.next failed.", node.next.next != null);
   free(node.next);
@@ -161,7 +161,7 @@ XaryuStruct :: struct {
 }
 
 #test test_comp_assign_non_iden :: fn() {
-  arr: f32[12];
+  mut arr: f32[12];
   arr[0] = 10;
   arr[0] += 10;
   assert("omp assign arr[0] += 10 failed to == 20.", arr[0] == 20);
@@ -174,5 +174,5 @@ XaryuStruct :: struct {
 
 #test test_underscores_in_number_literals :: fn() {
   n: s32 = 1_000_000;
-  assert("number literal with underscores failed to equal expected value", n == 1000000)
+  assert("number literal with underscores failed to equal expected value", n == 1000000);
 }

@@ -16,7 +16,7 @@ counter :: fn() -> s32 {
 
 Strukt :: struct;
 
-// A static method is just one that doesn't take a self, or self* parameter.
+// A static method is just one that doesn't take a self, or *mut self parameter.
 impl Strukt {
   // static functions on structs. Similar usage to the previous static function,
   counter :: fn() -> s32 {

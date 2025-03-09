@@ -95,9 +95,52 @@ static std::vector<std::pair<std::string, std::string>> type_map = {{"char", "u8
                                                                     {"unsigned", "u32"},
                                                                     {"void", "void"}};
 
+static inline std::string wrapgen_get_type_name(CXType type);
+
+static inline std::string wrapgen_get_pointer_type_name(CXType type) {
+  std::string result;
+  bool is_const = false;
+  bool is_mut = false;
+
+  while (type.kind == CXType_Pointer) {
+    CXType pointeeType = clang_getPointeeType(type);
+    if (clang_isConstQualifiedType(pointeeType)) {
+      if (!is_const && !is_mut) {
+        is_const = true;
+      }
+      result += "*";
+    } else {
+      if (!is_const && !is_mut) {
+        is_mut = true;
+      }
+      result += "*";
+    }
+    type = pointeeType;
+  }
+
+  // right now we just set all extern generated functions to be const pointers so they're more compatible.
+  // of course, we have no idea.
+  result += "const " + wrapgen_get_type_name(type);
+  return result;
+}
+
 static inline std::string wrapgen_get_type_name(CXType type) {
+  if (type.kind == CXType_Pointer && clang_getPointeeType(type).kind == CXType_FunctionProto) {
+    auto proto_type = clang_getPointeeType(type);
+    std::string returnType = wrapgen_get_type_name(clang_getResultType(proto_type));
+    std::string args;
+    int numArgs = clang_getNumArgTypes(proto_type);
+    for (int i = 0; i < numArgs; ++i) {
+      if (i > 0) {
+        args += ", ";
+      }
+      args += wrapgen_get_type_name(clang_getArgType(proto_type, i));
+    }
+    return "fn*(" + args + ") -> " + returnType;
+  }
+
   if (type.kind == CXType_Pointer) {
-    std::string result = wrapgen_get_type_name(clang_getPointeeType(type)) + " *";
+    std::string result = wrapgen_get_pointer_type_name(type);
     return result;
   }
 

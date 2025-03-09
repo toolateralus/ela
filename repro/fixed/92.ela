@@ -1,5 +1,4 @@
-
-#import format;
+import fmt::*;
 
 Vec2 :: struct {
   x: f32,
@@ -7,19 +6,19 @@ Vec2 :: struct {
 }
 
 impl Vec2 {
-  format :: fn(self, builder: String_Builder*) {
-    builder.append_then_free(format("Vec2 { x: %, y: % }", .[
-      any::from(&self.x),
-      any::from(&self.y),
-    ], Format_Options::default()));
+  format :: fn(self, builder: *mut String_Builder) {
+    builder.append_then_free(format("Vec2 { x: %, y: % }", (
+      self.x,
+      self.y,
+    ), Format_Options::default()));
   }
 }
 
 main :: fn() {
-  builder: String_Builder;
+  mut builder: String_Builder;
   
   vec2: Vec2;
-  vec2.format(&builder);
+  vec2.format(&mut builder);
 
   println(builder.get_string());
 }

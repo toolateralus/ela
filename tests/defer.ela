@@ -8,7 +8,7 @@
 
 
 nested_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   if (true) {
     defer x += 2;
@@ -21,7 +21,7 @@ nested_defer_test :: fn() -> s32 {
 }
 
 loop_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += i;
   }
@@ -33,7 +33,7 @@ loop_defer_test :: fn() -> s32 {
 }
 
 early_return_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   if (true) {
     defer x += 2;
@@ -47,7 +47,7 @@ early_return_defer_test :: fn() -> s32 {
 }
 
 DeferCleanup :: struct {
-  ptr : void*
+  ptr : *mut void
 }
 
 // Return statements are evaluated BEFORE the defer, so
@@ -56,30 +56,29 @@ DeferCleanup :: struct {
 
 // here we show that the ptr as a u64 is passed back to the caller before it's set to null
 // in the defer block. which is absolutely expected behaviour.
-defer_cleanup_routine :: fn(c: DeferCleanup*) -> u64 {
+defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
   defer {
     free(c.ptr);
     c.ptr = null;
   }
   assert("defer cleanup got null input", c.ptr != null);
-  return c.ptr as u64;
+  return (c.ptr as *mut u64) as u64;
 }
 
 #test test_defer_cleanup_routine :: fn() {
   ptr := malloc(8);
-  cleanup := DeferCleanup .{
+  mut cleanup := DeferCleanup .{
     ptr: ptr
   };
   ptr_as_int : u64 = ptr as u64;
-  n := defer_cleanup_routine(&cleanup);
+  n := defer_cleanup_routine(&mut cleanup);
   assert("yep", n == ptr_as_int);
   assert("leanup on defer failed", cleanup.ptr == null);
 }
 
 // Additional comprehensive tests
-
 continue_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {
@@ -95,7 +94,7 @@ continue_defer_test :: fn() -> s32 {
 }
 
 break_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {
@@ -111,7 +110,7 @@ break_defer_test :: fn() -> s32 {
 }
 
 multiple_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   defer x += 1;
   defer x += 2;
   return x;
@@ -122,7 +121,7 @@ multiple_defer_test :: fn() -> s32 {
 }
 
 nested_control_flow_defer_test :: fn() -> s32 {
-  x := 0;
+  mut x := 0;
   for i in 0..3 {
     defer x += 1;
     if (i == 1) {

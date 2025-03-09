@@ -1,5 +1,10 @@
 
-#import dlfcn;
+import dlfcn::{dlopen, dlsym, Rtld};
+import fmt::*;
+// import raylib::{InitWindow, SetTargetFPS, WindowShouldClose, IsKeyDown, BeginDrawing, ClearBackground, EndDrawing};
+import raylib::*;
+
+
 #include "shared.ela";
 
 // Use this flag for machines that don't have '.' or '$(pwd)' in 
@@ -7,7 +12,7 @@
 #c_flags "-Wl,-rpath,.";
 
 main :: fn() -> s32 {
-  handle := dlopen("test.so"c, Rtld::Now);
+  handle := dlopen("./test.so"c, Rtld::Lazy);
   
   if !handle {
     panic("unable to open library");

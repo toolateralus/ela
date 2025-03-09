@@ -4,17 +4,21 @@
   Also, if these libraries implement tests, we run them here.
 */
 
-#import directory;
-#import dlfcn;
-#import file;
-#import format;
-#import json;
-#import math;
-#import memory;
-#import net;
-#import pthread;
-// #import gl; This has conflicting definitions with raylib. It's less maintained than raylib, so we just ignore it.
-#import rayui;
-#import time;
+import fs::*;
+import dlfcn::*;
+import fmt::*;
+import json::*;
+import math::*;
+import memory::*;
+import pthread::*;
 
-main :: fn() {}
+// import gl::*;
+// import rayui::*;
+
+import time::*;
+
+module std {
+  
+}
+
+

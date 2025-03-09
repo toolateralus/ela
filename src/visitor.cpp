@@ -15,6 +15,8 @@
 
 // clang-format off
 void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTModule::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTImport::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTType_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSwitch::accept(VisitorBase *visitor) { visitor->visit(this); }
@@ -65,3 +67,31 @@ void ASTSize_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
   ##### DECLARE VISITOR ACCEPT METHODS ######
   ###########################################
 */
+void Parser::parse_pointer_extensions(ASTType *type) {
+  int pointer_depth = 0;
+
+  while (peek().type == TType::Mul) {
+    eat();
+    pointer_depth++;
+  }
+
+  Mutability mutability;
+
+  if (pointer_depth != 0) {
+    if (peek().type == TType::Const) {
+      eat();
+      mutability = CONST;
+    } else if (peek().type == TType::Mut) {
+      eat();
+      mutability = MUT;
+    } else {
+      throw_error(
+          "'*const/*mut' are required for all pointer types now, as a prefix. such as '*const s32', '**mut s64'",
+          {peek().location});
+    }
+  }
+
+  for (int i = 0; i < pointer_depth; ++i) {
+    type->extensions.push_back({mutability ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
+  }
+}

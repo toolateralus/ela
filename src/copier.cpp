@@ -1,4 +1,4 @@
-#include "ast_copier.hpp"
+#include "copier.hpp"
 #include "ast.hpp"
 #include "type.hpp"
 
@@ -220,6 +220,7 @@ ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
   auto new_node = copy(node);
   new_node->key_values.clear();
+  new_node->values.clear();
   if (node->tag == ASTInitializerList::INIT_LIST_COLLECTION) {
     for (auto expr : node->values) {
       new_node->values.push_back(static_cast<ASTExpr *>(copy_node(expr)));
@@ -303,12 +304,12 @@ ASTTuple *ASTCopier::copy_tuple(ASTTuple *node) {
 }
 ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruction *node) {
   auto new_node = copy(node);
-  new_node->identifiers.clear();
-  for (const auto &destruct : node->identifiers) {
+  new_node->elements.clear();
+  for (const auto &destruct : node->elements) {
     Destructure new_destruct;
     new_destruct.semantic = destruct.semantic;
     new_destruct.identifier = static_cast<ASTIdentifier *>(copy_node(destruct.identifier));
-    new_node->identifiers.push_back(new_destruct);
+    new_node->elements.push_back(new_destruct);
   }
   new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
   return new_node;
@@ -449,6 +450,10 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_statement_list(static_cast<ASTStatementList *>(node));
     case AST_NODE_TYPE_OF:
       return copy_type_of(static_cast<ASTType_Of *>(node));
+    case AST_NODE_IMPORT:
+      return copy_import(static_cast<ASTImport*>(node));
+    case AST_NODE_MODULE:
+      return copy_module(static_cast<ASTModule*>(node));
   }
 }
 
@@ -465,7 +470,7 @@ ASTNode *deep_copy_ast(ASTNode *root) {
 
 ASTAlias *ASTCopier::copy_alias(ASTAlias *node) {
   auto new_node = copy(node);
-  new_node->source_type = static_cast<ASTType *>(copy_node(node->source_type));
+  new_node->source_node = static_cast<ASTType *>(copy_node(node->source_node));
   return new_node;
 }
 
@@ -524,5 +529,30 @@ ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
   for (auto stmt : node->statements) {
     new_node->statements.push_back(copy_node(stmt));
   }
+  return new_node;
+}
+
+ASTImport *ASTCopier::copy_import(ASTImport *node) {
+  auto new_node = copy(node);
+  new_node->statements.clear();
+  new_node->scope = copy_scope(node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  for (const auto &statement: node->statements) {
+    new_node->statements.push_back((ASTStatement*)copy_node(statement));
+  }
+  current_scope = old_scope;
+  return new_node;
+}
+
+ASTModule *ASTCopier::copy_module(ASTModule *node) {
+  auto new_node = copy(node);
+  new_node->scope = copy_scope(node->scope);
+  auto old_scope = current_scope;
+  current_scope = new_node->scope;
+  for (const auto &statement: node->statements) {
+    new_node->statements.push_back((ASTStatement*)copy_node(statement));
+  }
+  current_scope = old_scope;
   return new_node;
 }

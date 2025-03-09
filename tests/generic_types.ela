@@ -4,7 +4,7 @@ GenericStruct :: struct!<T> {
 }
 
 impl!<T> GenericStruct!<T> {
-  add :: fn(self*) -> T {
+  add :: fn(*mut self) -> T {
     return self.a + self.b;
   }
 }
@@ -22,7 +22,7 @@ GenericUnion :: union!<T, T1> {
 }
 
 #test test_generic_union :: fn() {
-  int_adder: GenericUnion!<s32, f32>;
+  mut int_adder: GenericUnion!<s32, f32>;
   int_adder.a = 11;
   assert("generic type failure", int_adder.a == 5 + 6);
   int_adder.b = 1.23 + 4.56;

@@ -57,13 +57,7 @@ struct CompilationMetric {
 };
 
 struct CompileCommand {
-  void print_metrics() {
-    if (has_flag("metrics")) {
-      std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
-      std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
-      std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
-    }
-  }
+  
 
   CompilationMetric parse;
   CompilationMetric lower;
@@ -75,15 +69,21 @@ struct CompileCommand {
   std::filesystem::path binary_path;
   std::filesystem::path original_path;  // where the compiler was invoked from
   std::unordered_map<std::string, bool> flags;
-  std::string compilation_flags;
+  std::string c_flags;
 
-  void print() const;
-  void add_compilation_flag(const std::string &flags);
-  CompileCommand(int argc, char *argv[]);
-  std::string read_input_file();
-  bool has_flag(const std::string &flag) const;
   int compile();
-  void setup_ignored_warnings();
+  void print_command() const;
+  void add_c_flag(const std::string &flags);
+  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests);
+  bool has_flag(const std::string &flag) const;
+
+  void print_metrics() {
+    if (has_flag("metrics")) {
+      std::cout << "\033[1;36m" << parse.id << "\033[0m " << "\033[1;32m" << parse.get_time() << "\033[0m\n";
+      std::cout << "\033[1;36m" << lower.id << "\033[0m " << "\033[1;32m" << lower.get_time() << "\033[0m\n";
+      std::cout << "\033[1;36m" << cpp.id << "\033[0m " << "\033[1;32m" << cpp.get_time() << "\033[0m\n";
+    }
+  }
 };
 
 extern CompileCommand compile_command;

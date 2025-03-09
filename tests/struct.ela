@@ -24,7 +24,7 @@ Vector3 :: struct {
 }
 
 #test test_struct_assign_member :: fn() {
-  v: Vector2;
+  mut v: Vector2;
   v.x = 10.0;
   v.y = 10.0;
   assert("assigning v.x = 10.0 failed", v.x == 10.0);
@@ -32,7 +32,7 @@ Vector3 :: struct {
 }
 
 #test test_struct_assign_nested_member :: fn() {
-  v: Vector3;
+  mut v: Vector3;
   v.vec2.x = 1.0;
   v.vec2.y = 2.0;
   v.z = 3.0;

@@ -1,12 +1,12 @@
 thing :: struct!<T> {
-	next: thing!<T>*
+	next: *mut thing!<T>
 }
 
 main :: fn() {
-	a: thing!<s32>;
-	b: thing!<s32>;
-	a.next = &b;
-	a.next.next = &a;
+	mut a: thing!<s32>;
+	mut b: thing!<s32>;
+	a.next = &mut b;
+	a.next.next = &mut a;
 }
 
 /* Member "next" not found in type "thing"

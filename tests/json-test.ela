@@ -1,18 +1,18 @@
-#import json;
-#import directory;
+import json::*;
+import fs::*;
 
 JsonValue :: struct {}
 
 JsonValueDeleter :: struct {
-  vals: List!<JsonValue*>,
+  vals: List!<*const JsonValue>,
 }
 
 impl JsonValueDeleter {
-  add :: fn(self*, val: JsonValue*) {
+  add :: fn(*mut self, val: *const JsonValue) {
     self.vals.push(val);
   }
   // *fixme
-  destroy :: fn(self*) {
+  destroy :: fn(*mut self) {
     for val in self.vals {
       free(val);
     }
@@ -136,7 +136,7 @@ impl JsonValueDeleter {
 //   b: f32,
 // }
 // impl MyJsonStruct {
-//   to_string ::fn(self*) -> str {
+//   to_string ::fn(*mut self) -> str {
 //     return $"MyJsonStruct [n: {self.n}, b: {self.b}]";
 //   }
 // }

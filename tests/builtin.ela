@@ -7,7 +7,7 @@
   array : s32[11] = .[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
 
   for i in 0..11 {
-    assert("array element failed to init", i == array[i])
+    assert("array element failed to init", i == array[i]);
   }
 }
 
@@ -26,7 +26,7 @@ Xaryu :: struct {
   for i in 0..100 {
     array.push(10);
   }
-  n: s32;
+  mut n: s32;
   for i in 0..100 {
     n = array.pop();
   }
@@ -47,17 +47,11 @@ Xaryu :: struct {
 
 #test test_slicing_array :: fn() {
   arr := List!<s32>::init(.[
-    0, 0, 0,
-    0, 0, 0,
-    0, 0, 0,
-    0, 0,
+    0, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0,
   ]);
   
   assert("Length", arr.length == 11);
-
-  // for i in 0..10 {
-  //   arr[i] = 100;
-  // }
 
   subarr := arr.subarray(0..10);
 
@@ -101,7 +95,7 @@ Xaryu :: struct {
 }
 
 #test subscript_string :: fn() {
-  s: str = "0,1,2,3,4";
+  mut s: str = "0,1,2,3,4";
   s[0] = 10;
   assert("subscript assign str failed", s[0] == (10 as u8));
 }

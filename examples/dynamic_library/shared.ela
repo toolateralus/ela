@@ -1,5 +1,4 @@
-;
-#import raylib;
+import raylib::{Rectangle, Color, DrawRectangle};
 
 DrawCommand :: struct {
   rect: Rectangle,
@@ -11,7 +10,7 @@ DrawContext :: struct {
   inputState: bool[256],
 }
 impl DrawContext {
-   draw :: fn(self*) {
+   draw :: fn(*mut self) {
     while self.commands.length > 0 {
       command := self.commands.pop();
       DrawRectangle(command.rect.x as s32, command.rect.y as s32, command.rect.width as s32, command.rect.height as s32, command.color);
@@ -19,4 +18,4 @@ impl DrawContext {
   }
 }
 
-alias function :: fn* (DrawContext*);
+alias function :: fn* (DrawContext*)

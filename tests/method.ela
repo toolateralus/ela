@@ -3,10 +3,10 @@
 IHaveAMethod :: struct {}
 
 impl IHaveAMethod {
-  method :: fn(self*) -> f32 {
+  method :: fn(*mut self) -> f32 {
     return 0.0;
   }
-  parameter_method :: fn(self*, x: f32) -> f32 {
+  parameter_method :: fn(*mut self, x: f32) -> f32 {
       return x;
   }
 }

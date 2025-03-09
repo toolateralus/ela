@@ -15,7 +15,7 @@ Ela compiler:
 )_";
 
 constexpr auto RAYLIB_INIT_CODE = R"__(
-#import raylib;
+import raylib;
 
 main :: fn() {
   // Silence the raylib console output spewage
@@ -51,7 +51,7 @@ main :: fn() {
 )__";
 
 constexpr auto MAIN_INIT_CODE = R"__(
-#import format;
+import format;
 main :: fn() {
   println("Hello, World! |\nПривет, Мир! |\nHola, Mundo! |\nBonjour, le Monde! |\nHallo, Welt! |\nCiao, Mondo! |\nこんにちは、世界！ |\n안녕하세요, 세계! |\nمرحبا بالعالم! |\n你好，世界！ |\nHola, Mundo! |\nสวัสดี, โลก! |\nΓειά σου, Κόσμε! |\nสวัสดีโลก! |\nவணக்கம், உலகம்! |\nسلام، دنیا! |\nHei, Maailma! |\nOlá, Mundo! |\nAhoj, světe! |\nHelló, Világ! |\nสวัสดีครับ/ค่ะ, โลก! |\nこんにちは世界! |\nनमस्ते, दुनिया! |\nCześć, świecie! |\nสวัสดีโลก! |\nHei, maailma! |\nHola, món! |\nHallo, wêreld! |\nこんにちは、世界！ |\nHoi, Wêreld! |\nสวัสดีครับ, โลก!");
 }
@@ -70,7 +70,7 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
   )__";
   
   // This is stuff we just can't really get rid of while using a transpiled backend.
-  static constexpr auto INESCAPABLE_BOILERPLATE_AAAGHHH = R"__(
+  static constexpr auto BOILERPLATE_C_CODE = R"__(
   typedef unsigned long long int u64;
   typedef signed long long int s64;
   

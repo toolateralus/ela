@@ -10,7 +10,7 @@ Vector2 :: struct {
 
 impl Vector2 {
   // Define a to_string so that interpolated strings can print us implicitly.
-  to_string :: fn(self*) -> u8* {
+  to_string :: fn(*mut self) -> u8* {
     return $"x={self.x}, y={self.y}";
   }
 }

@@ -13,7 +13,50 @@
 
 struct VisitorBase {
   virtual ~VisitorBase() = default;
-  DECLARE_VISIT_BASE_METHODS()
+  void visit(ASTNoop *noop) { return; }
+  virtual void visit(ASTScopeResolution *node) = 0;
+  virtual void visit(ASTSize_Of *node) = 0;
+  virtual void visit(ASTImport *node) = 0;
+  virtual void visit(ASTCast *node) = 0;
+  virtual void visit(ASTWhere *node) = 0;
+  virtual void visit(ASTLambda *node) = 0;
+  virtual void visit(ASTProgram *node) = 0;
+  virtual void visit(ASTBlock *node) = 0;
+  virtual void visit(ASTFunctionDeclaration *node) = 0;
+  virtual void visit(ASTParamsDecl *node) = 0;
+  virtual void visit(ASTParamDecl *node) = 0;
+  virtual void visit(ASTVariable *node) = 0;
+  virtual void visit(ASTExprStatement *node) = 0;
+  virtual void visit(ASTBinExpr *node) = 0;
+  virtual void visit(ASTUnaryExpr *node) = 0;
+  virtual void visit(ASTIdentifier *node) = 0;
+  virtual void visit(ASTLiteral *node) = 0;
+  virtual void visit(ASTType *node) = 0;
+  virtual void visit(ASTCall *node) = 0;
+  virtual void visit(ASTArguments *node) = 0;
+  virtual void visit(ASTReturn *node) = 0;
+  virtual void visit(ASTContinue *node) = 0;
+  virtual void visit(ASTBreak *node) = 0;
+  virtual void visit(ASTFor *node) = 0;
+  virtual void visit(ASTIf *node) = 0;
+  virtual void visit(ASTElse *node) = 0;
+  virtual void visit(ASTWhile *node) = 0;
+  virtual void visit(ASTStructDeclaration *node) = 0;
+  virtual void visit(ASTDotExpr *node) = 0;
+  virtual void visit(ASTSubscript *node) = 0;
+  virtual void visit(ASTInitializerList *node) = 0;
+  virtual void visit(ASTEnumDeclaration *node) = 0;
+  virtual void visit(ASTRange *node) = 0;
+  virtual void visit(ASTSwitch *node) = 0;
+  virtual void visit(ASTTuple *node) = 0;
+  virtual void visit(ASTAlias *node) = 0;
+  virtual void visit(ASTImpl *node) = 0;
+  virtual void visit(ASTTupleDeconstruction *node) = 0;
+  virtual void visit(ASTDefer *node) = 0;
+  virtual void visit(ASTInterfaceDeclaration *node) = 0;
+  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTModule *node) = 0;
+  virtual void visit(ASTType_Of *node) = 0;
   virtual void visit(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
       stmt->accept(this);
@@ -24,23 +67,36 @@ struct VisitorBase {
 
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
-  int current_block_statement_idx;
-  int declaring_or_assigning_type = -1;
+  bool in_call = false;
+  int expected_type = -1;
 
   ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
-  Nullable<Symbol> get_symbol(ASTNode *);
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
+
+  int iter_interface() {
+    static int iter_id = ctx.scope->lookup("Iter")->type_id;
+    return iter_id;
+  }
+  int iterable_interface() {
+    static int iterable_id = ctx.scope->lookup("Iterable")->type_id;
+    return iterable_id;
+  }
+  int init_interface() {
+    static int init_id = ctx.scope->lookup("Init")->type_id;
+    return init_id;
+  }
 
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
- 
+  void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
+  void visit(ASTImport *node) override;
   void visit(ASTFunctionDeclaration *node) override;
   void visit(ASTBlock *node) override;
   void visit(ASTParamsDecl *node) override;
@@ -73,11 +129,11 @@ struct Typer : VisitorBase {
 
   int get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, bool skip_first);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
 
-  void compiler_mock_function_call_visit_impl(int type, const InternedString &method_name);
+  void compiler_mock_method_call_visit_impl(int type, const InternedString &method_name);
 
   void visit(ASTCall *node) override;
   void visit(ASTArguments *node) override;
@@ -105,6 +161,7 @@ struct Typer : VisitorBase {
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
 
+  void compiler_mock_associated_function_call_visit_impl(int left_type, const InternedString &method_name);
   InternedString type_name(ASTExpr *node);
 };
 
@@ -155,8 +212,8 @@ struct Emitter : VisitorBase {
   Context &ctx;
 
   int type_list_id = -1;
-  const bool is_freestanding = compile_command.compilation_flags.contains("-ffreestanding") ||
-                               compile_command.compilation_flags.contains("-nostdlib");
+  const bool is_freestanding = compile_command.c_flags.contains("-ffreestanding") ||
+                               compile_command.c_flags.contains("-nostdlib");
 
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
@@ -179,6 +236,7 @@ struct Emitter : VisitorBase {
     // }
   }
   void emit_tuple(int type);
+  std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
   void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);
@@ -212,6 +270,8 @@ struct Emitter : VisitorBase {
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   int get_expr_left_type_sr_dot(ASTNode *node);
+  void visit(ASTModule *node) override;
+  void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
@@ -254,7 +314,6 @@ struct Emitter : VisitorBase {
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
-
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
       emit_line_directive(stmt);
@@ -272,9 +331,10 @@ struct DependencyEmitter : VisitorBase {
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
   void define_type(int type_id);
-  void decl_type(int type_id);
+  void declare_type(int type_id);
   
-  Nullable<Symbol> get_symbol(ASTNode *node);
+  void visit(ASTModule *node) override;
+  void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;

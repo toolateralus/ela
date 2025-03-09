@@ -161,6 +161,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   assert(info && "Copying type info for extended type failed");
 
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
+  info->scope->parent = base_t->get_info()->scope->parent;
 
   return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
@@ -191,7 +192,7 @@ int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &typ
   }
 
   // We didn't find the tuple type. Return a new one.
-  auto base_id =  global_create_tuple_type(tuple_types);
+  auto base_id = global_create_tuple_type(tuple_types);
   return global_find_type_id(base_id, type_extensions);
 }
 
@@ -226,7 +227,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // allow pointer arithmetic, from scalar type pointers, to numerical types.
-  const auto from_is_scalar_ptr = from->get_ext().is_pointer();
+  const auto from_is_scalar_ptr = from->get_ext().is_mut_pointer();
   const auto to_is_non_ptr_number = type_is_numerical(to) && to->get_ext().has_no_extensions();
 
   if (from_is_scalar_ptr && to_is_non_ptr_number) {
@@ -237,7 +238,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   if (type_is_numerical(from) && to->get_ext().is_pointer()) {
     return CONVERT_EXPLICIT;
   }
-
 
   // TODO(Josh) 10/1/2024, 8:58:13 PM Probably make this stricter and only allow in if (...)
   // cast all numerical types and pointers to booleans implicitly.
@@ -250,7 +250,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   }
 
   // ! This needs to be re-evaluated. We should not be able to cast any pointer, to any other pointer.
-  const auto implicit_ptr_cast = from->get_ext().is_pointer() && to->get_ext().is_pointer();
+  const auto implicit_ptr_cast = (from->get_ext().is_const_pointer() && to->get_ext().is_const_pointer()) ||
+                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) ||
+                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_const_pointer());
 
   // If we have a fixed array such as
   // char[5] and the argument takes void*
@@ -264,11 +266,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (!to->get_ext().is_pointer())
       return false;
 
-    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to());
+    // not sure how to handle the mutability here. we will assume it's const?
+    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(CONST));
     auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
 
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
+
+  // We basically have to allow *const to *mut to allow for pointer arithmetic,
+  // you can't traverse a const array without this.
+  if (from->get_ext().is_const_pointer() && to->get_ext().is_mut_pointer()) {
+    return CONVERT_EXPLICIT;
+  }
 
   // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C
   // interop. This is far too C-like and highly unsafe.
@@ -289,6 +298,18 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (to->is_kind(TYPE_ENUM) && to->get_ext().has_no_extensions()) {
       auto enum_info = (to->get_info()->as<EnumTypeInfo>());
       return type_conversion_rule(from, global_get_type(enum_info->element_type), source_range);
+    }
+  }
+
+  // tagged union stuffz.
+  {
+    if (to->is_kind(TYPE_TAGGED_UNION)) {
+      auto info = to->get_info()->as<TaggedUnionTypeInfo>();
+      for (const auto &variant : info->variants) {
+        if (from->id == variant.type) {
+          return CONVERT_IMPLICIT;
+        }
+      }
     }
   }
 
@@ -365,11 +386,16 @@ std::string Type::to_string() const {
 int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
   Type *type = type_table.back();
-  type->set_base(name);
+  std::string base = name.get_str();
+  if (!generic_args.empty()) {
+    base += mangled_type_args(generic_args);
+  }
+  type->set_base(base);
   type->generic_args = generic_args;
   InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
   info->scope = scope;
   type->set_info(info);
+  info->scope->name = name;
   return type->id;
 }
 
@@ -384,6 +410,7 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
   type->generic_args = generic_args;
   StructTypeInfo *info = type_info_alloc<StructTypeInfo>();
   info->scope = scope;
+  info->scope->name = base;
   type->set_info(info);
   return type->id;
 }
@@ -391,10 +418,15 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
   type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
   Type *type = type_table.back();
-  type->set_base(name.get_str() + mangled_type_args(generic_args));
+  std::string base = name.get_str();
+  if (!generic_args.empty()) {
+    base += mangled_type_args(generic_args);
+  }
+  type->set_base(base);
   type->generic_args = generic_args;
   TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
   info->scope = scope;
+  info->scope->name = base;
   type->set_info(info);
   return type->id;
 }
@@ -406,6 +438,7 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
   EnumTypeInfo *info = type_info_alloc<EnumTypeInfo>();
   info->is_flags = is_flags;
   info->scope = scope;
+  info->scope->name = name;
   type->set_info(info);
   return type->id;
 }
@@ -417,9 +450,21 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   type->set_ext(extensions);
   type->set_base(name);
   type->set_info(info);
+
+  if (extensions.is_pointer() &&
+      std::ranges::find(type->interfaces, is_pointer_interface()) == type->interfaces.end()) {
+    type->interfaces.push_back(is_pointer_interface());
+    if (extensions.is_const_pointer()) {
+      type->interfaces.push_back(is_const_pointer_interface());
+    } else {
+      type->interfaces.push_back(is_mut_pointer_interface());
+    }
+  }
+
   if (!info->scope) {
     info->scope = create_child(nullptr);
   }
+  info->scope->name = name;
   return type->id;
 }
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
@@ -515,11 +560,6 @@ int f32_type() {
 }
 int f64_type() {
   static int type = global_create_type(TYPE_SCALAR, "f64", create_scalar_type_info(TYPE_DOUBLE, 8));
-  return type;
-}
-
-int voidptr_type() {
-  static int type = global_find_type_id(void_type(), {.extensions = {{TYPE_EXT_POINTER}}});
   return type;
 }
 
@@ -627,14 +667,20 @@ void init_type_system() {
     bool_type();
     void_type();
   }
+
+  is_const_pointer_interface();
+  is_mut_pointer_interface();
+  is_pointer_interface();
+
+  is_tuple_interface();
+
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
-  return t->id == s32_type() || t->id == s8_type() ||
-         t->id == s16_type() || t->id == s32_type() || t->id == s64_type() || t->id == u8_type() ||
-         t->id == u16_type() || t->id == u32_type() || t->id == u64_type() || t->id == f32_type() ||
-         t->id == f64_type();
+  return t->id == s32_type() || t->id == s8_type() || t->id == s16_type() || t->id == s32_type() ||
+         t->id == s64_type() || t->id == u8_type() || t->id == u16_type() || t->id == u32_type() ||
+         t->id == u64_type() || t->id == f32_type() || t->id == f64_type();
 }
 
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to) {
@@ -656,14 +702,14 @@ std::string TypeExtensions::to_string() const {
   std::stringstream ss;
   for (const auto ext : extensions) {
     switch (ext.type) {
-      case TYPE_EXT_POINTER:
-        ss << "*";
+      case TYPE_EXT_POINTER_MUT:
+        ss << "*mut";
+        break;
+      case TYPE_EXT_POINTER_CONST:
+        ss << "*const";
         break;
       case TYPE_EXT_ARRAY:
         ss << "[]";
-        break;
-      case TYPE_EXT_INVALID:
-        throw_error("internal compiler error: extension type invalid", {});
         break;
     }
   }
@@ -684,7 +730,7 @@ int global_create_tuple_type(const std::vector<int> &types) {
   // We do this for dot expressions that do tuple.1 etc.
   // Only in the base type.
   for (const auto [i, type] : types | std::ranges::views::enumerate) {
-    info->scope->insert_variable(std::to_string(i), type, nullptr);
+    info->scope->insert_variable(std::to_string(i), type, nullptr, MUT);
   }
 
   return type->id;
@@ -705,9 +751,9 @@ InternedString get_tuple_type_name(const std::vector<int> &types) {
   ss << ")";
   return ss.str();
 }
-int Type::take_pointer_to() const {
+int Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
-  ext.extensions.push_back({TYPE_EXT_POINTER});
+  ext.extensions.push_back({is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
   return global_find_type_id(base_id == -1 ? id : base_id, ext);
 }
 
@@ -814,4 +860,24 @@ std::string mangled_type_args(const std::vector<int> &args) {
     i++;
   }
   return s;
+}
+
+int is_tuple_interface() {
+  static int id = global_create_interface_type("Is_Tuple", create_child(nullptr), {});
+  return id;
+}
+
+int is_pointer_interface() {
+  static int id = global_create_interface_type("Is_Pointer", create_child(nullptr), {});
+  return id;
+}
+
+int is_mut_pointer_interface() {
+  static int id = global_create_interface_type("Is_Mut_Pointer", create_child(nullptr), {});
+  return id;
+}
+
+int is_const_pointer_interface() {
+  static int id = global_create_interface_type("Is_Const_Pointer", create_child(nullptr), {});
+  return id;
 }
