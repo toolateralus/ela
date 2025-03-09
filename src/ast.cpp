@@ -2383,6 +2383,42 @@ ASTType *Parser::parse_function_type() {
   return output_type;
 }
 
+ASTLambda *Parser::parse_lambda() {
+  NODE_ALLOC(ASTLambda, node, range, _, this);
+  expect(TType::Fn);
+  node->params = parse_parameters();
+  if (peek().type == TType::Arrow) {
+    eat();
+    node->return_type = parse_type();
+  } else {
+    node->return_type = ASTType::get_void();
+  }
+  
+  node->block = parse_block();
+
+  if (current_func_decl.is_null()) {
+    end_node(nullptr, range);
+    throw_error("temporarily, lambda functions cannot be used at a global level, only within functions", range);
+  }
+  return node;
+}
+
+void Parser::parse_pointer_extensions(ASTType *type) {
+  int pointer_depth = 0;
+
+  while (peek().type == TType::Mul) {
+    eat();
+    type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
+    if (peek().type != TType::Mut && peek().type != TType::Const) {
+      throw_error(
+          "'*const/*mut' are required for all pointer types now, as a prefix. such as '*const s32', '*const *mut s64'",
+          {peek().location});
+    }
+    eat();
+  }
+}
+
+
 static Precedence get_operator_precedence(Token token) {
   if (token.is_comp_assign()) {
     return PRECEDENCE_ASSIGNMENT;
@@ -2521,25 +2557,6 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
   }
 }
 
-ASTLambda *Parser::parse_lambda() {
-  NODE_ALLOC(ASTLambda, node, range, _, this);
-  expect(TType::Fn);
-  node->params = parse_parameters();
-  if (peek().type == TType::Arrow) {
-    eat();
-    node->return_type = parse_type();
-  } else {
-    node->return_type = ASTType::get_void();
-  }
-  
-  node->block = parse_block();
-
-  if (current_func_decl.is_null()) {
-    end_node(nullptr, range);
-    throw_error("temporarily, lambda functions cannot be used at a global level, only within functions", range);
-  }
-  return node;
-}
 
 Token Parser::peek() const {
   if (states.empty()) {
@@ -2638,3 +2655,4 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
   }
   return nullptr;
 }
+
