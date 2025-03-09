@@ -1,33 +1,5 @@
 
 MyStruct :: struct {
-  // normal field declaration:
   field: f32;
-  // field with a default value:
-  field1: f32 = 100.0;
-  // pointer to self (linked list):
-  // see docs/directives to understand #self.
   field2: #self *;
-  // you can use type inference on a default value to declare a field.
-  field3 := 100.0;
-}
-
-// Methods cannot appear in struct declarations. instead, use the rust-like impl syntax.
-
-impl MyStruct {
-  // method, since it takes 'self'
-  // you can take self by value, or by a pointer.
-  // the most common case would be by pointer.
-  my_method :: fn(self) -> f32 {
-    return self.field;
-  }
-
-  my_method_by_ptr :: fn(*mut self) -> f32 {
-    return self.field;
-  }
-  
-  //? to_string allows us to implicitly be stringified by interpolated strings.
-  //? this can also return a char*, but a string is preferred to not cause memory leaks.
-  to_string :: fn() -> string {
-    return "MyStruct ()";
-  }
 }

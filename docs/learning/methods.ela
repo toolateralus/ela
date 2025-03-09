@@ -1,0 +1,22 @@
+
+
+MyStruct :: struct {
+  field: f32;
+  field2: #self *;
+}
+
+// Methods cannot appear in struct declarations. instead, use the rust-like impl syntax.
+impl MyStruct {
+  // method, since it takes 'self'
+  // you can take self by value, or by a pointer.
+  // the most common case would be by pointer.
+  my_method :: fn(self) -> f32 {
+    return self.field;
+  }
+  my_method_by_ptr :: fn(*mut self) -> f32 {
+    return self.field;
+  }
+  my_method_by_const_ptr :: fn(*const self, x: s32) -> f32 {
+    return self.field;
+  }
+}

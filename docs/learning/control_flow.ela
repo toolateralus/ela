@@ -27,6 +27,11 @@ main :: fn() {
     if 1 then continue;
   }
 
+  /* the while condition can be ommitted for a 'while true' by default */
+  while {
+
+  }
+
   /* For loops:  */
 
   // C equivalent:  for (s32 i = 0; i < 100; ++i) {}
@@ -44,20 +49,13 @@ main :: fn() {
   // To control the increment in a range, you can use Range's initializer list.
 
   // C equivalent: for (s32 i = 0; i < 100; i += 2) {}
-  for i in Range{first: 0, last: 100, increment: 2} {}
+  for i in Range.{begin: 0,   end: 100, increment: 2} {}
 
   // C equivalent: for (s32 i = 100; i >= 0; i -= 4) {}
-  for i in Range{first: 100, last: 0, incrment: 4} {}
-
-  get_array :: fn() -> List![s32] {
-    arr: List![s32];
-    for i in 0..100 {
-      arr != i;
-    }
-  }
+  for i in Range.{begin: 100, end: 0,   increment: 4} {}
 
   // iterate and get copies of elements.
-  for v in get_array() {
+  for v in ... {
     println($"{v}");
   }
 
@@ -65,14 +63,28 @@ main :: fn() {
     To avoid copies, or to mutate elements, you can use this syntax to take a pointer to the element you're getting from the iterator
     You cannot use this on Ranges (0..100) currently.
   */
-  for *v in array {
+  for *v in ... {
     println($"{*v}");
+  }
+
+
+  // you can also destructure tuples and structs in for loop's such as
+
+  for k, v in HashMap::new() {
+
+  }
+
+  for *k, v in HashMap::new() {
+
+  }
+
+  for x, *y, z in Vector3List::new() {
+
   }
 
 
   // Switch cases work much like C, except devoid of the implicit fall-through logic, and the strict numerical restrictions.
   // Also, switches can return a value.
-
   greeting := switch true {
     false => "Hello!",
     true => "Goodbye",
@@ -86,21 +98,23 @@ main :: fn() {
       println("Goodbye!");
     }
   }
+}
 
-  done :: fn() -> bool {
-    return false;
-  }
+done :: fn() -> bool {
+  return false;
+}
 
-  // In control flow, the expression body => has some interesting semantics. You can do an implicit return out of a function via a switch case,
-  // if statement, etc, with the => operator.
-  func:: fn() -> s32 {
-    // so then this:
-    if done() => 100;
+// In control flow, the expression body => has some interesting semantics. You can do an implicit return out of a function via a switch case,
+// if statement, etc, with the => operator.
 
-    // is equal to
-    if done() { 
-      return 100;
-    }
+// I wouldn't reccomend this, it's rather confusing, and very prone to being removed.
+func:: fn() -> s32 {
+  // so then this:
+  if done() => 100;
+
+  // is equal to
+  if done() { 
+    return 100;
   }
 }
 

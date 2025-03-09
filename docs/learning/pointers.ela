@@ -1,0 +1,58 @@
+
+
+/* 
+  pointers in Ela are always either const or mut.
+*/
+
+main :: fn() {
+  x := 0; // declare an int.
+
+  // take the address of x, and store it as a const pointer.
+  // the type of this is `*const s32`
+  ptr := &const x;
+
+  // these are obviously illegal, because it's a const pointer.
+  ptr += 10;
+  *ptr = 10;
+
+
+  // this is a mutable pointer.
+  // this is illegal, because, `x` is not a mutable variable,
+  // so we cannot take a mutable reference to it.
+  invalid_mut_ptr : *mut s32 = &mut x;
+
+
+  // this is perfectly legal, and now we can mutate the data behind mut_ptr
+  mut x1 := 0;
+  mut_ptr := &mut x1;
+
+  // great
+  *mut_ptr = 100;
+  // also legal
+  mut_ptr += 100;
+
+  // this is illegal, because we're changing the variable itself, and not the
+  // data behind the pointer.
+  mut_ptr = get_some_new_value();
+
+  // this is how you'd do somthing like that.
+  mut mut_var_ptr := &mut x1;
+  mut_var_ptr = null;
+
+
+
+  // to take a several deep pointer to something, you just stack the *'s.
+
+  // invalid, because mut_var_ptr's type is `*mut s32`,
+  // so taking a pointer to it would be `*const *mut s32`,
+  // which of course doesn't match **const s32, which is
+  // effectively *const *const s32.
+
+  // this is kind of an ugly part of our system, but it's going to be improved.
+  const_const : **const = &const mut_var_ptr;
+
+  // just to show how we'd do the above, even though it's a bit obvious,
+  const_correct := &const x;
+  // it's ugly and youd rarely need to do this, but. still.
+  const_const_crrect := &const const_correct;
+}
