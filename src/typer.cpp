@@ -101,7 +101,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   auto info = (type->get_info()->as<StructTypeInfo>());
 
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) != 0 || node->is_fwd_decl) {
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
     node->resolved_type = type->id;
     return;
   }
@@ -222,11 +222,11 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
   auto control_flow = block->control_flow;
   if (control_flow.type == Type::INVALID_TYPE_ID)
     control_flow.type = void_type();
-  if ((control_flow.flags & BLOCK_FLAGS_CONTINUE) != 0)
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_CONTINUE))
     throw_error("Keyword \"continue\" must be in a loop.", node->source_range);
-  if ((control_flow.flags & BLOCK_FLAGS_BREAK) != 0)
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_BREAK))
     throw_error("Keyword \"break\" must be in a loop.", node->source_range);
-  if ((control_flow.flags & BLOCK_FLAGS_FALL_THROUGH) != 0 && node->return_type->resolved_type != void_type())
+  if (HAS_FLAG(control_flow.flags, BLOCK_FLAGS_FALL_THROUGH) && node->return_type->resolved_type != void_type())
     throw_error("Not all code paths return a value.", node->source_range);
 }
 
@@ -522,7 +522,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
       }
     } else {
-      if ((method->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      if (HAS_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         type_scope->insert_function(method->name, method->resolved_type, method,
                                     SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
       } else {
@@ -591,7 +591,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             symbol->flags &= ~SYMBOL_IS_FORWARD_DECLARED;
           }
         } else {
-          if ((method->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+          if (HAS_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
             type_scope->insert_function(method->name, method->resolved_type, method,
                                         SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
           } else {
@@ -1063,7 +1063,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   visit_function_header(node, false);
 
-  if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
     ctx.scope->insert_function(node->name, node->resolved_type, node,
                                SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
     return;
@@ -1071,7 +1071,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   ctx.scope->insert_function(node->name, node->resolved_type, node);
 
-  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN)) {
     return;
   }
 
@@ -1164,7 +1164,7 @@ void Typer::visit(ASTBlock *node) {
     auto &block_cf = node->control_flow;
     block_cf.flags |= stmnt_cf.flags;
 
-    if ((stmnt_cf.flags & BLOCK_FLAGS_FALL_THROUGH) == 0) {
+    if (DOESNT_HAVE_FLAG(stmnt_cf.flags, BLOCK_FLAGS_FALL_THROUGH)) {
       block_cf.flags &= ~BLOCK_FLAGS_FALL_THROUGH;
       block_cf.type = stmnt_cf.type;
     }
@@ -2037,9 +2037,11 @@ void Typer::visit(ASTSubscript *node) {
 
   auto ext = left_ty->get_ext();
   if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
-    throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` interface. {}",
-                            left_ty->to_string()),
-                node->source_range);
+    throw_error(
+        std::format(
+            "cannot index into non-array, non-pointer type that doesn't implement the `Subscript` interface. {}",
+            left_ty->to_string()),
+        node->source_range);
   }
 
   node->resolved_type = left_ty->get_element_type();
@@ -2218,7 +2220,7 @@ void Typer::visit(ASTSwitch *node) {
     auto &block_cf = _case.block->control_flow;
     flags |= block_cf.flags;
 
-    if ((block_cf.flags & BLOCK_FLAGS_RETURN) != 0) {
+    if (HAS_FLAG(block_cf.flags, BLOCK_FLAGS_RETURN)) {
       return_type = block_cf.type;
     }
 
@@ -2238,9 +2240,9 @@ void Typer::visit(ASTSwitch *node) {
   if (node->is_statement) {
     node->control_flow = ControlFlow{flags, return_type};
   } else {
-    if ((flags & BLOCK_FLAGS_BREAK) != 0) {
+    if (HAS_FLAG(flags, BLOCK_FLAGS_BREAK)) {
       throw_warning(WarningSwitchBreak, "You do not need to break from switch cases.", node->source_range);
-    } else if ((flags & BLOCK_FLAGS_CONTINUE) != 0) {
+    } else if (HAS_FLAG(flags, BLOCK_FLAGS_CONTINUE)) {
       throw_error("Cannot continue from a switch case: it is not a loop.", node->source_range);
     }
   }

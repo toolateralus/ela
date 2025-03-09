@@ -129,7 +129,7 @@ void Lexer::get_token(State &state) {
                     }
                     break;
             }
-        } else if ((c & 0x80) == 0) {
+        } else if (DOESNT_HAVE_FLAG(c, 0x80)) {
             // ASCII character
             codepoint = c;
             pos++;
@@ -211,7 +211,7 @@ void Lexer::get_token(State &state) {
           pos++;
           col++;
           c = input[pos];
-        } else if ((c & 0x80) != 0) { // Check if the character is a UTF-8 start byte
+        } else if (HAS_FLAG(c, 0x80)) { // Check if the character is a UTF-8 start byte
           int num_bytes = 0;
           if ((c & 0xE0) == 0xC0)
             num_bytes = 2;

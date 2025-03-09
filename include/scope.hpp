@@ -40,12 +40,12 @@ struct Symbol {
   Mutability mutability = CONST;
   Scope *scope;
 
-  bool is_function() const { return (flags & SYMBOL_IS_FUNCTION) != 0; }
-  bool is_variable() const { return (flags & SYMBOL_IS_VARIABLE) != 0; }
-  bool is_type() const { return (flags & SYMBOL_IS_TYPE) != 0; }
-  bool is_module() const { return (flags & SYMBOL_IS_MODULE) != 0; }
-  bool is_forward_declared() const { return (flags & SYMBOL_IS_FORWARD_DECLARED) != 0; }
-  bool is_local() const { return (flags & SYMBOL_IS_LOCAL) != 0; }
+  bool is_function() const { return HAS_FLAG(flags, SYMBOL_IS_FUNCTION); }
+  bool is_variable() const { return HAS_FLAG(flags, SYMBOL_IS_VARIABLE); }
+  bool is_type() const { return HAS_FLAG(flags, SYMBOL_IS_TYPE); }
+  bool is_module() const { return HAS_FLAG(flags, SYMBOL_IS_MODULE); }
+  bool is_forward_declared() const { return HAS_FLAG(flags, SYMBOL_IS_FORWARD_DECLARED); }
+  bool is_local() const { return HAS_FLAG(flags, SYMBOL_IS_LOCAL); }
 
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }

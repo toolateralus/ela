@@ -2079,7 +2079,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
       auto info = (type->get_info()->as<StructTypeInfo>());
-      if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+      if (DOESNT_HAVE_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED)) {
         throw_error("Redefinition of struct", range);
       }
     } else {
