@@ -200,7 +200,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\&mut|\&const|\*mut|\*const|mut|const|где|where|as|как|in|в|is|является)\b</string>
+					<string>\b(\&mut|\&const|\*mut|\*const|mut|const|где|where|as|как|in|в|is|является|import)\b</string>
 					<key>name</key>
 					<string>keyword.function.ela</string>
 				</dict>
