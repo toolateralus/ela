@@ -37,7 +37,7 @@
 #test basic_struct :: fn() {
   assert("interface failed", Struct::static_get() == 0);
   assert("interface failed", Struct::static_get_self().a == 100);
-  instance: Struct;
+  mut instance: Struct;
   assert("interface failed", instance.method_get() == 0);
   assert("interface failed", instance.method_get_ptr() == 0);
   assert("interface failed", instance.method_get_self().a == 100);
@@ -80,7 +80,7 @@
 #test generic_interface_regular_struct :: fn() {
   assert("interface failed", Struct1::static_get() == 0);
   assert("interface failed", Struct1::static_get_self().a == 100);
-  instance: Struct1;
+  mut instance: Struct1;
   assert("interface failed", instance.method_get() == 0);
   assert("interface failed", instance.method_get_ptr() == 0);
   assert("interface failed", instance.method_get_self().a == 100);
@@ -118,7 +118,7 @@
 #test generic_struct_generic_interface :: fn() {
   assert("interface failed", Struct2!<s32>::static_get() == 0);
   assert("interface failed", Struct2!<s32>::static_get_self().n == 0);
-  instance: Struct2!<s32>;
+  mut instance: Struct2!<s32>;
   assert("interface failed", instance.method_get() == 0);
   assert("interface failed", instance.method_get_ptr() == 0);
   assert("interface failed", instance.method_get_self().n == 0);

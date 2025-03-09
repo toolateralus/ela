@@ -827,7 +827,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
   return output;
 }
 
-int find_operator_overload(TType op, Type *type, OperationKind kind) {
+int find_operator_overload(int mutability, Type *type, TType op, OperationKind kind) {
   if (!type) {
     return -1;
   }
@@ -835,16 +835,24 @@ int find_operator_overload(TType op, Type *type, OperationKind kind) {
   if (op_str.empty()) {
     return -1;
   }
+
   std::transform(op_str.begin(), op_str.end(), op_str.begin(), ::tolower);
+
+  if (op_str == "subscript" && (type->get_ext().is_mut_pointer() || mutability == MUT)) {
+    op_str = "subscript_mut";
+  }
+
   auto scope = type->get_info()->scope;
+
   if (!scope)
     return Type::INVALID_TYPE_ID;
-  // TODO: make a system for type checking against this.
+  
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {
       return symbol->type_id;
     }
   }
+
   return Type::INVALID_TYPE_ID;
 }
 

@@ -5,7 +5,7 @@ Generic :: fn!<T>(obj: T) {
 Obj :: struct {};
 
 impl Obj {
-  do_thing :: fn(*mut self) {};
+  do_thing :: fn(*const self) {};
 }
 
 main :: fn() {

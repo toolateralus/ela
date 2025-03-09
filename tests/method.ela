@@ -12,7 +12,7 @@ impl IHaveAMethod {
 }
 
 #test test_method :: fn() {
-  owner: IHaveAMethod ;
+  mut owner: IHaveAMethod ;
   assert("failed to get 0.0 from method.", owner.method() == 0.0);
   assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);
 }

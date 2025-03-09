@@ -333,7 +333,7 @@ enum OperationKind {
   OPERATION_SUBSCRIPT,
 };
 
-int find_operator_overload(TType op, Type *left_ty, OperationKind kind);
+int find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
 static std::string get_unmangled_name(const Type *type) {

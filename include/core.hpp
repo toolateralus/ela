@@ -162,3 +162,7 @@ struct Flags {
   }
   underlying value{};
 };
+
+
+#define HAS_FLAG(var, flag) ((var & flag) != 0)
+#define DOESNT_HAVE_FLAG(var, flag) ((var & flag) == 0)

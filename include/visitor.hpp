@@ -77,8 +77,8 @@ struct Typer : VisitorBase {
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
 
-  int iter_interface() {
-    static int iter_id = ctx.scope->lookup("Iter")->type_id;
+  int iterator_interface() {
+    static int iter_id = ctx.scope->lookup("Iterator")->type_id;
     return iter_id;
   }
   int iterable_interface() {

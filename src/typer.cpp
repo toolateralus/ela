@@ -284,7 +284,7 @@ bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
       // return whether this type implements this trait or not.
       // also can be used to assert whether it's equal to the type provided or not.
       return std::ranges::find(target_type->interfaces, predicate->resolved_type) != target_type->interfaces.end() ||
-                    target_type->id == predicate->resolved_type;
+             target_type->id == predicate->resolved_type;
     } break;
     default:
       throw_error("Invalid node in 'where' clause predicate", predicate->source_range);
@@ -297,7 +297,8 @@ void Typer::visit(ASTWhere *node) {
   auto type = global_get_type(node->target_type->resolved_type);
   auto satisfied = visit_where_predicate(type, node->predicate);
   if (!satisfied) {
-    throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(node->predicate), get_unmangled_name(type)),
+    throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(node->predicate),
+                            get_unmangled_name(type)),
                 node->source_range);
   }
 }
@@ -755,14 +756,15 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
     if (first->get_ext().is_mut_pointer()) {
       if (!self_type->get_ext().is_pointer() && self_symbol && self_symbol.get()->is_const()) {
-        throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.", node->source_range);
+        throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.",
+                    node->source_range);
       }
       if (self_type->get_ext().is_const_pointer()) {
-        throw_error("cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however you obtained this pointer)", node->source_range);
+        throw_error("cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however "
+                    "you obtained this pointer)",
+                    node->source_range);
       }
-
     }
-
   }
 }
 
@@ -1277,7 +1279,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-  } else if (range_type->implements(iter_interface())) { // directly an iterator.
+  } else if (range_type->implements(iterator_interface())) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterable_type = range_type_id;
 
@@ -1291,7 +1293,7 @@ void Typer::visit(ASTFor *node) {
 
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
-                "'Iter!<T>' interface. ",
+                "'Iterator!<T>' interface. ",
                 node->source_range);
   }
 
@@ -1740,10 +1742,11 @@ void Typer::visit(ASTBinExpr *node) {
     }
   }
 
-  auto operator_overload_ty = find_operator_overload(node->op.type, left_ty, OPERATION_BINARY);
+  auto operator_overload_ty = find_operator_overload(CONST, left_ty, node->op.type, OPERATION_BINARY);
   if (operator_overload_ty != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;
-    node->resolved_type = global_get_type(operator_overload_ty)->get_info()->as<FunctionTypeInfo>()->return_type;
+    auto ty = global_get_type(operator_overload_ty);
+    node->resolved_type = ty->get_info()->as<FunctionTypeInfo>()->return_type;
     return;
   }
 
@@ -1781,7 +1784,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 
   auto type = global_get_type(operand_ty);
 
-  auto overload = find_operator_overload(node->op.type, type, OPERATION_UNARY);
+  auto overload = find_operator_overload(CONST, type, node->op.type, OPERATION_UNARY);
   if (overload != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
@@ -2009,7 +2012,11 @@ void Typer::visit(ASTSubscript *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   auto subscript_ty = global_get_type(node->subscript->resolved_type);
 
-  auto overload = find_operator_overload(TType::LBrace, left_ty, OPERATION_SUBSCRIPT);
+  auto symbol = ctx.get_symbol(node->left);
+
+  Mutability mutability = symbol ? symbol.get()->mutability : CONST;
+  auto overload = find_operator_overload(mutability, left_ty, TType::LBrace, OPERATION_SUBSCRIPT);
+
   if (overload != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
@@ -2030,8 +2037,7 @@ void Typer::visit(ASTSubscript *node) {
 
   auto ext = left_ty->get_ext();
   if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
-    throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement 'subscript :: "
-                            "fn(self*, idx: u32) -> T*' method. {}",
+    throw_error(std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` interface. {}",
                             left_ty->to_string()),
                 node->source_range);
   }
@@ -2186,7 +2192,7 @@ void Typer::visit(ASTSwitch *node) {
   auto type = global_get_type(type_id);
 
   if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
-    auto operator_overload = find_operator_overload(TType::EQ, type, OPERATION_BINARY);
+    auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
     if (operator_overload == Type::INVALID_TYPE_ID) {
       throw_error(
           std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "

@@ -1,7 +1,7 @@
 import fmt::*;
 
 main :: fn() { 
-  builder: String_Builder;
+  mut builder: String_Builder;
   defer builder.deinit();
   builder.append('c');
 

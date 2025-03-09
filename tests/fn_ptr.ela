@@ -8,7 +8,7 @@ alias FunctionPointer :: fn* (s32, s32) -> s32;
   ptr := &mut function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 
-  array: List!<FunctionPointer>;
+  mut array: List!<FunctionPointer>;
   array.push(&mut function_pointer_helper);
   from_arr : FunctionPointer = array[0];
   assert("Array of function pointers", from_arr(2, 3) == 6);

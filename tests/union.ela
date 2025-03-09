@@ -32,7 +32,7 @@ impl _Vec2 {
 }
 
 #test test_union_type_anonymous_sub_struct :: fn() {
-  vec: _Vec2;
+  mut vec: _Vec2;
   vec.method(0); // this does the assertions
 }
 

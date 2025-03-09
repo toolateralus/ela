@@ -58,8 +58,11 @@ void Emitter::forward_decl_type(Type *type) {
     case TYPE_STRUCT: {
       auto info = type->get_info()->as<StructTypeInfo>();
       std::string kw = "typedef struct ";
-      if ((info->flags & STRUCT_FLAG_IS_UNION) != 0)
+
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
         kw = "typedef union ";
+      }
+
       (*ss) << kw << to_cpp_string(type) << " " << to_cpp_string(type) << ";\n";
     } break;
     default:
@@ -327,7 +330,7 @@ void Emitter::visit(ASTCall *node) {
 
     auto func = symbol->function.declaration;
 
-    auto method_call = (func->flags & FUNCTION_IS_METHOD) != 0;
+    auto method_call = HAS_FLAG(func->flags, FUNCTION_IS_METHOD);
 
     if (!method_call) {
       throw_error("cannot call a static method from an instance", node->source_range);
@@ -660,7 +663,7 @@ void Emitter::visit(ASTVariable *node) {
 }
 
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
     (*ss) << "extern ";
   }
 
@@ -683,7 +686,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
         (*ss) << ", ";
       }
     }
-    if ((node->flags & FUNCTION_IS_VARARGS) != 0) {
+    if (HAS_FLAG(node->flags, FUNCTION_IS_VARARGS)) {
       (*ss) << ", ...);";
     } else {
       (*ss) << ")";
@@ -738,12 +741,8 @@ void Emitter::visit(ASTStructDeclaration *node) {
   std::string type_tag = (node->is_union ? "typedef union " : "typedef struct ");
   auto name = node->scope->full_name();
 
-  if ((info->flags & STRUCT_FLAG_FORWARD_DECLARED || node->is_fwd_decl) != 0) {
-    if (node->is_extern) {
-      // (*ss) << "extern ";
-      // I do not believe this is ever neccesary in C, you can alwasy just define an
-      // opaque struct and link against it, or redefine it: it doesn't matter.
-    }
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
+    // We don't care about extern here.
     (*ss) << type_tag << " " << name << " " << name << ";\n";
     return;
   }
@@ -752,7 +751,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   ctx.set_scope(info->scope);
   Defer _defer2([&] { ctx.set_scope(previous); });
 
-  if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
     (*ss) << (node->is_union ? "union " : "struct ");
     (*ss) << "{\n";
   } else {
@@ -795,7 +794,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   }
 
   // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
-  if ((info->flags & STRUCT_FLAG_IS_ANONYMOUS) != 0) {
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
     (*ss) << "};\n";
   } else {
     (*ss) << "} " << name << ";\n";
@@ -1252,7 +1251,8 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     if (type->is_kind(TYPE_STRUCT)) {
-      if ((type->get_info()->as<StructTypeInfo>()->flags & STRUCT_FLAG_FORWARD_DECLARED) == 0) {
+      auto flags = type->get_info()->as<StructTypeInfo>()->flags;
+      if (HAS_FLAG(flags, STRUCT_FLAG_FORWARD_DECLARED)) {
         ss << std::format(".size = sizeof({}), ", to_cpp_string(type));
       } else {
         ss << ".size = 0"; // non sized type
@@ -1423,7 +1423,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       int it = 0;
       for (const auto &name : info->scope->ordered_symbols) {
         auto sym = info->scope->local_lookup(name);
-        
+
         if (sym->is_type() || sym->is_function())
           continue;
 
@@ -1498,10 +1498,10 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
 bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
-  if (!test_flag && node->flags & FUNCTION_IS_TEST) {
+  if (!test_flag && HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     return false;
   }
-  
+
   auto sym = ctx.scope->lookup(node->name);
   if (node->declaring_type != Type::INVALID_TYPE_ID) {
     sym = global_get_type(node->declaring_type)->get_info()->scope->local_lookup(node->name);
@@ -1509,7 +1509,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   auto sym_name = emit_symbol(sym);
 
   // generate a test based on this function pointer.
-  if (test_flag && node->flags & FUNCTION_IS_TEST) {
+  if (test_flag && HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     visitor->test_functions << "($ela_test){.name = \"" << sym_name << "\", .function = &" << sym_name << "},";
     visitor->num_tests++;
   }
@@ -1612,11 +1612,9 @@ void Emitter::visit(ASTCast *node) {
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
-
   if (!node->generic_parameters.empty()) {
     return;
   }
-
 
   if (node->is_emitted) {
     return;
@@ -1751,16 +1749,16 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     auto name = emit_symbol(sym) + mangled_type_args(node->generic_arguments);
 
     if (node->name != "main" && node->name != "маин") {
-      if ((node->flags & FUNCTION_IS_STATIC) != 0) {
+      if (HAS_FLAG(node->flags, FUNCTION_IS_STATIC)) {
         (*ss) << "static ";
       }
-      if ((node->flags & FUNCTION_IS_FORWARD_DECLARED) != 0) {
+      if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         emit_forward_declaration(node);
         return;
       }
     }
 
-    if ((node->flags & FUNCTION_IS_EXPORTED) != 0) {
+    if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
       (*ss) << "extern  ";
     }
 
@@ -1794,7 +1792,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     return;
   }
 
-  if ((node->flags & FUNCTION_IS_FOREIGN) != 0) {
+  if (HAS_FLAG(node->flags,FUNCTION_IS_FOREIGN)) {
     emit_foreign_function(node);
     return;
   }
@@ -1965,7 +1963,8 @@ Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), c
 void Emitter::visit(ASTModule *node) {}
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
-  if (symbol->is_local()) {
+  if (symbol->is_local() ||
+      (symbol->is_function() && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_FOREIGN))) {
     return symbol->name.get_str();
   }
   auto full_name = symbol->scope->full_name();

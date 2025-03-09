@@ -25,7 +25,7 @@ generic_fn :: fn!<T>() {}
 Other :: struct{}
 
 impl!<T> Generic!<T> {
-  dont :: fn(*mut self) -> T {
+  dont :: fn(*const self) -> T {
     t: T;
     return t;
   }
