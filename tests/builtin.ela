@@ -16,13 +16,13 @@ Xaryu :: struct {
 }
 
 #test test_array_concat_operator :: fn() {
-  array: List!<s32>;
+  mut array: List!<s32>;
   array.push(10);
   assert("oncat operator failed", array.length == 1);
 }
 
 #test test_array_pop_operator :: fn() {
-  array: List!<s32>;
+  mut array: List!<s32>;
   for i in 0..100 {
     array.push(10);
   }
@@ -77,7 +77,7 @@ Xaryu :: struct {
     }
   }
 
-  dynamic : s32[][];
+  mut dynamic : s32[][];
   for x in 0..5 {
     dynamic.push(.{});
     for y in 0..5 {

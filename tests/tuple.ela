@@ -56,7 +56,7 @@ func_takes_tuple_arg :: fn(tuple: (s32, s32)) -> (s32, s32) {
     assert("mallocing with tuple failed", a == 10 && b == 10);
   }
 
-  ptr_arr: List!<*mut (s32, s32)>;
+  mut ptr_arr: List!<*mut (s32, s32)>;
   ptr_arr.push(ptr);
   {
     a, b := *(ptr_arr[0]);

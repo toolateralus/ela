@@ -747,7 +747,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
   // TODO: @Cooper-Pilot we need a more structured way to type check the self parameter, now that
   // we support const/mut var, and const/mut pointers, theres a billion combinations.
-  if (false && self_nullable.is_not_null()) {
+  if (self_nullable.is_not_null()) {
     auto self = self_nullable.get();
     auto first = global_get_type(params->params[0]->resolved_type);
     auto self_symbol = ctx.get_symbol(self);
