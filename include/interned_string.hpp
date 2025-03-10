@@ -9,56 +9,43 @@
 #include <memory>
 
 struct InternedString {
-  size_t hash;
-
-#ifdef DEBUG
-  std::string *str_ptr; // TODO: Remove this once we're done debugging the compiler
-#endif
-  using InternedStringTable = std::unordered_map<size_t, std::unique_ptr<std::string>>;
-
+  std::string *str_ptr;
   InternedString() = default;
 
+  using InternedStringTable = std::unordered_map<size_t, std::unique_ptr<std::string>>;
   static InternedStringTable &table() {
     static InternedStringTable table;
     return table;
   }
 
   std::string get_str() const { 
-  #ifdef DEBUG
     return *str_ptr;
-  #else 
-    return *table()[hash];
-  #endif
   }
 
   inline void insert_or_set(const std::string &value) {
-    hash = std::hash<std::string>()(value);
+    auto hash = std::hash<std::string>()(value);
     auto &tbl = table();
     auto it = tbl.find(hash);
     if (it == tbl.end()) {
       auto [new_it, inserted] = tbl.emplace(hash, std::make_unique<std::string>(value));
-      #ifdef DEBUG
       str_ptr = new_it->second.get();
-      #endif
     } else {
-      #ifdef DEBUG
       str_ptr = it->second.get();
-      #endif
     }
   }
 
   inline InternedString(const std::string &value) { insert_or_set(value); }
   inline InternedString(const char *str) { insert_or_set(std::string{str}); }
 
-  inline bool operator==(const InternedString &other) const { return hash == other.hash; }
-  inline bool operator!=(const InternedString &other) const { return hash != other.hash; }
-  inline bool operator<(const InternedString &other) const { return hash < other.hash; }
+  inline bool operator==(const InternedString &other) const { return str_ptr == other.str_ptr; }
+  inline bool operator!=(const InternedString &other) const { return str_ptr != other.str_ptr; }
+  inline bool operator<(const InternedString &other) const { return str_ptr < other.str_ptr; }
 };
 
 namespace std {
 template <> struct hash<InternedString> {
   inline size_t operator()(const InternedString &string) const {
-    return string.hash;
+    return (size_t)string.str_ptr;
   }
 };
 

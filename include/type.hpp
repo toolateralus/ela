@@ -124,7 +124,11 @@ struct TypeExtensions {
 
   inline bool operator==(const TypeExtensions &other) const { return equals(other); }
 
-  bool equals(const TypeExtensions &other) const;
+  inline bool equals(const TypeExtensions &other) const {
+    if (extensions != other.extensions)
+      return false;
+    return true;
+  }
 
   inline bool has_no_extensions() const { return extensions.empty(); }
 
@@ -236,7 +240,13 @@ int is_pointer_interface();
 int is_mut_pointer_interface();
 int is_const_pointer_interface();
 
-Type *global_get_type(const int id);
+inline Type *global_get_type(const int id) {
+  [[unlikely]]
+  if (id < 0 || id > type_table.size())
+    return nullptr;
+
+  return type_table[id];
+}
 InternedString get_tuple_type_name(const std::vector<int> &types);
 int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
                        const int = -1);
@@ -284,7 +294,7 @@ struct Type {
   TypeExtensions const get_ext_no_compound() const { return extensions; }
   TypeInfo *get_info() const { return info; }
 
-  bool implements(const int interface) {
+  inline bool implements(const int interface) {
     auto found = std::ranges::find(interfaces, interface);
     if (found != interfaces.end()) {
       return true;
@@ -304,15 +314,20 @@ private:
   TypeExtensions extensions{};
 
 public:
-  bool equals(const int base, const TypeExtensions &type_extensions) const;
+  inline bool equals(const int base, const TypeExtensions &type_extensions) const {
+    return base_id == base && type_extensions.extensions == get_ext().extensions;
+  }
+
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
-  Type() = default;
-  Type(const int id, const TypeKind kind) : id(id), kind(kind) {
+  inline Type() = default;
+  inline Type(const int id, const TypeKind kind) : id(id), kind(kind) {
     if (kind == TYPE_TUPLE)
       interfaces.push_back(is_tuple_interface());
   }
-  bool is_kind(const TypeKind kind) const { return this->kind == kind; }
+
+  inline bool is_kind(const TypeKind kind) const { return this->kind == kind; }
+
   std::string to_string() const;
 
   // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.

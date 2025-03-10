@@ -522,6 +522,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   }
   return;
 }
+
 void Emitter::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign &&
       (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
@@ -561,6 +562,7 @@ void Emitter::visit(ASTBinExpr *node) {
   code << ")";
   return;
 }
+
 void Emitter::visit(ASTExprStatement *node) {
   emit_line_directive(node);
   code << indent();
@@ -808,6 +810,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
 
   return;
 }
+
 void Emitter::visit(ASTEnumDeclaration *node) {
   if (node->is_emitted) {
     return;
@@ -856,6 +859,7 @@ void Emitter::visit(ASTParamDecl *node) {
 
   return;
 }
+
 void Emitter::visit(ASTParamsDecl *node) {
   code << "(";
   int i = 0;
@@ -996,6 +1000,7 @@ void Emitter::visit(ASTSubscript *node) {
   code << ']';
   return;
 }
+
 void Emitter::visit(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
 
@@ -1104,6 +1109,7 @@ void Emitter::visit(ASTSwitch *node) {
     code << "}\n";
   }
 }
+
 void Emitter::visit(ASTTuple *node) {
   auto type = global_get_type(node->resolved_type);
   auto name = "(" + to_cpp_string(type) + ")";

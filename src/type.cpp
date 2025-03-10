@@ -80,27 +80,25 @@ std::string FunctionTypeInfo::to_string() const {
   return ss.str();
 }
 
-Type *global_get_type(const int id) {
-  if (id < 0 || id > type_table.size())
-    return nullptr;
-  return type_table[id];
-}
-
 int global_find_function_type_id(const FunctionTypeInfo &info, const TypeExtensions &type_extensions) {
-  for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i]->kind != TYPE_FUNCTION)
-      continue;
-    const Type *type = type_table[i];
-    if (type->type_info_equals(&info, TYPE_FUNCTION) && type->get_ext() == type_extensions) {
+  const auto cmp_info_ptr = &info;
+
+  for (const Type *type : type_table) {
+    if (type->kind == TYPE_FUNCTION && type->get_ext() == type_extensions &&
+        type->type_info_equals(cmp_info_ptr, TYPE_FUNCTION)) {
       return type->id;
     }
   }
+
   auto base = Type::INVALID_TYPE_ID;
   auto type_name = info.to_string();
+
   auto info_ptr = new (type_info_alloc<FunctionTypeInfo>()) FunctionTypeInfo(info);
+
   if (type_extensions.has_extensions()) {
     base = global_create_type(TYPE_FUNCTION, type_name, info_ptr, {});
   }
+
   return global_create_type(TYPE_FUNCTION, type_name, info_ptr, type_extensions, base);
 }
 
@@ -114,11 +112,13 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   auto base_t = global_get_type(base);
   auto ext = type_extensions;
 
+  [[likely]]
   if (base_t && base_t->base_id != Type::INVALID_TYPE_ID) {
     ext = base_t->get_ext().append(ext);
     base_t = global_get_type(base_t->base_id);
   }
 
+  [[unlikely]]
   if (!base_t) {
     throw_error("INTERNAL_COMPILER_ERROR: global_find_type_id() reduced a type to nullptr when removing extensions",
                 {});
@@ -163,7 +163,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
   info->scope = new (scope_arena.allocate(sizeof(Scope))) Scope();
   info->scope->parent = base_t->get_info()->scope->parent;
 
-  return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
+  [[likely]] return global_create_type(base_t->kind, base_t->get_base(), info, ext, base_t->id);
 }
 
 int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions) {
@@ -330,8 +330,11 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
+  [[likely]]
   if (this->kind != kind)
     return false;
+
+  [[unlikely]]
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
     auto sinfo = static_cast<const FunctionTypeInfo *>(this->get_info());
@@ -340,32 +343,18 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
       return false;
     }
 
-    bool params_eq = finfo->params_len == sinfo->params_len;
-
-    if (!params_eq)
+    if (finfo->params_len != sinfo->params_len)
       return false;
 
     for (int i = 0; i < finfo->params_len; ++i)
       if (finfo->parameter_types[i] != sinfo->parameter_types[i]) {
-        params_eq = false;
-        break;
+        return false;
       }
 
-    return finfo->return_type == sinfo->return_type && params_eq;
+    return finfo->return_type == sinfo->return_type;
   }
-  return false;
-}
 
-bool Type::equals(const int base, const TypeExtensions &type_extensions) const {
-  auto isBaseIdEqual = base_id == base;
-  auto isTypeExtensionEqual = type_extensions == get_ext();
-  return isBaseIdEqual && isTypeExtensionEqual;
-}
-
-bool TypeExtensions::equals(const TypeExtensions &other) const {
-  if (extensions != other.extensions)
-    return false;
-  return true;
+  [[likely]] return false;
 }
 
 std::string Type::to_string() const {
@@ -673,7 +662,6 @@ void init_type_system() {
   is_pointer_interface();
 
   is_tuple_interface();
-
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
@@ -846,7 +834,7 @@ int find_operator_overload(int mutability, Type *type, TType op, OperationKind k
 
   if (!scope)
     return Type::INVALID_TYPE_ID;
-  
+
   if (auto symbol = scope->local_lookup(op_str)) {
     if (symbol->is_function() && symbol->type_id > 0) {
       return symbol->type_id;

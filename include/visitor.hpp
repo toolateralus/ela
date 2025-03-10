@@ -6,6 +6,7 @@
 #include <vector>
 
 #include "ast.hpp"
+#include "builder.hpp"
 #include "core.hpp"
 #include "interned_string.hpp"
 #include "scope.hpp"
@@ -204,8 +205,8 @@ struct Emitter : VisitorBase {
   // into that block.
   std::deque<DeferBlock> defer_blocks{};
 
-  std::stringstream code{};
-  std::stringstream test_functions{};
+  StringBuilder code{};
+  StringBuilder test_functions{};
 
   int indent_level = 0;
   Context &ctx;
