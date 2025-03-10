@@ -662,6 +662,7 @@ void init_type_system() {
   is_pointer_interface();
 
   is_tuple_interface();
+  is_array_interface();
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
@@ -859,21 +860,28 @@ std::string mangled_type_args(const std::vector<int> &args) {
 }
 
 int is_tuple_interface() {
-  static int id = global_create_interface_type("Is_Tuple", create_child(nullptr), {});
+  static int id = global_create_interface_type("IsTuple", create_child(nullptr), {});
   return id;
 }
 
+
+int is_array_interface() {
+  static int id = global_create_interface_type("IsArray", create_child(nullptr), {});
+  return id;
+}
+
+
 int is_pointer_interface() {
-  static int id = global_create_interface_type("Is_Pointer", create_child(nullptr), {});
+  static int id = global_create_interface_type("IsPointer", create_child(nullptr), {});
   return id;
 }
 
 int is_mut_pointer_interface() {
-  static int id = global_create_interface_type("Is_Mut_Pointer", create_child(nullptr), {});
+  static int id = global_create_interface_type("IsMutPointer", create_child(nullptr), {});
   return id;
 }
 
 int is_const_pointer_interface() {
-  static int id = global_create_interface_type("Is_Const_Pointer", create_child(nullptr), {});
+  static int id = global_create_interface_type("IsConstPointer", create_child(nullptr), {});
   return id;
 }

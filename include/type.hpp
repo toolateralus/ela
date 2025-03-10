@@ -236,6 +236,7 @@ int f64_type();
 int f32_type();
 
 int is_tuple_interface();
+int is_array_interface();
 int is_pointer_interface();
 int is_mut_pointer_interface();
 int is_const_pointer_interface();

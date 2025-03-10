@@ -136,7 +136,7 @@ void Emitter::visit(ASTFor *node) {
       node->right->accept(this);
       code << ";\n";
       code << indent() << to_cpp_string(iterable_type) << " " << unique_id << " = "
-            << emit_symbol(range_scope->local_lookup("iter")) << "(&" << range_unique_id << ");\n";
+           << emit_symbol(range_scope->local_lookup("iter")) << "(&" << range_unique_id << ");\n";
       break;
     case ASTFor::ITERATOR:
       code << indent() << to_cpp_string(iterable_type) << " " << unique_id << " = ";
@@ -324,8 +324,28 @@ void Emitter::visit(ASTCall *node) {
 
   auto symbol = base_symbol.get();
   if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-    if (!base_symbol || !base_symbol.get()->is_function()) {
+    if (!base_symbol) {
       throw_error("can't call a non-function", node->source_range);
+    }
+
+    // Call a function pointer via a dot expression
+    if (!base_symbol.get()->is_function()) {
+      auto func = node->function;
+      if (func->get_node_type() == AST_NODE_TYPE) {
+        auto ast_type = static_cast<ASTType *>(func);
+        if (ast_type->kind != ASTType::NORMAL) {
+          throw_error("Cannot call a tuple or function type", node->source_range);
+        }
+        if (!ast_type->normal.generic_arguments.empty()) {
+          throw_error("internal compiler error: generic args to call put on base", node->source_range);
+        }
+        func = ast_type->normal.base;
+      }
+      // normal function call, or a static method.
+      func->accept(this);
+      code << mangled_type_args(generic_args);
+      node->arguments->accept(this);
+      return;
     }
 
     auto func = symbol->function.declaration;
@@ -1800,7 +1820,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     return;
   }
 
-  if (HAS_FLAG(node->flags,FUNCTION_IS_FOREIGN)) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN)) {
     emit_foreign_function(node);
     return;
   }
@@ -1966,7 +1986,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   call.accept(this);
 }
 
-Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {  }
+Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {}
 
 void Emitter::visit(ASTModule *node) {}
 
