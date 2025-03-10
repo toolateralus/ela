@@ -205,7 +205,6 @@ struct Emitter : VisitorBase {
   std::deque<DeferBlock> defer_blocks{};
 
   std::stringstream code{};
-  std::stringstream *ss{};
   std::stringstream test_functions{};
 
   int indent_level = 0;
@@ -231,7 +230,7 @@ struct Emitter : VisitorBase {
         printf("Empty filename for line directive.\n");
         return;
       }
-      (*ss) << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
+      code << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     // }
   }
@@ -247,12 +246,12 @@ struct Emitter : VisitorBase {
   std::string to_type_struct(Type *type, Context &context);
   Emitter(Context &context, Typer &type_visitor);
   inline std::string indent() { return std::string(indent_level * 2, ' '); }
-  inline void indented(const std::string &s) { (*ss) << indent() << s; }
-  inline void indentedln(const std::string &s) { (*ss) << indent() << s + '\n'; }
-  inline void newline() { (*ss) << '\n'; }
-  inline void newline_indented() { (*ss) << '\n' << indent(); }
-  inline void semicolon() { (*ss) << ";"; }
-  inline void space() { (*ss) << ' '; }
+  inline void indented(const std::string &s) { code << indent() << s; }
+  inline void indentedln(const std::string &s) { code << indent() << s + '\n'; }
+  inline void newline() { code << '\n'; }
+  inline void newline_indented() { code << '\n' << indent(); }
+  inline void semicolon() { code << ";"; }
+  inline void space() { code << ' '; }
   
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
@@ -318,7 +317,7 @@ struct Emitter : VisitorBase {
     for (const auto &stmt : node->statements) {
       emit_line_directive(stmt);
       stmt->accept(this);
-      (*ss) << ";";
+      code << ";";
     }
     return;
   };
