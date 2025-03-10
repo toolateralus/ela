@@ -108,19 +108,16 @@ static inline std::string wrapgen_get_pointer_type_name(CXType type) {
       if (!is_const && !is_mut) {
         is_const = true;
       }
-      result += "*";
+      result += "*const ";
     } else {
-      if (!is_const && !is_mut) {
-        is_mut = true;
-      }
-      result += "*";
+      result += "*mut ";
     }
     type = pointeeType;
   }
 
   // right now we just set all extern generated functions to be const pointers so they're more compatible.
   // of course, we have no idea.
-  result += "const " + wrapgen_get_type_name(type);
+  result += wrapgen_get_type_name(type);
   return result;
 }
 

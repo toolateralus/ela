@@ -651,6 +651,7 @@ void Emitter::visit(ASTVariable *node) {
     } else if (emit_default_init) {
       (*ss) << "= {0}";
     }
+    (*ss) << ";";
     return;
   }
 
@@ -1611,6 +1612,7 @@ void Emitter::visit(ASTCast *node) {
 }
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
+
 void Emitter::visit(ASTTaggedUnionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;

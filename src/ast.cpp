@@ -2407,14 +2407,17 @@ void Parser::parse_pointer_extensions(ASTType *type) {
   int pointer_depth = 0;
 
   while (peek().type == TType::Mul) {
-    eat();
+    expect(TType::Mul);
     type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
-    if (peek().type != TType::Mut && peek().type != TType::Const) {
+    if (peek().type ==  TType::Mut) {
+      expect(TType::Mut);
+    } else if (peek().type == TType::Const) {
+      expect(TType::Const);
+    } else {
       throw_error(
           "'*const/*mut' are required for all pointer types now, as a prefix. such as '*const s32', '*const *mut s64'",
           {peek().location});
     }
-    eat();
   }
 }
 
