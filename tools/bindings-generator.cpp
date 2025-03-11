@@ -342,6 +342,8 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
     }
 
     data->output << ") -> " << return_type_name << ";\n";
+    return CXChildVisit_Continue;
+    
   } else if (kind == CXCursor_VarDecl) {
     CXString name = clang_getCursorSpelling(cursor);
     std::string variable_name = clang_getCString(name);

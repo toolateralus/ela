@@ -74,7 +74,7 @@ struct CompileCommand {
   int compile();
   void print_command() const;
   void add_c_flag(const std::string &flags);
-  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests);
+  CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args, bool &run_on_finished, bool &run_tests, bool &lldb);
   bool has_flag(const std::string &flag) const;
 
   void print_metrics() {

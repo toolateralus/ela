@@ -137,7 +137,7 @@ void CompileCommand::print_command() const {
 }
 
 CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args,
-                               bool &run_on_finished, bool &run_tests) {
+                               bool &run_on_finished, bool &run_tests, bool &lldb) {
   for (size_t i = 0; i < args.size(); ++i) {
     std::string arg = args[i];
     if (arg == "run" || arg == "r") {
@@ -159,6 +159,10 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       file.flush();
       file.close();
       exit(0);
+    } else if (arg == "lldb") {
+      input_path = "main.ela";
+      run_on_finished = false;
+      lldb = true;
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
     } else if (arg.ends_with(".ela") && input_path.empty()) {
