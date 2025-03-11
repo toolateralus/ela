@@ -534,14 +534,10 @@ struct ASTFor : ASTStatement {
   int iterable_type = Type::INVALID_TYPE_ID;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
   int identifier_type = Type::INVALID_TYPE_ID;
-  bool needs_dereference = false;
   union Left {
     Left() {}
     ~Left() {}
-    struct {
-      ASTIdentifier *identifier;
-      ValueSemantic semantic;
-    };
+    ASTIdentifier *identifier;
     std::vector<Destructure> destructure;
   } left;
 
@@ -572,7 +568,6 @@ struct ASTFor : ASTStatement {
     switch (left_tag) {
       case IDENTIFIER:
         left.identifier = other.left.identifier;
-        left.semantic = other.left.semantic;
         break;
       case DESTRUCTURE:
         left.destructure = other.left.destructure;

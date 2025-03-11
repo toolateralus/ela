@@ -1290,20 +1290,10 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
                 "'Iterator!<T>' interface. ",
                 node->source_range);
-  }
-
-  { // if we do 'for v in ...' and the iter returns a pointer, we dereference.
-    auto type = global_get_type(iter_ty);
-    if (node->left_tag == ASTFor::IDENTIFIER && node->left.semantic == VALUE_SEMANTIC_COPY &&
-        type->get_ext().is_pointer()) {
-      iter_ty = type->get_element_type();
-      node->needs_dereference = true;
-    }
   }
 
   node->identifier_type = iter_ty;
