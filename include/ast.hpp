@@ -204,11 +204,16 @@ struct ASTImport : ASTModule {
 };
 
 struct ASTBlock : ASTStatement {
-  size_t temp_iden_idx = 0;
   ASTNode *parent;
   int flags = BLOCK_FLAGS_FALL_THROUGH;
+
+  // used for tuple destructures.
+  size_t temp_iden_idx = 0;
+
+  // of course used for defer.
   bool has_defer = false;
   int defer_count = 0;
+
   Scope *scope;
   std::vector<ASTNode *> statements;
   void accept(VisitorBase *visitor) override;

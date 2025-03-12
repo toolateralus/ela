@@ -5,7 +5,7 @@ To search for all info comments in the source just use vscodes regex search with
 
 ### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
 
-#### Drop interface and "destructors"
+#### Drop interface / "destructors"
 
 #### Fix any type and add ability to do implicit casting routine stuff.
 
@@ -46,60 +46,6 @@ like
 
 ```
 
-
-#### Interfaces should have default or 'overrideable' functions, where the interface itself can define a method
-  and the consumer of the interface can choose to provide a new one, or use the default.
-
-
-#### Modules.
-  A simple module system would take us a far way, avoid namespacing conflicts, provide a simple name mangling scheme etc. They would be ultimately optional.
-
-```rust
-  // or, import a module, an expose it via the :: operator, qualified.
-  module main;
-  import std::format;
-  main :: fn() @entry {
-    format::println("hello world");
-  }
-
-
-  // or, import targeted symbols.
-  module main;
-  import { println } in std::format;
-  main :: fn() @entry {
-    println("hello world");
-  }
-
-  // or, unload all symbols from the module into here.
-  module main;
-  import * in std::format;
-  main :: fn() @entry {
-    println("hello world");
-  }
-
-
-  // this wouldn't work, because we didn't actually implement std::format, we just added the std module which contains very little itself.
-  module main;
-  import std;
-  main :: fn() @entry {
-    std::format::println("hello world");
-  }
-
-```
-
-#### allow tuple/struct destructure in for loop
-```rust
-  for k, v in hash_map {
-
-  }
-  for i, v in list.iter().indexed() {
-    
-  }
-  for x, y in list_of_vec2s {
-
-  }
-```
-
 #### add variadic generics and value generics.
 ```rust
   format :: fn!<T...>(fmt: str, pack: ...T) -> String {
@@ -125,7 +71,6 @@ index :: fn!<T, SIZE: u32, N: u32>(array: T[SIZE]) -> T {
   return array[N];
 }
 ```
-
 
 #### improve aliases. make it so we can alias functions and bascially any symbol (besides variables and arguments)
 
@@ -160,17 +105,11 @@ main :: fn() @entry {
 ```
 
 # features
-  - `for i, v in some_array` {} getting an index from an iterator.
-  
   - tagged unions (half started)
-  - modules.
   - fully fleshed out constexpr interpreter. structs, unions, everything but syscalls and pointers basically.
 
 ## out-of-language features
 - config file/ project. So we can organize submodules, add compilation commands & library paths, source ela libraries, etc.
-
-# reworks.
-- type inference for generics is near non existent
 
 ## general
 - clean up everything. the parser is a mess, a ton of ast can be simplified, and made more performant even.
