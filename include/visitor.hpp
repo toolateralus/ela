@@ -231,7 +231,7 @@ struct Emitter : VisitorBase {
         printf("Empty filename for line directive.\n");
         return;
       }
-      code << std::string{"\n#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
+      code << std::string{"#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
       last_loc = loc;
     // }
   }
@@ -316,9 +316,7 @@ struct Emitter : VisitorBase {
   void visit(ASTWhere *node) override;
   void visit(ASTStatementList *node) override {
     for (const auto &stmt : node->statements) {
-      emit_line_directive(stmt);
       stmt->accept(this);
-      code << ";";
     }
     return;
   };

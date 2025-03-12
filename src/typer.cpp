@@ -1250,28 +1250,28 @@ void Typer::visit(ASTFor *node) {
   ctx.set_scope(node->block->scope);
 
   node->right->accept(this);
-  int range_type_id = node->right->resolved_type;
-  Type *range_type = global_get_type(range_type_id);
-  node->range_type = range_type->id;
+  int iterable_type_id = node->right->resolved_type;
+  Type *iterable_type = global_get_type(iterable_type_id);
+  node->iterable_type = iterable_type->id;
 
-  if (range_type->get_ext().is_pointer()) {
+  if (iterable_type->get_ext().is_pointer()) {
     throw_error(std::format("Cannot iterate over a pointer. Did you mean to dereference a "
                             "pointer to an array, range or struct? got type {}",
-                            range_type->to_string()),
+                            iterable_type->to_string()),
                 node->source_range);
   }
 
   int iter_ty = Type::INVALID_TYPE_ID;
-  auto scope = range_type->get_info()->scope;
+  auto scope = iterable_type->get_info()->scope;
 
-  if (range_type->implements(iterable_interface())) { // can return an iterator.
+  if (iterable_type->implements(iterable_interface())) { // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
 
-    compiler_mock_method_call_visit_impl(range_type_id, "iter");
+    compiler_mock_method_call_visit_impl(iterable_type_id, "iter");
     auto symbol = scope->local_lookup("iter");
     auto symbol_ty = global_get_type(symbol->type_id);
     auto iter_return_ty = global_get_type(symbol_ty->get_info()->as<FunctionTypeInfo>()->return_type);
-    node->iterable_type = iter_return_ty->id;
+    node->iterator_type = iter_return_ty->id;
 
     // make sure the impl is actually emitted if this is generic.
     compiler_mock_method_call_visit_impl(iter_return_ty->id, "next");
@@ -1279,14 +1279,14 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-  } else if (range_type->implements(iterator_interface())) { // directly an iterator.
+  } else if (iterable_type->implements(iterator_interface())) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
-    node->iterable_type = range_type_id;
+    node->iterator_type = iterable_type_id;
 
     // make sure the impl is actually emitted if this is generic.
-    auto range_type = global_get_type(range_type_id);
-    compiler_mock_method_call_visit_impl(range_type_id, "next");
-    auto symbol = range_type->get_info()->scope->local_lookup("next");
+    auto iterable_type = global_get_type(iterable_type_id);
+    compiler_mock_method_call_visit_impl(iterable_type_id, "next");
+    auto symbol = iterable_type->get_info()->scope->local_lookup("next");
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];

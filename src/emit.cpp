@@ -90,7 +90,7 @@ void Emitter::visit(ASTIf *node) {
   emit_line_directive(node);
   code << indent() << "if (";
   node->condition->accept(this);
-  code << ")";
+  code << ")\n";
   node->block->accept(this);
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
@@ -100,7 +100,7 @@ void Emitter::visit(ASTIf *node) {
 
 void Emitter::visit(ASTElse *node) {
   emit_line_directive(node);
-  code << " else ";
+  code << indent() << "else\n";
   if (node->_if.is_not_null()) {
     node->_if.get()->accept(this);
   } else if (node->block.is_not_null()) {
@@ -110,73 +110,68 @@ void Emitter::visit(ASTElse *node) {
 }
 
 void Emitter::visit(ASTFor *node) {
-  emit_line_directive(node);
   auto old_scope = ctx.scope;
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   ctx.set_scope(node->block->scope);
 
-  static size_t depth = 0;
-  std::string range_unique_id = "$_range_id" + std::to_string(depth);
-  std::string unique_id = "$_loop_id" + std::to_string(depth);
-  depth++;
-
-  Defer _defer([] { depth--; });
-
+  emit_line_directive(node);
   code << indent() << "{\n";
   indent_level++;
 
-  auto range_type = global_get_type(node->range_type);
-  auto range_scope = range_type->get_info()->scope;
   auto iterable_type = global_get_type(node->iterable_type);
   auto iterable_scope = iterable_type->get_info()->scope;
+  auto iterator_type = global_get_type(node->iterator_type);
+  auto iterator_scope = iterator_type->get_info()->scope;
 
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE:
-      code << indent() << to_cpp_string(range_type) << " " << range_unique_id << " = ";
+      emit_line_directive(node);
+      code << indent() << to_cpp_string(iterable_type) << " $iterable = ";
       node->right->accept(this);
       code << ";\n";
-      code << indent() << to_cpp_string(iterable_type) << " " << unique_id << " = "
-           << emit_symbol(range_scope->local_lookup("iter")) << "(&" << range_unique_id << ");\n";
+      emit_line_directive(node);
+      code << indent() << to_cpp_string(iterator_type) << " $iterator = "
+           << emit_symbol(iterable_scope->local_lookup("iter")) << "(&$iterable);\n";
       break;
     case ASTFor::ITERATOR:
-      code << indent() << to_cpp_string(iterable_type) << " " << unique_id << " = ";
+      emit_line_directive(node);
+      code << indent() << to_cpp_string(iterator_type) << " $iterator = ";
       node->right->accept(this);
       code << ";\n";
       break;
   }
 
+  emit_line_directive(node);
   code << indent() << "while (1) {\n";
   indent_level++;
 
-  static size_t temp_iden_idx = 0;
-  std::string option_temp_identiifer = "$next" + std::to_string(temp_iden_idx);
-
   // get the Option!<T> from next().
-  code << "auto " << option_temp_identiifer << " = ";
-
-  code << emit_symbol(iterable_scope->local_lookup("next")) << "(&" << unique_id << ");\n";
+  emit_line_directive(node);
+  code << "auto $next = ";
+  code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator);\n";
 
   // end condition
-  code << "if (!" << option_temp_identiifer << ".has_value) break;\n";
+  emit_line_directive(node);
+  code << "if (!$next.has_value) break;\n";
 
   auto identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
+    emit_line_directive(node);
     code << indent() << identifier_type_str << " ";
     node->left.identifier->accept(this);
 
     if (node->left.semantic == VALUE_SEMANTIC_POINTER) {
-      code << " = " << option_temp_identiifer << ".s;";
+      code << " = $next.s;\n";
     } else {
       // This is terrible, because the auto dereference is really just presuming a ton.
       // What if i want to copy a pointer while iterating over a list of s8*'s?
       if (node->needs_dereference) {
-        code << " = *" << option_temp_identiifer << ".s;";
+        code << " = *$next.s;\n";
       } else {
-        code << " = " << option_temp_identiifer << ".s;";
+        code << " = $next.s;\n";
       }
     }
-
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
     auto type = global_get_type(node->identifier_type);
     auto scope = type->get_info()->scope;
@@ -188,14 +183,15 @@ void Emitter::visit(ASTFor *node) {
     auto id = block->temp_iden_idx++;
     std::string temp_id = "$deconstruction$" + std::to_string(id++);
 
+    emit_line_directive(node);
     code << "auto " << temp_id;
     if (node->left.semantic == VALUE_SEMANTIC_POINTER) {
-      code << option_temp_identiifer << ".s;";
+      code << " = $next.s;\n";
     } else {
       if (node->needs_dereference) {
-        code << " = *" << option_temp_identiifer << ".s;";
+        code << " = *$next.s;\n";
       } else {
-        code << " = " << option_temp_identiifer << ".s;";
+        code << " = $next.s;\n";
       }
     }
 
@@ -213,6 +209,7 @@ void Emitter::visit(ASTFor *node) {
 
       auto &destruct = node->left.destructure[i];
       auto iden = destruct.identifier;
+      emit_line_directive(node);
       code << indent() << "auto ";
       iden->accept(this);
       code << " = ";
@@ -587,6 +584,7 @@ void Emitter::visit(ASTExprStatement *node) {
   emit_line_directive(node);
   code << indent();
   node->expression->accept(this);
+  code << ";\n";
   return;
 }
 
@@ -610,7 +608,7 @@ void Emitter::visit(ASTVariable *node) {
 
     code << to_cpp_string(type) << " " << str << ";\n";
     node->value.get()->accept(this);
-    code << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str;
+    code << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str << ";\n";
     return;
   }
 
@@ -671,9 +669,9 @@ void Emitter::visit(ASTVariable *node) {
       code << " = ";
       node->value.get()->accept(this);
     } else if (emit_default_init) {
-      code << "= {0}";
+      code << " = {0}";
     }
-    code << ";";
+    code << ";\n";
     return;
   }
 
@@ -731,7 +729,7 @@ void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
   }
 
   semicolon();
-  space();
+  newline();
 }
 
 void Emitter::visit(ASTStructDeclaration *node) {
@@ -756,17 +754,16 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_default_init = false;
   emit_default_value = false;
 
-  emit_line_directive(node);
   auto type = global_get_type(node->resolved_type);
 
   auto info = (type->get_info()->as<StructTypeInfo>());
 
-  std::string type_tag = (node->is_union ? "typedef union " : "typedef struct ");
+  std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
   auto name = node->scope->full_name();
 
   if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
     // We don't care about extern here.
-    code << type_tag << " " << name << " " << name << ";\n";
+    code << indent() << type_tag << " " << name << " " << name << ";\n";
     return;
   }
 
@@ -775,13 +772,12 @@ void Emitter::visit(ASTStructDeclaration *node) {
   Defer _defer2([&] { ctx.set_scope(previous); });
 
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
-    code << (node->is_union ? "union " : "struct ");
-    code << "{\n";
+    code << indent() << (node->is_union ? "union" : "struct")<< " {\n";
   } else {
     if (node->is_extern) {
-      code << "extern ";
+      code << indent() << "extern ";
     }
-    code << type_tag << " " << name << "{\n";
+    code << type_tag << " " << name << " {\n";
   }
   indent_level++;
 
@@ -792,10 +788,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   Defer _defer1([&] { emit_default_init = old; });
 
   for (const auto &subtype : node->subtypes) {
-    indented("");
     subtype->accept(this);
-    semicolon();
-    newline();
   }
 
   for (const auto &member : node->members) {
@@ -816,14 +809,14 @@ void Emitter::visit(ASTStructDeclaration *node) {
     newline();
   }
 
+  indent_level--;
+
   // this is for anonymous substructs which just unfold at C compile time into the struct's namespace.
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
-    code << "};\n";
+    code << indent() << "};\n";
   } else {
-    code << "} " << name << ";\n";
+    code << indent() << "} " << name << ";\n";
   }
-
-  indent_level--;
 
   bool has_default_ctor = false;
   bool has_dtor = false;
@@ -837,12 +830,12 @@ void Emitter::visit(ASTEnumDeclaration *node) {
   } else {
     node->is_emitted = true;
   }
-  emit_line_directive(node);
   int n = 0;
   code << "typedef enum {\n";
+  indent_level++;
   auto scope = global_get_type(node->resolved_type)->get_info()->scope;
   for (const auto &[key, value] : node->key_values) {
-    code << emit_symbol(scope->lookup(key));
+    code << indent() << emit_symbol(scope->lookup(key));
     if (node->is_flags) {
       code << " = ";
       code << std::to_string(1 << n);
@@ -851,11 +844,13 @@ void Emitter::visit(ASTEnumDeclaration *node) {
       value->accept(this);
     }
     if (n != node->key_values.size() - 1) {
-      code << ",\n";
+      code << ",";
     }
+    newline();
     n++;
   }
-  code << "} " << emit_symbol(ctx.scope->lookup(node->name)) << ";\n";
+  indent_level--;
+  code << indent() << "} " << emit_symbol(ctx.scope->lookup(node->name)) << ";\n";
 
   auto type = global_get_type(node->resolved_type);
   return;
@@ -901,10 +896,7 @@ void Emitter::visit(ASTParamsDecl *node) {
 }
 
 void Emitter::visit(ASTProgram *node) {
-  emit_line_directive(node);
-
   static const auto testing = compile_command.has_flag("test");
-
   size_t index = 0;
   ctx.set_scope(ctx.root_scope);
   for (auto &statement : node->statements) {
@@ -912,8 +904,6 @@ void Emitter::visit(ASTProgram *node) {
       ctx.set_scope(node->scope);
     }
     statement->accept(this);
-    semicolon();
-    newline();
     index++;
   }
   ctx.set_scope(ctx.root_scope);
@@ -1027,7 +1017,7 @@ void Emitter::visit(ASTInitializerList *node) {
   if (!type->get_ext().is_fixed_sized_array()) {
     code << "(" + to_cpp_string(type) + ")";
   }
-  code << " {";
+  code << "{";
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
@@ -1035,16 +1025,20 @@ void Emitter::visit(ASTInitializerList *node) {
       return;
     }
     case ASTInitializerList::INIT_LIST_NAMED: {
+      newline();
+      indent_level++;
       const auto size = node->key_values.size();
       for (int i = 0; i < node->key_values.size(); ++i) {
         const auto &[key, value] = node->key_values[i];
-        code << '.' << key.get_str() << " = ";
+        emit_line_directive(value);
+        code << indent() << '.' << key.get_str() << " = ";
         code << "(" << to_cpp_string(global_get_type(value->resolved_type)) << ")";
         value->accept(this);
         if (i != size - 1) {
           code << ",\n";
         }
       }
+      indent_level--;
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
       if (type->get_base().get_str().starts_with("Init_List$")) {
@@ -1100,10 +1094,10 @@ void Emitter::visit(ASTSwitch *node) {
   newline();
 
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
+    emit_line_directive(target);
     if (!first) {
       code << " else ";
     }
-    emit_line_directive(target);
     code << " if (";
     if (use_eq_operator) {
       code << target_unique_id;
@@ -1113,7 +1107,6 @@ void Emitter::visit(ASTSwitch *node) {
       call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
     }
     code << ") ";
-    emit_line_directive(_case.block);
     _case.block->accept(this);
   };
 
@@ -1159,9 +1152,9 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
   {
     code << to_cpp_string(type) << " " << identifier << " = ";
     node->right->accept(this);
+    code << ";\n";
   }
 
-  semicolon();
   emit_line_directive(node);
 
   auto is_tuple = type->is_kind(TYPE_TUPLE);
@@ -1706,8 +1699,6 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
     }
     for (auto defer : defer_block->defers) {
       defer->statement->accept(this);
-      semicolon();
-      newline();
     }
     defer_block++;
   }
@@ -1716,8 +1707,6 @@ void Emitter::emit_deferred_statements(DeferBlockType type) {
   }
   for (auto defer : defer_block->defers) {
     defer->statement->accept(this);
-    semicolon();
-    newline();
   }
 }
 
@@ -1731,6 +1720,7 @@ void Emitter::emit_lambda(ASTLambda *node) {
   node->return_type->accept(this);
   code << ' ' << node->unique_identifier.get_str() << ' ';
   node->params->accept(this);
+  newline();
   node->block->accept(this);
   newline();
 }
@@ -1754,6 +1744,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << " " + name;
       node->params->accept(this);
     }
+    newline();
     defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
       auto block = node->block.get();
@@ -1794,7 +1785,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);
-      code << " __ela_main_()"; // We use Env::args() to get args now.
+      code << " __ela_main_()\n"; // We use Env::args() to get args now.
       node->block.get()->accept(this);
     } else {
       emit_function_signature_and_body(name);
@@ -1900,28 +1891,24 @@ void Emitter::visit(ASTContinue *node) {
 void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
 
 void Emitter::visit(ASTBlock *node) {
-  emit_line_directive(node);
-  code << (" {\n");
+  indentedln("{");
   indent_level++;
   ctx.set_scope(node->scope);
 
   defer_blocks.emplace_back();
 
   for (const auto &statement : node->statements) {
-    emit_line_directive(statement);
     if (statement->get_node_type() == AST_NODE_DECLARATION) {
       indented("");
     }
     statement->accept(this);
-    semicolon();
-    newline();
   }
 
   emit_deferred_statements(DEFER_BLOCK_TYPE_OTHER);
   defer_blocks.pop_back();
 
   indent_level--;
-  indented("}");
+  indentedln("}");
   ctx.exit_scope();
   return;
 }
@@ -1945,17 +1932,18 @@ void Emitter::emit_tuple(int type_id) {
   }
   auto name = to_cpp_string(type);
 
-  code << "typedef struct " << name << " {";
+  code << "typedef struct " << name << " {\n";
+  indent_level++;
   auto info = type->get_info()->as<TupleTypeInfo>();
   for (int i = 0; i < info->types.size(); ++i) {
     auto type = global_get_type(info->types[i]);
     if (type->is_kind(TYPE_FUNCTION)) {
-      code << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+      code << indent() << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
     } else {
-      auto name = to_cpp_string(type);
-      code << name << " $" << std::to_string(i) << ";\n";
+      code << indent()  << to_cpp_string(type) << " $" << std::to_string(i) << ";\n";
     }
   }
+  indent_level--;
   code << "} " << name << ";\n";
 }
 

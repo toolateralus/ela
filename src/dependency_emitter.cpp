@@ -242,14 +242,14 @@ void DependencyEmitter::visit(ASTContinue *node) {}
 void DependencyEmitter::visit(ASTBreak *node) {}
 
 void DependencyEmitter::visit(ASTFor *node) {
+  define_type(node->iterator_type);
   define_type(node->iterable_type);
-  define_type(node->range_type);
   define_type(node->identifier_type);
 
   node->right->accept(this);
 
-  auto range_scope = global_get_type(node->range_type)->get_info()->scope;
-  auto iter_scope = global_get_type(node->iterable_type)->get_info()->scope;
+  auto range_scope = global_get_type(node->iterable_type)->get_info()->scope;
+  auto iter_scope = global_get_type(node->iterator_type)->get_info()->scope;
 
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE: {

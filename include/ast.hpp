@@ -529,9 +529,9 @@ struct ASTFor : ASTStatement {
   } iteration_kind;
 
   // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
-  int range_type = Type::INVALID_TYPE_ID;
-  // This is either the type of that implements Enumerator![T], or is Iter![T];
   int iterable_type = Type::INVALID_TYPE_ID;
+  // This is either the type of that implements Enumerator![T], or is Iter![T];
+  int iterator_type = Type::INVALID_TYPE_ID;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
   int identifier_type = Type::INVALID_TYPE_ID;
   bool needs_dereference = false;
@@ -563,8 +563,8 @@ struct ASTFor : ASTStatement {
   ASTFor(const ASTFor &other) {
     source_range = other.source_range;
     iteration_kind = other.iteration_kind;
-    range_type = other.range_type;
     iterable_type = other.iterable_type;
+    iterator_type = other.iterator_type;
     identifier_type = other.identifier_type;
     left_tag = other.left_tag;
     right = other.right;
