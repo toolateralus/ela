@@ -160,40 +160,21 @@ void Emitter::visit(ASTFor *node) {
     emit_line_directive(node);
     code << indent() << identifier_type_str << " ";
     node->left.identifier->accept(this);
-
-    if (node->left.semantic == VALUE_SEMANTIC_POINTER) {
-      code << " = $next.s;\n";
-    } else {
-      // This is terrible, because the auto dereference is really just presuming a ton.
-      // What if i want to copy a pointer while iterating over a list of s8*'s?
-      if (node->needs_dereference) {
-        code << " = *$next.s;\n";
-      } else {
-        code << " = $next.s;\n";
-      }
-    }
+    code << " = $next.s;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
     auto type = global_get_type(node->identifier_type);
     auto scope = type->get_info()->scope;
+
     if (type->get_ext().is_pointer()) {
       auto t = global_get_type(type->get_element_type());
       scope = t->get_info()->scope;
     }
+
     auto block = node->block;
     auto id = block->temp_iden_idx++;
     std::string temp_id = "$deconstruction$" + std::to_string(id++);
 
-    emit_line_directive(node);
-    code << "auto " << temp_id;
-    if (node->left.semantic == VALUE_SEMANTIC_POINTER) {
-      code << " = $next.s;\n";
-    } else {
-      if (node->needs_dereference) {
-        code << " = *$next.s;\n";
-      } else {
-        code << " = $next.s;\n";
-      }
-    }
+    code << "auto " << temp_id << " = $next.s;\n";
 
     auto is_tuple = type->is_kind(TYPE_TUPLE);
 

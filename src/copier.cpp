@@ -165,7 +165,6 @@ ASTFor *ASTCopier::copy_for(ASTFor *node) {
   switch (node->left_tag) {
     case ASTFor::IDENTIFIER: {
       new_node->left.identifier = static_cast<ASTIdentifier *>(copy_node(node->left.identifier));
-      new_node->left.semantic = node->left.semantic;
     } break;
     case ASTFor::DESTRUCTURE: {
       new_node->left.destructure.clear();

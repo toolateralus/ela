@@ -68,10 +68,22 @@ int main(int argc, char *argv[]) {
   }
 
   std::vector<std::string> runtime_args;
-  bool run_on_finished = false, run_tests = false;
-  compile_command = CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests);
+  bool run_on_finished = false, run_tests = false, lldb = false;
+  compile_command = CompileCommand(std::vector<string>(argv, argc + argv), runtime_args, run_on_finished, run_tests, lldb);
 
   auto result = compile_command.compile();
+
+  if (lldb) {
+    std::string invocation = "lldb ./" + compile_command.binary_path.string();
+    std::string args;
+    for (const auto &arg : runtime_args) {
+      args += arg + " ";
+    }
+    std::string command = invocation + " " + args;
+    std::cout << "running lldb: " << command << std::endl;
+    auto status = system(command.c_str());
+    return 0;
+  }
 
   if (run_on_finished && result == 0) {
     std::string invocation = "./" + compile_command.binary_path.string();
@@ -101,6 +113,8 @@ int main(int argc, char *argv[]) {
     }
 
   }
+
+  
 
   if (run_tests) {
     system("rm test");

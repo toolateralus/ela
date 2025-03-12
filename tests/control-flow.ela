@@ -73,12 +73,12 @@
     i = i;
   }
 
-  array: List!<s32>;
+  mut array: List!<s32>;
 
   for k in array {
     k = k;
   }
-  for *k in array {
+  for k in array.iter_mut() {
     k = k;
   }
 }
@@ -89,7 +89,7 @@
     array.push(i as s8);
   }
   mut n: s32 ;
-  for *v in array {
+  for v in array.iter_mut() {
     assert("", n == *v);
     ++n;
   }
@@ -144,14 +144,14 @@
     ++i;
   }
 
-  for *x, *y in list {
-    *x *= 2;
-    *y *= 2;
+  for *x, *y in list.iter_mut() {
+    (*x) *= 2;
+    (*y) *= 2;
   }
 
   i = 0;
   for x, y in list {
-    assert("failed on set", x == i * 2 && y == i * 2);
+    assert("failed on set in tuple", x == i * 2 && y == i * 2);
     i++;
   }
 }
@@ -161,6 +161,7 @@ __Struct :: struct {
   y: s32,
 }
 
+import fmt::*;
 #test test_struct_destructure_in_for_loop :: fn() {
   mut list: __Struct[];
   list.push(.{x: 0, y: 0});
@@ -174,14 +175,15 @@ __Struct :: struct {
     ++i;
   }
 
-  for *x, *y in list {
-    *x *= 2;
-    *y *= 2;
+  for *x, *y in list.iter_mut() {
+    (*x) *= 2;
+    (*y) *= 2;
   }
 
   i = 0;
   for x, y in list {
-    assert("failed on set", x == i * 2 && y == i * 2);
+    println((x, y));
+    assert("failed on set for struct", x == i * 2 && y == i * 2);
     i++;
   }
 }
@@ -268,14 +270,14 @@ switch_helper :: fn() -> s32 {
 
 
 #test test_iterate_iter :: fn() {
-  list: s32[] = s32[]::init(.[0,1,2,3,4,5,6,7,8,9,10]);
+  mut list: s32[] = s32[]::init(.[0,1,2,3,4,5,6,7,8,9,10]);
   mut idx := 0;
   for v in list.iter() {
     assert("list.iter() for loop failed", v == idx);
     idx++;
   }
   idx = 0;
-  for *v in list.iter() {
+  for v in list.iter_mut() {
     assert("list.iter() for loop failed", (*v) == idx);
     idx++;
   }

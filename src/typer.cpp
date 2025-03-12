@@ -712,6 +712,24 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   call.accept(this);
 }
 
+bool is_const_pointer(ASTNode *node) {
+  if (node == nullptr)
+    return false;
+
+  if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
+    return is_const_pointer(subscript->left);
+  } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
+    return is_const_pointer(dot->base);
+  }
+
+  auto type = global_get_type(node->resolved_type);
+  if (type->get_ext().is_const_pointer()) {
+    return true;
+  }
+
+  return false;
+}
+
 void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
@@ -746,8 +764,6 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
     }
   }
 
-  // TODO: @Cooper-Pilot we need a more structured way to type check the self parameter, now that
-  // we support const/mut var, and const/mut pointers, theres a billion combinations.
   if (self_nullable.is_not_null()) {
     auto self = self_nullable.get();
     auto first = global_get_type(params->params[0]->resolved_type);
@@ -759,7 +775,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         throw_error("cannot call a '*mut self' method with a const variable, consider adding 'mut' to the declaration.",
                     node->source_range);
       }
-      if (self_type->get_ext().is_const_pointer()) {
+      if (is_const_pointer(self)) {
         throw_error("cannot call a '*mut self' method with a const pointer, consider taking it as '&mut' (or however "
                     "you obtained this pointer)",
                     node->source_range);
@@ -1290,20 +1306,10 @@ void Typer::visit(ASTFor *node) {
     iter_ty = global_get_type(symbol->type_id)->get_info()->as<FunctionTypeInfo>()->return_type;
     auto option = global_get_type(iter_ty);
     iter_ty = option->generic_args[0];
-
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
                 "'Iterator!<T>' interface. ",
                 node->source_range);
-  }
-
-  { // if we do 'for v in ...' and the iter returns a pointer, we dereference.
-    auto type = global_get_type(iter_ty);
-    if (node->left_tag == ASTFor::IDENTIFIER && node->left.semantic == VALUE_SEMANTIC_COPY &&
-        type->get_ext().is_pointer()) {
-      iter_ty = type->get_element_type();
-      node->needs_dereference = true;
-    }
   }
 
   node->identifier_type = iter_ty;

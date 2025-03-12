@@ -514,7 +514,6 @@ ASTProgram *Parser::parse_program() {
 
   program->end_of_bootstrap_index = program->statements.size();
 
-
   // put the rest on the program scope
   ctx.set_scope();
   program->scope = ctx.scope;
@@ -1096,7 +1095,8 @@ ASTStatement *Parser::parse_statement() {
           expect(TType::LParen);
           while (peek().type != TType::RParen) {
             attribute.arguments.push_back(parse_type());
-            if (peek().type != TType::RParen) expect(TType::Comma);
+            if (peek().type != TType::RParen)
+              expect(TType::Comma);
           }
           expect(TType::RParen);
         } else if (peek().type == TType::Const) {
@@ -1373,7 +1373,13 @@ ASTStatement *Parser::parse_statement() {
       } else {
         node->left_tag = ASTFor::IDENTIFIER;
         node->left.identifier = destructure[0].identifier;
-        node->left.semantic = destructure[0].semantic;
+
+        if (destructure[0].semantic == VALUE_SEMANTIC_POINTER) {
+          end_node(node, range);
+          throw_error("you can only take the elements of a tuple destructure as a pointer, 'for *v in ...' is "
+                      "redundant. just use the correct iterator, such as '.iter_mut()'",
+                      node->source_range);
+        }
       }
 
       // Ensure the 'in' keyword is present
@@ -1824,7 +1830,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
     }
 
     auto name = expect(TType::Identifier).value;
-    
+
     expect(TType::Colon);
     param->normal.type = parse_type();
     param->tag = ASTParamDecl::Normal;
@@ -2393,7 +2399,7 @@ ASTLambda *Parser::parse_lambda() {
   } else {
     node->return_type = ASTType::get_void();
   }
-  
+
   node->block = parse_block();
 
   if (current_func_decl.is_null()) {
@@ -2409,7 +2415,7 @@ void Parser::parse_pointer_extensions(ASTType *type) {
   while (peek().type == TType::Mul) {
     expect(TType::Mul);
     type->extensions.push_back({peek().type == TType::Mut ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
-    if (peek().type ==  TType::Mut) {
+    if (peek().type == TType::Mut) {
       expect(TType::Mut);
     } else if (peek().type == TType::Const) {
       expect(TType::Const);
@@ -2420,7 +2426,6 @@ void Parser::parse_pointer_extensions(ASTType *type) {
     }
   }
 }
-
 
 static Precedence get_operator_precedence(Token token) {
   if (token.is_comp_assign()) {
@@ -2560,7 +2565,6 @@ void Parser::end_node(ASTNode *node, SourceRange &range) {
   }
 }
 
-
 Token Parser::peek() const {
   if (states.empty()) {
     return Token::Eof();
@@ -2658,4 +2662,3 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
   }
   return nullptr;
 }
-

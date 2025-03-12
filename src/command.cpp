@@ -137,28 +137,28 @@ void CompileCommand::print_command() const {
 }
 
 CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector<std::string> &runtime_args,
-                               bool &run_on_finished, bool &run_tests) {
+                               bool &run_on_finished, bool &run_tests, bool &lldb) {
+  auto default_input_path = "main.ela";
+  std::string init_string = "";
   for (size_t i = 0; i < args.size(); ++i) {
     std::string arg = args[i];
     if (arg == "run" || arg == "r") {
-      input_path = "main.ela";
       run_on_finished = true;
     } else if (arg == "build" || arg == "b") {
-      input_path = "main.ela";
+      default_input_path = "main.ela";
     } else if (arg == "test" || arg == "t") {
       run_tests = true;
-      input_path = "test.ela";
+      default_input_path = "test.ela";
       run_on_finished = true;
     } else if (arg == "init") {
-      std::ofstream file("main.ela");
       if (i + 1 < args.size() && args[i + 1] == "raylib") {
-        file << RAYLIB_INIT_CODE;
+        init_string = RAYLIB_INIT_CODE;
       } else {
-        file << MAIN_INIT_CODE;
+        init_string = MAIN_INIT_CODE;
       }
-      file.flush();
-      file.close();
-      exit(0);
+    } else if (arg == "lldb") {
+      run_on_finished = false;
+      lldb = true;
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
     } else if (arg.ends_with(".ela") && input_path.empty()) {
@@ -171,13 +171,23 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
   }
 
   if (input_path.empty()) {
-    printf("\033[31mError: No input file specified.\033[0m\n");
-    exit(1);
+    input_path = default_input_path;
+  }
+
+  if (!init_string.empty()) {
+    std::ofstream file(input_path);
+    file << init_string;
+    file.flush();
+    file.close();
+    exit(0);
   }
 
   std::filesystem::path input_fs_path(input_path);
   if (!std::filesystem::exists(input_fs_path)) {
-    printf("%s\n", (std::format("\033[31mError: File '{}' does not exist.\033[0m", input_path.string())).c_str());
+    printf("%s\n", (std::format("\033[31mError: File '{}' does not exist. If you don't provide a input path, it will "
+                                "default to an appropriate default, often `./main.ela`\033[0m",
+                                input_path.string()))
+                       .c_str());
     exit(1);
   }
 
