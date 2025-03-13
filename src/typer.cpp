@@ -563,7 +563,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       if (auto impl_symbol = impl_scope.local_lookup(name)) {
         if (!impl_method_matches_interface(interface_sym.type_id, impl_symbol->type_id)) {
           if (interface_sym.type_id != Type::INVALID_TYPE_ID && impl_symbol->type_id != Type::INVALID_TYPE_ID) {
-            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {}, got {}", name,
+            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {},\ngot {}", name,
                                     global_get_type(interface_sym.type_id)->to_string(),
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);

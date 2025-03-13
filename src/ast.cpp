@@ -586,6 +586,23 @@ ASTCall *Parser::parse_call(ASTExpr *function) {
   if (peek().type == TType::GenericBrace) {
     call->generic_arguments = parse_generic_arguments();
   }
+
+  // ! See the ! comment in parse_postfix() where we call parse_call, because this is just a hack
+  // ! and I think this could be significantly better.
+  if (peek().type == TType::DoubleColon) {
+    eat();
+    NODE_ALLOC(ASTType, type, range, _, this);
+    type->normal.base = function;
+    type->normal.generic_arguments = call->generic_arguments;
+    call->generic_arguments.clear();
+
+    NODE_ALLOC(ASTScopeResolution, sr, range1, _1, this);
+    sr->base = type;
+    sr->member_name = expect(TType::Identifier).value;
+    return parse_call(sr);
+  }
+  // ! End hack.
+
   call->arguments = parse_arguments();
   end_node(call, range);
   return call;
@@ -693,6 +710,8 @@ ASTExpr *Parser::parse_postfix() {
          peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
          peek().type == TType::Decrement || peek().type == TType::Range || peek().type == TType::As) {
     if (peek().type == TType::LParen || peek().type == TType::GenericBrace) {
+      // ! This is problematic, because we assume if we see a generic type that it's a freakin thingy.
+      // ! Map!<s32, s32>::new() will not get correctly parsed here, because the base is a type.
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
