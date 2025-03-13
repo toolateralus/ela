@@ -1294,38 +1294,6 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   return ss.str();
 }
 
-std::string Emitter::get_elements_function(Type *type) {
-  //! We have to remove these lambdas so we can compile down to C.
-  auto element_type = global_get_type(type->get_element_type());
-  if (!type->get_ext().is_fixed_sized_array()) {
-    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
-                       "  auto arr = (_array<{}>*)(array);\n"
-                       "  _array<Element> elements;\n"
-                       "  for (int i = 0; i < arr->length; ++i) {{\n"
-                       "    elements.push({{\n"
-                       "      .data = (char*)&(*arr)[i],\n"
-                       "      .type = {},\n"
-                       "    }});\n"
-                       "  }}\n"
-                       "  return elements;\n"
-                       "}}\n",
-                       to_cpp_string(element_type), to_type_struct(element_type, ctx));
-  } else {
-    auto size = type->get_ext().extensions.back().array_size;
-    return std::format(".elements = +[](char * array) -> _array<Element> {{\n"
-                       "  auto arr = ({}*)(array);\n"
-                       "  _array<Element> elements;\n"
-                       "  for (int i = 0; i < {}; ++i) {{\n"
-                       "    elements.push({{\n"
-                       "      .data = (char*)&arr[i],\n"
-                       "      .type = {},\n"
-                       "    }});\n"
-                       "  }}\n"
-                       "  return elements;\n"
-                       "}}\n",
-                       to_cpp_string(element_type), size, to_type_struct(element_type, ctx));
-  }
-}
 
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
@@ -1398,7 +1366,6 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   }
 
   auto kind = 0;
-
   ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
   ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
@@ -1478,7 +1445,33 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     return fields_ss.str();
   };
 
+  auto get_generic_args_init_statements = [&] {
+    std::stringstream generics_ss;
+
+    if (type->generic_args.empty()) {
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->generic_args;\nargs->length = 0;\nargs->data = NULL\n;args->capacity = 0;\n }}", id);
+    }
+
+    int count = type->generic_args.size();
+    {
+      generics_ss << "_type_info.data[" << id << "]->generic_args.data = malloc(" << count << " * sizeof(Type));\n";
+      generics_ss << "_type_info.data[" << id << "]->generic_args.length = " << count << ";\n";
+      generics_ss << "_type_info.data[" << id << "]->generic_args.capacity = " << count << ";\n";
+    }
+
+    int idx = 0;
+    for (const auto &arg : type->generic_args) {
+      generics_ss << "_type_info.data[" << id << "]->generic_args.data[" << idx << "] = ";
+      generics_ss << to_type_struct(global_get_type(arg), ctx) << ";\n";
+      ++idx;
+    }
+
+    return generics_ss.str();
+  };
+
   ss << get_fields_init_statements();
+  ss << get_generic_args_init_statements();
+
   context.type_info_strings.push_back(ss.str());
   return std::format("_type_info.data[{}]", id);
 }
