@@ -48,7 +48,7 @@
       "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
       }
     },
     {

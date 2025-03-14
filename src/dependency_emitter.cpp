@@ -106,6 +106,9 @@ void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
   if (node->block.is_not_null()) {
     node->block.get()->accept(this);
   }
+  if (!node->is_emitted) {
+    emitter->emit_forward_declaration(node);
+  }
 }
 
 void DependencyEmitter::visit(ASTParamsDecl *node) {
