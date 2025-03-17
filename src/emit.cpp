@@ -1026,7 +1026,7 @@ void Emitter::visit(ASTInitializerList *node) {
       indent_level--;
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (type->get_base().get_str().starts_with("Init_List$")) {
+      if (type->get_base().get_str().starts_with("InitList$")) {
         auto element_type = type->generic_args[0];
         code << " .data = ";
         code << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";

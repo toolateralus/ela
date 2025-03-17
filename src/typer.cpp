@@ -2077,7 +2077,7 @@ void Typer::visit(ASTInitializerList *node) {
         }
         target_type = expected;
       } else {
-        target_type = global_get_type(find_generic_type_of("Init_List", {target_type->id}, node->source_range));
+        target_type = global_get_type(find_generic_type_of("InitList", {target_type->id}, node->source_range));
       }
     }
   }
@@ -2098,7 +2098,7 @@ void Typer::visit(ASTInitializerList *node) {
     for collection style initializer lists.
   */
   int target_element_type = Type::INVALID_TYPE_ID;
-  if (target_type->get_base().get_str().starts_with("Init_List$")) {
+  if (target_type->get_base().get_str().starts_with("InitList$")) {
     target_element_type = target_type->generic_args[0];
   } else if (target_type->get_ext().is_fixed_sized_array()) {
     target_element_type = target_type->get_element_type();

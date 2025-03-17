@@ -19,7 +19,10 @@
       "name": "Debug current file compilation (tests)",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
-      "args": ["${file}", "--test"]
+      "args": ["${file}", "--test"],
+      "env": {
+        "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+      }
     },
     {
       "preLaunchTask": "compile_current",
