@@ -668,17 +668,32 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   if (node->name == "main" || node->name == "маин") {
     return;
   }
-  if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
-    code << "extern ";
+  if (!node->generic_parameters.empty()) {
+    return;
   }
   
   Scope *scope;
   if (node->declaring_type != Type::INVALID_TYPE_ID) {
     scope = global_get_type(node->declaring_type)->get_info()->scope;
+  } else if (node->scope) {
+    scope = node->scope;
   } else {
     scope = ctx.scope;
   }
-  auto name = emit_symbol(scope->lookup(node->name)) + mangled_type_args(node->generic_arguments);
+
+  auto symbol = scope->lookup(node->name);
+  auto decl = symbol->function.declaration;
+  if (decl->is_declared || decl->is_emitted) {
+    return;
+  } else {
+    decl->is_declared = true;
+  }
+
+  if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
+    code << "extern ";
+  }
+
+  auto name = emit_symbol(symbol) + mangled_type_args(node->generic_arguments);
   auto returns = global_get_type(node->return_type->resolved_type);
 
   if (returns->is_kind(TYPE_FUNCTION)) {

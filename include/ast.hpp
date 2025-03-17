@@ -461,6 +461,7 @@ struct ASTLambda;
 struct ASTFunctionDeclaration : ASTDeclaration {
   size_t flags = 0;
   bool has_defer = false;
+  bool is_declared = false;
   int declaring_type = Type::INVALID_TYPE_ID;
   Nullable<ASTWhere> where_clause;
   std::vector<int> generic_arguments;

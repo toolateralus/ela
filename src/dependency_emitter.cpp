@@ -90,7 +90,8 @@ void DependencyEmitter::visit(ASTBlock *node) {
 }
 
 void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
-  if (visited_functions.contains(node)) {
+  if (visited_functions.contains(node)) {\
+    emitter->emit_forward_declaration(node);
     return;
   } else {
     visited_functions.insert(node);
@@ -106,9 +107,7 @@ void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
   if (node->block.is_not_null()) {
     node->block.get()->accept(this);
   }
-  if (!node->is_emitted) {
-    emitter->emit_forward_declaration(node);
-  }
+  node->accept(emitter);
 }
 
 void DependencyEmitter::visit(ASTParamsDecl *node) {
@@ -185,7 +184,6 @@ void DependencyEmitter::visit(ASTIdentifier *node) {
     } else if (symbol->is_function()) {
       // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
-      symbol->function.declaration->accept(emitter);
     }
   }
 }
@@ -220,7 +218,6 @@ void DependencyEmitter::visit(ASTCall *node) {
     // else, we do the other way
     if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
       decl->accept(this);
-      decl->accept(emitter);
       return;
     }
   } 
@@ -258,14 +255,12 @@ void DependencyEmitter::visit(ASTFor *node) {
     case ASTFor::ITERABLE: {
       auto iter_sym = range_scope->local_lookup("iter");
       iter_sym->function.declaration->accept(this);
-      iter_sym->function.declaration->accept(emitter);
     } break;
     case ASTFor::ITERATOR: break;
   }
 
   auto done_sym = iter_scope->local_lookup("next");
   done_sym->function.declaration->accept(this);
-  done_sym->function.declaration->accept(emitter);
   node->block->accept(this);
 }
 
