@@ -1,4 +1,6 @@
-import fmt::*;
+format :: fn!<T>(string: str, tuple: T, options: s32) {
+
+}
 
 Vec2 :: struct {
   x: f32,
@@ -6,18 +8,16 @@ Vec2 :: struct {
 }
 
 impl Vec2 {
-  format :: fn(self, builder: *mut String_Builder) {
-    builder.append_then_free(format("Vec2 { x: %, y: % }", (
+  format :: fn(self) {
+    format("Vec2 { x: %, y: % }", (
       self.x,
       self.y,
-    ), Format_Options::default()));
+    ), 1);
   }
 }
 
 main :: fn() {
-  mut builder: String_Builder;
   vec2: Vec2;
-  vec2.format(&mut builder);
-  println(builder.get_string());
+  vec2.format();
 }
 

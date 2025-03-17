@@ -669,13 +669,38 @@ void Emitter::visit(ASTVariable *node) {
 }
 
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
+  if (node->name == "main" || node->name == "маин") {
+    return;
+  }
   if (HAS_FLAG(node->flags, FUNCTION_IS_EXPORTED)) {
     code << "extern ";
   }
+  
+  Scope *scope;
+  if (node->declaring_type != Type::INVALID_TYPE_ID) {
+    scope = global_get_type(node->declaring_type)->get_info()->scope;
+  } else {
+    scope = ctx.scope;
+  }
+  auto name = emit_symbol(scope->lookup(node->name)) + mangled_type_args(node->generic_arguments);
+  auto returns = global_get_type(node->return_type->resolved_type);
 
-  node->return_type->accept(this);
-  code << ' ' << emit_symbol(ctx.scope->lookup(node->name)) << ' ';
-  node->params->accept(this);
+  if (returns->is_kind(TYPE_FUNCTION)) {
+    auto return_function_type = static_cast<FunctionTypeInfo *>(returns->get_info());
+
+    // we take fixed array extensions as pointer here because it's invalid and would get casted off anyway.
+    auto depth = returns->get_ext().extensions.size();
+    auto extensions = std::string(depth, '*');
+
+    code << to_cpp_string(global_get_type(return_function_type->return_type)) << "(" << extensions << name;
+    node->params->accept(this);
+    code << ")";
+  } else {
+    node->return_type->accept(this);
+    code << " " + name;
+    node->params->accept(this);
+  }
+  
   code << ";\n";
 }
 
