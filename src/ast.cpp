@@ -361,7 +361,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           auto struct$ = static_cast<ASTStructDeclaration*>(node);
           struct$->is_extern = true;
-        } else if (node->get_node_type() == AST_NODE_DECLARATION) {
+        } else if (node->get_node_type() == AST_NODE_VARIABLE) {
           auto decl = static_cast<ASTVariable*>(node);
           decl->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
@@ -549,7 +549,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_ENUM_DECLARATION:
       case AST_NODE_TAGGED_UNION_DECLARATION:
       case AST_NODE_ALIAS:
-      case AST_NODE_DECLARATION:
+      case AST_NODE_VARIABLE:
       case AST_NODE_NOOP:
       case AST_NODE_IMPL:
       case AST_NODE_IMPORT:
@@ -1281,7 +1281,7 @@ ASTStatement *Parser::parse_statement() {
     }
     alias->name = expect(TType::Identifier).value;
     expect(TType::DoubleColon);
-    if (peek().type == TType::Mul || peek().type == TType::Fn) {
+    if (peek().type == TType::Mul || peek().type == TType::Fn || lookahead_buf()[1].type == TType::GenericBrace) {
       alias->source_node = parse_type();
     } else {
       alias->source_node = parse_expr();
@@ -1441,7 +1441,7 @@ ASTStatement *Parser::parse_statement() {
         ctx.set_scope();
         auto statement = parse_statement();
         node->block->statements = {statement};
-        if (statement->get_node_type() == AST_NODE_DECLARATION) {
+        if (statement->get_node_type() == AST_NODE_VARIABLE) {
           throw_warning(WarningInaccessibleDeclaration, "Inaccesible declared variable", statement->source_range);
         }
         node->block->scope = ctx.exit_scope();
@@ -2048,8 +2048,6 @@ ASTImpl *Parser::parse_impl() {
   current_impl_decl = node;
   auto target = parse_type();
 
-  // Handle 'impl INTERFACE for TYPE'
-  // or normal 'impl TYPE'
   ASTType *interface = nullptr;
   if (peek().type == TType::For) {
     expect(TType::For);
@@ -2068,8 +2066,6 @@ ASTImpl *Parser::parse_impl() {
   auto block = parse_block(node->scope);
   end_node(node, range);
 
-  // TODO: maybe do this differently
-  // this is just so you can't call methods directly from within an impl without self
   node->scope->symbols.clear();
 
   for (const auto &statement : block->statements) {
@@ -2078,6 +2074,9 @@ ASTImpl *Parser::parse_impl() {
       node->methods.push_back(function);
     } else if (statement->get_node_type() == AST_NODE_ALIAS) {
       node->aliases.push_back(static_cast<ASTAlias *>(statement));
+    } else if (statement->get_node_type() == AST_NODE_VARIABLE) {
+      auto variable = (ASTVariable *)statement;
+      node->constants.push_back(variable);
     } else {
       throw_error("invalid statement: only methods and aliases are allowed in 'impl's", statement->source_range);
     }
@@ -2095,16 +2094,25 @@ ASTDefer *Parser::parse_defer() {
 
 ASTWhere *Parser::parse_where_clause() {
   NODE_ALLOC(ASTWhere, node, range, _, this);
+  std::vector<Constraint> &constraints = node->constraints;
+  auto parse_constraint = [&] -> Constraint {
+    auto type = parse_type();
+    expect(TType::Colon);
+    ASTExpr *condition = parse_type();
+    while (peek().type == TType::And || peek().type == TType::Or) {
+      NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
+      binexpr->op = eat();
+      binexpr->right = parse_type();
+      binexpr->left = condition;
+      condition = (ASTExpr *)binexpr;
+    }
+    return {type, condition};
+  };
   expect(TType::Where);
-  node->target_type = parse_type();
-  expect(TType::Is);
-  node->predicate = parse_type();
-  while (peek().type == TType::And || peek().type == TType::Or) {
-    NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
-    binexpr->op = eat();
-    binexpr->right = parse_type();
-    binexpr->left = node->predicate;
-    node->predicate = binexpr;
+  constraints.push_back(parse_constraint());
+  while (peek().type == TType::Comma) {
+    eat();
+    constraints.push_back(parse_constraint());
   }
   return node;
 }
@@ -2197,7 +2205,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
         if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
-        } else if (directive && directive.get()->get_node_type() == AST_NODE_DECLARATION) {
+        } else if (directive && directive.get()->get_node_type() == AST_NODE_VARIABLE) {
           ASTStructMember member{};
           auto _node = static_cast<ASTVariable *>(directive.get());
           member.name = _node->name;
