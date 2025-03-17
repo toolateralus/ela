@@ -20,7 +20,7 @@ struct ASTCopier {
   ASTFunctionDeclaration *copy_function_declaration(ASTFunctionDeclaration *node);
   ASTParamsDecl *copy_params_decl(ASTParamsDecl *node);
   ASTParamDecl *copy_param_decl(ASTParamDecl *node);
-  ASTVariable *copy_declaration(ASTVariable *node);
+  ASTVariable *copy_variable(ASTVariable *node);
   ASTExprStatement *copy_expr_statement(ASTExprStatement *node);
   ASTBinExpr *copy_bin_expr(ASTBinExpr *node);
   ASTUnaryExpr *copy_unary_expr(ASTUnaryExpr *node);

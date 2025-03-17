@@ -266,10 +266,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (!to->get_ext().is_pointer())
       return false;
 
-    // not sure how to handle the mutability here. we will assume it's const?
-    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(CONST));
+    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(MUT));
     auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
-
+    
     return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
   }();
 

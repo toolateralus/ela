@@ -369,6 +369,9 @@ void DependencyEmitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
+  for (const auto &constant: node->constants) {
+    constant->accept(this);
+  }
   for (const auto &alias: node->aliases) {
     alias->accept(this);
   }
@@ -416,8 +419,10 @@ void DependencyEmitter::visit(ASTLambda *node) {
 }
 
 void DependencyEmitter::visit(ASTWhere *node) {
-  node->target_type->accept(this);
-  node->predicate->accept(this);
+  for (const auto &[target, predicate]: node->constraints) {
+    target->accept(this);
+    predicate->accept(this);
+  }
 }
 
 void DependencyEmitter::visit(ASTModule *node) {}

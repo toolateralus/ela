@@ -293,14 +293,20 @@ bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
 }
 
 void Typer::visit(ASTWhere *node) {
-  node->target_type->accept(this);
-  auto type = global_get_type(node->target_type->resolved_type);
-  auto satisfied = visit_where_predicate(type, node->predicate);
-  if (!satisfied) {
-    throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(node->predicate),
-                            get_unmangled_name(type)),
-                node->source_range);
+
+  for (auto &constraint: node->constraints) {
+    auto [target_type, predicate] = constraint;
+    target_type->accept(this);
+    auto type = global_get_type(target_type->resolved_type);
+    auto satisfied = visit_where_predicate(type, predicate);
+
+    if (!satisfied) {
+      throw_error(std::format("constraint \"{}\" not satisfied for {}", print_where_predicate(predicate),
+                              get_unmangled_name(type)),
+                  node->source_range);
+    }
   }
+
 }
 
 int Typer::find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
@@ -493,6 +499,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
+
+  for (const auto &constant: node->constants) {
+    constant->accept(this);
+  }
 
   for (const auto &alias : node->aliases) {
     // auto old_scope = ctx.scope;
@@ -1574,7 +1584,6 @@ void Typer::visit(ASTType *node) {
     return;
   }
 
-  // ! I have to check if the base is null because for some reason it's just null sometimes.
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
     normal_ty.base->accept(this);
@@ -1972,35 +1981,32 @@ void Typer::visit(ASTDotExpr *node) {
 void Typer::visit(ASTScopeResolution *node) {
   node->base->accept(this);
   auto scope_nullable = ctx.get_scope(node->base);
-  if (scope_nullable.is_null()) {
-    throw_error("internal compiler error: scope is null for scope resolution", node->source_range);
-  }
-
   auto scope = scope_nullable.get();
+
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
     auto type = global_get_type(member->type_id);
     // force visit impls even if the function isnt called.
     auto symbol = ctx.get_symbol(node->base);
 
-    // @Cooper-Pilot
-    //! We mock call functions here??
-    //! I don't know how else to force impls to work.
-
-    //! if we do T::some_method/some_associated_function
-    //! we need to be able to get that method and make sure it's implemented.
-    //! but we only do that for calls.
-
-    //! if (!in_call && symbol && type->is_kind(TYPE_FUNCTION) && type->get_ext().has_no_extensions()) {
-    //!   auto left = symbol.get()->type_id;
-    //!   auto left_ty = global_get_type(left);
-    //!   auto func_info = type->get_info()->as<FunctionTypeInfo>();
-    //!   if (func_info->params_len > 0 && func_info->parameter_types[0] == left) {
-    //!     compiler_mock_method_call_visit_impl(left, node->member_name);
-    //!   } else {
-    //!     compiler_mock_associated_function_call_visit_impl(left, node->member_name);
-    //!   }
-    //! }
+    {
+      // @Cooper-Pilot
+      //! We mock call functions here??
+      //! I don't know how else to force impls to work.
+      //! if we do T::some_method/some_associated_function
+      //! we need to be able to get that method and make sure it's implemented.
+      //! but we only do that for calls.
+      //! if (!in_call && symbol && type->is_kind(TYPE_FUNCTION) && type->get_ext().has_no_extensions()) {
+      //!   auto left = symbol.get()->type_id;
+      //!   auto left_ty = global_get_type(left);
+      //!   auto func_info = type->get_info()->as<FunctionTypeInfo>();
+      //!   if (func_info->params_len > 0 && func_info->parameter_types[0] == left) {
+      //!     compiler_mock_method_call_visit_impl(left, node->member_name);
+      //!   } else {
+      //!     compiler_mock_associated_function_call_visit_impl(left, node->member_name);
+      //!   }
+      //! }
+    }
 
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
     if (type == Type::INVALID_TYPE_ID) {
@@ -2071,7 +2077,7 @@ void Typer::visit(ASTInitializerList *node) {
         }
         target_type = expected;
       } else {
-        target_type = global_get_type(find_generic_type_of("Init_List", {target_type->id}, node->source_range));
+        target_type = global_get_type(find_generic_type_of("InitList", {target_type->id}, node->source_range));
       }
     }
   }
@@ -2092,7 +2098,7 @@ void Typer::visit(ASTInitializerList *node) {
     for collection style initializer lists.
   */
   int target_element_type = Type::INVALID_TYPE_ID;
-  if (target_type->get_base().get_str().starts_with("Init_List$")) {
+  if (target_type->get_base().get_str().starts_with("InitList$")) {
     target_element_type = target_type->generic_args[0];
   } else if (target_type->get_ext().is_fixed_sized_array()) {
     target_element_type = target_type->get_element_type();
@@ -2185,7 +2191,7 @@ void Typer::visit(ASTRange *node) {
                 node->source_range);
   }
 
-  node->resolved_type = find_generic_type_of("Range_Base", {left}, node->source_range);
+  node->resolved_type = find_generic_type_of("RangeBase", {left}, node->source_range);
 
   if (node->resolved_type == Type::INVALID_TYPE_ID) {
     throw_error(std::format("Unable to find range type for `{}..{}`", global_get_type(left)->to_string(),

@@ -130,8 +130,8 @@ void Emitter::visit(ASTFor *node) {
       node->right->accept(this);
       code << ";\n";
       emit_line_directive(node);
-      code << indent() << to_cpp_string(iterator_type) << " $iterator = "
-           << emit_symbol(iterable_scope->local_lookup("iter")) << "(&$iterable);\n";
+      code << indent() << to_cpp_string(iterator_type)
+           << " $iterator = " << emit_symbol(iterable_scope->local_lookup("iter")) << "(&$iterable);\n";
       break;
     case ASTFor::ITERATOR:
       emit_line_directive(node);
@@ -158,8 +158,12 @@ void Emitter::visit(ASTFor *node) {
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     emit_line_directive(node);
-    code << indent() << identifier_type_str << " ";
-    node->left.identifier->accept(this);
+
+    // we have to do this for function pointers.
+    // it's likely we'll have to do this for all the tuple destructures and all that crap.
+    code << get_declaration_type_signature_and_identifier(
+        emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)), global_get_type(node->identifier_type));
+
     code << " = $next.s;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
     auto type = global_get_type(node->identifier_type);
@@ -793,7 +797,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   Defer _defer2([&] { ctx.set_scope(previous); });
 
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
-    code << indent() << (node->is_union ? "union" : "struct")<< " {\n";
+    code << indent() << (node->is_union ? "union" : "struct") << " {\n";
   } else {
     if (node->is_extern) {
       code << indent() << "extern ";
@@ -1062,7 +1066,7 @@ void Emitter::visit(ASTInitializerList *node) {
       indent_level--;
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      if (type->get_base().get_str().starts_with("Init_List$")) {
+      if (type->get_base().get_str().starts_with("InitList$")) {
         auto element_type = type->generic_args[0];
         code << " .data = ";
         code << "(" << to_cpp_string(global_get_type(element_type)) << "[]) {";
@@ -1326,7 +1330,6 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   return ss.str();
 }
 
-
 std::string get_type_flags(Type *type) {
   int kind_flags = 0;
   switch (type->kind) {
@@ -1481,7 +1484,9 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     std::stringstream generics_ss;
 
     if (type->generic_args.empty()) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->generic_args;\nargs->length = 0;\nargs->data = NULL\n;args->capacity = 0;\n }}", id);
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->generic_args;\nargs->length = 0;\nargs->data = "
+                         "NULL\n;args->capacity = 0;\n }}",
+                         id);
     }
 
     int count = type->generic_args.size();
@@ -1630,6 +1635,10 @@ void Emitter::visit(ASTImpl *node) {
   type_context = node->target;
   Defer _([&] { type_context = old_type; });
 
+  for (const auto &constant: node->constants) {
+    constant->accept(this);
+  }
+  
   for (const auto &method : node->methods) {
     method->accept(this);
   }
@@ -1912,7 +1921,7 @@ void Emitter::visit(ASTBlock *node) {
   defer_blocks.emplace_back();
 
   for (const auto &statement : node->statements) {
-    if (statement->get_node_type() == AST_NODE_DECLARATION) {
+    if (statement->get_node_type() == AST_NODE_VARIABLE) {
       indented("");
     }
     statement->accept(this);
@@ -1954,7 +1963,7 @@ void Emitter::emit_tuple(int type_id) {
     if (type->is_kind(TYPE_FUNCTION)) {
       code << indent() << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
     } else {
-      code << indent()  << to_cpp_string(type) << " $" << std::to_string(i) << ";\n";
+      code << indent() << to_cpp_string(type) << " $" << std::to_string(i) << ";\n";
     }
   }
   indent_level--;

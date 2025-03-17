@@ -175,11 +175,11 @@ void Lexer::get_token(State &state) {
       c = input[pos];
       while (pos < len) {
         c = input[pos];
-        if (c == '"')
+        if (c == '"') {
           break;
-        else if (c == '\n')
-          lines++;
-        else if (c == '\\') {
+        } if (c == '\n') {
+          throw_error("You can't directly embed a '\\n' in string by just letting it span multiple lines", {location});
+        } else if (c == '\\') {
           if (pos + 1 < len) {
             token.put(c);
             pos++;

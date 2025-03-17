@@ -71,7 +71,7 @@ ASTParamDecl *ASTCopier::copy_param_decl(ASTParamDecl *node) {
   }
   return new_node;
 }
-ASTVariable *ASTCopier::copy_declaration(ASTVariable *node) {
+ASTVariable *ASTCopier::copy_variable(ASTVariable *node) {
   auto new_node = copy(node);
   if (node->type)
     new_node->type = static_cast<ASTType *>(copy_node(node->type));
@@ -338,6 +338,11 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
     new_node->aliases.push_back(copy_alias(alias));
   }
 
+  new_node->constants.clear();
+  for (const auto &constant: node->constants) {
+    new_node->constants.push_back(copy_variable(constant));
+  }
+
   new_node->methods.clear();
   for (const auto &method : node->methods) {
     new_node->methods.push_back(static_cast<ASTFunctionDeclaration *>(copy_node(method)));
@@ -355,8 +360,10 @@ ASTCast *ASTCopier::copy_cast(ASTCast *node) {
 
 ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
   auto new_node = copy(node);
-  new_node->predicate = static_cast<ASTExpr *>(copy_node(node->predicate));
-  new_node->target_type = static_cast<ASTType *>(copy_node(node->target_type));
+  new_node->constraints.clear();
+  for (const auto &[target, predicate]: node->constraints) {
+    new_node->constraints.push_back({(ASTType *)copy_node(target), (ASTExpr *)copy_node(predicate)});
+  }
   return new_node;
 }
 
@@ -379,8 +386,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_params_decl(static_cast<ASTParamsDecl *>(node));
     case AST_NODE_PARAM_DECL:
       return copy_param_decl(static_cast<ASTParamDecl *>(node));
-    case AST_NODE_DECLARATION:
-      return copy_declaration(static_cast<ASTVariable *>(node));
+    case AST_NODE_VARIABLE:
+      return copy_variable(static_cast<ASTVariable *>(node));
     case AST_NODE_EXPR_STATEMENT:
       return copy_expr_statement(static_cast<ASTExprStatement *>(node));
     case AST_NODE_BIN_EXPR:

@@ -26,7 +26,7 @@ enum ASTNodeType {
   AST_NODE_FUNCTION_DECLARATION,
   AST_NODE_PARAMS_DECL,
   AST_NODE_PARAM_DECL,
-  AST_NODE_DECLARATION,
+  AST_NODE_VARIABLE,
   AST_NODE_EXPR_STATEMENT,
   AST_NODE_BIN_EXPR,
   AST_NODE_UNARY_EXPR,
@@ -337,7 +337,7 @@ struct ASTVariable : ASTStatement {
   bool is_bitfield = false;
 
   void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_DECLARATION; }
+  ASTNodeType get_node_type() const override { return AST_NODE_VARIABLE; }
 };
 
 struct ASTBinExpr : ASTExpr {
@@ -760,9 +760,16 @@ struct ASTImpl : ASTDeclaration {
   ASTType *target;
   Nullable<ASTType> interface;
   Scope *scope;
+
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
+  
+  // aliases.
   std::vector<ASTAlias *> aliases;
+
+  // constants.
+  std::vector<ASTVariable *> constants;
+
   ASTNodeType get_node_type() const override { return AST_NODE_IMPL; }
   void accept(VisitorBase *visitor) override;
 };
@@ -790,13 +797,14 @@ struct ASTLambda : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-// type constraint:
-// `where Type impl SomeInterface`
-// `where Type impl SomeInterface & AnotherInterface`
-// `where Type impl SomeInterface | SomeOtherInterface`
+using Constraint = std::pair<ASTType *, ASTExpr *>;
 struct ASTWhere : ASTExpr {
-  ASTType *target_type;
-  ASTExpr *predicate;
+  // instead of just having one, we can have several.
+  /* 
+    such as
+    * fn!<T, T1>() where T: s64, T1: AsSlice {}
+  */
+  std::vector<Constraint> constraints;
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
   void accept(VisitorBase *visitor) override;
 };
