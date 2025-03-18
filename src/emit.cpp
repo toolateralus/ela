@@ -675,7 +675,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
-  
+
   Scope *scope;
   if (node->declaring_type != Type::INVALID_TYPE_ID) {
     scope = global_get_type(node->declaring_type)->get_info()->scope;
@@ -715,7 +715,7 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
     code << " " + name;
     node->params->accept(this);
   }
-  
+
   code << ";\n";
 }
 
@@ -1405,7 +1405,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
      << ".name = \"" << type->to_string() << "\", ";
 
-  if (!type->is_kind(TYPE_ENUM))
+  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE))
     ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
 
   ss << get_type_flags(type) << ",\n";
@@ -1506,8 +1506,72 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     return generics_ss.str();
   };
 
+  auto get_interfaces_init_statements = [&] {
+    std::stringstream interfaces_ss;
+
+    if (type->interfaces.empty()) {
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->interfaces;\nargs->length = 0;\nargs->data = "
+                         "NULL\n;args->capacity = 0;\n }}",
+                         id);
+    }
+
+    int count = type->interfaces.size();
+    {
+      interfaces_ss << "_type_info.data[" << id << "]->interfaces.data = malloc(" << count << " * sizeof(Type));\n";
+      interfaces_ss << "_type_info.data[" << id << "]->interfaces.length = " << count << ";\n";
+      interfaces_ss << "_type_info.data[" << id << "]->interfaces.capacity = " << count << ";\n";
+    }
+
+    int idx = 0;
+    for (const auto &interface : type->interfaces) {
+      interfaces_ss << "_type_info.data[" << id << "]->interfaces.data[" << idx << "] = ";
+      interfaces_ss << to_type_struct(global_get_type(interface), ctx) << ";\n";
+      ++idx;
+    }
+
+    return interfaces_ss.str();
+  };
+
+  auto get_methods_init_statements = [&] {
+    std::stringstream methods_ss;
+
+    auto scope = type->get_info()->scope;
+    unsigned count = 0;
+
+    for (const auto &[name, symbol] : scope->symbols) {
+      if (symbol.is_function() && HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD)) {
+        count++;
+      }
+    }
+
+    if (count == 0) {
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->interfaces;\nargs->length = 0;\nargs->data = "
+                         "NULL\n;args->capacity = 0;\n }}",
+                         id);
+    }
+
+    {
+      methods_ss << "_type_info.data[" << id << "]->methods.data = malloc(" << count << " * sizeof(Type));\n";
+      methods_ss << "_type_info.data[" << id << "]->methods.length = " << count << ";\n";
+      methods_ss << "_type_info.data[" << id << "]->methods.capacity = " << count << ";\n";
+    }
+
+    int idx = 0;
+    for (auto &[name, symbol] : scope->symbols) {
+      if (symbol.is_function() && HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD)) {
+        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "] = ";
+        methods_ss << emit_symbol(&symbol) << ";\n";
+        ++idx;
+      }
+    }
+    return methods_ss.str();
+  };
+
   ss << get_fields_init_statements();
   ss << get_generic_args_init_statements();
+
+  ss << get_interfaces_init_statements();
+  ss << get_methods_init_statements();
 
   context.type_info_strings.push_back(ss.str());
   return std::format("_type_info.data[{}]", id);
@@ -1593,6 +1657,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     case TYPE_SCALAR:
     case TYPE_ENUM:
     case TYPE_STRUCT:
+    case TYPE_INTERFACE:
     case TYPE_TAGGED_UNION: {
       output = to_cpp_string(type->get_ext(), type->get_info()->scope->full_name());
       break;
@@ -1609,9 +1674,7 @@ std::string Emitter::to_cpp_string(Type *type) {
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
-    case TYPE_INTERFACE:
-      throw_error("can't declare an instance of an interface", {});
-      break;
+
   }
   return output;
 }
@@ -1635,10 +1698,10 @@ void Emitter::visit(ASTImpl *node) {
   type_context = node->target;
   Defer _([&] { type_context = old_type; });
 
-  for (const auto &constant: node->constants) {
+  for (const auto &constant : node->constants) {
     constant->accept(this);
   }
-  
+
   for (const auto &method : node->methods) {
     method->accept(this);
   }
