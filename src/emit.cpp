@@ -90,7 +90,7 @@ void Emitter::visit(ASTIf *node) {
   emit_line_directive(node);
   code << indent() << "if (";
   node->condition->accept(this);
-  code << ")\n";
+  code << ") ";
   node->block->accept(this);
   if (node->_else.is_not_null()) {
     node->_else.get()->accept(this);
@@ -100,8 +100,9 @@ void Emitter::visit(ASTIf *node) {
 
 void Emitter::visit(ASTElse *node) {
   emit_line_directive(node);
-  code << indent() << "else\n";
+  code << indent() << "else";
   if (node->_if.is_not_null()) {
+    newline();
     node->_if.get()->accept(this);
   } else if (node->block.is_not_null()) {
     node->block.get()->accept(this);
@@ -147,12 +148,12 @@ void Emitter::visit(ASTFor *node) {
 
   // get the Option!<T> from next().
   emit_line_directive(node);
-  code << "auto $next = ";
+  code << indent() << "auto $next = ";
   code << emit_symbol(iterator_scope->local_lookup("next")) << "(&$iterator);\n";
 
   // end condition
   emit_line_directive(node);
-  code << "if (!$next.has_value) break;\n";
+  code << indent() << "if (!$next.has_value) break;\n";
 
   auto identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
 
@@ -161,7 +162,7 @@ void Emitter::visit(ASTFor *node) {
 
     // we have to do this for function pointers.
     // it's likely we'll have to do this for all the tuple destructures and all that crap.
-    code << get_declaration_type_signature_and_identifier(
+    code << indent() << get_declaration_type_signature_and_identifier(
         emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)), global_get_type(node->identifier_type));
 
     code << " = $next.s;\n";
@@ -178,7 +179,7 @@ void Emitter::visit(ASTFor *node) {
     auto id = block->temp_iden_idx++;
     std::string temp_id = "$deconstruction$" + std::to_string(id++);
 
-    code << "auto " << temp_id << " = $next.s;\n";
+    code << indent() << "auto " << temp_id << " = $next.s;\n";
 
     auto is_tuple = type->is_kind(TYPE_TUPLE);
 
@@ -221,10 +222,10 @@ void Emitter::visit(ASTFor *node) {
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
 
   indent_level--;
-  code << indent() << "}\n";
+  indentedln("}");
 
   indent_level--;
-  code << indent() << "}\n";
+  indentedln("}");
 
   defer_blocks.pop_back();
   ctx.set_scope(old_scope);
@@ -534,7 +535,10 @@ void Emitter::visit(ASTBinExpr *node) {
     std::string str = "$register$" + std::to_string(cf_expr_return_id++);
     cf_expr_return_register = &str;
 
-    code << to_cpp_string(type) << " " << str << ";\n";
+    emit_line_directive(node);
+    code << indent() << to_cpp_string(type) << " " << str << ";\n";
+
+    code << indent();
     node->right->accept(this);
     node->left->accept(this);
     code << " = " << str;
@@ -591,9 +595,10 @@ void Emitter::visit(ASTVariable *node) {
     std::string str = "$register$" + std::to_string(cf_expr_return_id++);
     cf_expr_return_register = &str;
 
-    code << to_cpp_string(type) << " " << str << ";\n";
+    code << indent() << to_cpp_string(type) << " " << str << ";\n";
     node->value.get()->accept(this);
-    code << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str << ";\n";
+    emit_line_directive(node);
+    code << indent() << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str << ";\n";
     return;
   }
 
@@ -1113,7 +1118,7 @@ void Emitter::visit(ASTSwitch *node) {
   static size_t index = 0;
   auto target_unique_id = "$switch_target$" + std::to_string(index++);
 
-  code << "auto " << target_unique_id << " = ";
+  code << indent() << "auto " << target_unique_id << " = ";
   node->target->accept(this);
   semicolon();
   newline();
@@ -1121,9 +1126,9 @@ void Emitter::visit(ASTSwitch *node) {
   auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
     emit_line_directive(target);
     if (!first) {
-      code << " else ";
+      code << indent() << "else ";
     }
-    code << " if (";
+    code << indent() << "if (";
     if (use_eq_operator) {
       code << target_unique_id;
       code << " == ";
@@ -1830,7 +1835,6 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << " " + name;
       node->params->accept(this);
     }
-    newline();
     defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
       auto block = node->block.get();
@@ -1908,8 +1912,6 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
 }
 
 void Emitter::visit(ASTReturn *node) {
-  emit_line_directive(node);
-
   // Emit switch / if expressions.
   if (node->expression && (node->expression.get()->get_node_type() == AST_NODE_SWITCH ||
                            node->expression.get()->get_node_type() == AST_NODE_IF)) {
@@ -1919,16 +1921,20 @@ void Emitter::visit(ASTReturn *node) {
     std::string str = "$register$" + std::to_string(cf_expr_return_id++);
     cf_expr_return_register = &str;
 
-    code << to_cpp_string(type) << " " << str << ";\n";
+    emit_line_directive(node);
+    code << indent() << to_cpp_string(type) << " " << str << ";\n";
     node->expression.get()->accept(this);
 
     if (emitting_function_with_defer ||
         (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
-      code << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
+      emit_line_directive(node);
+      code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = " << str << ";\n";
       emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-      code << "return " << defer_return_value_key << ";\n";
+      emit_line_directive(node);
+      code << indent() << "return " << defer_return_value_key << ";\n";
     } else {
-      code << "return " << str << ";\n";
+      emit_line_directive(node);
+      code << indent() << "return " << str << ";\n";
     }
     return;
   }
@@ -1936,18 +1942,21 @@ void Emitter::visit(ASTReturn *node) {
   if (emitting_function_with_defer ||
       (node->declaring_block.is_not_null() && node->declaring_block.get()->defer_count != 0)) {
     if (node->expression.is_not_null()) {
+      emit_line_directive(node);
       auto type = global_get_type(node->expression.get()->resolved_type);
-      code << to_cpp_string(type) << " " << defer_return_value_key << " = ";
+      code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = ";
       node->expression.get()->accept(this);
       code << ";\n";
     }
     emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
-    code << "return";
+    emit_line_directive(node);
+    code << indent() << "return";
     if (node->expression.is_not_null()) {
       code << " " << defer_return_value_key;
     }
     code << ";\n";
   } else if (cf_expr_return_register.is_null() || node->expression.is_null()) {
+    emit_line_directive(node);
     indented("return");
     if (node->expression.is_not_null()) {
       space();
@@ -1955,6 +1964,7 @@ void Emitter::visit(ASTReturn *node) {
     }
     code << ";\n";
   } else {
+    emit_line_directive(node);
     code << *cf_expr_return_register.get() << " = ";
     node->expression.get()->accept(this);
     code << ";\n";
@@ -1977,7 +1987,7 @@ void Emitter::visit(ASTContinue *node) {
 void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node); }
 
 void Emitter::visit(ASTBlock *node) {
-  indentedln("{");
+  code << "{\n";
   indent_level++;
   ctx.set_scope(node->scope);
 
