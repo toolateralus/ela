@@ -59,3 +59,18 @@ void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaratio
   sym.scope = this;
   symbols.insert({name, sym});
 }
+
+bool Symbol::is_generic_function() const {
+  if (!is_function())
+    return false;
+  
+  auto declaration = this->function.declaration;
+
+  if (declaration->generic_parameters.size() != 0 || 
+      declaration->generic_arguments.size() != 0  ||
+      declaration->generic_instantiations.size() != 0) {
+    return true;
+  }
+
+  return false;
+}

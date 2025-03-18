@@ -1,0 +1,7 @@
+
+main :: fn() { 
+  // See `Typer::resolve_generic_function_call` for info as to why this crashes.
+  // wrong number of arguments during a generic inference.
+  string: String;
+  string.insert_substr("Woopity");
+}

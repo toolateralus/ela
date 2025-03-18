@@ -112,6 +112,8 @@ struct Symbol {
     symbol.module.declaration = declaration;
     return symbol;
   }
+
+  bool is_generic_function() const;
 };
 
 struct ASTFunctionDeclaration;

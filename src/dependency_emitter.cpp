@@ -67,6 +67,22 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   }
 }
 
+void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
+  auto type = global_get_type(id);
+  auto scope = type->get_info()->scope;
+
+  for (auto &[name, symbol] : scope->symbols) {
+    if (symbol.is_function() &&
+        HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD) &&
+        !symbol.is_generic_function()) {
+      symbol.function.declaration->accept(dep_resolver);
+      symbol.function.declaration->accept(dep_resolver->emitter);
+    } else if (symbol.type_id >= 0) {
+      emit_dependencies_for_reflection(dep_resolver, symbol.type_id);
+    }
+  }
+}
+
 void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
@@ -76,8 +92,8 @@ void DependencyEmitter::visit(ASTProgram *node) {
   // see the `Emitter:get_type_struct`
   // and `bootstrap/reflection.ela/Type :: struct`
   auto sub_types = std::vector<int>{
-    ctx.scope->find_type_id("str", {}),
-    ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
+      ctx.scope->find_type_id("str", {}),
+      ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
   };
   auto tuple_id = global_find_type_id(sub_types, {});
 
@@ -91,6 +107,11 @@ void DependencyEmitter::visit(ASTProgram *node) {
     statement->accept(this);
     index++;
   }
+
+  for (auto id : reflected_upon_types) {
+    emit_dependencies_for_reflection(this, id);
+  }
+
   ctx.set_scope(ctx.root_scope);
 }
 
@@ -104,7 +125,7 @@ void DependencyEmitter::visit(ASTBlock *node) {
 }
 
 void DependencyEmitter::visit(ASTFunctionDeclaration *node) {
-  if (visited_functions.contains(node)) {\
+  if (visited_functions.contains(node)) {
     emitter->emit_forward_declaration(node);
     return;
   } else {
@@ -130,9 +151,7 @@ void DependencyEmitter::visit(ASTParamsDecl *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTParamDecl *node) {
-  declare_type(node->resolved_type);
-}
+void DependencyEmitter::visit(ASTParamDecl *node) { declare_type(node->resolved_type); }
 
 void DependencyEmitter::visit(ASTVariable *node) {
   node->type->accept(this);
@@ -204,12 +223,11 @@ void DependencyEmitter::visit(ASTIdentifier *node) {
 
 void DependencyEmitter::visit(ASTLiteral *node) {}
 
-void DependencyEmitter::visit(ASTType *node) {
-  declare_type(node->resolved_type);
-}
+void DependencyEmitter::visit(ASTType *node) { declare_type(node->resolved_type); }
 
 void DependencyEmitter::visit(ASTType_Of *node) {
   node->target->accept(this);
+  reflected_upon_types.insert(node->target->resolved_type);
 }
 
 void DependencyEmitter::visit(ASTCall *node) {
@@ -234,8 +252,8 @@ void DependencyEmitter::visit(ASTCall *node) {
       decl->accept(this);
       return;
     }
-  } 
-  
+  }
+
   node->function->accept(this);
 }
 
@@ -270,7 +288,8 @@ void DependencyEmitter::visit(ASTFor *node) {
       auto iter_sym = range_scope->local_lookup("iter");
       iter_sym->function.declaration->accept(this);
     } break;
-    case ASTFor::ITERATOR: break;
+    case ASTFor::ITERATOR:
+      break;
   }
 
   auto done_sym = iter_scope->local_lookup("next");
@@ -372,9 +391,9 @@ void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this
 
 void DependencyEmitter::visit(ASTScopeResolution *node) { node->base->accept(this); }
 
-void DependencyEmitter::visit(ASTAlias *node) { }
+void DependencyEmitter::visit(ASTAlias *node) {}
 
-void DependencyEmitter::visit(ASTImport *node) { }
+void DependencyEmitter::visit(ASTImport *node) {}
 
 void DependencyEmitter::visit(ASTImpl *node) {
   auto old_scope = ctx.scope;
@@ -383,10 +402,10 @@ void DependencyEmitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
-  for (const auto &constant: node->constants) {
+  for (const auto &constant : node->constants) {
     constant->accept(this);
   }
-  for (const auto &alias: node->aliases) {
+  for (const auto &alias : node->aliases) {
     alias->accept(this);
   }
   for (const auto &method : node->methods) {
@@ -433,7 +452,7 @@ void DependencyEmitter::visit(ASTLambda *node) {
 }
 
 void DependencyEmitter::visit(ASTWhere *node) {
-  for (const auto &[target, predicate]: node->constraints) {
+  for (const auto &[target, predicate] : node->constraints) {
     target->accept(this);
     predicate->accept(this);
   }

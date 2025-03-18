@@ -11,7 +11,10 @@
       "name": "Debug current file compilation",
       "program": "${workspaceFolder}/bin/ela",
       "cwd": "${fileDirname}",
-      "args": ["${file}"]
+      "args": ["${file}"],
+      "env": {
+        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+      }
     },
     {
       "type": "lldb",
@@ -21,7 +24,7 @@
       "cwd": "${fileDirname}",
       "args": ["${file}", "--test"],
       "env": {
-        "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
       }
     },
     {
@@ -51,7 +54,7 @@
       "args": ["main.ela", "--s"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
       }
     },
     {

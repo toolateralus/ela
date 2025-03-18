@@ -817,6 +817,11 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   }
 }
 
+/* 
+  ! When you provide the wrong number of arguments (or at least too few) to a generic function that is inferring it's genericsd,
+  ! the compiler just crashes and doesn't report an error
+  REPRO: 103
+*/
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
 

@@ -162,8 +162,10 @@ void Emitter::visit(ASTFor *node) {
 
     // we have to do this for function pointers.
     // it's likely we'll have to do this for all the tuple destructures and all that crap.
-    code << indent() << get_declaration_type_signature_and_identifier(
-        emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)), global_get_type(node->identifier_type));
+    code << indent()
+         << get_declaration_type_signature_and_identifier(
+                emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)),
+                global_get_type(node->identifier_type));
 
     code << " = $next.s;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
@@ -598,7 +600,8 @@ void Emitter::visit(ASTVariable *node) {
     code << indent() << to_cpp_string(type) << " " << str << ";\n";
     node->value.get()->accept(this);
     emit_line_directive(node);
-    code << indent() << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str << ";\n";
+    code << indent() << to_cpp_string(global_get_type(node->type->resolved_type)) << " " << name << " = " << str
+         << ";\n";
     return;
   }
 
@@ -1409,7 +1412,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
 
   const auto type_string = type->to_string();
-  ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id, type_string, calculate_actual_length(type_string));
+  ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id,
+                    type_string, calculate_actual_length(type_string));
 
   if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE))
     ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
@@ -1545,9 +1549,14 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     unsigned count = 0;
 
     for (const auto &[name, symbol] : scope->symbols) {
-      if (symbol.is_function() && HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD)) {
-        count++;
+      if (!symbol.is_function() || !symbol.function.declaration) {
+        continue;
       }
+      auto declaration = symbol.function.declaration;
+      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD) || declaration->generic_arguments.size() != 0) {
+        continue;
+      }
+      count++;
     }
 
     if (count == 0) {
@@ -1563,12 +1572,23 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     }
 
     int idx = 0;
-    for (auto &[name, symbol] : scope->symbols) {
-      if (symbol.is_function() && HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD)) {
-        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str() << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
-        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << ";\n";
-        ++idx;
+    for (auto sym : scope->symbols) {
+      auto name = sym.first;
+      auto symbol = sym.second;
+      if (!symbol.is_function() || symbol.is_generic_function()) {
+        continue;
       }
+
+      auto declaration = symbol.function.declaration;
+      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD)) {
+        continue;
+      }
+
+      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str()
+                 << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
+
+      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << mangled_type_args(symbol.function.declaration->generic_arguments) << ";\n";
+      ++idx;
     }
     return methods_ss.str();
   };
@@ -1680,7 +1700,6 @@ std::string Emitter::to_cpp_string(Type *type) {
       output = to_cpp_string(type->get_ext(), output);
       break;
     }
-
   }
   return output;
 }
