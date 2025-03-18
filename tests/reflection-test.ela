@@ -5,7 +5,7 @@ Reflector :: struct {
 #test test_reflection_names :: fn() {
   f := typeof(Reflector);
   assert("field count wrong", f.fields.length == 1);
-  assert("name wrong", strcmp(f.name, "Reflector"c) as bool);
+  assert("name wrong", f.name == "Reflector");
 }
 
 #test test_set_field_with_reflection :: fn() {

@@ -1296,7 +1296,7 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
 
 std::string Emitter::get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context) {
   std::stringstream ss;
-  ss << "(Field) { " << std::format(".name = \"{}\", ", name)
+  ss << "(Field) { " << std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name))
      << std::format(".type = {}, ", to_type_struct(type, context));
 
   if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
@@ -1407,8 +1407,9 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   auto kind = 0;
   ss << "_type_info.data[" << id << "]" << "= malloc(sizeof(Type));\n";
-  ss << "*_type_info.data[" << id << "] = (Type) {" << ".id = " << id << ", "
-     << ".name = \"" << type->to_string() << "\", ";
+
+  const auto type_string = type->to_string();
+  ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id, type_string, calculate_actual_length(type_string));
 
   if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE))
     ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
@@ -1564,8 +1565,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     int idx = 0;
     for (auto &[name, symbol] : scope->symbols) {
       if (symbol.is_function() && HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD)) {
-        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "] = ";
-        methods_ss << emit_symbol(&symbol) << ";\n";
+        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str() << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
+        methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << ";\n";
         ++idx;
       }
     }
