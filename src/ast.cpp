@@ -1963,48 +1963,24 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
-
-  NODE_ALLOC(ASTLiteral, zero, lit_range, _1, this)
-  zero->tag = ASTLiteral::Integer;
-  zero->value = "0";
-
-  NODE_ALLOC(ASTLiteral, one, lit_range2, _2, this)
-  one->tag = ASTLiteral::Integer;
-  one->value = "1";
-
-  ASTExpr *last_value = zero;
-  bool was_zero = true;
-  Token add_token(tok.location, "+", TType::Add, TFamily::Operator);
+  int last_value = -1;
+  bool is_first = true;
   while (peek().type != TType::RCurly) {
     auto iden = expect(TType::Identifier).value;
     ASTExpr *value = nullptr;
-    bool explicitly_assigned = false;
 
     if (peek().type == TType::Assign) {
       expect(TType::Assign);
       value = parse_expr();
-      explicitly_assigned = true;
-    } else {
-      if (was_zero && last_value->get_node_type() == AST_NODE_LITERAL &&
-          static_cast<ASTLiteral *>(last_value)->value == "0") {
-        value = zero;
-        was_zero = false;
-      } else {
-        NODE_ALLOC(ASTBinExpr, bin, range, _, this)
-        bin->left = last_value;
-        bin->right = one;
-        bin->op = add_token;
-        last_value = bin;
-        value = bin;
-        end_node(bin, range);
-      }
-    }
-
-    // Evaluate the expression using the constexpr evaluator only if not explicitly assigned
-    if (value != nullptr && !explicitly_assigned) {
       auto evaluated_value = evaluate_constexpr(value, this->ctx);
+      if (evaluated_value.tag != Value::INTEGER) {
+        throw_error("Enums can only have integers", value->source_range);
+      }
+      last_value = evaluated_value.integer;
+    } else {
       NODE_ALLOC(ASTLiteral, literal, range, _, this)
-      literal->value = std::to_string(evaluated_value.integer);
+      last_value++;
+      literal->value = std::to_string(last_value);
       value = literal;
       end_node(literal, range);
     }
@@ -2012,8 +1988,9 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
     if (peek().type == TType::Comma) {
       eat();
     }
+
     node->key_values.push_back({iden, value});
-    last_value = value;
+    is_first = false;
   }
   end_node(node, range);
   std::vector<InternedString> keys;
