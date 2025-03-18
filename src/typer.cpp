@@ -293,8 +293,7 @@ bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
 }
 
 void Typer::visit(ASTWhere *node) {
-
-  for (auto &constraint: node->constraints) {
+  for (auto &constraint : node->constraints) {
     auto [target_type, predicate] = constraint;
     target_type->accept(this);
     auto type = global_get_type(target_type->resolved_type);
@@ -306,7 +305,6 @@ void Typer::visit(ASTWhere *node) {
                   node->source_range);
     }
   }
-
 }
 
 int Typer::find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
@@ -500,7 +498,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   auto type_scope = target_ty->get_info()->scope;
   Scope impl_scope = {};
 
-  for (const auto &constant: node->constants) {
+  for (const auto &constant : node->constants) {
     constant->accept(this);
   }
 
@@ -514,6 +512,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   for (const auto &method : node->methods) {
+
+    //// TODO: handle more attributes
+    for (auto attr : method->attributes) {
+      if (attr.tag == ATTRIBUTE_INLINE) {
+        method->flags |= FUNCTION_IS_INLINE;
+      }
+    }
+
     method->declaring_type = target_ty->id;
     if (!method->generic_parameters.empty()) {
       // TODO: actually generate a signature for a generic function so that you can compare them
@@ -817,10 +823,9 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   }
 }
 
-/* 
-  ! When you provide the wrong number of arguments (or at least too few) to a generic function that is inferring it's genericsd,
-  ! the compiler just crashes and doesn't report an error
-  REPRO: 103
+/*
+  ! When you provide the wrong number of arguments (or at least too few) to a generic function that is inferring it's
+  genericsd, ! the compiler just crashes and doesn't report an error REPRO: 103
 */
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
@@ -1086,6 +1091,12 @@ void Typer::visit(ASTEnumDeclaration *node) {
 }
 
 void Typer::visit(ASTFunctionDeclaration *node) {
+  for (auto attr : node->attributes) {
+    if (attr.tag == ATTRIBUTE_INLINE) {
+      node->flags |= FUNCTION_IS_INLINE;
+    }
+  }
+
   if (!node->generic_parameters.empty()) {
     // TODO: actually generate a signature for a generic function so that you can compare them
     ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);

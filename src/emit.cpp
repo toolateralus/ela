@@ -1881,6 +1881,14 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         emit_forward_declaration(node);
         return;
+
+      } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE) && compile_command.has_flag("release")) {
+        /*
+          ! We can only do this when we're in release mode because for some reason,
+          ! We get undefined references unless we use LTO when inlining functions?
+          ! utterly confusing, but it is
+        */
+        code << "inline ";
       }
     }
 

@@ -1158,6 +1158,7 @@ ASTStatement *Parser::parse_statement() {
     if (peek().type == TType::Attribute) {
       throw_error("doubling up attributes declarations leads to an overwrite. just use one @[...]", {peek().location});
     }
+
     auto statement = parse_statement();
     statement->attributes = std::move(attributes);
     return statement;
