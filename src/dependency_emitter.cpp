@@ -72,9 +72,7 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
   auto scope = type->get_info()->scope;
 
   for (auto &[name, symbol] : scope->symbols) {
-    if (symbol.is_function() &&
-        HAS_FLAG(symbol.function.declaration->flags, FUNCTION_IS_METHOD) &&
-        !symbol.is_generic_function()) {
+    if (symbol.is_function() && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
       symbol.function.declaration->accept(dep_resolver->emitter);
     } else if (symbol.type_id >= 0) {

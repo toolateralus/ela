@@ -1580,14 +1580,11 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       }
 
       auto declaration = symbol.function.declaration;
-      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD)) {
-        continue;
-      }
 
       methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str()
                  << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
 
-      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << mangled_type_args(symbol.function.declaration->generic_arguments) << ";\n";
+      methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$1 = " << emit_symbol(&symbol) << ";\n";
       ++idx;
     }
     return methods_ss.str();
