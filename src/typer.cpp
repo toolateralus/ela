@@ -783,6 +783,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
         } else {
           // TODO: handle default params here
+          // TODO: print a significantly more descriptive error here, I hate checking the source code
+          // just to call a function when it could tell us what we're missing.
           throw_error("Too few arguments to function", node->source_range);
         }
       } else {
@@ -858,7 +860,18 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         }
       }
     } else { // Infer generic parameter(S) from arguments.
-      node->arguments->accept(this);
+
+      /*  
+        ! This is the cause of repro 106.
+        ! I don't quite know  how to fix it, but somehow we need to
+        ! at least unset the expected type here? that will be a temporary fix.
+      */
+      {
+        auto old_expected = expected_type;
+        expected_type = Type::INVALID_TYPE_ID;
+        node->arguments->accept(this);
+        expected_type = old_expected;
+      }
 
       auto arguments = node->arguments->resolved_argument_types;
       auto parameters = func->params->params;

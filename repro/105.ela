@@ -1,0 +1,37 @@
+import fmt::*;
+
+impl!<T> T[] {
+  reverse :: fn(*mut self) {
+    len := self.length;
+
+    if len <= 1 then return;
+
+    for i in 0..(len / 2) {
+      high := len - 1 - i;
+      low := i;
+
+      printlnf("swapping indices: % <-> %", (low, high));
+
+      temp := self[low];
+      self[low] = self[high];
+      self[high] = temp;
+    }
+  }
+}
+
+
+/* 
+  for some reason, if we don't use self.data[idx] when swapping,
+  we get a *stack smashing detected*
+  There must be something fundamentally wrong with how our subscript operators
+  are implmented,
+
+  possibly it's just the List!<T> subscript operator.
+*/
+main :: fn() { 
+  mut list: s64[];
+  for i in 0..100 {
+    list.push(i);j
+  }  
+  list.reverse();
+}
