@@ -511,8 +511,24 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     alias->accept(this);
   }
 
+  // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
+  // just like C-- (owned)
   for (const auto &method : node->methods) {
+    method->declaring_type = target_ty->id;
 
+    if (!method->generic_parameters.empty()) {
+      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
+      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+      continue;
+    }
+
+    visit_function_header(method, false);
+    type_scope->insert_function(method->name, method->resolved_type, method,
+                                SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+    impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+  }
+
+  for (const auto &method : node->methods) {
     //// TODO: handle more attributes
     for (auto attr : method->attributes) {
       if (attr.tag == ATTRIBUTE_INLINE) {
@@ -528,7 +544,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       continue;
     }
 
-    visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
 
     if (auto symbol = type_scope->local_lookup(method->name)) {
