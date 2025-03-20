@@ -765,7 +765,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     }
     case TType::Mul: {
       if (kind == OPERATION_UNARY) {
-        return "deref"; // ?? do we want this?
+        return "deref";
       }
     }
     case TType::Div:

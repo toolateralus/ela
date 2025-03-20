@@ -5,11 +5,11 @@ AltOption :: struct!<T> {
 }
 
 impl!<T> Format for AltOption!<T> {
-  format :: fn(*const self, builder: *mut String_Builder, mut options: Format_Options) {
+  format :: fn(*const self, builder: *mut StringBuilder, mut options: FormatOptions) {
     if options.enum_parent_name {
       old := options.quote_strings;
       options.quote_strings = false;
-      // ! Here, when we use #self, we get String_Builder. Very odd.
+      // ! Here, when we use #self, we get StringBuilder. Very odd.
       builder.appendf("%::", (typeof(#self).name,), options);
       options.quote_strings = old;
     }

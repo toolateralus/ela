@@ -861,7 +861,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
       }
     } else { // Infer generic parameter(S) from arguments.
 
-      /*  
+      /*
         ! This is the cause of repro 106.
         ! I don't quite know  how to fix it, but somehow we need to
         ! at least unset the expected type here? that will be a temporary fix.
@@ -1847,6 +1847,18 @@ void Typer::visit(ASTUnaryExpr *node) {
   if (overload != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    auto name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+
+    if (name == "deref") {
+      auto type = global_get_type(node->resolved_type);
+      if (!type->get_ext().is_pointer()) {
+        throw_error("'deref' operator overload must return a pointer, the compiler will auto dereference this when "
+                    "it's used. it allows us to assign via this function",
+                    node->source_range);
+      }
+      node->resolved_type = type->get_element_type();
+    }
+    
     return;
   }
 

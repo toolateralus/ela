@@ -508,7 +508,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   auto left_ty = global_get_type(left_type);
 
   if (left_ty && node->is_operator_overload) {
-    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op.type, node->operand, node);
+    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op.type, node->operand, nullptr);
     return;
   }
 
@@ -2092,7 +2092,13 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   call.arguments->source_range = range;
   call.source_range = range;
   call.accept(&typer);
+  if (dot.member_name == "deref") {
+    code << "(*";
+  } else {
+    code << "(";
+  }
   call.accept(this);
+  code << ")";
 }
 
 Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), ctx(context) {}

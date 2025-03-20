@@ -86,3 +86,21 @@ impl Vec2 {
   assert("index 0 failed", a[0] == 3);
   assert("index 1 failed", a[1] == 2);
 }
+
+impl Vec2 {
+  deref :: fn(*mut self) -> *mut f32 {
+    return &mut self.x;
+  }
+}
+
+#test test_deref :: fn() {
+  mut a := Vec2.{
+    x: 100.0,
+    y: 200.0,
+  };
+
+  *a = 300.0;
+
+  assert_eq("deref assign failed", a.x, 300.0);
+  assert_eq("deref assign failed", *a, 300.0);
+}
