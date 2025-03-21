@@ -3,6 +3,7 @@
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
+#include <set>
 
 void DependencyEmitter::declare_type(int type_id) {
   auto type = global_get_type(type_id);
@@ -13,7 +14,7 @@ void DependencyEmitter::declare_type(int type_id) {
       return;
     }
   }
-  return define_type(type_id);
+  define_type(type_id);
 }
 
 void DependencyEmitter::define_type(int type_id) {
@@ -67,8 +68,18 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   }
 }
 
+
 void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
+  static std::set<int> visited_type_ids = {};
+  if (visited_type_ids.contains(id)) {
+    return;
+  } else {
+    visited_type_ids.insert(id);
+  }
   auto type = global_get_type(id);
+  if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
+    type = global_get_type(type->get_element_type());
+  }
   auto scope = type->get_info()->scope;
 
   for (auto &[name, symbol] : scope->symbols) {
