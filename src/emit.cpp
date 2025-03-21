@@ -1888,7 +1888,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
           ! We get undefined references unless we use LTO when inlining functions?
           ! utterly confusing, but it is
         */
-        code << "inline ";
+        // code << "inline ";
       }
     }
 
