@@ -119,10 +119,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
-  if (node->where_clause) {
-    node->where_clause.get()->accept(this);
-  }
-
   type->declaring_node = node;
   node->resolved_type = type->id;
 
@@ -131,6 +127,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   ast_type.resolved_type = type->id;
   type_context = &ast_type;
   Defer _([&] { type_context = old_type_context; });
+
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
+  }
 
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->members) {
@@ -511,8 +511,24 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     alias->accept(this);
   }
 
+  // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
+  // just like C-- (owned)
   for (const auto &method : node->methods) {
+    method->declaring_type = target_ty->id;
 
+    if (!method->generic_parameters.empty()) {
+      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
+      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+      continue;
+    }
+
+    visit_function_header(method, false);
+    type_scope->insert_function(method->name, method->resolved_type, method,
+                                SymbolFlags(SYMBOL_IS_FORWARD_DECLARED | SYMBOL_IS_FUNCTION));
+    impl_scope.symbols[method->name] = type_scope->symbols[method->name];
+  }
+
+  for (const auto &method : node->methods) {
     //// TODO: handle more attributes
     for (auto attr : method->attributes) {
       if (attr.tag == ATTRIBUTE_INLINE) {
@@ -528,7 +544,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       continue;
     }
 
-    visit_function_header(method, false);
     auto func_ty_id = method->resolved_type;
 
     if (auto symbol = type_scope->local_lookup(method->name)) {
@@ -768,6 +783,8 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
 
         } else {
           // TODO: handle default params here
+          // TODO: print a significantly more descriptive error here, I hate checking the source code
+          // just to call a function when it could tell us what we're missing.
           throw_error("Too few arguments to function", node->source_range);
         }
       } else {
@@ -843,7 +860,18 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         }
       }
     } else { // Infer generic parameter(S) from arguments.
-      node->arguments->accept(this);
+
+      /*
+        ! This is the cause of repro 106.
+        ! I don't quite know  how to fix it, but somehow we need to
+        ! at least unset the expected type here? that will be a temporary fix.
+      */
+      {
+        auto old_expected = expected_type;
+        expected_type = Type::INVALID_TYPE_ID;
+        node->arguments->accept(this);
+        expected_type = old_expected;
+      }
 
       auto arguments = node->arguments->resolved_argument_types;
       auto parameters = func->params->params;
@@ -1819,6 +1847,18 @@ void Typer::visit(ASTUnaryExpr *node) {
   if (overload != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;
     node->resolved_type = global_get_type(overload)->get_info()->as<FunctionTypeInfo>()->return_type;
+    auto name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+
+    if (name == "deref") {
+      auto type = global_get_type(node->resolved_type);
+      if (!type->get_ext().is_pointer()) {
+        throw_error("'deref' operator overload must return a pointer, the compiler will auto dereference this when "
+                    "it's used. it allows us to assign via this function",
+                    node->source_range);
+      }
+      node->resolved_type = type->get_element_type();
+    }
+    
     return;
   }
 

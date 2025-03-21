@@ -1,0 +1,14 @@
+S :: enum {
+  S1,
+}
+/* 
+  /usr/local/lib/ela/bootstrap/lib.ela:157:3: error: unknown type name 'S'
+    157 |   S $0;
+        |   ^
+  1 error generated.
+*/
+alias Tuple :: (S, s32);
+
+main :: fn() {
+  t: Tuple;
+}
