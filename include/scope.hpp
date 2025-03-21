@@ -286,10 +286,6 @@ static Scope *create_child(Scope *parent) {
 }
 
 struct Context {
-  // CLEANUP(Josh) 10/14/2024, 10:07:07 AM
-  // This type_info_strings field should be in the emit visitor.
-  // That's the only place it's used anyway.
-  std::vector<InternedString> type_info_strings {};
   Scope *root_scope = nullptr;
   Scope *scope = nullptr;
   Context();

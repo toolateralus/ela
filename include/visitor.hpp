@@ -118,7 +118,7 @@ struct Typer : VisitorBase {
   std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
   // For generics.
   void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
-                                std::vector<int> generic_args = {});
+                             std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
   void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
@@ -180,6 +180,9 @@ struct DeferBlock {
 struct DependencyEmitter;
 
 struct Emitter : VisitorBase {
+  std::vector<InternedString> type_info_strings {};
+  std::unordered_set<int> reflected_upon_types;
+  
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
 
@@ -189,7 +192,6 @@ struct Emitter : VisitorBase {
   bool emit_default_value = true;
   int num_tests = 0;
 
-  
   int cf_expr_return_id = 0;
   Nullable<std::string> cf_expr_return_register;
 
@@ -212,36 +214,36 @@ struct Emitter : VisitorBase {
   Context &ctx;
 
   int type_list_id = -1;
-  const bool is_freestanding = compile_command.c_flags.contains("-ffreestanding") ||
-                               compile_command.c_flags.contains("-nostdlib");
+  const bool is_freestanding =
+      compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
   // TODO(Josh) 10/1/2024, 10:10:17 AM
   // This causes a lot of empty lines. It would be nice to have a way to neatly
   // do this.
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
-    static bool is_debugging = !compile_command.has_flag("release");
-    if (!is_debugging) {
+    static bool is_release_or_omitting_line_info = compile_command.has_flag("release") || compile_command.has_flag("nl");
+    if (is_release_or_omitting_line_info) {
       return;
     }
     auto loc = node->source_range.begin_location.line;
     // if (loc != last_loc) {
-      auto filename = get_source_filename(node->source_range);
-      if (filename.empty()) {
-        printf("Empty filename for line directive.\n");
-        return;
-      }
-      code << std::string{"#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
-      last_loc = loc;
+    auto filename = get_source_filename(node->source_range);
+    if (filename.empty()) {
+      printf("Empty filename for line directive.\n");
+      return;
+    }
+    code << std::string{"#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
+    last_loc = loc;
     // }
   }
   void emit_tuple(int type);
   std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
-  void call_operator_overload(const SourceRange& range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
+  void call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
                               ASTExpr *right = nullptr);
 
-  void forward_decl_type(Type* type);
+  void forward_decl_type(Type *type);
   void emit_deferred_statements(DeferBlockType type);
 
   std::string to_type_struct(Type *type, Context &context);
@@ -253,7 +255,7 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { code << '\n' << indent(); }
   inline void semicolon() { code << ";"; }
   inline void space() { code << ' '; }
-  
+
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_foreign_function(ASTFunctionDeclaration *node);
 
@@ -320,18 +322,18 @@ struct Emitter : VisitorBase {
     }
     return;
   };
-}; 
+};
 
 struct DependencyEmitter : VisitorBase {
   Context &ctx;
   Emitter *emitter;
-  std::set<ASTFunctionDeclaration*> visited_functions = {};
+  std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<int> reflected_upon_types;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
 
   void define_type(int type_id);
   void declare_type(int type_id);
-  
+
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
@@ -380,7 +382,7 @@ struct DependencyEmitter : VisitorBase {
       stmt->accept(this);
     }
   };
-}; 
+};
 
 struct GenericInstantiationErrorUserData {
   std::string message = "";

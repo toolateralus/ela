@@ -50,10 +50,6 @@ int CompileCommand::compile() {
       std ::cout << "adding TEST_VERBOSE\n";
     }
 
-    if (!compile_command.has_flag("release")) {
-      emit.code << "#line 0 \"boilerplate.hpp\"";
-    }
-
     emit.code << BOILERPLATE_C_CODE << '\n';
 
     if (!is_freestanding) {

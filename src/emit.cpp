@@ -6,6 +6,7 @@
 #include <string>
 
 #include "ast.hpp"
+#include "builder.hpp"
 #include "core.hpp"
 #include "error.hpp"
 #include "lex.hpp"
@@ -941,40 +942,54 @@ void Emitter::visit(ASTProgram *node) {
   }
   ctx.set_scope(ctx.root_scope);
 
-  // Emit runtime reflection type info for requested types, only when we have
-  // actually requested runtime type information.
-  if (!ctx.type_info_strings.empty() && !is_freestanding) {
+  // Emit runtime reflection type info for requested types,
+  if (!type_info_strings.empty() && !is_freestanding) {
     std::stringstream type_info{};
-    for (const auto &str : ctx.type_info_strings) {
+    for (const auto &str : type_info_strings) {
       type_info << str.get_str() << ";\n";
-    }
-
-    if (!compile_command.has_flag("release")) {
-      code << "#line 0 \"boilerplate.h\"";
     }
 
     code << "\nvoid $initialize_reflection_system() {\n";
     {
       // we don't bother doing pushes into type info, it's easier for us to do it this way.
-      code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
+      code << std::format("_type_info.length = _type_info.capacity = {};\n", type_info_strings.size());
       code << std::format("_type_info.data = calloc(sizeof(Type*), {});", type_table.size());
       code << type_info.str() << ";\n";
     }
-
     code << "}\n";
 
-    if (!compile_command.has_flag("release")) {
-      code << "#line 0 \"boilerplate.h\"";
+    code << R"_(
+void $deinit_type(Type *type) {
+  if (type->methods.length > 0 || type->methods.data != NULL)
+    free(type->methods.data);
+
+  if (type->interfaces.length  > 0 || type->interfaces.data != NULL)
+    free(type->interfaces.data);
+
+  if (type->fields.length  > 0 || type->fields.data != NULL)
+    free(type->fields.data);
+
+  if (type->generic_args.length  > 0 || type->generic_args.data != NULL)
+    free(type->generic_args.data);
+
+  free(type);
+}
+)_";
+
+    StringBuilder builder(1024);
+    for (auto type : reflected_upon_types) {
+      builder << std::format("  $deinit_type(_type_info.data[{}]);\n", type);
     }
+    code << "void $deinitialize_reflection_system() {\n";
+    code << builder.str();
+    code << "free(_type_info.data);\n";
+    code << "\n}\n";
   }
 
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
-    }
-    if (!compile_command.has_flag("release")) {
-      code << "#line 0 \"boilerplate.hpp\"\n";
     }
     code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
@@ -983,47 +998,30 @@ void Emitter::visit(ASTProgram *node) {
     code << "__TEST_RUNNER_MAIN;";
   } else {
     if (has_user_defined_main && !is_freestanding) {
-      if (!compile_command.has_flag("release")) {
-        code << "#line 0 \"boilerplate.h\"\n";
-      }
-
       auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
 
-      const auto reflection_initialization = ctx.type_info_strings.size() != 0
-                                                 ? "$initialize_reflection_system();"
-                                                 : "{/* no reflection present in module */};";
+      const auto reflection_initialization = type_info_strings.size() != 0 ? "$initialize_reflection_system();"
+                                                                           : "{/* no reflection present in module */};";
 
+      const auto reflection_deinitialization = type_info_strings.size() != 0
+                                                   ? "$deinitialize_reflection_system();"
+                                                   : "{/* no reflection present in module */};";
       constexpr auto main_format = R"_(
 int main (int argc, char** argv) {{
   {}(argc, argv); /* initialize command line args. */
   {}              /* reflection system */
   __ela_main_();  /* call user main */
-  // TODO: fix memory leak from reflection here.
-  for (int i = 0; i < _type_info.length; ++i) {{
-    Type *type = _type_info.data[i];
-    if (!type) continue; 
-    if (type->methods.data)
-      free(type->methods.data);
-
-    if (type->interfaces.data)
-      free(type->interfaces.data);
-
-    if (type->fields.data)
-      free(type->fields.data);
-
-    if (type->generic_args.data)
-      free(type->generic_args.data);
-    free(type);
-  }}
+  {}              /* deinitialize command line args. */
 }}
 )_";
 
-      code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization);
+      code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
+                          reflection_deinitialization);
     }
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().
-  if (is_freestanding && !ctx.type_info_strings.empty()) {
+  if (is_freestanding && !type_info_strings.empty()) {
     throw_error("You cannot use runtime type reflection in a freestanding or "
                 "nostdlib environment, due to a lack of allocators. To compare "
                 "types, use typeid.",
@@ -1464,11 +1462,11 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     std::stringstream fields_ss;
     if (!type->is_kind(TYPE_FUNCTION) && !type->is_kind(TYPE_ENUM)) {
       auto info = type->get_info();
-      if (info->scope->symbols.empty()) {
+      int count = info->scope->fields_count();
+      if (count == 0) {
         return std::string("{}");
       }
 
-      int count = info->scope->fields_count();
       fields_ss << "_type_info.data[" << id << "]->fields.data = malloc(" << count << " * sizeof(Field));\n";
       fields_ss << "_type_info.data[" << id << "]->fields.length = " << count << ";\n";
       fields_ss << "_type_info.data[" << id << "]->fields.capacity = " << count << ";\n";
@@ -1628,7 +1626,8 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << get_interfaces_init_statements();
   ss << get_methods_init_statements();
 
-  context.type_info_strings.push_back(ss.str());
+  type_info_strings.push_back(ss.str());
+  reflected_upon_types.insert(id);
   return std::format("_type_info.data[{}]", id);
 }
 
