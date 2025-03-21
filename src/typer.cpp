@@ -119,10 +119,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
   }
 
-  if (node->where_clause) {
-    node->where_clause.get()->accept(this);
-  }
-
   type->declaring_node = node;
   node->resolved_type = type->id;
 
@@ -131,6 +127,10 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   ast_type.resolved_type = type->id;
   type_context = &ast_type;
   Defer _([&] { type_context = old_type_context; });
+
+  if (node->where_clause) {
+    node->where_clause.get()->accept(this);
+  }
 
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->members) {

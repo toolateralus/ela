@@ -957,7 +957,7 @@ void Emitter::visit(ASTProgram *node) {
     {
       // we don't bother doing pushes into type info, it's easier for us to do it this way.
       code << std::format("_type_info.length = _type_info.capacity = {};\n", ctx.type_info_strings.size());
-      code << std::format("_type_info.data = realloc(_type_info.data, sizeof(Type*) * {});", type_table.size());
+      code << std::format("_type_info.data = calloc(sizeof(Type*), {});", type_table.size());
       code << type_info.str() << ";\n";
     }
 
@@ -989,11 +989,36 @@ void Emitter::visit(ASTProgram *node) {
 
       auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
 
-      code << std::format("int main (int argc, char** argv) {{\n{}(argc, "
-                          "argv);\n{}\n__ela_main_();\n}}\n",
-                          emit_symbol(env_scope->lookup("initialize")),
-                          ctx.type_info_strings.size() != 0 ? "$initialize_reflection_system();"
-                                                            : "{/* no reflection present in module */};");
+      const auto reflection_initialization = ctx.type_info_strings.size() != 0
+                                                 ? "$initialize_reflection_system();"
+                                                 : "{/* no reflection present in module */};";
+
+      constexpr auto main_format = R"_(
+int main (int argc, char** argv) {{
+  {}(argc, argv); /* initialize command line args. */
+  {}              /* reflection system */
+  __ela_main_();  /* call user main */
+  // TODO: fix memory leak from reflection here.
+  for (int i = 0; i < _type_info.length; ++i) {{
+    Type *type = _type_info.data[i];
+    if (!type) continue; 
+    if (type->methods.data)
+      free(type->methods.data);
+
+    if (type->interfaces.data)
+      free(type->interfaces.data);
+
+    if (type->fields.data)
+      free(type->fields.data);
+
+    if (type->generic_args.data)
+      free(type->generic_args.data);
+    free(type);
+  }}
+}}
+)_";
+
+      code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization);
     }
   }
 
@@ -1302,7 +1327,9 @@ std::string Emitter::get_field_struct(const std::string &name, Type *type, Type 
   ss << "(Field) { " << std::format(".name = (str){{.data=\"{}\", .length={}}}, ", name, calculate_actual_length(name))
      << std::format(".type = {}, ", to_type_struct(type, context));
 
-  if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
+  if (type->get_ext().is_pointer()) {
+    ss << std::format(".size = sizeof(void*), ");
+  } else if (!type->is_kind(TYPE_FUNCTION) && !parent_type->is_kind(TYPE_ENUM)) {
     if (type->is_kind(TYPE_STRUCT)) {
       auto flags = type->get_info()->as<StructTypeInfo>()->flags;
       if (HAS_FLAG(flags, STRUCT_FLAG_FORWARD_DECLARED)) {
@@ -1415,8 +1442,13 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id,
                     type_string, calculate_actual_length(type_string));
 
-  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE))
-    ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE) && !type->is_kind(TYPE_FUNCTION)) {
+    if (type->get_ext().is_pointer()) {
+      ss << ".size = sizeof(void*), ";
+    } else {
+      ss << ".size = sizeof(" << to_cpp_string(type) << "), ";
+    }
+  }
 
   ss << get_type_flags(type) << ",\n";
 
@@ -1888,7 +1920,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
           ! We get undefined references unless we use LTO when inlining functions?
           ! utterly confusing, but it is
         */
-        code << "inline ";
+        // code << "inline ";
       }
     }
 

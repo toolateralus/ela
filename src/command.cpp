@@ -140,7 +140,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
                                bool &run_on_finished, bool &run_tests, bool &lldb) {
   auto default_input_path = "main.ela";
   std::string init_string = "";
-  for (size_t i = 0; i < args.size(); ++i) {
+  for (size_t i = 1; i < args.size(); ++i) {
     std::string arg = args[i];
     if (arg == "run" || arg == "r") {
       run_on_finished = true;

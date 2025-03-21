@@ -74,7 +74,6 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
   for (auto &[name, symbol] : scope->symbols) {
     if (symbol.is_function() && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
-      symbol.function.declaration->accept(dep_resolver->emitter);
     } else if (symbol.type_id >= 0) {
       emit_dependencies_for_reflection(dep_resolver, symbol.type_id);
     }
