@@ -119,6 +119,18 @@ struct TypeExtensions {
     return back_type() == TYPE_EXT_POINTER_CONST || back_type() == TYPE_EXT_POINTER_MUT;
   }
 
+  // this returns the number of pointers at the BACK of the extensions,
+  // so int*[]* would return 1;
+  inline int pointer_depth() const {
+    auto temp = extensions;
+    int depth = 0;
+    while (!temp.empty() && (temp.back().type == TYPE_EXT_POINTER_CONST || temp.back().type == TYPE_EXT_POINTER_MUT)) {
+      depth++;
+      temp.pop_back();
+    }
+    return depth;
+  }
+
   inline bool is_const_pointer() const { return back_type() == TYPE_EXT_POINTER_CONST; }
 
   inline bool is_mut_pointer() const { return back_type() == TYPE_EXT_POINTER_MUT; }
