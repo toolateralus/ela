@@ -32,10 +32,11 @@ void DependencyEmitter::define_type(int type_id) {
       }
     } break;
     case TYPE_TAGGED_UNION:
+    case TYPE_ENUM:
     case TYPE_STRUCT: {
-      if (type->declaring_node.is_not_null()) {
-        type->declaring_node.get()->accept(this);
-        type->declaring_node.get()->accept(emitter);
+      if (auto declaring_node = type->declaring_node.get()) {
+        declaring_node->accept(this);
+        declaring_node->accept(emitter);
       }
     } break;
     case TYPE_TUPLE: {
@@ -45,8 +46,6 @@ void DependencyEmitter::define_type(int type_id) {
       }
       emitter->emit_tuple(type_id);
     } break;
-    case TYPE_ENUM:
-      // TODO: enums should be handled here
     case TYPE_INTERFACE:
     case TYPE_SCALAR:
       break;
