@@ -249,39 +249,101 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     return CONVERT_EXPLICIT;
   }
 
-  // ! This needs to be re-evaluated. We should not be able to cast any pointer, to any other pointer.
-  const auto implicit_ptr_cast = (from->get_ext().is_const_pointer() && to->get_ext().is_const_pointer()) ||
-                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) ||
-                                 (from->get_ext().is_mut_pointer() && to->get_ext().is_const_pointer());
+  const auto operands_are_pointers = (from->get_ext().is_const_pointer() && to->get_ext().is_const_pointer()) ||
+                                     (from->get_ext().is_mut_pointer() && to->get_ext().is_mut_pointer()) ||
+                                     (from->get_ext().is_mut_pointer() && to->get_ext().is_const_pointer());
+
+  bool elements_cast = false;
+  if (operands_are_pointers) {
+    auto from_elem = global_get_type(from->get_element_type());
+    auto to_elem = global_get_type(to->get_element_type());
+    auto conversion = type_conversion_rule(from_elem, to_elem);
+    if (conversion == CONVERT_NONE_NEEDED ||
+        conversion == CONVERT_IMPLICIT && (from->get_ext().pointer_depth() == to->get_ext().pointer_depth())) {
+      elements_cast = true;
+    }
+  }
+
+  const auto dest_is_u8_or_void_ptr =
+      to->get_ext().is_pointer() && (to->base_id == u8_type() || to->base_id == void_type());
+
+  const auto implicit_cast_void_pointer_to_any_ptr = to->get_ext().is_pointer() && (from->base_id == void_type());
+
+  // Handling casting function pointers:
+  /*
+    Any function pointer type may implicitly cast to any other function pointer,
+    so as long as all of it's parameters are equal or can implicitly convert to the target parameter,
+    and the same for the return type.
+  */
+  if (operands_are_pointers && to->is_kind(TYPE_FUNCTION) && from->is_kind(TYPE_FUNCTION)) {
+    // Wrong number of pointer extensions.
+    if (to->get_ext().pointer_depth() != from->get_ext().pointer_depth()) {
+      return CONVERT_PROHIBITED;
+    }
+
+    auto from_fn_info = from->get_info()->as<FunctionTypeInfo>();
+    auto to_fn_info = to->get_info()->as<FunctionTypeInfo>();
+
+    if (from_fn_info->params_len != to_fn_info->params_len) {
+      return CONVERT_PROHIBITED;
+    }
+
+    auto &from_params = from_fn_info->parameter_types;
+    auto &to_params = to_fn_info->parameter_types;
+
+    for (int i = 0; i < from_fn_info->params_len; ++i) {
+      auto from = global_get_type(from_params[i]);
+      auto to = global_get_type(to_params[i]);
+      auto rule = type_conversion_rule(from, to);
+      if (rule != CONVERT_NONE_NEEDED && rule != CONVERT_IMPLICIT) {
+        return CONVERT_PROHIBITED;
+      }
+    }
+
+    auto from_return = global_get_type(from_fn_info->return_type);
+    auto to_return = global_get_type(to_fn_info->return_type);
+
+    auto rule = type_conversion_rule(from_return, to_return);
+
+    if (rule != CONVERT_NONE_NEEDED && rule != CONVERT_IMPLICIT) {
+      return CONVERT_PROHIBITED;
+    }
+
+    return CONVERT_IMPLICIT;
+  }
+
+  if (operands_are_pointers && (elements_cast || dest_is_u8_or_void_ptr || implicit_cast_void_pointer_to_any_ptr)) {
+    return CONVERT_IMPLICIT;
+  }
 
   // If we have a fixed array such as
   // char[5] and the argument takes void*
   // we check if char* can cast to void*, and if it can, we allow the cast.
   // this obviously works for char* too.
-  const auto implicit_fixed_array_to_ptr_cast = [&]() {
-    // not array, return.
-    if (!from->get_ext().is_fixed_sized_array())
-      return false;
+  {
+    const auto implicit_fixed_array_to_ptr_cast = [&]() {
+      // not array, return.
+      if (!from->get_ext().is_fixed_sized_array())
+        return false;
 
-    if (!to->get_ext().is_pointer())
-      return false;
+      if (!to->get_ext().is_pointer())
+        return false;
 
-    auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(MUT));
-    auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
-    
-    return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
-  }();
+      auto element_ty_ptr = global_get_type(global_get_type(from->get_element_type())->take_pointer_to(MUT));
+      auto rule = type_conversion_rule(element_ty_ptr, to, source_range);
+
+      return rule == CONVERT_IMPLICIT || rule == CONVERT_NONE_NEEDED;
+    }();
+
+    if (implicit_fixed_array_to_ptr_cast) {
+      return CONVERT_IMPLICIT;
+    }
+  }
 
   // We basically have to allow *const to *mut to allow for pointer arithmetic,
   // you can't traverse a const array without this.
   if (from->get_ext().is_const_pointer() && to->get_ext().is_mut_pointer()) {
     return CONVERT_EXPLICIT;
-  }
-
-  // TODO: we should probably only allow implicit casting of pointers to void*, and u8*, for ptr arithmetic and C
-  // interop. This is far too C-like and highly unsafe.
-  if (implicit_ptr_cast || implicit_fixed_array_to_ptr_cast) {
-    return CONVERT_IMPLICIT;
   }
 
   // TODO: this allows two way casting of enums to their underlying type. Is this what we want?
@@ -863,12 +925,10 @@ int is_tuple_interface() {
   return id;
 }
 
-
 int is_array_interface() {
   static int id = global_create_interface_type("IsArray", create_child(nullptr), {});
   return id;
 }
-
 
 int is_pointer_interface() {
   static int id = global_create_interface_type("IsPointer", create_child(nullptr), {});
