@@ -382,6 +382,9 @@ void DependencyEmitter::visit(ASTSwitch *node) {
     $case.block->accept(this);
     $case.expression->accept(this);
   }
+  if (auto default_case = node->default_case.get()) {
+    default_case->accept(this);
+  }
 }
 
 void DependencyEmitter::visit(ASTTuple *node) {
