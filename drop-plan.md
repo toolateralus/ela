@@ -36,7 +36,7 @@ main :: fn() {
 ```
 
 Since this is how it works, we encounter a problem: Who calls the destructor here? It may seem obvious,
-you would call the destructor in `main`, right? well, let's look at a case that challenges that idea.
+you would call the destructor in `main`, right?
 
 ```rust
 // same as before.
@@ -110,4 +110,24 @@ main :: fn() {
 
 In the above example, we clearly see that we can't destroy that value, as it goes into another function as an rvalue.
 
-In conclusion, it's quite apparent that we can't really achieve a drop trait unless we have a comprehensive IR and ownership analyzer. This would be a net-positive, especially as we move to a LLVM backend, but it's a far ways away.
+We would also need to do this on the assignment of any object that implments a drop / destructor, which is even more complicated.
+
+```rust
+main :: fn() {
+  mut x := get_some_list();
+
+  // drop gets called here
+  x = get_some_list();
+}
+
+another_silly_function :: fn(list: *mut List) {
+  if get_local_time() == saturday_17th() {
+    *list = get_some_list();
+  }
+}
+
+// here, the function might own it, or it may not, depending on the condition
+main :: fn() {
+  another_silly_function(get_some_list());
+}
+```
