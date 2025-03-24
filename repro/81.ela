@@ -1,8 +1,9 @@
 
+import fmt::*;
 
 main :: fn() { 
   // This just crahes the compiler?
   // We're passing Type* to println, which should be fine
   // it works if we pass the .name, but still what.
-  println(typeof(u8***));
+  println(typeof(*mut u8));
 }

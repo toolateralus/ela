@@ -10,7 +10,7 @@ impl Strukt {
   since we have no vtables we should easily be able to do so.
 */
 main :: fn() {
-  n := &Strukt::statik;
+  n := &mut Strukt::statik;
 //   /home/cooper/repos/languages/ela/ela_source/dummy.ela:8:33: error: expected expression
 //     8 | void(*n)() = (void(*)())(&void(*)());
 //       |                                 ^

@@ -1,5 +1,9 @@
 import fmt::*;
 
+/* 
+  We still have reflection problems.
+*/
+
 AltOption :: struct!<T> {
   t: T
 }

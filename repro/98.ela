@@ -1,4 +1,4 @@
-// !FEATURE
+// !NOCOMPILE
 
 // move this somwhere it belongs
 Test_Enumerator :: struct!<Index, Value_Type> {

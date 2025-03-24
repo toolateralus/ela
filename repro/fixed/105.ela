@@ -12,9 +12,9 @@ impl!<T> T[] {
 
       printlnf("swapping indices: % <-> %", (low, high));
 
-      temp := self[low];
-      self[low] = self[high];
-      self[high] = temp;
+      temp := (*self)[low];
+      (*self)[low] = (*self)[high];
+      (*self)[high] = temp;
     }
   }
 }
