@@ -1,6 +1,6 @@
 
 import fmt::*;
 main :: fn() { 
-  // mut string := String::from("abcd");
-  string := format("$%", (0,), FormatOptions::default());
+  mut string := String::from("abcd");
+  string := format("$%", (string,), FormatOptions::default());
 }
