@@ -1655,7 +1655,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
 bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag) {
   // if we're not testing, don't emit for test functions
-  if (!test_flag || DOESNT_HAVE_FLAG(node->flags, FUNCTION_IS_TEST)) {
+  if (!test_flag && HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     return false;
   }
 
