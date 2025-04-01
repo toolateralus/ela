@@ -345,6 +345,8 @@ void DependencyEmitter::visit(ASTSubscript *node) {
     call.arguments = &args;
     call.accept(this);
   } else {
+    // make sure type is defined for size
+    define_type(node->left->resolved_type);
     node->left->accept(this);
     node->subscript->accept(this);
   }
