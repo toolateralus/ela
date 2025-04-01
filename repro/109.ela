@@ -1,6 +1,6 @@
 
-import fmt::*;
 main :: fn() { 
-  mut string := String::from("abcd");
-  string := format("$%", (string,), FormatOptions::default());
+  /* redeclaring a variable causes C errors. */
+  x := 0;
+  x := 0;
 }

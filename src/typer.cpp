@@ -6,6 +6,7 @@
 #include <iostream>
 #include <ostream>
 #include <ranges>
+#include <sstream>
 #include <string>
 #include <vector>
 
@@ -499,7 +500,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   Scope impl_scope = {};
 
   for (const auto &constant : node->constants) {
+    auto old = ctx.scope;
+    ctx.scope = type_scope;
     constant->accept(this);
+    ctx.scope = old;
   }
 
   for (const auto &alias : node->aliases) {
@@ -782,14 +786,42 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
                           arg_index + 1)); // +1 here to make it 1 based indexing for user. more intuitive
 
         } else {
-          // TODO: handle default params here
-          // TODO: print a significantly more descriptive error here, I hate checking the source code
-          // just to call a function when it could tell us what we're missing.
-          throw_error("Too few arguments to function", node->source_range);
+          std::stringstream ss;
+          ss << "Too few arguments to function. Expected:\n  fn(";
+          for (auto param: params->params) {
+            if (param->tag == ASTParamDecl::Normal) {
+              ss << param->normal.name.get_str() << ": " << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
+            } else {
+              ss << (param->self.is_pointer ? "*" : "") << "self, ";
+            }
+          }
+          ss << ")\nbut got:\n";
+          ss << "  fn(";
+
+          for (auto arg: node->arguments) {
+            ss << global_get_type(arg->resolved_type)->to_string() << ", ";
+          }
+          ss << ")\n";
+          throw_error(ss.str(), node->source_range);
         }
       } else {
         if (!params->is_varargs) {
-          throw_error("Too many arguments to function", node->source_range);
+          std::stringstream ss;
+          ss << "Too many arguments to function. Expected:\n  fn(";
+          for (auto param: params->params) {
+            if (param->tag == ASTParamDecl::Normal) {
+              ss << param->normal.name.get_str() << ": " << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
+            } else {
+              ss << (param->self.is_pointer ? "*" : "") << "self, ";
+            }
+          }
+          ss << ")\nbut got:\n  fn(";
+
+          for (auto arg: node->arguments) {
+            ss << global_get_type(arg->resolved_type)->to_string() << ", ";
+          }
+          ss << ")\n";
+          throw_error(ss.str(), node->source_range);
         }
         expected_type = Type::INVALID_TYPE_ID;
         node->arguments[arg_index]->accept(this);

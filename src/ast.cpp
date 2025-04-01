@@ -154,7 +154,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return nullptr;
      }
     },
-    
+
     // #read
     // Read a file into a string at compile time. Nice for embedding resources
     // into your program.
@@ -170,12 +170,12 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == TType::Comma) {
           parser->eat();
           // could be binary, and whatever other options
-          mode = parser->eat().value; 
+          mode = parser->eat().value;
         }
         if (!std::filesystem::exists(filename.get_str())) {
           throw_error(std::format("Couldn't find 'read' file: {}", filename), {});
         }
-        
+
         parser->expect(TType::RParen);
         NODE_ALLOC(ASTLiteral, string, range, _, parser)
         string->tag = ASTLiteral::String;
@@ -217,7 +217,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return func;
         } else {
           parser->ctx.scope->erase(func->name);
-          return ast_alloc<ASTNoop>(); 
+          return ast_alloc<ASTNoop>();
         }
     }},
     // #foreign
@@ -311,7 +311,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
         enum_decl->is_flags = true;
         return enum_decl;
-    }},    
+    }},
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -403,7 +403,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         decl->is_bitfield = true;
         decl->bitsize = size.value;
         return decl;
-    }}, 
+    }},
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
     {.identifier = "static",
@@ -2181,6 +2181,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (peek().type == TType::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
+        if (!directive) {// it yielded no node, just return.
+          continue;
+        }
         if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           node->subtypes.push_back(static_cast<ASTStructDeclaration *>(directive.get()));
         } else if (directive && directive.get()->get_node_type() == AST_NODE_VARIABLE) {
@@ -2406,7 +2409,7 @@ ASTLambda *Parser::parse_lambda() {
   }
 
   node->block = parse_block();
-  
+
   return node;
 }
 

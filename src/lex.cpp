@@ -299,7 +299,7 @@ void Lexer::get_token(State &state) {
           col++;
           c = input[pos];
         }
-        if (c == '.' && pos + 1 < len && input[pos + 1] == '.') {
+        if (c == '.' && pos + 1 < len && (input[pos + 1] == '.' || !isdigit(input[pos+1]))) {
           break;
         }
         if (c == '.') {

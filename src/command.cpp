@@ -157,7 +157,7 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       lldb = true;
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
-    } else if (arg.ends_with(".ela") && input_path.empty()) {
+    } else if (arg.ends_with(".ela") && input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r main.ela where main.ela is the arg not the file. we should use a rust like -- seperator to seperate runtime args from ela compiler args.
       input_path = arg;
     } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;

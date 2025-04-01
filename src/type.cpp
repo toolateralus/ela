@@ -492,6 +492,7 @@ int global_create_enum_type(const InternedString &name, Scope *scope, bool is_fl
   type->set_info(info);
   return type->id;
 }
+
 int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info, const TypeExtensions &extensions,
                        const int base_id) {
   type_table.push_back(new Type(type_table.size(), kind));
