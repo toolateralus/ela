@@ -518,6 +518,7 @@ int global_create_type(TypeKind kind, const InternedString &name, TypeInfo *info
   info->scope->name = name;
   return type->id;
 }
+
 InternedString get_function_typename(ASTFunctionDeclaration *decl) {
   std::stringstream ss;
   auto return_type = decl->return_type;

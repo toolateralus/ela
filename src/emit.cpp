@@ -1610,7 +1610,9 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
       }
 
       auto declaration = symbol.function.declaration;
-
+      if (DOESNT_HAVE_FLAG(declaration->flags, FUNCTION_IS_METHOD) || declaration->generic_arguments.size() != 0) {
+        continue;
+      }
       methods_ss << "_type_info.data[" << id << "]->methods.data[" << idx << "].$0 = (str){.data=\"" << name.get_str()
                  << "\", .length= " << calculate_actual_length(name.get_str()) << "};\n";
 
