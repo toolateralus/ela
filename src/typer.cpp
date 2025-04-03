@@ -2073,29 +2073,17 @@ void Typer::visit(ASTScopeResolution *node) {
 
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
-    auto type = global_get_type(member->type_id);
-    // force visit impls even if the function isnt called.
-    auto symbol = ctx.get_symbol(node->base);
-
-    {
-      // @Cooper-Pilot
-      //! We mock call functions here??
-      //! I don't know how else to force impls to work.
-      //! if we do T::some_method/some_associated_function
-      //! we need to be able to get that method and make sure it's implemented.
-      //! but we only do that for calls.
-      //! if (!in_call && symbol && type->is_kind(TYPE_FUNCTION) && type->get_ext().has_no_extensions()) {
-      //!   auto left = symbol.get()->type_id;
-      //!   auto left_ty = global_get_type(left);
-      //!   auto func_info = type->get_info()->as<FunctionTypeInfo>();
-      //!   if (func_info->params_len > 0 && func_info->parameter_types[0] == left) {
-      //!     compiler_mock_method_call_visit_impl(left, node->member_name);
-      //!   } else {
-      //!     compiler_mock_associated_function_call_visit_impl(left, node->member_name);
-      //!   }
-      //! }
-    }
-
+    // TODO: remove this if it's not needed
+    // auto symbol = ctx.get_symbol(node->base).get();
+    // ASTNode *decl = nullptr;
+    // if (symbol->is_type()) {
+    //   decl = symbol->type.declaration.get();
+    // } else if (symbol->is_function()) {
+    //   decl = symbol->function.declaration;
+    // }
+    // if (decl) {
+    //   decl->accept(this);
+    // }
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
     if (type == Type::INVALID_TYPE_ID) {
       throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
