@@ -29,13 +29,9 @@ Context::Context() {
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i]->kind == TYPE_FUNCTION) {
-      continue;
-    }
     if (type_table[i]->get_info()->scope) {
       type_table[i]->get_info()->scope->parent = scope;
     }
-
     scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
   }
 }

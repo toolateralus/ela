@@ -3,8 +3,6 @@
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
-### see 'feature/*' to see some planned/proposed features that may or may not get implemented.
-
 #### Drop interface / "destructors"
 
 #### Fix any type and add ability to do implicit casting routine stuff.

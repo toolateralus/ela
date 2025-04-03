@@ -36,6 +36,7 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
+constexpr auto TYPE_FLAGS_INTERFACE = 1 << 13;
 
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_id != Type::INVALID_TYPE_ID) {
@@ -1408,7 +1409,7 @@ std::string get_type_flags(Type *type) {
       kind_flags = TYPE_FLAGS_TAGGED_UNION;
       break;
     case TYPE_INTERFACE:
-      kind_flags = 0;
+      kind_flags = TYPE_FLAGS_INTERFACE;
       break;
   }
   for (const auto &ext : type->get_ext().extensions) {

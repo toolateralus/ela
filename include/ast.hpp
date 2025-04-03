@@ -156,16 +156,15 @@ struct ASTStatementList : ASTStatement {
 
 inline static std::string block_flags_to_string(int flags) {
   std::string result;
-
 #define X(flag)                                                                                     \
   if (flags & flag)                                                                                                    \
     result += #flag " ";
-
   X(BLOCK_FLAGS_FALL_THROUGH)
   X(BLOCK_FLAGS_RETURN)
   X(BLOCK_FLAGS_CONTINUE)
   X(BLOCK_FLAGS_BREAK)
   return result;
+#undef X
 }
 
 struct ASTModule : ASTStatement {

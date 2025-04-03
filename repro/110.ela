@@ -1,10 +1,7 @@
 
-
-main :: fn() { 
-
-  for i in 0..100 {
-    n := any.{
-
-    };
-  }
+main :: fn() {
+  // x: (u32, u32); // have to do this to not have emit errors.
+  type := typeof((u32, u32));
+  fmt::println(type.fields.length);
 }
+  
