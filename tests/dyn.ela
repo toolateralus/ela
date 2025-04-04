@@ -1,0 +1,85 @@
+DynInterface :: interface {
+  default_getter :: fn(*const self) -> s32 {
+    return 0;
+  }
+  scrut :: fn(*const self) -> f64;
+}
+
+impl DynInterface for s32 {
+  scrut :: fn(*const self) -> f64 {
+    return 100.0;
+  }
+}
+
+#test test_dynamic_dispatch :: fn() {
+  mut num := 0;
+  d := dynof(&mut num, DynInterface);
+  assert("dyn default method failed", d.default_getter() == 0);
+}
+
+
+#test test_dynamic_dispatch_non_default :: fn() {
+  mut num := 0;
+  d := dynof(&mut num, DynInterface);
+  assert("dyn default method failed", d.scrut() == 100.0);
+}
+
+dyn_func :: fn(o: dyn DynInterface) {
+  assert("dyn as param failed", o.scrut() == 100.0);
+}
+
+dyn_returns :: fn() -> dyn DynInterface {
+  mut num := 0;
+  return dynof(&mut num);
+}
+
+#test test_dyn_as_param_and_return_value :: fn() {
+  iface := dyn_returns();
+  dyn_func(iface);
+  assert("dyn returned from func failed", iface.scrut() == 100.0);
+}
+
+Strakt :: struct {
+  obj: dyn DynInterface,
+}
+
+#test test_dyn_as_struct_member :: fn() {
+  mut x := 0;
+  s: Strakt = .{
+    obj: dynof(&mut x),
+  };
+  assert("nested call of dyn failed", s.obj.scrut() == 100.0);
+}
+
+#test test_dyn_from_array :: fn() {
+  mut x := 0;
+  mut array: dyn DynInterface[100];
+  array[0] = dynof(&mut x);
+  assert("dyn call from array failed", array[0].scrut() == 100.0);
+}
+
+#test test_dyn_from_list :: fn() {
+  mut x := 0;
+  /* 
+    this fails in emit symbol 
+  */
+  // ! mut array: List!<dyn DynInterface>;
+  // array.push(dynof(&mut x));
+  // assert("dyn call from array failed", (array[0]).scrut() == 100.0);
+}
+
+
+impl Strakt {
+  new :: fn() -> #self {
+    mut self: #self;
+    /* 
+      this fails in dependency emitter.
+    */
+    // ! self.obj = dynof(new(0));
+    return self;
+  }
+
+  init :: fn(*mut self) {
+    self.obj = dynof(new(0));
+  }
+}
