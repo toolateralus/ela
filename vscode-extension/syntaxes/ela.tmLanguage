@@ -152,7 +152,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch)\b</string>
+					<string>\b(if|елси|then|тогда|else|ещё|for|для|while|пока|defer|отложить|return|возврат|матч|switch|dyn)\b</string>
 					<key>name</key>
 					<string>keyword.control.ela</string>
 				</dict>
@@ -261,7 +261,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(str|String)\b</string>
+					<string>\b(str|String|c_str)\b</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -279,7 +279,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(sizeof|кегль)\b\s*\(</string>
+					<string>\b(sizeof|кегль|typeof|dynof)\b\s*\(</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>
