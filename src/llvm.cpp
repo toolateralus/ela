@@ -1,5 +1,5 @@
 #include "llvm.hpp"
-
+#if 0
 void LLVMEmitter::visit(ASTModule *node) {
 
 }
@@ -127,3 +127,4 @@ void LLVMEmitter::visit(ASTLambda *node) {
 
 }
 void LLVMEmitter::visit(ASTWhere *node) {}
+#endif

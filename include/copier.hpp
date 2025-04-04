@@ -63,6 +63,7 @@ struct ASTCopier {
   ASTType_Of *copy_type_of(ASTType_Of *node);
   ASTImport *copy_import(ASTImport *node);
   ASTModule *copy_module(ASTModule *node);
+  ASTDyn_Of *copy_dyn_of(ASTDyn_Of *node);
 };
 
 ASTNode *deep_copy_ast(ASTNode *root);

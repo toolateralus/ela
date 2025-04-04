@@ -46,6 +46,31 @@ void DependencyEmitter::define_type(int type_id) {
       }
       emitter->emit_tuple(type_id);
     } break;
+    case TYPE_DYN: {
+      if (type->dyn_emitted) {
+        return;
+      }
+      type->dyn_emitted = true;
+      auto info = type->get_info()->as<DynTypeInfo>();
+      auto interface_type = global_get_type(info->interface_type);
+      auto interface_info = interface_type->get_info()->as<InterfaceTypeInfo>();
+      for (auto [name, sym] : interface_info->scope->symbols) {
+        if (sym.is_function() && !sym.is_generic_function()) {
+          auto declaration = sym.function.declaration;
+          for (auto param : declaration->params->params) {
+            if (param->resolved_type != -1) {
+              define_type(param->resolved_type);
+            }
+          }
+          auto return_type = declaration->return_type->resolved_type;
+          if (return_type != -1) {
+            define_type(return_type);
+          }
+        }
+      }
+      define_type(info->interface_type);
+      emitter->emit_dyn_dispatch_object(info->interface_type, type_id);
+    } break;
     case TYPE_INTERFACE:
     case TYPE_SCALAR:
       break;
@@ -66,7 +91,6 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
     declare_type(member.type->resolved_type);
   }
 }
-
 
 void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
   static std::set<int> visited_type_ids = {};
@@ -491,3 +515,5 @@ void DependencyEmitter::visit(ASTWhere *node) {
 }
 
 void DependencyEmitter::visit(ASTModule *node) {}
+
+void DependencyEmitter::visit(ASTDyn_Of *node) { declare_type(node->resolved_type); }

@@ -156,6 +156,9 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     case TYPE_INTERFACE: {
       info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
     } break;
+    case TYPE_DYN: {
+      info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo(*base_t->get_info()->as<DynTypeInfo>());
+    } break;
   }
 
   assert(info && "Copying type info for extended type failed");
@@ -422,6 +425,8 @@ std::string Type::to_string() const {
   switch (kind) {
     case TYPE_FUNCTION:
       return (get_info()->as<FunctionTypeInfo>())->to_string(extensions) + extensions.to_string();
+    case TYPE_DYN:
+      return "dyn " + get_unmangled_name(global_get_type(info->as<DynTypeInfo>()->interface_type));
     case TYPE_STRUCT:
     case TYPE_TUPLE:
     case TYPE_SCALAR:

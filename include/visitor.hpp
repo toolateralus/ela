@@ -16,6 +16,7 @@ struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *noop) { return; }
   virtual void visit(ASTScopeResolution *node) = 0;
+  virtual void visit(ASTDyn_Of *node) = 0;
   virtual void visit(ASTSize_Of *node) = 0;
   virtual void visit(ASTImport *node) = 0;
   virtual void visit(ASTCast *node) = 0;
@@ -94,6 +95,7 @@ struct Typer : VisitorBase {
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
+  void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
   void visit(ASTProgram *node) override;
@@ -182,6 +184,7 @@ struct DependencyEmitter;
 struct Emitter : VisitorBase {
   std::vector<InternedString> type_info_strings {};
   std::unordered_set<int> reflected_upon_types;
+  DependencyEmitter *dep_emitter;
   
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
@@ -237,6 +240,8 @@ struct Emitter : VisitorBase {
     last_loc = loc;
     // }
   }
+
+  void emit_dyn_dispatch_object(int interface_type, int dyn_type);
   void emit_tuple(int type);
   std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
@@ -268,10 +273,12 @@ struct Emitter : VisitorBase {
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 
-  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr);
+  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr, bool type_erase_self = false);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
   int get_expr_left_type_sr_dot(ASTNode *node);
+
+  void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;
@@ -334,6 +341,7 @@ struct DependencyEmitter : VisitorBase {
   void define_type(int type_id);
   void declare_type(int type_id);
 
+  void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
   void visit(ASTType_Of *node) override;

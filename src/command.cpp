@@ -30,6 +30,7 @@ int CompileCommand::compile() {
   {
     Emitter emit(context, type_visitor);
     DependencyEmitter dependencyEmitter(context, &emit);
+    emit.dep_emitter = &dependencyEmitter;
 
     static const auto testing = compile_command.has_flag("test");
     const bool is_freestanding =

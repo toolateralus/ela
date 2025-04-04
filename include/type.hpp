@@ -57,6 +57,7 @@ enum TypeKind {
   TYPE_TUPLE,
   TYPE_TAGGED_UNION,
   TYPE_INTERFACE,
+  TYPE_DYN,
 };
 
 enum TypeExtEnum {
@@ -184,8 +185,6 @@ struct TypeInfo {
 
 struct InterfaceTypeInfo : TypeInfo {
   InternedString name;
-  // <method_name, type_signature>.
-  std::vector<std::pair<InternedString, int>> methods;
 };
 
 struct TaggedUnionVariant {
@@ -232,6 +231,11 @@ struct StructTypeInfo : TypeInfo {
 
 struct TupleTypeInfo : TypeInfo {
   std::vector<int> types;
+};
+
+struct DynTypeInfo : TypeInfo {
+  int interface_type;
+  std::vector<std::pair<InternedString, Type *>> methods;
 };
 
 // helpers to get scalar types for fast comparison
@@ -294,6 +298,8 @@ struct Type {
   std::vector<int> generic_args{};
   std::vector<int> interfaces{};
   Nullable<ASTNode> declaring_node;
+
+  bool dyn_emitted = false;
   bool fwd_decl_is_emitted = false;
   bool tuple_is_emitted = false;
   // if this is an alias or something just get the actual real true type.

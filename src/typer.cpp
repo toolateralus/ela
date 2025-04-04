@@ -788,9 +788,10 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         } else {
           std::stringstream ss;
           ss << "Too few arguments to function. Expected:\n  fn(";
-          for (auto param: params->params) {
+          for (auto param : params->params) {
             if (param->tag == ASTParamDecl::Normal) {
-              ss << param->normal.name.get_str() << ": " << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
+              ss << param->normal.name.get_str() << ": "
+                 << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
             } else {
               ss << (param->self.is_pointer ? "*" : "") << "self, ";
             }
@@ -798,7 +799,7 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
           ss << ")\nbut got:\n";
           ss << "  fn(";
 
-          for (auto arg: node->arguments) {
+          for (auto arg : node->arguments) {
             ss << global_get_type(arg->resolved_type)->to_string() << ", ";
           }
           ss << ")\n";
@@ -808,16 +809,17 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
         if (!params->is_varargs) {
           std::stringstream ss;
           ss << "Too many arguments to function. Expected:\n  fn(";
-          for (auto param: params->params) {
+          for (auto param : params->params) {
             if (param->tag == ASTParamDecl::Normal) {
-              ss << param->normal.name.get_str() << ": " << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
+              ss << param->normal.name.get_str() << ": "
+                 << global_get_type(param->normal.type->resolved_type)->to_string() << ", ";
             } else {
               ss << (param->self.is_pointer ? "*" : "") << "self, ";
             }
           }
           ss << ")\nbut got:\n  fn(";
 
-          for (auto arg: node->arguments) {
+          for (auto arg : node->arguments) {
             ss << global_get_type(arg->resolved_type)->to_string() << ", ";
           }
           ss << ")\n";
@@ -1507,6 +1509,7 @@ void Typer::visit(ASTCall *node) {
   // Otherwise find it via a type resolution, for things like array[10](); or what have you.
   node->function->accept(this);
   auto symbol = ctx.get_symbol(node->function).get();
+
   if (symbol && symbol->is_function()) {
     if (!type) {
       type = global_get_type(symbol->type_id);
@@ -1535,7 +1538,24 @@ void Typer::visit(ASTCall *node) {
       type = global_get_type(func_decl->resolved_type);
     }
   } else {
+
     node->function->accept(this);
+
+    // Implicitly pass the 'dyn.instance' when calling the function pointers 
+    // that the dyn thingy sets up.
+    if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
+      auto base = ((ASTDotExpr*)node->function)->base;
+      auto base_type = global_get_type(base->resolved_type);
+      if (base_type->is_kind(TYPE_DYN)) {
+        auto &args = node->arguments->arguments;
+        auto dot = ast_alloc<ASTDotExpr>();
+        dot->base = base;
+        dot->member_name = "instance";
+        dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
+        args.insert(args.begin(), dot);
+      }
+    }
+
     type = global_get_type(node->function->resolved_type);
   }
 
@@ -1704,6 +1724,18 @@ void Typer::visit(ASTType *node) {
       }
       node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }
+
+    if (node->normal.is_dyn) {
+      auto type = global_get_type(node->resolved_type);
+      auto extension = type->get_ext();
+      auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
+      if (extensions.has_extensions()) {
+        node->resolved_type = global_find_type_id(ty, extensions);
+      } else {
+        node->resolved_type = ty;
+      }
+    }
+
   } else if (node->kind == ASTType::TUPLE) {
     std::vector<int> types;
     for (const auto &t : node->tuple_types) {
@@ -1890,7 +1922,7 @@ void Typer::visit(ASTUnaryExpr *node) {
       }
       node->resolved_type = type->get_element_type();
     }
-    
+
     return;
   }
 
@@ -2490,4 +2522,117 @@ void Typer::visit(ASTModule *node) {
   }
   ctx.set_scope(old_scope);
   ctx.scope->create_module(node->module_name, node);
+}
+
+void Typer::visit(ASTDyn_Of *node) {
+  node->interface_type->accept(this);
+  node->object->accept(this);
+
+  auto object_type = global_get_type(node->object->resolved_type);
+
+  if (!object_type->get_ext().is_mut_pointer()) { 
+    throw_error("'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a mutable pointer. eventually we'll have const dyn's", node->source_range);
+  }
+
+  auto type = global_get_type(node->interface_type->resolved_type);
+  if (!type->is_kind(TYPE_INTERFACE)) {
+    throw_error("cannot use 'dynof(Type, $expr)' on types that aren't interfaces.", node->source_range);
+  }
+
+  auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
+  node->resolved_type = ty;
+}
+
+
+int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
+  for (int i = 0; i < type_table.size(); ++i) {
+    if (type_table[i]->is_kind(TYPE_DYN) &&
+        type_table[i]->get_info()->as<DynTypeInfo>()->interface_type == interface_type) {
+      return type_table[i]->id;
+    }
+  }
+  auto iface_type = global_get_type(interface_type);
+  auto interface_name = "dyn$" + iface_type->to_string();
+  auto dyn_info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo();
+  dyn_info->interface_type = interface_type;
+  
+  // TODO: * determine whether 'dyn' should actually be in the type name itself. *
+  auto ty = global_get_type(global_create_type(TYPE_DYN, interface_name, dyn_info, {}, -1));
+
+  dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT);
+
+  ty->get_info()->as<DynTypeInfo>()->interface_type = interface_type;
+
+  auto interface_info = iface_type->get_info()->as<InterfaceTypeInfo>();
+
+  for (auto [name, sym] : interface_info->scope->symbols) {
+    if (sym.is_function() && !sym.is_generic_function()) {
+      auto declaration = sym.function.declaration;
+
+      
+      std::vector<int> parameters;
+
+      bool has_self = false;
+      for (auto param : declaration->params->params) {
+        if (param->tag == ASTParamDecl::Self || param->tag == ASTParamDecl::Себя) {
+          if (param->self.is_pointer) {
+            parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
+          } else {
+            throw_error("cannot use 'dyn' on interfaces that take 'self' by value because that would be a zero-sized "
+                        "parameter, as we don't know the type of the 'self' at compile time definitively.",
+                        range);
+          }
+          has_self = true;
+        } else {
+          if (!has_self) {
+            throw_error(
+                "'dyn' can only be used with interfaces that do not have any associated functions, e.g functions "
+                "that\n"
+                "do not take a '*mut self', nor a '*const self' (in the case of 'dyn' self must always be a pointer)",
+                range);
+          }
+
+          param->accept(typer);
+          // There's an exception here for interface typed parameters.
+          auto parameter_type = global_get_type(param->resolved_type);
+          if (parameter_type->is_kind(TYPE_INTERFACE)) {
+            throw_error("you cannot take a 'dyn' of an interface that uses other interfaces as parameter constraints.\n"
+                        "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
+                        range);
+          }
+
+          parameters.push_back(param->resolved_type);
+        }
+      }
+
+      if (declaration->return_type->kind == ASTType::SELF) {
+        throw_error(
+            "just as we can't take 'self' by value in a 'dyn' interface, you can't return '#self', even by pointer, "
+            "because we would have to return it as a type erased *const void. return the concrete type.",
+            range);
+      }
+
+      declaration->return_type->accept(typer);
+      auto return_type = declaration->return_type->resolved_type;
+
+      FunctionTypeInfo type_info;
+      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(int));
+      type_info.params_len = parameters.size();
+      type_info.return_type = return_type;
+
+      // ! TODO: @Cooper-Pilot Why do i have to call back into the dependency emitter here, even though the dependency
+      // emitter ! Tries to resolve each of the parameter and return types of every method in the freaking dang
+      // Interface??? ! This is a last ditch effort hack so I can just continue writing the rest of the stuff like
+      // calling dyn's.
+      auto function_type = global_get_type(global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}}));
+      dyn_info->methods.push_back({name.get_str(), function_type});
+      dyn_info->scope->insert_variable(name.get_str(), global_find_type_id(function_type->id, {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT, nullptr);
+    }
+  }
+
+  auto sym = Symbol::create_type(ty->id, interface_name, TYPE_DYN, nullptr);
+  sym.scope = this; // TODO: we have to fit this in modules or some stuff.
+
+  symbols.insert_or_assign(interface_name, sym);
+  return ty->id;
 }

@@ -1,3 +1,5 @@
+#warning "we gotta undo this once we get Cmake configured with LLVM"
+#if 0 
 #pragma once
 #include "core.hpp"
 #include "visitor.hpp"
@@ -181,3 +183,4 @@ struct LLVMEmitter : VisitorBase {
     }
   };
 };
+#endif

@@ -37,6 +37,7 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
 constexpr auto TYPE_FLAGS_INTERFACE = 1 << 13;
+constexpr auto TYPE_FLAGS_DYN = 1 << 14;
 
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_id != Type::INVALID_TYPE_ID) {
@@ -1276,7 +1277,8 @@ std::string Emitter::get_declaration_type_signature_and_identifier(const std::st
 
 // Identifier may contain a fixed buffer size like name[30] due to the way
 // function pointers have to work in C.
-std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier) {
+std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::string> identifier,
+                                                      bool type_erase_self) {
   if (!type->is_kind(TYPE_FUNCTION)) {
     throw_error("internal compiler error: tried to get a function pointer from "
                 "a non-function type",
@@ -1311,8 +1313,13 @@ std::string Emitter::get_function_pointer_type_string(Type *type, Nullable<std::
   ss << ")(";
 
   for (int i = 0; i < info->params_len; ++i) {
-    auto type = global_get_type(info->parameter_types[i]);
-    ss << to_cpp_string(type);
+    if (i == 0 && type_erase_self) {
+      ss << "void*";
+    } else {
+      auto type = global_get_type(info->parameter_types[i]);
+      ss << to_cpp_string(type);
+    }
+
     if (i != info->params_len - 1) {
       ss << ", ";
     }
@@ -1410,6 +1417,9 @@ std::string get_type_flags(Type *type) {
       break;
     case TYPE_INTERFACE:
       kind_flags = TYPE_FLAGS_INTERFACE;
+      break;
+    case TYPE_DYN:
+      kind_flags = TYPE_FLAGS_DYN;
       break;
   }
   for (const auto &ext : type->get_ext().extensions) {
@@ -1711,6 +1721,12 @@ std::string Emitter::get_cpp_scalar_type(int id) {
 std::string Emitter::to_cpp_string(Type *type) {
   auto output = std::string{};
   switch (type->kind) {
+    case TYPE_DYN: {
+      auto info = type->get_info()->as<DynTypeInfo>();
+      auto interface_symbol = ctx.scope->find_type_symbol(info->interface_type);
+      output = "dyn$" + emit_symbol(interface_symbol.get());
+      output = to_cpp_string(type->get_ext(), output);
+    } break;
     case TYPE_FUNCTION:
       return get_function_pointer_type_string(type);
     case TYPE_SCALAR:
@@ -2146,6 +2162,7 @@ std::string Emitter::emit_symbol(Symbol *symbol) {
       (symbol->is_function() && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_FOREIGN))) {
     return symbol->name.get_str();
   }
+
   auto full_name = symbol->scope->full_name();
   if (!full_name.empty()) {
     full_name += "$";
@@ -2153,3 +2170,68 @@ std::string Emitter::emit_symbol(Symbol *symbol) {
   full_name += symbol->name.get_str();
   return full_name;
 };
+
+void Emitter::visit(ASTDyn_Of *node) {
+  if (node->is_emitted) {
+    return;
+  }
+
+  code << "(" << to_cpp_string(global_get_type(node->resolved_type)) << ") {\n";
+  indent();
+  code << ".instance = (void*)";
+  node->object->accept(this);
+  code << ",\n";
+  // ugliest code ever freaking written.
+  auto interface_scope =
+      global_get_type(global_get_type(node->resolved_type)->get_info()->as<DynTypeInfo>()->interface_type)
+          ->get_info()
+          ->scope;
+
+  auto object_scope_bare = global_get_type(global_get_type(node->object->resolved_type)->get_element_type());
+  auto object_scope = object_scope_bare->get_info()->scope;
+
+  for (auto [name, sym] : interface_scope->symbols) {
+    if (sym.is_function() && !sym.is_generic_function()) {
+      indent();
+      code << "." << name.get_str() << " = ";
+      auto symbol = object_scope->local_lookup(name);
+      auto type = global_find_type_id(symbol->type_id, {{{TYPE_EXT_POINTER_MUT}}});
+      auto typestring = get_function_pointer_type_string(global_get_type(type), nullptr, true);
+      code << "(" << typestring << ")" << emit_symbol(symbol) << ",\n";
+    }
+  }
+
+  code << "}";
+}
+
+void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
+  Type *interface = global_get_type(interface_type);
+
+  if (interface->dyn_emitted) {
+    return;
+  }
+
+  interface->dyn_emitted = true;
+
+  auto dyn_ty = global_get_type(dyn_type);
+  auto methods_to_emit = dyn_ty->get_info()->as<DynTypeInfo>()->methods;
+
+  auto symbol = ctx.scope->find_type_symbol(interface_type);
+  if (symbol.is_null()) {
+    throw_error("unable to locate symbol for interface type used in a dyn", {});
+  }
+
+  for (auto [name, function_type] : methods_to_emit) {
+    this->dep_emitter->define_type(function_type->id);
+  }
+
+  auto name = to_cpp_string(dyn_ty);
+  code << "typedef struct " << name << "{\n";
+  code << "void *instance;\n";
+  for (auto [name, type] : methods_to_emit) {
+    std::string method_pointer_name = name.get_str();
+    code << get_function_pointer_type_string(type, &method_pointer_name) << ";";
+    newline_indented();
+  }
+  code << "} " << name << ";";
+}

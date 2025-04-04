@@ -58,6 +58,7 @@ enum ASTNodeType {
   AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_SIZE_OF,
   AST_NODE_TYPE_OF,
+  AST_NODE_DYN_OF,
   AST_NODE_DEFER,
   AST_NODE_CAST,
   AST_NODE_LAMBDA,
@@ -271,6 +272,7 @@ struct ASTType : ASTExpr {
     struct {
       ASTExpr *base;
       std::vector<ASTType *> generic_arguments;
+      bool is_dyn = false;
     } normal;
     struct {
       std::vector<ASTType *> parameter_types;
@@ -645,6 +647,13 @@ struct ASTSize_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
+struct ASTDyn_Of : ASTExpr {
+  ASTType *interface_type;
+  ASTExpr *object;
+  ASTNodeType get_node_type() const override { return AST_NODE_DYN_OF; }
+  void accept(VisitorBase *visitor) override;
+};
+
 struct ASTType_Of : ASTExpr {
   ASTExpr *target;
   ASTNodeType get_node_type() const override { return AST_NODE_TYPE_OF; }
@@ -941,4 +950,5 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                                                                     \
     deferred;                                                                                                          \
   });
+
 

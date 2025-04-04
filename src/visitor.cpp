@@ -13,6 +13,7 @@
 // {
 
 // clang-format off
+void ASTDyn_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTModule::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTImport::accept(VisitorBase *visitor) { visitor->visit(this); }

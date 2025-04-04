@@ -847,11 +847,21 @@ ASTExpr *Parser::parse_primary() {
   }
 
   switch (tok.type) {
+    case TType::Dyn_Of: {
+      expect(TType::Dyn_Of);
+      NODE_ALLOC(ASTDyn_Of, dyn_of, range, _, this)
+      expect(TType::LParen);
+      dyn_of->interface_type = parse_type();
+      expect(TType::Comma);
+      dyn_of->object = parse_expr();
+      expect(TType::RParen);
+      return dyn_of;
+    }
     case TType::Type_Of: {
       expect(TType::Type_Of);
       NODE_ALLOC(ASTType_Of, type_of, range, _, this)
       expect(TType::LParen);
-      type_of->target = parse_expr();
+      type_of->target = parse_type();
       expect(TType::RParen);
       return type_of;
     }
@@ -1033,6 +1043,11 @@ ASTType *Parser::parse_type() {
 
   NODE_ALLOC(ASTType, node, range, _, this)
   parse_pointer_extensions(node);
+
+  if (peek().type == TType::Dyn) {
+    node->normal.is_dyn = true;
+    eat();
+  }
 
   if (peek().type == TType::LParen) {
     node->resolved_type = Type::INVALID_TYPE_ID;

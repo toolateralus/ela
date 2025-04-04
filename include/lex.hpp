@@ -112,7 +112,10 @@ enum struct TType {
   Attribute,
 
   Mut,
-  Const
+  Const,
+
+  Dyn,
+  Dyn_Of,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -121,7 +124,6 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
-
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
@@ -216,6 +218,9 @@ static inline std::string TTypeToString(TType type) {
     
     TTYPE_CASE(Mut);
     TTYPE_CASE(Const);
+
+    TTYPE_CASE(Dyn);
+    TTYPE_CASE(Dyn_Of);
 
   }
   return "Unknown";
@@ -366,6 +371,10 @@ static std::unordered_map<std::string, TType> keywords{
 
     {"interface", TType::Interface},
     {"интерфейс", TType::Interface},
+
+    {"dyn", TType::Dyn}, // TODO: do we want a 'dyn' 
+    {"dynof", TType::Dyn_Of},
+
 };
 
 static std::unordered_map<std::string, TType> operators{{"=>", TType::ExpressionBody},
