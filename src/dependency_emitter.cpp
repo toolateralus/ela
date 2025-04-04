@@ -516,4 +516,16 @@ void DependencyEmitter::visit(ASTWhere *node) {
 
 void DependencyEmitter::visit(ASTModule *node) {}
 
-void DependencyEmitter::visit(ASTDyn_Of *node) { declare_type(node->resolved_type); }
+void DependencyEmitter::visit(ASTDyn_Of *node) {
+  define_type(node->resolved_type);
+  auto element_type = global_get_type(node->object->resolved_type)->get_element_type();
+  auto element_scope = global_get_type(element_type)->get_info()->scope;
+  auto interface_scope = global_get_type(node->interface_type->resolved_type)->get_info()->scope;
+  for (auto [name, interface_sym] : interface_scope->symbols) {
+    if (!interface_sym.is_function() || interface_sym.is_generic_function()) {
+      continue;
+    }
+    auto decl = element_scope->local_lookup(name)->function.declaration;
+    decl->accept(this);
+  }
+}

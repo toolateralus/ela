@@ -1538,13 +1538,12 @@ void Typer::visit(ASTCall *node) {
       type = global_get_type(func_decl->resolved_type);
     }
   } else {
-
     node->function->accept(this);
 
-    // Implicitly pass the 'dyn.instance' when calling the function pointers 
+    // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-      auto base = ((ASTDotExpr*)node->function)->base;
+      auto base = ((ASTDotExpr *)node->function)->base;
       auto base_type = global_get_type(base->resolved_type);
       if (base_type->is_kind(TYPE_DYN)) {
         auto &args = node->arguments->arguments;
@@ -1728,7 +1727,8 @@ void Typer::visit(ASTType *node) {
     if (node->normal.is_dyn) {
       auto type = global_get_type(node->resolved_type);
       auto extension = type->get_ext();
-      auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
+      auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id,
+                                                      node->source_range, this);
       if (extensions.has_extensions()) {
         node->resolved_type = global_find_type_id(ty, extensions);
       } else {
@@ -2514,14 +2514,16 @@ void Typer::visit(ASTModule *node) {
 }
 
 void Typer::visit(ASTDyn_Of *node) {
-
   if (!node->interface_type) {
     auto type = global_get_type(expected_type);
     if (type && type->is_kind(TYPE_DYN)) {
       node->interface_type = ast_alloc<ASTType>();
       node->interface_type->resolved_type = type->get_info()->as<DynTypeInfo>()->interface_type;
     } else {
-      throw_error("if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, etc), you must pass the _interface_ type as the second parameter to 'dynof'\nSo, if you wanted a 'dyn Format', youd use 'dynof(my_instance, Format)'", node->source_range);
+      throw_error("if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, "
+                  "etc), you must pass the _interface_ type as the second parameter to 'dynof'\nSo, if you wanted a "
+                  "'dyn Format', youd use 'dynof(my_instance, Format)'",
+                  node->source_range);
     }
   } else {
     node->interface_type->accept(this);
@@ -2531,8 +2533,10 @@ void Typer::visit(ASTDyn_Of *node) {
 
   auto object_type = global_get_type(node->object->resolved_type);
 
-  if (!object_type->get_ext().is_mut_pointer()) { 
-    throw_error("'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a mutable pointer. eventually we'll have const dyn's", node->source_range);
+  if (!object_type->get_ext().is_mut_pointer()) {
+    throw_error("'dynof' requires the second argument, the instance to create a dyn dispatch object for, must be a "
+                "mutable pointer. eventually we'll have const dyn's",
+                node->source_range);
   }
 
   auto type = global_get_type(node->interface_type->resolved_type);
@@ -2540,33 +2544,18 @@ void Typer::visit(ASTDyn_Of *node) {
     throw_error("cannot use 'dynof(Type, $expr)' on types that aren't interfaces.", node->source_range);
   }
 
-  auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
-  node->resolved_type = ty;
-
-
-  /* 
-   ! @Cooper-Pilot 
-   ! Even when I do this, I still need to manually call the methods in the source code
-   ! to use a Dyn without getting emit errors. i have no freaking idea why it does this.
-  */
   auto element_type = global_get_type(object_type->get_element_type());
-  auto object_scope = element_type->get_info()->scope;
-  auto interface_scope = global_get_type(node->interface_type->resolved_type)->get_info()->scope;
-  for (const auto &[method, sym]: object_scope->symbols) {
-    if (!interface_scope->local_lookup(method)) {
-      continue;
-    }
-    if (sym.is_function() && !sym.is_generic_function()) {
-      ASTScopeResolution scope_res;
-      ASTType type;
-      type.resolved_type = element_type->id;
-      scope_res.base = &type;
-      scope_res.member_name = method;
-      scope_res.accept(this);
-    }
+  if (!element_type->implements(node->interface_type->resolved_type)) {
+    throw_error(
+        std::format("cannot create 'dyn {}' from object of type '{}' because it does not implement the interface.",
+                    type->to_string(), element_type->to_string()),
+        node->source_range);
   }
-}
 
+  auto ty =
+      ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
+  node->resolved_type = ty;
+}
 
 int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {
@@ -2579,11 +2568,12 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
   auto interface_name = "dyn$" + iface_type->to_string();
   auto dyn_info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo();
   dyn_info->interface_type = interface_type;
-  
+
   // TODO: * determine whether 'dyn' should actually be in the type name itself. *
   auto ty = global_get_type(global_create_type(TYPE_DYN, interface_name, dyn_info, {}, -1));
 
-  dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT);
+  dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr,
+                                   MUT);
 
   ty->get_info()->as<DynTypeInfo>()->interface_type = interface_type;
 
@@ -2593,7 +2583,6 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
     if (sym.is_function() && !sym.is_generic_function()) {
       auto declaration = sym.function.declaration;
 
-      
       std::vector<int> parameters;
 
       bool has_self = false;
@@ -2650,7 +2639,8 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
       // calling dyn's.
       auto function_type = global_get_type(global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}}));
       dyn_info->methods.push_back({name.get_str(), function_type});
-      dyn_info->scope->insert_variable(name.get_str(), global_find_type_id(function_type->id, {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT, nullptr);
+      dyn_info->scope->insert_variable(
+          name.get_str(), global_find_type_id(function_type->id, {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT, nullptr);
     }
   }
 
