@@ -1304,7 +1304,7 @@ ASTStatement *Parser::parse_statement() {
     if (peek().type == TType::Mul || peek().type == TType::Fn || lookahead_buf()[1].type == TType::GenericBrace) {
       alias->source_node = parse_type();
     } else {
-      alias->source_node = parse_expr();
+      alias->source_node = parse_type();
     }
     return alias;
   }

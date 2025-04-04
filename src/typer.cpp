@@ -2639,8 +2639,7 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
       // calling dyn's.
       auto function_type = global_get_type(global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}}));
       dyn_info->methods.push_back({name.get_str(), function_type});
-      dyn_info->scope->insert_variable(
-          name.get_str(), global_find_type_id(function_type->id, {{{TYPE_EXT_POINTER_MUT}}}), nullptr, MUT, nullptr);
+      dyn_info->scope->insert_variable(name.get_str(), function_type->id, nullptr, MUT, nullptr);
     }
   }
 

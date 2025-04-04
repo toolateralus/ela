@@ -65,7 +65,6 @@ Strakt :: struct {
   assert("dyn call from array failed", (array[0]).scrut() == 100.0);
 }
 
-
 impl Strakt {
   new :: fn() -> #self {
     mut self: #self;
