@@ -2105,17 +2105,6 @@ void Typer::visit(ASTScopeResolution *node) {
 
   if (auto member = scope->local_lookup(node->member_name)) {
     node->resolved_type = member->type_id;
-    // TODO: remove this if it's not needed
-    // auto symbol = ctx.get_symbol(node->base).get();
-    // ASTNode *decl = nullptr;
-    // if (symbol->is_type()) {
-    //   decl = symbol->type.declaration.get();
-    // } else if (symbol->is_function()) {
-    //   decl = symbol->function.declaration;
-    // }
-    // if (decl) {
-    //   decl->accept(this);
-    // }
   } else if (auto type = scope->find_type_id(node->member_name, {})) {
     if (type == Type::INVALID_TYPE_ID) {
       throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
@@ -2553,6 +2542,29 @@ void Typer::visit(ASTDyn_Of *node) {
 
   auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
   node->resolved_type = ty;
+
+
+  /* 
+   ! @Cooper-Pilot 
+   ! Even when I do this, I still need to manually call the methods in the source code
+   ! to use a Dyn without getting emit errors. i have no freaking idea why it does this.
+  */
+  auto element_type = global_get_type(object_type->get_element_type());
+  auto object_scope = element_type->get_info()->scope;
+  auto interface_scope = global_get_type(node->interface_type->resolved_type)->get_info()->scope;
+  for (const auto &[method, sym]: object_scope->symbols) {
+    if (!interface_scope->local_lookup(method)) {
+      continue;
+    }
+    if (sym.is_function() && !sym.is_generic_function()) {
+      ASTScopeResolution scope_res;
+      ASTType type;
+      type.resolved_type = element_type->id;
+      scope_res.base = &type;
+      scope_res.member_name = method;
+      scope_res.accept(this);
+    }
+  }
 }
 
 
