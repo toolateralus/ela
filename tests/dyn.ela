@@ -11,16 +11,36 @@ impl DynInterface for s32 {
   }
 }
 
+impl DynInterface for u32 {
+  scrut :: fn(*const self) -> f64 {
+    return 200.0;
+  }
+}
+
 #test test_dynamic_dispatch :: fn() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
   assert("dyn default method failed", d.default_getter() == 0);
 }
 
-
 #test test_dynamic_dispatch_non_default :: fn() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
+  assert("dyn default method failed", d.scrut() == 100.0);
+}
+
+#test test_dynamic_dispatch_non_default_2 :: fn() {
+  mut num : u32 = 0;
+  d := dynof(&mut num, DynInterface);
+  assert("dyn default method failed", d.scrut() == 200.0);
+}
+
+#test test_dynamic_dispatch_non_default_3 :: fn() {
+  mut num1 : s32 = 0;
+  mut num : u32 = 0;
+  mut d := dynof(&mut num, DynInterface);
+  assert("dyn default method failed", d.scrut() == 200.0);
+  d = dynof(&mut num1);
   assert("dyn default method failed", d.scrut() == 100.0);
 }
 
