@@ -60,22 +60,16 @@ Strakt :: struct {
 
 #test test_dyn_from_list :: fn() {
   mut x := 0;
-  /* 
-    this fails in emit symbol 
-  */
-  // ! mut array: List!<dyn DynInterface>;
-  // array.push(dynof(&mut x));
-  // assert("dyn call from array failed", (array[0]).scrut() == 100.0);
+  mut array: List!<dyn DynInterface>;
+  array.push(dynof(&mut x));
+  assert("dyn call from array failed", (array[0]).scrut() == 100.0);
 }
 
 
 impl Strakt {
   new :: fn() -> #self {
     mut self: #self;
-    /* 
-      this fails in dependency emitter.
-    */
-    // ! self.obj = dynof(new(0));
+    self.obj = dynof(new(0));
     return self;
   }
 

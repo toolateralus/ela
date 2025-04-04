@@ -1723,8 +1723,7 @@ std::string Emitter::to_cpp_string(Type *type) {
   switch (type->kind) {
     case TYPE_DYN: {
       auto info = type->get_info()->as<DynTypeInfo>();
-      auto interface_symbol = ctx.scope->find_type_symbol(info->interface_type);
-      output = "dyn$" + emit_symbol(interface_symbol.get());
+      output = "dyn$" + to_cpp_string(global_get_type(info->interface_type));
       output = to_cpp_string(type->get_ext(), output);
     } break;
     case TYPE_FUNCTION:
@@ -2215,11 +2214,6 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
 
   auto dyn_ty = global_get_type(dyn_type);
   auto methods_to_emit = dyn_ty->get_info()->as<DynTypeInfo>()->methods;
-
-  auto symbol = ctx.scope->find_type_symbol(interface_type);
-  if (symbol.is_null()) {
-    throw_error("unable to locate symbol for interface type used in a dyn", {});
-  }
 
   for (auto [name, function_type] : methods_to_emit) {
     this->dep_emitter->define_type(function_type->id);

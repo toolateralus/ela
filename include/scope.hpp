@@ -282,19 +282,6 @@ struct Scope {
     return global_find_type_id(symbol->type_id, ext);
   }
 
-  Nullable<Symbol> find_type_symbol(const int id) {
-    auto type = global_get_type(id);
-    for (auto &[name, sym] : symbols) {
-      if (sym.is_type() && name == type->get_base()) {
-        return &sym;
-      }
-    }
-    if (parent) {
-      return parent->find_type_symbol(id);
-    }
-    return nullptr;
-  }
-
   int find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer);
 };
 
