@@ -1,8 +1,7 @@
-import rayui;
-import raylib;
-import file;
+import rayui::*;
+import fs::*;
 
-list_erase :: fn![T](list: List![T], value: T) -> bool {
+list_erase :: fn!<T>(list: List!<T>, value: T) -> bool {
   if list.length == 0 {
     return false;
   }
@@ -24,79 +23,79 @@ Scene :: enum {
 }
 
 #region Global Variables {
-  button_style : Style = {
+  mut button_style : Style = .{
     foreground: WHITE,
     background: CLEAR,
     font_size: 20
   };
 
-  jiggly_text_style : Style = {
+  mut jiggly_text_style : Style = .{
     foreground: WHITE,
     background: CLEAR,
     font_size: 40
   };
 
-  round_base_num_enemies_to_advance: s32 = 6;
-  round_index : s32 = 1;
-  round_failed := false;
-  camera: Camera2D;
-  scene: s32 = Scene::MainMenu;
+  mut round_base_num_enemies_to_advance: s32 = 6;
+  mut round_index : s32 = 1;
+  mut round_failed := false;
+  mut camera: Camera2D;
+  mut scene: s32 = Scene::MainMenu;
 
-  max_tilt : f32 = 16;
-  screen_width : f32;
-  screen_height : f32;
-  zero : Vector2 = {x: 0, y: 0};
+  mut max_tilt : f32 = 16;
+  mut screen_width : f32;
+  mut screen_height : f32;
+  mut zero : Vector2 = .{x: 0, y: 0};
 
-  player_drag := 0.87;
+  mut player_drag := 0.87;
 
-  bullet_start_velocity := -15.0;
-  bullet_min_velocity := 0.3;
-  bullet_scale := 32.0;
-  bullet_drag := 0.99;
+  mut bullet_start_velocity := -15.0;
+  mut bullet_min_velocity := 0.3;
+  mut bullet_scale := 32.0;
+  mut bullet_drag := 0.99;
 
-  enemy_scale := 48.0;
-  enemy_rotation_speed := 13.0;
-  enemy_max_speed := 1.0;
+  mut enemy_scale := 48.0;
+  mut enemy_rotation_speed := 13.0;
+  mut enemy_max_speed := 1.0;
 
-  score : s32  = 0;
-  targets_destroyed : s32 = 0;
-  num_enemies_spawned : s32 = 0;
-  can_burst := true;
+  mut score : s32  = 0;
+  mut targets_destroyed : s32 = 0;
+  mut num_enemies_spawned : s32 = 0;
+  mut can_burst := true;
 
-  bullet_max_burst: s32 = 3;
+  mut bullet_max_burst: s32 = 3;
 
-  smoke_particle_init_scale : Vector2 = {x: 15, y: 15};
-  smoke_particle_max_burst := 6;
-  smoke_particle_density := 1.5;
+  mut smoke_particle_init_scale : Vector2 = .{x: 15, y: 15};
+  mut smoke_particle_max_burst := 6;
+  mut smoke_particle_density := 1.5;
 
-  player_smoke_color : Color;
+  mut player_smoke_color : Color;
 
-  fire_particle_density := 3.0;
-  fire_particle_max_burst := 6;
+  mut fire_particle_density := 3.0;
+  mut fire_particle_max_burst := 6;
 
-  game_start_time : f32;
-  fade_in_length : f32 = 3.0;
-  misses_this_round : s8 = 0;
-  round_finish_start_time : f32 = -1;
+  mut game_start_time : f32;
+  mut fade_in_length : f32 = 3.0;
+  mut misses_this_round : s8 = 0;
+  mut round_finish_start_time : f32 = -1;
 
-  background_rect : Rectangle;
+  mut background_rect : Rectangle;
 
-  format_buffer: u8*;
+  mut format_buffer: *const u8;
 
-  game_music: Music;
-  menu_music: Music;
-  current_music: Music*;
+  mut game_music: Music;
+  mut menu_music: Music;
+  mut current_music: *mut Music;
 
-  spark_color : Color = {
+  mut spark_color : Color = .{
     r: YELLOW.r,
     g: YELLOW.g,
     b: YELLOW.b,
     a: 25 as u8
   };
 
-  bg_color : Color = BLACK;
+  mut bg_color : Color = BLACK;
 
-  target_bg_color : Color = {
+  mut target_bg_color : Color = .{
     r: 75 as u8, g: 75 as u8, b: 75 as u8, a: 255 as u8,
   }
 }
@@ -113,10 +112,10 @@ RenderInfo :: struct {
 
 impl RenderInfo {
   create :: fn(tex: Texture2D) -> #self {
-    self: #self;
+    mut self: #self;
     w := tex.width as f32;
     h := tex.height as f32;
-    self.tex_rect = {
+    self.tex_rect = .{
       x: 0, 
       y: 0,
       width: w,
@@ -128,7 +127,7 @@ impl RenderInfo {
 }
 
 Particle :: struct {
-  render_info: RenderInfo*,
+  render_info: *mut RenderInfo,
   velocity: Vector2,
   spawn_time: f32,
   lifetime: f32,
@@ -154,18 +153,18 @@ Bullet :: struct {
   speed: f32,
   rotation: f32,
   dead : bool,
-  render_info: RenderInfo*,
+  render_info: *mut RenderInfo,
   origin: Vector2,
   rect: Rectangle,
 }
 
 impl Bullet {
-  create :: fn(_rect: Rectangle, info: RenderInfo*, vel : Vector2, rot: f32) -> #self{
-    self: #self;
+  create :: fn(_rect: Rectangle, info: *mut RenderInfo, vel : Vector2, rot: f32) -> #self{
+    mut self: #self;
     self.rotation = rot;
     self.render_info = info;
     self.rect = _rect;
-    self.origin = { x:  _rect.width / 2, y: _rect.height / 2 };
+    self.origin = .{ x:  _rect.width / 2, y: _rect.height / 2 };
     self.velocity = vel;
     return self;
   }
@@ -176,18 +175,18 @@ Enemy :: struct {
   dead: bool,
   rect: Rectangle,
   origin: Vector2,
-  render_info : RenderInfo*,
+  render_info : *mut RenderInfo,
   target: Vector2,
   rotation: f32,
   speed: f32,
 };
 
 impl Enemy {
-  create :: fn(_rect: Rectangle, info: RenderInfo*) -> #self{
-    self: #self;
+  create :: fn(_rect: Rectangle, info: *mut RenderInfo) -> #self{
+    mut self: #self;
     self.render_info = info;
     self.rect = _rect;
-    self.origin = { x: _rect.width / 2, y: _rect.height / 2 };
+    self.origin = .{ x: _rect.width / 2, y: _rect.height / 2 };
     return self;
   }
 }
@@ -195,37 +194,34 @@ impl Enemy {
 TextParticle :: struct {
   position: Vector2,
   font_size : s32,
-  text: str,
+  text: String,
   spawn_time: f32,
   lifetime: f32,
   color: Color,
 }
 
 #region Global Variables {
-  timer : Timer;
+  mut timer : Timer;
 
-  bullet_render_info: RenderInfo;
-  enemy_render_info: RenderInfo;
-  smoke_particle_render_info: RenderInfo;
-  fire_particle_render_info: RenderInfo;
-  background_texture : Texture2D;
-
-  character : Character;
-  bullets: List![Bullet*];
-  enemies: List![Enemy*];
-  particles: List![Particle*];
-  text_particles: List![TextParticle*];
-
-  shot_sound: Sound;
-  explosion_sound: Sound;
-  thud_sound: Sound;
-  fail_sound: Sound;
-
-  ui_text_color : Color = WHITE;
+  mut bullet_render_info: RenderInfo;
+  mut enemy_render_info: RenderInfo;
+  mut smoke_particle_render_info: RenderInfo;
+  mut fire_particle_render_info: RenderInfo;
+  mut background_texture : Texture2D;
+  mut character : Character;
+  mut bullets: List!<*mut Bullet>;
+  mut enemies: List!<*mut Enemy>;
+  mut particles: List!<*mut Particle>;
+  mut text_particles: List!<*mut TextParticle>;
+  mut shot_sound: Sound;
+  mut explosion_sound: Sound;
+  mut thud_sound: Sound;
+  mut fail_sound: Sound;
+  mut ui_text_color : Color = WHITE;
 }
 
-get_center_screen_rect:: fn(width: f32, height, offset: Vector2) -> Rectangle {
-  return {
+get_center_screen_rect:: fn(width: f32, height: f32, offset: Vector2) -> Rectangle {
+  return .{
     x: screen_width / 2 + offset.x,
     y: screen_width / 2 + offset.y,
     width: width,
@@ -233,14 +229,14 @@ get_center_screen_rect:: fn(width: f32, height, offset: Vector2) -> Rectangle {
   };
 }
 
-make_text_particle :: fn(text: str, font_size: s32, position: Vector2, lifetime: f32) {
-  particle : TextParticle* = malloc(sizeof(TextParticle));
-  particle.position = position;
-  particle.font_size = font_size;
-  particle.text = text;
-  particle.spawn_time = GetTime();
-  particle.lifetime = lifetime;
-  text_particles.push(particle);
+make_text_particle :: fn(text: String, font_size: s32, position: Vector2, lifetime: f32) {
+  text_particles.push(new(TextParticle.{
+    position: position,
+    font_size: font_size,
+    text: text,
+    spawn_time: GetTime() as f32,
+    lifetime: lifetime,
+  }));
 }
 
 // great function name
@@ -249,30 +245,30 @@ get_random_grayscale_color_with_per_channel_variance :: fn(_variance: f32) -> Co
   r : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   g : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
   b : u8 = clamp(gray_value + (GetRandomValue(0, 1) * _variance) as u8, 0, 255) as u8;
-  return {r: r, g: g, b: b, a: 255 as u8};
+  return .{r: r, g: g, b: b, a: 255 as u8};
 }
 
-random_vector2 :: fn(origin: Vector2, min, max) -> Vector2 {
-  result: Vector2;
+random_vector2 :: fn(origin: Vector2, min: Vector2, max: Vector2) -> Vector2 {
+  mut result: Vector2;
   result.x = origin.x + min.x + GetRandomValue(0, 1) * (max.x - min.x);
   result.y = origin.y + min.y + GetRandomValue(0, 1) * (max.y - min.y);
   return result;
 }
 
 random_vector2_scalar :: fn(max: f32) -> Vector2 {
-  result: Vector2;
+  mut result: Vector2;
   value := GetRandomValue(0, max as s32);
-  result.x = value
+  result.x = value;
   result.y = value;
   return result;
 }
 
 make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
-  particle : Particle* = malloc(sizeof(Particle));
+  particle : *mut Particle = malloc(sizeof(Particle));
   if kind == ParticleKind::Smoke {
     max_vel := 3.0;
-    particle.position = random_vector2(position, {x: 0, y: 0}, {x: max_vel, y: max_vel});
-    particle.velocity = random_vector2({x: 0.0, y: 0.0}, {x: -max_vel, y: -1.0}, {x: max_vel, y: max_vel});
+    particle.position = random_vector2(position, .{x: 0, y: 0}, .{x: max_vel, y: max_vel});
+    particle.velocity = random_vector2(.{x: 0.0, y: 0.0}, .{x: -max_vel, y: -1.0}, .{x: max_vel, y: max_vel});
     burst : s32 = (GetRandomValue(0, 1) * smoke_particle_max_burst) as s32;
     if can_burst && burst > 1 {
       can_burst = false;
@@ -281,7 +277,7 @@ make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
     }
 
     particle.color = ColorAlphaBlend(get_random_grayscale_color_with_per_channel_variance(50.0), tint, WHITE);
-    particle.render_info = &smoke_particle_render_info;
+    particle.render_info = &mut smoke_particle_render_info;
     particle.lifetime = 1.0;
     particle.scale = smoke_particle_init_scale.scale(GetRandomValue(0, 6400));
     particle.spawn_time = GetTime();
@@ -297,9 +293,9 @@ make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
       can_burst = true;
     }
 
-    particle.render_info = &fire_particle_render_info;
+    particle.render_info = &mut fire_particle_render_info;
     particle.lifetime = 4.0 / 60;
-    particle.scale = {x: 16.0, y: 16.0};
+    particle.scale = .{x: 16.0, y: 16.0};
     particle.spawn_time = GetTime();
     particle.color = tint;
   }
@@ -307,7 +303,7 @@ make_particle :: fn(kind: s32, position: Vector2, tint: Color) {
   particles.push(particle);
 }
 
-update_particle :: fn(particle: Particle*) -> bool {
+update_particle :: fn(particle: *mut Particle) -> bool {
   time := GetTime();
   if particle.kind == ParticleKind::Smoke {
     particle.position = particle.position.add(particle.velocity);
@@ -320,7 +316,7 @@ update_particle :: fn(particle: Particle*) -> bool {
     if delta > particle.lifetime {
       return t < 0.1 && particle.color.a == 0;
     }
-    particle.scale = {x: scale, y: scale};
+    particle.scale = .{x: scale, y: scale};
   } else if  particle.kind == ParticleKind::Fire {
     particle.scale.x *= 0.95;
     particle.scale.y *= 0.95;
@@ -331,10 +327,10 @@ update_particle :: fn(particle: Particle*) -> bool {
   return true;
 }
 
-enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
-  position : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
+enemy_move_towards_or_get_new_target :: fn(enemy: *mut Enemy) {
+  mut position: Vector2 = .{x: enemy.rect.x, y: enemy.rect.y};
   if position.distance(enemy.target) < 5 || zero.equals(enemy.target) {
-    enemy.target = { 
+    enemy.target = .{ 
       x: GetRandomValue(0, 1) * screen_width, 
       y: GetRandomValue(0, 1) * screen_height 
     };
@@ -350,58 +346,55 @@ enemy_move_towards_or_get_new_target :: fn(enemy: Enemy*) {
 }
 
 make_enemy :: fn() {
-  x : f32 = GetRandomValue(0, 1) * screen_width;
-  y : f32 = GetRandomValue(0, 1) * screen_height;
-  rect : Rectangle = {x: x, y: y, width: enemy_scale, height: enemy_scale};
+  x: f32 = GetRandomValue(0, 1) * screen_width;
+  y: f32 = GetRandomValue(0, 1) * screen_height;
+  mut rect: Rectangle = .{x: x, y: y, width: enemy_scale, height: enemy_scale};
 
   rect.x = clamp(rect.x, 0, screen_width);
   rect.y = clamp(rect.y, 0, screen_height / 1.5);
 
-  enemy : Enemy* = malloc(sizeof(Enemy));
-  *enemy = Enemy::create(rect, &enemy_render_info);
+  enemy := new(Enemy::create(rect, &mut enemy_render_info));
 
   enemy_move_towards_or_get_new_target(enemy);
 
   for _ in 0..10 {
-    make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, BLUE);
+    make_particle(ParticleKind::Smoke, .{x: rect.x, y: rect.y}, BLUE);
   }
 
   enemy.id = enemies.length;
   enemies.push(enemy);
 }
 
-make_bullet :: fn(x: f32, y, rotation) {
-  offset: f32;
+make_bullet :: fn(x: f32, y: f32, rotation: f32) {
+  mut offset: f32;
   if character.cannon_idx == 0 {
-    offset = -(bullet_scale / 2.0)
+    offset = -(bullet_scale / 2.0);
   } else {
     offset = (bullet_scale / 2.0);
   }
-  rect : Rectangle = {x: x + offset, y: y - bullet_scale, width: bullet_scale, height: bullet_scale};
+  rect: Rectangle = .{x: x + offset, y: y - bullet_scale, width: bullet_scale, height: bullet_scale};
   radians := (rotation / 360) * 3.14159265 * 2;
-  direction : Vector2 = {x: -(sin(radians) as f32), y: cos(radians) as f32};
+  direction: Vector2 = .{x: -(sin(radians) as f32), y: cos(radians) as f32};
   start_velocity := direction.scale(bullet_start_velocity);
   
   { 
-    bullet: Bullet* = malloc(sizeof(Bullet));
-    *bullet = Bullet::create(rect, &bullet_render_info, start_velocity, rotation);
-    bullets.push(bullet);
+    bullets.push(new(Bullet::create(rect, &mut bullet_render_info, start_velocity, rotation)));
   }
 
-  make_particle(ParticleKind::Smoke, {x: rect.x, y: rect.y}, PINK);
-  fire_pos : Vector2 = {x: rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, y: rect.y - bullet_scale};
+  make_particle(ParticleKind::Smoke, .{x: rect.x, y: rect.y}, PINK);
+  fire_pos: Vector2 = .{x: rect.x - (bullet_scale * 0.5) + character.horizontal_velocity, y: rect.y - bullet_scale};
   make_particle(ParticleKind::Fire, fire_pos, WHITE);
 }
 
 draw_background :: fn() {
   bg_color = Color::lerp(bg_color, target_bg_color, 0.25);
   
-  DrawTexturePro(background_texture, background_rect, {
+  DrawTexturePro(background_texture, background_rect, .{
     x: 0.0,
     y: 0.0,
     width: screen_width, 
     height: screen_height
-  }, {x: 0.0, y: 0.0}, 0.0, bg_color);
+  }, .{x: 0.0, y: 0.0}, 0.0, bg_color);
 
   now : f32 = GetTime() as f32; 
   t := (now - game_start_time) / fade_in_length;
@@ -425,7 +418,7 @@ draw_game :: fn() {
   }
 
   for particle in particles {
-    rect : Rectangle = {
+    rect : Rectangle = .{
       x: particle.position.x,
       y: particle.position.y,
       width: particle.scale.x,
@@ -439,10 +432,10 @@ draw_game :: fn() {
 
   DrawTexturePro(character.texture, character.tex_rect, character.rect, character.origin, character.rotation, WHITE);
 
-  sprintf(format_buffer,  "Score:            %d", score);
+  sprintf(format_buffer,  "Score:            %d"c, score);
   DrawText(format_buffer, 0, 0, 24, ui_text_color);
 
-  sprintf(format_buffer,  "Count:            %d", targets_destroyed);
+  sprintf(format_buffer,  "Count:            %d"c, targets_destroyed);
   DrawText(format_buffer, 0, 30, 24, ui_text_color);
 
   if ui_text_color.a > 0 then
@@ -473,7 +466,7 @@ impl BulletRoutine {
   }
 }
 
-bullet_routine : BulletRoutine;
+mut bullet_routine : BulletRoutine;
 
 
 on_bullet_fizzle :: fn() {
@@ -492,11 +485,11 @@ on_bullet_fizzle :: fn() {
   // }
 }
 
-on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: s32) {
+on_enemy_killed :: fn(enemy: *mut Enemy, n_enemies_killed_this_frame: s32) {
   PlaySound(explosion_sound);
-  make_particle(ParticleKind::Fire, {x: enemy.rect.x, y: enemy.rect.y}, WHITE);
+  make_particle(ParticleKind::Fire, .{x: enemy.rect.x, y: enemy.rect.y}, WHITE);
   for _ in 0..4 {
-    make_particle(ParticleKind::Smoke, {x: enemy.rect.x, y: enemy.rect.y}, spark_color);
+    make_particle(ParticleKind::Smoke, .{x: enemy.rect.x, y: enemy.rect.y}, spark_color);
   }
   // bonus score.
   if n_enemies_killed_this_frame >= enemies.length {
@@ -505,7 +498,7 @@ on_enemy_killed :: fn(enemy: Enemy*, n_enemies_killed_this_frame: s32) {
   }
 }
 
-space_down := false;
+mut space_down := false;
 
 update_game :: fn() {
 
@@ -514,23 +507,23 @@ update_game :: fn() {
     if round_finish_start_time == -1.0 { round_finish_start_time = GetTime(); }
     now : f32 = GetTime() as f32;
     if now - round_finish_start_time < 2.0 {
-      v := round_index + 1;
-      text := format("Round: %...", {any::from(&v)});
-      defer free(text);
+      mut v := round_index + 1;
 
-      style := jiggly_text_style;
+      mut style := jiggly_text_style;
       style.foreground = Color::lerp(GREEN, CYAN, 0.5);
       style.font_size = 18;
       style.jiggle_intensity = 2;
       style.jiggle_rate = 10;
 
+      mut text := format("Round: %...", (v,), FormatOptions::default());
       text_w := measure_jiggly_text(text, style) / 4.0;
-      jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 0.0}), style);
+      jiggly_text(text, get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 0.0}), style);
+      text.deinit();
 
       v = round_base_num_enemies_to_advance * round_index;
-      text = format("Requires % enemies to pass.", {any::from(&v)});
-      jiggly_text(text, get_center_screen_rect(24, 12, {x: -(text_w * 3), y: 24}), style);
-
+      text = format("Requires % enemies to pass.", (v,), FormatOptions::default());
+      jiggly_text(text, get_center_screen_rect(24, 12, .{x: -(text_w * 3), y: 24}), style);
+      text.deinit();
     } else {
       misses_this_round = 0;
       round_index++;
@@ -566,7 +559,7 @@ update_game :: fn() {
     //   scene = Scene::MainMenu;
     // }
   }
-  moved := false;
+  mut moved := false;
   if IsKeyDown(KeyboardKey::KEY_A) {
     character.horizontal_velocity -= character.speed;
     moved = true;
@@ -578,7 +571,7 @@ update_game :: fn() {
 
   if moved || character.horizontal_velocity > 0 || character.horizontal_velocity < 0 {
     for i in 0..fabs(character.horizontal_velocity * smoke_particle_density) as s64 {
-      make_particle(ParticleKind::Smoke, {
+      make_particle(ParticleKind::Smoke, .{
         x: character.rect.x - 10,
         y: character.rect.y + (character.rect.height / 3),
       }, player_smoke_color);
@@ -594,8 +587,8 @@ update_game :: fn() {
     bullet_routine.count = bullet_max_burst;
   }
 
-  dead_bullets: Bullet*[];
-  dead_enemies: Enemy*[];
+  mut dead_bullets: List!<*mut Bullet>;
+  mut dead_enemies: List!<*mut Enemy>;
 
   // update enemy transforms.
   for enemy in enemies {
@@ -606,7 +599,7 @@ update_game :: fn() {
     }
   }
 
-  screen_rect : Rectangle = {
+  screen_rect : Rectangle = .{
     x: 0.0, y: 0.0,
     width: GetScreenWidth() as f32,
     height: GetScreenHeight() as f32,
@@ -621,7 +614,7 @@ update_game :: fn() {
 
     // mark stopped bullets or bullets off-screen as dead.
     if !CheckCollisionRecs(screen_rect, bullet.rect) || bullet.velocity.length_sqr() <= bullet_min_velocity {
-      dead_bullets.push(bullet)
+      dead_bullets.push(bullet);
       bullet.dead = true;
       on_bullet_fizzle();
       continue;
@@ -650,41 +643,41 @@ update_game :: fn() {
         }
         targets_destroyed++;
 
-        enemy_pos : Vector2 = {x: enemy.rect.x, y: enemy.rect.y};
-        u8acter_pos : Vector2 = {x: character.rect.x, y: character.rect.y};
+        enemy_pos : Vector2 = .{x: enemy.rect.x, y: enemy.rect.y};
+        u8acter_pos : Vector2 = .{x: character.rect.x, y: character.rect.y};
         distance := enemy_pos.distance(u8acter_pos);
         amount : s32 = (distance * round_index) as s32;
-        score += amount
+        score += amount;
         ui_text_color.a = 255 as u8;
         
-        make_text_particle(String::from(format("+%", {any::from(&amount)})), 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        mut text := format("+%", (amount,), FormatOptions::default());
+        make_text_particle(text, 12 + clamp(0, 8, distance), enemy_pos, clamp(0.5, 3.5, distance as f32) as f32);
+        text.deinit();
         break;
       }
     }
   }
 
-  for bullet in dead_bullets {
-    list_erase![Bullet*](bullets, bullet);
-    free(bullet);
+
+  while !dead_bullets.is_empty() {
+    free(dead_bullets.pop());
   }
 
-  for enemy in dead_enemies {
-    list_erase![Enemy*](enemies, enemy);
-    free(enemy);
+  while !dead_enemies.is_empty() {
+    free(dead_enemies.pop());
   }
 
-  dead_particles: Particle*[];
+  mut dead_particles: List!<*mut Particle>;
   for particle in particles {
     if !update_particle(particle)
       then dead_particles.push(particle);
   }
 
-  for particle in dead_particles {
-    list_erase![Particle*](particles, particle);
-    free(particle);
+  while !dead_particles.is_empty() {
+    free(dead_particles.pop());
   }
 
-  dead_text_particles : TextParticle*[];
+  mut dead_text_particles : List!<*mut TextParticle>;
   for particle in text_particles {
     particle.position = particle.position.add(Vector2::scalar(0.1));
     now := GetTime() as f32;
@@ -694,27 +687,25 @@ update_game :: fn() {
     }
   }
 
-  for particle in dead_text_particles {
-    //list_erase![TextParticle*](text_particles, particle);
-    free(particle);
+  while !dead_text_particles.is_empty() {
+    free(dead_text_particles.pop());
   }
-
 }
 
 init :: fn() {
-  background_texture = LoadTexture("res/background.png");
+  background_texture = LoadTexture("res/background.png"c);
 
   screen_width =  GetScreenWidth() as f32;
   screen_height = GetScreenHeight() as f32;
 
-  background_rect = {
+  background_rect = .{
     x: 0.0,
     y: 0.0,
     width: background_texture.width as f32,
     height: background_texture.height as f32
   };
 
-  character.texture = LoadTexture("res/character.png");
+  character.texture = LoadTexture("res/character.png"c);
 
   player_smoke_color = CYAN;
   player_smoke_color.r /= 2;
@@ -723,23 +714,23 @@ init :: fn() {
 
   w := character.texture.width  as f32;
   h := character.texture.height as f32;
-  character.tex_rect = {
+  character.tex_rect = .{
     x: 0, y: 0,
     width: w, height: h
   };
 
-  character.rect = {
+  character.rect = .{
     x: screen_width / 2,
     y: screen_height / 1.25,
     width: 64, height: 64
   };
 
-  character.origin = { x: character.rect.width / 2, y: character.rect.height / 2 };
+  character.origin = .{ x: character.rect.width / 2, y: character.rect.height / 2 };
 
-  bullet_render_info = RenderInfo::create(LoadTexture("res/bullet.png"));
-  enemy_render_info = RenderInfo::create(LoadTexture("res/enemy.png"));
-  smoke_particle_render_info = RenderInfo::create(LoadTexture("res/smoke.png"));
-  fire_particle_render_info = RenderInfo::create(LoadTexture("res/fire.png"));
+  bullet_render_info = RenderInfo::create(LoadTexture("res/bullet.png"c));
+  enemy_render_info = RenderInfo::create(LoadTexture("res/enemy.png"c));
+  smoke_particle_render_info = RenderInfo::create(LoadTexture("res/smoke.png"c));
+  fire_particle_render_info = RenderInfo::create(LoadTexture("res/fire.png"c));
   timer.interval = 3;
 
 }
@@ -747,12 +738,12 @@ init :: fn() {
 init_audio :: fn() {
   InitAudioDevice();
   if !IsAudioDeviceReady() {
-    printf("Failed to initialize audio device.\n");
+    printf("Failed to initialize audio device.\n"c);
     exit(1);
   }
   // init audio
-  menu_music = LoadMusicStream("res/music1.wav")
-  game_music = LoadMusicStream("res/music.wav");
+  menu_music = LoadMusicStream("res/music1.wav"c);
+  game_music = LoadMusicStream("res/music.wav"c);
   menu_music.looping = true;
   game_music.looping = true;
 
@@ -760,18 +751,18 @@ init_audio :: fn() {
   SetMusicVolume(game_music, 1.5);
 
   PlayMusicStream(menu_music);
-  current_music = &menu_music;
+  current_music = &mut menu_music;
 
-  shot_sound = LoadSound("res/shot.wav");
+  shot_sound = LoadSound("res/shot.wav"c);
   SetSoundVolume(shot_sound, 5.0);
 
-  explosion_sound = LoadSound("res/explosion_low.wav");
+  explosion_sound = LoadSound("res/explosion_low.wav"c);
   SetSoundVolume(explosion_sound, 1);
 
-  thud_sound = LoadSound("res/thud.wav");
+  thud_sound = LoadSound("res/thud.wav"c);
   SetSoundVolume(thud_sound, 0.4);
 
-  fail_sound = LoadSound("res/fail.wav");
+  fail_sound = LoadSound("res/fail.wav"c);
   SetSoundVolume(fail_sound, 0.05);
   SetMasterVolume(0.75);
 }
@@ -803,9 +794,9 @@ reset_game_state :: fn() {
 swap_music :: fn() {
   StopMusicStream(*current_music);
   if scene == Scene::MainMenu {
-    current_music = &menu_music;
+    current_music = &mut menu_music;
   } else {
-    current_music = &game_music;
+    current_music = &mut game_music;
   }
   PlayMusicStream(*current_music);
 }
@@ -814,7 +805,7 @@ draw_main_menu :: fn() {
   width : f32 = 72;
   height : f32 = 48;
 
-  start_button_rect := Rectangle {
+  start_button_rect := Rectangle .{
     x: screen_width / 2 - (width / 2), 
     y: screen_height / 1.2 - (height / 2), 
     width: width,
@@ -830,7 +821,7 @@ draw_main_menu :: fn() {
     round_failed = false;
   }
 
-  rect : Rectangle = {
+  rect : Rectangle = .{
     x: screen_width / 7,
     y: screen_height / 10,
     width: screen_width / 2,
@@ -840,8 +831,8 @@ draw_main_menu :: fn() {
   jiggly_text("target practice", rect, jiggly_text_style);
 
   if round_failed {
-    style := jiggly_text_style;
-    rect : Rectangle = {
+    mut style := jiggly_text_style;
+    mut rect: Rectangle = .{
       x: screen_width / 7,
       y: screen_height / 3,
       width: screen_width / 2,
@@ -855,43 +846,43 @@ draw_main_menu :: fn() {
     style.foreground = CYAN;
     style.jiggle_intensity = 3.0;
     style.jiggle_rate = 1.0;
-    text := format("reached round %,", {any::from(&round_index)});
+    mut text := qformat("reached round %,", (round_index,));
     jiggly_text(text, rect, style);
-    free(text);
+    text.deinit();
     rect.y += 64;
-    text = format("% targets taken down", {any::from(&targets_destroyed)});
+    text = qformat("% targets taken down", (targets_destroyed,));
     jiggly_text(text, rect, style);
-    free(text);
+    text.deinit();
     rect.y += 64;
-    text = format("scored % points", {any::from(&score)});
+    text = qformat("scored % points", (score,));
     jiggly_text(text, rect, style);
-    free(text);
+    text.deinit();
   }
 }
 
-music_muted := false;
+mut music_muted := false;
 
 draw_game_menu :: fn() {
   width : f32 = 72 / 3;
   height : f32 = 48 / 3;
 
-  style := button_style;
+  mut style := button_style;
   style.use_jiggly_text = false;
-  swap_rect := Rectangle {x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height};
+  swap_rect := Rectangle .{x: screen_width - width * 8, y: screen_height - height * 1.2, width: width, height: height};
 
   if button("swap music", swap_rect, style) {
     StopMusicStream(*current_music);
-    if current_music == &game_music {
-      current_music = &menu_music;
+    if current_music == &mut game_music {
+      current_music = &mut menu_music;
     } else {
-      current_music = &game_music;
+      current_music = &mut game_music;
     }
     PlayMusicStream(*current_music);
   }
 
   style = button_style;
   style.use_jiggly_text = false;
-  mute_rect := Rectangle {x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height};
+  mute_rect := Rectangle .{x: screen_width - width * 3, y: screen_height - height * 1.2, width: width, height: height};
 
   if button("mute music", mute_rect, style) {
     if music_muted {
@@ -909,7 +900,7 @@ main :: fn() {
   button_style.highlighted = CYAN.with_alpha(24);
   format_buffer = malloc(sizeof(u8) * 1024);
 
-  InitWindow(800, 600, "target practice");
+  InitWindow(800, 600, "target practice"c);
   SetTargetFPS(60);
 
   init();

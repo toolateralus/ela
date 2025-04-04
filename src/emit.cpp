@@ -1628,7 +1628,6 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
 
   ss << get_interfaces_init_statements();
 
-
   if (!type->is_kind(TYPE_INTERFACE))
     ss << get_methods_init_statements();
 
