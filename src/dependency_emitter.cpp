@@ -401,7 +401,27 @@ void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
 
 void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTScopeResolution *node) { node->base->accept(this); }
+void DependencyEmitter::visit(ASTScopeResolution *node) {
+  node->base->accept(this);
+  auto scope_nullable = ctx.get_scope(node->base);
+  auto scope = scope_nullable.get();
+
+  if (auto member = scope->local_lookup(node->member_name)) {
+    ASTNode *decl = nullptr;
+    if (member->is_type()) {
+      decl = member->type.declaration.get();
+    } else if (member->is_function()) {
+      decl = member->function.declaration;
+    }
+    if (decl) {
+      decl->accept(this);
+    }
+  } else if (auto type = scope->find_type_id(node->member_name, {})) {
+    if (type == Type::INVALID_TYPE_ID) {
+      throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
+    }
+  }
+}
 
 void DependencyEmitter::visit(ASTAlias *node) {}
 
