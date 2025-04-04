@@ -851,9 +851,13 @@ ASTExpr *Parser::parse_primary() {
       expect(TType::Dyn_Of);
       NODE_ALLOC(ASTDyn_Of, dyn_of, range, _, this)
       expect(TType::LParen);
-      dyn_of->interface_type = parse_type();
-      expect(TType::Comma);
       dyn_of->object = parse_expr();
+
+      if (peek().type == TType::Comma) {
+        expect(TType::Comma);
+        dyn_of->interface_type = parse_type();
+      }
+      
       expect(TType::RParen);
       return dyn_of;
     }

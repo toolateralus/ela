@@ -2234,4 +2234,5 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
     newline_indented();
   }
   code << "} " << name << ";";
+  newline_indented();
 }

@@ -2525,7 +2525,19 @@ void Typer::visit(ASTModule *node) {
 }
 
 void Typer::visit(ASTDyn_Of *node) {
-  node->interface_type->accept(this);
+
+  if (!node->interface_type) {
+    auto type = global_get_type(expected_type);
+    if (type && type->is_kind(TYPE_DYN)) {
+      node->interface_type = ast_alloc<ASTType>();
+      node->interface_type->resolved_type = type->get_info()->as<DynTypeInfo>()->interface_type;
+    } else {
+      throw_error("if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, etc), you must pass the _interface_ type as the second parameter to 'dynof'\nSo, if you wanted a 'dyn Format', youd use 'dynof(my_instance, Format)'", node->source_range);
+    }
+  } else {
+    node->interface_type->accept(this);
+  }
+
   node->object->accept(this);
 
   auto object_type = global_get_type(node->object->resolved_type);
