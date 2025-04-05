@@ -12,24 +12,49 @@ Math :: choice {
 
 #test test_main :: fn() {
   /* constructor */
-  mut x := OptionT!<s32>::Some(10);
+
+  /* 
+    this treats what would get normally parsed as a call,
+    as some sort of a tuple literal.
+  */
+  mut x : OptionT!<s32> = OptionT!<s32>::Some(10);
+
+  /* 
+    this is just weird.
+  */
   x = OptionT!<s32>::None;
 
-  /* struct thing */
+  /* struct thing, kinda would just work with init list. */
   x := Math::Vector2.{
     x: 0.0,
     y: 0.0
   };
   
+  /* pattern match, positional args kind of thing */
   if x is Math::Vector2 { x, y } {
     fmt::println((x, y));
   }
 
+  /* pattern match, named args. */
+  if x is Math::Vector2 { x: x, y: y } {
+    fmt::println((x, y));
+  }
+
+  /* again, positional. */
   if x is Math::Vector3 { x, y, z } {
     fmt::println((x, y, y));
   }
 
+  /* pattern match, take tuple members as a destructured list */
   if x is OptionT!<s32>::Some(v) {
     fmt::println(v);
   }
+
+  /* 
+    * assuming we had more members
+    
+    ? if x is OptionT!<s32>::Some(x, y) {
+
+    ? } 
+  */
 }
