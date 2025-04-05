@@ -619,6 +619,17 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
       eat();
       auto target_type = parse_type();
 
+      // TODO: figure out why we have to rectify this. it may be indicative of another problem.
+      if (peek().type == TType::DoubleColon) {
+        eat();
+        auto type = ast_alloc<ASTType>();
+        auto scope_res = ast_alloc<ASTScopeResolution>();
+        scope_res->base = target_type;
+        scope_res->member_name = expect(TType::Identifier).value;
+        type->normal.base = scope_res;
+        target_type = type;
+      }
+
       if (peek().type == TType::LCurly) {
         eat();
         pattern_match->pattern_tag = ASTPatternMatch::STRUCT;
