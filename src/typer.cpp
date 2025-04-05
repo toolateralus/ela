@@ -1997,7 +1997,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 }
 
 void Typer::visit(ASTPath *node) {
-  Scope *scope = ctx->scope;
+  Scope *scope = ctx.scope;
   auto index = 0;
   for (auto &part in node->parts) {
     auto &ident = part.value;
@@ -2011,11 +2011,14 @@ void Typer::visit(ASTPath *node) {
       auto generic_args = part.get_resolved_generics();
       ASTDeclaration *instantiation;
       if (symbol->is_type()) {
-        auto decl = (ASTType *)symbol->type.declaration.get();
+        auto decl = (ASTStructDeclaration *)symbol->type.declaration.get();
         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
         auto type = global_get_type(instantiation->resolved_type);
         scope = type->get_info()->scope;
-      } else if (symbol->is_function()) {target of generic in
+      } else if (symbol->is_function()) {
+        auto decl = (ASTFunctionDeclaration *)symbol->function.declaration;
+        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+      }
       part.resolved_type = instantiation->resolved_type;
     } else {
       if (symbol->is_module()) {
