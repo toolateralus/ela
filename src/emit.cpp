@@ -167,7 +167,7 @@ void Emitter::visit(ASTFor *node) {
     // it's likely we'll have to do this for all the tuple destructures and all that crap.
     code << indent()
          << get_declaration_type_signature_and_identifier(
-                emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)),
+                emit_symbol(ctx.scope->local_lookup(node->left.identifier)),
                 global_get_type(node->identifier_type));
 
     code << " = $next.s;\n";
@@ -201,8 +201,7 @@ void Emitter::visit(ASTFor *node) {
       auto &destruct = node->left.destructure[i];
       auto iden = destruct.identifier;
       emit_line_directive(node);
-      code << indent() << "auto ";
-      iden->accept(this);
+      code << indent() << "auto " << iden.get_str();
       code << " = ";
 
       if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
@@ -287,15 +286,12 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_TYPE:
       return node->resolved_type;
-    case AST_NODE_IDENTIFIER:
-      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       return dotnode->base->resolved_type;
     } break;
-    case AST_NODE_SCOPE_RESOLUTION: {
-      auto srnode = static_cast<ASTScopeResolution *>(node);
-      return srnode->base->resolved_type;
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath*>(node);
     } break;
     default:
       throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",

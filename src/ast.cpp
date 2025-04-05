@@ -758,9 +758,9 @@ ASTExpr *Parser::parse_postfix() {
   auto left = parse_primary();
   auto range = begin_node();
   // build dot and subscript expressions
-  while (peek().type == TType::Dot || peek().type == TType::LBrace ||
-         peek().type == TType::LParen || peek().type == TType::GenericBrace || peek().type == TType::Increment ||
-         peek().type == TType::Decrement || peek().type == TType::Range || peek().type == TType::As) {
+  while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::LParen ||
+         peek().type == TType::GenericBrace || peek().type == TType::Increment || peek().type == TType::Decrement ||
+         peek().type == TType::Range || peek().type == TType::As) {
     if (peek().type == TType::LParen) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -1108,7 +1108,6 @@ ASTType *Parser::parse_type() {
     return type;
   }
 
-  
   node->kind = ASTType::NORMAL;
   node->normal.base = parse_path();
   node->normal.base->source_range = range;
@@ -1650,10 +1649,10 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
                     node->source_range);
       ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
     } else {
-
       // TODO: reimplement this error in a sane way.
-      if (!symbol) 
-        throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist", node->source_range);
+      if (!symbol)
+        throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
+                    node->source_range);
 
       ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
     }
@@ -2581,9 +2580,41 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       }
       return get_symbol(type_node->normal.base);
     }
-    case AST_NODE_PATH:
-      // ! TODO: Resolve path to symbol.
-      // return scope->lookup(static_cast<ASTPath *>(node)->value);
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath *>(node);
+      Scope *scope = this->scope;
+      auto index = 0;
+      for (auto &part in path->parts) {
+        auto &ident = part.value;
+        auto symbol = scope->lookup(ident);
+        if (!symbol) 
+          return nullptr;
+
+        if (index == path->length() - 1) 
+          return symbol;
+
+        if (part.generic_arguments) {
+          if (symbol->is_type()) {
+            auto instantiation =
+                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                      part.get_resolved_generics());
+            auto type = global_get_type(instantiation->resolved_type);
+            scope = type->get_info()->scope;
+          } else return nullptr;
+        } else {
+          if (symbol->is_module()) {
+            scope = symbol->module.declaration->scope;
+          } else if (symbol->is_type()) {
+            auto resolved_type = global_get_type(symbol->type_id);
+            scope = resolved_type->get_info()->scope;
+          } else {
+            return nullptr;
+          }
+        }
+        index++;
+      } 
+
+    } break;
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       auto type = global_get_type(dotnode->base->resolved_type);
@@ -2608,17 +2639,39 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       return type->get_info()->scope;
     }
     case AST_NODE_PATH: {
-      // ! /* RESOLVE NODE TO SCOPE */
-      // auto symbol = scope->lookup(static_cast<ASTPath *>(node)->value);
-      // if (symbol->is_module()) {
-      //   return symbol->module.declaration->scope;
-      // } else if (symbol->is_type() && symbol->type_id != Type::INVALID_TYPE_ID) {
-      //   auto type = global_get_type(symbol->type_id);
-      //   return type->get_info()->scope;
-      // } else {
-      //   return nullptr;
-      // }
-    }
+      auto path = static_cast<ASTPath *>(node);
+      Scope *scope = this->scope;
+      auto index = 0;
+      for (auto &part in path->parts) {
+        auto &ident = part.value;
+        auto symbol = scope->lookup(ident);
+        if (!symbol) 
+          return nullptr;
+
+        if (index == path->length() - 1) 
+          return symbol->scope;
+
+        if (part.generic_arguments) {
+          if (symbol->is_type()) {
+            auto instantiation =
+                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                      part.get_resolved_generics());
+            auto type = global_get_type(instantiation->resolved_type);
+            scope = type->get_info()->scope;
+          } else return nullptr;
+        } else {
+          if (symbol->is_module()) {
+            scope = symbol->module.declaration->scope;
+          } else if (symbol->is_type()) {
+            auto resolved_type = global_get_type(symbol->type_id);
+            scope = resolved_type->get_info()->scope;
+          } else {
+            return nullptr;
+          }
+        }
+        index++;
+      } 
+    } break;
     default:
       return nullptr; // TODO: verify this isn't strange.
   }

@@ -268,6 +268,15 @@ struct ASTPath: ASTExpr {
       like identifiers.
     */
     std::optional<std::vector<ASTExpr*>> generic_arguments = std::nullopt;
+
+    inline std::vector<int> get_resolved_generics() {
+      std::vector<int> generics;
+      for (auto arg: *generic_arguments) {
+        generics.push_back(arg->resolved_type);
+      }
+      return generics;
+    }
+    
   };
 
   /*
@@ -283,6 +292,10 @@ struct ASTPath: ASTExpr {
   std::vector<Part> parts;
   ASTNodeType get_node_type() const {
     return AST_NODE_PATH;
+  }
+
+  inline size_t length() const {
+    return parts.size();
   }
 
   inline void push_part(InternedString identifier) {
