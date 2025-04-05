@@ -1195,6 +1195,15 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
+  if (tok.type == TType::Const) {
+    eat();
+    auto variable = parse_variable();
+    variable->is_constexpr = true;
+    ctx.scope->insert_variable(variable->name, -1, variable->value.get(), CONST);
+    return variable;
+  }
+
+
   if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)
     statment->expression = parse_expr();
@@ -1691,10 +1700,6 @@ ASTVariable *Parser::parse_variable() {
       auto expr = parse_expr();
       decl->value = expr;
     }
-  } else if (peek().type == TType::DoubleColon) {
-    eat();
-    decl->value = parse_expr();
-    decl->is_constexpr = true;
   } else {
     expect(TType::ColonEquals);
     decl->value = parse_expr();
