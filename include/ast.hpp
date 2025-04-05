@@ -261,13 +261,13 @@ struct ASTTypeExtension {
 
 struct ASTPath: ASTExpr {
   struct Part {
-    int resolved_type = Type::INVALID_TYPE_ID;
     InternedString value {};
     /* 
       we use optional here to avoid unneccesary initialization for basic stuff
       like identifiers.
     */
     std::optional<std::vector<ASTExpr*>> generic_arguments = std::nullopt;
+    int resolved_type = Type::INVALID_TYPE_ID;
 
     inline std::vector<int> get_resolved_generics() {
       std::vector<int> generics;
