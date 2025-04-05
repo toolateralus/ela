@@ -1997,17 +1997,40 @@ void Typer::visit(ASTUnaryExpr *node) {
   return;
 }
 
-void Typer::visit(ASTIdentifier *node) {
-  node->resolved_type = ctx.scope->find_type_id(node->value, {});
-  if (node->resolved_type != Type::INVALID_TYPE_ID) {
-    return;
-  }
+void Typer::visit(ASTPath *node) {
+  Scope *scope = ctx->scope;
+  auto index = 0;
+  for (auto &part in node->parts) {
+    auto &ident = part.value;
+    auto symbol = scope->lookup(ident);
+    scope = nullptr;
+    if (!symbol) {
+      throw_error("symbol not found in scope", node->source_range);
+    }
 
-  auto symbol = ctx.scope->lookup(node->value);
-  if (symbol) {
-    node->resolved_type = symbol->type_id;
-  } else {
-    throw_error(std::format("Use of undeclared identifier '{}'", node->value), node->source_range);
+    if (part.generic_arguments) {
+      auto generic_args = part.get_resolved_generics();
+      ASTDeclaration *instantiation;
+      if (symbol->is_type()) {
+        auto decl = (ASTType *)symbol->type.declaration.get();
+        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+        auto type = global_get_type(instantiation->resolved_type);
+        scope = type->get_info()->scope;
+      } else if (symbol->is_function()) {target of generic in
+      part.resolved_type = instantiation->resolved_type;
+    } else {
+      if (symbol->is_module()) {
+        scope = symbol->module.declaration->scope;
+      } else if (symbol->is_type()) {
+        scope = global_get_type(symbol->type_id)->get_info()->scope;
+      } else if (!symbol->is_function()) {
+        throw_error("invalid symbol type in path", node->source_range);
+      }
+      part.resolved_type = symbol->type_id;
+    }
+    if (!scope && index < node->parts.size() - 1) {
+      throw_error("symbol scope could not be resolved in path", node->source_range);
+    }
   }
 }
 

@@ -2612,8 +2612,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
           }
         }
         index++;
-      } 
-
+      }
     } break;
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);

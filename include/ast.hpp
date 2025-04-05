@@ -262,6 +262,7 @@ struct ASTTypeExtension {
 
 struct ASTPath: ASTExpr {
   struct Part {
+    int resolved_type = Type::INVALID_TYPE_ID;
     InternedString value {};
     /* 
       we use optional here to avoid unneccesary initialization for basic stuff
