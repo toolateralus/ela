@@ -5,8 +5,7 @@ impl Struct {
     return 0;
   }
   other_method :: fn() {
-    // #self can't begin an expression statement for some reason
-    #self::static_method();
+    Struct::static_method();
   }
 }
 

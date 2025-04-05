@@ -1195,7 +1195,15 @@ ASTStatement *Parser::parse_statement() {
     return statement;
   }
 
-  // #self::fn() or some thing.
+  if (tok.type == TType::Const) {
+    eat();
+    auto variable = parse_variable();
+    variable->is_constexpr = true;
+    ctx.scope->insert_variable(variable->name, -1, variable->value.get(), CONST);
+    return variable;
+  }
+
+
   if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)
     statment->expression = parse_expr();
@@ -1493,7 +1501,7 @@ ASTStatement *Parser::parse_statement() {
 
   // * Type declarations.
   // * Todo: handle constant 'CONST :: VALUE' Declarations here.
-  if (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[1].family == TFamily::Keyword) {
+  if (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family == TFamily::Keyword) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
     if (peek().type == TType::Fn) {
@@ -1517,6 +1525,10 @@ ASTStatement *Parser::parse_statement() {
       auto tagged_union = parse_tagged_union_declaration(tok);
       return tagged_union;
     }
+  } else if (lookahead_buf()[1].type == TType::DoubleColon) {
+    NODE_ALLOC(ASTExprStatement, expr, range, defer, this);
+    expr->expression = parse_expr();
+    return expr;
   }
 
   // * Expression statements.
@@ -1688,10 +1700,6 @@ ASTVariable *Parser::parse_variable() {
       auto expr = parse_expr();
       decl->value = expr;
     }
-  } else if (peek().type == TType::DoubleColon) {
-    eat();
-    decl->value = parse_expr();
-    decl->is_constexpr = true;
   } else {
     expect(TType::ColonEquals);
     decl->value = parse_expr();

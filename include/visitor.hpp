@@ -15,6 +15,8 @@
 struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *noop) { return; }
+
+  virtual void visit(ASTPath *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
   virtual void visit(ASTPatternMatch *node) = 0;
   virtual void visit(ASTSize_Of *node) = 0;
@@ -95,6 +97,7 @@ struct Typer : VisitorBase {
                            const SourceRange &source_range);
 
   void visit(ASTPatternMatch *node) override;
+  void visit(ASTPath *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
@@ -115,7 +118,7 @@ struct Typer : VisitorBase {
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
 
-  std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
+  std::vector<int> get_generic_arg_types(const std::vector<ASTExpr *> &args);
   // For generics.
   void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
                              std::vector<int> generic_args = {});
@@ -277,6 +280,7 @@ struct Emitter : VisitorBase {
   int get_expr_left_type_sr_dot(ASTNode *node);
 
   void visit(ASTPatternMatch *node) override;
+  void visit(ASTPath *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
@@ -338,6 +342,7 @@ struct DependencyEmitter : VisitorBase {
   void define_type(int type_id);
   void declare_type(int type_id);
 
+  void visit(ASTPath *node) override;
   void visit(ASTPatternMatch *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;

@@ -230,15 +230,17 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTIdentifier *node) {
+void DependencyEmitter::visit(ASTPath *node) {
   // TODO: this should be handled by ASTType
   auto type = global_get_type(node->resolved_type);
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
   }
+
   // for global variables
-  if (auto symbol = ctx.scope->lookup(node->value)) {
+  // why just earch the first part of the path?
+  if (auto symbol = ctx.scope->lookup(node->parts[0].value)) {
     if (symbol->is_variable() && symbol->variable.declaration) {
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
@@ -425,27 +427,27 @@ void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
 
 void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTScopeResolution *node) {
-  node->base->accept(this);
-  auto scope_nullable = ctx.get_scope(node->base);
-  auto scope = scope_nullable.get();
+// void DependencyEmitter::visit(ASTScopeResolution *node) {
+//   node->base->accept(this);
+//   auto scope_nullable = ctx.get_scope(node->base);
+//   auto scope = scope_nullable.get();
 
-  if (auto member = scope->local_lookup(node->member_name)) {
-    ASTNode *decl = nullptr;
-    if (member->is_type()) {
-      decl = member->type.declaration.get();
-    } else if (member->is_function()) {
-      decl = member->function.declaration;
-    }
-    if (decl) {
-      decl->accept(this);
-    }
-  } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type == Type::INVALID_TYPE_ID) {
-      throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
-    }
-  }
-}
+//   if (auto member = scope->local_lookup(node->member_name)) {
+//     ASTNode *decl = nullptr;
+//     if (member->is_type()) {
+//       decl = member->type.declaration.get();
+//     } else if (member->is_function()) {
+//       decl = member->function.declaration;
+//     }
+//     if (decl) {
+//       decl->accept(this);
+//     }
+//   } else if (auto type = scope->find_type_id(node->member_name, {})) {
+//     if (type == Type::INVALID_TYPE_ID) {
+//       throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
+//     }
+//   }
+// }
 
 void DependencyEmitter::visit(ASTAlias *node) {}
 
@@ -530,4 +532,5 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
     decl->accept(this);
   }
 }
+
 void DependencyEmitter::visit(ASTPatternMatch *node) {}

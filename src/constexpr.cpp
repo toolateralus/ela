@@ -4,17 +4,17 @@
 
 Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
   switch (node->get_node_type()) {
-    case AST_NODE_IDENTIFIER: {
-      auto name = static_cast<ASTIdentifier*>(node);
-      auto symbol = ctx.scope->lookup(name->value);
-      
+    case AST_NODE_PATH: {
+      auto symbol = ctx.get_symbol((ASTPath *)node).get();
       if (!symbol || symbol->is_function()) {
         throw_error("Cannot evaluate non-variable, non-constant values at compile time currently.", node->source_range);
       }
 
       auto initial_value = symbol->variable.initial_value;
       if (!initial_value) {
-        throw_error(std::format("Couldn't evaluate symbol {}, it didn't have a value. Make sure it's a constant, such as `CONSTANT :: 100`, or a default initialized runtime variable with a constant value.", name->value.get_str()), node->source_range);
+        throw_error(std::format("Couldn't evaluate symbol, it didn't have a value. Make sure it's a constant, such as "
+                                "`CONSTANT :: 100`, or a default initialized runtime variable with a constant value."),
+                    node->source_range);
       }
 
       return evaluate_constexpr(initial_value.get(), ctx);
