@@ -606,9 +606,10 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
           }
         }
-      } else if (!(interface_sym.function.declaration->flags & FUNCTION_IS_FORWARD_DECLARED)) {
+      } else if (DOESNT_HAVE_FLAG(interface_sym.function.declaration->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         auto method = (ASTFunctionDeclaration *)deep_copy_ast(interface_sym.function.declaration);
         method->declaring_type = target_ty->id;
+
         if (!method->generic_parameters.empty()) {
           // TODO: actually generate a signature for a generic function so that you can compare them
           type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
@@ -637,7 +638,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             continue;
           }
         }
-
         visit_function_body(method);
       } else {
         throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
@@ -1230,9 +1230,9 @@ void Typer::visit(ASTVariable *node) {
                                    "invalid type in declaration");
   }
 
-  // if (ctx.scope->local_lookup(node->name)) {
-  //   throw_error(std::format("re-definition of '{}'", node->name), node->source_range);
-  // }
+  if (!node->is_constexpr && ctx.scope->local_lookup(node->name)) {
+    throw_error(std::format("re-definition of '{}'", node->name), node->source_range);
+  }
 
   auto variable_type = node->type->resolved_type;
   ctx.scope->insert_variable(node->name, variable_type, node->value.get(), node->mutability, node);

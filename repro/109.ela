@@ -1,3 +1,4 @@
+// !NO_COMPILE
 
 main :: fn() { 
   /* redeclaring a variable causes C errors. */
