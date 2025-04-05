@@ -464,6 +464,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_module(static_cast<ASTModule*>(node));
     case AST_NODE_DYN_OF:
       return copy_dyn_of(static_cast<ASTDyn_Of*>(node));
+    case AST_NODE_PATTERN_MATCH:
+      return copy_pattern_match(static_cast<ASTPatternMatch*>(node));
       break;
   }
 }
@@ -571,5 +573,13 @@ ASTModule *ASTCopier::copy_module(ASTModule *node) {
 ASTDyn_Of *ASTCopier::copy_dyn_of(ASTDyn_Of *node) {
   auto new_node = copy(node);
   new_node->object = (ASTExpr*)copy_node(node->object);
+  return new_node;
+}
+
+
+ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
+  auto new_node = copy(node);
+  new_node->object = (ASTExpr*)copy_node(node->object);
+  new_node->target_type = (ASTType*)copy_node(node->target_type);
   return new_node;
 }

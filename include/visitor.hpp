@@ -17,6 +17,7 @@ struct VisitorBase {
   void visit(ASTNoop *noop) { return; }
   virtual void visit(ASTScopeResolution *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
+  virtual void visit(ASTPatternMatch *node) = 0;
   virtual void visit(ASTSize_Of *node) = 0;
   virtual void visit(ASTImport *node) = 0;
   virtual void visit(ASTCast *node) = 0;
@@ -95,6 +96,7 @@ struct Typer : VisitorBase {
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
+  void visit(ASTPatternMatch *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
@@ -278,6 +280,7 @@ struct Emitter : VisitorBase {
 
   int get_expr_left_type_sr_dot(ASTNode *node);
 
+  void visit(ASTPatternMatch *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
@@ -341,6 +344,7 @@ struct DependencyEmitter : VisitorBase {
   void define_type(int type_id);
   void declare_type(int type_id);
 
+  void visit(ASTPatternMatch *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;

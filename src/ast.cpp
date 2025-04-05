@@ -613,6 +613,54 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
   while (true) {
     auto op = peek();
 
+    /* Pattern matching / destructuring Choice types. */
+    if (op.type == TType::Is) {
+      NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
+      eat();
+      auto target_type = parse_type();
+
+      if (peek().type == TType::LCurly) {
+        eat();
+        pattern_match->pattern_tag = ASTPatternMatch::STRUCT;
+        while (peek().type != TType::RCurly) {
+          StructPattern::Part part;
+          part.field_name = expect(TType::Identifier).value;
+          part.mutability = CONST;
+          expect(TType::Colon);
+          if (peek().type == TType::Mut) {
+            eat();
+            part.mutability = MUT;
+          }
+          part.var_name = expect(TType::Identifier).value;
+          pattern_match->struct_pattern.parts.push_back(part);
+
+          if (peek().type != TType::RCurly) {
+            expect(TType::Comma);
+          }
+        }
+        expect(TType::RCurly);
+      } else if (peek().type == TType::LParen) {
+        eat();
+        pattern_match->pattern_tag = ASTPatternMatch::TUPLE;
+        while (peek().type != TType::RParen) {
+          TuplePattern::Part part;
+          part.mutability = CONST;
+          if (peek().type == TType::Mut) {
+            eat();
+            part.mutability = MUT;
+          }
+          part.var_name = expect(TType::Identifier).value;
+          pattern_match->tuple_pattern.parts.push_back(part);
+          if (peek().type != TType::RParen) {
+            expect(TType::Comma);
+          }
+        }
+        expect(TType::RParen);
+      }
+
+      return pattern_match;
+    }
+
     Precedence token_precedence = get_operator_precedence(peek());
 
     if (peek().type == TType::GT && lookahead_buf()[1].type == TType::GT) {
@@ -857,7 +905,7 @@ ASTExpr *Parser::parse_primary() {
         expect(TType::Comma);
         dyn_of->interface_type = parse_type();
       }
-      
+
       expect(TType::RParen);
       return dyn_of;
     }
@@ -1515,12 +1563,12 @@ ASTStatement *Parser::parse_statement() {
     if (peek().type == TType::Enum) {
       auto enum_decl = parse_enum_declaration(tok);
       return enum_decl;
-    } 
+    }
     if (peek().type == TType::Choice) {
-        eat();
-        auto tagged_union = parse_tagged_union_declaration(tok);
-        return tagged_union;
-      }
+      eat();
+      auto tagged_union = parse_tagged_union_declaration(tok);
+      return tagged_union;
+    }
 
     // CT constant.
     NODE_ALLOC(ASTVariable, decl, range, _, this);
@@ -2196,7 +2244,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       if (peek().type == TType::Directive) {
         eat();
         auto directive = process_directive(DIRECTIVE_KIND_STATEMENT, expect(TType::Identifier).value);
-        if (!directive) {// it yielded no node, just return.
+        if (!directive) { // it yielded no node, just return.
           continue;
         }
         if (directive && directive.get()->get_node_type() == AST_NODE_STRUCT_DECLARATION) {

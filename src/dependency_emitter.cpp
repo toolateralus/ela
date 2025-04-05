@@ -530,3 +530,4 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
     decl->accept(this);
   }
 }
+void DependencyEmitter::visit(ASTPatternMatch *node) {}

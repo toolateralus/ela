@@ -2557,6 +2557,8 @@ void Typer::visit(ASTDyn_Of *node) {
   node->resolved_type = ty;
 }
 
+void Typer::visit(ASTPatternMatch *node) {}
+
 int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->is_kind(TYPE_DYN) &&
@@ -2649,3 +2651,4 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
   symbols.insert_or_assign(interface_name, sym);
   return ty->id;
 }
+
