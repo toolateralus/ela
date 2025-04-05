@@ -52,9 +52,21 @@ Math :: choice {
 
   /* 
     * assuming we had more members
-    
+
     ? if x is OptionT!<s32>::Some(x, y) {
 
     ? } 
   */
+}
+
+AST :: choice {
+  Program(List!<AST>),
+  Statement(*mut AST),
+  Expression(*mut AST),
+  Literal(s32),
+  Call{name: String, args: List!<AST>}
+}
+
+visit_expression :: fn(expr: AST::Expression) {
+
 }
