@@ -67,6 +67,7 @@ struct Symbol {
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
+      Nullable<ASTTaggedUnionDeclaration> choice;
       Nullable<ASTNode> declaration;
       TypeKind kind;
     } type;

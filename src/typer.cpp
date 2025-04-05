@@ -183,6 +183,7 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
     switch (variant.kind) {
       case ASTTaggedUnionVariant::NORMAL: {
         info->variants.push_back({variant.name, void_type()});
+        info->scope->create_type_alias(variant.name, void_type(), TYPE_SCALAR, nullptr);
       } break;
       case ASTTaggedUnionVariant::TUPLE: {
         variant.tuple->accept(this);
@@ -201,6 +202,7 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
         info->variants.push_back({variant.name, type});
       } break;
     }
+    info->scope->local_lookup(variant.name)->type.choice = node;
   }
   ctx.exit_scope();
 }
@@ -1537,6 +1539,25 @@ void Typer::visit(ASTCall *node) {
 
       type = global_get_type(func_decl->resolved_type);
     }
+  } else if (symbol && symbol->is_type()) {
+    if (!symbol->type.choice) {
+      throw_error(std::format("type {} must be a choice variant to use '(..)' constructor for now",
+                              global_get_type(symbol->type_id)->get_base()),
+                  node->source_range);
+    }
+    if (symbol->type.kind != TYPE_TUPLE) {
+      throw_error(
+          std::format("type {} must be tuple to use '(..)' constructor", global_get_type(symbol->type_id)->get_base()),
+          node->source_range);
+    }
+    ASTTuple tuple;
+    tuple.values = node->arguments->arguments;
+    auto old_expected = expected_type;
+    expected_type = symbol->type_id;
+    tuple.accept(this);
+    expected_type = old_expected;
+    node->resolved_type = symbol->type.choice.get()->resolved_type;
+    return;
   } else {
     node->function->accept(this);
 
