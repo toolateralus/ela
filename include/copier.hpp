@@ -28,7 +28,6 @@ struct ASTCopier {
   ASTExprStatement *copy_expr_statement(ASTExprStatement *node);
   ASTBinExpr *copy_bin_expr(ASTBinExpr *node);
   ASTUnaryExpr *copy_unary_expr(ASTUnaryExpr *node);
-  ASTIdentifier *copy_identifier(ASTIdentifier *node);
   ASTLiteral *copy_literal(ASTLiteral *node);
   ASTType *copy_type(ASTType *node);
   ASTCall *copy_call(ASTCall *node);
@@ -56,7 +55,6 @@ struct ASTCopier {
   ASTLambda *copy_lambda(ASTLambda *node);
   ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
   ASTStatementList *copy_statement_list(ASTStatementList *node);
-  ASTScopeResolution *copy_scope_resolution(ASTScopeResolution *node);
   ASTNode *copy_node(ASTNode *node);
   ASTWhere *copy_where(ASTWhere *node);
   ASTCast *copy_cast(ASTCast *node);

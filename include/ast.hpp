@@ -30,7 +30,7 @@ enum ASTNodeType {
   AST_NODE_EXPR_STATEMENT,
   AST_NODE_BIN_EXPR,
   AST_NODE_UNARY_EXPR,
-  AST_NODE_IDENTIFIER,
+  AST_NODE_PATH,
   AST_NODE_LITERAL,
   AST_NODE_TYPE,
   AST_NODE_TUPLE,
@@ -101,7 +101,6 @@ struct ASTNode {
     switch (get_node_type()) {
       case AST_NODE_BIN_EXPR:
       case AST_NODE_UNARY_EXPR:
-      case AST_NODE_IDENTIFIER:
       case AST_NODE_LITERAL:
       case AST_NODE_TYPE:
       case AST_NODE_TUPLE:
@@ -261,6 +260,40 @@ struct ASTTypeExtension {
   ASTExpr *expression;
 };
 
+struct ASTPath: ASTExpr {
+  struct Part {
+    InternedString value {};
+    /* 
+      we use optional here to avoid unneccesary initialization for basic stuff
+      like identifiers.
+    */
+    std::optional<std::vector<ASTExpr*>> generic_arguments = std::nullopt;
+  };
+
+  /*
+    Path parts are typically identifiers, and they may contain their own generic arguments.
+
+    "collections::List!<s32>" -> {
+      parts: [
+        { "collections" },
+        { "List", [ s32 ] }
+      ]
+    }
+  */
+  std::vector<Part> parts;
+  ASTNodeType get_node_type() const {
+    return AST_NODE_PATH;
+  }
+
+  inline void push_part(InternedString identifier) {
+    parts.emplace_back(identifier);
+  }
+
+  inline void push_part(InternedString identifier, std::vector<ASTExpr*> generic_arguments) {
+    parts.emplace_back(identifier, std::make_optional(generic_arguments));
+  }
+};
+
 struct ASTType : ASTExpr {
   enum Kind {
     NORMAL,
@@ -272,7 +305,7 @@ struct ASTType : ASTExpr {
   union {
     struct {
       ASTExpr *base;
-      std::vector<ASTType *> generic_arguments;
+      std::vector<ASTExpr *> generic_arguments;
       bool is_dyn = false;
     } normal;
     struct {
@@ -360,14 +393,6 @@ struct ASTUnaryExpr : ASTExpr {
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };
 
-struct ASTIdentifier : ASTExpr {
-  ASTIdentifier() {}
-  ASTIdentifier(const InternedString &value) : value(value) {}
-  InternedString value;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_IDENTIFIER; }
-};
-
 struct ASTLiteral : ASTExpr {
   enum Tag {
     Integer,
@@ -390,7 +415,7 @@ enum ValueSemantic {
 
 struct Destructure {
   ValueSemantic semantic;
-  ASTIdentifier *identifier;
+  InternedString identifier;
   Mutability mutability;
 };
 
@@ -486,7 +511,7 @@ struct ASTArguments : ASTNode {
 struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
-  std::vector<ASTType *> generic_arguments;
+  std::vector<ASTExpr *> generic_arguments;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
@@ -496,13 +521,6 @@ struct ASTDotExpr : ASTExpr {
   InternedString member_name;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DOT_EXPR; }
-};
-
-struct ASTScopeResolution : ASTExpr {
-  ASTExpr *base;
-  InternedString member_name;
-  void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_SCOPE_RESOLUTION; }
 };
 
 struct ASTReturn : ASTStatement {
@@ -545,7 +563,7 @@ struct ASTFor : ASTStatement {
   union Left {
     Left() {}
     ~Left() {}
-    ASTIdentifier *identifier;
+    InternedString identifier;
     std::vector<Destructure> destructure;
   } left;
 
@@ -756,7 +774,7 @@ struct ASTNoop : ASTStatement {
 struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic aliases?
   InternedString name;
   ASTNode *source_node;
-  std::vector<ASTType *> generic_arguments;
+  std::vector<ASTExpr *> generic_arguments;
   std::vector<GenericParameter> generic_parameters;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
   void accept(VisitorBase *visitor) override;
@@ -956,7 +974,7 @@ struct Parser {
   ASTVariable *parse_variable();
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
-  std::vector<ASTType *> parse_generic_arguments();
+  std::vector<ASTExpr *> parse_generic_arguments();
   ASTTaggedUnionDeclaration *parse_tagged_union_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);
@@ -965,6 +983,7 @@ struct Parser {
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
   ASTExpr *parse_unary();
   ASTExpr *parse_postfix();
+  ASTPath *parse_path();
   ASTExpr *parse_primary();
   ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();

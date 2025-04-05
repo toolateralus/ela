@@ -15,7 +15,6 @@
 struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *noop) { return; }
-  virtual void visit(ASTScopeResolution *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
   virtual void visit(ASTPatternMatch *node) = 0;
   virtual void visit(ASTSize_Of *node) = 0;
@@ -32,7 +31,6 @@ struct VisitorBase {
   virtual void visit(ASTExprStatement *node) = 0;
   virtual void visit(ASTBinExpr *node) = 0;
   virtual void visit(ASTUnaryExpr *node) = 0;
-  virtual void visit(ASTIdentifier *node) = 0;
   virtual void visit(ASTLiteral *node) = 0;
   virtual void visit(ASTType *node) = 0;
   virtual void visit(ASTCall *node) = 0;
@@ -110,11 +108,9 @@ struct Typer : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTType *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
@@ -296,7 +292,6 @@ struct Emitter : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTType *node) override;
   void visit(ASTCall *node) override;
@@ -317,7 +312,6 @@ struct Emitter : VisitorBase {
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
   void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
@@ -359,7 +353,6 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTType *node) override;
   void visit(ASTCall *node) override;
@@ -380,7 +373,6 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
   void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
