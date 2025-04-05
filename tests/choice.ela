@@ -1,0 +1,35 @@
+import fmt;
+
+OptionT :: choice!<T> {
+  Some(T),
+  None,
+}
+
+Math :: choice {
+  Vector2 { x: f32, y: f32 },
+  Vector3 { x: f32, y: f32, z: f32 },
+}
+
+#test test_main :: fn() {
+  /* constructor */
+  mut x := OptionT!<s32>::Some(10);
+  x = OptionT!<s32>::None;
+
+  /* struct thing */
+  x := Math::Vector2.{
+    x: 0.0,
+    y: 0.0
+  };
+  
+  if x is Math::Vector2 { x, y } {
+    fmt::println((x, y));
+  }
+
+  if x is Math::Vector3 { x, y, z } {
+    fmt::println((x, y, y));
+  }
+
+  if x is OptionT!<s32>::Some(v) {
+    fmt::println(v);
+  }
+}

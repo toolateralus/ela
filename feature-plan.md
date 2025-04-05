@@ -1,7 +1,9 @@
 ## A list of features we want.
 
+#### Compiler Features
 -- Out of order compilation.
--- `dyn` Interfaces.
--- `impl Interface` arguments, that work a lot like a generic.
+-- LLVM Backend.
+
+#### Language Features
 -- `Drop :: interface` destructors.
--- `enum(union)` tagged unions.
+-- `choice` tagged unions.

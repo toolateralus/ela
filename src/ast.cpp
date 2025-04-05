@@ -1513,18 +1513,14 @@ ASTStatement *Parser::parse_statement() {
       return struct_decl;
     }
     if (peek().type == TType::Enum) {
-      if (lookahead_buf()[1].type == TType::LParen && lookahead_buf()[2].type == TType::Union &&
-          lookahead_buf()[3].type == TType::RParen) {
-        expect(TType::Enum);
-        expect(TType::LParen);
-        expect(TType::Union);
-        expect(TType::RParen);
+      auto enum_decl = parse_enum_declaration(tok);
+      return enum_decl;
+    } 
+    if (peek().type == TType::Choice) {
+        eat();
         auto tagged_union = parse_tagged_union_declaration(tok);
         return tagged_union;
       }
-      auto enum_decl = parse_enum_declaration(tok);
-      return enum_decl;
-    }
 
     // CT constant.
     NODE_ALLOC(ASTVariable, decl, range, _, this);
