@@ -45,7 +45,6 @@ enum ASTNodeType {
   AST_NODE_WHILE,
   AST_NODE_STRUCT_DECLARATION,
   AST_NODE_DOT_EXPR,
-  AST_NODE_SCOPE_RESOLUTION,
   AST_NODE_SUBSCRIPT,
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_ENUM_DECLARATION,
@@ -107,12 +106,12 @@ struct ASTNode {
       case AST_NODE_CALL:
       case AST_NODE_ARGUMENTS:
       case AST_NODE_DOT_EXPR:
-      case AST_NODE_SCOPE_RESOLUTION:
       case AST_NODE_SUBSCRIPT:
       case AST_NODE_INITIALIZER_LIST:
       case AST_NODE_CAST:
       case AST_NODE_RANGE:
       case AST_NODE_SWITCH:
+      case AST_NODE_PATH:
         return true;
       default:
         return false;
@@ -290,10 +289,12 @@ struct ASTPath: ASTExpr {
     }
   */
   std::vector<Part> parts;
-  ASTNodeType get_node_type() const {
+
+  ASTNodeType get_node_type() const override {
     return AST_NODE_PATH;
   }
 
+  void accept(VisitorBase *visitor) override;
   inline size_t length() const {
     return parts.size();
   }

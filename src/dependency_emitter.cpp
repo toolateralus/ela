@@ -230,15 +230,17 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTIdentifier *node) {
+void DependencyEmitter::visit(ASTPath *node) {
   // TODO: this should be handled by ASTType
   auto type = global_get_type(node->resolved_type);
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
   }
+
   // for global variables
-  if (auto symbol = ctx.scope->lookup(node->value)) {
+  // why just earch the first part of the path?
+  if (auto symbol = ctx.scope->lookup(node->parts[0].value)) {
     if (symbol->is_variable() && symbol->variable.declaration) {
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
@@ -530,4 +532,5 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
     decl->accept(this);
   }
 }
+
 void DependencyEmitter::visit(ASTPatternMatch *node) {}

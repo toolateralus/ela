@@ -492,12 +492,6 @@ void Emitter::visit(ASTLiteral *node) {
   return;
 }
 
-void Emitter::visit(ASTIdentifier *node) {
-  auto symbol = ctx.scope->lookup(node->value);
-  code << emit_symbol(symbol);
-  return;
-}
-
 void Emitter::visit(ASTUnaryExpr *node) {
   if (node->op.type == TType::Sub) {
     auto type = to_cpp_string(global_get_type(node->operand->resolved_type));
@@ -1230,13 +1224,13 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     auto semantic = node->elements[index].semantic;
 
     if (node->op == TType::ColonEquals) {
-      code << "auto " << node->elements[index++].identifier->value.get_str() << " = ";
+      code << "auto " << node->elements[index++].identifier.get_str() << " = ";
       if (semantic == VALUE_SEMANTIC_POINTER) {
         code << "&";
       }
       code << identifier << "." << name.get_str() << ";\n";
     } else {
-      code << node->elements[index++].identifier->value.get_str() << " = ";
+      code << node->elements[index++].identifier.get_str() << " = ";
       if (semantic == VALUE_SEMANTIC_POINTER) {
         code << "&";
       }
@@ -1748,11 +1742,6 @@ std::string Emitter::to_cpp_string(Type *type) {
   return output;
 }
 
-void Emitter::visit(ASTScopeResolution *node) {
-  code << emit_symbol(ctx.get_symbol(node).get());
-  return;
-}
-
 void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     return;
@@ -2231,4 +2220,6 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
 void Emitter::visit(ASTPatternMatch *node) {
 
 }
+
+void Emitter::visit(ASTPath *node) {}
 

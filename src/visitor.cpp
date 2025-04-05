@@ -60,6 +60,7 @@ void ASTStatementList::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTInterfaceDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSize_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTPatternMatch::accept(VisitorBase *visitor) {}
+void ASTPath::accept(VisitorBase *visitor) { visitor->visit(this); }
 
 // clang-format on
 // }

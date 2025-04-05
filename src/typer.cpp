@@ -1,4 +1,3 @@
-
 #include <algorithm>
 #include <cassert>
 #include <csetjmp>
@@ -708,14 +707,11 @@ void Typer::compiler_mock_associated_function_call_visit_impl(int left_type, con
   call.arguments = &arguments;
 
   // Type.
-  ASTIdentifier left;
-  left.value = global_get_type(left_type)->get_base();
+  ASTPath path;
+  path.push_part(global_get_type(left_type)->get_base());
+  path.push_part(method_name);
 
-  ASTScopeResolution sr;
-  sr.base = &left;
-  sr.member_name = method_name;
-
-  call.function = &sr;
+  call.function = &path;
   call.accept(this);
 }
 
@@ -728,12 +724,13 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   call.arguments = &arguments;
 
   // Type.
-  ASTIdentifier left;
+  ASTPath path;
   static int depth = 0;
 
-  left.value = "$$temp$$" + std::to_string(depth++);
-  ctx.scope->insert_variable(left.value, left_type, nullptr, MUT);
-  ctx.scope->local_lookup(left.value)->flags |= SYMBOL_IS_LOCAL;
+  InternedString varname = "$$temp$$" + std::to_string(depth++);
+  path.push_part(varname);
+  ctx.scope->insert_variable(varname, left_type, nullptr, MUT);
+  ctx.scope->local_lookup(varname)->flags |= SYMBOL_IS_LOCAL;
 
   Defer erase_temp_symbol([&] {
     depth--;
@@ -742,7 +739,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
 
   // .method
   ASTDotExpr dot;
-  dot.base = &left;
+  dot.base = &path;
   dot.member_name = method_name;
 
   call.function = &dot;
@@ -887,8 +884,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL) {
-        auto identifier = dynamic_cast<ASTIdentifier *>(func->return_type->normal.base);
-        if (identifier && func->generic_parameters[0] == identifier->value) {
+        auto identifier = dynamic_cast<ASTPath *>(func->return_type->normal.base);
+        if (identifier && func->generic_parameters[0] == identifier->parts[0].value) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = type->source_range;
@@ -927,8 +924,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
             int generic_index = 0;
 
             for (const auto &generic : generics) {
-              auto identifier = dynamic_cast<ASTIdentifier *>(param->normal.type->normal.base);
-              if (identifier && generic == identifier->value) {
+              auto identifier = dynamic_cast<ASTPath *>(param->normal.type->normal.base);
+              if (identifier && generic == identifier->parts[0].value) {
                 is_generic = true;
                 break;
               }
@@ -1059,7 +1056,7 @@ std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension
   return extensions;
 }
 
-std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTType *> &args) {
+std::vector<int> Typer::get_generic_arg_types(const std::vector<ASTExpr *> &args) {
   std::vector<int> generic_args;
   for (const auto &arg : args) {
     arg->accept(this);
@@ -1406,9 +1403,8 @@ void Typer::visit(ASTFor *node) {
 
   if (node->left_tag == ASTFor::IDENTIFIER) {
     auto iden = node->left.identifier;
-    ctx.scope->insert_variable(iden->value, iter_ty, iden, MUT);
-    ctx.scope->local_lookup(iden->value)->flags |= SYMBOL_IS_LOCAL;
-    node->left.identifier->accept(this);
+    ctx.scope->insert_variable(iden, iter_ty, nullptr, MUT);
+    ctx.scope->local_lookup(iden)->flags |= SYMBOL_IS_LOCAL;
   } else {
     auto type = global_get_type(iter_ty);
 
@@ -1438,8 +1434,8 @@ void Typer::visit(ASTFor *node) {
       if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
         type_id = global_get_type(type_id)->take_pointer_to(destructure.mutability);
       }
-      ctx.scope->insert_variable(iden->value, type_id, iden, MUT);
-      ctx.scope->local_lookup(iden->value)->flags |= SYMBOL_IS_LOCAL;
+      ctx.scope->insert_variable(iden, type_id, nullptr, MUT);
+      ctx.scope->local_lookup(iden)->flags |= SYMBOL_IS_LOCAL;
       i++;
     }
   }
@@ -1805,22 +1801,25 @@ void Typer::visit(ASTBinExpr *node) {
   auto right = node->right->resolved_type;
 
   if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
-    if (node->left->get_node_type() == AST_NODE_IDENTIFIER) {
-      auto name = ((ASTIdentifier *)node->left)->value;
-      if (auto symbol = ctx.scope->lookup(name)) {
-        if (symbol->mutability == CONST) {
-          throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
-                      node->source_range);
+    if (node->left->get_node_type() == AST_NODE_PATH) {
+      auto path = (ASTPath *)node->left;
+      if (path->length() == 1 && !path->parts[0].generic_arguments) {
+        if (auto symbol = ctx.get_symbol(path)) {
+          if (symbol && symbol.get()->mutability == CONST) {
+            throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
+                        node->source_range);
+          }
+        } else {
+          throw_error("can't assign a non-existent variable (TODO verify this error is correct)", node->source_range);
         }
-      } else {
-        throw_error("can't assign a non-existent variable (TODO verify this error is correct)", node->source_range);
-      }
-      // we assume this is mutable since we made it past that?
-      auto symbol = ctx.scope->lookup(name);
-      if (symbol->is_variable()) {
-        symbol->variable.initial_value = node->right;
-      } else {
-        throw_error("Cannot assign to non-variable symbol", node->source_range);
+
+        // we assume this is mutable since we made it past that?
+        auto symbol = ctx.get_symbol(path).get();
+        if (symbol && symbol->is_variable()) {
+          symbol->variable.initial_value = node->right;
+        } else {
+          throw_error("Cannot assign to non-variable symbol", node->source_range);
+        }
       }
     }
   }
@@ -1997,20 +1996,6 @@ void Typer::visit(ASTUnaryExpr *node) {
   return;
 }
 
-void Typer::visit(ASTIdentifier *node) {
-  node->resolved_type = ctx.scope->find_type_id(node->value, {});
-  if (node->resolved_type != Type::INVALID_TYPE_ID) {
-    return;
-  }
-
-  auto symbol = ctx.scope->lookup(node->value);
-  if (symbol) {
-    node->resolved_type = symbol->type_id;
-  } else {
-    throw_error(std::format("Use of undeclared identifier '{}'", node->value), node->source_range);
-  }
-}
-
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
@@ -2119,22 +2104,6 @@ void Typer::visit(ASTDotExpr *node) {
   }
 }
 
-void Typer::visit(ASTScopeResolution *node) {
-  node->base->accept(this);
-  auto scope_nullable = ctx.get_scope(node->base);
-  auto scope = scope_nullable.get();
-
-  if (auto member = scope->local_lookup(node->member_name)) {
-    node->resolved_type = member->type_id;
-  } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type == Type::INVALID_TYPE_ID) {
-      throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
-    }
-    node->resolved_type = type;
-  } else {
-    throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
-  }
-}
 
 void Typer::visit(ASTSubscript *node) {
   node->left->accept(this);
@@ -2459,9 +2428,9 @@ void Typer::visit(ASTTupleDeconstruction *node) {
     if (destructure.semantic == VALUE_SEMANTIC_POINTER) {
       type = global_get_type(symbol->type_id)->take_pointer_to(MUT);
     }
-    ctx.scope->insert_variable(destructure.identifier->value, type, symbol->variable.initial_value.get(),
+    ctx.scope->insert_variable(destructure.identifier, type, symbol->variable.initial_value.get(),
                                destructure.mutability);
-    ctx.scope->local_lookup(destructure.identifier->value)->flags |= SYMBOL_IS_LOCAL;
+    ctx.scope->local_lookup(destructure.identifier)->flags |= SYMBOL_IS_LOCAL;
     ++i;
   }
 };
@@ -2594,11 +2563,9 @@ void Typer::visit(ASTPatternMatch *node) {
       for (const auto &part : node->struct_pattern.parts) {
         auto symbol = info->scope->local_lookup(part.field_name);
         if (!symbol) {
-          throw_error(std::format(
-            "cannot destructure field {} of choice variant {} because it didn't have that field.",
-            part.field_name, target_type->to_string()),
-            node->source_range
-          );
+          throw_error(std::format("cannot destructure field {} of choice variant {} because it didn't have that field.",
+                                  part.field_name, target_type->to_string()),
+                      node->source_range);
         }
         ctx.scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
       }
@@ -2709,3 +2676,5 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
   symbols.insert_or_assign(interface_name, sym);
   return ty->id;
 }
+
+void Typer::visit(ASTPath *node) {}
