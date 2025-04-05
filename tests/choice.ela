@@ -29,23 +29,22 @@ Math :: choice {
   x = OptionT!<s32>::None;
 
   /* struct thing, kinda would just work with init list. */
-  x := Math::Vector2.{
+  x = Math::Vector2.{
     x: 0.0,
     y: 0.0
   };
-  
-  /* pattern match, positional args kind of thing */
-  if x is Math::Vector2 { x, y } {
+
+  /* pattern match, named args. mutability optional */
+  if x is Math::Vector2 { x: mut x, y: mut y } {
     fmt::println((x, y));
   }
 
-  /* pattern match, named args. */
   if x is Math::Vector2 { x: x, y: y } {
     fmt::println((x, y));
   }
 
   /* again, positional. */
-  if x is Math::Vector3 { x, y, z } {
+  if x is Math::Vector3 { x: x, y: y, z: z } {
     fmt::println((x, y, y));
   }
 
@@ -57,10 +56,10 @@ Math :: choice {
   /* 
     * assuming we had more members
 
-    ? if x is OptionT!<s32>::Some(x, y) {
-
-    ? } 
   */
+  if x is OptionT!<s32>::Some(x, y) {
+
+  } 
 }
 
 AST :: choice {

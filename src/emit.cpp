@@ -2230,3 +2230,5 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
   code << "} " << name << ";";
   newline_indented();
 }
+void Emitter::visit(ASTPatternMatch *node) {}
+

@@ -2578,6 +2578,45 @@ void Typer::visit(ASTDyn_Of *node) {
   node->resolved_type = ty;
 }
 
+void Typer::visit(ASTPatternMatch *node) {
+  node->object->accept(this);
+  node->target_type->accept(this);
+
+  // this just serves as a condition.
+  // we should probably restrict this to being in control flow.
+  node->resolved_type = bool_type();
+  auto target_type = global_get_type(node->target_type->resolved_type);
+  switch (node->pattern_tag) {
+    case ASTPatternMatch::NONE:
+      break;
+    case ASTPatternMatch::STRUCT: {
+      auto info = target_type->get_info()->as<StructTypeInfo>();
+      for (const auto &part : node->struct_pattern.parts) {
+        auto symbol = info->scope->local_lookup(part.field_name);
+        if (!symbol) {
+          throw_error(std::format(
+            "cannot destructure field {} of choice variant {} because it didn't have that field.",
+            part.field_name, target_type->to_string()),
+            node->source_range
+          );
+        }
+        ctx.scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
+      }
+    } break;
+    case ASTPatternMatch::TUPLE: {
+      auto info = target_type->get_info()->as<TupleTypeInfo>();
+      if (node->tuple_pattern.parts.size() > info->types.size()) {
+        throw_error("too many variables provided in choice type tuple destructure", node->source_range);
+      }
+      auto index = 0;
+      for (const auto &part : node->tuple_pattern.parts) {
+        ctx.scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
+        index++;
+      }
+    } break;
+  }
+}
+
 int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {
     if (type_table[i]->is_kind(TYPE_DYN) &&

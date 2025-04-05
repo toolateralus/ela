@@ -66,6 +66,7 @@ enum ASTNodeType {
   AST_NODE_SWITCH,
   AST_NODE_TUPLE_DECONSTRUCTION,
   AST_NODE_WHERE,
+  AST_NODE_PATTERN_MATCH,
   AST_NODE_STATEMENT_LIST, // Used just to return a bunch of statments from a single directive.s
 };
 
@@ -157,7 +158,7 @@ struct ASTStatementList : ASTStatement {
 
 inline static std::string block_flags_to_string(int flags) {
   std::string result;
-#define X(flag)                                                                                     \
+#define X(flag)                                                                                                        \
   if (flags & flag)                                                                                                    \
     result += #flag " ";
   X(BLOCK_FLAGS_FALL_THROUGH)
@@ -232,14 +233,14 @@ struct ImplicitConversion {
   int to = Type::INVALID_TYPE_ID;
   int from = Type::INVALID_TYPE_ID;
   enum {
-    /* 
+    /*
       this is for things like:
         `n : any = 100;`
 
       where we need to construct & reflect to create the instance.
     */
     TO_ANY,
-    /* 
+    /*
       this is when we do like:
 
         `n : Option = Option::Some(x);`
@@ -771,7 +772,7 @@ struct ASTImpl : ASTDeclaration {
 
   // methods / static methods this is implementing for the type.
   std::vector<ASTFunctionDeclaration *> methods;
-  
+
   // aliases.
   std::vector<ASTAlias *> aliases;
 
@@ -808,12 +809,99 @@ struct ASTLambda : ASTExpr {
 using Constraint = std::pair<ASTType *, ASTExpr *>;
 struct ASTWhere : ASTExpr {
   // instead of just having one, we can have several.
-  /* 
+  /*
     such as
     * fn!<T, T1>() where T: s64, T1: AsSlice {}
   */
   std::vector<Constraint> constraints;
   ASTNodeType get_node_type() const override { return AST_NODE_WHERE; }
+  void accept(VisitorBase *visitor) override;
+};
+
+struct TuplePattern {
+  struct Part {
+    Mutability mutability = CONST;
+    InternedString var_name;
+  };
+  std::vector<Part> parts;
+};
+
+struct StructPattern {
+  struct Part {
+    InternedString field_name;
+    InternedString var_name;
+    Mutability mutability = CONST;
+  };
+  std::vector<Part> parts;
+};
+
+/*
+  * note: the new variables created by the pattern match's destructure
+  * are denoted by $name
+  
+    tuple style. never has names, only new var names.
+  if x is Choice::Variant($v1, $v2) { ... }
+
+    can be mut
+  if x is Choice::Variant(mut $v1, mut $v2) { ... }
+
+    struct style, for now, has to have the property names and the new var name.
+  if x is Choice::Variant{ v: $v, y: $y } { ... }
+
+    can be mut too.
+  if x is Choice::Variant{ v: mut $v, y: mut $y } { ... }
+*/
+struct ASTPatternMatch : ASTExpr {
+  ~ASTPatternMatch() {}
+  ASTPatternMatch() {}
+  ASTPatternMatch(const ASTPatternMatch &other) {
+    source_range = other.source_range;
+    object = other.object;
+    target_type = other.target_type;
+    pattern_tag = other.pattern_tag;
+    switch (pattern_tag) {
+      case NONE:
+        break;
+      case STRUCT:
+        struct_pattern = other.struct_pattern;
+        break;
+      case TUPLE:
+        tuple_pattern = other.tuple_pattern;
+        break;
+    }
+  }
+  /*
+    the left hand side of the 'is', e.g { if x is ... }
+                                             ^<- object.
+  */
+  ASTExpr *object;
+  /* 
+    the type thats being matched
+    e.g  
+      if x is Choice::Variant {... } 
+              ^^^^^^^^^^^^^^^<- the target type.
+  */
+  ASTType *target_type;
+
+  enum {
+    /*
+      this (NONE) is for when there's no fields being destructured,
+      such as:
+        if x is Choice::None {
+
+        }
+    */
+    NONE, 
+    STRUCT,
+    TUPLE,
+  } pattern_tag;
+
+  union {
+    StructPattern struct_pattern;
+    TuplePattern tuple_pattern;
+  };
+
+  ASTNodeType get_node_type() const override { return AST_NODE_PATTERN_MATCH; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -950,5 +1038,3 @@ ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiation
     parser->end_node(node, range);                                                                                     \
     deferred;                                                                                                          \
   });
-
-

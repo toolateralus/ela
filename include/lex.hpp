@@ -118,6 +118,7 @@ enum struct TType {
   Dyn_Of,
 
   Choice,
+  Is,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -224,6 +225,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Dyn);
     TTYPE_CASE(Dyn_Of);
     TTYPE_CASE(Choice);
+    TTYPE_CASE(Is);
 
   }
   return "Unknown";
@@ -375,10 +377,13 @@ static std::unordered_map<std::string, TType> keywords{
     {"interface", TType::Interface},
     {"интерфейс", TType::Interface},
 
-    {"dyn", TType::Dyn}, // TODO: do we want a 'dyn' 
+    {"dyn", TType::Dyn},
     {"dynof", TType::Dyn_Of},
     
     {"choice", TType::Choice},
+
+    // for pattern matching
+    {"is", TType::Is},
 
 };
 
