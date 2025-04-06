@@ -77,7 +77,7 @@ Xaryu :: struct {
     }
   }
 
-  mut dynamic : s32[][];
+  mut dynamic : List!<List!<s32>>;
   for x in 0..5 {
     dynamic.push(.{});
     for y in 0..5 {

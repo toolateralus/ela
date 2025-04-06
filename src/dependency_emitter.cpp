@@ -195,11 +195,11 @@ void DependencyEmitter::visit(ASTExprStatement *node) { node->expression->accept
 
 void DependencyEmitter::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTCall{};
+    auto call = ASTMethodCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
     dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_BINARY)};
-    call.function = &dot;
+    call.dot = &dot;
     auto args = ASTArguments{};
     if (node->right) {
       args.arguments = {node->right};
@@ -214,11 +214,11 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
 
 void DependencyEmitter::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTCall{};
+    auto call = ASTMethodCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->operand;
     dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_UNARY)};
-    call.function = &dot;
+    call.dot = &dot;
     auto args = ASTArguments{};
     call.arguments = &args;
     call.accept(this);
@@ -396,11 +396,11 @@ void DependencyEmitter::visit(ASTDotExpr *node) {
 
 void DependencyEmitter::visit(ASTSubscript *node) {
   if (node->is_operator_overload) {
-    auto call = ASTCall{};
+    auto call = ASTMethodCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
     dot.member = ASTPath::Segment{get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT)};
-    call.function = &dot;
+    call.dot = &dot;
     auto args = ASTArguments{};
     args.arguments = {node->subscript};
     call.arguments = &args;
@@ -570,4 +570,22 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
 
 void DependencyEmitter::visit(ASTPatternMatch *node) {}
 
-void DependencyEmitter::visit(ASTMethodCall *node) {}
+void DependencyEmitter::visit(ASTMethodCall *node) {
+  node->arguments->accept(this);
+  node->dot->accept(this);
+  auto symbol_nullable = ctx.get_symbol(node->dot);
+
+  if (symbol_nullable.is_not_null()) {
+    auto decl = symbol_nullable.get()->function.declaration;
+    auto generic_args = node->dot->member.get_resolved_generics();
+
+    if (!generic_args.empty()) {
+      decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);
+    }
+
+    if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      decl->accept(this);
+      return;
+    }
+  }
+}
