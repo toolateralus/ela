@@ -137,7 +137,7 @@ struct Typer : VisitorBase {
 
   void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
-  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func, std::vector<ASTExpr*> *generic_args, ASTArguments *arguments, SourceRange range);
 
   void compiler_mock_method_call_visit_impl(int type, const InternedString &method_name);
 

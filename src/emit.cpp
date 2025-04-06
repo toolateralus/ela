@@ -2115,11 +2115,11 @@ void Emitter::visit(ASTImport *node) {}
 
 void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
-  auto call = ASTCall{};
+  auto call = ASTMethodCall{};
   auto dot = ASTDotExpr{};
   dot.base = left;
   dot.member = ASTPath::Segment{get_operator_overload_name(op, operation)};
-  call.function = &dot;
+  call.dot = &dot;
   auto args = ASTArguments{};
   if (right) {
     args.arguments = {right};

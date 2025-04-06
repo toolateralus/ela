@@ -516,7 +516,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     // ctx.set_scope(type_scope); // is this correct?
     alias->accept(this);
   }
-  
+
   int x = 0;
   // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
   // just like C-- (owned)
@@ -710,7 +710,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   auto old_call_state = in_call;
   in_call = true;
   Defer _([&] { in_call = old_call_state; });
-  ASTCall call;
+  ASTMethodCall call;
   ASTArguments arguments;
   call.arguments = &arguments;
 
@@ -733,7 +733,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   dot.base = &path;
   dot.member = ASTPath::Segment{method_name};
 
-  call.function = &dot;
+  call.dot = &dot;
   call.accept(this);
 }
 
@@ -868,30 +868,31 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
   ! When you provide the wrong number of arguments (or at least too few) to a generic function that is inferring it's
   genericsd, ! the compiler just crashes and doesn't report an error REPRO: 103
 */
-ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
-  std::vector<int> generic_args;
-  auto path_generics = node->get_generic_arguments().get();
-
-  if (path_generics->empty()) {
+ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclaration *func,
+                                                             std::vector<ASTExpr *> *generic_args,
+                                                             ASTArguments *arguments, SourceRange source_range) {
+  if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
-    if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
+    if (arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (expected_type == -1) {
-        throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so none can be substituted.", node->source_range);
+        throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so "
+                    "none can be substituted.",
+                    source_range);
       }
 
       if (func->return_type->kind == ASTType::NORMAL) {
         auto return_ty_path = func->return_type->normal.path;
-        /* 
-          TODO: we need to do a better job of checking whether the return type name 
-          
+        /*
+          TODO: we need to do a better job of checking whether the return type name
+
           * matches the generic parameter it's trying to infer.
           * we shouldn't restrict the path length nor use a simple string comparison here.
         */
         if (return_ty_path->length() == 1 && (func->generic_parameters[0] == return_ty_path->segments[0].identifier)) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
-          type->source_range = node->function->source_range;
-          path_generics->push_back(type);
+          type->source_range = source_range;
+          generic_args->push_back(type);
         }
       }
 
@@ -905,11 +906,11 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
       {
         auto old_expected = expected_type;
         expected_type = Type::INVALID_TYPE_ID;
-        node->arguments->accept(this);
+        arguments->accept(this);
         expected_type = old_expected;
       }
 
-      auto arguments = node->arguments->resolved_argument_types;
+      auto args = arguments->resolved_argument_types;
       auto parameters = func->params->params;
       auto generics = func->generic_parameters;
 
@@ -943,8 +944,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
       auto start_index = (parameters[0]->tag == ASTParamDecl::Self || parameters[0]->tag == ASTParamDecl::Себя) ? 1 : 0;
 
-      for (size_t i = 0; i < arguments.size(); ++i) {
-        auto arg_ty_id = arguments[i];
+      for (size_t i = 0; i < args.size(); ++i) {
+        auto arg_ty_id = args[i];
         auto [is_generic, generic_index] = arg_to_generic_map[i + start_index];
 
         if (is_generic) {
@@ -971,16 +972,14 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
       for (auto i = 0; i < generics.size(); ++i) {
         auto type = ast_alloc<ASTType>();
-        type->source_range = node->source_range;
+        type->source_range = source_range;
         type->resolved_type = inferred_generics[i];
-        path_generics->push_back(type);
+        generic_args->push_back(type);
       }
     }
   }
 
-  generic_args = get_generic_arg_types(*path_generics);
-
-  return (ASTFunctionDeclaration *)visit_generic(func, generic_args, node->source_range);
+  return (ASTFunctionDeclaration *)visit_generic(func, get_generic_arg_types(*generic_args), source_range);
 }
 
 // #undef USE_GENERIC_PANIC_HANDLER
@@ -1539,7 +1538,8 @@ void Typer::visit(ASTCall *node) {
           type_context = &func_type_ast;
         }
 
-        func_decl = resolve_generic_function_call(node, func_decl);
+        func_decl = resolve_generic_function_call(func_decl, node->get_generic_arguments().get(), node->arguments,
+                                                  node->source_range);
       }
 
       type = global_get_type(func_decl->resolved_type);
@@ -1564,21 +1564,6 @@ void Typer::visit(ASTCall *node) {
     node->resolved_type = symbol->type.choice.get()->resolved_type;
     return;
   } else {
-    // Implicitly pass the 'dyn.instance' when calling the function pointers
-    // that the dyn thingy sets up.
-    if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-      auto base = ((ASTDotExpr *)node->function)->base;
-      auto base_type = global_get_type(base->resolved_type);
-      if (base_type->is_kind(TYPE_DYN)) {
-        auto &args = node->arguments->arguments;
-        auto dot = ast_alloc<ASTDotExpr>();
-        dot->base = base;
-        dot->member = ASTPath::Segment{"instance"};
-        dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
-        args.insert(args.begin(), dot);
-      }
-    }
-
     type = global_get_type(node->function->resolved_type);
   }
 
@@ -1595,14 +1580,7 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-      if (!func_decl->params->has_self) {
-        throw_error("Calling static methods with instance not allowed", node->source_range);
-      }
-      type_check_args_from_params(node->arguments, func_decl->params, ((ASTDotExpr *)node->function)->base);
-    } else {
-      type_check_args_from_params(node->arguments, func_decl->params, nullptr);
-    }
+    type_check_args_from_params(node->arguments, func_decl->params, nullptr);
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -2123,7 +2101,7 @@ void Typer::visit(ASTDotExpr *node) {
   }
 
   if (auto member = base_scope->local_lookup(node->member.identifier)) {
-    /* 
+    /*
       TODO Resolve generic arguments for dot expression?
     */
     node->resolved_type = member->type_id;
@@ -2135,7 +2113,6 @@ void Typer::visit(ASTDotExpr *node) {
                 node->source_range);
   }
 }
-
 
 void Typer::visit(ASTSubscript *node) {
   node->left->accept(this);
@@ -2817,4 +2794,77 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
   return nullptr;
 }
 
-void Typer::visit(ASTMethodCall *node) {}
+void Typer::visit(ASTMethodCall *node) {
+  Type *type = nullptr;
+  ASTFunctionDeclaration *func_decl = nullptr;
+  node->dot->accept(this);
+  auto func_sym = ctx.get_symbol(node->dot).get();
+
+  if (func_sym && func_sym->is_function()) {
+    type = global_get_type(func_sym->type_id);
+
+    auto declaring_node = func_sym->function.declaration;
+    if (declaring_node && declaring_node->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
+
+      // resolve a generic call.
+
+      if (!func_decl->generic_parameters.empty()) {
+        // doing this so self will get the right type when we call generic methods
+        // TODO: handle this in the function decl itself, maybe insert self into symbol table
+
+        auto old_type = type_context;
+        Defer _([&] { type_context = old_type; });
+
+        ASTType func_type_ast;
+        if (func_decl->declaring_type != Type::INVALID_TYPE_ID) {
+          func_type_ast.resolved_type = func_decl->declaring_type;
+          type_context = &func_type_ast;
+        }
+
+        func_decl = resolve_generic_function_call(func_decl, &node->dot->member.generic_arguments,
+                                                  node->arguments, node->source_range);
+      }
+
+      type = global_get_type(func_decl->resolved_type);
+    }
+  } else {
+    // Implicitly pass the 'dyn.instance' when calling the function pointers
+    // that the dyn thingy sets up.
+    auto object = node->dot->base;
+    auto obj_type = global_get_type(object->resolved_type);
+    if (obj_type->is_kind(TYPE_DYN)) {
+      auto &args = node->arguments->arguments;
+      auto dot = ast_alloc<ASTDotExpr>();
+      dot->base = object;
+      dot->member = ASTPath::Segment{"instance"};
+      dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
+      args.insert(args.begin(), dot);
+    }
+
+    type = global_get_type(node->dot->resolved_type);
+  }
+
+  if (!type) {
+    throw_error("use of undeclared function", node->source_range);
+  }
+
+  if (!type->is_kind(TYPE_FUNCTION)) {
+    throw_error(std::format("unable to call a non-function, got {}", type->to_string()), node->source_range);
+  }
+
+  auto info = type->get_info()->as<FunctionTypeInfo>();
+
+  // If we have the declaring node representing this function, type check it against the parameters in that definition.
+  // else, use the type.
+  if (func_decl) {
+    if (!func_decl->params->has_self) {
+      throw_error("Calling static methods with instance not allowed", node->source_range);
+    }
+    type_check_args_from_params(node->arguments, func_decl->params, node->dot->base);
+  } else {
+    type_check_args_from_info(node->arguments, info);
+  }
+
+  node->resolved_type = info->return_type;
+}

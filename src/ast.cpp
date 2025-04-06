@@ -610,6 +610,9 @@ ASTArguments *Parser::parse_arguments() {
 ASTCall *Parser::parse_call(ASTExpr *function) {
   NODE_ALLOC(ASTCall, call, range, _, this);
   call->function = function;
+  if (function->get_node_type() == AST_NODE_DOT_EXPR) {
+    throw_error("dot exr", range);
+  }
   call->arguments = parse_arguments();
   end_node(call, range);
   return call;
@@ -846,14 +849,15 @@ ASTExpr *Parser::parse_postfix() {
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
       }
 
-      // if (peek().type == TType::LParen) {
-      //   NODE_ALLOC(ASTMethodCall, method, range, defer, this);
-      //   method->base = dot;
-      //   method->arguments = parse_arguments();
-      //   left = method;
-      // }
+      if (peek().type == TType::LParen) {
+        NODE_ALLOC(ASTMethodCall, method, range, defer, this);
+        method->dot = dot;
+        method->arguments = parse_arguments();
+        left = method;
+      } else {
+        left = dot;
+      }
 
-      left = dot;
     } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
       NODE_ALLOC(ASTUnaryExpr, unary, unary_range, _, this)
       unary->operand = left;
