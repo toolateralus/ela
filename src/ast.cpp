@@ -18,6 +18,14 @@
 #include "scope.hpp"
 #include "type.hpp"
 
+
+/* 
+  TODO: we should not have a preprocessor at all,
+  and all the conditional compilation stuff should get it's own node
+  so that we can do type checking on the constants that #if might use.
+  
+
+*/
 enum PreprocKind {
   PREPROC_IF,
   PREPROC_IFDEF,
@@ -192,6 +200,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return string;
         }
     }},
+
     // #test
     // declare a test function. Only gets compiled into --test builds, and
     // produces a test main, a builtin test suite.
@@ -220,6 +229,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return ast_alloc<ASTNoop>();
         }
     }},
+
     // #foreign
     // Declare a foreign function, like C's extern.
     {.identifier = "foreign",
@@ -250,6 +260,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->end_node(function, range);
         return function;
     }},
+
+    // #location, for getting source location.
     {
       .identifier = "location",
       .kind = DIRECTIVE_KIND_EXPRESSION,
@@ -279,6 +291,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         throw_error(literal->value.get_str(), error->source_range);
         return nullptr;
     }},
+
     // #c_flags, for adding stuff like linker options, -g etc from within
     // your program or header.
     {.identifier = "c_flags",
@@ -291,6 +304,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         compile_command.add_c_flag(string.get_str());
         return nullptr;
     }},
+    
     // #flags, for making an enum declaration auto increment with a flags value.
     // #flags MyEnum :: enum {...};
     {.identifier = "flags",
@@ -312,6 +326,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         enum_decl->is_flags = true;
         return enum_decl;
     }},
+
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -322,6 +337,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->append_type_extensions(type);
         return type;
     }},
+
     // #self, return the type of the current declaring struct or union
     {.identifier = "себя",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -332,6 +348,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parser->append_type_extensions(type);
         return type;
     }},
+
     // #anon, for declaring anonymous sub-structs in unions primarily, and anonymous unions within struct declarations.
     {.identifier = "anon",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -351,6 +368,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return nullptr;
         }
     }},
+
     // #export, for exporting a non-mangled name to a dll or C library
     // primarily.
     // Equivalent to marking a function extern "C" in C++.
@@ -370,6 +388,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return node;
     }},
+
     // #typeid, integer version of typeof. can be used to compare types without
     // the pointers.
     {.identifier = "typeid",
@@ -386,6 +405,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         literal->source_range = type->source_range;
         return literal;
     }},
+
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
     // a
@@ -404,6 +424,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         decl->bitsize = size.value;
         return decl;
     }},
+
     // #static, used exclusively for static globals, and static locals.
     // We do not support static methods or static members.
     {.identifier = "static",
@@ -417,6 +438,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
         return statement;
     }},
+
     // #def, define a compile time flag, like C #define but cannot be a macro.
     {.identifier = "def",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -425,6 +447,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         while (parser->peek().type == TType::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
+
     // #undef, remove a #def
     {.identifier = "undef",
       .kind = DIRECTIVE_KIND_STATEMENT,
@@ -433,6 +456,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         while (parser->peek().type == TType::Semi) parser->eat();
         return ast_alloc<ASTNoop>();
     }},
+
     // #ifdef, conditional compilation based on a #def being present.
     {.identifier = "ifdef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -441,6 +465,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFDEF);
         return list;
     }},
+
     // #ifndef, conditional compilation based on a #def not being present.
     {.identifier = "ifndef",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -449,6 +474,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IFNDEF);
         return list;
     }},
+
     // #if, conditional compilation based on compile time value.
     {.identifier = "if",
       .kind = DIRECTIVE_KIND_DONT_CARE,
@@ -457,6 +483,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
     }},
+    
     // #region, for named/unnnamed regions. just for organization, has no compilation implications.
     // can have anything between the #region directive and the {} block
     // #region My code region 1 {...} is legal.
