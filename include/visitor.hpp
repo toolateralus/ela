@@ -341,6 +341,7 @@ struct DependencyEmitter : VisitorBase {
   std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<int> reflected_upon_types;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
+  void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
   void define_type(int type_id);
   void declare_type(int type_id);

@@ -118,8 +118,6 @@ void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
 
-
-
   if (!compile_command.has_flag("nostdlib")) {
     // We have to do this here because the reflection system depends on this type and it doesn't
     // neccesarily get instantiatied.
@@ -196,19 +194,23 @@ void DependencyEmitter::visit(ASTVariable *node) {
 
 void DependencyEmitter::visit(ASTExprStatement *node) { node->expression->accept(this); }
 
+void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
+  auto call = ASTMethodCall{};
+  auto dot = ASTDotExpr{};
+  dot.base = base;
+  dot.member = ASTPath::Segment{operator_name};
+  call.dot = &dot;
+  auto args = ASTArguments{};
+  if (argument) {
+    args.arguments = {argument};
+  }
+  call.arguments = &args;
+  call.accept(this);
+}
+
 void DependencyEmitter::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTMethodCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->left;
-    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_BINARY)};
-    call.dot = &dot;
-    auto args = ASTArguments{};
-    if (node->right) {
-      args.arguments = {node->right};
-    }
-    call.arguments = &args;
-    call.accept(this);
+    visit_operator_overload(node->left, get_operator_overload_name(node->op.type, OPERATION_BINARY), node->right);
   } else {
     node->left->accept(this);
     node->right->accept(this);
@@ -217,19 +219,24 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
 
 void DependencyEmitter::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTMethodCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->operand;
-    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_UNARY)};
-    call.dot = &dot;
-    auto args = ASTArguments{};
-    call.arguments = &args;
-    call.accept(this);
+    visit_operator_overload(node->operand, get_operator_overload_name(node->op.type, OPERATION_UNARY), nullptr);
   } else {
     if (node->op.type == TType::Mul) {
       define_type(node->operand->resolved_type);
     }
     node->operand->accept(this);
+  }
+}
+
+void DependencyEmitter::visit(ASTSubscript *node) {
+  if (node->is_operator_overload) {
+    visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT),
+                            node->subscript);
+  } else {
+    // make sure type is defined for size
+    define_type(node->left->resolved_type);
+    node->left->accept(this);
+    node->subscript->accept(this);
   }
 }
 
@@ -377,25 +384,6 @@ void DependencyEmitter::visit(ASTDotExpr *node) {
   node->base->accept(this);
 }
 
-void DependencyEmitter::visit(ASTSubscript *node) {
-  if (node->is_operator_overload) {
-    auto call = ASTMethodCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->left;
-    dot.member = ASTPath::Segment{get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT)};
-    call.dot = &dot;
-    auto args = ASTArguments{};
-    args.arguments = {node->subscript};
-    call.arguments = &args;
-    call.accept(this);
-  } else {
-    // make sure type is defined for size
-    define_type(node->left->resolved_type);
-    node->left->accept(this);
-    node->subscript->accept(this);
-  }
-}
-
 void DependencyEmitter::visit(ASTInitializerList *node) {
   if (node->target_type)
     node->target_type.get()->accept(this);
@@ -444,28 +432,6 @@ void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
 }
 
 void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
-
-// void DependencyEmitter::visit(ASTScopeResolution *node) {
-//   node->base->accept(this);
-//   auto scope_nullable = ctx.get_scope(node->base);
-//   auto scope = scope_nullable.get();
-
-//   if (auto member = scope->local_lookup(node->member_name)) {
-//     ASTNode *decl = nullptr;
-//     if (member->is_type()) {
-//       decl = member->type.declaration.get();
-//     } else if (member->is_function()) {
-//       decl = member->function.declaration;
-//     }
-//     if (decl) {
-//       decl->accept(this);
-//     }
-//   } else if (auto type = scope->find_type_id(node->member_name, {})) {
-//     if (type == Type::INVALID_TYPE_ID) {
-//       throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
-//     }
-//   }
-// }
 
 void DependencyEmitter::visit(ASTAlias *node) {}
 
