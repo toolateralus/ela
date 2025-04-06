@@ -18,7 +18,7 @@ impl!<Value_Type> Enumerator!<(u32, Value_Type)> for Test_Enumerator!<u32, Value
   }
 }
 
-impl!<Value_Type> Value_Type[] {
+impl!<Value_Type> List!<Value_Type> {
   failure :: fn(*mut self) -> Test_Enumerator!<u32, Value_Type> {
     return .{
       index: 0,
@@ -34,7 +34,7 @@ import fmt::*;
 
 
 main :: fn() { 
-  list := s32[]::init(.[
+  list := List!<s32>::init(.[
     0,1,2,3,4
   ]);
 
