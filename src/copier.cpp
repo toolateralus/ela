@@ -110,8 +110,8 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
     case ASTType::SELF:
       break;
     case ASTType::NORMAL:
-      if (node->normal.base) {
-        new_node->normal.base = (ASTPath*)copy_node(node->normal.base);
+      if (node->normal.path) {
+        new_node->normal.path = (ASTPath*)copy_node(node->normal.path);
       }
       break;
     case ASTType::TUPLE:

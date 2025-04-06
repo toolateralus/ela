@@ -327,7 +327,7 @@ struct ASTType : ASTExpr {
 
   union {
     struct {
-      ASTPath *base;
+      ASTPath *path;
       bool is_dyn = false;
     } normal;
     struct {

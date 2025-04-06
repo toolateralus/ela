@@ -808,7 +808,7 @@ ASTExpr *Parser::parse_postfix() {
           eat(); // eat {
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
           init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.base = path;
+          init_list->target_type.get()->normal.path = path;
           if (peek().type == TType::RCurly) {
             init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
           } else {
@@ -829,7 +829,7 @@ ASTExpr *Parser::parse_postfix() {
           eat(); // eat [
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
           init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.base = path;
+          init_list->target_type.get()->normal.path = path;
           init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
           while (peek().type != TType::RBrace) {
             init_list->values.push_back(parse_expr());
@@ -1150,8 +1150,8 @@ ASTType *Parser::parse_type() {
   }
 
   node->kind = ASTType::NORMAL;
-  node->normal.base = parse_path();
-  node->normal.base->source_range = range;
+  node->normal.path = parse_path();
+  node->normal.path->source_range = range;
 
   append_type_extensions(node);
 
@@ -2490,7 +2490,7 @@ ASTType *ASTType::get_void() {
     type->kind = ASTType::NORMAL;
     auto path = ast_alloc<ASTPath>();
     path->push_part("void");
-    type->normal.base = path;
+    type->normal.path = path;
     type->resolved_type = void_type();
     return type;
   }();

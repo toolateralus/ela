@@ -323,7 +323,7 @@ void Emitter::visit(ASTCall *node) {
         if (ast_type->kind != ASTType::NORMAL) {
           throw_error("Cannot call a tuple or function type", node->source_range);
         }
-        func = ast_type->normal.base;
+        func = ast_type->normal.path;
       }
       // normal function call, or a static method.
       func->accept(this);
@@ -384,7 +384,7 @@ void Emitter::visit(ASTCall *node) {
       if (ast_type->kind != ASTType::NORMAL) {
         throw_error("Cannot call a tuple or function type", node->source_range);
       }
-      func = ast_type->normal.base;
+      func = ast_type->normal.path;
     }
     // normal function call, or a static method.
     func->accept(this);

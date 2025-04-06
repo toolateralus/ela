@@ -886,22 +886,24 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     we need to make sure that array is Some() and valid, so we acn possibly push
     into it,.
   */
+
   if (!path_generics && node->function->get_node_type() == AST_NODE_PATH) {
     auto path = (ASTPath*)node->function;
     path->segments.back().generic_arguments = {std::vector<ASTExpr*>{}};
     path_generics = &path->segments.back().generic_arguments.value();
-  }
+  } 
   
 
   if (path_generics->empty()) {
+    path_generics->resize(func->generic_parameters.size());
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL) {
-        auto identifier = dynamic_cast<ASTPath *>(func->return_type->normal.base);
-        if (identifier && func->generic_parameters[0] == identifier->segments[0].identifier) {
+        auto return_ty_path = func->return_type->normal.path;
+        if (func->generic_parameters[0] == return_ty_path->segments[0].identifier) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
-          type->source_range = type->source_range;
+          type->source_range = node->function->source_range;
           path_generics->push_back(type);
         }
       }
@@ -937,8 +939,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
             int generic_index = 0;
 
             for (const auto &generic : generics) {
-              auto identifier = dynamic_cast<ASTPath *>(param->normal.type->normal.base);
-              if (identifier && generic == identifier->segments[0].identifier) {
+              if (generic == param->normal.type->normal.path->segments[0].identifier) {
                 is_generic = true;
                 break;
               }
@@ -1537,7 +1538,7 @@ void Typer::visit(ASTCall *node) {
 
       // resolve a generic call.
 
-      if (node->has_generics() || !func_decl->generic_parameters.empty()) {
+      if (!func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
 
@@ -1718,8 +1719,8 @@ void Typer::visit(ASTType *node) {
 
   if (node->kind == ASTType::NORMAL) {
     auto &normal_ty = node->normal;
-    normal_ty.base->accept(this);
-    auto symbol = ctx.get_symbol(normal_ty.base).get();
+    normal_ty.path->accept(this);
+    auto symbol = ctx.get_symbol(normal_ty.path).get();
 
     if (!symbol) {
       throw_error("use of undeclared type", node->source_range);
@@ -1729,12 +1730,12 @@ void Typer::visit(ASTType *node) {
 
     auto declaring_node = symbol->type.declaration.get();
 
-    normal_ty.base->accept(this);
-    auto base_ty = global_get_type(normal_ty.base->resolved_type);
+    normal_ty.path->accept(this);
+    auto base_ty = global_get_type(normal_ty.path->resolved_type);
     if (!base_ty) {
-      if (normal_ty.base->resolved_type == Type::INVALID_TYPE_ID) {
+      if (normal_ty.path->resolved_type == Type::INVALID_TYPE_ID) {
         throw_error("use of undeclared type", node->source_range);
-      } else if (normal_ty.base->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+      } else if (normal_ty.path->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
         throw_error("use of unresolved generic type", node->source_range);
       }
     }
@@ -2729,7 +2730,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       if (type_node->kind != ASTType::NORMAL) {
         return nullptr;
       }
-      return get_symbol(type_node->normal.base);
+      return get_symbol(type_node->normal.path);
     }
     case AST_NODE_PATH: {
       auto path = static_cast<ASTPath *>(node);
