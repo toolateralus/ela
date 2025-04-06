@@ -843,14 +843,12 @@ ASTExpr *Parser::parse_postfix() {
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
       }
 
-
-      // ! UNCOMMENT ME
-      // if (peek().type == TType::LParen) {
-      //   NODE_ALLOC(ASTMethodCall, method, range, defer, this);
-      //   method->base = dot;
-      //   method->arguments = parse_arguments();
-      //   left = method;
-      // }
+      if (peek().type == TType::LParen) {
+        NODE_ALLOC(ASTMethodCall, method, range, defer, this);
+        method->base = dot;
+        method->arguments = parse_arguments();
+        left = method;
+      }
 
       left = dot;
     } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
