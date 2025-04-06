@@ -555,9 +555,9 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
   auto new_node = copy(node);
   new_node->segments.clear();
   for (const auto &part : node->segments) {
-    if (part.generic_arguments) {
+    if (!part.generic_arguments.empty()) {
       std::vector<ASTExpr *> args;
-      for (auto arg in *part.generic_arguments) {
+      for (auto arg in part.generic_arguments) {
         auto new_arg = (ASTExpr *)copy_node(arg);
         new_arg->resolved_type = Type::INVALID_TYPE_ID;
         args.push_back(new_arg);

@@ -273,24 +273,21 @@ struct ASTPath : ASTExpr {
       we use optional here to avoid unneccesary initialization for basic stuff
       like identifiers.
     */
-    std::optional<std::vector<ASTExpr *>> generic_arguments = std::nullopt;
+    std::vector<ASTExpr *> generic_arguments;
 
     int resolved_type = Type::INVALID_TYPE_ID;
 
     inline std::vector<int> get_resolved_generics() {
       std::vector<int> generics;
-      for (auto arg : *generic_arguments) {
+      for (auto arg : generic_arguments) {
         generics.push_back(arg->resolved_type);
       }
       return generics;
     }
   };
 
-  Nullable<std::vector<ASTExpr *>> get_last_segments_generics() {
-    if (segments.back().generic_arguments) {
-      return &(segments.back().generic_arguments.value());
-    }
-    return nullptr;
+  std::vector<ASTExpr *> *get_last_segments_generics() {
+    return &segments.back().generic_arguments;
   }
 
   /*
@@ -303,7 +300,7 @@ struct ASTPath : ASTExpr {
       ]
     }
   */
-  std::vector<Segment> segments;
+  std::vector<Segment> segments{};
 
   ASTNodeType get_node_type() const override { return AST_NODE_PATH; }
 
@@ -313,7 +310,7 @@ struct ASTPath : ASTExpr {
   inline void push_part(InternedString identifier) { segments.emplace_back(identifier); }
 
   inline void push_part(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
-    segments.emplace_back(identifier, std::make_optional(generic_arguments));
+    segments.emplace_back(identifier, generic_arguments);
   }
 };
 
@@ -536,7 +533,7 @@ struct ASTCall : ASTExpr {
 
   bool has_generics() {
     if (auto path = dynamic_cast<ASTPath*>(function)) {
-      return path->get_last_segments_generics().is_not_null();
+      return path->get_last_segments_generics() != nullptr;
     }
     return false;
   }

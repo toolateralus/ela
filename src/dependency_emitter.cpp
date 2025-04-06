@@ -249,8 +249,8 @@ void DependencyEmitter::visit(ASTPath *node) {
     }
 
     ASTDeclaration *instantiation = nullptr;
-    if (seg.generic_arguments) {
-      auto generic_args = emitter->typer.get_generic_arg_types(*seg.generic_arguments);
+    if (!seg.generic_arguments.empty()) {
+      auto generic_args = emitter->typer.get_generic_arg_types(seg.generic_arguments);
       if (symbol->is_type()) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);

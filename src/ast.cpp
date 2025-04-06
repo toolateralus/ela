@@ -763,7 +763,7 @@ ASTPath::Segment Parser::parse_path_segment() {
     auto generics = parse_generic_arguments();
     return {identifier, generics};
   } else {
-    return {identifier};
+    return {identifier, std::vector<ASTExpr*>{}};
   }
 }
 

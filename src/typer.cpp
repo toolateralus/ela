@@ -881,19 +881,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   std::vector<int> generic_args;
   auto path_generics = node->get_generic_arguments().get();
 
-  /* 
-    here, if the function call was a path, and it didn't parse any generics,
-    we need to make sure that array is Some() and valid, so we acn possibly push
-    into it,.
-  */
-
-  if (!path_generics && node->function->get_node_type() == AST_NODE_PATH) {
-    auto path = (ASTPath*)node->function;
-    path->segments.back().generic_arguments = {std::vector<ASTExpr*>{}};
-    path_generics = &path->segments.back().generic_arguments.value();
-  } 
-  
-
   if (path_generics->empty()) {
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
@@ -1586,8 +1573,6 @@ void Typer::visit(ASTCall *node) {
     node->resolved_type = symbol->type.choice.get()->resolved_type;
     return;
   } else {
-    node->function->accept(this);
-
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
     if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
@@ -1813,7 +1798,7 @@ void Typer::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
     if (node->left->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->left;
-      if (path->length() == 1 && !path->segments[0].generic_arguments) {
+      if (path->length() == 1 && path->segments[0].generic_arguments.empty()) {
         if (auto symbol = ctx.get_symbol(path)) {
           if (symbol && symbol.get()->mutability == CONST) {
             throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
@@ -2017,9 +2002,9 @@ void Typer::visit(ASTPath *node) {
       throw_error("symbol not found in scope", node->source_range);
     }
 
-    if (part.generic_arguments) {
+    if (!part.generic_arguments.empty()) {
       std::vector<int> generic_args;
-      for (auto &arg : *part.generic_arguments) {
+      for (auto &arg : part.generic_arguments) {
         arg->accept(this);
         generic_args.push_back(arg->resolved_type);
       }
@@ -2755,7 +2740,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         if (index == path->length() - 1)
           return symbol;
 
-        if (part.generic_arguments) {
+        if (!part.generic_arguments.empty()) {
           if (symbol->is_type()) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
@@ -2813,7 +2798,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
         if (index == path->length() - 1)
           return symbol->scope;
 
-        if (part.generic_arguments) {
+        if (!part.generic_arguments.empty()) {
           if (symbol->is_type()) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
