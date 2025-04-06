@@ -58,7 +58,7 @@ struct VisitorBase {
   virtual void visit(ASTTupleDeconstruction *node) = 0;
   virtual void visit(ASTDefer *node) = 0;
   virtual void visit(ASTInterfaceDeclaration *node) = 0;
-  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTChoiceDeclaration *node) = 0;
   virtual void visit(ASTModule *node) = 0;
   virtual void visit(ASTType_Of *node) = 0;
   virtual void visit(ASTStatementList *node) {
@@ -126,7 +126,7 @@ struct Typer : VisitorBase {
                              std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
-  void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
+  void visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                       std::vector<int> generic_args = {});
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
@@ -162,7 +162,7 @@ struct Typer : VisitorBase {
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
@@ -322,7 +322,7 @@ struct Emitter : VisitorBase {
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;
@@ -384,7 +384,7 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;

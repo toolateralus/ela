@@ -22,7 +22,7 @@ enum SymbolFlags {
 struct ASTNode;
 struct ASTStructDeclaration;
 struct ASTFunctionDeclaration;
-struct ASTTaggedUnionDeclaration;
+struct ASTChoiceDeclaration;
 struct ASTEnumDeclaration;
 struct ASTModule;
 
@@ -67,7 +67,7 @@ struct Symbol {
     struct {
       // This is nullable purely because `tuple` types do not have a declaring node!
       // Otherwise, all other nodes have this property, and must.
-      Nullable<ASTTaggedUnionDeclaration> choice;
+      Nullable<ASTChoiceDeclaration> choice;
       Nullable<ASTNode> declaration;
       TypeKind kind;
     } type;
@@ -201,7 +201,7 @@ struct Scope {
 
   void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
-  int create_tagged_union(const InternedString &name, Scope *scope, ASTTaggedUnionDeclaration *declaration) {
+  int create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
     auto sym = Symbol::create_type(id, name, TYPE_TAGGED_UNION, (ASTNode *)declaration);
     sym.scope = this;

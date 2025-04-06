@@ -150,8 +150,8 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
       info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
     } break;
     case TYPE_TAGGED_UNION: {
-      info = new (type_info_alloc<TaggedUnionTypeInfo>())
-          TaggedUnionTypeInfo(*base_t->get_info()->as<TaggedUnionTypeInfo>());
+      info = new (type_info_alloc<ChoiceTypeInfo>())
+          ChoiceTypeInfo(*base_t->get_info()->as<ChoiceTypeInfo>());
     } break;
     case TYPE_INTERFACE: {
       info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
@@ -368,7 +368,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   // tagged union stuffz.
   {
     if (to->is_kind(TYPE_TAGGED_UNION)) {
-      auto info = to->get_info()->as<TaggedUnionTypeInfo>();
+      auto info = to->get_info()->as<ChoiceTypeInfo>();
       for (const auto &variant : info->variants) {
         if (from->id == variant.type) {
           return CONVERT_IMPLICIT;
@@ -479,7 +479,7 @@ int global_create_tagged_union_type(const InternedString &name, Scope *scope, co
   }
   type->set_base(base);
   type->generic_args = generic_args;
-  TaggedUnionTypeInfo *info = type_info_alloc<TaggedUnionTypeInfo>();
+  ChoiceTypeInfo *info = type_info_alloc<ChoiceTypeInfo>();
   info->scope = scope;
   info->scope->name = base;
   type->set_info(info);

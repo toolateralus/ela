@@ -151,7 +151,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   ctx.set_scope(old_scope);
 }
 
-void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
+void Typer::visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                            std::vector<int> generic_args) {
   auto type = global_get_type(node->resolved_type);
 
@@ -175,22 +175,22 @@ void Typer::visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool
     node->where_clause.get()->accept(this);
   }
 
-  auto info = type->get_info()->as<TaggedUnionTypeInfo>();
+  auto info = type->get_info()->as<ChoiceTypeInfo>();
   info->scope = node->scope;
 
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL: {
+      case ASTChoiceVariant::NORMAL: {
         info->variants.push_back({variant.name, void_type()});
         info->scope->create_type_alias(variant.name, void_type(), TYPE_SCALAR, nullptr);
       } break;
-      case ASTTaggedUnionVariant::TUPLE: {
+      case ASTChoiceVariant::TUPLE: {
         variant.tuple->accept(this);
         auto type = variant.tuple->resolved_type;
         info->variants.push_back({variant.name, type});
         info->scope->create_type_alias(variant.name, type, TYPE_TUPLE, variant.tuple);
       } break;
-      case ASTTaggedUnionVariant::STRUCT: {
+      case ASTChoiceVariant::STRUCT: {
         auto scope = create_child(ctx.scope);
         ctx.set_scope(scope);
         for (const auto &field : variant.struct_declarations) {
@@ -1018,8 +1018,8 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
         case AST_NODE_INTERFACE_DECLARATION:
           visit_interface_declaration((ASTInterfaceDeclaration *)instantiation, true, args);
           break;
-        case AST_NODE_TAGGED_UNION_DECLARATION: {
-          visit_tagged_union_declaration((ASTTaggedUnionDeclaration *)instantiation, true, args);
+        case AST_NODE_CHOICE_DECLARATION: {
+          visit_tagged_union_declaration((ASTChoiceDeclaration *)instantiation, true, args);
         } break;
         case AST_NODE_IMPL: {
           visit_impl_declaration((ASTImpl *)instantiation, true, args);
@@ -1083,7 +1083,7 @@ void Typer::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
 }
 
-void Typer::visit(ASTTaggedUnionDeclaration *node) {
+void Typer::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     ctx.scope->create_type_alias(node->name, Type::INVALID_TYPE_ID, TypeKind(0), node);
     return;

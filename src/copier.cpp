@@ -430,8 +430,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
     case AST_NODE_INTERFACE_DECLARATION:
       return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
-    case AST_NODE_TAGGED_UNION_DECLARATION:
-      return copy_tagged_union_declaration(static_cast<ASTTaggedUnionDeclaration *>(node));
+    case AST_NODE_CHOICE_DECLARATION:
+      return copy_tagged_union_declaration(static_cast<ASTChoiceDeclaration *>(node));
     case AST_NODE_NOOP:
       return node;
     case AST_NODE_ALIAS:
@@ -499,23 +499,23 @@ ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   return new_node;
 }
 
-ASTTaggedUnionDeclaration *ASTCopier::copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node) {
+ASTChoiceDeclaration *ASTCopier::copy_tagged_union_declaration(ASTChoiceDeclaration *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   new_node->variants.clear();
   for (const auto &variant : node->variants) {
-    ASTTaggedUnionVariant new_variant;
+    ASTChoiceVariant new_variant;
     new_variant.kind = variant.kind;
     new_variant.name = variant.name;
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
+      case ASTChoiceVariant::NORMAL:
         break;
-      case ASTTaggedUnionVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE:
         new_variant.tuple = static_cast<ASTType *>(copy_node(variant.tuple));
         break;
-      case ASTTaggedUnionVariant::STRUCT:
+      case ASTChoiceVariant::STRUCT:
         new_variant.struct_declarations.clear();
         for (auto field : variant.struct_declarations) {
           new_variant.struct_declarations.push_back(static_cast<ASTVariable *>(copy_node(field)));

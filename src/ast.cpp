@@ -574,7 +574,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_FUNCTION_DECLARATION:
       case AST_NODE_INTERFACE_DECLARATION:
       case AST_NODE_ENUM_DECLARATION:
-      case AST_NODE_TAGGED_UNION_DECLARATION:
+      case AST_NODE_CHOICE_DECLARATION:
       case AST_NODE_ALIAS:
       case AST_NODE_VARIABLE:
       case AST_NODE_NOOP:
@@ -2241,8 +2241,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return node;
 }
 
-ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
-  NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
+ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+  NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this)
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
@@ -2259,13 +2259,13 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   expect(TType::LCurly);
 
   while (peek().type != TType::RCurly) {
-    ASTTaggedUnionVariant variant;
+    ASTChoiceVariant variant;
     variant.name = expect(TType::Identifier).value;
     if (peek().type == TType::Comma || peek().type == TType::RCurly) {
-      variant.kind = ASTTaggedUnionVariant::NORMAL;
+      variant.kind = ASTChoiceVariant::NORMAL;
       node->variants.push_back(variant);
     } else if (peek().type == TType::LCurly) {
-      variant.kind = ASTTaggedUnionVariant::STRUCT;
+      variant.kind = ASTChoiceVariant::STRUCT;
       eat();
       while (peek().type != TType::RCurly) {
         variant.struct_declarations.push_back(parse_variable());
@@ -2276,7 +2276,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       expect(TType::RCurly);
       node->variants.push_back(variant);
     } else if (peek().type == TType::LParen) {
-      variant.kind = ASTTaggedUnionVariant::TUPLE;
+      variant.kind = ASTChoiceVariant::TUPLE;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
       node->variants.push_back(variant);

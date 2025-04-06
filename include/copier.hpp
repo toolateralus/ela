@@ -53,7 +53,7 @@ struct ASTCopier {
   ASTSize_Of *copy_sizeof(ASTSize_Of *node);
   ASTDefer *copy_defer(ASTDefer *node);
   ASTLambda *copy_lambda(ASTLambda *node);
-  ASTTaggedUnionDeclaration *copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node);
+  ASTChoiceDeclaration *copy_tagged_union_declaration(ASTChoiceDeclaration *node);
   ASTStatementList *copy_statement_list(ASTStatementList *node);
   ASTNode *copy_node(ASTNode *node);
   ASTWhere *copy_where(ASTWhere *node);

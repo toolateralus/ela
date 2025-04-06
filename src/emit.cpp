@@ -1775,7 +1775,7 @@ void Emitter::visit(ASTCast *node) {
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
 
-void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+void Emitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -1795,7 +1795,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
   emit_default_init = false;
 
   for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+    if (variant.kind == ASTChoiceVariant::STRUCT) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
@@ -1803,7 +1803,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
         code << ";\n";
       }
       code << "} " << subtype_name << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+    } else if (variant.kind == ASTChoiceVariant::TUPLE) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "typedef ";
       variant.tuple->accept(this);
@@ -1818,10 +1818,10 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
 
   int n = 0;
   for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+    if (variant.kind == ASTChoiceVariant::STRUCT) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+    } else if (variant.kind == ASTChoiceVariant::TUPLE) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
     }

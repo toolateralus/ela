@@ -38,7 +38,7 @@ enum ASTNodeType {
   AST_NODE_WHILE,
   AST_NODE_STRUCT_DECLARATION,
   AST_NODE_ENUM_DECLARATION,
-  AST_NODE_TAGGED_UNION_DECLARATION,
+  AST_NODE_CHOICE_DECLARATION,
   AST_NODE_INTERFACE_DECLARATION,
 
   AST_NODE_PARAMS_DECL,
@@ -731,7 +731,7 @@ struct ASTEnumDeclaration : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_ENUM_DECLARATION; }
 };
 
-struct ASTTaggedUnionVariant {
+struct ASTChoiceVariant {
   enum Kind {
     NORMAL,
     TUPLE,
@@ -742,13 +742,13 @@ struct ASTTaggedUnionVariant {
   InternedString name;
 };
 
-struct ASTTaggedUnionDeclaration : ASTDeclaration {
+struct ASTChoiceDeclaration : ASTDeclaration {
   InternedString name;
   Nullable<ASTWhere> where_clause;
   Scope *scope;
-  std::vector<ASTTaggedUnionVariant> variants;
+  std::vector<ASTChoiceVariant> variants;
   void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_TAGGED_UNION_DECLARATION; }
+  ASTNodeType get_node_type() const override { return AST_NODE_CHOICE_DECLARATION; }
 };
 
 struct ASTInitializerList : ASTExpr {
@@ -1009,7 +1009,7 @@ struct Parser {
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
-  ASTTaggedUnionDeclaration *parse_tagged_union_declaration(Token name);
+  ASTChoiceDeclaration *parse_tagged_union_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTLambda *parse_lambda();

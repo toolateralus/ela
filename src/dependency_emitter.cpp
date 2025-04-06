@@ -473,7 +473,7 @@ void DependencyEmitter::visit(ASTImpl *node) {
 
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
-void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
+void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -482,12 +482,12 @@ void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
   Defer _([&] { ctx.set_scope(old_scope); });
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
+      case ASTChoiceVariant::NORMAL:
         break;
-      case ASTTaggedUnionVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE:
         variant.tuple->accept(this);
         break;
-      case ASTTaggedUnionVariant::STRUCT:
+      case ASTChoiceVariant::STRUCT:
         for (const auto &decl : variant.struct_declarations) {
           decl->accept(this);
         }
