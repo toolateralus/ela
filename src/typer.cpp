@@ -896,17 +896,29 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
   if (path_generics->empty()) {
     path_generics->resize(func->generic_parameters.size());
+
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
+      if (expected_type == -1) {
+        throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so none can be substituted.", node->source_range);
+      }
+
       if (func->return_type->kind == ASTType::NORMAL) {
         auto return_ty_path = func->return_type->normal.path;
-        if (func->generic_parameters[0] == return_ty_path->segments[0].identifier) {
+        /* 
+          TODO: we need to do a better job of checking whether the return type name 
+          
+          * matches the generic parameter it's trying to infer.
+          * we shouldn't restrict the path length nor use a simple string comparison here.
+        */
+        if (return_ty_path->length() == 1 && (func->generic_parameters[0] == return_ty_path->segments[0].identifier)) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = node->function->source_range;
           path_generics->push_back(type);
         }
       }
+
     } else { // Infer generic parameter(S) from arguments.
 
       /*
