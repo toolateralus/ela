@@ -64,12 +64,22 @@ def main():
 
     # Print summary of passed and failed tests
     print("\n\033[1;34mTest Summary:\033[0m")
+    # Print passed tests
     print(f"\033[1;32mPassed tests ({len(passed_tests)}):\033[0m")
-    for test in passed_tests:
-        print(f"  - {test}")
+        # Define the column width and number of items per line
+    COLUMN_WIDTH = 35  # Adjust the width as needed
+    ITEMS_PER_LINE = 3  # Adjust the number of items per line
+    
+    # Print passed tests
+    for i in range(0, len(passed_tests), ITEMS_PER_LINE):
+        row = passed_tests[i:i+ITEMS_PER_LINE]
+        print("  - " + "".join(f"{test:<{COLUMN_WIDTH}}" for test in row))
+    
+    # Print failed tests
     print(f"\033[1;31mFailed tests ({len(failed_tests)}):\033[0m")
-    for test in failed_tests:
-        print(f"  - {test}")
+    for i in range(0, len(failed_tests), ITEMS_PER_LINE):
+        row = failed_tests[i:i+ITEMS_PER_LINE]
+        print("  - " + "".join(f"{test:<{COLUMN_WIDTH}}" for test in row))
 
 if __name__ == "__main__":
     main()
