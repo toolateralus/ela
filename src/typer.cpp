@@ -3,6 +3,7 @@
 #include <csetjmp>
 #include <format>
 #include <iostream>
+#include <linux/limits.h>
 #include <ostream>
 #include <ranges>
 #include <sstream>
@@ -878,8 +879,9 @@ void Typer::type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info
 */
 ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func) {
   std::vector<int> generic_args;
+  auto path_generics = node->get_generic_arguments().get();
 
-  if (node->generic_arguments.empty()) {
+  if (path_generics->empty()) {
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL) {
@@ -888,7 +890,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = type->source_range;
-          node->generic_arguments.push_back(type);
+          path_generics->push_back(type);
         }
       }
     } else { // Infer generic parameter(S) from arguments.
@@ -970,12 +972,12 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
         auto type = ast_alloc<ASTType>();
         type->source_range = node->source_range;
         type->resolved_type = inferred_generics[i];
-        node->generic_arguments.push_back(type);
+        path_generics->push_back(type);
       }
     }
   }
 
-  generic_args = get_generic_arg_types(node->generic_arguments);
+  generic_args = get_generic_arg_types(*path_generics);
 
   return (ASTFunctionDeclaration *)visit_generic(func, generic_args, node->source_range);
 }
@@ -1522,7 +1524,8 @@ void Typer::visit(ASTCall *node) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
-      if (!node->generic_arguments.empty() || !func_decl->generic_parameters.empty()) {
+
+      if (node->has_generics() || !func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
 

@@ -137,10 +137,6 @@ ASTCall *ASTCopier::copy_call(ASTCall *node) {
   auto new_node = copy(node);
   new_node->function = static_cast<ASTExpr *>(copy_node(node->function));
   new_node->arguments = static_cast<ASTArguments *>(copy_node(node->arguments));
-  new_node->generic_arguments.clear();
-  for (auto arg : node->generic_arguments) {
-    new_node->generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
-  }
   return new_node;
 }
 ASTArguments *ASTCopier::copy_arguments(ASTArguments *node) {

@@ -610,9 +610,6 @@ ASTArguments *Parser::parse_arguments() {
 ASTCall *Parser::parse_call(ASTExpr *function) {
   NODE_ALLOC(ASTCall, call, range, _, this);
   call->function = function;
-  if (peek().type == TType::GenericBrace) {
-    call->generic_arguments = parse_generic_arguments();
-  }
   call->arguments = parse_arguments();
   end_node(call, range);
   return call;

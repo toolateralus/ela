@@ -533,7 +533,21 @@ struct ASTArguments : ASTNode {
 struct ASTCall : ASTExpr {
   ASTExpr *function;
   ASTArguments *arguments;
-  std::vector<ASTExpr *> generic_arguments;
+
+  bool has_generics() {
+    if (auto path = dynamic_cast<ASTPath*>(function)) {
+      return path->get_last_segments_generics().is_not_null();
+    }
+    return false;
+  }
+
+  Nullable<std::vector<ASTExpr *>> get_generic_arguments() {
+    if (auto path = dynamic_cast<ASTPath*>(function)) {
+      return path->get_last_segments_generics();
+    }
+    return nullptr;
+  }
+
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_CALL; }
 };
