@@ -302,97 +302,23 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 }
 
 void Emitter::visit(ASTCall *node) {
-  auto base_symbol = ctx.get_symbol(node->function);
-
   std::vector<int> generic_args;
   if (node->has_generics()) {
     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
-
-  auto symbol = base_symbol.get();
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-    if (!base_symbol) {
-      throw_error("can't call a non-function", node->source_range);
+  auto func = node->function;
+  // TODO: Do we need this?
+  if (func->get_node_type() == AST_NODE_TYPE) {
+    auto ast_type = static_cast<ASTType *>(func);
+    if (ast_type->kind != ASTType::NORMAL) {
+      throw_error("Cannot call a tuple or function type", node->source_range);
     }
-
-    // Call a function pointer via a dot expression
-    if (!base_symbol.get()->is_function()) {
-      auto func = node->function;
-      if (func->get_node_type() == AST_NODE_TYPE) {
-        auto ast_type = static_cast<ASTType *>(func);
-        if (ast_type->kind != ASTType::NORMAL) {
-          throw_error("Cannot call a tuple or function type", node->source_range);
-        }
-        func = ast_type->normal.path;
-      }
-      // normal function call, or a static method.
-      func->accept(this);
-      code << mangled_type_args(generic_args);
-      node->arguments->accept(this);
-      return;
-    }
-
-    auto func = symbol->function.declaration;
-
-    auto method_call = HAS_FLAG(func->flags, FUNCTION_IS_METHOD);
-
-    if (!method_call) {
-      throw_error("cannot call a static method from an instance", node->source_range);
-    }
-
-    auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
-    if (!base_type) {
-      throw_error("internal compiler error: unable to find method call", node->source_range);
-    }
-
-    Type *function_type = global_get_type(symbol->type_id);
-    // if generic function
-    if (!func->generic_parameters.empty()) {
-      func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);
-      function_type = global_get_type(func->resolved_type);
-    }
-
-    code << emit_symbol(symbol) + mangled_type_args(generic_args);
-    code << "(";
-
-    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
-
-    if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
-      code << "&";
-    } else if (!param_0_ty->get_ext().is_pointer() && base_type->get_ext().is_pointer()) {
-      code << "*";
-    }
-
-    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
-    base->accept(this);
-    if (node->arguments->arguments.size() > 0) {
-      code << ", ";
-    }
-
-    for (auto &arg : node->arguments->arguments) {
-      arg->accept(this);
-      if (arg != node->arguments->arguments.back()) {
-        code << ", ";
-      }
-    }
-    code << ")";
-  } else {
-    auto func = node->function;
-    if (func->get_node_type() == AST_NODE_TYPE) {
-      auto ast_type = static_cast<ASTType *>(func);
-      if (ast_type->kind != ASTType::NORMAL) {
-        throw_error("Cannot call a tuple or function type", node->source_range);
-      }
-      func = ast_type->normal.path;
-    }
-    // normal function call, or a static method.
-    func->accept(this);
-    code << mangled_type_args(generic_args);
-    node->arguments->accept(this);
+    func = ast_type->normal.path;
   }
-
-  return;
+  // normal function call, or a static method.
+  func->accept(this);
+  code << mangled_type_args(generic_args);
+  node->arguments->accept(this);
 }
 
 size_t calculate_actual_length(const std::string_view &str_view) {
@@ -2219,7 +2145,56 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
 
 void Emitter::visit(ASTPatternMatch *node) {}
 
-void Emitter::visit(ASTMethodCall *node) {}
+void Emitter::visit(ASTMethodCall *node) {
+  std::vector<int> generic_args = node->dot->member.get_resolved_generics();
+
+  auto symbol = ctx.get_symbol(node->dot).get();
+  // Call a function pointer via a dot expression
+  if (symbol->is_variable()) {
+    auto func = node->dot;
+    func->accept(this);
+    code << mangled_type_args(generic_args);
+    node->arguments->accept(this);
+    return;
+  }
+
+  auto func = symbol->function.declaration;
+
+  Type *function_type = global_get_type(symbol->type_id);
+  // if generic function
+  if (!func->generic_parameters.empty()) {
+    func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);
+    function_type = global_get_type(func->resolved_type);
+  }
+
+  code << emit_symbol(symbol) + mangled_type_args(generic_args);
+  code << "(";
+
+  auto self_param_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
+
+  auto base_type = global_get_type(node->dot->base->resolved_type);
+
+  if (self_param_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
+    // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
+    code << "&";
+  } else if (!self_param_ty->get_ext().is_pointer() && base_type->get_ext().is_pointer()) {
+    code << "*";
+  }
+
+  ASTExpr *base = node->dot->base;
+  base->accept(this);
+  if (node->arguments->arguments.size() > 0) {
+    code << ", ";
+  }
+
+  for (auto &arg : node->arguments->arguments) {
+    arg->accept(this);
+    if (arg != node->arguments->arguments.back()) {
+      code << ", ";
+    }
+  }
+  code << ")";
+}
 
 void Emitter::visit(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
