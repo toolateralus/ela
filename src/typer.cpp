@@ -881,6 +881,17 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   std::vector<int> generic_args;
   auto path_generics = node->get_generic_arguments().get();
 
+  /* 
+    here, if the function call was a path, and it didn't parse any generics,
+    we need to make sure that array is Some() and valid, so we acn possibly push
+    into it,.
+  */
+  if (!path_generics && node->function->get_node_type() == AST_NODE_PATH) {
+    auto path = (ASTPath*)node->function;
+    path->segments.back().generic_arguments = {std::vector<ASTExpr*>{}};
+    path_generics = &path->segments.back().generic_arguments.value();
+  }
+
   if (path_generics->empty()) {
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
