@@ -2216,5 +2216,8 @@ void Emitter::visit(ASTPatternMatch *node) {
 
 }
 
-void Emitter::visit(ASTPath *node) {}
+void Emitter::visit(ASTPath *node) {
+  auto symbol = ctx.get_symbol(node);
+  code << emit_symbol(symbol.get());
+}
 

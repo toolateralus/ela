@@ -238,10 +238,40 @@ void DependencyEmitter::visit(ASTPath *node) {
     type->declaring_node.get()->accept(emitter);
   }
 
-  // for global variables
-  // why just earch the first part of the path?
-  if (auto symbol = ctx.scope->lookup(node->parts[0].value)) {
-    if (symbol->is_variable() && symbol->variable.declaration) {
+  Scope *scope = ctx.scope;
+  auto index = 0;
+  for (auto &part in node->parts) {
+    auto &ident = part.value;
+    auto symbol = scope->lookup(ident);
+    scope = nullptr;
+    if (!symbol) {
+      throw_error("symbol not found in scope", node->source_range);
+    }
+
+    ASTDeclaration *instantiation = nullptr;
+    if (part.generic_arguments) {
+      auto generic_args = emitter->typer.get_generic_arg_types(*part.generic_arguments);
+      if (symbol->is_type()) {
+        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
+        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+        auto type = global_get_type(instantiation->resolved_type);
+        scope = type->get_info()->scope;
+      } else if (symbol->is_function()) {
+        instantiation = find_generic_instance(symbol->function.declaration->generic_instantiations, generic_args);
+      }
+    } else {
+      if (symbol->is_module()) {
+        scope = symbol->module.declaration->scope;
+      } else if (symbol->is_type()) {
+        scope = global_get_type(symbol->type_id)->get_info()->scope;
+      }
+    }
+
+    if (instantiation) {
+      instantiation->accept(this);
+      instantiation->accept(emitter);
+    } else if (symbol->is_variable() && symbol->variable.declaration) {
+      // for global variables
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
         symbol->variable.declaration.get()->accept(this);
@@ -250,7 +280,14 @@ void DependencyEmitter::visit(ASTPath *node) {
     } else if (symbol->is_function()) {
       // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
+    } else if (symbol->is_type()) {
+      if (auto decl = symbol->type.declaration.get()) {
+        decl->accept(this);
+        decl->accept(emitter);
+      }
     }
+
+    index++;
   }
 }
 
