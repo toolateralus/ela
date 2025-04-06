@@ -1004,7 +1004,7 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
     auto instantiation = find_generic_instance(definition->generic_instantiations, args);
     if (!instantiation) {
       instantiation = static_cast<ASTDeclaration *>(deep_copy_ast(definition));
-      definition->generic_instantiations.push_back({args, instantiation});
+      definition->generic_instantiations.emplace_back(args, instantiation);
       switch (definition->get_node_type()) {
         case AST_NODE_STRUCT_DECLARATION: {
           visit_struct_declaration((ASTStructDeclaration *)instantiation, true, args);
