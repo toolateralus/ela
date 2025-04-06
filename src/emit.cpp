@@ -912,7 +912,7 @@ void $deinit_type(Type *type) {
     // use the test runner main macro.
     code << "__TEST_RUNNER_MAIN;";
   } else {
-    if (has_user_defined_main && !is_freestanding) {
+    if (has_user_defined_main && !is_freestanding && !compile_command.has_flag("nostdlib")) {
       auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
 
       const auto reflection_initialization = type_info_strings.size() != 0 ? "$initialize_reflection_system();"
@@ -1859,7 +1859,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << "extern  ";
     }
 
-    if ((node->name == "main" || node->name == "маин") && !is_freestanding) {
+    if ((node->name == "main" || node->name == "маин") && !is_freestanding && !compile_command.has_flag("nostdlib")) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);

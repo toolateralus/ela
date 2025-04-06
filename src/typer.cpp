@@ -475,6 +475,11 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   node->target->accept(this);
+
+  if (node->target->resolved_type == -2) {
+    throw_error("the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`", node->source_range);
+  }
+
   node->scope->name = std::to_string(node->target->resolved_type) + "impl";
 
   auto target_ty = global_get_type(node->target->resolved_type);
@@ -1991,6 +1996,9 @@ void Typer::visit(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
+        if (symbol->type_id == -2) {
+          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+        }
         scope = global_get_type(symbol->type_id)->get_info()->scope;
       }
       part.resolved_type = symbol->type_id;
@@ -2046,6 +2054,10 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     case ASTLiteral::String: {
+      static bool nostdlib =  compile_command.has_flag("nostdlib");
+      if (nostdlib) {
+        node->is_c_string = true;
+      }
       if (node->is_c_string) {
         static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
         node->resolved_type = type;

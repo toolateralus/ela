@@ -4,7 +4,7 @@ alias Tuple :: (s32, *const Type);
 // * _: Tuple;
 
 Pack :: struct {
-  tuples: Tuple[],
+  tuples: List!<Tuple>,
 }
 
 main :: fn() { 

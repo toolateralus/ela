@@ -118,18 +118,21 @@ void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
 
-  // We have to do this here because the reflection system depends on this type and it doesn't
-  // neccesarily get instantiatied.
-  // see the `Emitter:get_type_struct`
-  // and `bootstrap/reflection.ela/Type :: struct`
-  auto sub_types = std::vector<int>{
-      ctx.scope->find_type_id("str", {}),
-      ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
-  };
-  auto tuple_id = global_find_type_id(sub_types, {});
 
-  define_type(tuple_id);
-  declare_type(tuple_id);
+
+  if (!compile_command.has_flag("nostdlib")) {
+    // We have to do this here because the reflection system depends on this type and it doesn't
+    // neccesarily get instantiatied.
+    // see the `Emitter:get_type_struct`
+    // and `bootstrap/reflection.ela/Type :: struct`
+    auto sub_types = std::vector<int>{
+        ctx.scope->find_type_id("str", {}),
+        ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
+    };
+    auto tuple_id = global_find_type_id(sub_types, {});
+    define_type(tuple_id);
+    declare_type(tuple_id);
+  }
 
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {

@@ -528,7 +528,7 @@ ASTProgram *Parser::parse_program() {
   NODE_ALLOC(ASTProgram, program, range, _, this)
 
   // put bootstrap on root scope
-  if (true) {
+  if (!compile_command.has_flag("nostdlib")) {
     import("bootstrap", &ctx.root_scope);
 
     while (peek().type != TType::Eof) {
