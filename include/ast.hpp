@@ -259,25 +259,32 @@ struct ASTTypeExtension {
   ASTExpr *expression;
 };
 
-struct ASTPath: ASTExpr {
-  struct Part {
-    InternedString value {};
-    /* 
+struct ASTPath : ASTExpr {
+  struct Segment {
+    InternedString value{};
+    /*
       we use optional here to avoid unneccesary initialization for basic stuff
       like identifiers.
     */
-    std::optional<std::vector<ASTExpr*>> generic_arguments = std::nullopt;
+    std::optional<std::vector<ASTExpr *>> generic_arguments = std::nullopt;
+
     int resolved_type = Type::INVALID_TYPE_ID;
 
     inline std::vector<int> get_resolved_generics() {
       std::vector<int> generics;
-      for (auto arg: *generic_arguments) {
+      for (auto arg : *generic_arguments) {
         generics.push_back(arg->resolved_type);
       }
       return generics;
     }
-    
   };
+
+  Nullable<std::vector<ASTExpr *>> get_last_segments_generics() {
+    if (segments.back().generic_arguments) {
+      return &(segments.back().generic_arguments.value());
+    }
+    return nullptr;
+  }
 
   /*
     Path parts are typically identifiers, and they may contain their own generic arguments.
@@ -289,23 +296,17 @@ struct ASTPath: ASTExpr {
       ]
     }
   */
-  std::vector<Part> parts;
+  std::vector<Segment> segments;
 
-  ASTNodeType get_node_type() const override {
-    return AST_NODE_PATH;
-  }
+  ASTNodeType get_node_type() const override { return AST_NODE_PATH; }
 
   void accept(VisitorBase *visitor) override;
-  inline size_t length() const {
-    return parts.size();
-  }
+  inline size_t length() const { return segments.size(); }
 
-  inline void push_part(InternedString identifier) {
-    parts.emplace_back(identifier);
-  }
+  inline void push_part(InternedString identifier) { segments.emplace_back(identifier); }
 
-  inline void push_part(InternedString identifier, std::vector<ASTExpr*> generic_arguments) {
-    parts.emplace_back(identifier, std::make_optional(generic_arguments));
+  inline void push_part(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
+    segments.emplace_back(identifier, std::make_optional(generic_arguments));
   }
 };
 
@@ -870,7 +871,7 @@ struct StructPattern {
 /*
   * note: the new variables created by the pattern match's destructure
   * are denoted by $name
-  
+
     tuple style. never has names, only new var names.
   if x is Choice::Variant($v1, $v2) { ... }
 
@@ -907,10 +908,10 @@ struct ASTPatternMatch : ASTExpr {
                                              ^<- object.
   */
   ASTExpr *object;
-  /* 
+  /*
     the type thats being matched
-    e.g  
-      if x is Choice::Variant {... } 
+    e.g
+      if x is Choice::Variant {... }
               ^^^^^^^^^^^^^^^<- the target type.
   */
   ASTType *target_type;
@@ -923,7 +924,7 @@ struct ASTPatternMatch : ASTExpr {
 
         }
     */
-    NONE, 
+    NONE,
     STRUCT,
     TUPLE,
   } pattern_tag;

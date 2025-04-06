@@ -2613,7 +2613,7 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->parts) {
+      for (auto &part in path->segments) {
         auto &ident = part.value;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -2671,7 +2671,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->parts) {
+      for (auto &part in path->segments) {
         auto &ident = part.value;
         auto symbol = scope->lookup(ident);
         if (!symbol)

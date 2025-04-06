@@ -575,8 +575,8 @@ ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
 
 ASTPath *ASTCopier::copy_path(ASTPath *node) {
   auto new_node = copy(node);
-  new_node->parts.clear();
-  for (const auto &part: node->parts) {
+  new_node->segments.clear();
+  for (const auto &part: node->segments) {
     if (part.generic_arguments) {
       std::vector<ASTExpr*> args;
       for (auto arg in *part.generic_arguments) {

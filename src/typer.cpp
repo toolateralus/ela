@@ -884,7 +884,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL) {
         auto identifier = dynamic_cast<ASTPath *>(func->return_type->normal.base);
-        if (identifier && func->generic_parameters[0] == identifier->parts[0].value) {
+        if (identifier && func->generic_parameters[0] == identifier->segments[0].value) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = type->source_range;
@@ -924,7 +924,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
             for (const auto &generic : generics) {
               auto identifier = dynamic_cast<ASTPath *>(param->normal.type->normal.base);
-              if (identifier && generic == identifier->parts[0].value) {
+              if (identifier && generic == identifier->segments[0].value) {
                 is_generic = true;
                 break;
               }
@@ -1787,7 +1787,7 @@ void Typer::visit(ASTBinExpr *node) {
   if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
     if (node->left->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->left;
-      if (path->length() == 1 && !path->parts[0].generic_arguments) {
+      if (path->length() == 1 && !path->segments[0].generic_arguments) {
         if (auto symbol = ctx.get_symbol(path)) {
           if (symbol && symbol.get()->mutability == CONST) {
             throw_error("cannot assign to a constant variable. consider adding 'mut' to the parameter or variable.",
@@ -1983,7 +1983,7 @@ void Typer::visit(ASTUnaryExpr *node) {
 void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &part in node->parts) {
+  for (auto &part in node->segments) {
     auto &ident = part.value;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
@@ -2015,12 +2015,12 @@ void Typer::visit(ASTPath *node) {
       }
       part.resolved_type = symbol->type_id;
     }
-    if (!scope && index < node->parts.size() - 1) {
+    if (!scope && index < node->segments.size() - 1) {
       throw_error("symbol scope could not be resolved in path", node->source_range);
     }
     index++;
   }
-  node->resolved_type = node->parts[node->parts.size() - 1].resolved_type;
+  node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
 }
 
 void Typer::visit(ASTLiteral *node) {

@@ -292,7 +292,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
     } break;
     case AST_NODE_PATH: {
       auto path = static_cast<ASTPath*>(node);
-      return path->parts[path->parts.size() - 1].resolved_type;
+      return path->segments[path->segments.size() - 1].resolved_type;
     } break;
     default:
       throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
@@ -2211,10 +2211,10 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
   newline_indented();
 }
 
-
 void Emitter::visit(ASTPatternMatch *node) {
 
 }
 
-void Emitter::visit(ASTPath *node) {}
+void Emitter::visit(ASTPath *node) {
 
+}
