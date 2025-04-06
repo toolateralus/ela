@@ -53,7 +53,7 @@ int CompileCommand::compile() {
 
     emit.code << BOILERPLATE_C_CODE << '\n';
 
-    if (!is_freestanding) {
+    if (!is_freestanding && !has_flag("nostdlib")) {
       dependencyEmitter.declare_type(type_list);
       dependencyEmitter.define_type(type_list);
       emit.code << "typedef struct Type Type;\n";

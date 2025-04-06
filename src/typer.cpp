@@ -2046,6 +2046,10 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     case ASTLiteral::String: {
+      static bool nostdlib =  compile_command.has_flag("nostdlib");
+      if (nostdlib) {
+        node->is_c_string = true;
+      }
       if (node->is_c_string) {
         static int type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
         node->resolved_type = type;
