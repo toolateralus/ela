@@ -841,7 +841,6 @@ ASTExpr *Parser::parse_postfix() {
       }
 
 
-      //@no-checkin
       // if (peek().type == TType::LParen) {
       //   NODE_ALLOC(ASTMethodCall, method, range, defer, this);
       //   method->base = dot;
