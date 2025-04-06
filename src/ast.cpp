@@ -574,7 +574,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_FUNCTION_DECLARATION:
       case AST_NODE_INTERFACE_DECLARATION:
       case AST_NODE_ENUM_DECLARATION:
-      case AST_NODE_TAGGED_UNION_DECLARATION:
+      case AST_NODE_CHOICE_DECLARATION:
       case AST_NODE_ALIAS:
       case AST_NODE_VARIABLE:
       case AST_NODE_NOOP:
@@ -760,18 +760,21 @@ ASTExpr *Parser::parse_unary() {
   return parse_postfix();
 }
 
+ASTPath::Segment Parser::parse_path_segment() {
+  InternedString identifier = expect(TType::Identifier).value;
+  if (peek().type == TType::GenericBrace) {
+    auto generics = parse_generic_arguments();
+    return {identifier, generics};
+  } else {
+    return {identifier};
+  }
+}
+
 ASTPath *Parser::parse_path() {
   NODE_ALLOC(ASTPath, path, range, defer, this);
+  // If we find a double colon, then we continue.
   while (true) {
-    InternedString identifier = expect(TType::Identifier).value;
-    if (peek().type == TType::GenericBrace) {
-      auto generics = parse_generic_arguments();
-      path->push_part(identifier, generics);
-    } else {
-      path->push_part(identifier);
-    }
-
-    // If we find a double colon, then we continue.
+    path->segments.push_back(parse_path_segment());
     if (peek().type == TType::DoubleColon) {
       eat();
     } else {
@@ -795,7 +798,7 @@ ASTExpr *Parser::parse_postfix() {
       eat();
       dot->base = left;
       if (peek().type == TType::Integer || peek().type == TType::Identifier) {
-        dot->member_name = eat().value;
+        dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
         if (peek().type == TType::LCurly) {
@@ -839,6 +842,16 @@ ASTExpr *Parser::parse_postfix() {
         end_node(left, range);
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
       }
+
+
+      // ! UNCOMMENT ME
+      // if (peek().type == TType::LParen) {
+      //   NODE_ALLOC(ASTMethodCall, method, range, defer, this);
+      //   method->base = dot;
+      //   method->arguments = parse_arguments();
+      //   left = method;
+      // }
+
       left = dot;
     } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
       NODE_ALLOC(ASTUnaryExpr, unary, unary_range, _, this)
@@ -2228,8 +2241,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return node;
 }
 
-ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
-  NODE_ALLOC(ASTTaggedUnionDeclaration, node, range, _, this)
+ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+  NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this)
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
@@ -2246,13 +2259,13 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
   expect(TType::LCurly);
 
   while (peek().type != TType::RCurly) {
-    ASTTaggedUnionVariant variant;
+    ASTChoiceVariant variant;
     variant.name = expect(TType::Identifier).value;
     if (peek().type == TType::Comma || peek().type == TType::RCurly) {
-      variant.kind = ASTTaggedUnionVariant::NORMAL;
+      variant.kind = ASTChoiceVariant::NORMAL;
       node->variants.push_back(variant);
     } else if (peek().type == TType::LCurly) {
-      variant.kind = ASTTaggedUnionVariant::STRUCT;
+      variant.kind = ASTChoiceVariant::STRUCT;
       eat();
       while (peek().type != TType::RCurly) {
         variant.struct_declarations.push_back(parse_variable());
@@ -2263,7 +2276,7 @@ ASTTaggedUnionDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       expect(TType::RCurly);
       node->variants.push_back(variant);
     } else if (peek().type == TType::LParen) {
-      variant.kind = ASTTaggedUnionVariant::TUPLE;
+      variant.kind = ASTChoiceVariant::TUPLE;
       variant.tuple = parse_type();
       assert(variant.tuple->kind == ASTType::TUPLE);
       node->variants.push_back(variant);
@@ -2599,111 +2612,3 @@ Parser::Parser(const std::string &filename, Context &context)
 Parser::~Parser() { delete typer; }
 
 Nullable<ASTBlock> Parser::current_block = nullptr;
-
-Nullable<Symbol> Context::get_symbol(ASTNode *node) {
-  switch (node->get_node_type()) {
-    case AST_NODE_TYPE: {
-      auto type_node = static_cast<ASTType *>(node);
-      if (type_node->kind != ASTType::NORMAL) {
-        return nullptr;
-      }
-      return get_symbol(type_node->normal.base);
-    }
-    case AST_NODE_PATH: {
-      auto path = static_cast<ASTPath *>(node);
-      Scope *scope = this->scope;
-      auto index = 0;
-      for (auto &part in path->parts) {
-        auto &ident = part.value;
-        auto symbol = scope->lookup(ident);
-        if (!symbol)
-          return nullptr;
-
-        if (index == path->length() - 1)
-          return symbol;
-
-        if (part.generic_arguments) {
-          if (symbol->is_type()) {
-            auto instantiation =
-                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      part.get_resolved_generics());
-            auto type = global_get_type(instantiation->resolved_type);
-            scope = type->get_info()->scope;
-          } else
-            return nullptr;
-        } else {
-          if (symbol->is_module()) {
-            scope = symbol->module.declaration->scope;
-          } else if (symbol->is_type()) {
-            auto resolved_type = global_get_type(symbol->type_id);
-            scope = resolved_type->get_info()->scope;
-          } else {
-            return nullptr;
-          }
-        }
-        index++;
-      }
-    } break;
-    case AST_NODE_DOT_EXPR: {
-      auto dotnode = static_cast<ASTDotExpr *>(node);
-      auto type = global_get_type(dotnode->base->resolved_type);
-      auto symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      // Implicit dereference, we look at the base scope.
-      if (!symbol && type->get_ext().is_pointer()) {
-        type = global_get_type(type->get_element_type());
-        symbol = type->get_info()->scope->local_lookup(dotnode->member_name);
-      }
-      return symbol;
-    }
-    default:
-      return nullptr; // TODO: verify this isn't strange.
-  }
-  return nullptr;
-}
-
-Nullable<Scope> Context::get_scope(ASTNode *node) {
-  switch (node->get_node_type()) {
-    case AST_NODE_TYPE: {
-      auto type = global_get_type(node->resolved_type);
-      return type->get_info()->scope;
-    }
-    case AST_NODE_PATH: {
-      auto path = static_cast<ASTPath *>(node);
-      Scope *scope = this->scope;
-      auto index = 0;
-      for (auto &part in path->parts) {
-        auto &ident = part.value;
-        auto symbol = scope->lookup(ident);
-        if (!symbol)
-          return nullptr;
-
-        if (index == path->length() - 1)
-          return symbol->scope;
-
-        if (part.generic_arguments) {
-          if (symbol->is_type()) {
-            auto instantiation =
-                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      part.get_resolved_generics());
-            auto type = global_get_type(instantiation->resolved_type);
-            scope = type->get_info()->scope;
-          } else
-            return nullptr;
-        } else {
-          if (symbol->is_module()) {
-            scope = symbol->module.declaration->scope;
-          } else if (symbol->is_type()) {
-            auto resolved_type = global_get_type(symbol->type_id);
-            scope = resolved_type->get_info()->scope;
-          } else {
-            return nullptr;
-          }
-        }
-        index++;
-      }
-    } break;
-    default:
-      return nullptr; // TODO: verify this isn't strange.
-  }
-  return nullptr;
-}

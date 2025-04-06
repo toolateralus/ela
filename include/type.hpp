@@ -187,13 +187,13 @@ struct InterfaceTypeInfo : TypeInfo {
   InternedString name;
 };
 
-struct TaggedUnionVariant {
+struct ChoiceVariant {
   InternedString name;
   int type;
 };
 
-struct TaggedUnionTypeInfo : TypeInfo {
-  std::vector<TaggedUnionVariant> variants;
+struct ChoiceTypeInfo : TypeInfo {
+  std::vector<ChoiceVariant> variants;
 };
 
 struct ASTFunctionDeclaration;

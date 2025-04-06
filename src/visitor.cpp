@@ -18,7 +18,7 @@ void ASTWhere::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTModule::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTImport::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTType_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTTaggedUnionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTChoiceDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSwitch::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTProgram::accept(VisitorBase *visitor) {visitor->visit(this); }
 void ASTBlock::accept(VisitorBase *visitor) { visitor->visit(this); }
@@ -29,6 +29,7 @@ void ASTBinExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTUnaryExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTLiteral::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTMethodCall::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamsDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTFunctionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTuple::accept(VisitorBase *visitor) { visitor->visit(this); }

@@ -198,7 +198,7 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
+    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_BINARY)};
     call.function = &dot;
     auto args = ASTArguments{};
     if (node->right) {
@@ -217,7 +217,7 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->operand;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_UNARY)};
     call.function = &dot;
     auto args = ASTArguments{};
     call.arguments = &args;
@@ -240,8 +240,8 @@ void DependencyEmitter::visit(ASTPath *node) {
 
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &part in node->parts) {
-    auto &ident = part.value;
+  for (auto &seg in node->segments) {
+    auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
     if (!symbol) {
@@ -249,8 +249,8 @@ void DependencyEmitter::visit(ASTPath *node) {
     }
 
     ASTDeclaration *instantiation = nullptr;
-    if (part.generic_arguments) {
-      auto generic_args = emitter->typer.get_generic_arg_types(*part.generic_arguments);
+    if (seg.generic_arguments) {
+      auto generic_args = emitter->typer.get_generic_arg_types(*seg.generic_arguments);
       if (symbol->is_type()) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
@@ -401,7 +401,7 @@ void DependencyEmitter::visit(ASTSubscript *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
-    dot.member_name = get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT);
+    dot.member = ASTPath::Segment{get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT)};
     call.function = &dot;
     auto args = ASTArguments{};
     args.arguments = {node->subscript};
@@ -510,7 +510,7 @@ void DependencyEmitter::visit(ASTImpl *node) {
 
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
-void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
+void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -519,12 +519,12 @@ void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
   Defer _([&] { ctx.set_scope(old_scope); });
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
+      case ASTChoiceVariant::NORMAL:
         break;
-      case ASTTaggedUnionVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE:
         variant.tuple->accept(this);
         break;
-      case ASTTaggedUnionVariant::STRUCT:
+      case ASTChoiceVariant::STRUCT:
         for (const auto &decl : variant.struct_declarations) {
           decl->accept(this);
         }
@@ -571,3 +571,5 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
 }
 
 void DependencyEmitter::visit(ASTPatternMatch *node) {}
+
+void DependencyEmitter::visit(ASTMethodCall *node) {}
