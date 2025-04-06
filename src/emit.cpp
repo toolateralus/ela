@@ -166,9 +166,8 @@ void Emitter::visit(ASTFor *node) {
     // we have to do this for function pointers.
     // it's likely we'll have to do this for all the tuple destructures and all that crap.
     code << indent()
-         << get_declaration_type_signature_and_identifier(
-                emit_symbol(ctx.scope->local_lookup(node->left.identifier)),
-                global_get_type(node->identifier_type));
+         << get_declaration_type_signature_and_identifier(emit_symbol(ctx.scope->local_lookup(node->left.identifier)),
+                                                          global_get_type(node->identifier_type));
 
     code << " = $next.s;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
@@ -291,7 +290,7 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
       return dotnode->base->resolved_type;
     } break;
     case AST_NODE_PATH: {
-      auto path = static_cast<ASTPath*>(node);
+      auto path = static_cast<ASTPath *>(node);
       return path->segments[path->segments.size() - 1].resolved_type;
     } break;
     default:
@@ -305,7 +304,10 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 void Emitter::visit(ASTCall *node) {
   auto base_symbol = ctx.get_symbol(node->function);
 
-  std::vector<int> generic_args = typer.get_generic_arg_types(node->generic_arguments);
+  std::vector<int> generic_args;
+  if (node->has_generics()) {
+    generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
+  }
 
   auto symbol = base_symbol.get();
   if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
@@ -1033,7 +1035,7 @@ void Emitter::visit(ASTDotExpr *node) {
     code << "$";
   }
 
-  /* 
+  /*
     ! TODO: mangle generics here?
   */
   code << node->member.identifier.get_str();
@@ -2215,9 +2217,7 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
   newline_indented();
 }
 
-void Emitter::visit(ASTPatternMatch *node) {
-
-}
+void Emitter::visit(ASTPatternMatch *node) {}
 
 void Emitter::visit(ASTMethodCall *node) {}
 
@@ -2225,4 +2225,3 @@ void Emitter::visit(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
   code << emit_symbol(symbol.get());
 }
-

@@ -891,6 +891,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     path->segments.back().generic_arguments = {std::vector<ASTExpr*>{}};
     path_generics = &path->segments.back().generic_arguments.value();
   }
+  
 
   if (path_generics->empty()) {
     // infer generic parameter (return type only) from expected type
