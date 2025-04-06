@@ -739,7 +739,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   // .method
   ASTDotExpr dot;
   dot.base = &path;
-  dot.member_name = method_name;
+  dot.member = ASTPath::Segment{method_name};
 
   call.function = &dot;
   call.accept(this);
@@ -884,7 +884,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (func->return_type->kind == ASTType::NORMAL) {
         auto identifier = dynamic_cast<ASTPath *>(func->return_type->normal.base);
-        if (identifier && func->generic_parameters[0] == identifier->segments[0].value) {
+        if (identifier && func->generic_parameters[0] == identifier->segments[0].identifier) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = type->source_range;
@@ -924,7 +924,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
 
             for (const auto &generic : generics) {
               auto identifier = dynamic_cast<ASTPath *>(param->normal.type->normal.base);
-              if (identifier && generic == identifier->segments[0].value) {
+              if (identifier && generic == identifier->segments[0].identifier) {
                 is_generic = true;
                 break;
               }
@@ -1571,7 +1571,7 @@ void Typer::visit(ASTCall *node) {
         auto &args = node->arguments->arguments;
         auto dot = ast_alloc<ASTDotExpr>();
         dot->base = base;
-        dot->member_name = "instance";
+        dot->member = ASTPath::Segment{"instance"};
         dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
         args.insert(args.begin(), dot);
       }
@@ -1984,7 +1984,7 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   for (auto &part in node->segments) {
-    auto &ident = part.value;
+    auto &ident = part.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
     if (!symbol) {
@@ -2120,13 +2120,16 @@ void Typer::visit(ASTDotExpr *node) {
     throw_error("internal compiler error: dot expression used on a type that had a null scope", node->source_range);
   }
 
-  if (auto member = base_scope->local_lookup(node->member_name)) {
+  if (auto member = base_scope->local_lookup(node->member.identifier)) {
+    /* 
+      TODO Resolve generic arguments for dot expression?
+    */
     node->resolved_type = member->type_id;
   } else {
     for (const auto &[name, _] : base_scope->symbols) {
       std::cout << "symbol: " << name.get_str() << '\n';
     }
-    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member_name, base_ty->to_string()),
+    throw_error(std::format("Member \"{}\" not found in type \"{}\"", node->member.identifier, base_ty->to_string()),
                 node->source_range);
   }
 }
@@ -2703,3 +2706,113 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
   symbols.insert_or_assign(interface_name, sym);
   return ty->id;
 }
+
+Nullable<Symbol> Context::get_symbol(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_TYPE: {
+      auto type_node = static_cast<ASTType *>(node);
+      if (type_node->kind != ASTType::NORMAL) {
+        return nullptr;
+      }
+      return get_symbol(type_node->normal.base);
+    }
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath *>(node);
+      Scope *scope = this->scope;
+      auto index = 0;
+      for (auto &part in path->segments) {
+        auto &ident = part.identifier;
+        auto symbol = scope->lookup(ident);
+        if (!symbol)
+          return nullptr;
+
+        if (index == path->length() - 1)
+          return symbol;
+
+        if (part.generic_arguments) {
+          if (symbol->is_type()) {
+            auto instantiation =
+                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                      part.get_resolved_generics());
+            auto type = global_get_type(instantiation->resolved_type);
+            scope = type->get_info()->scope;
+          } else
+            return nullptr;
+        } else {
+          if (symbol->is_module()) {
+            scope = symbol->module.declaration->scope;
+          } else if (symbol->is_type()) {
+            auto resolved_type = global_get_type(symbol->type_id);
+            scope = resolved_type->get_info()->scope;
+          } else {
+            return nullptr;
+          }
+        }
+        index++;
+      }
+    } break;
+    case AST_NODE_DOT_EXPR: {
+      auto dotnode = static_cast<ASTDotExpr *>(node);
+      auto type = global_get_type(dotnode->base->resolved_type);
+      auto symbol = type->get_info()->scope->local_lookup(dotnode->member.identifier);
+      // Implicit dereference, we look at the base scope.
+      if (!symbol && type->get_ext().is_pointer()) {
+        type = global_get_type(type->get_element_type());
+        symbol = type->get_info()->scope->local_lookup(dotnode->member.identifier);
+      }
+      return symbol;
+    }
+    default:
+      return nullptr; // TODO: verify this isn't strange.
+  }
+  return nullptr;
+}
+
+Nullable<Scope> Context::get_scope(ASTNode *node) {
+  switch (node->get_node_type()) {
+    case AST_NODE_TYPE: {
+      auto type = global_get_type(node->resolved_type);
+      return type->get_info()->scope;
+    }
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath *>(node);
+      Scope *scope = this->scope;
+      auto index = 0;
+      for (auto &part in path->segments) {
+        auto &ident = part.identifier;
+        auto symbol = scope->lookup(ident);
+        if (!symbol)
+          return nullptr;
+
+        if (index == path->length() - 1)
+          return symbol->scope;
+
+        if (part.generic_arguments) {
+          if (symbol->is_type()) {
+            auto instantiation =
+                find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
+                                      part.get_resolved_generics());
+            auto type = global_get_type(instantiation->resolved_type);
+            scope = type->get_info()->scope;
+          } else
+            return nullptr;
+        } else {
+          if (symbol->is_module()) {
+            scope = symbol->module.declaration->scope;
+          } else if (symbol->is_type()) {
+            auto resolved_type = global_get_type(symbol->type_id);
+            scope = resolved_type->get_info()->scope;
+          } else {
+            return nullptr;
+          }
+        }
+        index++;
+      }
+    } break;
+    default:
+      return nullptr; // TODO: verify this isn't strange.
+  }
+  return nullptr;
+}
+
+void Typer::visit(ASTMethodCall *node) {}

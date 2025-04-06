@@ -198,7 +198,7 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
+    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_BINARY)};
     call.function = &dot;
     auto args = ASTArguments{};
     if (node->right) {
@@ -217,7 +217,7 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->operand;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+    dot.member = ASTPath::Segment{get_operator_overload_name(node->op.type, OPERATION_UNARY)};
     call.function = &dot;
     auto args = ASTArguments{};
     call.arguments = &args;
@@ -240,7 +240,7 @@ void DependencyEmitter::visit(ASTPath *node) {
 
   // for global variables
   // why just earch the first part of the path?
-  if (auto symbol = ctx.scope->lookup(node->parts[0].value)) {
+  if (auto symbol = ctx.scope->lookup(node->segments[0].identifier)) {
     if (symbol->is_variable() && symbol->variable.declaration) {
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
@@ -364,7 +364,7 @@ void DependencyEmitter::visit(ASTSubscript *node) {
     auto call = ASTCall{};
     auto dot = ASTDotExpr{};
     dot.base = node->left;
-    dot.member_name = get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT);
+    dot.member = ASTPath::Segment{get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT)};
     call.function = &dot;
     auto args = ASTArguments{};
     args.arguments = {node->subscript};
@@ -534,3 +534,5 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
 }
 
 void DependencyEmitter::visit(ASTPatternMatch *node) {}
+
+void DependencyEmitter::visit(ASTMethodCall *node) {}

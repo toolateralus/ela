@@ -456,6 +456,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_pattern_match(static_cast<ASTPatternMatch *>(node));
     case AST_NODE_PATH:
       return copy_path(static_cast<ASTPath*>(node));
+    case AST_NODE_METHOD_CALL:
+      return copy_method_call(static_cast<ASTMethodCall*>(node));
       break;
   }
 }
@@ -584,10 +586,17 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
         new_arg->resolved_type = Type::INVALID_TYPE_ID;
         args.push_back(new_arg);
       }
-      new_node->push_part(part.value, args);
+      new_node->push_part(part.identifier, args);
     } else {
-      new_node->push_part(part.value);
+      new_node->push_part(part.identifier);
     }
   }
+  return new_node;
+}
+
+ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
+  auto new_node = copy(node);
+  new_node->base = copy(node->base);
+  new_node->arguments = copy(node->arguments);
   return new_node;
 }

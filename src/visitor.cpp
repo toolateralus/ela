@@ -29,6 +29,7 @@ void ASTBinExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTUnaryExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTLiteral::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTMethodCall::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTParamsDecl::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTFunctionDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTTuple::accept(VisitorBase *visitor) { visitor->visit(this); }

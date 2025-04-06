@@ -64,6 +64,7 @@ struct ASTCopier {
   ASTDyn_Of *copy_dyn_of(ASTDyn_Of *node);
   ASTPatternMatch *copy_pattern_match(ASTPatternMatch *node);
   ASTPath *copy_path(ASTPath *node);
+  ASTMethodCall *copy_method_call(ASTMethodCall *node);
 };
 
 ASTNode *deep_copy_ast(ASTNode *root);

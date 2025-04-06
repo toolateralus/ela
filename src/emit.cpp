@@ -1032,7 +1032,11 @@ void Emitter::visit(ASTDotExpr *node) {
   if (base_ty->is_kind(TYPE_TUPLE)) {
     code << "$";
   }
-  code << node->member_name.get_str();
+
+  /* 
+    ! TODO: mangle generics here?
+  */
+  code << node->member.identifier.get_str();
   return;
 }
 
@@ -2112,7 +2116,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   auto call = ASTCall{};
   auto dot = ASTDotExpr{};
   dot.base = left;
-  dot.member_name = get_operator_overload_name(op, operation);
+  dot.member = ASTPath::Segment{get_operator_overload_name(op, operation)};
   call.function = &dot;
   auto args = ASTArguments{};
   if (right) {
@@ -2123,7 +2127,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   call.arguments->source_range = range;
   call.source_range = range;
   call.accept(&typer);
-  if (dot.member_name == "deref") {
+  if (dot.member.identifier == "deref") {
     code << "(*";
   } else {
     code << "(";
@@ -2215,6 +2219,6 @@ void Emitter::visit(ASTPatternMatch *node) {
 
 }
 
-void Emitter::visit(ASTPath *node) {
+void Emitter::visit(ASTMethodCall *node) {}
 
-}
+void Emitter::visit(ASTPath *node) {}

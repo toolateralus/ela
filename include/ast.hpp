@@ -24,18 +24,11 @@ enum ASTNodeType {
   AST_NODE_PROGRAM,
   AST_NODE_BLOCK,
   AST_NODE_FUNCTION_DECLARATION,
-  AST_NODE_PARAMS_DECL,
-  AST_NODE_PARAM_DECL,
-  AST_NODE_VARIABLE,
-  AST_NODE_EXPR_STATEMENT,
-  AST_NODE_BIN_EXPR,
-  AST_NODE_UNARY_EXPR,
-  AST_NODE_PATH,
-  AST_NODE_LITERAL,
-  AST_NODE_TYPE,
-  AST_NODE_TUPLE,
-  AST_NODE_CALL,
-  AST_NODE_ARGUMENTS,
+  AST_NODE_NOOP,
+  AST_NODE_ALIAS,
+  AST_NODE_IMPL,
+  AST_NODE_IMPORT,
+  AST_NODE_MODULE,
   AST_NODE_RETURN,
   AST_NODE_CONTINUE,
   AST_NODE_BREAK,
@@ -44,17 +37,31 @@ enum ASTNodeType {
   AST_NODE_ELSE,
   AST_NODE_WHILE,
   AST_NODE_STRUCT_DECLARATION,
+  AST_NODE_ENUM_DECLARATION,
+  AST_NODE_TAGGED_UNION_DECLARATION,
+  AST_NODE_INTERFACE_DECLARATION,
+
+  AST_NODE_PARAMS_DECL,
+  AST_NODE_PARAM_DECL,
+  AST_NODE_VARIABLE,
+  
+  AST_NODE_EXPR_STATEMENT,
+  AST_NODE_BIN_EXPR,
+  AST_NODE_UNARY_EXPR,
+  
+  AST_NODE_LITERAL,
+
+  AST_NODE_PATH,
+  AST_NODE_TYPE,
+  AST_NODE_TUPLE,
+  
+  AST_NODE_CALL,
+  AST_NODE_METHOD_CALL,
+  AST_NODE_ARGUMENTS,
+
   AST_NODE_DOT_EXPR,
   AST_NODE_SUBSCRIPT,
   AST_NODE_INITIALIZER_LIST,
-  AST_NODE_ENUM_DECLARATION,
-  AST_NODE_TAGGED_UNION_DECLARATION,
-  AST_NODE_NOOP,
-  AST_NODE_ALIAS,
-  AST_NODE_IMPL,
-  AST_NODE_IMPORT,
-  AST_NODE_MODULE,
-  AST_NODE_INTERFACE_DECLARATION,
   AST_NODE_SIZE_OF,
   AST_NODE_TYPE_OF,
   AST_NODE_DYN_OF,
@@ -261,7 +268,7 @@ struct ASTTypeExtension {
 
 struct ASTPath : ASTExpr {
   struct Segment {
-    InternedString value{};
+    InternedString identifier{};
     /*
       we use optional here to avoid unneccesary initialization for basic stuff
       like identifiers.
@@ -533,9 +540,21 @@ struct ASTCall : ASTExpr {
 
 struct ASTDotExpr : ASTExpr {
   ASTExpr *base;
-  InternedString member_name;
+  /* Generic arguments are stored in the segment. */
+  ASTPath::Segment member;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_DOT_EXPR; }
+};
+
+struct ASTMethodCall : ASTExpr {
+  /* 
+    сперма хранится в яйцах.
+    (aka the generic arguments are stored in the base)
+  */
+  ASTDotExpr *base; 
+  ASTArguments *arguments;
+  void accept(VisitorBase *visitor) override;
+  ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
 };
 
 struct ASTReturn : ASTStatement {
@@ -982,7 +1001,7 @@ struct Parser {
   ASTProgram *parse_program();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
-
+  ASTPath::Segment parse_path_segment();
   ASTInterfaceDeclaration *parse_interface_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
