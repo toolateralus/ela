@@ -759,8 +759,8 @@ ASTExpr *Parser::parse_postfix() {
   auto range = begin_node();
   // build dot and subscript expressions
   while (peek().type == TType::Dot || peek().type == TType::LBrace || peek().type == TType::LParen ||
-         peek().type == TType::GenericBrace || peek().type == TType::Increment || peek().type == TType::Decrement ||
-         peek().type == TType::Range || peek().type == TType::As) {
+         peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Range ||
+         peek().type == TType::As) {
     if (peek().type == TType::LParen) {
       left = parse_call(left);
     } else if (peek().type == TType::Dot) {
@@ -1202,7 +1202,6 @@ ASTStatement *Parser::parse_statement() {
     ctx.scope->insert_variable(variable->name, -1, variable->value.get(), CONST);
     return variable;
   }
-
 
   if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)
@@ -2595,10 +2594,10 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       for (auto &part in path->parts) {
         auto &ident = part.value;
         auto symbol = scope->lookup(ident);
-        if (!symbol) 
+        if (!symbol)
           return nullptr;
 
-        if (index == path->length() - 1) 
+        if (index == path->length() - 1)
           return symbol;
 
         if (part.generic_arguments) {
@@ -2608,7 +2607,8 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
                                       part.get_resolved_generics());
             auto type = global_get_type(instantiation->resolved_type);
             scope = type->get_info()->scope;
-          } else return nullptr;
+          } else
+            return nullptr;
         } else {
           if (symbol->is_module()) {
             scope = symbol->module.declaration->scope;
@@ -2652,10 +2652,10 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       for (auto &part in path->parts) {
         auto &ident = part.value;
         auto symbol = scope->lookup(ident);
-        if (!symbol) 
+        if (!symbol)
           return nullptr;
 
-        if (index == path->length() - 1) 
+        if (index == path->length() - 1)
           return symbol->scope;
 
         if (part.generic_arguments) {
@@ -2665,7 +2665,8 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
                                       part.get_resolved_generics());
             auto type = global_get_type(instantiation->resolved_type);
             scope = type->get_info()->scope;
-          } else return nullptr;
+          } else
+            return nullptr;
         } else {
           if (symbol->is_module()) {
             scope = symbol->module.declaration->scope;
@@ -2677,7 +2678,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
           }
         }
         index++;
-      } 
+      }
     } break;
     default:
       return nullptr; // TODO: verify this isn't strange.

@@ -515,13 +515,15 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     // ctx.set_scope(type_scope); // is this correct?
     alias->accept(this);
   }
-
+  
+  int x = 0;
   // We forward declare all the methods so they can refer to each other without obnoxious crud crap.
   // just like C-- (owned)
   for (const auto &method : node->methods) {
     method->declaring_type = target_ty->id;
 
     if (!method->generic_parameters.empty()) {
+      // TODO: actually generate a signature for a generic function so that you can compare them
       type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
@@ -543,9 +545,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
     method->declaring_type = target_ty->id;
     if (!method->generic_parameters.empty()) {
-      // TODO: actually generate a signature for a generic function so that you can compare them
-      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
-      impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
 
@@ -981,12 +980,16 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   return (ASTFunctionDeclaration *)visit_generic(func, generic_args, node->source_range);
 }
 
+// #undef USE_GENERIC_PANIC_HANDLER
+
 ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range) {
+#ifdef USE_GENERIC_PANIC_HANDLER
   GenericInstantiationErrorUserData data;
   set_panic_handler(generic_instantiation_panic_handler);
   set_error_user_data(&data);
   Defer defer_1([] { reset_panic_handler(); });
   if (_setjmp(data.save_state) == 0) {
+#endif
     if (definition->generic_parameters.size() != args.size()) {
       if (definition->generic_parameters.size() > args.size()) {
         throw_error(std::format("too few generic arguments. expected {}, got {}", definition->generic_parameters.size(),
@@ -1034,10 +1037,12 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
       instantiation->generic_instantiations.clear();
     }
     return instantiation;
+#ifdef USE_GENERIC_PANIC_HANDLER
   } else {
     handle_generic_error(&data, source_range);
     return nullptr;
   }
+#endif
 }
 
 std::vector<TypeExtension> Typer::accept_extensions(std::vector<ASTTypeExtension> ast_extensions) {
@@ -2008,16 +2013,19 @@ void Typer::visit(ASTPath *node) {
     }
 
     if (part.generic_arguments) {
-      auto generic_args = part.get_resolved_generics();
+      std::vector<int> generic_args;
+      for (auto &arg : *part.generic_arguments) {
+        arg->accept(this);
+        generic_args.push_back(arg->resolved_type);
+      }
       ASTDeclaration *instantiation;
       if (symbol->is_type()) {
-        auto decl = (ASTStructDeclaration *)symbol->type.declaration.get();
-        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
+        instantiation = visit_generic(decl, generic_args, node->source_range);
         auto type = global_get_type(instantiation->resolved_type);
         scope = type->get_info()->scope;
       } else if (symbol->is_function()) {
-        auto decl = (ASTFunctionDeclaration *)symbol->function.declaration;
-        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+        instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
       }
       part.resolved_type = instantiation->resolved_type;
     } else {
@@ -2025,15 +2033,15 @@ void Typer::visit(ASTPath *node) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
         scope = global_get_type(symbol->type_id)->get_info()->scope;
-      } else if (!symbol->is_function()) {
-        throw_error("invalid symbol type in path", node->source_range);
       }
       part.resolved_type = symbol->type_id;
     }
     if (!scope && index < node->parts.size() - 1) {
       throw_error("symbol scope could not be resolved in path", node->source_range);
     }
+    index++;
   }
+  node->resolved_type = node->parts[node->parts.size() - 1].resolved_type;
 }
 
 void Typer::visit(ASTLiteral *node) {
@@ -2716,5 +2724,3 @@ int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typ
   symbols.insert_or_assign(interface_name, sym);
   return ty->id;
 }
-
-void Typer::visit(ASTPath *node) {}
