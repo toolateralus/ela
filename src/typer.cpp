@@ -583,32 +583,23 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
 
     auto interface = static_cast<ASTInterfaceDeclaration *>(declaring_node);
-    interface = (ASTInterfaceDeclaration *)deep_copy_ast(interface);
-    ctx.set_scope(interface->scope);
+    ctx.scope = interface->scope;
 
-    for (auto &decl : interface->methods) {
-      decl->accept(this);
-    }
-
-    ctx.set_scope(node->scope);
-
-    for (auto &[name, interface_sym] : interface->scope->symbols) {
-      if (!interface_sym.is_function())
-        continue;
-
-      if (auto impl_symbol = impl_scope.local_lookup(name)) {
-        if (!impl_method_matches_interface(interface_sym.type_id, impl_symbol->type_id)) {
-          if (interface_sym.type_id != Type::INVALID_TYPE_ID && impl_symbol->type_id != Type::INVALID_TYPE_ID) {
-            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {},\ngot {}", name,
-                                    global_get_type(interface_sym.type_id)->to_string(),
+    for (auto interface_method : interface->methods) {
+      auto method = (ASTFunctionDeclaration *)deep_copy_ast(interface_method);
+      if (auto impl_symbol = impl_scope.local_lookup(method->name)) {
+        method->accept(this);
+        if (!impl_method_matches_interface(method->resolved_type, impl_symbol->type_id)) {
+          if (method->resolved_type != Type::INVALID_TYPE_ID && impl_symbol->type_id != Type::INVALID_TYPE_ID) {
+            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {},\ngot {}", method->name,
+                                    global_get_type(method->resolved_type)->to_string(),
                                     global_get_type(impl_symbol->type_id)->to_string()),
                         node->source_range);
           } else {
             throw_error("internal compiler error: method.type_id or impl_symbol.type_id was null", node->source_range);
           }
         }
-      } else if (DOESNT_HAVE_FLAG(interface_sym.function.declaration->flags, FUNCTION_IS_FORWARD_DECLARED)) {
-        auto method = (ASTFunctionDeclaration *)deep_copy_ast(interface_sym.function.declaration);
+      } else if (DOESNT_HAVE_FLAG(method->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         method->declaring_type = target_ty->id;
 
         if (!method->generic_parameters.empty()) {
@@ -641,7 +632,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         }
         visit_function_body(method);
       } else {
-        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", name,
+        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", method->name,
                                 interface_ty->to_string()),
                     node->source_range);
       }
