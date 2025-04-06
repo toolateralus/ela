@@ -895,8 +895,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTCall *node, ASTF
   
 
   if (path_generics->empty()) {
-    path_generics->resize(func->generic_parameters.size());
-
     // infer generic parameter (return type only) from expected type
     if (node->arguments->arguments.empty() && func->generic_parameters.size() == 1) {
       if (expected_type == -1) {
