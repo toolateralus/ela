@@ -794,13 +794,15 @@ ASTExpr *Parser::parse_postfix() {
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
       eat();
       dot->base = left;
-      if (peek().type == TType::Integer || peek().type == TType::Identifier) {
+      if (peek().type == TType::Integer) {
+        dot->member = ASTPath::Segment{eat().value};
+      } else if (peek().type == TType::Identifier) {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
         auto path = dynamic_cast<ASTPath*>(left);
         if (!path) {
-          throw_error("can only use an initializer list on a path", left->source_range);
+          throw_error("can only use an initializer list on a path, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, etc.", left->source_range);
         }
         if (peek().type == TType::LCurly) {
           eat(); // eat {
@@ -843,7 +845,6 @@ ASTExpr *Parser::parse_postfix() {
         end_node(left, range);
         throw_error("Invalid dot expression right hand side: expected a member name, or for a tuple, an index.", range);
       }
-
 
       // if (peek().type == TType::LParen) {
       //   NODE_ALLOC(ASTMethodCall, method, range, defer, this);
@@ -2368,15 +2369,6 @@ void Parser::append_type_extensions(ASTType *&node) {
       if (peek().type != TType::RBrace) {
         auto expression = parse_expr();
         node->extensions.insert(node->extensions.begin(), {TYPE_EXT_ARRAY, expression});
-      } else {
-        // Syntactic sugar for doing int[] instead of List![int];
-        auto type = ast_alloc<ASTType>();
-        auto path = ast_alloc<ASTPath>();
-        path->push_part("List", {node});
-        type->kind = ASTType::NORMAL;
-        type->normal.base = path;
-        type->source_range = node->source_range;
-        node = type;
       }
       expect(TType::RBrace);
     } else {
