@@ -303,26 +303,6 @@ void DependencyEmitter::visit(ASTType_Of *node) {
 void DependencyEmitter::visit(ASTCall *node) {
   node->arguments->accept(this);
   node->function->accept(this);
-  auto symbol_nullable = ctx.get_symbol(node->function);
-
-  if (symbol_nullable.is_not_null()) {
-    auto decl = symbol_nullable.get()->function.declaration;
-
-    // ! Replace this with the call's path's possible generic arguments.
-    // if (!node->generic_arguments.empty()) {
-    //   auto generic_args = emitter->typer.get_generic_arg_types(node->generic_arguments);
-    //   decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);
-    // }
-    
-    // only accept if not a fn ptr
-    // else, we do the other way
-    if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      decl->accept(this);
-      return;
-    }
-  }
-
-  node->function->accept(this);
 }
 
 void DependencyEmitter::visit(ASTArguments *node) {

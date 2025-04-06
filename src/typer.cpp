@@ -113,8 +113,8 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
+      auto type = global_get_type(*generic_arg);
+      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
     type = global_get_type(global_create_struct_type(node->name, node->scope, generic_args));
@@ -163,8 +163,8 @@ void Typer::visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool gene
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
+      auto type = global_get_type(*generic_arg);
+      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
     type = global_get_type(global_create_tagged_union_type(node->name.get_str(), node->scope, generic_args));
@@ -350,8 +350,8 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
+      auto type = global_get_type(*generic_arg);
+      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -464,8 +464,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
+      auto type = global_get_type(*generic_arg);
+      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -672,8 +672,8 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto kind = global_get_type(*generic_arg)->kind;
-      ctx.scope->create_type_alias(param, *generic_arg, kind, node);
+      auto type = global_get_type(*generic_arg);
+      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
     type->generic_base_id = ctx.scope->lookup(node->name)->type_id;
