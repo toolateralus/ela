@@ -798,11 +798,15 @@ ASTExpr *Parser::parse_postfix() {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
+        auto path = dynamic_cast<ASTPath*>(left);
+        if (!path) {
+          throw_error("can only use an initializer list on a path", left->source_range);
+        }
         if (peek().type == TType::LCurly) {
           eat(); // eat {
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
           init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.base = left;
+          init_list->target_type.get()->normal.base = path;
           if (peek().type == TType::RCurly) {
             init_list->tag = ASTInitializerList::INIT_LIST_EMPTY;
           } else {
@@ -823,7 +827,7 @@ ASTExpr *Parser::parse_postfix() {
           eat(); // eat [
           NODE_ALLOC(ASTInitializerList, init_list, range, _, this)
           init_list->target_type = ast_alloc<ASTType>();
-          init_list->target_type.get()->normal.base = left;
+          init_list->target_type.get()->normal.base = path;
           init_list->tag = ASTInitializerList::INIT_LIST_COLLECTION;
           while (peek().type != TType::RBrace) {
             init_list->values.push_back(parse_expr());

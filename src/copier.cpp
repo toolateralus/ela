@@ -112,7 +112,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
       break;
     case ASTType::NORMAL:
       if (node->normal.base) {
-        new_node->normal.base = (ASTExpr *)copy_node(node->normal.base);
+        new_node->normal.base = copy(node->normal.base);
       }
       break;
     case ASTType::TUPLE:
