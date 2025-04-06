@@ -483,7 +483,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         parse_ifdef_if_else_preprocs(parser, list, PREPROC_IF);
         return list;
     }},
-    
+
     // #region, for named/unnnamed regions. just for organization, has no compilation implications.
     // can have anything between the #region directive and the {} block
     // #region My code region 1 {...} is legal.
@@ -1138,10 +1138,6 @@ ASTType *Parser::parse_type() {
   node->kind = ASTType::NORMAL;
   node->normal.base = parse_path();
   node->normal.base->source_range = range;
-
-  if (peek().type == TType::GenericBrace) {
-    node->normal.generic_arguments = parse_generic_arguments();
-  }
 
   append_type_extensions(node);
 
@@ -2362,11 +2358,10 @@ void Parser::append_type_extensions(ASTType *&node) {
       } else {
         // Syntactic sugar for doing int[] instead of List![int];
         auto type = ast_alloc<ASTType>();
-        auto iden = ast_alloc<ASTPath>();
-        iden->push_part("List");
+        auto path = ast_alloc<ASTPath>();
+        path->push_part("List", {node});
         type->kind = ASTType::NORMAL;
-        type->normal.base = iden;
-        type->normal.generic_arguments.push_back(node);
+        type->normal.base = path;
         type->source_range = node->source_range;
         node = type;
       }

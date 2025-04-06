@@ -320,7 +320,6 @@ struct ASTType : ASTExpr {
   union {
     struct {
       ASTExpr *base;
-      std::vector<ASTExpr *> generic_arguments;
       bool is_dyn = false;
     } normal;
     struct {

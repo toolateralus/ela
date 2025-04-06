@@ -321,9 +321,6 @@ void Emitter::visit(ASTCall *node) {
         if (ast_type->kind != ASTType::NORMAL) {
           throw_error("Cannot call a tuple or function type", node->source_range);
         }
-        if (!ast_type->normal.generic_arguments.empty()) {
-          throw_error("internal compiler error: generic args to call put on base", node->source_range);
-        }
         func = ast_type->normal.base;
       }
       // normal function call, or a static method.
@@ -384,9 +381,6 @@ void Emitter::visit(ASTCall *node) {
       auto ast_type = static_cast<ASTType *>(func);
       if (ast_type->kind != ASTType::NORMAL) {
         throw_error("Cannot call a tuple or function type", node->source_range);
-      }
-      if (!ast_type->normal.generic_arguments.empty()) {
-        throw_error("internal compiler error: generic args to call put on base", node->source_range);
       }
       func = ast_type->normal.base;
     }

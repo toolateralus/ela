@@ -1714,37 +1714,16 @@ void Typer::visit(ASTType *node) {
 
     auto declaring_node = symbol->type.declaration.get();
 
-    if (declaring_node && !normal_ty.generic_arguments.empty()) {
-      std::vector<int> generic_args;
-      for (auto &arg : normal_ty.generic_arguments) {
-        arg->accept(this);
-        generic_args.push_back(arg->resolved_type);
+    normal_ty.base->accept(this);
+    auto base_ty = global_get_type(normal_ty.base->resolved_type);
+    if (!base_ty) {
+      if (normal_ty.base->resolved_type == Type::INVALID_TYPE_ID) {
+        throw_error("use of undeclared type", node->source_range);
+      } else if (normal_ty.base->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+        throw_error("use of unresolved generic type", node->source_range);
       }
-
-      switch (declaring_node->get_node_type()) {
-        case AST_NODE_STRUCT_DECLARATION:
-        case AST_NODE_FUNCTION_DECLARATION:
-        case AST_NODE_INTERFACE_DECLARATION:
-        case AST_NODE_TAGGED_UNION_DECLARATION:
-          break;
-        default:
-          throw_error("Invalid target to generic args", node->source_range);
-          break;
-      }
-      auto instantiation = visit_generic((ASTDeclaration *)declaring_node, generic_args, node->source_range);
-      node->resolved_type = global_find_type_id(instantiation->resolved_type, extensions);
-    } else {
-      normal_ty.base->accept(this);
-      auto base_ty = global_get_type(normal_ty.base->resolved_type);
-      if (!base_ty) {
-        if (normal_ty.base->resolved_type == Type::INVALID_TYPE_ID) {
-          throw_error("use of undeclared type", node->source_range);
-        } else if (normal_ty.base->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
-          throw_error("use of unresolved generic type", node->source_range);
-        }
-      }
-      node->resolved_type = global_find_type_id(base_ty->id, extensions);
     }
+    node->resolved_type = global_find_type_id(base_ty->id, extensions);
 
     if (node->normal.is_dyn) {
       auto type = global_get_type(node->resolved_type);

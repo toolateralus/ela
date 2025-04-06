@@ -108,13 +108,10 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
   new_node->resolved_type = node->resolved_type;
 
   switch (new_node->kind) {
-    case ASTType::NORMAL:
     case ASTType::SELF:
+      break;
+    case ASTType::NORMAL:
       new_node->normal.base = (ASTExpr *)copy_node(node->normal.base);
-      new_node->normal.generic_arguments.clear();
-      for (auto arg : node->normal.generic_arguments) {
-        new_node->normal.generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
-      }
       break;
     case ASTType::TUPLE:
       new_node->tuple_types.clear();
