@@ -110,6 +110,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
   switch (new_node->kind) {
     case ASTType::NORMAL:
     case ASTType::SELF:
+      new_node->normal.base = (ASTExpr *)copy_node(node->normal.base);
       new_node->normal.generic_arguments.clear();
       for (auto arg : node->normal.generic_arguments) {
         new_node->normal.generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
@@ -580,7 +581,9 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
     if (part.generic_arguments) {
       std::vector<ASTExpr*> args;
       for (auto arg in *part.generic_arguments) {
-        args.push_back((ASTExpr*)copy_node(arg));
+        auto new_arg = (ASTExpr*)copy_node(arg);
+        new_arg->resolved_type = Type::INVALID_TYPE_ID;
+        args.push_back(new_arg);
       }
       new_node->push_part(part.value, args);
     } else {
