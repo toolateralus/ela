@@ -35,7 +35,12 @@ def run_test(test_file):
         run_result = subprocess.run([f"./{test_file[:-4]}"])
         if run_result.returncode == 0:
             passed_tests.append(test_file)
+        elif run_result.returncode < 0:  # Abnormal termination (e.g., segfault)
+            signal_name = signal.Signals(-run_result.returncode).name
+            print(f"\033[1;31mTest {test_file} failed with signal: {signal_name}\033[0m")
+            failed_tests.append(f"{test_file} (signal: {signal_name})")
         else:
+            print(f"\033[1;31mTest {test_file} failed with return code: {run_result.returncode}\033[0m")
             failed_tests.append(test_file)
         if os.path.isfile(test_file[:-4]):
             os.remove(test_file[:-4])
@@ -66,11 +71,15 @@ def main():
     print("\n\033[1;34mTest Summary:\033[0m")
     # Print passed tests
     print(f"\033[1;32mPassed tests ({len(passed_tests)}):\033[0m")
-        # Define the column width and number of items per line
-    COLUMN_WIDTH = 35  # Adjust the width as needed
+    
+    # Calculate dynamic column width based on the longest test name
+    max_passed_length = max((len(test) for test in passed_tests), default=0)
+    max_failed_length = max((len(test) for test in failed_tests), default=0)
+    COLUMN_WIDTH = max(max_passed_length, max_failed_length) + 15  # Add padding for spacing
     ITEMS_PER_LINE = 3  # Adjust the number of items per line
     
     # Print passed tests
+    print(f"\033[1;32mPassed tests ({len(passed_tests)}):\033[0m")
     for i in range(0, len(passed_tests), ITEMS_PER_LINE):
         row = passed_tests[i:i+ITEMS_PER_LINE]
         print("  - " + "".join(f"{test:<{COLUMN_WIDTH}}" for test in row))
