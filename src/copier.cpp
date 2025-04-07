@@ -197,11 +197,17 @@ ASTWhile *ASTCopier::copy_while(ASTWhile *node) {
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
 }
+
 ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
   auto new_node = copy(node);
   new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
+  new_node->member.generic_arguments.clear();
+  for (const auto &arg: node->member.generic_arguments) {
+    new_node->member.generic_arguments.push_back((ASTExpr*)copy_node(arg));
+  }
   return new_node;
 }
+
 ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
   auto new_node = copy(node);
   new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
@@ -572,6 +578,6 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
 ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   auto new_node = copy(node);
   new_node->dot = (ASTDotExpr*)copy_node(node->dot);
-  new_node->arguments = (ASTArguments*)copy(node->arguments);
+  new_node->arguments = (ASTArguments*)copy_node(node->arguments);
   return new_node;
 }
