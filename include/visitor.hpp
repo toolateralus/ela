@@ -15,7 +15,9 @@
 struct VisitorBase {
   virtual ~VisitorBase() = default;
   void visit(ASTNoop *noop) { return; }
-  virtual void visit(ASTScopeResolution *node) = 0;
+
+  virtual void visit(ASTPath *node) = 0;
+  virtual void visit(ASTMethodCall *node) = 0;
   virtual void visit(ASTDyn_Of *node) = 0;
   virtual void visit(ASTPatternMatch *node) = 0;
   virtual void visit(ASTSize_Of *node) = 0;
@@ -32,7 +34,6 @@ struct VisitorBase {
   virtual void visit(ASTExprStatement *node) = 0;
   virtual void visit(ASTBinExpr *node) = 0;
   virtual void visit(ASTUnaryExpr *node) = 0;
-  virtual void visit(ASTIdentifier *node) = 0;
   virtual void visit(ASTLiteral *node) = 0;
   virtual void visit(ASTType *node) = 0;
   virtual void visit(ASTCall *node) = 0;
@@ -57,7 +58,7 @@ struct VisitorBase {
   virtual void visit(ASTTupleDeconstruction *node) = 0;
   virtual void visit(ASTDefer *node) = 0;
   virtual void visit(ASTInterfaceDeclaration *node) = 0;
-  virtual void visit(ASTTaggedUnionDeclaration *node) = 0;
+  virtual void visit(ASTChoiceDeclaration *node) = 0;
   virtual void visit(ASTModule *node) = 0;
   virtual void visit(ASTType_Of *node) = 0;
   virtual void visit(ASTStatementList *node) {
@@ -96,7 +97,9 @@ struct Typer : VisitorBase {
   int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
                            const SourceRange &source_range);
 
+  void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
+  void visit(ASTPath *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTStructDeclaration *node) override;
@@ -110,22 +113,20 @@ struct Typer : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTType *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
 
-  std::vector<int> get_generic_arg_types(const std::vector<ASTType *> &args);
+  std::vector<int> get_generic_arg_types(const std::vector<ASTExpr *> &args);
   // For generics.
   void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
                              std::vector<int> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                 std::vector<int> generic_args = {});
-  void visit_tagged_union_declaration(ASTTaggedUnionDeclaration *node, bool generic_instantiation,
+  void visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                       std::vector<int> generic_args = {});
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
@@ -136,7 +137,7 @@ struct Typer : VisitorBase {
 
   void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
-  ASTFunctionDeclaration *resolve_generic_function_call(ASTCall *node, ASTFunctionDeclaration *func);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func, std::vector<ASTExpr*> *generic_args, ASTArguments *arguments, SourceRange range);
 
   void compiler_mock_method_call_visit_impl(int type, const InternedString &method_name);
 
@@ -161,7 +162,7 @@ struct Typer : VisitorBase {
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
@@ -280,7 +281,9 @@ struct Emitter : VisitorBase {
 
   int get_expr_left_type_sr_dot(ASTNode *node);
 
+  void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
+  void visit(ASTPath *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
   void visit(ASTImport *node) override;
@@ -296,7 +299,6 @@ struct Emitter : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTType *node) override;
   void visit(ASTCall *node) override;
@@ -317,11 +319,10 @@ struct Emitter : VisitorBase {
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
   void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;
@@ -340,10 +341,12 @@ struct DependencyEmitter : VisitorBase {
   std::set<ASTFunctionDeclaration *> visited_functions = {};
   std::unordered_set<int> reflected_upon_types;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
+  void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
   void define_type(int type_id);
   void declare_type(int type_id);
-
+  void visit(ASTMethodCall *node) override;
+  void visit(ASTPath *node) override;
   void visit(ASTPatternMatch *node) override;
   void visit(ASTDyn_Of *node) override;
   void visit(ASTModule *node) override;
@@ -359,7 +362,6 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTExprStatement *node) override;
   void visit(ASTBinExpr *node) override;
   void visit(ASTUnaryExpr *node) override;
-  void visit(ASTIdentifier *node) override;
   void visit(ASTLiteral *node) override;
   void visit(ASTType *node) override;
   void visit(ASTCall *node) override;
@@ -380,11 +382,10 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTTuple *node) override;
   void visit(ASTTupleDeconstruction *node) override;
   void visit(ASTSize_Of *node) override;
-  void visit(ASTScopeResolution *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
-  void visit(ASTTaggedUnionDeclaration *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTInterfaceDeclaration *node) override;
   void visit(ASTLambda *node) override;

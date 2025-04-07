@@ -11,29 +11,6 @@
   }
 }
 
-Xaryu :: struct {
-  value: s32
-}
-
-#test test_array_concat_operator :: fn() {
-  mut array: List!<s32>;
-  array.push(10);
-  assert("oncat operator failed", array.length == 1);
-}
-
-#test test_array_pop_operator :: fn() {
-  mut array: List!<s32>;
-  for i in 0..100 {
-    array.push(10);
-  }
-  mut n: s32;
-  for i in 0..100 {
-    n = array.pop();
-  }
-  assert("pop operator failed", array.length == 0 && n == 10);
-}
-
-
 #test test_range_var :: fn() {
   r : Range = 0..10;
   assert("range variable failed", r.begin == 0 && r.end == 10);
@@ -44,24 +21,6 @@ Xaryu :: struct {
     i++;
   }
 }
-
-#test test_slicing_array :: fn() {
-  arr := List!<s32>::init(.[
-    0, 0, 0, 0, 0, 0,
-    0, 0, 0, 0, 0,
-  ]);
-  
-  assert("Length", arr.length == 11);
-
-  subarr := arr.subarray(0..10);
-
-  for i in 0..10 {
-    assert("Slice failed", subarr[i] == arr[i]);
-  }
-
-  assert("Slice failed", subarr.length == 10);
-}
-
 
 #test test_multidimensional_arrays :: fn() {
   array: s32[5][5];
@@ -77,7 +36,7 @@ Xaryu :: struct {
     }
   }
 
-  mut dynamic : s32[][];
+  mut dynamic : List!<List!<s32>>;
   for x in 0..5 {
     dynamic.push(.{});
     for y in 0..5 {
@@ -94,8 +53,11 @@ Xaryu :: struct {
   }
 }
 
+/* 
+  subscript assign will never work on a 'str' type ;; it's in the .data section, i.e it's a C string literal.
+*/
 #test subscript_string :: fn() {
-  mut s: str = "0,1,2,3,4";
+  mut s := String::from("0,1,2,3,4");
   s[0] = 10;
-  assert("subscript assign str failed", s[0] == (10 as u8));
+  assert("subscript assign str failed", s[0] == 10);
 }

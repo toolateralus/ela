@@ -4,11 +4,11 @@
   #def CHEESE;
 
   #ifdef HAMBURGER {
-    CONSTANT0 :: 100;
+    const CONSTANT0 := 100;
   } else ifdef CHEESE {
-    CONSTANT0 :: 20;
+    const CONSTANT0 := 20;
   } else {
-    CONSTANT0 :: 10;
+    const CONSTANT0 := 10;
   }
   
   assert("ifdef failed", CONSTANT0 == 20);
@@ -17,11 +17,11 @@
   #def HAMBURGER;
 
   #ifdef HAMBURGER {
-    CONSTANT1 :: 100;
+    const CONSTANT1 := 100;
   } else ifdef CHEESE {
-    CONSTANT1 :: 20;
+    const CONSTANT1 := 20;
   } else if true {
-    CONSTANT1 :: 10;
+    const CONSTANT1 := 10;
   }
   
   assert("ifdef failed", CONSTANT1 == 100);
@@ -29,18 +29,18 @@
   #undef HAMBURGER;
   
   #ifdef HAMBURGER {
-    CONSTANT2 :: 100;
+    const CONSTANT2 := 100;
   } else ifdef CHEESE {
-    CONSTANT2 :: 20;
+    const CONSTANT2 := 20;
   } else  {
-    CONSTANT2 :: 10;
+    const CONSTANT2 := 10;
   }
 
   
   assert("ifdef failed", CONSTANT2 == 10);
 
   #ifndef HAMBURGER {
-    CONSTANT3 :: 100;
+    const CONSTANT3 := 100;
   } 
 
   assert("ifndef failed", CONSTANT3 == 100);
@@ -95,7 +95,7 @@
   }
   assert("`#if true` failed", n == 0);
 
-  CONSTANT_EXPR :: 100 * 2;
+  const CONSTANT_EXPR := 100 * 2;
   #if CONSTANT_EXPR > 199 {
     n = 1;
   } else {

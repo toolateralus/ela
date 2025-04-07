@@ -166,9 +166,8 @@ void Emitter::visit(ASTFor *node) {
     // we have to do this for function pointers.
     // it's likely we'll have to do this for all the tuple destructures and all that crap.
     code << indent()
-         << get_declaration_type_signature_and_identifier(
-                emit_symbol(ctx.scope->local_lookup(node->left.identifier->value)),
-                global_get_type(node->identifier_type));
+         << get_declaration_type_signature_and_identifier(emit_symbol(ctx.scope->local_lookup(node->left.identifier)),
+                                                          global_get_type(node->identifier_type));
 
     code << " = $next.s;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
@@ -201,8 +200,7 @@ void Emitter::visit(ASTFor *node) {
       auto &destruct = node->left.destructure[i];
       auto iden = destruct.identifier;
       emit_line_directive(node);
-      code << indent() << "auto ";
-      iden->accept(this);
+      code << indent() << "auto " << iden.get_str();
       code << " = ";
 
       if (destruct.semantic == VALUE_SEMANTIC_POINTER) {
@@ -287,15 +285,13 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
   switch (node->get_node_type()) {
     case AST_NODE_TYPE:
       return node->resolved_type;
-    case AST_NODE_IDENTIFIER:
-      return ctx.scope->lookup(static_cast<ASTIdentifier *>(node)->value)->type_id;
     case AST_NODE_DOT_EXPR: {
       auto dotnode = static_cast<ASTDotExpr *>(node);
       return dotnode->base->resolved_type;
     } break;
-    case AST_NODE_SCOPE_RESOLUTION: {
-      auto srnode = static_cast<ASTScopeResolution *>(node);
-      return srnode->base->resolved_type;
+    case AST_NODE_PATH: {
+      auto path = static_cast<ASTPath *>(node);
+      return path->segments[path->segments.size() - 1].resolved_type;
     } break;
     default:
       throw_error(std::format("internal compiler error: 'get_dot_left_type' encountered an unexpected node, kind {}",
@@ -306,100 +302,23 @@ int Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 }
 
 void Emitter::visit(ASTCall *node) {
-  auto base_symbol = ctx.get_symbol(node->function);
-
-  std::vector<int> generic_args = typer.get_generic_arg_types(node->generic_arguments);
-
-  auto symbol = base_symbol.get();
-  if (node->function->get_node_type() == AST_NODE_DOT_EXPR) {
-    if (!base_symbol) {
-      throw_error("can't call a non-function", node->source_range);
-    }
-
-    // Call a function pointer via a dot expression
-    if (!base_symbol.get()->is_function()) {
-      auto func = node->function;
-      if (func->get_node_type() == AST_NODE_TYPE) {
-        auto ast_type = static_cast<ASTType *>(func);
-        if (ast_type->kind != ASTType::NORMAL) {
-          throw_error("Cannot call a tuple or function type", node->source_range);
-        }
-        if (!ast_type->normal.generic_arguments.empty()) {
-          throw_error("internal compiler error: generic args to call put on base", node->source_range);
-        }
-        func = ast_type->normal.base;
-      }
-      // normal function call, or a static method.
-      func->accept(this);
-      code << mangled_type_args(generic_args);
-      node->arguments->accept(this);
-      return;
-    }
-
-    auto func = symbol->function.declaration;
-
-    auto method_call = HAS_FLAG(func->flags, FUNCTION_IS_METHOD);
-
-    if (!method_call) {
-      throw_error("cannot call a static method from an instance", node->source_range);
-    }
-
-    auto base_type = global_get_type(get_expr_left_type_sr_dot(node->function));
-    if (!base_type) {
-      throw_error("internal compiler error: unable to find method call", node->source_range);
-    }
-
-    Type *function_type = global_get_type(symbol->type_id);
-    // if generic function
-    if (!func->generic_parameters.empty()) {
-      func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);
-      function_type = global_get_type(func->resolved_type);
-    }
-
-    code << emit_symbol(symbol) + mangled_type_args(generic_args);
-    code << "(";
-
-    auto param_0_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
-
-    if (param_0_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
-      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
-      code << "&";
-    } else if (!param_0_ty->get_ext().is_pointer() && base_type->get_ext().is_pointer()) {
-      code << "*";
-    }
-
-    ASTExpr *base = static_cast<ASTDotExpr *>(node->function)->base;
-    base->accept(this);
-    if (node->arguments->arguments.size() > 0) {
-      code << ", ";
-    }
-
-    for (auto &arg : node->arguments->arguments) {
-      arg->accept(this);
-      if (arg != node->arguments->arguments.back()) {
-        code << ", ";
-      }
-    }
-    code << ")";
-  } else {
-    auto func = node->function;
-    if (func->get_node_type() == AST_NODE_TYPE) {
-      auto ast_type = static_cast<ASTType *>(func);
-      if (ast_type->kind != ASTType::NORMAL) {
-        throw_error("Cannot call a tuple or function type", node->source_range);
-      }
-      if (!ast_type->normal.generic_arguments.empty()) {
-        throw_error("internal compiler error: generic args to call put on base", node->source_range);
-      }
-      func = ast_type->normal.base;
-    }
-    // normal function call, or a static method.
-    func->accept(this);
-    code << mangled_type_args(generic_args);
-    node->arguments->accept(this);
+  std::vector<int> generic_args;
+  if (node->has_generics()) {
+    generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
-
-  return;
+  auto func = node->function;
+  // TODO: Do we need this?
+  if (func->get_node_type() == AST_NODE_TYPE) {
+    auto ast_type = static_cast<ASTType *>(func);
+    if (ast_type->kind != ASTType::NORMAL) {
+      throw_error("Cannot call a tuple or function type", node->source_range);
+    }
+    func = ast_type->normal.path;
+  }
+  // normal function call, or a static method.
+  func->accept(this);
+  code << mangled_type_args(generic_args);
+  node->arguments->accept(this);
 }
 
 size_t calculate_actual_length(const std::string_view &str_view) {
@@ -493,12 +412,6 @@ void Emitter::visit(ASTLiteral *node) {
       break;
   }
   code << output;
-  return;
-}
-
-void Emitter::visit(ASTIdentifier *node) {
-  auto symbol = ctx.scope->lookup(node->value);
-  code << emit_symbol(symbol);
   return;
 }
 
@@ -988,38 +901,45 @@ void $deinit_type(Type *type) {
     code << "\n}\n";
   }
 
+  // this is just a macro, and it's guarded by an ifdef.
+  code << TESTING_BOILERPLATE;
+
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
     code << std::format("$ela_test tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
     // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
-  } else {
-    if (has_user_defined_main && !is_freestanding) {
-      auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
+  }
 
-      const auto reflection_initialization = type_info_strings.size() != 0 ? "$initialize_reflection_system();"
+  // We now use a normalized main, with init and deinit code for Env and the reflection system, even in testing.
+  // I am not sure how this ever worked before, when it was selectively initialized.
+  // but this is better anyway
+  if ((has_user_defined_main || testing) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
+    auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
+
+    const auto reflection_initialization =
+        type_info_strings.size() != 0 ? "$initialize_reflection_system();" : "{/* no reflection present in module */};";
+
+    const auto reflection_deinitialization = type_info_strings.size() != 0 ? "$deinitialize_reflection_system();"
                                                                            : "{/* no reflection present in module */};";
-
-      const auto reflection_deinitialization = type_info_strings.size() != 0
-                                                   ? "$deinitialize_reflection_system();"
-                                                   : "{/* no reflection present in module */};";
-      constexpr auto main_format = R"_(
+    constexpr auto main_format = R"_(
 int main (int argc, char** argv) {{
-  {}(argc, argv); /* initialize command line args. */
-  {}              /* reflection system */
-  __ela_main_();  /* call user main */
-  {}              /* deinitialize command line args. */
+  /* initialize command line args. */
+  {}(argc, argv); 
+  /* reflection system */
+  {}                   
+  /* call user main, or dispatch tests, depending on the build type. */
+  __TEST_RUNNER_MAIN;  
+  /* deinitialize command line args. */
+  {}              
 }}
 )_";
 
-      code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
-                          reflection_deinitialization);
-    }
+    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
+                        reflection_deinitialization);
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().
@@ -1047,7 +967,11 @@ void Emitter::visit(ASTDotExpr *node) {
   if (base_ty->is_kind(TYPE_TUPLE)) {
     code << "$";
   }
-  code << node->member_name.get_str();
+
+  /*
+    ! TODO: mangle generics here?
+  */
+  code << node->member.identifier.get_str();
   return;
 }
 
@@ -1234,13 +1158,13 @@ void Emitter::visit(ASTTupleDeconstruction *node) {
     auto semantic = node->elements[index].semantic;
 
     if (node->op == TType::ColonEquals) {
-      code << "auto " << node->elements[index++].identifier->value.get_str() << " = ";
+      code << "auto " << node->elements[index++].identifier.get_str() << " = ";
       if (semantic == VALUE_SEMANTIC_POINTER) {
         code << "&";
       }
       code << identifier << "." << name.get_str() << ";\n";
     } else {
-      code << node->elements[index++].identifier->value.get_str() << " = ";
+      code << node->elements[index++].identifier.get_str() << " = ";
       if (semantic == VALUE_SEMANTIC_POINTER) {
         code << "&";
       }
@@ -1752,11 +1676,6 @@ std::string Emitter::to_cpp_string(Type *type) {
   return output;
 }
 
-void Emitter::visit(ASTScopeResolution *node) {
-  code << emit_symbol(ctx.get_symbol(node).get());
-  return;
-}
-
 void Emitter::visit(ASTImpl *node) {
   if (!node->generic_parameters.empty()) {
     return;
@@ -1791,7 +1710,7 @@ void Emitter::visit(ASTCast *node) {
 
 void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
 
-void Emitter::visit(ASTTaggedUnionDeclaration *node) {
+void Emitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -1811,7 +1730,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
   emit_default_init = false;
 
   for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+    if (variant.kind == ASTChoiceVariant::STRUCT) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
@@ -1819,7 +1738,7 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
         code << ";\n";
       }
       code << "} " << subtype_name << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+    } else if (variant.kind == ASTChoiceVariant::TUPLE) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "typedef ";
       variant.tuple->accept(this);
@@ -1834,10 +1753,10 @@ void Emitter::visit(ASTTaggedUnionDeclaration *node) {
 
   int n = 0;
   for (const auto &variant : node->variants) {
-    if (variant.kind == ASTTaggedUnionVariant::STRUCT) {
+    if (variant.kind == ASTChoiceVariant::STRUCT) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
-    } else if (variant.kind == ASTTaggedUnionVariant::TUPLE) {
+    } else if (variant.kind == ASTChoiceVariant::TUPLE) {
       auto subtype_name = name + "_" + variant.name.get_str();
       code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
     }
@@ -1947,7 +1866,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << "extern  ";
     }
 
-    if ((node->name == "main" || node->name == "маин") && !is_freestanding) {
+    if ((node->name == "main" || node->name == "маин") && !is_freestanding && !compile_command.has_flag("nostdlib")) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);
@@ -2129,11 +2048,11 @@ void Emitter::visit(ASTImport *node) {}
 
 void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op,
                                      ASTExpr *left, ASTExpr *right) {
-  auto call = ASTCall{};
+  auto call = ASTMethodCall{};
   auto dot = ASTDotExpr{};
   dot.base = left;
-  dot.member_name = get_operator_overload_name(op, operation);
-  call.function = &dot;
+  dot.member = ASTPath::Segment{get_operator_overload_name(op, operation)};
+  call.dot = &dot;
   auto args = ASTArguments{};
   if (right) {
     args.arguments = {right};
@@ -2143,7 +2062,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   call.arguments->source_range = range;
   call.source_range = range;
   call.accept(&typer);
-  if (dot.member_name == "deref") {
+  if (dot.member.identifier == "deref") {
     code << "(*";
   } else {
     code << "(";
@@ -2230,5 +2149,61 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
   code << "} " << name << ";";
   newline_indented();
 }
+
 void Emitter::visit(ASTPatternMatch *node) {}
 
+void Emitter::visit(ASTMethodCall *node) {
+  std::vector<int> generic_args = node->dot->member.get_resolved_generics();
+
+  auto symbol = ctx.get_symbol(node->dot).get();
+  // Call a function pointer via a dot expression
+  if (symbol->is_variable()) {
+    auto func = node->dot;
+    func->accept(this);
+    code << mangled_type_args(generic_args);
+    node->arguments->accept(this);
+    return;
+  }
+
+  auto func = symbol->function.declaration;
+
+  Type *function_type = global_get_type(symbol->type_id);
+  // if generic function
+  if (!func->generic_parameters.empty()) {
+    func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);
+    function_type = global_get_type(func->resolved_type);
+  }
+
+  code << emit_symbol(symbol) + mangled_type_args(generic_args);
+  code << "(";
+
+  auto self_param_ty = global_get_type(function_type->get_info()->as<FunctionTypeInfo>()->parameter_types[0]);
+
+  auto base_type = global_get_type(node->dot->base->resolved_type);
+
+  if (self_param_ty->get_ext().is_pointer() && !base_type->get_ext().is_pointer()) {
+    // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
+    code << "&";
+  } else if (!self_param_ty->get_ext().is_pointer() && base_type->get_ext().is_pointer()) {
+    code << "*";
+  }
+
+  ASTExpr *base = node->dot->base;
+  base->accept(this);
+  if (node->arguments->arguments.size() > 0) {
+    code << ", ";
+  }
+
+  for (auto &arg : node->arguments->arguments) {
+    arg->accept(this);
+    if (arg != node->arguments->arguments.back()) {
+      code << ", ";
+    }
+  }
+  code << ")";
+}
+
+void Emitter::visit(ASTPath *node) {
+  auto symbol = ctx.get_symbol(node);
+  code << emit_symbol(symbol.get());
+}

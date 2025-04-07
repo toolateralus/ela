@@ -97,10 +97,6 @@ ASTUnaryExpr *ASTCopier::copy_unary_expr(ASTUnaryExpr *node) {
   new_node->operand = static_cast<ASTExpr *>(copy_node(node->operand));
   return new_node;
 }
-ASTIdentifier *ASTCopier::copy_identifier(ASTIdentifier *node) {
-  return new (ast_alloc<ASTIdentifier>()) ASTIdentifier(*node);
-}
-
 ASTLiteral *ASTCopier::copy_literal(ASTLiteral *node) {
   auto new_node = copy(node);
   // do anything here?
@@ -111,11 +107,11 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
   new_node->resolved_type = node->resolved_type;
 
   switch (new_node->kind) {
-    case ASTType::NORMAL:
     case ASTType::SELF:
-      new_node->normal.generic_arguments.clear();
-      for (auto arg : node->normal.generic_arguments) {
-        new_node->normal.generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
+      break;
+    case ASTType::NORMAL:
+      if (node->normal.path) {
+        new_node->normal.path = (ASTPath*)copy_node(node->normal.path);
       }
       break;
     case ASTType::TUPLE:
@@ -140,10 +136,6 @@ ASTCall *ASTCopier::copy_call(ASTCall *node) {
   auto new_node = copy(node);
   new_node->function = static_cast<ASTExpr *>(copy_node(node->function));
   new_node->arguments = static_cast<ASTArguments *>(copy_node(node->arguments));
-  new_node->generic_arguments.clear();
-  for (auto arg : node->generic_arguments) {
-    new_node->generic_arguments.push_back(static_cast<ASTType *>(copy_node(arg)));
-  }
   return new_node;
 }
 ASTArguments *ASTCopier::copy_arguments(ASTArguments *node) {
@@ -166,14 +158,14 @@ ASTFor *ASTCopier::copy_for(ASTFor *node) {
   auto new_node = copy(node);
   switch (node->left_tag) {
     case ASTFor::IDENTIFIER: {
-      new_node->left.identifier = static_cast<ASTIdentifier *>(copy_node(node->left.identifier));
+      new_node->left.identifier = node->left.identifier;
     } break;
     case ASTFor::DESTRUCTURE: {
       new_node->left.destructure.clear();
-      for (auto destructure: node->left.destructure) {
+      for (auto destructure : node->left.destructure) {
         new_node->left.destructure.push_back({
-          .semantic = destructure.semantic,
-          .identifier = (ASTIdentifier*)copy_node(destructure.identifier),
+            .semantic = destructure.semantic,
+            .identifier = destructure.identifier,
         });
       }
     } break;
@@ -209,15 +201,19 @@ ASTWhile *ASTCopier::copy_while(ASTWhile *node) {
 ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
   auto new_node = copy(node);
   new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
+  new_node->member.generic_arguments.clear();
+  for (const auto &arg: node->member.generic_arguments) {
+    new_node->member.generic_arguments.push_back((ASTExpr*)copy_node(arg));
+  }
   return new_node;
 }
+
 ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
   auto new_node = copy(node);
   new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
   new_node->subscript = static_cast<ASTExpr *>(copy_node(node->subscript));
   return new_node;
 }
-
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
   auto new_node = copy(node);
   new_node->key_values.clear();
@@ -241,7 +237,6 @@ ASTEnumDeclaration *ASTCopier::copy_enum_declaration(ASTEnumDeclaration *node) {
   }
   return new_node;
 }
-
 ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(new_node->scope);
@@ -309,15 +304,10 @@ ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruct
   for (const auto &destruct : node->elements) {
     Destructure new_destruct;
     new_destruct.semantic = destruct.semantic;
-    new_destruct.identifier = static_cast<ASTIdentifier *>(copy_node(destruct.identifier));
+    new_destruct.identifier = destruct.identifier;
     new_node->elements.push_back(new_destruct);
   }
   new_node->right = static_cast<ASTExpr *>(copy_node(node->right));
-  return new_node;
-}
-ASTScopeResolution *ASTCopier::copy_scope_resolution(ASTScopeResolution *node) {
-  auto new_node = copy(node);
-  new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
   return new_node;
 }
 ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
@@ -330,18 +320,18 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  
+
   if (node->where_clause) {
     new_node->where_clause = (ASTWhere *)copy_node(node->where_clause.get());
   }
 
   new_node->aliases.clear();
-  for (const auto &alias: node->aliases) {
+  for (const auto &alias : node->aliases) {
     new_node->aliases.push_back(copy_alias(alias));
   }
 
   new_node->constants.clear();
-  for (const auto &constant: node->constants) {
+  for (const auto &constant : node->constants) {
     new_node->constants.push_back(copy_variable(constant));
   }
 
@@ -352,23 +342,20 @@ ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   current_scope = old_scope;
   return new_node;
 }
-
 ASTCast *ASTCopier::copy_cast(ASTCast *node) {
   auto new_node = copy(node);
   new_node->expression = (ASTExpr *)copy_node(node->expression);
   new_node->target_type = (ASTType *)copy_node(node->target_type);
   return new_node;
 }
-
 ASTWhere *ASTCopier::copy_where(ASTWhere *node) {
   auto new_node = copy(node);
   new_node->constraints.clear();
-  for (const auto &[target, predicate]: node->constraints) {
+  for (const auto &[target, predicate] : node->constraints) {
     new_node->constraints.push_back({(ASTType *)copy_node(target), (ASTExpr *)copy_node(predicate)});
   }
   return new_node;
 }
-
 ASTNode *ASTCopier::copy_node(ASTNode *node) {
   const auto type = node->get_node_type();
   switch (type) {
@@ -396,8 +383,6 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_bin_expr(static_cast<ASTBinExpr *>(node));
     case AST_NODE_UNARY_EXPR:
       return copy_unary_expr(static_cast<ASTUnaryExpr *>(node));
-    case AST_NODE_IDENTIFIER:
-      return copy_identifier(static_cast<ASTIdentifier *>(node));
     case AST_NODE_LITERAL:
       return copy_literal(static_cast<ASTLiteral *>(node));
     case AST_NODE_TYPE:
@@ -426,8 +411,6 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
     case AST_NODE_DOT_EXPR:
       return copy_dot_expr(static_cast<ASTDotExpr *>(node));
-    case AST_NODE_SCOPE_RESOLUTION:
-      return copy_scope_resolution(static_cast<ASTScopeResolution *>(node));
     case AST_NODE_SUBSCRIPT:
       return copy_subscript(static_cast<ASTSubscript *>(node));
     case AST_NODE_INITIALIZER_LIST:
@@ -442,8 +425,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
     case AST_NODE_INTERFACE_DECLARATION:
       return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
-    case AST_NODE_TAGGED_UNION_DECLARATION:
-      return copy_tagged_union_declaration(static_cast<ASTTaggedUnionDeclaration *>(node));
+    case AST_NODE_CHOICE_DECLARATION:
+      return copy_tagged_union_declaration(static_cast<ASTChoiceDeclaration *>(node));
     case AST_NODE_NOOP:
       return node;
     case AST_NODE_ALIAS:
@@ -459,46 +442,44 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_TYPE_OF:
       return copy_type_of(static_cast<ASTType_Of *>(node));
     case AST_NODE_IMPORT:
-      return copy_import(static_cast<ASTImport*>(node));
+      return copy_import(static_cast<ASTImport *>(node));
     case AST_NODE_MODULE:
-      return copy_module(static_cast<ASTModule*>(node));
+      return copy_module(static_cast<ASTModule *>(node));
     case AST_NODE_DYN_OF:
-      return copy_dyn_of(static_cast<ASTDyn_Of*>(node));
+      return copy_dyn_of(static_cast<ASTDyn_Of *>(node));
     case AST_NODE_PATTERN_MATCH:
-      return copy_pattern_match(static_cast<ASTPatternMatch*>(node));
+      return copy_pattern_match(static_cast<ASTPatternMatch *>(node));
+    case AST_NODE_PATH:
+      return copy_path(static_cast<ASTPath *>(node));
+    case AST_NODE_METHOD_CALL:
+      return copy_method_call(static_cast<ASTMethodCall *>(node));
       break;
   }
 }
-
 ASTType_Of *ASTCopier::copy_type_of(ASTType_Of *node) {
   auto new_node = copy(node);
   new_node->target = (ASTExpr *)copy_node((ASTNode *)node->target);
   return new_node;
 }
-
 ASTNode *deep_copy_ast(ASTNode *root) {
   ASTCopier copier;
   return copier.copy_node(root);
 }
-
 ASTAlias *ASTCopier::copy_alias(ASTAlias *node) {
   auto new_node = copy(node);
   new_node->source_node = static_cast<ASTType *>(copy_node(node->source_node));
   return new_node;
 }
-
 ASTSize_Of *ASTCopier::copy_sizeof(ASTSize_Of *node) {
   auto new_node = copy(node);
   new_node->target_type = static_cast<ASTType *>(copy_node(node->target_type));
   return new_node;
 }
-
 ASTDefer *ASTCopier::copy_defer(ASTDefer *node) {
   auto new_node = copy(node);
   new_node->statement = copy_node(node->statement);
   return new_node;
 }
-
 ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   auto new_node = copy(node);
   new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
@@ -506,24 +487,23 @@ ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
 }
-
-ASTTaggedUnionDeclaration *ASTCopier::copy_tagged_union_declaration(ASTTaggedUnionDeclaration *node) {
+ASTChoiceDeclaration *ASTCopier::copy_tagged_union_declaration(ASTChoiceDeclaration *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
   new_node->variants.clear();
   for (const auto &variant : node->variants) {
-    ASTTaggedUnionVariant new_variant;
+    ASTChoiceVariant new_variant;
     new_variant.kind = variant.kind;
     new_variant.name = variant.name;
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
+      case ASTChoiceVariant::NORMAL:
         break;
-      case ASTTaggedUnionVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE:
         new_variant.tuple = static_cast<ASTType *>(copy_node(variant.tuple));
         break;
-      case ASTTaggedUnionVariant::STRUCT:
+      case ASTChoiceVariant::STRUCT:
         new_variant.struct_declarations.clear();
         for (auto field : variant.struct_declarations) {
           new_variant.struct_declarations.push_back(static_cast<ASTVariable *>(copy_node(field)));
@@ -535,7 +515,6 @@ ASTTaggedUnionDeclaration *ASTCopier::copy_tagged_union_declaration(ASTTaggedUni
   current_scope = old_scope;
   return new_node;
 }
-
 ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
@@ -544,42 +523,61 @@ ASTStatementList *ASTCopier::copy_statement_list(ASTStatementList *node) {
   }
   return new_node;
 }
-
 ASTImport *ASTCopier::copy_import(ASTImport *node) {
   auto new_node = copy(node);
   new_node->statements.clear();
   new_node->scope = copy_scope(node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  for (const auto &statement: node->statements) {
-    new_node->statements.push_back((ASTStatement*)copy_node(statement));
+  for (const auto &statement : node->statements) {
+    new_node->statements.push_back((ASTStatement *)copy_node(statement));
   }
   current_scope = old_scope;
   return new_node;
 }
-
 ASTModule *ASTCopier::copy_module(ASTModule *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(node->scope);
   auto old_scope = current_scope;
   current_scope = new_node->scope;
-  for (const auto &statement: node->statements) {
-    new_node->statements.push_back((ASTStatement*)copy_node(statement));
+  for (const auto &statement : node->statements) {
+    new_node->statements.push_back((ASTStatement *)copy_node(statement));
   }
   current_scope = old_scope;
   return new_node;
 }
-
 ASTDyn_Of *ASTCopier::copy_dyn_of(ASTDyn_Of *node) {
   auto new_node = copy(node);
-  new_node->object = (ASTExpr*)copy_node(node->object);
+  new_node->object = (ASTExpr *)copy_node(node->object);
   return new_node;
 }
-
-
 ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
   auto new_node = copy(node);
-  new_node->object = (ASTExpr*)copy_node(node->object);
-  new_node->target_type = (ASTType*)copy_node(node->target_type);
+  new_node->object = (ASTExpr *)copy_node(node->object);
+  new_node->target_type = (ASTType *)copy_node(node->target_type);
+  return new_node;
+}
+ASTPath *ASTCopier::copy_path(ASTPath *node) {
+  auto new_node = copy(node);
+  new_node->segments.clear();
+  for (const auto &part : node->segments) {
+    if (!part.generic_arguments.empty()) {
+      std::vector<ASTExpr *> args;
+      for (auto arg in part.generic_arguments) {
+        auto new_arg = (ASTExpr *)copy_node(arg);
+        new_arg->resolved_type = Type::INVALID_TYPE_ID;
+        args.push_back(new_arg);
+      }
+      new_node->push_part(part.identifier, args);
+    } else {
+      new_node->push_part(part.identifier);
+    }
+  }
+  return new_node;
+}
+ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
+  auto new_node = copy(node);
+  new_node->dot = (ASTDotExpr*)copy_node(node->dot);
+  new_node->arguments = (ASTArguments*)copy_node(node->arguments);
   return new_node;
 }

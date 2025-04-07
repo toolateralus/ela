@@ -74,53 +74,53 @@ main :: fn() {
 )__";
 
 
-static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
-  #ifdef TESTING
-  #define __TEST_RUNNER_MAIN                                                                                             \
-    int main() {                                                                                                         \
-      for (int i = 0; i < sizeof(tests) / sizeof($ela_test); i++) {                                      \
-        $ela_test_run(&tests[i]);                                                                        \
-      }                                                                                                                  \
-    }                                                                                                                     
-  #endif
+static constexpr auto TESTING_BOILERPLATE = R"__(
+#ifdef TESTING
+  #define __TEST_RUNNER_MAIN\
+    for (int i = 0; i < sizeof(tests) / sizeof($ela_test); i++) { $ela_test_run(&tests[i]); }
+#else 
+  #define __TEST_RUNNER_MAIN\
+    __ela_main_();
+#endif
   )__";
-  
-  // This is stuff we just can't really get rid of while using a transpiled backend.
-  static constexpr auto BOILERPLATE_C_CODE = R"__(
+
+// This is stuff we just can't really get rid of while using a transpiled backend.
+static constexpr auto BOILERPLATE_C_CODE = R"__(
   typedef unsigned long long int u64;
   typedef signed long long int s64;
-  
+
   typedef signed int s32;
   typedef unsigned int u32;
-  
+
   typedef double f64;
   typedef float f32;
-  
+
   typedef short int s16;
   typedef unsigned short int u16;
-  
+
   typedef signed char s8;
   typedef unsigned char u8;
   #include <stddef.h>
-  
+
+  // I don't think we need any of these includes anymore.
   #if USE_STD_LIB
     #include <stdint.h>
     #include <errno.h>
     #undef RAND_MAX
   #endif
-  
+
   #ifdef TESTING
     #if TEST_VERBOSE
       int printf(u8 *, ...);
     #endif
-    
+
     typedef struct {
       const char *name;
       void (*function)();
     } $ela_test;
 
     static void $ela_test_run($ela_test *test) {
-      #if TEST_VERBOSE 
+      #if TEST_VERBOSE
         printf("running %s\n", test->name);
       #endif
       test->function();
@@ -128,4 +128,3 @@ static constexpr auto TESTING_MAIN_BOILERPLATE_AAAAGHH = R"__(
 
   #endif
   )__";
-  

@@ -118,18 +118,19 @@ void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
   size_t index = 0;
 
-  // We have to do this here because the reflection system depends on this type and it doesn't
-  // neccesarily get instantiatied.
-  // see the `Emitter:get_type_struct`
-  // and `bootstrap/reflection.ela/Type :: struct`
-  auto sub_types = std::vector<int>{
-      ctx.scope->find_type_id("str", {}),
-      ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
-  };
-  auto tuple_id = global_find_type_id(sub_types, {});
-
-  define_type(tuple_id);
-  declare_type(tuple_id);
+  if (!compile_command.has_flag("nostdlib")) {
+    // We have to do this here because the reflection system depends on this type and it doesn't
+    // neccesarily get instantiatied.
+    // see the `Emitter:get_type_struct`
+    // and `bootstrap/reflection.ela/Type :: struct`
+    auto sub_types = std::vector<int>{
+        ctx.scope->find_type_id("str", {}),
+        ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
+    };
+    auto tuple_id = global_find_type_id(sub_types, {});
+    define_type(tuple_id);
+    declare_type(tuple_id);
+  }
 
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {
@@ -193,19 +194,23 @@ void DependencyEmitter::visit(ASTVariable *node) {
 
 void DependencyEmitter::visit(ASTExprStatement *node) { node->expression->accept(this); }
 
+void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument) {
+  auto call = ASTMethodCall{};
+  auto dot = ASTDotExpr{};
+  dot.base = base;
+  dot.member = ASTPath::Segment{operator_name};
+  call.dot = &dot;
+  auto args = ASTArguments{};
+  if (argument) {
+    args.arguments = {argument};
+  }
+  call.arguments = &args;
+  call.accept(this);
+}
+
 void DependencyEmitter::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->left;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_BINARY);
-    call.function = &dot;
-    auto args = ASTArguments{};
-    if (node->right) {
-      args.arguments = {node->right};
-    }
-    call.arguments = &args;
-    call.accept(this);
+    visit_operator_overload(node->left, get_operator_overload_name(node->op.type, OPERATION_BINARY), node->right);
   } else {
     node->left->accept(this);
     node->right->accept(this);
@@ -214,14 +219,7 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
 
 void DependencyEmitter::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
-    auto call = ASTCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->operand;
-    dot.member_name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
-    call.function = &dot;
-    auto args = ASTArguments{};
-    call.arguments = &args;
-    call.accept(this);
+    visit_operator_overload(node->operand, get_operator_overload_name(node->op.type, OPERATION_UNARY), nullptr);
   } else {
     if (node->op.type == TType::Mul) {
       define_type(node->operand->resolved_type);
@@ -230,16 +228,60 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTIdentifier *node) {
+void DependencyEmitter::visit(ASTSubscript *node) {
+  if (node->is_operator_overload) {
+    visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT),
+                            node->subscript);
+  } else {
+    // make sure type is defined for size
+    define_type(node->left->resolved_type);
+    node->left->accept(this);
+    node->subscript->accept(this);
+  }
+}
+
+void DependencyEmitter::visit(ASTPath *node) {
   // TODO: this should be handled by ASTType
   auto type = global_get_type(node->resolved_type);
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
   }
-  // for global variables
-  if (auto symbol = ctx.scope->lookup(node->value)) {
-    if (symbol->is_variable() && symbol->variable.declaration) {
+
+  Scope *scope = ctx.scope;
+  auto index = 0;
+  for (auto &seg in node->segments) {
+    auto &ident = seg.identifier;
+    auto symbol = scope->lookup(ident);
+    scope = nullptr;
+    if (!symbol) {
+      throw_error("symbol not found in scope", node->source_range);
+    }
+
+    ASTDeclaration *instantiation = nullptr;
+    if (!seg.generic_arguments.empty()) {
+      auto generic_args = emitter->typer.get_generic_arg_types(seg.generic_arguments);
+      if (symbol->is_type()) {
+        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
+        instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
+        auto type = global_get_type(instantiation->resolved_type);
+        scope = type->get_info()->scope;
+      } else if (symbol->is_function()) {
+        instantiation = find_generic_instance(symbol->function.declaration->generic_instantiations, generic_args);
+      }
+    } else {
+      if (symbol->is_module()) {
+        scope = symbol->module.declaration->scope;
+      } else if (symbol->is_type()) {
+        scope = global_get_type(symbol->type_id)->get_info()->scope;
+      }
+    }
+
+    if (instantiation) {
+      instantiation->accept(this);
+      instantiation->accept(emitter);
+    } else if (symbol->is_variable() && symbol->variable.declaration) {
+      // for global variables
       auto decl = symbol->variable.declaration.get();
       if (!decl->declaring_block) {
         symbol->variable.declaration.get()->accept(this);
@@ -248,7 +290,14 @@ void DependencyEmitter::visit(ASTIdentifier *node) {
     } else if (symbol->is_function()) {
       // TODO: we should change how template retrival works;
       symbol->function.declaration->accept(this);
+    } else if (symbol->is_type()) {
+      if (auto decl = symbol->type.declaration.get()) {
+        decl->accept(this);
+        decl->accept(emitter);
+      }
     }
+
+    index++;
   }
 }
 
@@ -262,29 +311,7 @@ void DependencyEmitter::visit(ASTType_Of *node) {
 }
 
 void DependencyEmitter::visit(ASTCall *node) {
-  for (auto generic_arg : node->generic_arguments) {
-    generic_arg->accept(this);
-  }
-
   node->arguments->accept(this);
-  node->function->accept(this);
-  auto symbol_nullable = ctx.get_symbol(node->function);
-
-  if (symbol_nullable.is_not_null()) {
-    auto decl = symbol_nullable.get()->function.declaration;
-
-    if (!node->generic_arguments.empty()) {
-      auto generic_args = emitter->typer.get_generic_arg_types(node->generic_arguments);
-      decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);
-    }
-    // only accept if not a fn ptr
-    // else, we do the other way
-    if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      decl->accept(this);
-      return;
-    }
-  }
-
   node->function->accept(this);
 }
 
@@ -357,25 +384,6 @@ void DependencyEmitter::visit(ASTDotExpr *node) {
   node->base->accept(this);
 }
 
-void DependencyEmitter::visit(ASTSubscript *node) {
-  if (node->is_operator_overload) {
-    auto call = ASTCall{};
-    auto dot = ASTDotExpr{};
-    dot.base = node->left;
-    dot.member_name = get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT);
-    call.function = &dot;
-    auto args = ASTArguments{};
-    args.arguments = {node->subscript};
-    call.arguments = &args;
-    call.accept(this);
-  } else {
-    // make sure type is defined for size
-    define_type(node->left->resolved_type);
-    node->left->accept(this);
-    node->subscript->accept(this);
-  }
-}
-
 void DependencyEmitter::visit(ASTInitializerList *node) {
   if (node->target_type)
     node->target_type.get()->accept(this);
@@ -425,28 +433,6 @@ void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
 
 void DependencyEmitter::visit(ASTSize_Of *node) { node->target_type->accept(this); }
 
-void DependencyEmitter::visit(ASTScopeResolution *node) {
-  node->base->accept(this);
-  auto scope_nullable = ctx.get_scope(node->base);
-  auto scope = scope_nullable.get();
-
-  if (auto member = scope->local_lookup(node->member_name)) {
-    ASTNode *decl = nullptr;
-    if (member->is_type()) {
-      decl = member->type.declaration.get();
-    } else if (member->is_function()) {
-      decl = member->function.declaration;
-    }
-    if (decl) {
-      decl->accept(this);
-    }
-  } else if (auto type = scope->find_type_id(node->member_name, {})) {
-    if (type == Type::INVALID_TYPE_ID) {
-      throw_error(std::format("Member \"{}\" not found in base", node->member_name), node->source_range);
-    }
-  }
-}
-
 void DependencyEmitter::visit(ASTAlias *node) {}
 
 void DependencyEmitter::visit(ASTImport *node) {}
@@ -471,7 +457,7 @@ void DependencyEmitter::visit(ASTImpl *node) {
 
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
-void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
+void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
@@ -480,12 +466,12 @@ void DependencyEmitter::visit(ASTTaggedUnionDeclaration *node) {
   Defer _([&] { ctx.set_scope(old_scope); });
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
-      case ASTTaggedUnionVariant::NORMAL:
+      case ASTChoiceVariant::NORMAL:
         break;
-      case ASTTaggedUnionVariant::TUPLE:
+      case ASTChoiceVariant::TUPLE:
         variant.tuple->accept(this);
         break;
-      case ASTTaggedUnionVariant::STRUCT:
+      case ASTChoiceVariant::STRUCT:
         for (const auto &decl : variant.struct_declarations) {
           decl->accept(this);
         }
@@ -530,4 +516,25 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
     decl->accept(this);
   }
 }
+
 void DependencyEmitter::visit(ASTPatternMatch *node) {}
+
+void DependencyEmitter::visit(ASTMethodCall *node) {
+  node->arguments->accept(this);
+  node->dot->accept(this);
+  auto symbol_nullable = ctx.get_symbol(node->dot);
+
+  if (symbol_nullable.is_not_null()) {
+    auto decl = symbol_nullable.get()->function.declaration;
+    auto generic_args = node->dot->member.get_resolved_generics();
+
+    if (!generic_args.empty()) {
+      decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);
+    }
+
+    if (decl && decl->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
+      decl->accept(this);
+      return;
+    }
+  }
+}
