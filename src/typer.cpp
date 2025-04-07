@@ -153,16 +153,14 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 }
 
 void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
-                                           std::vector<int> generic_args) {
-
+                                     std::vector<int> generic_args) {
   auto old_scope = ctx.scope;
   Defer _defer([&] { ctx.scope = old_scope; });
   ctx.set_scope(node->scope);
-  
 
   /* get the type, if it's a concrete declaration. */
   auto type = global_get_type(node->resolved_type);
-  
+
   /* otherwise, we alias our generic parameters by name, then create the instantation. */
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -197,6 +195,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
         ctx.set_scope();
         for (const auto &field : variant.struct_declarations) {
           field->accept(this);
+          field->resolved_type = field->type->resolved_type;
         }
         auto type = info->scope->create_struct_type(variant.name, ctx.exit_scope(), nullptr);
         info->variants.push_back({variant.name, type});
@@ -478,7 +477,9 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   node->target->accept(this);
 
   if (node->target->resolved_type == -2) {
-    throw_error("the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`", node->source_range);
+    throw_error("the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> "
+                "MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`",
+                node->source_range);
   }
 
   node->scope->name = std::to_string(node->target->resolved_type) + "impl";
@@ -1969,17 +1970,30 @@ void Typer::visit(ASTUnaryExpr *node) {
 void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &part in node->segments) {
-    auto &ident = part.identifier;
+  Type *previous_type = nullptr;
+  for (auto &segment in node->segments) {
+    auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
     if (!symbol) {
-      throw_error("symbol not found in scope", node->source_range);
+      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
     }
 
-    if (!part.generic_arguments.empty()) {
+    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
+      /* we need to return the parent type here? but we need to maintain the variant. hmm. */
+      node->resolved_type = previous_type->id;
+      auto symbol = previous_type->get_info()->scope->lookup(segment.identifier);
+      if (!symbol) {
+        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
+                                previous_type->to_string()),
+                    node->source_range);
+      }
+      return;
+    }
+
+    if (!segment.generic_arguments.empty()) {
       std::vector<int> generic_args;
-      for (auto &arg : part.generic_arguments) {
+      for (auto &arg : segment.generic_arguments) {
         arg->accept(this);
         generic_args.push_back(arg->resolved_type);
       }
@@ -1989,10 +2003,12 @@ void Typer::visit(ASTPath *node) {
         instantiation = visit_generic(decl, generic_args, node->source_range);
         auto type = global_get_type(instantiation->resolved_type);
         scope = type->get_info()->scope;
+        previous_type = type;
       } else if (symbol->is_function()) {
         instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
       }
-      part.resolved_type = instantiation->resolved_type;
+      segment.resolved_type = instantiation->resolved_type;
+
     } else {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
@@ -2000,12 +2016,14 @@ void Typer::visit(ASTPath *node) {
         if (symbol->type_id == -2) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
-        scope = global_get_type(symbol->type_id)->get_info()->scope;
+        previous_type = global_get_type(symbol->type_id);
+        scope = previous_type->get_info()->scope;
       }
-      part.resolved_type = symbol->type_id;
+      segment.resolved_type = symbol->type_id;
     }
     if (!scope && index < node->segments.size() - 1) {
-      throw_error("symbol scope could not be resolved in path", node->source_range);
+      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
+                  node->source_range);
     }
     index++;
   }
@@ -2055,7 +2073,7 @@ void Typer::visit(ASTLiteral *node) {
       }
       return;
     case ASTLiteral::String: {
-      static bool nostdlib =  compile_command.has_flag("nostdlib");
+      static bool nostdlib = compile_command.has_flag("nostdlib");
       if (nostdlib) {
         node->is_c_string = true;
       }
@@ -2217,7 +2235,20 @@ void Typer::visit(ASTInitializerList *node) {
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_NAMED: {
-      if (!target_type->is_kind(TYPE_STRUCT)) {
+      Defer _defer([] {});
+      if (target_type->is_kind(TYPE_CHOICE)) {
+        if (node->target_type.get() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH) {
+          const auto path = (ASTPath *)node->target_type.get()->normal.path;
+          const auto last_segment = path->segments.back();
+          const auto info = target_type->get_info()->as<ChoiceTypeInfo>();
+          const auto variant_type = info->get_variant_type(last_segment.identifier);
+
+          auto old_target = target_type;
+          target_type = variant_type;
+          scope = variant_type->get_info()->scope;
+          _defer.func = [&] { target_type = old_target; };
+        }
+      } else if (!target_type->is_kind(TYPE_STRUCT)) {
         throw_error(std::format("named initializer lists can only be used for structs & unions, got type {}\nNote, for "
                                 "unions, you can only provide one value.",
                                 target_type->to_string()),
@@ -2835,8 +2866,8 @@ void Typer::visit(ASTMethodCall *node) {
           type_context = &func_type_ast;
         }
 
-        func_decl = resolve_generic_function_call(func_decl, &node->dot->member.generic_arguments,
-                                                  node->arguments, node->source_range);
+        func_decl = resolve_generic_function_call(func_decl, &node->dot->member.generic_arguments, node->arguments,
+                                                  node->source_range);
       }
 
       type = global_get_type(func_decl->resolved_type);

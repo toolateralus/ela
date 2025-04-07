@@ -239,7 +239,9 @@ struct Emitter : VisitorBase {
       printf("Empty filename for line directive.\n");
       return;
     }
-    code << std::string{"#line "} << std::to_string(loc) << std::string{" \""} << filename << std::string{"\"\n"};
+
+    auto line = std::format("#line {} \"{}\"\n", loc, filename);
+    code << line;
     last_loc = loc;
     // }
   }
@@ -333,6 +335,8 @@ struct Emitter : VisitorBase {
     }
     return;
   };
+  void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
+  void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
 };
 
 struct DependencyEmitter : VisitorBase {

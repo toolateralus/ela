@@ -241,11 +241,16 @@ void DependencyEmitter::visit(ASTSubscript *node) {
 }
 
 void DependencyEmitter::visit(ASTPath *node) {
-  // TODO: this should be handled by ASTType
+
+  // TODO: this should be handled by ASTType ... update: what does this mean by 'this'? I think this is irrelevant.
   auto type = global_get_type(node->resolved_type);
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
+  }
+
+  if (type && type->kind == TYPE_CHOICE) {
+    return; // Do we need to do anything here?
   }
 
   Scope *scope = ctx.scope;
@@ -464,6 +469,7 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
+  
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL:
@@ -472,9 +478,8 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
         variant.tuple->accept(this);
         break;
       case ASTChoiceVariant::STRUCT:
-        for (const auto &decl : variant.struct_declarations) {
+        for (const auto &decl : variant.struct_declarations)
           decl->accept(this);
-        }
         break;
     }
   }

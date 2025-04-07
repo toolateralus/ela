@@ -194,6 +194,8 @@ struct ChoiceVariant {
 
 struct ChoiceTypeInfo : TypeInfo {
   std::vector<ChoiceVariant> variants;
+  int get_variant_index(const InternedString &variant_name) const;
+  Type *get_variant_type(const InternedString &variant_name) const;
 };
 
 struct ASTFunctionDeclaration;

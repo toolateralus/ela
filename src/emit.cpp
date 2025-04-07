@@ -306,19 +306,19 @@ void Emitter::visit(ASTCall *node) {
   if (node->has_generics()) {
     generic_args = typer.get_generic_arg_types(*node->get_generic_arguments().get());
   }
-  auto func = node->function;
-  // TODO: Do we need this?
-  if (func->get_node_type() == AST_NODE_TYPE) {
-    auto ast_type = static_cast<ASTType *>(func);
-    if (ast_type->kind != ASTType::NORMAL) {
-      throw_error("Cannot call a tuple or function type", node->source_range);
-    }
-    func = ast_type->normal.path;
+
+  auto resolved_func_type = global_get_type(node->function->resolved_type);
+
+  if (node->function->get_node_type() == AST_NODE_PATH && resolved_func_type &&
+      resolved_func_type->is_kind(TYPE_CHOICE)) {
+    // Creating a choice type's tuple-variant, such as Option!<T>::Some(10), etc.
+    emit_choice_tuple_variant_instantiation((ASTPath *)node->function, node->arguments);
+  } else {
+    // normal function call, or a static method.
+    node->function->accept(this);
+    code << mangled_type_args(generic_args);
+    node->arguments->accept(this);
   }
-  // normal function call, or a static method.
-  func->accept(this);
-  code << mangled_type_args(generic_args);
-  node->arguments->accept(this);
 }
 
 size_t calculate_actual_length(const std::string_view &str_view) {
@@ -928,13 +928,13 @@ void $deinit_type(Type *type) {
     constexpr auto main_format = R"_(
 int main (int argc, char** argv) {{
   /* initialize command line args. */
-  {}(argc, argv); 
+  {}(argc, argv);
   /* reflection system */
-  {}                   
+  {}
   /* call user main, or dispatch tests, depending on the build type. */
-  __TEST_RUNNER_MAIN;  
+  __TEST_RUNNER_MAIN;
   /* deinitialize command line args. */
-  {}              
+  {}
 }}
 )_";
 
@@ -999,6 +999,13 @@ void Emitter::visit(ASTInitializerList *node) {
   if (!type->get_ext().is_fixed_sized_array()) {
     code << "(" + to_cpp_string(type) + ")";
   }
+
+  if (node->target_type.is_not_null() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH &&
+      type->is_kind(TYPE_CHOICE)) {
+    emit_choice_struct_variant_instantation(node->target_type.get()->normal.path, node);
+    return;
+  }
+
   code << "{";
 
   switch (node->tag) {
@@ -1729,14 +1736,20 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
   auto old_init = emit_default_init;
   emit_default_init = false;
 
+  auto type = global_get_type(node->resolved_type);
+  auto info = type->get_info();
+
+  auto old_scope = ctx.scope;
+  Defer _defer([&] { ctx.scope = old_scope; });
+  ctx.scope = info->scope;
+
   for (const auto &variant : node->variants) {
     auto variant_name = variant.name.get_str();
     if (variant.kind == ASTChoiceVariant::STRUCT) {
       auto subtype_name = name + "$" + variant_name;
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
-        field->accept(this);
-        code << ";\n";
+        code << to_cpp_string(global_get_type(field->resolved_type)) << " " << field->name.get_str() << ";\n";
       }
       code << "} " << subtype_name << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
@@ -1746,28 +1759,22 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
       code << " " << subtype_name << ";\n";
     }
   }
-  
+
   emit_default_init = old_init;
   code << "typedef struct " << name << " {\n";
   code << "  int index;\n";
   code << "  union {\n";
-
-  int n = 0;
   for (const auto &variant : node->variants) {
     auto variant_name = variant.name.get_str();
+    auto subtype_name = name + "$" + variant_name;
     if (variant.kind == ASTChoiceVariant::STRUCT) {
-      auto subtype_name = name + "$" + variant_name;
-      code << "    " << subtype_name << " " << variant_name  << std::to_string(n) << ";\n";
+      code << "    " << subtype_name << " " << variant_name << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
-      auto subtype_name = name + "$" + variant_name;
-      code << "    " << subtype_name << " " << variant_name << std::to_string(n) << ";\n";
+      code << "    " << subtype_name << " " << variant_name << ";\n";
     }
-    n++;
   }
-
   code << "  };\n";
   code << "} " << name << ";\n";
-  return;
 }
 
 // Helper function to emit deferred statements
@@ -2203,6 +2210,47 @@ void Emitter::visit(ASTMethodCall *node) {
     }
   }
   code << ")";
+}
+
+void Emitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments) {
+  const auto choice_type = global_get_type(path->resolved_type);
+  const auto info = choice_type->get_info()->as<ChoiceTypeInfo>();
+  const auto last_segment = path->segments.back();
+  const auto variant_name = last_segment.identifier;
+  const auto variant_type = info->get_variant_type(variant_name);
+  const auto type_string = to_cpp_string(choice_type);
+
+  code << "(" << type_string << ") {\n";
+  code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
+  ASTTuple tuple;
+
+  code << "." << variant_name.get_str() << " = ";
+
+  tuple.resolved_type = variant_type->id;
+  tuple.values = arguments->arguments;
+  tuple.accept(this);
+
+  code << "}";
+}
+
+void Emitter::emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer) {
+  const auto choice_type = global_get_type(path->resolved_type);
+  const auto info = choice_type->get_info()->as<ChoiceTypeInfo>();
+  const auto last_segment = path->segments.back();
+  const auto variant_name = last_segment.identifier;
+  const auto variant_type = info->get_variant_type(variant_name);
+  const auto type_string = to_cpp_string(choice_type);
+
+  code << "(" << type_string << ") {\n";
+  code << ".index = " << std::to_string(info->get_variant_index(variant_name)) << ",\n";
+  code << "." << variant_name.get_str() << " = " << "{";
+  for (const auto &[name, value] : initializer->key_values) {
+    code << "." << name.get_str() << " = ";
+    value->accept(this);
+    code << ", ";
+  }
+  code << "},";
+  code << "}";
 }
 
 void Emitter::visit(ASTPath *node) {

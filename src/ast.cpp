@@ -2287,7 +2287,7 @@ ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
       node->variants.push_back(variant);
     } else {
       end_node(node, range);
-      throw_error("Unexpected token in tagged union declaration", node->source_range);
+      throw_error("Unexpected token in choice type declaration", node->source_range);
     }
     if (peek().type != TType::RCurly)
       expect(TType::Comma);

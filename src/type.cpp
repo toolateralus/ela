@@ -150,8 +150,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
       info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
     } break;
     case TYPE_CHOICE: {
-      info = new (type_info_alloc<ChoiceTypeInfo>())
-          ChoiceTypeInfo(*base_t->get_info()->as<ChoiceTypeInfo>());
+      info = new (type_info_alloc<ChoiceTypeInfo>()) ChoiceTypeInfo(*base_t->get_info()->as<ChoiceTypeInfo>());
     } break;
     case TYPE_INTERFACE: {
       info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->get_info()->as<InterfaceTypeInfo>());
@@ -362,18 +361,6 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
     if (to->is_kind(TYPE_ENUM) && to->get_ext().has_no_extensions()) {
       auto enum_info = (to->get_info()->as<EnumTypeInfo>());
       return type_conversion_rule(from, global_get_type(enum_info->element_type), source_range);
-    }
-  }
-
-  // tagged union stuffz.
-  {
-    if (to->is_kind(TYPE_CHOICE)) {
-      auto info = to->get_info()->as<ChoiceTypeInfo>();
-      for (const auto &variant : info->variants) {
-        if (from->id == variant.type) {
-          return CONVERT_IMPLICIT;
-        }
-      }
     }
   }
 
@@ -950,4 +937,21 @@ int is_mut_pointer_interface() {
 int is_const_pointer_interface() {
   static int id = global_create_interface_type("IsConstPointer", create_child(nullptr), {});
   return id;
+}
+
+Type *ChoiceTypeInfo::get_variant_type(const InternedString &variant_name) const {
+  int variant_index = get_variant_index(variant_name);
+  if (variant_index == -1) {
+    return nullptr;
+  }
+  return global_get_type(variants[variant_index].type);
+}
+
+int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const {
+  for (size_t i = 0; i < variants.size(); ++i) {
+    if (variants[i].name == variant_name) {
+      return i;
+    }
+  }
+  return -1;
 }
