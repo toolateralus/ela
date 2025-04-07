@@ -901,38 +901,45 @@ void $deinit_type(Type *type) {
     code << "\n}\n";
   }
 
+  // this is just a macro, and it's guarded by an ifdef.
+  code << TESTING_BOILERPLATE;
+
   if (testing) {
     auto test_init = test_functions.str();
     if (test_init.ends_with(',')) {
       test_init.pop_back();
     }
-    code << TESTING_MAIN_BOILERPLATE_AAAAGHH << '\n';
     // deploy the array of test struct wrappers.
     code << std::format("$ela_test tests[{}] = {}\n", num_tests, "{ " + test_init + " };");
     // use the test runner main macro.
-    code << "__TEST_RUNNER_MAIN;";
-  } else {
-    if (has_user_defined_main && !is_freestanding && !compile_command.has_flag("nostdlib")) {
-      auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
+  }
 
-      const auto reflection_initialization = type_info_strings.size() != 0 ? "$initialize_reflection_system();"
+  // We now use a normalized main, with init and deinit code for Env and the reflection system, even in testing.
+  // I am not sure how this ever worked before, when it was selectively initialized.
+  // but this is better anyway
+  if ((has_user_defined_main || testing) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
+    auto env_scope = global_get_type(ctx.scope->find_type_id("Env", {}))->get_info()->scope;
+
+    const auto reflection_initialization =
+        type_info_strings.size() != 0 ? "$initialize_reflection_system();" : "{/* no reflection present in module */};";
+
+    const auto reflection_deinitialization = type_info_strings.size() != 0 ? "$deinitialize_reflection_system();"
                                                                            : "{/* no reflection present in module */};";
-
-      const auto reflection_deinitialization = type_info_strings.size() != 0
-                                                   ? "$deinitialize_reflection_system();"
-                                                   : "{/* no reflection present in module */};";
-      constexpr auto main_format = R"_(
+    constexpr auto main_format = R"_(
 int main (int argc, char** argv) {{
-  {}(argc, argv); /* initialize command line args. */
-  {}              /* reflection system */
-  __ela_main_();  /* call user main */
-  {}              /* deinitialize command line args. */
+  /* initialize command line args. */
+  {}(argc, argv); 
+  /* reflection system */
+  {}                   
+  /* call user main, or dispatch tests, depending on the build type. */
+  __TEST_RUNNER_MAIN;  
+  /* deinitialize command line args. */
+  {}              
 }}
 )_";
 
-      code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
-                          reflection_deinitialization);
-    }
+    code << std::format(main_format, emit_symbol(env_scope->lookup("initialize")), reflection_initialization,
+                        reflection_deinitialization);
   }
 
   // TODO: if we're freestanding, we should just emit ID's only for typeof().

@@ -69,9 +69,6 @@ def main():
 
     # Print summary of passed and failed tests
     print("\n\033[1;34mTest Summary:\033[0m")
-    # Print passed tests
-    print(f"\033[1;32mPassed tests ({len(passed_tests)}):\033[0m")
-    
     # Calculate dynamic column width based on the longest test name
     max_passed_length = max((len(test) for test in passed_tests), default=0)
     max_failed_length = max((len(test) for test in failed_tests), default=0)
