@@ -26,7 +26,7 @@ constexpr auto TYPE_FLAGS_FLOAT = 1 << 1;
 constexpr auto TYPE_FLAGS_BOOL = 1 << 2;
 constexpr auto TYPE_FLAGS_STRING = 1 << 3;
 constexpr auto TYPE_FLAGS_STRUCT = 1 << 4;
-constexpr auto TYPE_FLAGS_TAGGED_UNION = 1 << 5;
+constexpr auto TYPE_FLAGS_CHOICE = 1 << 5;
 constexpr auto TYPE_FLAGS_ENUM = 1 << 6;
 constexpr auto TYPE_FLAGS_TUPLE = 1 << 7;
 
@@ -57,7 +57,7 @@ void Emitter::forward_decl_type(Type *type) {
       forward_decl_type(global_get_type(info->return_type));
     } break;
     case TYPE_TUPLE:
-    case TYPE_TAGGED_UNION:
+    case TYPE_CHOICE:
     case TYPE_STRUCT: {
       auto info = type->get_info()->as<StructTypeInfo>();
       std::string kw = "typedef struct ";
@@ -1336,8 +1336,8 @@ std::string get_type_flags(Type *type) {
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;
-    case TYPE_TAGGED_UNION:
-      kind_flags = TYPE_FLAGS_TAGGED_UNION;
+    case TYPE_CHOICE:
+      kind_flags = TYPE_FLAGS_CHOICE;
       break;
     case TYPE_INTERFACE:
       kind_flags = TYPE_FLAGS_INTERFACE;
@@ -1656,7 +1656,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     case TYPE_ENUM:
     case TYPE_STRUCT:
     case TYPE_INTERFACE:
-    case TYPE_TAGGED_UNION: {
+    case TYPE_CHOICE: {
       output = to_cpp_string(type->get_ext(), type->get_info()->scope->full_name());
       break;
     }
@@ -1730,8 +1730,9 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
   emit_default_init = false;
 
   for (const auto &variant : node->variants) {
+    auto variant_name = variant.name.get_str();
     if (variant.kind == ASTChoiceVariant::STRUCT) {
-      auto subtype_name = name + "_" + variant.name.get_str();
+      auto subtype_name = name + "$" + variant_name;
       code << "typedef struct " << subtype_name << " {\n";
       for (const auto &field : variant.struct_declarations) {
         field->accept(this);
@@ -1739,13 +1740,13 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
       }
       code << "} " << subtype_name << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
-      auto subtype_name = name + "_" + variant.name.get_str();
+      auto subtype_name = name + "$" + variant_name;
       code << "typedef ";
       variant.tuple->accept(this);
       code << " " << subtype_name << ";\n";
     }
   }
-
+  
   emit_default_init = old_init;
   code << "typedef struct " << name << " {\n";
   code << "  int index;\n";
@@ -1753,12 +1754,13 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
 
   int n = 0;
   for (const auto &variant : node->variants) {
+    auto variant_name = variant.name.get_str();
     if (variant.kind == ASTChoiceVariant::STRUCT) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
+      auto subtype_name = name + "$" + variant_name;
+      code << "    " << subtype_name << " " << variant_name  << std::to_string(n) << ";\n";
     } else if (variant.kind == ASTChoiceVariant::TUPLE) {
-      auto subtype_name = name + "_" + variant.name.get_str();
-      code << "    " << subtype_name << " $index_" << std::to_string(n) << ";\n";
+      auto subtype_name = name + "$" + variant_name;
+      code << "    " << subtype_name << " " << variant_name << std::to_string(n) << ";\n";
     }
     n++;
   }

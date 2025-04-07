@@ -203,7 +203,7 @@ struct Scope {
 
   int create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
-    auto sym = Symbol::create_type(id, name, TYPE_TAGGED_UNION, (ASTNode *)declaration);
+    auto sym = Symbol::create_type(id, name, TYPE_CHOICE, (ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return id;

@@ -149,7 +149,7 @@ int global_find_type_id(const int base, const TypeExtensions &type_extensions) {
     case TYPE_TUPLE: {
       info = new (type_info_alloc<TupleTypeInfo>()) TupleTypeInfo(*base_t->get_info()->as<TupleTypeInfo>());
     } break;
-    case TYPE_TAGGED_UNION: {
+    case TYPE_CHOICE: {
       info = new (type_info_alloc<ChoiceTypeInfo>())
           ChoiceTypeInfo(*base_t->get_info()->as<ChoiceTypeInfo>());
     } break;
@@ -367,7 +367,7 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 
   // tagged union stuffz.
   {
-    if (to->is_kind(TYPE_TAGGED_UNION)) {
+    if (to->is_kind(TYPE_CHOICE)) {
       auto info = to->get_info()->as<ChoiceTypeInfo>();
       for (const auto &variant : info->variants) {
         if (from->id == variant.type) {
@@ -431,7 +431,7 @@ std::string Type::to_string() const {
     case TYPE_TUPLE:
     case TYPE_SCALAR:
     case TYPE_ENUM:
-    case TYPE_TAGGED_UNION:
+    case TYPE_CHOICE:
     case TYPE_INTERFACE:
       return get_unmangled_name(this);
       break;
@@ -471,7 +471,7 @@ int global_create_struct_type(const InternedString &name, Scope *scope, std::vec
 }
 
 int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args) {
-  type_table.push_back(new Type(type_table.size(), TYPE_TAGGED_UNION));
+  type_table.push_back(new Type(type_table.size(), TYPE_CHOICE));
   Type *type = type_table.back();
   std::string base = name.get_str();
   if (!generic_args.empty()) {

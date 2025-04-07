@@ -31,7 +31,7 @@ void DependencyEmitter::define_type(int type_id) {
         declare_type(param_ty);
       }
     } break;
-    case TYPE_TAGGED_UNION:
+    case TYPE_CHOICE:
     case TYPE_ENUM:
     case TYPE_STRUCT: {
       if (auto declaring_node = type->declaring_node.get()) {

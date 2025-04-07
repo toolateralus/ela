@@ -70,7 +70,7 @@ void assert_types_can_cast_or_equal(ASTExpr *expr, const int to, const SourceRan
   }
 
   if (conv_rule == CONVERT_IMPLICIT) {
-    if (to_t->is_kind(TYPE_TAGGED_UNION)) {
+    if (to_t->is_kind(TYPE_CHOICE)) {
       expr->conversion = std::optional(ImplicitConversion{
           .to = to, .from = expr->resolved_type, .kind = ImplicitConversion::VARIANT_TO_TAGGED_UNION});
     } else if (to_t->get_base() == "any") {
@@ -152,14 +152,18 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   ctx.set_scope(old_scope);
 }
 
-void Typer::visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
+void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                            std::vector<int> generic_args) {
-  auto type = global_get_type(node->resolved_type);
 
   auto old_scope = ctx.scope;
   Defer _defer([&] { ctx.scope = old_scope; });
   ctx.set_scope(node->scope);
+  
 
+  /* get the type, if it's a concrete declaration. */
+  auto type = global_get_type(node->resolved_type);
+  
+  /* otherwise, we alias our generic parameters by name, then create the instantation. */
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -171,14 +175,12 @@ void Typer::visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool gene
   }
 
   type->declaring_node = node;
+  auto info = type->get_info()->as<ChoiceTypeInfo>();
 
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
-
-  auto info = type->get_info()->as<ChoiceTypeInfo>();
   info->scope = node->scope;
-
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL: {
@@ -192,18 +194,17 @@ void Typer::visit_tagged_union_declaration(ASTChoiceDeclaration *node, bool gene
         info->scope->create_type_alias(variant.name, type, TYPE_TUPLE, variant.tuple);
       } break;
       case ASTChoiceVariant::STRUCT: {
-        auto scope = create_child(ctx.scope);
-        ctx.set_scope(scope);
+        ctx.set_scope();
         for (const auto &field : variant.struct_declarations) {
           field->accept(this);
         }
-        ctx.exit_scope();
-        auto type = info->scope->create_struct_type(variant.name, scope, nullptr);
+        auto type = info->scope->create_struct_type(variant.name, ctx.exit_scope(), nullptr);
         info->variants.push_back({variant.name, type});
       } break;
     }
     info->scope->local_lookup(variant.name)->type.choice = node;
   }
+
   ctx.exit_scope();
 }
 
@@ -1026,7 +1027,7 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<int
           visit_interface_declaration((ASTInterfaceDeclaration *)instantiation, true, args);
           break;
         case AST_NODE_CHOICE_DECLARATION: {
-          visit_tagged_union_declaration((ASTChoiceDeclaration *)instantiation, true, args);
+          visit_choice_declaration((ASTChoiceDeclaration *)instantiation, true, args);
         } break;
         case AST_NODE_IMPL: {
           visit_impl_declaration((ASTImpl *)instantiation, true, args);
@@ -1092,10 +1093,10 @@ void Typer::visit(ASTProgram *node) {
 
 void Typer::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::INVALID_TYPE_ID, TypeKind(0), node);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_CHOICE, node);
     return;
   }
-  visit_tagged_union_declaration(node, false);
+  visit_choice_declaration(node, false);
 }
 
 void Typer::visit(ASTLambda *node) {
