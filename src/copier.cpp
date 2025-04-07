@@ -554,7 +554,7 @@ ASTDyn_Of *ASTCopier::copy_dyn_of(ASTDyn_Of *node) {
 ASTPatternMatch *ASTCopier::copy_pattern_match(ASTPatternMatch *node) {
   auto new_node = copy(node);
   new_node->object = (ASTExpr *)copy_node(node->object);
-  new_node->target_type = (ASTType *)copy_node(node->target_type);
+  new_node->target_type_path = (ASTPath *)copy_node(node->target_type_path);
   return new_node;
 }
 ASTPath *ASTCopier::copy_path(ASTPath *node) {

@@ -78,6 +78,11 @@ void Emitter::visit(ASTWhile *node) {
   emit_line_directive(node);
   code << indent() << "while (";
   if (node->condition.is_not_null()) {
+    // ! TODO: implement me!
+    // if (node->condition.get()->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    //   emit_pattern_match_for_while(node, (ASTPatternMatch*)node->condition.get());
+    //   return;
+    // }
     node->condition.get()->accept(this);
   } else {
     code << "true";
@@ -90,6 +95,11 @@ void Emitter::visit(ASTWhile *node) {
 }
 
 void Emitter::visit(ASTIf *node) {
+  if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    emit_pattern_match_for_if(node, (ASTPatternMatch *)node->condition);
+    return;
+  }
+
   emit_line_directive(node);
   code << indent() << "if (";
   node->condition->accept(this);
@@ -2159,8 +2169,6 @@ void Emitter::emit_dyn_dispatch_object(int interface_type, int dyn_type) {
   newline_indented();
 }
 
-void Emitter::visit(ASTPatternMatch *node) {}
-
 void Emitter::visit(ASTMethodCall *node) {
   std::vector<int> generic_args = node->dot->member.get_resolved_generics();
 
@@ -2257,3 +2265,68 @@ void Emitter::visit(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
   code << emit_symbol(symbol.get());
 }
+
+/*
+  This probably should be limited to exclusively be done on 'if' statements, or anything that's followed by a block
+  and has statement semantics. it needs to be scoped, and also that scope only should be reachable upon success.
+*/
+void Emitter::visit(ASTPatternMatch *node) {
+  throw_error("pattern matches cannot exist outside of 'if' statements currently. they will be expanded to 'while', "
+              "'switch', and possibly other nodes in the future.",
+              node->source_range);
+}
+
+void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern) {
+
+  ctx.set_scope(pattern->scope);
+  Defer _([&]{
+    ctx.exit_scope();
+  });
+
+  static int id = 0;
+  const auto matches_label = std::format("$pattern_matches{}", id++);
+
+  auto path = pattern->target_type_path;
+  const auto type = global_get_type(pattern->target_type_path->resolved_type);
+  const auto info = type->get_info()->as<ChoiceTypeInfo>();
+  const auto segment = path->segments.back();
+
+  auto variant_type = info->get_variant_type(segment.identifier);
+  const auto variant_index = info->get_variant_index(segment.identifier);
+
+  const auto object_label = std::format("$pattern_object{}", id++);
+  code << to_cpp_string(global_get_type(pattern->object->resolved_type)) << " " << object_label << " = ";
+  pattern->object->accept(this);
+  code << ";\n";
+
+  /* this is the actual condition */
+  code << "bool " << matches_label << " = (" << object_label << ".index == " << variant_index << ");\n";
+
+  code << "if (" << matches_label << ") {\n";
+  emit_pattern_match_destructure(object_label, segment.identifier.get_str(), pattern, variant_type);
+
+  // TODO: we need to do more than just this.
+  the_if->block->scope->parent = ctx.scope;
+  the_if->block->accept(this);
+
+  code << "}\n";
+}
+
+void Emitter::emit_pattern_match_destructure(const std::string &object_label, const std::string &variant_name, ASTPatternMatch *pattern, Type *variant_type) {
+  /* I'm just gonna use auto in here cause im lazy. */
+  if (variant_type->is_kind(TYPE_STRUCT)) {
+    auto info = variant_type->get_info()->as<StructTypeInfo>();
+    for (StructPattern::Part &part: pattern->struct_pattern.parts) {
+      code << "auto " << part.var_name.get_str() << " = " << object_label << "." << variant_name << "." << part.field_name.get_str() << ";\n";
+    }
+  } else if (variant_type->is_kind(TYPE_TUPLE)) {
+    auto info = variant_type->get_info()->as<TupleTypeInfo>();
+    auto index = 0;
+    for (TuplePattern::Part &part: pattern->tuple_pattern.parts) {
+      code << "auto " << part.var_name.get_str() << " = " << object_label << "." << variant_name << ".$" << std::to_string(index++) << ";\n";
+    }
+  } else if (variant_type->id == void_type()) {
+    return;
+  }
+}
+

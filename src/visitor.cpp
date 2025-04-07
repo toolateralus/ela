@@ -58,9 +58,8 @@ void ASTDefer::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTStatementList::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTInterfaceDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTSize_Of::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTPatternMatch::accept(VisitorBase *visitor) {}
+void ASTPatternMatch::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTPath::accept(VisitorBase *visitor) { visitor->visit(this); }
-
 // clang-format on
 // }
 /*

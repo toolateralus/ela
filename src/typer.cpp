@@ -1467,6 +1467,20 @@ void Typer::visit(ASTFor *node) {
 }
 
 void Typer::visit(ASTIf *node) {
+  bool exit_scope = false;
+  Defer defer([&] {
+    if (exit_scope) {
+      ctx.exit_scope();
+    }
+  });
+
+  if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    auto pattern = (ASTPatternMatch *)node->condition;
+    exit_scope = true;
+    ctx.set_scope(pattern->scope);
+    node->block->scope->parent = pattern->scope;
+  }
+
   node->condition->accept(this);
   auto cond_ty = node->condition->resolved_type;
   auto conversion_rule = type_conversion_rule(global_get_type(cond_ty), global_get_type(bool_type()));
@@ -2601,18 +2615,34 @@ void Typer::visit(ASTDyn_Of *node) {
 }
 
 void Typer::visit(ASTPatternMatch *node) {
-  node->object->accept(this);
-  node->target_type->accept(this);
+  ctx.scope = node->scope;
+  Defer _([&] { ctx.exit_scope(); });
 
   // this just serves as a condition.
   // we should probably restrict this to being in control flow.
   node->resolved_type = bool_type();
-  auto target_type = global_get_type(node->target_type->resolved_type);
+
+  node->object->accept(this);
+  node->target_type_path->accept(this);
+
+  auto target_type = global_get_type(node->target_type_path->resolved_type);
+  auto info = target_type->get_info()->as<ChoiceTypeInfo>();
+
+  const auto segment = node->target_type_path->segments.back();
+  auto variant_type = info->get_variant_type(segment.identifier);
+
   switch (node->pattern_tag) {
     case ASTPatternMatch::NONE:
       break;
     case ASTPatternMatch::STRUCT: {
-      auto info = target_type->get_info()->as<StructTypeInfo>();
+      if (!variant_type->is_kind(TYPE_STRUCT)) {
+        throw_error("cannot use { $field: $var, ... } destructure on a non-struct-style choice variant.\nfor tuple "
+                    "style <Variant(), Variant(f32, s32)>,\nuse the tuple destructure syntax. <Choice::Tuple(x, y)>. "
+                    "for markers, such as <Variant>, dont use any destructure.",
+                    node->source_range);
+      }
+
+      auto info = variant_type->get_info()->as<StructTypeInfo>();
       for (const auto &part : node->struct_pattern.parts) {
         auto symbol = info->scope->local_lookup(part.field_name);
         if (!symbol) {
@@ -2620,17 +2650,28 @@ void Typer::visit(ASTPatternMatch *node) {
                                   part.field_name, target_type->to_string()),
                       node->source_range);
         }
-        ctx.scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
+        node->scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
+        auto sym = node->scope->local_lookup(part.var_name);
+        sym->flags |= SYMBOL_IS_LOCAL;
       }
     } break;
     case ASTPatternMatch::TUPLE: {
-      auto info = target_type->get_info()->as<TupleTypeInfo>();
+      if (!variant_type->is_kind(TYPE_TUPLE)) {
+        throw_error("cannot use ($var, $var) destructure on a non-tuple-style choice variant.\nfor struct "
+                    "style <Variant {x: f32, y: f32} >,\nuse the struct destructure syntax. <Choice::Variant { x: x, "
+                    "y: mut y)>. "
+                    "for markers, such as <Variant>, dont use any destructure.",
+                    node->source_range);
+      }
+      auto info = variant_type->get_info()->as<TupleTypeInfo>();
       if (node->tuple_pattern.parts.size() > info->types.size()) {
         throw_error("too many variables provided in choice type tuple destructure", node->source_range);
       }
       auto index = 0;
       for (const auto &part : node->tuple_pattern.parts) {
-        ctx.scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
+        node->scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
+        auto sym = node->scope->local_lookup(part.var_name);
+        sym->flags |= SYMBOL_IS_LOCAL;
         index++;
       }
     } break;

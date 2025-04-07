@@ -626,10 +626,13 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
     /* Pattern matching / destructuring Choice types. */
     if (op.type == TType::Is) {
       NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
+      pattern_match->scope = create_child(ctx.scope);
       eat();
-      auto target_type = parse_path();
+      pattern_match->target_type_path = parse_path();
+      pattern_match->object = left;
 
-      if (peek().type == TType::LCurly) {
+      if (peek().type == TType::Dot && lookahead_buf()[1].type == TType::LCurly) {
+        eat();
         eat();
         pattern_match->pattern_tag = ASTPatternMatch::STRUCT;
         while (peek().type != TType::RCurly) {
@@ -649,6 +652,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
           }
         }
         expect(TType::RCurly);
+        
       } else if (peek().type == TType::LParen) {
         eat();
         pattern_match->pattern_tag = ASTPatternMatch::TUPLE;

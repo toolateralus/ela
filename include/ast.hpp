@@ -915,12 +915,14 @@ struct StructPattern {
   if x is Choice::Variant{ v: mut $v, y: mut $y } { ... }
 */
 struct ASTPatternMatch : ASTExpr {
+  /* This needs a scope to store possibly destructured variables. */
+  Scope *scope;
   ~ASTPatternMatch() {}
   ASTPatternMatch() {}
   ASTPatternMatch(const ASTPatternMatch &other) {
     source_range = other.source_range;
     object = other.object;
-    target_type = other.target_type;
+    target_type_path = other.target_type_path;
     pattern_tag = other.pattern_tag;
     switch (pattern_tag) {
       case NONE:
@@ -944,7 +946,7 @@ struct ASTPatternMatch : ASTExpr {
       if x is Choice::Variant {... }
               ^^^^^^^^^^^^^^^<- the target type.
   */
-  ASTType *target_type;
+  ASTPath *target_type_path;
 
   enum {
     /*
