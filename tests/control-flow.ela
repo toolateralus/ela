@@ -182,7 +182,7 @@ import fmt::*;
 
   i = 0;
   for x, y in list {
-    println((x, y));
+    // println((x, y));
     assert("failed on set for struct", x == i * 2 && y == i * 2);
     i++;
   }
