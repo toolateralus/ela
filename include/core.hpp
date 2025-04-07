@@ -97,7 +97,7 @@ static std::string get_source_filename(const SourceRange &range) {
 }
 
 struct Defer {
-  std::function<void()> func;
+  const std::function<void()> func;
   Defer(const std::function<void()> &&func) : func(func) {}
   ~Defer() { func(); }
 };

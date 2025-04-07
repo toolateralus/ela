@@ -1271,6 +1271,12 @@ void Typer::visit(ASTVariable *node) {
 }
 
 void Typer::visit(ASTBlock *node) {
+
+  auto old_scope = ctx.scope;
+
+  Defer _([&]{
+    ctx.scope = old_scope;
+  });
   ctx.set_scope(node->scope);
 
   int return_type = Type::INVALID_TYPE_ID;
@@ -1289,7 +1295,6 @@ void Typer::visit(ASTBlock *node) {
 
   node->flags = node->control_flow.flags;
   node->resolved_type = node->control_flow.type;
-  ctx.exit_scope();
 }
 
 // TODO: Remove ParamDecl, and ArgumentDecl probably. Such unneccesary nodes, a ton of boilerplate visitor logic
@@ -1467,17 +1472,9 @@ void Typer::visit(ASTFor *node) {
 }
 
 void Typer::visit(ASTIf *node) {
-  bool exit_scope = false;
-  Defer defer([&] {
-    if (exit_scope) {
-      ctx.exit_scope();
-    }
-  });
 
   if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
     auto pattern = (ASTPatternMatch *)node->condition;
-    exit_scope = true;
-    ctx.set_scope(pattern->scope);
     node->block->scope->parent = pattern->scope;
   }
 
@@ -1490,6 +1487,7 @@ void Typer::visit(ASTIf *node) {
                             global_get_type(cond_ty)->to_string()),
                 node->source_range);
   }
+
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
 
@@ -1501,6 +1499,7 @@ void Typer::visit(ASTIf *node) {
   } else {
     control_flow.flags |= BLOCK_FLAGS_FALL_THROUGH;
   }
+
   node->control_flow = control_flow;
 }
 
@@ -1516,7 +1515,16 @@ void Typer::visit(ASTElse *node) {
 
 void Typer::visit(ASTWhile *node) {
   if (node->condition.is_not_null()) {
-    node->condition.get()->accept(this);
+    auto condition = node->condition.get();
+    if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+      auto pattern = (ASTPatternMatch *)condition;
+      auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
+      node->block->scope->parent = pattern->scope;
+      condition->accept(this);
+      ctx.scope = old_scope;      // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST HACKING IT IN!
+    } else {
+      condition->accept(this);
+    }
   }
   node->block->accept(this);
   auto control_flow = node->block->control_flow;
@@ -1981,68 +1989,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   return;
 }
 
-void Typer::visit(ASTPath *node) {
-  Scope *scope = ctx.scope;
-  auto index = 0;
-  Type *previous_type = nullptr;
-  for (auto &segment in node->segments) {
-    auto &ident = segment.identifier;
-    auto symbol = scope->lookup(ident);
-    scope = nullptr;
-    if (!symbol) {
-      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
-    }
 
-    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
-      /* we need to return the parent type here? but we need to maintain the variant. hmm. */
-      node->resolved_type = previous_type->id;
-      auto symbol = previous_type->get_info()->scope->lookup(segment.identifier);
-      if (!symbol) {
-        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
-                                previous_type->to_string()),
-                    node->source_range);
-      }
-      return;
-    }
-
-    if (!segment.generic_arguments.empty()) {
-      std::vector<int> generic_args;
-      for (auto &arg : segment.generic_arguments) {
-        arg->accept(this);
-        generic_args.push_back(arg->resolved_type);
-      }
-      ASTDeclaration *instantiation;
-      if (symbol->is_type()) {
-        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
-        instantiation = visit_generic(decl, generic_args, node->source_range);
-        auto type = global_get_type(instantiation->resolved_type);
-        scope = type->get_info()->scope;
-        previous_type = type;
-      } else if (symbol->is_function()) {
-        instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
-      }
-      segment.resolved_type = instantiation->resolved_type;
-
-    } else {
-      if (symbol->is_module()) {
-        scope = symbol->module.declaration->scope;
-      } else if (symbol->is_type()) {
-        if (symbol->type_id == -2) {
-          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
-        }
-        previous_type = global_get_type(symbol->type_id);
-        scope = previous_type->get_info()->scope;
-      }
-      segment.resolved_type = symbol->type_id;
-    }
-    if (!scope && index < node->segments.size() - 1) {
-      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
-                  node->source_range);
-    }
-    index++;
-  }
-  node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
-}
 
 void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
@@ -2249,7 +2196,9 @@ void Typer::visit(ASTInitializerList *node) {
 
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_NAMED: {
-      Defer _defer([] {});
+      auto old_target = target_type;
+      auto old_scope = scope;
+
       if (target_type->is_kind(TYPE_CHOICE)) {
         if (node->target_type.get() && node->target_type.get()->normal.path->get_node_type() == AST_NODE_PATH) {
           const auto path = (ASTPath *)node->target_type.get()->normal.path;
@@ -2257,10 +2206,8 @@ void Typer::visit(ASTInitializerList *node) {
           const auto info = target_type->get_info()->as<ChoiceTypeInfo>();
           const auto variant_type = info->get_variant_type(last_segment.identifier);
 
-          auto old_target = target_type;
           target_type = variant_type;
           scope = variant_type->get_info()->scope;
-          _defer.func = [&] { target_type = old_target; };
         }
       } else if (!target_type->is_kind(TYPE_STRUCT)) {
         throw_error(std::format("named initializer lists can only be used for structs & unions, got type {}\nNote, for "
@@ -2295,6 +2242,10 @@ void Typer::visit(ASTInitializerList *node) {
         assert_types_can_cast_or_equal(value, symbol->type_id, value->source_range,
                                        "Unable to cast type to target field for named initializer list");
       }
+
+      scope = old_scope;
+      target_type = old_target;
+
     } break;
     case ASTInitializerList::INIT_LIST_COLLECTION: {
       auto &values = node->values;
@@ -2614,69 +2565,7 @@ void Typer::visit(ASTDyn_Of *node) {
   node->resolved_type = ty;
 }
 
-void Typer::visit(ASTPatternMatch *node) {
-  ctx.scope = node->scope;
-  Defer _([&] { ctx.exit_scope(); });
 
-  // this just serves as a condition.
-  // we should probably restrict this to being in control flow.
-  node->resolved_type = bool_type();
-
-  node->object->accept(this);
-  node->target_type_path->accept(this);
-
-  auto target_type = global_get_type(node->target_type_path->resolved_type);
-  auto info = target_type->get_info()->as<ChoiceTypeInfo>();
-
-  const auto segment = node->target_type_path->segments.back();
-  auto variant_type = info->get_variant_type(segment.identifier);
-
-  switch (node->pattern_tag) {
-    case ASTPatternMatch::NONE:
-      break;
-    case ASTPatternMatch::STRUCT: {
-      if (!variant_type->is_kind(TYPE_STRUCT)) {
-        throw_error("cannot use { $field: $var, ... } destructure on a non-struct-style choice variant.\nfor tuple "
-                    "style <Variant(), Variant(f32, s32)>,\nuse the tuple destructure syntax. <Choice::Tuple(x, y)>. "
-                    "for markers, such as <Variant>, dont use any destructure.",
-                    node->source_range);
-      }
-
-      auto info = variant_type->get_info()->as<StructTypeInfo>();
-      for (const auto &part : node->struct_pattern.parts) {
-        auto symbol = info->scope->local_lookup(part.field_name);
-        if (!symbol) {
-          throw_error(std::format("cannot destructure field {} of choice variant {} because it didn't have that field.",
-                                  part.field_name, target_type->to_string()),
-                      node->source_range);
-        }
-        node->scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
-        auto sym = node->scope->local_lookup(part.var_name);
-        sym->flags |= SYMBOL_IS_LOCAL;
-      }
-    } break;
-    case ASTPatternMatch::TUPLE: {
-      if (!variant_type->is_kind(TYPE_TUPLE)) {
-        throw_error("cannot use ($var, $var) destructure on a non-tuple-style choice variant.\nfor struct "
-                    "style <Variant {x: f32, y: f32} >,\nuse the struct destructure syntax. <Choice::Variant { x: x, "
-                    "y: mut y)>. "
-                    "for markers, such as <Variant>, dont use any destructure.",
-                    node->source_range);
-      }
-      auto info = variant_type->get_info()->as<TupleTypeInfo>();
-      if (node->tuple_pattern.parts.size() > info->types.size()) {
-        throw_error("too many variables provided in choice type tuple destructure", node->source_range);
-      }
-      auto index = 0;
-      for (const auto &part : node->tuple_pattern.parts) {
-        node->scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
-        auto sym = node->scope->local_lookup(part.var_name);
-        sym->flags |= SYMBOL_IS_LOCAL;
-        index++;
-      }
-    } break;
-  }
-}
 
 int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {
@@ -2952,4 +2841,132 @@ void Typer::visit(ASTMethodCall *node) {
   }
 
   node->resolved_type = info->return_type;
+}
+
+void Typer::visit(ASTPatternMatch *node) {
+  // this just serves as a condition.
+  // we should probably restrict this to being in control flow.
+  node->resolved_type = bool_type();
+
+  node->object->accept(this);
+  node->target_type_path->accept(this);
+
+  ctx.set_scope(node->scope);
+  auto old_scope = ctx.scope;
+  Defer _([&] { ctx.scope = old_scope; });
+
+  auto target_type = global_get_type(node->target_type_path->resolved_type);
+  auto info = target_type->get_info()->as<ChoiceTypeInfo>();
+
+  const auto segment = node->target_type_path->segments.back();
+  auto variant_type = info->get_variant_type(segment.identifier);
+
+  switch (node->pattern_tag) {
+    case ASTPatternMatch::NONE:
+      break;
+    case ASTPatternMatch::STRUCT: {
+      if (!variant_type->is_kind(TYPE_STRUCT)) {
+        throw_error("cannot use { $field: $var, ... } destructure on a non-struct-style choice variant.\nfor tuple "
+                    "style <Variant(), Variant(f32, s32)>,\nuse the tuple destructure syntax. <Choice::Tuple(x, y)>. "
+                    "for markers, such as <Variant>, dont use any destructure.",
+                    node->source_range);
+      }
+
+      auto info = variant_type->get_info()->as<StructTypeInfo>();
+      for (const auto &part : node->struct_pattern.parts) {
+        auto symbol = info->scope->local_lookup(part.field_name);
+        if (!symbol) {
+          throw_error(std::format("cannot destructure field {} of choice variant {} because it didn't have that field.",
+                                  part.field_name, target_type->to_string()),
+                      node->source_range);
+        }
+        node->scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
+        auto sym = node->scope->local_lookup(part.var_name);
+        sym->flags |= SYMBOL_IS_LOCAL;
+      }
+    } break;
+    case ASTPatternMatch::TUPLE: {
+      if (!variant_type->is_kind(TYPE_TUPLE)) {
+        throw_error("cannot use ($var, $var) destructure on a non-tuple-style choice variant.\nfor struct "
+                    "style <Variant {x: f32, y: f32} >,\nuse the struct destructure syntax. <Choice::Variant { x: x, "
+                    "y: mut y)>. "
+                    "for markers, such as <Variant>, dont use any destructure.",
+                    node->source_range);
+      }
+      auto info = variant_type->get_info()->as<TupleTypeInfo>();
+      if (node->tuple_pattern.parts.size() > info->types.size()) {
+        throw_error("too many variables provided in choice type tuple destructure", node->source_range);
+      }
+      auto index = 0;
+      for (const auto &part : node->tuple_pattern.parts) {
+        node->scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
+        auto sym = node->scope->local_lookup(part.var_name);
+        sym->flags |= SYMBOL_IS_LOCAL;
+        index++;
+      }
+    } break;
+  }
+}
+
+void Typer::visit(ASTPath *node) {
+  Scope *scope = ctx.scope;
+  auto index = 0;
+  Type *previous_type = nullptr;
+  for (auto &segment in node->segments) {
+    auto &ident = segment.identifier;
+    auto symbol = scope->lookup(ident);
+    scope = nullptr;
+    if (!symbol) {
+      throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
+    }
+
+    if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
+      /* we need to return the parent type here? but we need to maintain the variant. hmm. */
+      node->resolved_type = previous_type->id;
+      auto symbol = previous_type->get_info()->scope->lookup(segment.identifier);
+      if (!symbol) {
+        throw_error(std::format("unable to find varaint '{}' in choice type '{}'", segment.identifier,
+                                previous_type->to_string()),
+                    node->source_range);
+      }
+      return;
+    }
+
+    if (!segment.generic_arguments.empty()) {
+      std::vector<int> generic_args;
+      for (auto &arg : segment.generic_arguments) {
+        arg->accept(this);
+        generic_args.push_back(arg->resolved_type);
+      }
+      ASTDeclaration *instantiation;
+      if (symbol->is_type()) {
+        auto decl = (ASTDeclaration *)symbol->type.declaration.get();
+        instantiation = visit_generic(decl, generic_args, node->source_range);
+        auto type = global_get_type(instantiation->resolved_type);
+        scope = type->get_info()->scope;
+        previous_type = type;
+      } else if (symbol->is_function()) {
+        instantiation = visit_generic(symbol->function.declaration, generic_args, node->source_range);
+      }
+      segment.resolved_type = instantiation->resolved_type;
+
+    } else {
+      if (symbol->is_module()) {
+        scope = symbol->module.declaration->scope;
+      } else if (symbol->is_type()) {
+        if (symbol->type_id == -2) {
+          throw_error("use of generic type, but no type arguments were provided.", node->source_range);
+        }
+        previous_type = global_get_type(symbol->type_id);
+        scope = previous_type->get_info()->scope;
+      }
+      segment.resolved_type = symbol->type_id;
+    }
+    if (!scope && index < node->segments.size() - 1) {
+      throw_error(std::format("symbol {}'s scope could not be resolved in path", segment.identifier),
+                  node->source_range);
+    }
+    index++;
+  }
+  node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
 }

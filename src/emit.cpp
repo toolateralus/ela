@@ -76,15 +76,16 @@ void Emitter::forward_decl_type(Type *type) {
 void Emitter::visit(ASTWhile *node) {
   defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_LOOP});
   emit_line_directive(node);
-  code << indent() << "while (";
   if (node->condition.is_not_null()) {
-    // ! TODO: implement me!
-    // if (node->condition.get()->get_node_type() == AST_NODE_PATTERN_MATCH) {
-    //   emit_pattern_match_for_while(node, (ASTPatternMatch*)node->condition.get());
-    //   return;
-    // }
-    node->condition.get()->accept(this);
+    auto condition = node->condition.get();
+    if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+      emit_pattern_match_for_while(node, (ASTPatternMatch *)condition);
+      return;
+    }
+    code << indent() << "while (";
+    condition->accept(this);
   } else {
+    code << indent() << "while (";
     code << "true";
   }
   code << ") ";
@@ -253,7 +254,30 @@ void Emitter::visit(ASTArguments *node) {
     if (i != 0) {
       code << ", ";
     }
-    node->arguments[i]->accept(this);
+
+    auto argument = node->arguments[i];
+
+    auto type = global_get_type(argument->resolved_type);
+
+    /* 
+      TODO: we should get rid of this too.
+    */
+    if (type->is_kind(TYPE_CHOICE) && argument->get_node_type() == AST_NODE_PATH) {
+      auto value = (ASTPath *)argument;
+      if (value->length() > 1) {
+        const auto last_segment = value->segments.back();
+        const auto info = type->get_info()->as<ChoiceTypeInfo>();
+        const auto type = info->get_variant_type(last_segment.identifier);
+        if (type->id == void_type()) {
+          const auto index = info->get_variant_index(last_segment.identifier);
+          const auto type_string = to_cpp_string(type);
+          code << " (" << type_string << ") { .index = " << index << "}";
+        }
+      }
+    } else {
+      node->arguments[i]->accept(this);
+    }
+
   }
   code << ")";
   return;
@@ -536,6 +560,7 @@ void Emitter::visit(ASTVariable *node) {
   }
 
   auto type = global_get_type(node->type->resolved_type);
+
   auto symbol = ctx.scope->local_lookup(node->name);
 
   auto handle_initialization = [&]() {
@@ -598,7 +623,23 @@ void Emitter::visit(ASTVariable *node) {
   space();
   code << name;
   space();
-  handle_initialization();
+
+  // TODO: it's not ideal to have this special case all over the place.
+  if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
+    auto value = (ASTPath *)node->value.get();
+    if (value->length() > 1) {
+      const auto last_segment = value->segments.back();
+      const auto info = type->get_info()->as<ChoiceTypeInfo>();
+      const auto variant_type = info->get_variant_type(last_segment.identifier);
+      if (variant_type->id == void_type()) {
+        const auto index = info->get_variant_index(last_segment.identifier);
+        const auto type_string = to_cpp_string(type);
+        code << " = (" << type_string << ") { .index = " << index << "};\n";
+      }
+    }
+  } else {
+    handle_initialization();
+  }
   return;
 }
 
@@ -2277,14 +2318,9 @@ void Emitter::visit(ASTPatternMatch *node) {
 }
 
 void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern) {
-
   ctx.set_scope(pattern->scope);
-  Defer _([&]{
-    ctx.exit_scope();
-  });
-
-  static int id = 0;
-  const auto matches_label = std::format("$pattern_matches{}", id++);
+  auto old_scope = ctx.scope;
+  Defer _([&] { ctx.scope = old_scope; });
 
   auto path = pattern->target_type_path;
   const auto type = global_get_type(pattern->target_type_path->resolved_type);
@@ -2294,39 +2330,71 @@ void Emitter::emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *pattern)
   auto variant_type = info->get_variant_type(segment.identifier);
   const auto variant_index = info->get_variant_index(segment.identifier);
 
-  const auto object_label = std::format("$pattern_object{}", id++);
-  code << to_cpp_string(global_get_type(pattern->object->resolved_type)) << " " << object_label << " = ";
+  code << "if (";
   pattern->object->accept(this);
-  code << ";\n";
-
-  /* this is the actual condition */
-  code << "bool " << matches_label << " = (" << object_label << ".index == " << variant_index << ");\n";
-
-  code << "if (" << matches_label << ") {\n";
-  emit_pattern_match_destructure(object_label, segment.identifier.get_str(), pattern, variant_type);
-
-  // TODO: we need to do more than just this.
-  the_if->block->scope->parent = ctx.scope;
+  code << ".index == " << variant_index << ") {\n";
+  // within the if block
+  emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+  // the_if->block->scope->parent = ctx.scope;
   the_if->block->accept(this);
+  // exiting the if block.
+  code << "}\n";
 
+  if (the_if->_else.get()) {
+    the_if->_else.get()->accept(this);
+  }
+}
+
+void Emitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *pattern) {
+  ctx.set_scope(pattern->scope);
+  auto old_scope = ctx.scope;
+  Defer _([&] { ctx.scope = old_scope; });
+
+  auto path = pattern->target_type_path;
+  const auto type = global_get_type(pattern->target_type_path->resolved_type);
+  const auto info = type->get_info()->as<ChoiceTypeInfo>();
+  const auto segment = path->segments.back();
+
+  auto variant_type = info->get_variant_type(segment.identifier);
+  const auto variant_index = info->get_variant_index(segment.identifier);
+
+  code << "while (";
+  pattern->object->accept(this);
+  code << ".index == " << variant_index << ") {\n";
+  // ? within the while's block
+
+  emit_pattern_match_destructure(pattern->object, segment.identifier.get_str(), pattern, variant_type);
+  // the_if->block->scope->parent = ctx.scope;
+  the_while->block->accept(this);
+
+  // ? exiting the while's block.
   code << "}\n";
 }
 
-void Emitter::emit_pattern_match_destructure(const std::string &object_label, const std::string &variant_name, ASTPatternMatch *pattern, Type *variant_type) {
+void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
+                                             Type *variant_type) {
+  static auto id = 0;
+  const auto label = std::format("$pat_mat$obj{}", id++);
+
+  code << "auto " << label << " = ";
+  object->accept(this);
+  code << ";\n";
+
   /* I'm just gonna use auto in here cause im lazy. */
   if (variant_type->is_kind(TYPE_STRUCT)) {
     auto info = variant_type->get_info()->as<StructTypeInfo>();
-    for (StructPattern::Part &part: pattern->struct_pattern.parts) {
-      code << "auto " << part.var_name.get_str() << " = " << object_label << "." << variant_name << "." << part.field_name.get_str() << ";\n";
+    for (StructPattern::Part &part : pattern->struct_pattern.parts) {
+      code << "auto " << part.var_name.get_str() << " = " << label << "." << variant_name << "."
+           << part.field_name.get_str() << ";\n";
     }
   } else if (variant_type->is_kind(TYPE_TUPLE)) {
     auto info = variant_type->get_info()->as<TupleTypeInfo>();
     auto index = 0;
-    for (TuplePattern::Part &part: pattern->tuple_pattern.parts) {
-      code << "auto " << part.var_name.get_str() << " = " << object_label << "." << variant_name << ".$" << std::to_string(index++) << ";\n";
+    for (TuplePattern::Part &part : pattern->tuple_pattern.parts) {
+      code << "auto " << part.var_name.get_str() << " = " << label << "." << variant_name << ".$"
+           << std::to_string(index++) << ";\n";
     }
   } else if (variant_type->id == void_type()) {
     return;
   }
 }
-
