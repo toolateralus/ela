@@ -335,7 +335,7 @@ struct Emitter : VisitorBase {
     }
     return;
   };
-
+  void emit_marker_choice_variant_instantiation(Type *type, const ASTPath *value);
   void emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *path);
   void emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *path);
   void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern, Type *variant_type);

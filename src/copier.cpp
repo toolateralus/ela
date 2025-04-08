@@ -426,7 +426,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_INTERFACE_DECLARATION:
       return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
     case AST_NODE_CHOICE_DECLARATION:
-      return copy_tagged_union_declaration(static_cast<ASTChoiceDeclaration *>(node));
+      return copy_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
     case AST_NODE_NOOP:
       return node;
     case AST_NODE_ALIAS:
@@ -487,7 +487,7 @@ ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));
   return new_node;
 }
-ASTChoiceDeclaration *ASTCopier::copy_tagged_union_declaration(ASTChoiceDeclaration *node) {
+ASTChoiceDeclaration *ASTCopier::copy_choice_declaration(ASTChoiceDeclaration *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;

@@ -41,7 +41,7 @@ return_choice :: fn() -> Math {
 choice_as_param :: fn(math: Math) {
   // TODO: do we want to allow  { !(math is Pattern)  } ?
   // TODO: or do we want        { math is not Pattern } ?
-  if math is Math::Vector2 {x: _, y: _1} {
+  if math is Math::Vector2.{x: _, y: _1} {
     // pass.
   } else {
     assert("failed to pattern match parameter choice type", false);
@@ -51,16 +51,16 @@ choice_as_param :: fn(math: Math) {
 #test test_pattern_matching_struct_patterns :: fn() {
   x := get_value();
   /* pattern match, named args. mutability optional */
-  if x is Math::Vector2 { x: mut x, y: mut y } {
+  if x is Math::Vector2.{ x: mut x, y: mut y } {
     fmt::println((x, y));
   } 
 
-  if x is Math::Vector2 { x: x, y: y } {
+  if x is Math::Vector2.{ x: x, y: y } {
     fmt::println((x, y));
   }
 
   /* again, positional. */
-  if x is Math::Vector3 { x: x, y: y, z: z } {
+  if x is Math::Vector3.{ x: x, y: y, z: z } {
     fmt::println((x, y, y));
   }
 }

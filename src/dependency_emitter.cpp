@@ -466,10 +466,10 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
+  
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
-  
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL:

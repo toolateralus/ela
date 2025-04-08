@@ -263,17 +263,8 @@ void Emitter::visit(ASTArguments *node) {
       TODO: we should get rid of this too.
     */
     if (type->is_kind(TYPE_CHOICE) && argument->get_node_type() == AST_NODE_PATH) {
-      auto value = (ASTPath *)argument;
-      if (value->length() > 1) {
-        const auto last_segment = value->segments.back();
-        const auto info = type->get_info()->as<ChoiceTypeInfo>();
-        const auto type = info->get_variant_type(last_segment.identifier);
-        if (type->id == void_type()) {
-          const auto index = info->get_variant_index(last_segment.identifier);
-          const auto type_string = to_cpp_string(type);
-          code << " (" << type_string << ") { .index = " << index << "}";
-        }
-      }
+      auto path = (ASTPath *)argument;
+      emit_marker_choice_variant_instantiation(type, path);
     } else {
       node->arguments[i]->accept(this);
     }
@@ -511,9 +502,12 @@ void Emitter::visit(ASTBinExpr *node) {
   code << node->op.value.get_str();
   if (node->op.type == TType::Assign) {
     auto type = global_get_type(node->resolved_type);
-    auto isptr = type->get_ext().is_pointer();
-    if (isptr)
-      code << "(" << to_cpp_string(type) << ")";
+    if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
+      auto path = (ASTPath*)node->right;
+      emit_marker_choice_variant_instantiation(type, path);
+      code << ")";
+      return;
+    }
   }
   space();
   node->right->accept(this);
@@ -527,6 +521,17 @@ void Emitter::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   code << ";\n";
   return;
+}
+
+void Emitter::emit_marker_choice_variant_instantiation(Type *type, const ASTPath *value) {
+  const auto last_segment = value->segments.back();
+  const auto info = type->get_info()->as<ChoiceTypeInfo>();
+  const auto variant_type = info->get_variant_type(last_segment.identifier);
+  if (variant_type->id == void_type()) {
+    const auto index = info->get_variant_index(last_segment.identifier);
+    const auto type_string = to_cpp_string(type);
+    code << " (" << type_string << ") { .index = " << index << "}";
+  }
 }
 
 void Emitter::visit(ASTVariable *node) {
@@ -627,16 +632,9 @@ void Emitter::visit(ASTVariable *node) {
   // TODO: it's not ideal to have this special case all over the place.
   if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
     auto value = (ASTPath *)node->value.get();
-    if (value->length() > 1) {
-      const auto last_segment = value->segments.back();
-      const auto info = type->get_info()->as<ChoiceTypeInfo>();
-      const auto variant_type = info->get_variant_type(last_segment.identifier);
-      if (variant_type->id == void_type()) {
-        const auto index = info->get_variant_index(last_segment.identifier);
-        const auto type_string = to_cpp_string(type);
-        code << " = (" << type_string << ") { .index = " << index << "};\n";
-      }
-    }
+    code << " = ";
+    emit_marker_choice_variant_instantiation(type, value);
+    code << ";\n";
   } else {
     handle_initialization();
   }
@@ -1072,8 +1070,16 @@ void Emitter::visit(ASTInitializerList *node) {
         const auto &[key, value] = node->key_values[i];
         emit_line_directive(value);
         code << indent() << '.' << key.get_str() << " = ";
-        code << "(" << to_cpp_string(global_get_type(value->resolved_type)) << ")";
-        value->accept(this);
+
+        auto type = global_get_type(value->resolved_type);
+
+        if (type->is_kind(TYPE_CHOICE) && value->get_node_type() == AST_NODE_PATH) {
+          auto path = (ASTPath*)value;
+          emit_marker_choice_variant_instantiation(type, path);
+        } else {
+          code << "(" << to_cpp_string(type) << ")";
+          value->accept(this);
+        }
         if (i != size - 1) {
           code << ",\n";
         }
@@ -1999,8 +2005,14 @@ void Emitter::visit(ASTReturn *node) {
     if (node->expression.is_not_null()) {
       emit_line_directive(node);
       auto type = global_get_type(node->expression.get()->resolved_type);
-      code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = ";
-      node->expression.get()->accept(this);
+
+      if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
+        auto path = (ASTPath*)node->expression.get();
+        emit_marker_choice_variant_instantiation(type, path);
+      } else {
+        code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = ";
+        node->expression.get()->accept(this);
+      }
       code << ";\n";
     }
     emit_deferred_statements(DEFER_BLOCK_TYPE_FUNC);
@@ -2015,13 +2027,25 @@ void Emitter::visit(ASTReturn *node) {
     indented("return");
     if (node->expression.is_not_null()) {
       space();
-      node->expression.get()->accept(this);
+      auto type = global_get_type(node->expression.get()->resolved_type);
+      if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
+        auto path = (ASTPath*)node->expression.get();
+        emit_marker_choice_variant_instantiation(type, path);
+      } else {
+        node->expression.get()->accept(this);
+      }
     }
     code << ";\n";
   } else {
     emit_line_directive(node);
     code << *cf_expr_return_register.get() << " = ";
-    node->expression.get()->accept(this);
+    auto type = global_get_type(node->expression.get()->resolved_type);
+    if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
+      auto path = (ASTPath*)node->expression.get();
+      emit_marker_choice_variant_instantiation(type, path);
+    } else {
+      node->expression.get()->accept(this);
+    }
     code << ";\n";
   }
   return;
