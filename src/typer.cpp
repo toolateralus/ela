@@ -172,6 +172,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     type = global_get_type(global_create_tagged_union_type(node->name.get_str(), node->scope, generic_args));
   }
 
+  node->resolved_type = type->id;
   type->declaring_node = node;
   auto info = type->get_info()->as<ChoiceTypeInfo>();
 
