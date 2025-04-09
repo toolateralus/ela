@@ -13,6 +13,7 @@ main :: fn() {
   }
 
   // if you wanted an initializer list version:
+  // note this is of type InitList<s64>
   my_other_array := s64.[
     0, 1, 2, 3, 4, 5, 6, 7, 8, 9,
   ];
