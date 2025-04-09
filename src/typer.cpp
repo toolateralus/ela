@@ -2874,14 +2874,23 @@ void Typer::visit(ASTPatternMatch *node) {
       }
 
       auto info = variant_type->get_info()->as<StructTypeInfo>();
-      for (const auto &part : node->struct_pattern.parts) {
+      for (auto &part : node->struct_pattern.parts) {
         auto symbol = info->scope->local_lookup(part.field_name);
         if (!symbol) {
           throw_error(std::format("cannot destructure field {} of choice variant {} because it didn't have that field.",
                                   part.field_name, target_type->to_string()),
                       node->source_range);
         }
-        node->scope->insert_variable(part.var_name, symbol->type_id, nullptr, part.mutability);
+
+        auto type_id = symbol->type_id;
+        if (part.semantic == PTR_CONST) {
+          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
+        } else if (part.semantic == PTR_MUT) {
+          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
+        }
+
+        part.resolved_type = type_id;
+        node->scope->insert_variable(part.var_name, type_id, nullptr, part.mutability);
         auto sym = node->scope->local_lookup(part.var_name);
         sym->flags |= SYMBOL_IS_LOCAL;
       }
@@ -2899,8 +2908,16 @@ void Typer::visit(ASTPatternMatch *node) {
         throw_error("too many variables provided in choice type tuple destructure", node->source_range);
       }
       auto index = 0;
-      for (const auto &part : node->tuple_pattern.parts) {
-        node->scope->insert_variable(part.var_name, info->types[index], nullptr, part.mutability);
+      for (auto &part : node->tuple_pattern.parts) {
+
+        auto type_id = info->types[index];
+        if (part.semantic == PTR_CONST) {
+          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_CONST}}});
+        } else if (part.semantic == PTR_MUT) {
+          type_id = global_find_type_id(type_id, {{{TYPE_EXT_POINTER_MUT}}});
+        }
+        part.resolved_type = type_id;
+        node->scope->insert_variable(part.var_name, type_id, nullptr, part.mutability);
         auto sym = node->scope->local_lookup(part.var_name);
         sym->flags |= SYMBOL_IS_LOCAL;
         index++;

@@ -18,12 +18,11 @@
 #include "scope.hpp"
 #include "type.hpp"
 
-
-/* 
+/*
   TODO: we should not have a preprocessor at all,
   and all the conditional compilation stuff should get it's own node
   so that we can do type checking on the constants that #if might use.
-  
+
 
 */
 enum PreprocKind {
@@ -640,10 +639,23 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
           part.field_name = expect(TType::Identifier).value;
           part.mutability = CONST;
           expect(TType::Colon);
+
           if (peek().type == TType::Mut) {
             eat();
             part.mutability = MUT;
           }
+
+          if (peek().type == TType::And) {
+            eat();
+            if (peek().type == TType::Mut) {
+              eat();
+              part.semantic = PTR_MUT;
+            } else {
+              expect(TType::Const);
+              part.semantic = PTR_CONST;
+            }
+          }
+
           part.var_name = expect(TType::Identifier).value;
           pattern_match->struct_pattern.parts.push_back(part);
 
@@ -652,17 +664,30 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
           }
         }
         expect(TType::RCurly);
-        
+
       } else if (peek().type == TType::LParen) {
         eat();
         pattern_match->pattern_tag = ASTPatternMatch::TUPLE;
         while (peek().type != TType::RParen) {
           TuplePattern::Part part;
           part.mutability = CONST;
+
           if (peek().type == TType::Mut) {
             eat();
             part.mutability = MUT;
           }
+
+          if (peek().type == TType::And) {
+            eat();
+            if (peek().type == TType::Mut) {
+              eat();
+              part.semantic = PTR_MUT;
+            } else {
+              expect(TType::Const);
+              part.semantic = PTR_CONST;
+            }
+          }
+
           part.var_name = expect(TType::Identifier).value;
           pattern_match->tuple_pattern.parts.push_back(part);
           if (peek().type != TType::RParen) {
@@ -770,7 +795,7 @@ ASTPath::Segment Parser::parse_path_segment() {
     auto generics = parse_generic_arguments();
     return {identifier, generics};
   } else {
-    return {identifier, std::vector<ASTExpr*>{}};
+    return {identifier, std::vector<ASTExpr *>{}};
   }
 }
 
@@ -807,9 +832,11 @@ ASTExpr *Parser::parse_postfix() {
         dot->member = parse_path_segment();
       } else if (peek().type == TType::LCurly || peek().type == TType::LBrace) {
         // .{} initializer lists.
-        auto path = dynamic_cast<ASTPath*>(left);
+        auto path = dynamic_cast<ASTPath *>(left);
         if (!path) {
-          throw_error("can only use an initializer list on a path, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, etc.", left->source_range);
+          throw_error(
+              "can only use an initializer list on a path, e.g 's32, List!<s32>, std::fmt::formatter!<s32>, etc.",
+              left->source_range);
         }
         if (peek().type == TType::LCurly) {
           eat(); // eat {
