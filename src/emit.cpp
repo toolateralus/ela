@@ -504,9 +504,11 @@ void Emitter::visit(ASTBinExpr *node) {
     auto type = global_get_type(node->resolved_type);
     if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath*)node->right;
-      emit_marker_choice_variant_instantiation(type, path);
-      code << ")";
-      return;
+      if (path->length() > 1) {
+        emit_marker_choice_variant_instantiation(type, path);
+        code << ")";
+        return;
+      }
     }
   }
   space();
@@ -1075,8 +1077,11 @@ void Emitter::visit(ASTInitializerList *node) {
 
         if (type->is_kind(TYPE_CHOICE) && value->get_node_type() == AST_NODE_PATH) {
           auto path = (ASTPath*)value;
-          emit_marker_choice_variant_instantiation(type, path);
+          if (path->length() > 1) {
+            emit_marker_choice_variant_instantiation(type, path);
+          } else goto NORMAL;
         } else {
+          NORMAL:
           code << "(" << to_cpp_string(type) << ")";
           value->accept(this);
         }
@@ -1787,18 +1792,20 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
 
   emit_line_directive(node);
 
-  auto name = emit_symbol(ctx.scope->lookup(node->name));
+  auto old_scope = ctx.scope;
+  Defer _defer([&] { ctx.scope = old_scope; });
+
+  auto type = global_get_type(node->resolved_type);
+  auto info = type->get_info();
+  ctx.scope = info->scope;
+
+  auto name = emit_symbol(ctx.scope->parent->lookup(node->name));
   code << "typedef struct " << name << " " << name << ";\n";
 
   auto old_init = emit_default_init;
   emit_default_init = false;
 
-  auto type = global_get_type(node->resolved_type);
-  auto info = type->get_info();
 
-  auto old_scope = ctx.scope;
-  Defer _defer([&] { ctx.scope = old_scope; });
-  ctx.scope = info->scope;
 
   for (const auto &variant : node->variants) {
     auto variant_name = variant.name.get_str();
