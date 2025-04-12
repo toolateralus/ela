@@ -2681,8 +2681,8 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
-        auto &ident = part.identifier;
+      for (auto &segment: path->segments) {
+        auto &ident = segment.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
           return nullptr;
@@ -2690,11 +2690,11 @@ Nullable<Symbol> Context::get_symbol(ASTNode *node) {
         if (index == path->length() - 1)
           return symbol;
 
-        if (!part.generic_arguments.empty()) {
+        if (!segment.generic_arguments.empty()) {
           if (symbol->is_type()) {
             auto instantiation =
                 find_generic_instance(((ASTDeclaration *)symbol->type.declaration.get())->generic_instantiations,
-                                      part.get_resolved_generics());
+                                      segment.get_resolved_generics());
             auto type = global_get_type(instantiation->resolved_type);
             scope = type->get_info()->scope;
           } else
@@ -2739,7 +2739,7 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
       auto path = static_cast<ASTPath *>(node);
       Scope *scope = this->scope;
       auto index = 0;
-      for (auto &part in path->segments) {
+      for (auto &part: path->segments) {
         auto &ident = part.identifier;
         auto symbol = scope->lookup(ident);
         if (!symbol)
@@ -2937,7 +2937,7 @@ void Typer::visit(ASTPath *node) {
   Scope *scope = ctx.scope;
   auto index = 0;
   Type *previous_type = nullptr;
-  for (auto &segment in node->segments) {
+  for (auto &segment: node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;

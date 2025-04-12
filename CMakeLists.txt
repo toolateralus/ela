@@ -1,6 +1,6 @@
-cmake_minimum_required(VERSION 3.10)
+cmake_minimum_required(VERSION 3.20.0)
 
-project(ela LANGUAGES CXX)
+project(ela LANGUAGES C CXX)
 
 set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_COMPILER clang++)
@@ -25,27 +25,30 @@ set(BIN_DIR ${CMAKE_BINARY_DIR}/../bin)
 file(MAKE_DIRECTORY ${OBJ_DIR})
 file(MAKE_DIRECTORY ${BIN_DIR})
 
-# Executable
+# Find LLVM package
+find_package(LLVM REQUIRED CONFIG)
+
+# Print LLVM information
+message(STATUS "Found LLVM ${LLVM_PACKAGE_VERSION}")
+message(STATUS "Using LLVMConfig.cmake in: ${LLVM_DIR}")
+message(STATUS "LLVM Include Dir: ${LLVM_INCLUDE_DIRS}")
+message(STATUS "LLVM Libraries: ${LLVM_LIBRARIES}")
+
+# Include LLVM directories
+include_directories(${LLVM_INCLUDE_DIRS})
+add_definitions(${LLVM_DEFINITIONS})
+
+# Add executable
 add_executable(ela ${SRCS})
 
+
+#! my system has a monolithic LLVM build (arch//pacman//wayland)
+#! this may not work depending on your package manager.
+
+# Link against the monolithic LLVM library
+target_link_libraries(ela PRIVATE LLVM-19)
+
+# Set output directory for the executable
 set_target_properties(ela PROPERTIES
   RUNTIME_OUTPUT_DIRECTORY ${BIN_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_DEBUG ${BIN_DIR}
-  RUNTIME_OUTPUT_DIRECTORY_RELEASE ${BIN_DIR}
 )
-
-
-# Set compiler flags based on the compiler and platform
-if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
-    # -fsanitize=address,leak
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} -g")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} -O3 -flto")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W3 /EHsc")
-    set(CMAKE_CXX_FLAGS_DEBUG "${CMAKE_CXX_FLAGS_DEBUG} /Zi /Ob0 /Od /RTC1")
-    set(CMAKE_CXX_FLAGS_RELEASE "${CMAKE_CXX_FLAGS_RELEASE} /O2 /Ob2 /DNDEBUG")
-endif()
-
-if(CMAKE_BUILD_TYPE STREQUAL "Debug")
-  target_compile_definitions(ela PRIVATE DEBUG DEBUG=1)
-endif()

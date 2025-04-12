@@ -1,5 +1,3 @@
-#warning "we gotta undo this once we get Cmake configured with LLVM"
-#if 0 
 #pragma once
 #include "core.hpp"
 #include "visitor.hpp"
@@ -132,5 +130,56 @@ struct LLVMEmitter : VisitorBase {
   LLVMEmitter(Context &ctx)
       : ctx(ctx), llvm_ctx(), builder(llvm_ctx), module(std::make_unique<Module>("module", llvm_ctx)),
         di_builder(std::make_shared<DIBuilder>(*module)), data_layout(nullptr), dont_load(false), scope_manager(di_builder) {}
+
+  
+  void visit(ASTMethodCall *node) override;
+  void visit(ASTPath *node) override;
+  void visit(ASTPatternMatch *node) override;
+  void visit(ASTDyn_Of *node) override;
+  void visit(ASTModule *node) override;
+  void visit(ASTImport *node) override;
+  void visit(ASTType_Of *node) override;
+  void visit(ASTStructDeclaration *node) override;
+  void visit(ASTProgram *node) override;
+  void visit(ASTBlock *node) override;
+  void visit(ASTFunctionDeclaration *node) override;
+  void visit(ASTParamsDecl *node) override;
+  void visit(ASTParamDecl *node) override;
+  void visit(ASTVariable *node) override;
+  void visit(ASTExprStatement *node) override;
+  void visit(ASTBinExpr *node) override;
+  void visit(ASTUnaryExpr *node) override;
+  void visit(ASTLiteral *node) override;
+  void visit(ASTType *node) override;
+  void visit(ASTCall *node) override;
+  void visit(ASTArguments *node) override;
+  void visit(ASTReturn *node) override;
+  void visit(ASTContinue *node) override;
+  void visit(ASTBreak *node) override;
+  void visit(ASTFor *node) override;
+  void visit(ASTIf *node) override;
+  void visit(ASTElse *node) override;
+  void visit(ASTWhile *node) override;
+  void visit(ASTDotExpr *node) override;
+  void visit(ASTSubscript *node) override;
+  void visit(ASTInitializerList *node) override;
+  void visit(ASTEnumDeclaration *node) override;
+  void visit(ASTRange *node) override;
+  void visit(ASTSwitch *node) override;
+  void visit(ASTTuple *node) override;
+  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTSize_Of *node) override;
+  void visit(ASTAlias *node) override;
+  void visit(ASTImpl *node) override;
+  void visit(ASTDefer *node) override;
+  void visit(ASTChoiceDeclaration *node) override;
+  void visit(ASTCast *node) override;
+  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTLambda *node) override;
+  void visit(ASTWhere *node) override;
+  inline void visit(ASTStatementList *node) override {
+    for (const auto &stmt : node->statements) {
+      stmt->accept(this);
+    }
+  };
 };
-#endif

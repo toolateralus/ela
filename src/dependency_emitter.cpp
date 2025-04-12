@@ -292,7 +292,7 @@ void DependencyEmitter::visit(ASTPath *node) {
 
   Scope *scope = ctx.scope;
   auto index = 0;
-  for (auto &seg in node->segments) {
+  for (auto &seg: node->segments) {
     auto &ident = seg.identifier;
     auto symbol = scope->lookup(ident);
     scope = nullptr;
