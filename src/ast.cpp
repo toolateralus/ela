@@ -1004,10 +1004,9 @@ ASTExpr *Parser::parse_primary() {
       NODE_ALLOC(ASTSwitch, node, range, _, this)
       expect(TType::Switch);
 
-      auto is_pattern_matching = false;
       if (peek().type == TType::Is) {
         eat();
-        is_pattern_matching = true;
+        node->is_pattern_match = true;
       }
 
       node->target = parse_expr();
@@ -1028,7 +1027,7 @@ ASTExpr *Parser::parse_primary() {
 
         SwitchCase _case;
 
-        if (is_pattern_matching) {
+        if (node->is_pattern_match) {
           NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
           pattern_match->scope = create_child(ctx.scope);
           pattern_match->target_type_path = parse_path();

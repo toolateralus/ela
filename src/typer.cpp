@@ -2311,10 +2311,12 @@ void Typer::visit(ASTSwitch *node) {
   auto type_id = node->target->resolved_type;
   auto type = global_get_type(type_id);
 
-  if (node->target->get_node_type() == AST_NODE_PATTERN_MATCH) {
-    auto pattern = (ASTPatternMatch *)node->target;
-    for (auto &$case: node->cases) {
-      $case.block->scope->parent = pattern->scope;
+  if (node->is_pattern_match) {
+    for (auto _case = node->cases.begin(); _case != node->cases.end(); _case++) {
+      if (_case->expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
+        auto pattern = (ASTPatternMatch*)_case->expression;
+        _case->block->scope->parent = pattern->scope;
+      }
     }
   }
 

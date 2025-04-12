@@ -804,6 +804,7 @@ struct SwitchCase {
 struct ASTSwitch : ASTExpr {
   bool is_statement = false;
   int return_type = void_type();
+  bool is_pattern_match = false;
   ASTExpr *target;
   Nullable<ASTBlock> default_case;
   std::vector<SwitchCase> cases;
