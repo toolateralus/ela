@@ -231,6 +231,7 @@ void Emitter::visit(ASTFor *node) {
     }
   }
 
+  code << indent();
   node->block->accept(this);
 
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
@@ -866,9 +867,9 @@ void Emitter::visit(ASTParamDecl *node) {
       code << ' ' << node->normal.name.get_str();
     }
   } else if (node->tag == ASTParamDecl::Self) {
-    code << ' ' << to_cpp_string(type) << " self";
+    code << to_cpp_string(type) << " self";
   } else {
-    code << ' ' << to_cpp_string(type) << " себя";
+    code << to_cpp_string(type) << " себя";
   }
 
   return;
@@ -887,11 +888,9 @@ void Emitter::visit(ASTParamsDecl *node) {
 
   if (node->is_varargs) {
     code << ", ...)";
-    return;
+  } else {
+    code << ")";
   }
-
-  code << ")";
-  return;
 }
 
 void Emitter::visit(ASTProgram *node) {
@@ -1849,6 +1848,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
     defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
+      code << " ";
       auto block = node->block.get();
       block->accept(this);
     }
