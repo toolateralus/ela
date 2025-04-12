@@ -204,8 +204,6 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     }
     info->scope->local_lookup(variant.name)->type.choice = node;
   }
-
-  ctx.exit_scope();
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
@@ -1370,6 +1368,8 @@ void Typer::visit(ASTContinue *node) { node->control_flow = {BLOCK_FLAGS_CONTINU
 void Typer::visit(ASTBreak *node) { node->control_flow = {BLOCK_FLAGS_BREAK, Type::INVALID_TYPE_ID}; }
 
 void Typer::visit(ASTFor *node) {
+
+  auto old_scope = ctx.scope;
   ctx.set_scope(node->block->scope);
 
   node->right->accept(this);
@@ -1462,7 +1462,7 @@ void Typer::visit(ASTFor *node) {
 
   node->right->accept(this);
 
-  ctx.exit_scope();
+  ctx.scope = old_scope;
   node->block->accept(this);
 
   auto control_flow = node->block->control_flow;

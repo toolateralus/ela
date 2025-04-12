@@ -343,7 +343,7 @@ struct Emitter : VisitorBase {
 
   void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
-  void emit_choice_marker_variant_instantiation(Type *type, const ASTPath *value);
+  void emit_choice_marker_variant_instantiation(Type *type, ASTPath *value);
 };
 
 struct DependencyEmitter : VisitorBase {

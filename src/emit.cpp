@@ -167,7 +167,7 @@ void Emitter::visit(ASTFor *node) {
 
   // end condition
   emit_line_directive(node);
-  code << indent() << "if (!$next.has_value) break;\n";
+  code << indent() << "if (!$next.index != 1) break;\n";
 
   auto identifier_type_str = to_cpp_string(global_get_type(node->identifier_type));
 
@@ -180,7 +180,7 @@ void Emitter::visit(ASTFor *node) {
          << get_declaration_type_signature_and_identifier(emit_symbol(ctx.scope->local_lookup(node->left.identifier)),
                                                           global_get_type(node->identifier_type));
 
-    code << " = $next.s;\n";
+    code << " = $next.Some.$0;\n";
   } else if (node->left_tag == ASTFor::DESTRUCTURE) {
     auto type = global_get_type(node->identifier_type);
     auto scope = type->get_info()->scope;
@@ -194,7 +194,7 @@ void Emitter::visit(ASTFor *node) {
     auto id = block->temp_iden_idx++;
     std::string temp_id = "$deconstruction$" + std::to_string(id++);
 
-    code << indent() << "auto " << temp_id << " = $next.s;\n";
+    code << indent() << "auto " << temp_id << " = $next.Some.$0;\n";
 
     auto is_tuple = type->is_kind(TYPE_TUPLE);
 
@@ -522,17 +522,6 @@ void Emitter::visit(ASTExprStatement *node) {
   node->expression->accept(this);
   code << ";\n";
   return;
-}
-
-void Emitter::emit_choice_marker_variant_instantiation(Type *type, const ASTPath *value) {
-  const auto last_segment = value->segments.back();
-  const auto info = type->get_info()->as<ChoiceTypeInfo>();
-  const auto variant_type = info->get_variant_type(last_segment.identifier);
-  if (variant_type->id == void_type()) {
-    const auto index = info->get_variant_index(last_segment.identifier);
-    const auto type_string = to_cpp_string(type);
-    code << " (" << type_string << ") { .index = " << index << "}";
-  }
 }
 
 void Emitter::visit(ASTVariable *node) {
@@ -2027,6 +2016,7 @@ void Emitter::visit(ASTDefer *node) { defer_blocks.back().defers.push_back(node)
 void Emitter::visit(ASTBlock *node) {
   code << "{\n";
   indent_level++;
+  auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
 
   defer_blocks.emplace_back();
@@ -2043,7 +2033,7 @@ void Emitter::visit(ASTBlock *node) {
 
   indent_level--;
   indentedln("}");
-  ctx.exit_scope();
+  ctx.scope = old_scope;
   return;
 }
 
@@ -2242,6 +2232,22 @@ void Emitter::visit(ASTMethodCall *node) {
     }
   }
   code << ")";
+}
+
+
+void Emitter::emit_choice_marker_variant_instantiation(Type *type, ASTPath *value) {
+  const auto last_segment = value->segments.back();
+  const auto info = type->get_info()->as<ChoiceTypeInfo>();
+  const auto variant_type = info->get_variant_type(last_segment.identifier);
+  if (!variant_type) {
+    value->accept(this);
+    return;
+  }
+  if (variant_type->id == void_type()) {
+    const auto index = info->get_variant_index(last_segment.identifier);
+    const auto type_string = to_cpp_string(type);
+    code << " (" << type_string << ") { .index = " << index << "}";
+  }
 }
 
 void Emitter::emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments) {

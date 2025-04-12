@@ -148,9 +148,11 @@ void DependencyEmitter::visit(ASTProgram *node) {
 }
 
 void DependencyEmitter::visit(ASTBlock *node) {
+  
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
+
   for (auto statement : node->statements) {
     statement->accept(this);
   }
@@ -260,7 +262,7 @@ void DependencyEmitter::visit(ASTPath *node) {
     auto symbol = scope->lookup(ident);
     scope = nullptr;
     if (!symbol) {
-      throw_error("symbol not found in scope", node->source_range);
+      throw_error(std::format("symbol {} not found in scope", ident.get_str()), node->source_range);
     }
 
     ASTDeclaration *instantiation = nullptr;
@@ -522,7 +524,9 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPatternMatch *node) {}
+void DependencyEmitter::visit(ASTPatternMatch *node) {
+
+}
 
 void DependencyEmitter::visit(ASTMethodCall *node) {
   node->arguments->accept(this);

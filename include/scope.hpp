@@ -302,6 +302,12 @@ struct Context {
     }
     scope = in_scope;
   }
+
+
+  // ONLY use this for exiting a scope you JUST created.
+  // just store the scope you left in any other case,
+  // and return in the appropriate place.
+  // this has adverse effects in many places.
   inline Scope *exit_scope() {
     auto old_scope = scope;
     if (scope) {

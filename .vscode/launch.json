@@ -51,10 +51,10 @@
       "request": "launch",
       "name": "Debug ela_source/main",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", "--s", "--nl"],
+      "args": ["main.ela", "--s", "--nl", "--nostdlib"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
       }
     },
     {
