@@ -307,9 +307,9 @@ struct ASTPath : ASTExpr {
   void accept(VisitorBase *visitor) override;
   inline size_t length() const { return segments.size(); }
 
-  inline void push_part(InternedString identifier) { segments.emplace_back(identifier); }
+  inline void push_segment(InternedString identifier) { segments.emplace_back(identifier); }
 
-  inline void push_part(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
+  inline void push_segment(InternedString identifier, std::vector<ASTExpr *> generic_arguments) {
     segments.emplace_back(identifier, generic_arguments);
   }
 };

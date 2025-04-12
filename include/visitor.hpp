@@ -335,13 +335,15 @@ struct Emitter : VisitorBase {
     }
     return;
   };
-  void emit_marker_choice_variant_instantiation(Type *type, const ASTPath *value);
   void emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *path);
   void emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *path);
+  void emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target, const SwitchCase &the_while, ASTPatternMatch *path);
+
   void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern, Type *variant_type);
 
   void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
+  void emit_choice_marker_variant_instantiation(Type *type, const ASTPath *value);
 };
 
 struct DependencyEmitter : VisitorBase {

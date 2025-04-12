@@ -568,9 +568,9 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
         new_arg->resolved_type = Type::INVALID_TYPE_ID;
         args.push_back(new_arg);
       }
-      new_node->push_part(part.identifier, args);
+      new_node->push_segment(part.identifier, args);
     } else {
-      new_node->push_part(part.identifier);
+      new_node->push_segment(part.identifier, {});
     }
   }
   return new_node;

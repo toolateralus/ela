@@ -77,6 +77,25 @@ get_value :: fn() -> Math {
   }
 }
 
+#test test_pattern_matching_in_switch :: fn() {
+  const widget := Math::Vector2.{
+    x: 0.0,
+    y: 1.0,
+  };
+
+  mut hit := false;
+
+  switch is widget {
+    Math::Vector2.{x: x, y: y}: {
+      hit = x == 0.0 && y == 1.0;
+    }
+    else: {
+      assert("hit nothing", false);
+    }
+  }
+  assert("'switch is' failed", hit);
+}
+
 #test test_choice_as_param :: fn() {
   choice_as_param(Math::Vector3.{x: 0, y: 0, z: 0});
 }

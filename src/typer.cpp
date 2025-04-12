@@ -707,8 +707,8 @@ void Typer::compiler_mock_associated_function_call_visit_impl(int left_type, con
 
   // Type.
   ASTPath path;
-  path.push_part(global_get_type(left_type)->get_base());
-  path.push_part(method_name);
+  path.push_segment(global_get_type(left_type)->get_base());
+  path.push_segment(method_name);
 
   call.function = &path;
   call.accept(this);
@@ -727,7 +727,7 @@ void Typer::compiler_mock_method_call_visit_impl(int left_type, const InternedSt
   static int depth = 0;
 
   InternedString varname = "$$temp$$" + std::to_string(depth++);
-  path.push_part(varname);
+  path.push_segment(varname);
   ctx.scope->insert_variable(varname, left_type, nullptr, MUT);
   ctx.scope->local_lookup(varname)->flags |= SYMBOL_IS_LOCAL;
 
@@ -2311,12 +2311,19 @@ void Typer::visit(ASTSwitch *node) {
   auto type_id = node->target->resolved_type;
   auto type = global_get_type(type_id);
 
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+  if (node->target->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    auto pattern = (ASTPatternMatch *)node->target;
+    for (auto &$case: node->cases) {
+      $case.block->scope->parent = pattern->scope;
+    }
+  }
+
+  if (!type->is_kind(TYPE_CHOICE) && !type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
     auto operator_overload = find_operator_overload(CONST, type, TType::EQ, OPERATION_BINARY);
     if (operator_overload == Type::INVALID_TYPE_ID) {
       throw_error(
-          std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum type that doesn't implement "
-                      "Eq (== operator on #self)\ngot type '{}'",
+          std::format("Can't use a 'switch' statement/expression on a non-scalar, non-enum, non-choice type that doesn't implement "
+                      "Eq (== operator on #self), or qualify for pattern matching (choice types).\ngot type '{}'",
                       type->to_string()),
           node->target->source_range);
     }
@@ -2344,7 +2351,7 @@ void Typer::visit(ASTSwitch *node) {
 
     if (type_is_numerical(type)) {
       continue;
-    } else {
+    } else if (_case.expression->get_node_type() != AST_NODE_PATTERN_MATCH) {
       assert_types_can_cast_or_equal(_case.expression, type_id, node->source_range, "Invalid switch case.");
     }
   }
@@ -2565,8 +2572,6 @@ void Typer::visit(ASTDyn_Of *node) {
       ctx.scope->find_or_create_dyn_type_of(type->base_id == -1 ? type->id : type->base_id, node->source_range, this);
   node->resolved_type = ty;
 }
-
-
 
 int Scope::find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {

@@ -1003,9 +1003,18 @@ ASTExpr *Parser::parse_primary() {
     case TType::Switch: {
       NODE_ALLOC(ASTSwitch, node, range, _, this)
       expect(TType::Switch);
+
+      auto is_pattern_matching = false;
+      if (peek().type == TType::Is) {
+        eat();
+        is_pattern_matching = true;
+      }
+
       node->target = parse_expr();
       expect(TType::LCurly);
+
       while (peek().type != TType::RCurly) {
+        // Default case., 'else: {}' in our language.
         if (peek().type == TType::Else) {
           eat();
           if (peek().type != TType::ExpressionBody) {
@@ -1016,9 +1025,86 @@ ASTExpr *Parser::parse_primary() {
             eat();
           continue;
         }
-        SwitchCase _case{
-            .expression = parse_expr(),
-        };
+
+        SwitchCase _case;
+
+        if (is_pattern_matching) {
+          NODE_ALLOC(ASTPatternMatch, pattern_match, range, defer, this);
+          pattern_match->scope = create_child(ctx.scope);
+          pattern_match->target_type_path = parse_path();
+          pattern_match->object = node->target;
+          _case.expression = pattern_match;
+
+          if (peek().type == TType::Dot && lookahead_buf()[1].type == TType::LCurly) {
+            eat();
+            eat();
+            pattern_match->pattern_tag = ASTPatternMatch::STRUCT;
+            while (peek().type != TType::RCurly) {
+              StructPattern::Part part;
+              part.field_name = expect(TType::Identifier).value;
+              part.mutability = CONST;
+              expect(TType::Colon);
+
+              if (peek().type == TType::Mut) {
+                eat();
+                part.mutability = MUT;
+              }
+
+              if (peek().type == TType::And) {
+                eat();
+                if (peek().type == TType::Mut) {
+                  eat();
+                  part.semantic = PTR_MUT;
+                } else {
+                  expect(TType::Const);
+                  part.semantic = PTR_CONST;
+                }
+              }
+
+              part.var_name = expect(TType::Identifier).value;
+              pattern_match->struct_pattern.parts.push_back(part);
+
+              if (peek().type != TType::RCurly) {
+                expect(TType::Comma);
+              }
+            }
+            expect(TType::RCurly);
+
+          } else if (peek().type == TType::LParen) {
+            eat();
+            pattern_match->pattern_tag = ASTPatternMatch::TUPLE;
+            while (peek().type != TType::RParen) {
+              TuplePattern::Part part;
+              part.mutability = CONST;
+
+              if (peek().type == TType::Mut) {
+                eat();
+                part.mutability = MUT;
+              }
+
+              if (peek().type == TType::And) {
+                eat();
+                if (peek().type == TType::Mut) {
+                  eat();
+                  part.semantic = PTR_MUT;
+                } else {
+                  expect(TType::Const);
+                  part.semantic = PTR_CONST;
+                }
+              }
+
+              part.var_name = expect(TType::Identifier).value;
+              pattern_match->tuple_pattern.parts.push_back(part);
+              if (peek().type != TType::RParen) {
+                expect(TType::Comma);
+              }
+            }
+            expect(TType::RParen);
+          }
+        } else {
+          _case.expression = parse_expr();
+        }
+
         if (peek().type != TType::ExpressionBody) {
           expect(TType::Colon);
         }
@@ -1028,6 +1114,7 @@ ASTExpr *Parser::parse_primary() {
           eat();
         }
       }
+
       expect(TType::RCurly);
       return node;
     }
@@ -2524,7 +2611,7 @@ ASTType *ASTType::get_void() {
     ASTType *type = ast_alloc<ASTType>();
     type->kind = ASTType::NORMAL;
     auto path = ast_alloc<ASTPath>();
-    path->push_part("void");
+    path->push_segment("void");
     type->normal.path = path;
     type->resolved_type = void_type();
     return type;

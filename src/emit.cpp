@@ -264,7 +264,7 @@ void Emitter::visit(ASTArguments *node) {
     */
     if (type->is_kind(TYPE_CHOICE) && argument->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)argument;
-      emit_marker_choice_variant_instantiation(type, path);
+      emit_choice_marker_variant_instantiation(type, path);
     } else {
       node->arguments[i]->accept(this);
     }
@@ -504,7 +504,7 @@ void Emitter::visit(ASTBinExpr *node) {
     if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->right;
       if (path->length() > 1) {
-        emit_marker_choice_variant_instantiation(type, path);
+        emit_choice_marker_variant_instantiation(type, path);
         code << ")";
         return;
       }
@@ -524,7 +524,7 @@ void Emitter::visit(ASTExprStatement *node) {
   return;
 }
 
-void Emitter::emit_marker_choice_variant_instantiation(Type *type, const ASTPath *value) {
+void Emitter::emit_choice_marker_variant_instantiation(Type *type, const ASTPath *value) {
   const auto last_segment = value->segments.back();
   const auto info = type->get_info()->as<ChoiceTypeInfo>();
   const auto variant_type = info->get_variant_type(last_segment.identifier);
@@ -634,7 +634,7 @@ void Emitter::visit(ASTVariable *node) {
   if (type->is_kind(TYPE_CHOICE) && node->value.is_not_null() && node->value.get()->get_node_type() == AST_NODE_PATH) {
     auto value = (ASTPath *)node->value.get();
     code << " = ";
-    emit_marker_choice_variant_instantiation(type, value);
+    emit_choice_marker_variant_instantiation(type, value);
     code << ";\n";
   } else {
     handle_initialization();
@@ -1077,7 +1077,7 @@ void Emitter::visit(ASTInitializerList *node) {
         if (type->is_kind(TYPE_CHOICE) && value->get_node_type() == AST_NODE_PATH) {
           auto path = (ASTPath *)value;
           if (path->length() > 1) {
-            emit_marker_choice_variant_instantiation(type, path);
+            emit_choice_marker_variant_instantiation(type, path);
           } else
             goto NORMAL;
         } else {
@@ -1126,52 +1126,6 @@ void Emitter::visit(ASTRange *node) {
   node->right->accept(this);
   code << "}";
   return;
-}
-
-void Emitter::visit(ASTSwitch *node) {
-  auto type = global_get_type(node->target->resolved_type);
-  bool use_eq_operator = true;
-
-  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
-    use_eq_operator = false;
-  }
-
-  static size_t index = 0;
-  auto target_unique_id = "$switch_target$" + std::to_string(index++);
-
-  code << indent() << "auto " << target_unique_id << " = ";
-  node->target->accept(this);
-  semicolon();
-  newline();
-
-  auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
-    emit_line_directive(target);
-    if (!first) {
-      code << indent() << "else ";
-    }
-    code << indent() << "if (";
-    if (use_eq_operator) {
-      code << target_unique_id;
-      code << " == ";
-      _case.expression->accept(this);
-    } else {
-      call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
-    }
-    code << ") ";
-    _case.block->accept(this);
-  };
-
-  bool first = true;
-  for (const auto &_case : node->cases) {
-    emit_switch_case(node->target, _case, first);
-    first = false;
-  }
-
-  if (node->default_case.is_not_null()) {
-    code << "else {\n";
-    node->default_case.get()->accept(this);
-    code << "}\n";
-  }
 }
 
 void Emitter::visit(ASTTuple *node) {
@@ -2013,7 +1967,7 @@ void Emitter::visit(ASTReturn *node) {
 
       if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
         auto path = (ASTPath *)node->expression.get();
-        emit_marker_choice_variant_instantiation(type, path);
+        emit_choice_marker_variant_instantiation(type, path);
       } else {
         code << indent() << to_cpp_string(type) << " " << defer_return_value_key << " = ";
         node->expression.get()->accept(this);
@@ -2035,7 +1989,7 @@ void Emitter::visit(ASTReturn *node) {
       auto type = global_get_type(node->expression.get()->resolved_type);
       if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
         auto path = (ASTPath *)node->expression.get();
-        emit_marker_choice_variant_instantiation(type, path);
+        emit_choice_marker_variant_instantiation(type, path);
       } else {
         node->expression.get()->accept(this);
       }
@@ -2047,7 +2001,7 @@ void Emitter::visit(ASTReturn *node) {
     auto type = global_get_type(node->expression.get()->resolved_type);
     if (type->is_kind(TYPE_CHOICE) && node->expression.get()->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->expression.get();
-      emit_marker_choice_variant_instantiation(type, path);
+      emit_choice_marker_variant_instantiation(type, path);
     } else {
       node->expression.get()->accept(this);
     }
@@ -2394,7 +2348,7 @@ void Emitter::emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch 
 
   auto variant_type = info->get_variant_type(segment.identifier);
   const auto variant_index = info->get_variant_index(segment.identifier);
-  
+
   const auto object_type = global_get_type(pattern->object->resolved_type);
   const auto is_pointer = object_type->get_ext().is_pointer();
 
@@ -2430,7 +2384,7 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
       if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
         code << "&";
       };
-      code << "("; 
+      code << "(";
       object->accept(this);
 
       if (is_pointer) {
@@ -2450,7 +2404,7 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
       if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
         code << "&";
       }
-      code << "("; 
+      code << "(";
       object->accept(this);
       if (is_pointer) {
         code << "->";
@@ -2461,5 +2415,135 @@ void Emitter::emit_pattern_match_destructure(ASTExpr *object, const std::string 
     }
   } else if (variant_type->id == void_type()) {
     return;
+  }
+}
+
+void Emitter::emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target_temp_identifier,
+                                                 const SwitchCase &the_case, ASTPatternMatch *pattern) {
+  ctx.set_scope(pattern->scope);
+  auto old_scope = ctx.scope;
+  Defer _([&] { ctx.scope = old_scope; });
+
+  auto path = pattern->target_type_path;
+  const auto type = global_get_type(pattern->target_type_path->resolved_type);
+  const auto info = type->get_info()->as<ChoiceTypeInfo>();
+  const auto segment = path->segments.back();
+
+  const auto variant_name = segment.identifier;
+  auto variant_type = info->get_variant_type(variant_name);
+  const auto variant_index = info->get_variant_index(variant_name);
+  const auto is_pointer = target_type->get_ext().is_pointer();
+
+  code << "if (" << target_temp_identifier;
+  if (is_pointer) {
+    code << "->index == ";
+  } else {
+    code << ".index == ";
+  }
+  code << std::to_string(variant_index);
+  code << ") {\n";
+
+  { // TODO: we should try to make this work with the exiting method to do this, 
+    // Copy pasting this is annoying.
+    if (variant_type->is_kind(TYPE_STRUCT)) {
+      auto info = variant_type->get_info()->as<StructTypeInfo>();
+      for (StructPattern::Part &part : pattern->struct_pattern.parts) {
+        auto type = global_get_type(part.resolved_type);
+        code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+        if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+          code << "&";
+        };
+        code << "(" << target_temp_identifier;
+        if (is_pointer) {
+          code << "->";
+        } else {
+          code << ".";
+        }
+
+        code << variant_name.get_str() << "." << part.field_name.get_str() << ");\n";
+      }
+    } else if (variant_type->is_kind(TYPE_TUPLE)) {
+      auto info = variant_type->get_info()->as<TupleTypeInfo>();
+      auto index = 0;
+      for (TuplePattern::Part &part : pattern->tuple_pattern.parts) {
+        auto type = global_get_type(part.resolved_type);
+        code << to_cpp_string(type) << " " << part.var_name.get_str() << " = ";
+        if (part.semantic == PTR_MUT || part.semantic == PTR_CONST) {
+          code << "&";
+        }
+        code << "(" << target_temp_identifier;
+        if (is_pointer) {
+          code << "->";
+        } else {
+          code << ".";
+        }
+        code << variant_name.get_str() << ".$" << std::to_string(index++) << ");\n";
+      }
+    } else if (variant_type->id == void_type()) {
+      return;
+    }
+  }
+
+  the_case.block->accept(this);
+
+  code << "}\n";
+}
+
+void Emitter::visit(ASTSwitch *node) {
+  auto type = global_get_type(node->target->resolved_type);
+  bool use_eq_operator = true;
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->get_ext().is_pointer()) {
+    use_eq_operator = false;
+  }
+
+  static size_t index = 0;
+  auto target_unique_id = "$switch_target$" + std::to_string(index++);
+
+  code << indent() << "auto " << target_unique_id << " = ";
+  node->target->accept(this);
+
+  semicolon();
+  newline();
+
+  const auto target_type = global_get_type(node->target->resolved_type);
+  const auto is_choice_type = target_type->is_kind(TYPE_CHOICE);
+
+  auto emit_switch_case = [&](ASTExpr *target, const SwitchCase &_case, bool first) {
+    emit_line_directive(target);
+    if (!first) {
+      code << indent() << "else ";
+    }
+
+    /*
+      The 'else' is handled above.
+    */
+    if (_case.expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
+      emit_pattern_match_for_switch_case(target_type, target_unique_id, _case, (ASTPatternMatch *)_case.expression);
+      return;
+    }
+
+    code << indent() << "if (";
+    if (use_eq_operator) {
+      code << target_unique_id;
+      code << " == ";
+      _case.expression->accept(this);
+    } else {
+      call_operator_overload(target->source_range, type, OPERATION_BINARY, TType::EQ, target, _case.expression);
+    }
+    code << ") ";
+    _case.block->accept(this);
+  };
+
+  bool first = true;
+  for (const auto &_case : node->cases) {
+    emit_switch_case(node->target, _case, first);
+    first = false;
+  }
+
+  if (node->default_case.is_not_null()) {
+    code << "else {\n";
+    node->default_case.get()->accept(this);
+    code << "}\n";
   }
 }
