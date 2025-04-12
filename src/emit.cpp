@@ -1753,7 +1753,7 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
   auto info = type->get_info();
   ctx.scope = info->scope;
 
-  auto name = emit_symbol(ctx.scope->parent->lookup(node->name));
+  auto name = node->scope->full_name();
   code << "typedef struct " << name << " " << name << ";\n";
 
   auto old_init = emit_default_init;
