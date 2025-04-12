@@ -1,5 +1,6 @@
 #include "ast.hpp"
 #include "core.hpp"
+#include "interned_string.hpp"
 #include "lex.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -116,7 +117,6 @@ void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
 
 void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
-  size_t index = 0;
 
   if (!compile_command.has_flag("nostdlib")) {
     // We have to do this here because the reflection system depends on this type and it doesn't
@@ -132,17 +132,52 @@ void DependencyEmitter::visit(ASTProgram *node) {
     declare_type(tuple_id);
   }
 
-  for (auto &statement : node->statements) {
-    if (index == node->end_of_bootstrap_index) {
-      ctx.set_scope(node->scope);
+  if (auto env_sym = ctx.root_scope->local_lookup("Env")) {
+    auto env_scope = global_get_type(env_sym->type_id)->get_info()->scope;
+    if (auto initialize_sym = env_scope->local_lookup("initialize")) {
+      initialize_sym->function.declaration->accept(this);
     }
-    statement->accept(this);
-    index++;
+  }
+
+  if (compile_command.has_flag("test")) {
+    size_t index = 0;
+    for (auto &statement : node->statements) {
+      if (index == node->end_of_bootstrap_index) {
+        ctx.set_scope(node->scope);
+      }
+      statement->accept(this);
+      index++;
+    }
+  }
+
+  if (auto main_sym = node->scope->local_lookup("main")) {
+    main_sym->function.declaration->accept(this);
   }
 
   for (auto id : reflected_upon_types) {
     emit_dependencies_for_reflection(this, id);
   }
+
+  auto emit_symbol = [&](InternedString name) {
+    if (auto sym = ctx.root_scope->local_lookup(name)) {
+      if (sym->is_variable()) {
+        auto ast = sym->variable.declaration.get();
+        ast->accept(this);
+        ast->accept(emitter);
+      } else if (sym->is_function()) {
+        sym->function.declaration->accept(this);
+      } else if (sym->is_type()) {
+        define_type(sym->type_id);
+      }
+    }
+  };
+  
+  emit_symbol("Type");
+  emit_symbol("Field");
+  emit_symbol("calloc");
+  emit_symbol("malloc");
+  emit_symbol("free");
+  emit_symbol("_type_info");
 
   ctx.set_scope(ctx.root_scope);
 }

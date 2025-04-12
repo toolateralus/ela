@@ -231,6 +231,7 @@ void Emitter::visit(ASTFor *node) {
     }
   }
 
+  code << indent();
   node->block->accept(this);
 
   emit_deferred_statements(DEFER_BLOCK_TYPE_LOOP);
@@ -855,9 +856,9 @@ void Emitter::visit(ASTParamDecl *node) {
       code << ' ' << node->normal.name.get_str();
     }
   } else if (node->tag == ASTParamDecl::Self) {
-    code << ' ' << to_cpp_string(type) << " self";
+    code << to_cpp_string(type) << " self";
   } else {
-    code << ' ' << to_cpp_string(type) << " себя";
+    code << to_cpp_string(type) << " себя";
   }
 
   return;
@@ -876,24 +877,14 @@ void Emitter::visit(ASTParamsDecl *node) {
 
   if (node->is_varargs) {
     code << ", ...)";
-    return;
+  } else {
+    code << ")";
   }
-
-  code << ")";
-  return;
 }
 
 void Emitter::visit(ASTProgram *node) {
   static const auto testing = compile_command.has_flag("test");
   size_t index = 0;
-  ctx.set_scope(ctx.root_scope);
-  for (auto &statement : node->statements) {
-    if (index == node->end_of_bootstrap_index) {
-      ctx.set_scope(node->scope);
-    }
-    statement->accept(this);
-    index++;
-  }
   ctx.set_scope(ctx.root_scope);
 
   // Emit runtime reflection type info for requested types,
@@ -1838,6 +1829,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
     defer_blocks.push_back({{}, DEFER_BLOCK_TYPE_FUNC});
     if (node->block.is_not_null()) {
+      code << " ";
       auto block = node->block.get();
       block->accept(this);
     }
