@@ -897,14 +897,6 @@ void Emitter::visit(ASTProgram *node) {
   static const auto testing = compile_command.has_flag("test");
   size_t index = 0;
   ctx.set_scope(ctx.root_scope);
-  for (auto &statement : node->statements) {
-    if (index == node->end_of_bootstrap_index) {
-      ctx.set_scope(node->scope);
-    }
-    statement->accept(this);
-    index++;
-  }
-  ctx.set_scope(ctx.root_scope);
 
   // Emit runtime reflection type info for requested types,
   if (!type_info_strings.empty() && !is_freestanding) {

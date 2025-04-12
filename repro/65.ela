@@ -14,5 +14,6 @@ impl From!<bool> for s32 {
 }
 
 main :: fn() {
-  
+  n := s32::from(true);
+  n := s32::from(5);
 }
