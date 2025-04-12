@@ -2083,12 +2083,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     throw_error(std::format("Redefinition of function {}", name.value), range);
   }
 
-  for (const auto &stmt : function->block.get()->statements) {
-    if (stmt->get_node_type() == AST_NODE_FUNCTION_DECLARATION) {
-      throw_error("local functions are not allowed", stmt->source_range);
-    }
-  }
-
   end_node(function, range);
   function->scope = ctx.exit_scope();
   return function;
