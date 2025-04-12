@@ -1,5 +1,3 @@
-import fmt;
-
 OptionT :: choice!<T> {
   Some(T),
   None,
@@ -38,39 +36,29 @@ return_choice :: fn() -> Math {
   return Math::Vector2.{x: 0, y: 0};
 }
 
-choice_as_param :: fn(math: Math) {
-  // TODO: do we want to allow  { !(math is Pattern)  } ?
-  // TODO: or do we want        { math is not Pattern } ?
-  if math is Math::Vector2.{x: _, y: _1} {
-    // pass.
-  } else {
-    assert("failed to pattern match parameter choice type", false);
-  }
-}
-
 get_value :: fn() -> Math {
   return Math::Vector2.{x: 10, y: 10};
 }
 
 #test test_pattern_matching_struct_patterns :: fn() {
-  x := get_value();
+  val := get_value();
   /* pattern match, named args. mutability optional */
-  if x is Math::Vector2.{ x: mut x, y: mut y } {
-    fmt::println((x, y));
+  if val is Math::Vector2.{ x: mut x, y: mut y } {
+    assert("pattern match destructure failed", x == 10 && y == 10);
   } 
 
-  if x is Math::Vector2.{ x: x, y: y } {
-    fmt::println((x, y));
+  if val is Math::Vector2.{ x: x, y: y } {
+    assert("pattern match destructure failed 2", x == 10 && y == 10);
   }
 
   /* again, positional. */
-  if x is Math::Vector3.{ x: x, y: y, z: z } {
-    fmt::println((x, y, y));
+  if val is Math::Vector3.{ x: x, y: y, z: z } {
+    assert("pattern match failed", false);
   }
 }
 
 #test test_pattern_matching_tuple_patterns :: fn() {
-  x := get_value();
+  x := OptionT!<s32>::Some(10);
   /* pattern match, take tuple members as a destructured list */
   if x is OptionT!<s32>::Some(v) {
     // fmt::println(v);
@@ -96,6 +84,16 @@ get_value :: fn() -> Math {
   assert("'switch is' failed", hit);
 }
 
+choice_as_param :: fn(math: Math) {
+  // TODO: do we want to allow  { !(math is Pattern)  } ?
+  // TODO: or do we want        { math is not Pattern } ?
+  if math is Math::Vector2.{x: _, y: _1} {
+    // pass.
+  } else {
+    assert("failed to pattern match parameter choice type", false);
+  }
+}
+
 #test test_choice_as_param :: fn() {
-  choice_as_param(Math::Vector3.{x: 0, y: 0, z: 0});
+  choice_as_param(Math::Vector2.{x: 0, y: 0});
 }
