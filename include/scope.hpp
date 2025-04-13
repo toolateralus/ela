@@ -1,5 +1,6 @@
 #pragma once
 
+#include <llvm/IR/Value.h>
 #include <unordered_map>
 #include <unordered_set>
 
@@ -36,7 +37,7 @@ struct Symbol {
   InternedString name;
   int type_id = -1;
   int flags = SYMBOL_IS_VARIABLE;
-
+  llvm::Value *llvm_value;
   Mutability mutability = CONST;
   Scope *scope;
 

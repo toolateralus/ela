@@ -1,4 +1,5 @@
 #include "core.hpp"
+#include "llvm.hpp"
 #include "strings.hpp"
 #include "type.hpp"
 #include "visitor.hpp"
@@ -27,7 +28,7 @@ int CompileCommand::compile() {
   auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
   type_visitor.visit(root);
 
-  {
+  if (false) {
     Emitter emit(context, type_visitor);
     DependencyEmitter dependencyEmitter(context, &emit);
     emit.dep_emitter = &dependencyEmitter;
@@ -80,36 +81,34 @@ int CompileCommand::compile() {
     output.close();
   }
 
-  lower.end("lowering to cpp complete");
+  LLVMEmitter emitter(context);
+  emitter.visit_program(root);
 
+  lower.end("lowering to cpp complete");
   int result = 0;
 
-  if (!has_flag("no-compile")) {
-    std::string extra_flags = c_flags;
+  /* 
+    TODO: we need to use a 'target_machine' thing to setup the target triple etc.
+  */
+  {
+    // Finalize the LLVM IR and compile it to an executable
+    std::string output_filename = std::filesystem::path(get_source_filename(root->source_range)).filename().replace_extension("");
+    std::error_code ec;
+    llvm::raw_fd_ostream dest(output_filename + ".ll", ec, (llvm::sys::fs::OpenFlags)0);
 
-    if (has_flag("release"))
-      extra_flags += " -O3 ";
-    else
-      extra_flags += " -g ";
+    if (ec) {
+      std::cerr << "Could not open file: " << ec.message() << std::endl;
+      return 1;
+    } 
 
-    static std::string ignored_warnings = "-w";
+    emitter.module->print(dest, nullptr);
+    dest.flush();
 
-    std::string output_flag = (c_flags.find("-o") != std::string::npos) ? "" : "-o " + binary_path.string();
-
-    auto compilation_string =
-        std::format("clang -std=c23 {} {} {} {}", ignored_warnings, output_path.string(), output_flag, extra_flags);
-
-    if (compile_command.has_flag("x"))
-      printf("\033[1;36m%s\n\033[0m", compilation_string.c_str());
-
-    cpp.begin();
-    result = system(compilation_string.c_str());
-    cpp.end("invoking `clang` C compiler and `lld` linker");
-    if (!has_flag("s")) {
-      std::filesystem::remove(output_path);
+    std::string link_command = "clang++ " + output_filename + ".ll -o " + output_filename;
+    if (std::system(link_command.c_str()) != 0) {
+      std::cerr << "Error: linking failed!" << std::endl;
     }
   }
-
   std::filesystem::current_path(original_path);
   print_metrics();
 
@@ -158,7 +157,10 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
       lldb = true;
     } else if (arg == "-o" && i + 1 < args.size()) {
       output_path = args[++i];
-    } else if (arg.ends_with(".ela") && input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r main.ela where main.ela is the arg not the file. we should use a rust like -- seperator to seperate runtime args from ela compiler args.
+    } else if (arg.ends_with(".ela") &&
+               input_path.empty()) { // Sometimes this is annoying if you're just passing args to a thing. like ela r
+                                     // main.ela where main.ela is the arg not the file. we should use a rust like --
+                                     // seperator to seperate runtime args from ela compiler args.
       input_path = arg;
     } else if (arg.starts_with("--")) {
       flags[arg.substr(2)] = true;

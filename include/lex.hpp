@@ -249,6 +249,10 @@ struct SourceLocation {
     return files;
   }
   std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
+
+  std::string filename() const {
+    return files()[file];
+  }
 };
 
 struct Token {
