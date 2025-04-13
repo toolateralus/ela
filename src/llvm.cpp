@@ -340,7 +340,30 @@ void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
 void LLVMEmitter::visit_for(ASTFor *node) {}
-void LLVMEmitter::visit_if(ASTIf *node) {}
+void LLVMEmitter::visit_if(ASTIf *node) {
+  llvm::Function *function = builder.GetInsertBlock()->getParent();
+
+  // decalare blocks
+  auto *ifBlock = llvm::BasicBlock::Create(llvm_ctx, "if");
+  auto *mergeBlock = llvm::BasicBlock::Create(llvm_ctx, "ifcont");
+
+  // if condition
+  auto cond_result = visit_expr(node->condition);
+  builder.CreateCondBr(cond_result, ifBlock, mergeBlock);
+
+  // if block
+  function->insert(function->end(), ifBlock);
+  builder.SetInsertPoint(ifBlock);
+
+  visit_block(node->block);
+  if (HAS_FLAG(node->block->control_flow.flags, BLOCK_FLAGS_FALL_THROUGH)) {
+    builder.CreateBr(mergeBlock);
+  }
+
+  // merge block
+  function->insert(function->end(), mergeBlock);
+  builder.SetInsertPoint(mergeBlock);
+}
 void LLVMEmitter::visit_else(ASTElse *node) {}
 void LLVMEmitter::visit_while(ASTWhile *node) {}
 
