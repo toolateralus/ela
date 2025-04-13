@@ -784,8 +784,7 @@ struct LLVMEmitter {
 
   llvm::Value *binary_fp(llvm::Value *left, llvm::Value *right, TType op, llvm::Type *expr_ty = nullptr);
 
-  llvm::Value *binary_scalars(llvm::Value *left, llvm::Value *right, TType op, Type *expr_ty, ScalarTypeInfo *left_info,
-                              ScalarTypeInfo *right_info);
+  llvm::Value *binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, TType op, Type *expr_ty);
 
   llvm::Value *cast_scalar(llvm::Value *value, llvm::Type *type, bool from_signed, bool to_signed);
 };

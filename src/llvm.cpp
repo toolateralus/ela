@@ -128,8 +128,14 @@ llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
-  if (node->expression.get()) {
-    return builder.CreateRet(visit_expr(node->expression.get()));
+  if (node->expression) {
+    auto expr_ast = node->expression.get();
+    auto expr_val = visit_expr(expr_ast);
+    if (expr_ast->get_node_type() == AST_NODE_PATH) {
+      auto type = global_get_type(expr_ast->resolved_type);
+      expr_val = builder.CreateLoad(llvm_typeof(type), expr_val);
+    }
+    return builder.CreateRet(expr_val);
   } else {
     return builder.CreateRetVoid();
   }
@@ -153,7 +159,12 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
       return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, value, true));
     }
     case ASTLiteral::Float: {
-      return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stod(node->value.get_str())));
+      auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
+      if (info->size == 8) {
+        return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stod(node->value.get_str())));
+      } else if (info->size == 4) {
+        return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stof(node->value.get_str())));
+      }
     }
     case ASTLiteral::String: {
       return builder.CreateGlobalString(node->value.get_str());
@@ -191,15 +202,7 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
     return nullptr;
   }
 
-  // We can assume that if we aren't an operator overload at this point,
-  // that we have 2 scalars;
-  auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
-  auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
-
-  auto left = visit_expr(node->left);
-  auto right = visit_expr(node->right);
-
-  auto result = binary_scalars(left, right, node->op.type, expr_ty, left_info, right_info);
+  auto result = binary_scalars(node->left, node->right, node->op.type, expr_ty);
   /*
     TODO: attach debug info.
   */
@@ -209,7 +212,11 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_path(ASTPath *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
+  auto symbol = ctx.get_symbol(node);
+  auto type = global_get_type(symbol.get()->type_id);
+  return symbol.get()->llvm_value;
+}
 llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
@@ -243,7 +250,7 @@ llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   const auto is_signed = [](Type *type) {
     return (type->is_kind(TYPE_SCALAR) && type->get_info()->as<ScalarTypeInfo>()->is_signed());
   };
-  /* 
+  /*
     TODO: probably need to handle more types here.
   */
   return cast_scalar(visit_expr(node->expression), llvm_typeof(target), is_signed(from), is_signed(target));
@@ -255,7 +262,20 @@ void LLVMEmitter::visit_import(ASTImport *node) {}
 
 void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
 void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
-void LLVMEmitter::visit_variable(ASTVariable *node) {}
+void LLVMEmitter::visit_variable(ASTVariable *node) {
+  auto var_type = global_get_type(node->type->resolved_type);
+  auto llvm_var_type = llvm_typeof(var_type);
+
+  llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
+  ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
+
+  if (node->value) {
+    auto init_value = visit_expr(node->value.get());
+    builder.CreateStore(init_value, alloca_inst);
+  } else {
+    builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
+  }
+}
 void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
@@ -595,17 +615,33 @@ llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, llvm::Type *type, bool
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::binary_scalars(llvm::Value *left, llvm::Value *right, TType op, Type *expr_ty,
-                                         ScalarTypeInfo *left_info, ScalarTypeInfo *right_info) {
+llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, TType op, Type *expr_ty) {
   auto expr_ty_info = expr_ty->get_info()->as<ScalarTypeInfo>();
+
+  auto left = visit_expr(left_ast);
+  auto right = visit_expr(right_ast);
 
   Token temp_token = {};
   temp_token.type = op;
   const bool is_assignment = temp_token.is_comp_assign() || op == TType::Assign;
 
   auto type = llvm_typeof(expr_ty);
+
+  auto right_ty = global_get_type(right_ast->resolved_type);
+  auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
+  if (right_ast->get_node_type() == AST_NODE_PATH) {
+    // this might not work when path is for a function without an address of operator
+    right = builder.CreateLoad(llvm_typeof(right_ty), right);
+  }
   right = cast_scalar(right, type, right_info->is_signed(), expr_ty_info->is_signed());
+
   if (!is_assignment) {
+    auto left_ty = global_get_type(left_ast->resolved_type);
+    auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
+    if (left_ast->get_node_type() == AST_NODE_PATH) {
+      // this might not work when path is for a function without an address of operator
+      left = builder.CreateLoad(llvm_typeof(left_ty), left);
+    }
     left = cast_scalar(left, type, left_info->is_signed(), expr_ty_info->is_signed());
   }
 
