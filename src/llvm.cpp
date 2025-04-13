@@ -9,7 +9,6 @@
 #include <llvm/IR/Type.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-#include <ostream>
 #include <print>
 
 
@@ -81,7 +80,9 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto entry_block = llvm::BasicBlock::Create(llvm_ctx, "entry", func);
   builder.SetInsertPoint(entry_block);
 
+  auto old_scope = ctx.scope;
   ctx.set_scope(node->block.get()->scope);
+  dbg.enter_function_scope(dbg.current_scope(), func, name, node->source_range);
 
   auto index = 0;
   for (auto &param : func->args()) {
@@ -105,6 +106,9 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
       builder.CreateRet(llvm::Constant::getNullValue(llvm_typeof(return_type)));
     }
   }
+  dbg.pop_scope();
+
+  ctx.scope = old_scope;
 }
 
 llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) { 
