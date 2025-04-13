@@ -204,7 +204,11 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_path(ASTPath *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
+  auto symbol = ctx.get_symbol(node);
+  auto type = global_get_type(symbol.get()->type_id);
+  return builder.CreateLoad(llvm_typeof(type), symbol.get()->llvm_value);
+}
 llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
@@ -250,7 +254,20 @@ void LLVMEmitter::visit_import(ASTImport *node) {}
 
 void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
 void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
-void LLVMEmitter::visit_variable(ASTVariable *node) {}
+void LLVMEmitter::visit_variable(ASTVariable *node) {
+  auto var_type = global_get_type(node->type->resolved_type);
+  auto llvm_var_type = llvm_typeof(var_type);
+
+  llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
+  ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
+
+  if (node->value) {
+    auto init_value = visit_expr(node->value.get());
+    builder.CreateStore(init_value, alloca_inst);
+  } else {
+    builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
+  }
+}
 void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
