@@ -504,7 +504,12 @@ llvm::Value *LLVMEmitter::binary_fp(llvm::IRBuilder<> *builder, llvm::Value *lef
       builder->CreateStore(result, left);
       return result;
     }
-
+    case TType::CompMod: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateFRem(loadedLeft, right, "compmodtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
     // Assignment
     case TType::Assign:
       builder->CreateStore(right, left);
