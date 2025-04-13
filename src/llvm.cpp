@@ -194,7 +194,11 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
   auto left = visit_expr(node->left);
   auto right = visit_expr(node->right);
 
-  return binary_scalars(&builder, left, right, node->op.type, expr_ty, left_info, right_info);
+  auto result = binary_scalars(left, right, node->op.type, expr_ty, left_info, right_info);
+  /*
+    TODO: attach debug info.
+  */
+  return result;
 }
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) { return nullptr; }
@@ -214,7 +218,6 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) { ret
 llvm::Value *LLVMEmitter::visit_range(ASTRange *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_switch(ASTSwitch *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_lambda(ASTLambda *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
@@ -223,6 +226,22 @@ llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   auto data_layout = module->getDataLayout();
   auto size = data_layout.getTypeStoreSize(llvm_type);
   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
+  /*
+    TODO: attach debug info
+  */
+}
+
+llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
+  auto target = global_get_type(node->target_type->resolved_type);
+  auto from = global_get_type(node->expression->resolved_type);
+
+  const auto is_signed = [](Type *type) {
+    return (type->is_kind(TYPE_SCALAR) && type->get_info()->as<ScalarTypeInfo>()->is_signed());
+  };
+  /* 
+    TODO: probably need to handle more types here.
+  */
+  return cast_scalar(visit_expr(node->expression), llvm_typeof(target), is_signed(from), is_signed(target));
 }
 
 void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {}
@@ -248,107 +267,106 @@ void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {}
 void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_where(ASTWhere *node) {}
 
-llvm::Value *LLVMEmitter::binary_signed(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                        llvm::Type *expr_type) {
+llvm::Value *LLVMEmitter::binary_signed(llvm::Value *left, llvm::Value *right, TType op, llvm::Type *expr_type) {
   switch (op) {
     case TType::Add:
-      return builder->CreateAdd(left, right, "addtmp");
+      return builder.CreateAdd(left, right, "addtmp");
     case TType::Sub:
-      return builder->CreateSub(left, right, "subtmp");
+      return builder.CreateSub(left, right, "subtmp");
     case TType::Mul:
-      return builder->CreateMul(left, right, "multmp");
+      return builder.CreateMul(left, right, "multmp");
     case TType::Div:
-      return builder->CreateSDiv(left, right, "divtmp");
+      return builder.CreateSDiv(left, right, "divtmp");
     case TType::Modulo:
-      return builder->CreateSRem(left, right, "modtmp");
+      return builder.CreateSRem(left, right, "modtmp");
     case TType::LT:
-      return builder->CreateICmpSLT(left, right, "lttmp");
+      return builder.CreateICmpSLT(left, right, "lttmp");
     case TType::GT:
-      return builder->CreateICmpSGT(left, right, "gttmp");
+      return builder.CreateICmpSGT(left, right, "gttmp");
     case TType::LE:
-      return builder->CreateICmpSLE(left, right, "letmp");
+      return builder.CreateICmpSLE(left, right, "letmp");
     case TType::GE:
-      return builder->CreateICmpSGE(left, right, "getmp");
+      return builder.CreateICmpSGE(left, right, "getmp");
     case TType::EQ:
-      return builder->CreateICmpEQ(left, right, "eqtmp");
+      return builder.CreateICmpEQ(left, right, "eqtmp");
     case TType::NEQ:
-      return builder->CreateICmpNE(left, right, "neqtmp");
+      return builder.CreateICmpNE(left, right, "neqtmp");
     case TType::And:
-      return builder->CreateAnd(left, right, "andtmp");
+      return builder.CreateAnd(left, right, "andtmp");
     case TType::Or:
-      return builder->CreateOr(left, right, "ortmp");
+      return builder.CreateOr(left, right, "ortmp");
     case TType::Xor:
-      return builder->CreateXor(left, right, "xortmp");
+      return builder.CreateXor(left, right, "xortmp");
     case TType::SHL:
-      return builder->CreateShl(left, right, "shltmp");
+      return builder.CreateShl(left, right, "shltmp");
     case TType::SHR:
-      return builder->CreateAShr(left, right, "shrtmp"); // Arithmetic shift
+      return builder.CreateAShr(left, right, "shrtmp"); // Arithmetic shift
 
     // Compound assignments
     case TType::CompAdd: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateAdd(loadedLeft, right, "compaddtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateAdd(loadedLeft, right, "compaddtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSub: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateSub(loadedLeft, right, "compsubtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateSub(loadedLeft, right, "compsubtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMul: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateMul(loadedLeft, right, "compmultmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateMul(loadedLeft, right, "compmultmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompDiv: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateSDiv(loadedLeft, right, "compdivtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateSDiv(loadedLeft, right, "compdivtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMod: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateSRem(loadedLeft, right, "compmodtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateSRem(loadedLeft, right, "compmodtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompAnd: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateAnd(loadedLeft, right, "compandtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateAnd(loadedLeft, right, "compandtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompOr: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateOr(loadedLeft, right, "comportmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateOr(loadedLeft, right, "comportmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompXor: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateXor(loadedLeft, right, "compxortmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateXor(loadedLeft, right, "compxortmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSHL: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateShl(loadedLeft, right, "compshltmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateShl(loadedLeft, right, "compshltmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSHR: {
-      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
-      auto result = builder->CreateAShr(loadedLeft, right, "compshrtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(expr_type, left, "loadtmp");
+      auto result = builder.CreateAShr(loadedLeft, right, "compshrtmp");
+      builder.CreateStore(result, left);
       return result;
     }
 
     // Assignment
     case TType::Assign:
-      builder->CreateStore(right, left);
+      builder.CreateStore(right, left);
       return right;
 
     default:
@@ -357,107 +375,106 @@ llvm::Value *LLVMEmitter::binary_signed(llvm::IRBuilder<> *builder, llvm::Value 
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::binary_unsigned(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                          llvm::Type *left_type) {
+llvm::Value *LLVMEmitter::binary_unsigned(llvm::Value *left, llvm::Value *right, TType op, llvm::Type *left_type) {
   switch (op) {
     case TType::Add:
-      return builder->CreateAdd(left, right, "addtmp");
+      return builder.CreateAdd(left, right, "addtmp");
     case TType::Sub:
-      return builder->CreateSub(left, right, "subtmp");
+      return builder.CreateSub(left, right, "subtmp");
     case TType::Mul:
-      return builder->CreateMul(left, right, "multmp");
+      return builder.CreateMul(left, right, "multmp");
     case TType::Div:
-      return builder->CreateUDiv(left, right, "divtmp");
+      return builder.CreateUDiv(left, right, "divtmp");
     case TType::Modulo:
-      return builder->CreateURem(left, right, "modtmp");
+      return builder.CreateURem(left, right, "modtmp");
     case TType::LT:
-      return builder->CreateICmpULT(left, right, "lttmp");
+      return builder.CreateICmpULT(left, right, "lttmp");
     case TType::GT:
-      return builder->CreateICmpUGT(left, right, "gttmp");
+      return builder.CreateICmpUGT(left, right, "gttmp");
     case TType::LE:
-      return builder->CreateICmpULE(left, right, "letmp");
+      return builder.CreateICmpULE(left, right, "letmp");
     case TType::GE:
-      return builder->CreateICmpUGE(left, right, "getmp");
+      return builder.CreateICmpUGE(left, right, "getmp");
     case TType::EQ:
-      return builder->CreateICmpEQ(left, right, "eqtmp");
+      return builder.CreateICmpEQ(left, right, "eqtmp");
     case TType::NEQ:
-      return builder->CreateICmpNE(left, right, "neqtmp");
+      return builder.CreateICmpNE(left, right, "neqtmp");
     case TType::And:
-      return builder->CreateAnd(left, right, "andtmp");
+      return builder.CreateAnd(left, right, "andtmp");
     case TType::Or:
-      return builder->CreateOr(left, right, "ortmp");
+      return builder.CreateOr(left, right, "ortmp");
     case TType::Xor:
-      return builder->CreateXor(left, right, "xortmp");
+      return builder.CreateXor(left, right, "xortmp");
     case TType::SHL:
-      return builder->CreateShl(left, right, "shltmp");
+      return builder.CreateShl(left, right, "shltmp");
     case TType::SHR:
-      return builder->CreateLShr(left, right, "shrtmp"); // Logical shift
+      return builder.CreateLShr(left, right, "shrtmp"); // Logical shift
 
     // Compound assignments
     case TType::CompAdd: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateAdd(loadedLeft, right, "compaddtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateAdd(loadedLeft, right, "compaddtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSub: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateSub(loadedLeft, right, "compsubtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateSub(loadedLeft, right, "compsubtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMul: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateMul(loadedLeft, right, "compmultmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateMul(loadedLeft, right, "compmultmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompDiv: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateUDiv(loadedLeft, right, "compdivtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateUDiv(loadedLeft, right, "compdivtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMod: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateURem(loadedLeft, right, "compmodtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateURem(loadedLeft, right, "compmodtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompAnd: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateAnd(loadedLeft, right, "compandtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateAnd(loadedLeft, right, "compandtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompOr: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateOr(loadedLeft, right, "comportmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateOr(loadedLeft, right, "comportmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompXor: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateXor(loadedLeft, right, "compxortmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateXor(loadedLeft, right, "compxortmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSHL: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateShl(loadedLeft, right, "compshltmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateShl(loadedLeft, right, "compshltmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSHR: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateLShr(loadedLeft, right, "compshrtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateLShr(loadedLeft, right, "compshrtmp");
+      builder.CreateStore(result, left);
       return result;
     }
 
     // Assignment
     case TType::Assign:
-      builder->CreateStore(right, left);
+      builder.CreateStore(right, left);
       return right;
 
     default:
@@ -466,66 +483,65 @@ llvm::Value *LLVMEmitter::binary_unsigned(llvm::IRBuilder<> *builder, llvm::Valu
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::binary_fp(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                    llvm::Type *left_type) {
+llvm::Value *LLVMEmitter::binary_fp(llvm::Value *left, llvm::Value *right, TType op, llvm::Type *left_type) {
   switch (op) {
     case TType::Add:
-      return builder->CreateFAdd(left, right, "addtmp");
+      return builder.CreateFAdd(left, right, "addtmp");
     case TType::Sub:
-      return builder->CreateFSub(left, right, "subtmp");
+      return builder.CreateFSub(left, right, "subtmp");
     case TType::Mul:
-      return builder->CreateFMul(left, right, "multmp");
+      return builder.CreateFMul(left, right, "multmp");
     case TType::Div:
-      return builder->CreateFDiv(left, right, "divtmp");
+      return builder.CreateFDiv(left, right, "divtmp");
     case TType::Modulo:
-      return builder->CreateFRem(left, right, "modtmp");
+      return builder.CreateFRem(left, right, "modtmp");
     case TType::LT:
-      return builder->CreateFCmpOLT(left, right, "lttmp");
+      return builder.CreateFCmpOLT(left, right, "lttmp");
     case TType::GT:
-      return builder->CreateFCmpOGT(left, right, "gttmp");
+      return builder.CreateFCmpOGT(left, right, "gttmp");
     case TType::LE:
-      return builder->CreateFCmpOLE(left, right, "letmp");
+      return builder.CreateFCmpOLE(left, right, "letmp");
     case TType::GE:
-      return builder->CreateFCmpOGE(left, right, "getmp");
+      return builder.CreateFCmpOGE(left, right, "getmp");
     case TType::EQ:
-      return builder->CreateFCmpOEQ(left, right, "eqtmp");
+      return builder.CreateFCmpOEQ(left, right, "eqtmp");
     case TType::NEQ:
-      return builder->CreateFCmpONE(left, right, "neqtmp");
+      return builder.CreateFCmpONE(left, right, "neqtmp");
 
     // Compound assignments
     case TType::CompAdd: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateFAdd(loadedLeft, right, "compaddtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateFAdd(loadedLeft, right, "compaddtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompSub: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateFSub(loadedLeft, right, "compsubtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateFSub(loadedLeft, right, "compsubtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMul: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateFMul(loadedLeft, right, "compmultmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateFMul(loadedLeft, right, "compmultmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompDiv: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateFDiv(loadedLeft, right, "compdivtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateFDiv(loadedLeft, right, "compdivtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     case TType::CompMod: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
-      auto result = builder->CreateFRem(loadedLeft, right, "compmodtmp");
-      builder->CreateStore(result, left);
+      auto loadedLeft = builder.CreateLoad(left_type, left, "loadtmp");
+      auto result = builder.CreateFRem(loadedLeft, right, "compmodtmp");
+      builder.CreateStore(result, left);
       return result;
     }
     // Assignment
     case TType::Assign:
-      builder->CreateStore(right, left);
+      builder.CreateStore(right, left);
       return right;
 
     default:
@@ -534,8 +550,7 @@ llvm::Value *LLVMEmitter::binary_fp(llvm::IRBuilder<> *builder, llvm::Value *lef
   return nullptr;
 }
 
-llvm::Value *cast_scalar(llvm::IRBuilder<> *builder, llvm::Value *value, llvm::Type *type, bool from_signed,
-                         bool to_signed) {
+llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, llvm::Type *type, bool from_signed, bool to_signed) {
   if (value->getType() == type) {
     return value;
   }
@@ -543,40 +558,40 @@ llvm::Value *cast_scalar(llvm::IRBuilder<> *builder, llvm::Value *value, llvm::T
   if (value->getType()->isIntegerTy() && type->isIntegerTy()) {
     if (value->getType()->getIntegerBitWidth() < type->getIntegerBitWidth()) {
       if (from_signed) {
-        return builder->CreateSExt(value, type, "sexttmp");
+        return builder.CreateSExt(value, type, "sexttmp");
       } else {
-        return builder->CreateZExt(value, type, "zexttmp");
+        return builder.CreateZExt(value, type, "zexttmp");
       }
     } else if (value->getType()->getIntegerBitWidth() > type->getIntegerBitWidth()) {
-      return builder->CreateTrunc(value, type, "trunctmp");
+      return builder.CreateTrunc(value, type, "trunctmp");
     }
   } else if (value->getType()->isFloatingPointTy() && type->isFloatingPointTy()) {
     if (value->getType()->getPrimitiveSizeInBits() < type->getPrimitiveSizeInBits()) {
-      return builder->CreateFPExt(value, type, "fpexttmp");
+      return builder.CreateFPExt(value, type, "fpexttmp");
     } else if (value->getType()->getPrimitiveSizeInBits() > type->getPrimitiveSizeInBits()) {
-      return builder->CreateFPTrunc(value, type, "fptrunctmp");
+      return builder.CreateFPTrunc(value, type, "fptrunctmp");
     }
   } else if (value->getType()->isIntegerTy() && type->isFloatingPointTy()) {
     if (from_signed) {
-      return builder->CreateSIToFP(value, type, "sitofptmp");
+      return builder.CreateSIToFP(value, type, "sitofptmp");
     } else {
-      return builder->CreateUIToFP(value, type, "uitofptmp");
+      return builder.CreateUIToFP(value, type, "uitofptmp");
     }
   } else if (value->getType()->isFloatingPointTy() && type->isIntegerTy()) {
     if (to_signed) {
-      return builder->CreateFPToSI(value, type, "fptositmp");
+      return builder.CreateFPToSI(value, type, "fptositmp");
     } else {
-      return builder->CreateFPToUI(value, type, "fptouitmp");
+      return builder.CreateFPToUI(value, type, "fptouitmp");
     }
   } else if (value->getType()->isPointerTy() && type->isPointerTy()) {
-    return builder->CreateBitCast(value, type, "bitcasttmp");
+    return builder.CreateBitCast(value, type, "bitcasttmp");
   }
 
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                         Type *expr_ty, ScalarTypeInfo *left_info, ScalarTypeInfo *right_info) {
+llvm::Value *LLVMEmitter::binary_scalars(llvm::Value *left, llvm::Value *right, TType op, Type *expr_ty,
+                                         ScalarTypeInfo *left_info, ScalarTypeInfo *right_info) {
   auto expr_ty_info = expr_ty->get_info()->as<ScalarTypeInfo>();
 
   Token temp_token = {};
@@ -584,9 +599,9 @@ llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value
   const bool is_assignment = temp_token.is_comp_assign() || op == TType::Assign;
 
   auto type = llvm_typeof(expr_ty);
-  right = cast_scalar(builder, right, type, right_info->is_signed(), expr_ty_info->is_signed());
+  right = cast_scalar(right, type, right_info->is_signed(), expr_ty_info->is_signed());
   if (!is_assignment) {
-    left = cast_scalar(builder, left, type, left_info->is_signed(), expr_ty_info->is_signed());
+    left = cast_scalar(left, type, left_info->is_signed(), expr_ty_info->is_signed());
   }
 
   switch (expr_ty_info->scalar_type) {
@@ -594,17 +609,17 @@ llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value
     case TYPE_S16:
     case TYPE_S32:
     case TYPE_S64:
-      return binary_signed(builder, left, right, op, type);
+      return binary_signed(left, right, op, type);
     case TYPE_CHAR:
     case TYPE_BOOL:
     case TYPE_U8:
     case TYPE_U16:
     case TYPE_U32:
     case TYPE_U64:
-      return binary_unsigned(builder, left, right, op, type);
+      return binary_unsigned(left, right, op, type);
     case TYPE_FLOAT:
     case TYPE_DOUBLE:
-      return binary_fp(builder, left, right, op, type);
+      return binary_fp(left, right, op, type);
       break;
     case TYPE_VOID:
       break;
