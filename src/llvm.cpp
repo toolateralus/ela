@@ -625,25 +625,26 @@ llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, 
   temp_token.type = op;
   const bool is_assignment = temp_token.is_comp_assign() || op == TType::Assign;
 
-  auto type = llvm_typeof(expr_ty);
-
   auto right_ty = global_get_type(right_ast->resolved_type);
+  auto left_ty = global_get_type(left_ast->resolved_type);
+  auto llvm_left_ty = llvm_typeof(left_ty);
   auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
+  auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
   if (right_ast->get_node_type() == AST_NODE_PATH) {
     // this might not work when path is for a function without an address of operator
     right = builder.CreateLoad(llvm_typeof(right_ty), right);
   }
-  right = cast_scalar(right, type, right_info->is_signed(), expr_ty_info->is_signed());
+  right = cast_scalar(right, llvm_left_ty, right_info->is_signed(), expr_ty_info->is_signed());
 
   if (!is_assignment) {
-    auto left_ty = global_get_type(left_ast->resolved_type);
-    auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
     if (left_ast->get_node_type() == AST_NODE_PATH) {
       // this might not work when path is for a function without an address of operator
-      left = builder.CreateLoad(llvm_typeof(left_ty), left);
+      left = builder.CreateLoad(llvm_left_ty, left);
     }
-    left = cast_scalar(left, type, left_info->is_signed(), expr_ty_info->is_signed());
+    left = cast_scalar(left, llvm_left_ty, left_info->is_signed(), expr_ty_info->is_signed());
   }
+
+  auto type = llvm_typeof(expr_ty);
 
   switch (expr_ty_info->scalar_type) {
     case TYPE_S8:
