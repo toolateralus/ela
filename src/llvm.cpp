@@ -4,6 +4,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include <alloca.h>
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
@@ -119,7 +120,6 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
 llvm::Value *LLVMEmitter::visit_call(ASTCall *node) { 
   llvm::Value *callee = visit_expr(node->function);
   std::vector<llvm::Value *> args;
-
   for (const auto &arg : node->arguments->arguments) {
     auto arg_value = visit_expr(arg);
     auto arg_type = global_get_type(arg->resolved_type);
@@ -305,21 +305,40 @@ void LLVMEmitter::visit_variable(ASTVariable *node) {
   }
 }
 
-void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {}
-void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {}
-void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
-void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {}
+void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {
+  if (node->is_emitted) return;
+  if (node->generic_parameters.size()) return;
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
+  if (node->generic_parameters.size()) return;
+  if (node->is_emitted) return;
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
 
+void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {
+  
+}
+
+/* These probably will never ever get used. We should remove them */
 void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_alias(ASTAlias *node) {}
 void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
 void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
+/* end unneccesary nodes. */
 
 void LLVMEmitter::visit_impl(ASTImpl *node) {}
 void LLVMEmitter::visit_module(ASTModule *node) {}
 void LLVMEmitter::visit_import(ASTImport *node) {}
 
 void LLVMEmitter::visit_arguments(ASTArguments *node) {}
+
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
 void LLVMEmitter::visit_for(ASTFor *node) {}

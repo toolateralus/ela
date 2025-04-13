@@ -405,13 +405,16 @@ struct LLVMEmitter {
         auto struct_name = info->scope->full_name();
         auto llvm_struct_type = llvm::StructType::create(llvm_ctx, struct_name);
 
-        // Memoize the forward declaration
         type_pair forward_pair = {llvm_struct_type, nullptr};
         memoized_types.insert({type, forward_pair});
 
-        // Populate the struct
+        bool is_union = HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION);
+
         std::vector<llvm::Type *> member_types;
         std::vector<llvm::Metadata *> member_debug_info;
+
+        llvm::Type *largest_member_type = nullptr;
+        uint64_t largest_member_size = 0;
 
         for (const auto &[name, symbol] : info->scope->symbols) {
           if (!symbol.is_variable())
@@ -420,9 +423,22 @@ struct LLVMEmitter {
           auto member_type = global_get_type(symbol.type_id);
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member_type);
 
-          member_types.push_back(llvm_member_type);
-          member_debug_info.push_back(
-              dbg.create_variable(dbg.current_scope(), name.get_str(), file, 0, di_member_type));
+          if (is_union) {
+            uint64_t member_size = data_layout.getTypeAllocSize(llvm_member_type);
+            if (member_size > largest_member_size) {
+              largest_member_size = member_size;
+              largest_member_type = llvm_member_type;
+            }
+          } else {
+            // For structs, add all members
+            member_types.push_back(llvm_member_type);
+          }
+
+          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.get_str(), file, 0, di_member_type));
+        }
+
+        if (is_union) {
+          member_types.push_back(largest_member_type);
         }
 
         llvm_struct_type->setBody(member_types);
