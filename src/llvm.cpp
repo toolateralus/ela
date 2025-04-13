@@ -476,236 +476,238 @@ llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value
     }
   }
 
-  // switch (left_info->scalar_type) {
-  //   case TYPE_S8: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_S16: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_S32: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_S64: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_U8: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_U16: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_U32: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_U64: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_FLOAT: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_DOUBLE: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_CHAR: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   case TYPE_BOOL: {
-  //     switch (right_info->scalar_type) {
-  //       case TYPE_S8:
-  //       case TYPE_S16:
-  //       case TYPE_S32:
-  //       case TYPE_S64:
-  //       case TYPE_U8:
-  //       case TYPE_U16:
-  //       case TYPE_U32:
-  //       case TYPE_U64:
-  //       case TYPE_FLOAT:
-  //       case TYPE_DOUBLE:
-  //       case TYPE_CHAR:
-  //       case TYPE_BOOL:
-  //         break;
-  //       default:
-  //         return nullptr;
-  //     }
-  //   } break;
-  //   default:
-  //     break;
-  // }
+  switch (left_info->scalar_type) {
+    case TYPE_S8: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_S16: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_S32: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_S64: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_U8: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_U16: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_U32: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_U64: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_FLOAT: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_DOUBLE: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_CHAR: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    case TYPE_BOOL: {
+      switch (right_info->scalar_type) {
+        case TYPE_S8:
+        case TYPE_S16:
+        case TYPE_S32:
+        case TYPE_S64:
+        case TYPE_U8:
+        case TYPE_U16:
+        case TYPE_U32:
+        case TYPE_U64:
+        case TYPE_FLOAT:
+        case TYPE_DOUBLE:
+        case TYPE_CHAR:
+        case TYPE_BOOL:
+          break;
+        default:
+          return nullptr;
+      }
+    } break;
+    default:
+      break;
+  }
+  
+  return nullptr;
 }
