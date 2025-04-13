@@ -3,14 +3,23 @@
 #include "constexpr.hpp"
 #include "core.hpp"
 #include "type.hpp"
+
 #include "llvm/IR/LLVMContext.h"
 #include "llvm/IR/IRBuilder.h"
 #include "llvm/IR/Module.h"
 #include "llvm/IR/DIBuilder.h"
+#include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/DataLayout.h>
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Value.h>
+#include <llvm/Support/CodeGen.h>
+#include <llvm/Support/CommandLine.h>
+#include <llvm/Support/TargetSelect.h>
+#include <llvm/Target/TargetMachine.h>
+#include <llvm/TargetParser/Triple.h>
+#include <llvm/Target/TargetOptions.h>
+#include <llvm/MC/TargetRegistry.h>
 #include <map>
 #include <memory>
 #include <stack>
@@ -134,14 +143,36 @@ struct LLVMEmitter {
 
   std::unique_ptr<llvm::Module> module;
   std::shared_ptr<DIBuilder> di_builder;
-  DataLayout *data_layout;
+  llvm::Target *target;
+  llvm::DataLayout data_layout;
+  llvm::TargetMachine *target_machine;
   bool dont_load;
   DIManager dbg;
 
-  LLVMEmitter(Context &ctx)
+  inline LLVMEmitter(Context &ctx)
       : ctx(ctx), llvm_ctx(), builder(llvm_ctx), module(std::make_unique<llvm::Module>("module", llvm_ctx)),
-        di_builder(std::make_shared<DIBuilder>(*module)), data_layout(nullptr), dont_load(false), dbg(di_builder) {
-    data_layout = new DataLayout("e-m:e-i64:64-f80:128-n8:16:32:64-S128");
+        di_builder(std::make_shared<DIBuilder>(*module)), dont_load(false), dbg(di_builder), data_layout("") {
+
+    llvm::InitializeAllTargetInfos();
+    llvm::InitializeAllTargets();
+    llvm::InitializeAllTargetMCs();
+    llvm::InitializeAllAsmParsers();
+    llvm::InitializeAllAsmPrinters();
+
+    std::string error;
+    auto target_triple = "x86_64-pc-linux-gnu";
+    module->setTargetTriple(target_triple);
+
+    auto target = llvm::TargetRegistry::lookupTarget(target_triple, error);
+    if (!target) {
+      throw std::runtime_error("Failed to lookup target: " + error);
+    }
+
+    llvm::TargetOptions opt;
+    auto reloc_model = llvm::Reloc::Model::PIC_;
+    auto target_machine = target->createTargetMachine(target_triple, "generic", "", opt, reloc_model);
+    module->setDataLayout(data_layout = target_machine->createDataLayout());
+    module->setTargetTriple(target_machine->getTargetTriple().str());
   }
 
   using type_pair = std::pair<llvm::Type *, llvm::DIType *>;
@@ -272,8 +303,8 @@ struct LLVMEmitter {
         llvm_struct_type->setBody(member_types);
 
         auto di_struct_type = dbg.create_struct_type(
-            dbg.current_scope(), struct_name, file, 0, data_layout->getTypeAllocSize(llvm_struct_type) * 8,
-            data_layout->getABITypeAlign(llvm_struct_type).value() * 8, llvm::DINode::FlagZero, member_debug_info);
+            dbg.current_scope(), struct_name, file, 0, data_layout.getTypeAllocSize(llvm_struct_type) * 8,
+            data_layout.getABITypeAlign(llvm_struct_type).value() * 8, llvm::DINode::FlagZero, member_debug_info);
 
         type_pair final_pair = {llvm_struct_type, di_struct_type};
         memoized_types[type] = final_pair;
@@ -330,8 +361,8 @@ struct LLVMEmitter {
         llvm_tuple_type->setBody(element_types);
 
         auto di_tuple_type = dbg.create_struct_type(
-            dbg.current_scope(), tuple_name, file, 0, data_layout->getTypeAllocSize(llvm_tuple_type) * 8,
-            data_layout->getABITypeAlign(llvm_tuple_type).value() * 8, llvm::DINode::FlagZero, element_debug_info);
+            dbg.current_scope(), tuple_name, file, 0, data_layout.getTypeAllocSize(llvm_tuple_type) * 8,
+            data_layout.getABITypeAlign(llvm_tuple_type).value() * 8, llvm::DINode::FlagZero, element_debug_info);
 
         type_pair final_pair = {llvm_tuple_type, di_tuple_type};
         memoized_types[type] = final_pair;
@@ -365,8 +396,8 @@ struct LLVMEmitter {
             variant_debug_info.push_back(
                 dbg.create_struct_type(dbg.current_scope(), variant_name.get_str(), file,
                                        0, // Line number (can be set if needed)
-                                       data_layout->getTypeAllocSize(llvm_payload_type) * 8,        // Size in bits
-                                       data_layout->getABITypeAlign(llvm_payload_type).value() * 8, // Alignment in bits
+                                       data_layout.getTypeAllocSize(llvm_payload_type) * 8,        // Size in bits
+                                       data_layout.getABITypeAlign(llvm_payload_type).value() * 8, // Alignment in bits
                                        llvm::DINode::FlagZero, {di_payload_type}));
           }
         }
@@ -374,8 +405,8 @@ struct LLVMEmitter {
         llvm_choice_type->setBody(choice_fields);
 
         auto di_choice_type = dbg.create_struct_type(
-            dbg.current_scope(), choice_name, file, 0, data_layout->getTypeAllocSize(llvm_choice_type) * 8,
-            data_layout->getABITypeAlign(llvm_choice_type).value() * 8, llvm::DINode::FlagZero, variant_debug_info);
+            dbg.current_scope(), choice_name, file, 0, data_layout.getTypeAllocSize(llvm_choice_type) * 8,
+            data_layout.getABITypeAlign(llvm_choice_type).value() * 8, llvm::DINode::FlagZero, variant_debug_info);
 
         type_pair final_pair = {llvm_choice_type, di_choice_type};
         memoized_types[type] = final_pair;
@@ -409,8 +440,8 @@ struct LLVMEmitter {
         llvm_dyn_type->setBody(dyn_fields);
 
         auto di_dyn_type = dbg.create_struct_type(
-            dbg.current_scope(), dyn_name, file, 0, data_layout->getTypeAllocSize(llvm_dyn_type) * 8,
-            data_layout->getABITypeAlign(llvm_dyn_type).value() * 8, llvm::DINode::FlagZero, dyn_debug_info);
+            dbg.current_scope(), dyn_name, file, 0, data_layout.getTypeAllocSize(llvm_dyn_type) * 8,
+            data_layout.getABITypeAlign(llvm_dyn_type).value() * 8, llvm::DINode::FlagZero, dyn_debug_info);
 
         type_pair final_pair = {llvm_dyn_type, di_dyn_type};
         memoized_types[type] = final_pair;

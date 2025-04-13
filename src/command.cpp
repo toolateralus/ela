@@ -87,27 +87,27 @@ int CompileCommand::compile() {
   lower.end("lowering to cpp complete");
   int result = 0;
 
-  /* 
+  /*
     TODO: we need to use a 'target_machine' thing to setup the target triple etc.
   */
   {
     // Finalize the LLVM IR and compile it to an executable
-    std::string output_filename = std::filesystem::path(get_source_filename(root->source_range)).filename().replace_extension("");
+    std::string output_filename =
+        std::filesystem::path(get_source_filename(root->source_range)).filename().replace_extension("");
     std::error_code ec;
     llvm::raw_fd_ostream dest(output_filename + ".ll", ec, (llvm::sys::fs::OpenFlags)0);
 
     if (ec) {
       std::cerr << "Could not open file: " << ec.message() << std::endl;
       return 1;
-    } 
+    }
 
+    emitter.di_builder->finalize();
     emitter.module->print(dest, nullptr);
     dest.flush();
 
-    std::string link_command = "clang++ " + output_filename + ".ll -o " + output_filename;
-    if (std::system(link_command.c_str()) != 0) {
-      std::cerr << "Error: linking failed!" << std::endl;
-    }
+    auto llc_command = std::format("clang -lc -lm {}.ll -o {}", output_filename, output_filename);
+    system(llc_command.c_str());
   }
   std::filesystem::current_path(original_path);
   print_metrics();
