@@ -4,26 +4,27 @@
 #include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
+#include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
+#include <llvm/TargetParser/Triple.h>
 
 void LLVMEmitter::visit_program(ASTProgram *node) {
   size_t index = 0;
-
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {
       ctx.set_scope(node->scope);
       this->module->setSourceFileName(node->source_range.begin_location.filename());
-      dbg.enter_file_scope(node->source_range);
+      file = dbg.enter_file_scope(node->source_range);
+      di_builder->createCompileUnit(llvm::dwarf::DW_LANG_lo_user, file, "Ela", false, "", 0);
     }
     visit_node(statement);
     index++;
   }
-
   dbg.pop_scope();
 }
 
@@ -81,7 +82,9 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
 
   auto old_scope = ctx.scope;
   ctx.set_scope(node->block.get()->scope);
-  dbg.enter_function_scope(dbg.current_scope(), func, name, node->source_range);
+
+  auto subprogram = dbg.enter_function_scope(dbg.current_scope(), func, name, node->source_range);
+  func->setSubprogram(subprogram);
 
   auto index = 0;
   for (auto &param : func->args()) {
@@ -96,7 +99,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
     index++;
   }
 
-  visit_node(node->block.get());
+  visit_block(node->block.get());
 
   if (!builder.GetInsertBlock()->getTerminator()) {
     if (return_type->id == void_type()) {
@@ -113,11 +116,13 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
 llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) {
   auto old_scope = ctx.scope;
   ctx.scope = node->scope;
+  dbg.enter_lexical_scope(dbg.current_scope(), node->source_range);
 
   for (const auto &statement : node->statements) {
     visit_node(statement);
   }
 
+  dbg.pop_scope();
   ctx.scope = old_scope;
   return nullptr;
 }
