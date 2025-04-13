@@ -234,10 +234,11 @@ llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_lambda(ASTLambda *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
-  auto type = global_get_type(node->resolved_type);
+  auto type = global_get_type(node->target_type->resolved_type);
   auto llvm_type = llvm_typeof(type);
   auto data_layout = module->getDataLayout();
-  auto size = data_layout.getTypeStoreSize(llvm_type);
+  auto bitsize = data_layout.getTypeSizeInBits(llvm_type);
+  auto size = bitsize > 1 ? bitsize / 8 : bitsize;
   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
   /*
     TODO: attach debug info
@@ -257,12 +258,6 @@ llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   return cast_scalar(visit_expr(node->expression), llvm_typeof(target), is_signed(from), is_signed(target));
 }
 
-void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {}
-void LLVMEmitter::visit_module(ASTModule *node) {}
-void LLVMEmitter::visit_import(ASTImport *node) {}
-
-void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
-void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
 void LLVMEmitter::visit_variable(ASTVariable *node) {
   auto var_type = global_get_type(node->type->resolved_type);
   auto llvm_var_type = llvm_typeof(var_type);
@@ -277,6 +272,22 @@ void LLVMEmitter::visit_variable(ASTVariable *node) {
     builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
   }
 }
+
+void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {}
+void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {}
+void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
+void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {}
+
+void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
+void LLVMEmitter::visit_alias(ASTAlias *node) {}
+void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
+void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
+
+void LLVMEmitter::visit_impl(ASTImpl *node) {}
+void LLVMEmitter::visit_module(ASTModule *node) {}
+void LLVMEmitter::visit_import(ASTImport *node) {}
+
+
 void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
@@ -284,19 +295,19 @@ void LLVMEmitter::visit_for(ASTFor *node) {}
 void LLVMEmitter::visit_if(ASTIf *node) {}
 void LLVMEmitter::visit_else(ASTElse *node) {}
 void LLVMEmitter::visit_while(ASTWhile *node) {}
-void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {}
-void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
-void LLVMEmitter::visit_alias(ASTAlias *node) {}
-void LLVMEmitter::visit_impl(ASTImpl *node) {}
+
 void LLVMEmitter::visit_defer(ASTDefer *node) {}
-void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {}
-void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_where(ASTWhere *node) {}
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit_expr(node->operand);
   auto type = global_get_type(node->operand->resolved_type);
   auto llvm_type = llvm_typeof(type);
+
+  /* 
+    TODO: we need to handle casting and typing better here.
+    very wrong.
+  */
   switch (node->op.type) {
     case TType::LogicalNot: {
       auto zero = llvm::ConstantInt::get(operand->getType(), 0);
