@@ -134,7 +134,18 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
       auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
-      return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, std::stoll(node->value.get_str()), true));
+      std::string value_str = node->value.get_str();
+      int64_t value = 0;
+
+      if (value_str.size() > 2 && value_str[0] == '0' && (value_str[1] == 'x' || value_str[1] == 'X')) {
+        value = std::stoll(value_str, nullptr, 16);
+      } else if (value_str.size() > 2 && value_str[0] == '0' && (value_str[1] == 'b' || value_str[1] == 'B')) {
+        value = std::stoll(value_str.substr(2), nullptr, 2);
+      } else {
+        value = std::stoll(value_str);
+      }
+
+      return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, value, true));
     }
     case ASTLiteral::Float: {
       return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stod(node->value.get_str())));
