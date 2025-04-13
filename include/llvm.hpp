@@ -450,9 +450,7 @@ struct LLVMEmitter {
     return {};
   }
 
-  inline llvm::Type *llvm_typeof(Type *type) {
-    return llvm_typeof_impl(type).first;
-  }
+  inline llvm::Type *llvm_typeof(Type *type) { return llvm_typeof_impl(type).first; }
 
   llvm::Value *visit_method_call(ASTMethodCall *node);
   llvm::Value *visit_path(ASTPath *node);
@@ -748,4 +746,16 @@ struct LLVMEmitter {
         return nullptr;
     }
   }
+
+  llvm::Value *binary_signed(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
+                             llvm::Type *left_type = nullptr);
+
+  llvm::Value *binary_unsigned(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
+                               llvm::Type *left_type = nullptr);
+
+  llvm::Value *binary_fp(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
+                         llvm::Type *left_type = nullptr);
+
+  llvm::Value *binary_scalars(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
+                              Type *left_ty, Type *right_ty, ScalarTypeInfo *left_info, ScalarTypeInfo *right_info);
 };
