@@ -138,7 +138,7 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
     case ASTLiteral::Float:
       return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stod(node->value.get_str())));
     case ASTLiteral::String:
-      return builder.CreateGlobalStringPtr(node->value.get_str());
+      return builder.CreateGlobalString(node->value.get_str());
     case ASTLiteral::Char:
       return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(8, node->value.get_str()[0], false));
     case ASTLiteral::Bool:
