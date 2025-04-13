@@ -14,13 +14,15 @@
 #include <llvm/TargetParser/Triple.h>
 
 void LLVMEmitter::visit_program(ASTProgram *node) {
+
+  this->module->setSourceFileName(node->source_range.begin_location.filename());
+  file = dbg.enter_file_scope(node->source_range);
+  di_builder->createCompileUnit(llvm::dwarf::DW_LANG_C, file, "0.01", false, "", 0);
+
   size_t index = 0;
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {
       ctx.set_scope(node->scope);
-      this->module->setSourceFileName(node->source_range.begin_location.filename());
-      file = dbg.enter_file_scope(node->source_range);
-      di_builder->createCompileUnit(llvm::dwarf::DW_LANG_lo_user, file, "Ela", false, "", 0);
     }
     visit_node(statement);
     index++;
@@ -51,8 +53,6 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   } else {
     node->is_emitted = true;
   }
-
-  std::printf("emitting function %s\n", node->name.get_str().c_str());
 
   auto name = get_mangled_name(ctx.scope->lookup(node->name));
   auto return_type = global_get_type(node->return_type->resolved_type);

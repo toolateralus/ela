@@ -106,7 +106,7 @@ int CompileCommand::compile() {
     emitter.module->print(dest, nullptr);
     dest.flush();
 
-    auto llc_command = std::format("clang -lc -lm {}.ll -o {}", output_filename, output_filename);
+    auto llc_command = std::format("clang -g -lc -lm {}.ll -o {}", output_filename, output_filename);
     system(llc_command.c_str());
   }
   std::filesystem::current_path(original_path);
