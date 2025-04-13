@@ -955,3 +955,15 @@ int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const 
   }
   return -1;
 }
+
+int StructTypeInfo::get_field_index(const InternedString &name) const {
+  int index = 0;
+  for (const auto &[sym_name, sym] : scope->symbols) {
+    if (!sym.is_variable()) continue;
+    if (sym_name == name) {
+      return index;
+    }
+    ++index;
+  }
+  return -1;
+}

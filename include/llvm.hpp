@@ -434,7 +434,8 @@ struct LLVMEmitter {
             member_types.push_back(llvm_member_type);
           }
 
-          member_debug_info.push_back(dbg.create_variable(dbg.current_scope(), name.get_str(), file, 0, di_member_type));
+          member_debug_info.push_back(
+              dbg.create_variable(dbg.current_scope(), name.get_str(), file, 0, di_member_type));
         }
 
         if (is_union) {
@@ -527,20 +528,30 @@ struct LLVMEmitter {
         };
         std::vector<llvm::Metadata *> variant_debug_info;
 
+        size_t largest_member_size = 0;
+        llvm::Type *largest_payload_type = nullptr;
+
         for (const auto &[variant_name, variant_info] : info->variants) {
           auto variant_type = global_get_type(variant_info);
 
           if (variant_type->id != void_type()) {
             auto [llvm_payload_type, di_payload_type] = llvm_typeof_impl(variant_type);
-            choice_fields.push_back(llvm_payload_type);
 
-            variant_debug_info.push_back(
-                dbg.create_struct_type(dbg.current_scope(), variant_name.get_str(), file,
-                                       0, // Line number (can be set if needed)
-                                       data_layout.getTypeAllocSize(llvm_payload_type) * 8,        // Size in bits
-                                       data_layout.getABITypeAlign(llvm_payload_type).value() * 8, // Alignment in bits
-                                       llvm::DINode::FlagZero, {di_payload_type}));
+            uint64_t member_size = data_layout.getTypeAllocSize(llvm_payload_type);
+            if (member_size > largest_member_size) {
+              largest_member_size = member_size;
+              largest_payload_type = llvm_payload_type;
+            }
+
+            variant_debug_info.push_back(dbg.create_struct_type(
+                dbg.current_scope(), variant_name.get_str(), file, 0,
+                data_layout.getTypeAllocSize(llvm_payload_type) * 8,
+                data_layout.getABITypeAlign(llvm_payload_type).value() * 8, llvm::DINode::FlagZero, {di_payload_type}));
           }
+        }
+
+        if (largest_payload_type) {
+          choice_fields.push_back(largest_payload_type);
         }
 
         llvm_choice_type->setBody(choice_fields);

@@ -239,6 +239,7 @@ struct StructTypeInfo : TypeInfo {
   int flags;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
+  int get_field_index(const InternedString &name) const;
 };
 
 struct TupleTypeInfo : TypeInfo {

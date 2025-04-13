@@ -117,7 +117,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   ctx.scope = old_scope;
 }
 
-llvm::Value *LLVMEmitter::visit_call(ASTCall *node) { 
+llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
   llvm::Value *callee = visit_expr(node->function);
   std::vector<llvm::Value *> args;
   for (const auto &arg : node->arguments->arguments) {
@@ -247,7 +247,64 @@ llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
 
 llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_subscript(ASTSubscript *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) { return nullptr; }
+
+llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
+  auto type = global_get_type(node->resolved_type);
+  switch (node->tag) {
+    case ASTInitializerList::INIT_LIST_EMPTY: {
+      auto llvm_type = llvm_typeof(type);
+      auto alloca_inst = builder.CreateAlloca(llvm_type);
+      builder.CreateStore(llvm::ConstantAggregateZero::get(llvm_type), alloca_inst);
+      return alloca_inst;
+    }
+    case ASTInitializerList::INIT_LIST_NAMED: {
+      auto struct_type = llvm::cast<llvm::StructType>(llvm_typeof(type));
+      auto alloca_inst = builder.CreateAlloca(struct_type);
+      auto info = type->get_info()->as<StructTypeInfo>();
+
+      for (const auto &[key, value] : node->key_values) {
+        const auto field_index = info->get_field_index(key);
+        const auto field_type = global_get_type(value->resolved_type);
+        auto field_value = visit_expr(value);
+        field_value = load_value(value, field_value);
+        auto field_ptr = builder.CreateStructGEP(struct_type, alloca_inst, field_index);
+        builder.CreateStore(field_value, field_ptr);
+      }
+
+      return alloca_inst;
+    }
+    case ASTInitializerList::INIT_LIST_COLLECTION: {
+      auto element_type = global_get_type(type->generic_args[0]);
+      auto llvm_element_type = llvm_typeof(element_type);
+
+      auto array_size = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), node->values.size());
+      auto array_alloca = builder.CreateAlloca(llvm_element_type, array_size);
+
+      for (size_t i = 0; i < node->values.size(); ++i) {
+        auto value = visit_expr(node->values[i]);
+        value = load_value(node->values[i], value);
+
+        auto element_ptr = builder.CreateGEP(llvm_element_type, array_alloca,
+                                             llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), i));
+        builder.CreateStore(value, element_ptr);
+      }
+
+      if (type->get_base().get_str().starts_with("InitList$")) {
+        auto struct_type = llvm::cast<llvm::StructType>(llvm_typeof(type));
+        auto alloca_inst = builder.CreateAlloca(struct_type);
+        auto array_ptr = builder.CreateStructGEP(struct_type, alloca_inst, 0);
+        builder.CreateStore(array_alloca, array_ptr);
+        auto length_ptr = builder.CreateStructGEP(struct_type, alloca_inst, 1);
+        builder.CreateStore(array_size, length_ptr);
+        return alloca_inst;
+      }
+
+      return array_alloca;
+    }
+  }
+  return nullptr;
+}
+
 llvm::Value *LLVMEmitter::visit_range(ASTRange *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_switch(ASTSwitch *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) { return nullptr; }
@@ -259,9 +316,6 @@ llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   auto data_layout = module->getDataLayout();
   auto bitsize = data_layout.getTypeSizeInBits(llvm_type);
   auto size = bitsize > 1 ? bitsize / 8 : bitsize;
-  /*
-    TODO: attach debug info
-  */
   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
 }
 
@@ -278,11 +332,6 @@ llvm::Value *LLVMEmitter::load_value(ASTNode *node, llvm::Value *expr) {
 llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   auto target = global_get_type(node->target_type->resolved_type);
   auto from = global_get_type(node->expression->resolved_type);
-
-  /*
-    TODO: probably need to handle more types here.
-  */
-
   auto expr = visit_expr(node->expression);
   expr = load_value(node->expression, expr);
   return cast_scalar(expr, from, target);
@@ -304,38 +353,42 @@ void LLVMEmitter::visit_variable(ASTVariable *node) {
 }
 
 void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {
-  if (node->is_emitted) return;
-  if (node->generic_parameters.size()) return;
-  node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
-}
-void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
-  node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
-}
-void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
-  if (node->generic_parameters.size()) return;
-  if (node->is_emitted) return;
+  if (node->is_emitted)
+    return;
+  if (node->generic_parameters.size())
+    return;
   node->is_emitted = true;
   llvm_typeof(global_get_type(node->resolved_type));
 }
 
-void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {
-  
+void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
 }
+
+void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
+  if (node->generic_parameters.size())
+    return;
+  if (node->is_emitted)
+    return;
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+
+void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
 
 /* These probably will never ever get used. We should remove them */
 void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_alias(ASTAlias *node) {}
 void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
 void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
+void LLVMEmitter::visit_arguments(ASTArguments *node) {}
+void LLVMEmitter::visit_where(ASTWhere *node) {}
 /* end unneccesary nodes. */
 
 void LLVMEmitter::visit_impl(ASTImpl *node) {}
 void LLVMEmitter::visit_module(ASTModule *node) {}
 void LLVMEmitter::visit_import(ASTImport *node) {}
-
-void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
@@ -345,7 +398,6 @@ void LLVMEmitter::visit_else(ASTElse *node) {}
 void LLVMEmitter::visit_while(ASTWhile *node) {}
 
 void LLVMEmitter::visit_defer(ASTDefer *node) {}
-void LLVMEmitter::visit_where(ASTWhere *node) {}
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit_expr(node->operand);
@@ -370,7 +422,7 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
     builder.CreateStore(decremented, operand);
     return decremented;
   }
-  
+
   operand = load_value(node->operand, operand);
 
   switch (node->op.type) {
