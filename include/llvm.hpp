@@ -246,7 +246,7 @@ struct LLVMEmitter {
         auto info = type->get_info()->as<StructTypeInfo>();
 
         // Forward declaration for recursive types
-        auto struct_name = type->get_base().get_str();
+        auto struct_name = info->scope->full_name();
         auto llvm_struct_type = llvm::StructType::create(llvm_ctx, struct_name);
 
         // Memoize the forward declaration
@@ -292,7 +292,7 @@ struct LLVMEmitter {
         }
 
         auto [underlying_type, underlying_di_type] = llvm_typeof_impl(global_get_type(info->element_type));
-        auto enum_name = type->get_base().get_str();
+        auto enum_name = info->scope->full_name();
         auto di_enum_type =
             di_builder->createEnumerationType(dbg.current_scope(), enum_name, file, 0, 32, 32,
                                               di_builder->getOrCreateArray(enumerators), underlying_di_type);
@@ -402,7 +402,7 @@ struct LLVMEmitter {
 
         for (const auto &[method_name, method_type] : info->methods) {
           auto [llvm_function_type, di_function_type] = llvm_typeof_impl(method_type);
-          dyn_fields.push_back(llvm_function_type->getPointerTo());
+          dyn_fields.push_back(llvm::PointerType::get(llvm_function_type, 0));
           dyn_debug_info.push_back(dbg.create_function_type(di_function_type));
         }
 
