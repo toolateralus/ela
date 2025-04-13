@@ -6,6 +6,8 @@
 #include "type.hpp"
 #include <llvm/BinaryFormat/Dwarf.h>
 #include <llvm/IR/DerivedTypes.h>
+#include <llvm/IR/Function.h>
+#include <llvm/IR/GlobalValue.h>
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
@@ -68,32 +70,34 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto function_symbol = ctx.scope->local_lookup(name);
   function_symbol->llvm_value = func;
 
-  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN)) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN) || HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     return;
   } else if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
     return;
-  } else if (HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
-    return;
+  } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE)) {
+    func->setLinkage(llvm::GlobalValue::LinkOnceAnyLinkage);
+  } else if (HAS_FLAG(node->flags, FUNCTION_IS_STATIC)) {
+    func->setLinkage(llvm::GlobalValue::InternalLinkage);
   }
 
   auto entry_block = llvm::BasicBlock::Create(llvm_ctx, "entry", func);
   builder.SetInsertPoint(entry_block);
 
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->block.get()->scope);
+  ctx.set_scope(node->scope);
 
   auto subprogram = dbg.enter_function_scope(dbg.current_scope(), func, name, node->source_range);
   func->setSubprogram(subprogram);
 
   auto index = 0;
-  for (auto &param : func->args()) {
+  for (auto param = func->arg_begin(); param != func->arg_end(); ++param) {
     auto ast_param = node->params->params[index];
     if (ast_param->tag == ASTParamDecl::Normal) {
       Symbol *symbol = ctx.scope->local_lookup(ast_param->normal.name);
-      symbol->llvm_value = &param;
+      symbol->llvm_value = param;
     } else {
       Symbol *symbol = ctx.scope->local_lookup("self");
-      symbol->llvm_value = &param;
+      symbol->llvm_value = param;
     }
     index++;
   }
@@ -110,6 +114,27 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   dbg.pop_scope();
 
   ctx.scope = old_scope;
+}
+
+llvm::Value *LLVMEmitter::visit_call(ASTCall *node) { 
+  llvm::Value *callee = visit_expr(node->function);
+  std::vector<llvm::Value *> args;
+
+  for (const auto &arg : node->arguments->arguments) {
+    auto arg_value = visit_expr(arg);
+    auto arg_type = global_get_type(arg->resolved_type);
+    if (arg->get_node_type() == AST_NODE_PATH) {
+      arg_value = builder.CreateLoad(llvm_typeof(arg_type), arg_value);
+    }
+    args.push_back(arg_value);
+  }
+
+  if (auto *func = llvm::dyn_cast<llvm::Function>(callee)) {
+    return builder.CreateCall(func, args);
+  }
+
+  // TODO: handle calling function pointers.
+  return nullptr;
 }
 
 llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) {
@@ -166,7 +191,7 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
       }
     }
     case ASTLiteral::String: {
-      return builder.CreateGlobalString(node->value.get_str());
+      return builder.CreateGlobalString(unescape_string_lit(node->value.get_str()));
     }
     case ASTLiteral::Char: {
       auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
@@ -209,16 +234,17 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) { return nullptr; }
+
 llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
   auto type = global_get_type(symbol.get()->type_id);
   return symbol.get()->llvm_value;
 }
+
 llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_call(ASTCall *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
   visit_expr(node->expression);
@@ -239,10 +265,10 @@ llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   auto data_layout = module->getDataLayout();
   auto bitsize = data_layout.getTypeSizeInBits(llvm_type);
   auto size = bitsize > 1 ? bitsize / 8 : bitsize;
-  return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
   /*
     TODO: attach debug info
   */
+  return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
 }
 
 llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
@@ -292,7 +318,6 @@ void LLVMEmitter::visit_impl(ASTImpl *node) {}
 void LLVMEmitter::visit_module(ASTModule *node) {}
 void LLVMEmitter::visit_import(ASTImport *node) {}
 
-
 void LLVMEmitter::visit_arguments(ASTArguments *node) {}
 void LLVMEmitter::visit_continue(ASTContinue *node) {}
 void LLVMEmitter::visit_break(ASTBreak *node) {}
@@ -309,7 +334,7 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto type = global_get_type(node->operand->resolved_type);
   auto llvm_type = llvm_typeof(type);
 
-  /* 
+  /*
     TODO: we need to handle casting and typing better here.
     very wrong.
   */

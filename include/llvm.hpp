@@ -30,6 +30,132 @@ using llvm::DIScope;
 using llvm::IRBuilder;
 using llvm::LLVMContext;
 
+static inline std::string unescape_string_lit(const std::string &s) {
+  std::string res;
+  std::istringstream iss(s);
+  char c;
+
+  while (iss.get(c)) {
+    if (c == '\\') {
+      char next = iss.peek();
+      if (iss.eof()) {
+        res += '\\'; // Handle dangling backslash
+        break;
+      }
+
+      switch (next) {
+        case 'n':
+          res += '\n';
+          iss.get();
+          break;
+        case 't':
+          res += '\t';
+          iss.get();
+          break;
+        case 'r':
+          res += '\r';
+          iss.get();
+          break;
+        case 'f':
+          res += '\f';
+          iss.get();
+          break;
+        case 'v':
+          res += '\v';
+          iss.get();
+          break;
+        case 'a':
+          res += '\a';
+          iss.get();
+          break;
+        case 'b':
+          res += '\b';
+          iss.get();
+          break;
+        case '\\':
+          res += '\\';
+          iss.get();
+          break;
+        case '\'':
+          res += '\'';
+          iss.get();
+          break;
+        case '\"':
+          res += '\"';
+          iss.get();
+          break;
+        case '\?':
+          res += '\?';
+          iss.get();
+          break;
+        case 'e':
+          res += '\x1B'; // Escape character
+          iss.get();
+          break;
+        case 'x': {  // Hexadecimal escape sequence
+          iss.get(); // Consume 'x'
+          std::string hex_digits;
+          for (int i = 0; i < 2 && std::isxdigit(iss.peek()); ++i) {
+            hex_digits += iss.get();
+          }
+          if (!hex_digits.empty()) {
+            res += static_cast<char>(std::stoi(hex_digits, nullptr, 16));
+          } else {
+            res += "\\x"; // Invalid \x escape
+          }
+          break;
+        }
+        case 'u': {  // Unicode escape sequence (\uXXXX)
+          iss.get(); // Consume 'u'
+          std::string hex_digits;
+          for (int i = 0; i < 4 && std::isxdigit(iss.peek()); ++i) {
+            hex_digits += iss.get();
+          }
+          if (hex_digits.size() == 4) {
+            int codepoint = std::stoi(hex_digits, nullptr, 16);
+            res += static_cast<char>(codepoint); // Simplified for ASCII range
+          } else {
+            res += "\\u" + hex_digits; // Invalid \u escape
+          }
+          break;
+        }
+        case 'U': {  // Unicode escape sequence (\UXXXXXXXX)
+          iss.get(); // Consume 'U'
+          std::string hex_digits;
+          for (int i = 0; i < 8 && std::isxdigit(iss.peek()); ++i) {
+            hex_digits += iss.get();
+          }
+          if (hex_digits.size() == 8) {
+            int codepoint = std::stoi(hex_digits, nullptr, 16);
+            res += static_cast<char>(codepoint); // Simplified for ASCII range
+          } else {
+            res += "\\U" + hex_digits; // Invalid \U escape
+          }
+          break;
+        }
+        default:
+          if (next >= '0' && next <= '7') { // Octal escape sequence
+            std::string oct_digits;
+            for (int i = 0; i < 3 && std::isdigit(iss.peek()) && iss.peek() >= '0' && iss.peek() <= '7'; ++i) {
+              oct_digits += iss.get();
+            }
+            res += static_cast<char>(std::stoi(oct_digits, nullptr, 8));
+          } else {
+            // Unrecognized escape sequence, treat as literal
+            res += '\\';
+            res += next;
+            iss.get();
+          }
+          break;
+      }
+    } else {
+      res += c; // Non-escaped characters are added as-is
+    }
+  }
+
+  return res;
+}
+
 struct DIManager {
   std::shared_ptr<DIBuilder> di_builder;
   std::stack<DIScope *> scope_stack;
@@ -152,7 +278,6 @@ struct LLVMEmitter {
   inline LLVMEmitter(Context &ctx)
       : ctx(ctx), llvm_ctx(), builder(llvm_ctx), module(std::make_unique<llvm::Module>("module", llvm_ctx)),
         di_builder(std::make_shared<DIBuilder>(*module)), dont_load(false), dbg(di_builder), data_layout("") {
-
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();
