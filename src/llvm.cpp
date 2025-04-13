@@ -122,10 +122,7 @@ llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
 
   for (const auto &arg : node->arguments->arguments) {
     auto arg_value = visit_expr(arg);
-    auto arg_type = global_get_type(arg->resolved_type);
-    if (arg->get_node_type() == AST_NODE_PATH) {
-      arg_value = builder.CreateLoad(llvm_typeof(arg_type), arg_value);
-    }
+    arg_value = load_value(arg, arg_value);
     args.push_back(arg_value);
   }
 
@@ -155,10 +152,7 @@ llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
   if (node->expression) {
     auto expr_ast = node->expression.get();
     auto expr_val = visit_expr(expr_ast);
-    if (expr_ast->get_node_type() == AST_NODE_PATH) {
-      auto type = global_get_type(expr_ast->resolved_type);
-      expr_val = builder.CreateLoad(llvm_typeof(type), expr_val);
-    }
+    expr_val = load_value(expr_ast, expr_val);
     return builder.CreateRet(expr_val);
   } else {
     return builder.CreateRetVoid();
@@ -271,22 +265,26 @@ llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
 }
 
+llvm::Value *LLVMEmitter::load_value(ASTNode *node, llvm::Value *expr) {
+  if (auto symbol = ctx.get_symbol(node)) {
+    if (!symbol.get()->is_param()) {
+      auto type = global_get_type(node->resolved_type);
+      expr = builder.CreateLoad(llvm_typeof(type), expr);
+    }
+  }
+  return expr;
+}
+
 llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   auto target = global_get_type(node->target_type->resolved_type);
   auto from = global_get_type(node->expression->resolved_type);
 
-  const auto is_signed = [](Type *type) {
-    return (type->is_kind(TYPE_SCALAR) && type->get_info()->as<ScalarTypeInfo>()->is_signed());
-  };
   /*
     TODO: probably need to handle more types here.
   */
+
   auto expr = visit_expr(node->expression);
-  if (node->expression->get_node_type() == AST_NODE_PATH) {
-    // this is probably wrong for pointer casting
-    auto type = global_get_type(node->expression->resolved_type);
-    expr = builder.CreateLoad(llvm_typeof(type), expr);
-  }
+  expr = load_value(node->expression, expr);
   return cast_scalar(expr, from, target);
 }
 
@@ -335,14 +333,27 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto type = global_get_type(node->operand->resolved_type);
   auto llvm_type = llvm_typeof(type);
 
-  if (node->operand->get_node_type() == AST_NODE_PATH) {
-    operand = builder.CreateLoad(llvm_type, operand);
-  }
-
   /*
     TODO: we need to handle casting and typing better here.
     very wrong.
   */
+
+  if (node->op.type == TType::Increment) {
+    auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
+    auto incremented = builder.CreateAdd(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "inctmp");
+    builder.CreateStore(incremented, operand);
+    return incremented;
+  }
+
+  if (node->op.type == TType::Decrement) {
+    auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
+    auto decremented = builder.CreateSub(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "dectmp");
+    builder.CreateStore(decremented, operand);
+    return decremented;
+  }
+  
+  operand = load_value(node->operand, operand);
+
   switch (node->op.type) {
     case TType::LogicalNot: {
       auto zero = llvm::ConstantInt::get(operand->getType(), 0);
@@ -356,18 +367,6 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
       } else {
         return builder.CreateNeg(operand, "negtmp");
       }
-    case TType::Increment: {
-      auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
-      auto incremented = builder.CreateAdd(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "inctmp");
-      builder.CreateStore(incremented, operand);
-      return incremented;
-    }
-    case TType::Decrement: {
-      auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
-      auto decremented = builder.CreateSub(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "dectmp");
-      builder.CreateStore(decremented, operand);
-      return decremented;
-    }
     case TType::Mul: {
       auto element_type = llvm_typeof(global_get_type(node->resolved_type));
       return builder.CreateLoad(element_type, operand);
@@ -743,17 +742,12 @@ llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, 
   auto llvm_left_ty = llvm_typeof(left_ty);
   auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
   auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
-  if (right_ast->get_node_type() == AST_NODE_PATH) {
-    // this might not work when path is for a function without an address of operator
-    right = builder.CreateLoad(llvm_typeof(right_ty), right);
-  }
+
+  right = load_value(right_ast, right);
   right = cast_scalar(right, right_ty, left_ty);
 
   if (!is_assignment) {
-    if (left_ast->get_node_type() == AST_NODE_PATH) {
-      // this might not work when path is for a function without an address of operator
-      left = builder.CreateLoad(llvm_left_ty, left);
-    }
+    left = load_value(left_ast, left);
   }
 
   auto type = llvm_typeof(expr_ty);

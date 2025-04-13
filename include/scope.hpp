@@ -18,6 +18,7 @@ enum SymbolFlags {
   SYMBOL_IS_TYPE = 1 << 3,
   SYMBOL_IS_MODULE = 1 << 4,
   SYMBOL_IS_LOCAL = 1 << 5,
+  SYMBOL_IS_PARAM = 1 << 6,
 };
 
 struct ASTNode;
@@ -47,6 +48,7 @@ struct Symbol {
   bool is_module() const { return HAS_FLAG(flags, SYMBOL_IS_MODULE); }
   bool is_forward_declared() const { return HAS_FLAG(flags, SYMBOL_IS_FORWARD_DECLARED); }
   bool is_local() const { return HAS_FLAG(flags, SYMBOL_IS_LOCAL); }
+  bool is_param() const { return HAS_FLAG(flags, SYMBOL_IS_PARAM); }
 
   bool is_const() const { return mutability == CONST; }
   bool is_mut() const { return mutability == MUT; }

@@ -627,6 +627,7 @@ struct LLVMEmitter {
   llvm::Value *visit_range(ASTRange *node);
   llvm::Value *visit_switch(ASTSwitch *node);
   llvm::Value *visit_tuple(ASTTuple *node);
+  llvm::Value *load_value(ASTNode *node, llvm::Value *expr);
   llvm::Value *visit_cast(ASTCast *node);
   llvm::Value *visit_lambda(ASTLambda *node);
   llvm::Value *visit_size_of(ASTSize_Of *node);
