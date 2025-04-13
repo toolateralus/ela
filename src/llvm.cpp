@@ -302,6 +302,36 @@ llvm::Value *LLVMEmitter::binary_signed(llvm::IRBuilder<> *builder, llvm::Value 
       builder->CreateStore(result, left);
       return result;
     }
+    case TType::CompAnd: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateAnd(loadedLeft, right, "compandtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompOr: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateOr(loadedLeft, right, "comportmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompXor: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateXor(loadedLeft, right, "compxortmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompSHL: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateShl(loadedLeft, right, "compshltmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompSHR: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateAShr(loadedLeft, right, "compshrtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
 
     // Assignment
     case TType::Assign:
@@ -372,6 +402,42 @@ llvm::Value *LLVMEmitter::binary_unsigned(llvm::IRBuilder<> *builder, llvm::Valu
     case TType::CompDiv: {
       auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
       auto result = builder->CreateUDiv(loadedLeft, right, "compdivtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompMod: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateURem(loadedLeft, right, "compmodtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompAnd: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateAnd(loadedLeft, right, "compandtmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompOr: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateOr(loadedLeft, right, "comportmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompXor: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateXor(loadedLeft, right, "compxortmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompSHL: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateShl(loadedLeft, right, "compshltmp");
+      builder->CreateStore(result, left);
+      return result;
+    }
+    case TType::CompSHR: {
+      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto result = builder->CreateLShr(loadedLeft, right, "compshrtmp");
       builder->CreateStore(result, left);
       return result;
     }
@@ -708,6 +774,6 @@ llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value
     default:
       break;
   }
-  
+
   return nullptr;
 }
