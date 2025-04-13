@@ -257,6 +257,7 @@ llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   */
   auto expr = visit_expr(node->expression);
   if (node->expression->get_node_type() == AST_NODE_PATH) {
+    // this is probably wrong for pointer casting
     auto type = global_get_type(node->expression->resolved_type);
     expr = builder.CreateLoad(llvm_typeof(type), expr);
   }
@@ -308,6 +309,10 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit_expr(node->operand);
   auto type = global_get_type(node->operand->resolved_type);
   auto llvm_type = llvm_typeof(type);
+
+  if (node->operand->get_node_type() == AST_NODE_PATH) {
+    operand = builder.CreateLoad(llvm_type, operand);
+  }
 
   /* 
     TODO: we need to handle casting and typing better here.
