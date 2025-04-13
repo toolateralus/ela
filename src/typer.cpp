@@ -375,7 +375,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     if (param->tag == ASTParamDecl::Normal) {
       auto &normal = param->normal;
       ctx.scope->insert_variable(normal.name, param->resolved_type, nullptr, param->mutability);
-      ctx.scope->local_lookup(normal.name)->flags |= SYMBOL_IS_LOCAL;
+      ctx.scope->local_lookup(normal.name)->flags |= SYMBOL_IS_LOCAL | SYMBOL_IS_PARAM;
       info.parameter_types[info.params_len] = param->resolved_type;
     } else {
       auto type = get_self_type();
@@ -385,10 +385,10 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
 
       if (param->tag == ASTParamDecl::Себя) {
         ctx.scope->insert_variable("себя", type, nullptr, param->mutability);
-        ctx.scope->local_lookup("себя")->flags |= SYMBOL_IS_LOCAL;
+        ctx.scope->local_lookup("себя")->flags |= SYMBOL_IS_LOCAL | SYMBOL_IS_PARAM;
       } else {
         ctx.scope->insert_variable("self", type, nullptr, param->mutability);
-        ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
+        ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL | SYMBOL_IS_PARAM;
       }
       info.parameter_types[info.params_len] = type;
     }
