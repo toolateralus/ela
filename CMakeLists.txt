@@ -46,7 +46,7 @@ add_executable(ela ${SRCS})
 #! this may not work depending on your package manager.
 
 # Link against the monolithic LLVM library
-target_link_libraries(ela PRIVATE LLVM-19)
+target_link_libraries(ela PRIVATE LLVM)
 
 # Set output directory for the executable
 set_target_properties(ela PROPERTIES

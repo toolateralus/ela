@@ -9,7 +9,7 @@
 #include <llvm/IR/Type.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
-#include <print>
+#include <ostream>
 
 
 void LLVMEmitter::visit_program(ASTProgram *node) {
@@ -52,7 +52,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
     node->is_emitted = true;
   }
 
-  std::println("emitting function {}", node->name.get_str());
+  std::printf("emitting function %s\n", node->name.get_str().c_str());
 
   auto name = get_mangled_name(ctx.scope->lookup(node->name));
   auto return_type = global_get_type(node->return_type->resolved_type);
