@@ -14,13 +14,14 @@
 #include <llvm/TargetParser/Triple.h>
 
 void LLVMEmitter::visit_program(ASTProgram *node) {
+  this->module->setSourceFileName(node->source_range.begin_location.filename());
+  file = dbg.enter_file_scope(node->source_range);
+  di_builder->createCompileUnit(llvm::dwarf::DW_LANG_C, file, "0.01", false, "", 0);
+
   size_t index = 0;
   for (auto &statement : node->statements) {
     if (index == node->end_of_bootstrap_index) {
       ctx.set_scope(node->scope);
-      this->module->setSourceFileName(node->source_range.begin_location.filename());
-      file = dbg.enter_file_scope(node->source_range);
-      di_builder->createCompileUnit(llvm::dwarf::DW_LANG_lo_user, file, "Ela", false, "", 0);
     }
     visit_node(statement);
     index++;
@@ -51,8 +52,6 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   } else {
     node->is_emitted = true;
   }
-
-  std::printf("emitting function %s\n", node->name.get_str().c_str());
 
   auto name = get_mangled_name(ctx.scope->lookup(node->name));
   auto return_type = global_get_type(node->return_type->resolved_type);
@@ -209,8 +208,6 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
   return result;
 }
 
-llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) { return nullptr; }
-
 llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
@@ -222,7 +219,11 @@ llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_call(ASTCall *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) { return nullptr; }
+
+llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
+  visit_expr(node->expression);
+  return nullptr;
+}
 
 llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_subscript(ASTSubscript *node) { return nullptr; }
@@ -296,6 +297,52 @@ void LLVMEmitter::visit_defer(ASTDefer *node) {}
 void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {}
 void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_where(ASTWhere *node) {}
+
+llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
+  auto operand = visit_expr(node->operand);
+  auto type = global_get_type(node->operand->resolved_type);
+  auto llvm_type = llvm_typeof(type);
+  switch (node->op.type) {
+    case TType::LogicalNot: {
+      auto zero = llvm::ConstantInt::get(operand->getType(), 0);
+      return builder.CreateICmpEQ(operand, zero, "nottmp");
+    }
+    case TType::Not:
+      return builder.CreateNot(operand, "nottmp");
+    case TType::Sub:
+      if (llvm_type->isFloatingPointTy()) {
+        return builder.CreateFNeg(operand, "negtmp");
+      } else {
+        return builder.CreateNeg(operand, "negtmp");
+      }
+    case TType::Increment: {
+      auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
+      auto incremented = builder.CreateAdd(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "inctmp");
+      builder.CreateStore(incremented, operand);
+      return incremented;
+    }
+    case TType::Decrement: {
+      auto loadedOperand = builder.CreateLoad(llvm_type, operand, "loadtmp");
+      auto decremented = builder.CreateSub(loadedOperand, llvm::ConstantInt::get(llvm_type, 1), "dectmp");
+      builder.CreateStore(decremented, operand);
+      return decremented;
+    }
+    case TType::Mul: {
+      auto element_type = llvm_typeof(global_get_type(node->resolved_type));
+      return builder.CreateLoad(element_type, operand);
+    }
+    case TType::And: {
+      if (!operand->getType()->isPointerTy()) {
+        auto alloca = builder.CreateAlloca(operand->getType());
+        builder.CreateStore(operand, alloca);
+        return alloca;
+      }
+      return operand;
+    }
+    default:
+      return nullptr;
+  }
+}
 
 llvm::Value *LLVMEmitter::binary_signed(llvm::Value *left, llvm::Value *right, TType op, llvm::Type *expr_type) {
   switch (op) {
