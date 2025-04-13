@@ -1,6 +1,7 @@
 #include "llvm.hpp"
 #include "ast.hpp"
 #include "core.hpp"
+#include "lex.hpp"
 #include "scope.hpp"
 #include "type.hpp"
 #include <llvm/IR/DerivedTypes.h>
@@ -160,9 +161,7 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
 llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
   auto left_ty = global_get_type(node->left->resolved_type);
   auto right_ty = global_get_type(node->right->resolved_type);
-
-  auto left_llvm_ty = llvm_typeof(left_ty);
-  auto right_llvm_ty = llvm_typeof(right_ty);
+  auto expr_ty = global_get_type(node->resolved_type);
 
   if (node->is_operator_overload) {
     /// TODO:
@@ -181,7 +180,10 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
   auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
   auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
 
-  return nullptr;
+  auto left = visit_expr(node->left);
+  auto right = visit_expr(node->right);
+
+  return binary_scalars(&builder, left, right, node->op.type, expr_ty, left_info, right_info);
 }
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) { return nullptr; }
@@ -236,7 +238,7 @@ void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
 void LLVMEmitter::visit_where(ASTWhere *node) {}
 
 llvm::Value *LLVMEmitter::binary_signed(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                        llvm::Type *left_type) {
+                                        llvm::Type *expr_type) {
   switch (op) {
     case TType::Add:
       return builder->CreateAdd(left, right, "addtmp");
@@ -273,61 +275,61 @@ llvm::Value *LLVMEmitter::binary_signed(llvm::IRBuilder<> *builder, llvm::Value 
 
     // Compound assignments
     case TType::CompAdd: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateAdd(loadedLeft, right, "compaddtmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompSub: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateSub(loadedLeft, right, "compsubtmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompMul: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateMul(loadedLeft, right, "compmultmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompDiv: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateSDiv(loadedLeft, right, "compdivtmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompMod: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateSRem(loadedLeft, right, "compmodtmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompAnd: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateAnd(loadedLeft, right, "compandtmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompOr: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateOr(loadedLeft, right, "comportmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompXor: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateXor(loadedLeft, right, "compxortmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompSHL: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateShl(loadedLeft, right, "compshltmp");
       builder->CreateStore(result, left);
       return result;
     }
     case TType::CompSHR: {
-      auto loadedLeft = builder->CreateLoad(left_type, left, "loadtmp");
+      auto loadedLeft = builder->CreateLoad(expr_type, left, "loadtmp");
       auto result = builder->CreateAShr(loadedLeft, right, "compshrtmp");
       builder->CreateStore(result, left);
       return result;
@@ -521,262 +523,79 @@ llvm::Value *LLVMEmitter::binary_fp(llvm::IRBuilder<> *builder, llvm::Value *lef
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                                         Type *left_ty, Type *right_ty, ScalarTypeInfo *left_info,
-                                         ScalarTypeInfo *right_info) {
-  Token temp_token = {};
-  temp_token.type = op;
-  const auto is_assignment = temp_token.is_comp_assign();
-
-  if (is_assignment) {
-    switch (left_info->scalar_type) {
-      case TYPE_S8:
-      case TYPE_S16:
-      case TYPE_S32:
-      case TYPE_S64:
-        binary_signed(builder, left, right, op, LLVMEmitter::llvm_typeof(left_ty));
-      case TYPE_U8:
-      case TYPE_U16:
-      case TYPE_U32:
-      case TYPE_U64:
-      case TYPE_FLOAT:
-      case TYPE_DOUBLE:
-      case TYPE_CHAR:
-      case TYPE_BOOL:
-        break;
-    }
+llvm::Value *cast_scalar(llvm::IRBuilder<> *builder, llvm::Value *value, llvm::Type *type, bool from_signed,
+                         bool to_signed) {
+  if (value->getType() == type) {
+    return value;
   }
 
-  switch (left_info->scalar_type) {
-    case TYPE_S8: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
+  if (value->getType()->isIntegerTy() && type->isIntegerTy()) {
+    if (value->getType()->getIntegerBitWidth() < type->getIntegerBitWidth()) {
+      if (from_signed) {
+        return builder->CreateSExt(value, type, "sexttmp");
+      } else {
+        return builder->CreateZExt(value, type, "zexttmp");
       }
-    } break;
-    case TYPE_S16: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_S32: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_S64: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_U8: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_U16: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_U32: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_U64: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_FLOAT: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_DOUBLE: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_CHAR: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    case TYPE_BOOL: {
-      switch (right_info->scalar_type) {
-        case TYPE_S8:
-        case TYPE_S16:
-        case TYPE_S32:
-        case TYPE_S64:
-        case TYPE_U8:
-        case TYPE_U16:
-        case TYPE_U32:
-        case TYPE_U64:
-        case TYPE_FLOAT:
-        case TYPE_DOUBLE:
-        case TYPE_CHAR:
-        case TYPE_BOOL:
-          break;
-        default:
-          return nullptr;
-      }
-    } break;
-    default:
+    } else if (value->getType()->getIntegerBitWidth() > type->getIntegerBitWidth()) {
+      return builder->CreateTrunc(value, type, "trunctmp");
+    }
+  } else if (value->getType()->isFloatingPointTy() && type->isFloatingPointTy()) {
+    if (value->getType()->getPrimitiveSizeInBits() < type->getPrimitiveSizeInBits()) {
+      return builder->CreateFPExt(value, type, "fpexttmp");
+    } else if (value->getType()->getPrimitiveSizeInBits() > type->getPrimitiveSizeInBits()) {
+      return builder->CreateFPTrunc(value, type, "fptrunctmp");
+    }
+  } else if (value->getType()->isIntegerTy() && type->isFloatingPointTy()) {
+    if (from_signed) {
+      return builder->CreateSIToFP(value, type, "sitofptmp");
+    } else {
+      return builder->CreateUIToFP(value, type, "uitofptmp");
+    }
+  } else if (value->getType()->isFloatingPointTy() && type->isIntegerTy()) {
+    if (to_signed) {
+      return builder->CreateFPToSI(value, type, "fptositmp");
+    } else {
+      return builder->CreateFPToUI(value, type, "fptouitmp");
+    }
+  } else if (value->getType()->isPointerTy() && type->isPointerTy()) {
+    return builder->CreateBitCast(value, type, "bitcasttmp");
+  }
+
+  return nullptr;
+}
+
+llvm::Value *LLVMEmitter::binary_scalars(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
+                                         Type *expr_ty, ScalarTypeInfo *left_info, ScalarTypeInfo *right_info) {
+  auto expr_ty_info = expr_ty->get_info()->as<ScalarTypeInfo>();
+
+  Token temp_token = {};
+  temp_token.type = op;
+  const bool is_assignment = temp_token.is_comp_assign() || op == TType::Assign;
+
+  auto type = llvm_typeof(expr_ty);
+  right = cast_scalar(builder, right, type, right_info->is_signed(), expr_ty_info->is_signed());
+  if (!is_assignment) {
+    left = cast_scalar(builder, left, type, left_info->is_signed(), expr_ty_info->is_signed());
+  }
+
+  switch (expr_ty_info->scalar_type) {
+    case TYPE_S8:
+    case TYPE_S16:
+    case TYPE_S32:
+    case TYPE_S64:
+      return binary_signed(builder, left, right, op, type);
+    case TYPE_CHAR:
+    case TYPE_BOOL:
+    case TYPE_U8:
+    case TYPE_U16:
+    case TYPE_U32:
+    case TYPE_U64:
+      return binary_unsigned(builder, left, right, op, type);
+    case TYPE_FLOAT:
+    case TYPE_DOUBLE:
+      return binary_fp(builder, left, right, op, type);
+      break;
+    case TYPE_VOID:
       break;
   }
 

@@ -215,6 +215,17 @@ struct ScalarTypeInfo : TypeInfo {
   bool is_integral = false;
   size_t size = 0;
   ScalarType scalar_type;
+  inline bool is_signed() const {
+    switch (scalar_type) {
+      case TYPE_S8:
+      case TYPE_S16:
+      case TYPE_S32:
+      case TYPE_S64:
+        return true;
+      default:
+        return false;
+    }
+  }
   virtual std::string to_string() const override { return ""; }
 };
 

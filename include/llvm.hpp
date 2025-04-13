@@ -748,14 +748,14 @@ struct LLVMEmitter {
   }
 
   llvm::Value *binary_signed(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                             llvm::Type *left_type = nullptr);
+                             llvm::Type *expr_ty = nullptr);
 
   llvm::Value *binary_unsigned(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                               llvm::Type *left_type = nullptr);
+                               llvm::Type *expr_ty = nullptr);
 
   llvm::Value *binary_fp(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                         llvm::Type *left_type = nullptr);
+                         llvm::Type *expr_ty = nullptr);
 
   llvm::Value *binary_scalars(llvm::IRBuilder<> *builder, llvm::Value *left, llvm::Value *right, TType op,
-                              Type *left_ty, Type *right_ty, ScalarTypeInfo *left_info, ScalarTypeInfo *right_info);
+                              Type *expr_ty, ScalarTypeInfo *left_info, ScalarTypeInfo *right_info);
 };
