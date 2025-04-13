@@ -253,7 +253,12 @@ llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   /*
     TODO: probably need to handle more types here.
   */
-  return cast_scalar(visit_expr(node->expression), llvm_typeof(target), is_signed(from), is_signed(target));
+  auto expr = visit_expr(node->expression);
+  if (node->expression->get_node_type() == AST_NODE_PATH) {
+    auto type = global_get_type(node->expression->resolved_type);
+    expr = builder.CreateLoad(llvm_typeof(type), expr);
+  }
+  return cast_scalar(expr, from, target);
 }
 
 void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {}
@@ -575,41 +580,61 @@ llvm::Value *LLVMEmitter::binary_fp(llvm::Value *left, llvm::Value *right, TType
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, llvm::Type *type, bool from_signed, bool to_signed) {
-  if (value->getType() == type) {
+llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, Type *from, Type *to) {
+  if (from == to) {
     return value;
   }
 
-  if (value->getType()->isIntegerTy() && type->isIntegerTy()) {
-    if (value->getType()->getIntegerBitWidth() < type->getIntegerBitWidth()) {
-      if (from_signed) {
-        return builder.CreateSExt(value, type, "sexttmp");
+  auto from_info = from->get_info()->as<ScalarTypeInfo>();
+  auto to_info = to->get_info()->as<ScalarTypeInfo>();
+  auto llvm_to = llvm_typeof(to);
+
+  if (to->get_ext().is_pointer()) {
+    if (from->get_ext().is_pointer()) {
+      return builder.CreateBitCast(value, llvm_to, "bitcasttmp");
+    }
+  } else if (to_info->scalar_type == TYPE_BOOL) {
+    if (from_info->is_integral) {
+      return builder.CreateICmpNE(value, llvm::ConstantInt::get(value->getType(), 0), "booltmp");
+    } else {
+      return builder.CreateFCmpONE(value, llvm::ConstantFP::get(value->getType(), 0.0), "booltmp");
+    }
+  } else if (to_info->is_integral) {
+    if (from_info->scalar_type == TYPE_BOOL) {
+      return builder.CreateZExt(value, llvm_to, "zexttmp");
+    } else if (from_info->is_integral) {
+      if (value->getType()->getIntegerBitWidth() < llvm_to->getIntegerBitWidth()) {
+        if (from_info->is_signed()) {
+          return builder.CreateSExt(value, llvm_to, "sexttmp");
+        } else {
+          return builder.CreateZExt(value, llvm_to, "zexttmp");
+        }
       } else {
-        return builder.CreateZExt(value, type, "zexttmp");
+        return builder.CreateTrunc(value, llvm_to, "trunctmp");
       }
-    } else if (value->getType()->getIntegerBitWidth() > type->getIntegerBitWidth()) {
-      return builder.CreateTrunc(value, type, "trunctmp");
-    }
-  } else if (value->getType()->isFloatingPointTy() && type->isFloatingPointTy()) {
-    if (value->getType()->getPrimitiveSizeInBits() < type->getPrimitiveSizeInBits()) {
-      return builder.CreateFPExt(value, type, "fpexttmp");
-    } else if (value->getType()->getPrimitiveSizeInBits() > type->getPrimitiveSizeInBits()) {
-      return builder.CreateFPTrunc(value, type, "fptrunctmp");
-    }
-  } else if (value->getType()->isIntegerTy() && type->isFloatingPointTy()) {
-    if (from_signed) {
-      return builder.CreateSIToFP(value, type, "sitofptmp");
     } else {
-      return builder.CreateUIToFP(value, type, "uitofptmp");
+      if (to_info->is_signed()) {
+        return builder.CreateFPToSI(value, llvm_to, "fptositmp");
+      } else {
+        return builder.CreateFPToUI(value, llvm_to, "fptouitmp");
+      }
     }
-  } else if (value->getType()->isFloatingPointTy() && type->isIntegerTy()) {
-    if (to_signed) {
-      return builder.CreateFPToSI(value, type, "fptositmp");
+  } else {
+    if (from_info->scalar_type == TYPE_BOOL) {
+      return builder.CreateUIToFP(value, llvm_to, "uitofptmp");
+    } else if (from_info->is_integral) {
+      if (from_info->is_signed()) {
+        return builder.CreateSIToFP(value, llvm_to, "sitofptmp");
+      } else {
+        return builder.CreateUIToFP(value, llvm_to, "uitofptmp");
+      }
     } else {
-      return builder.CreateFPToUI(value, type, "fptouitmp");
+      if (value->getType()->getPrimitiveSizeInBits() < llvm_to->getPrimitiveSizeInBits()) {
+        return builder.CreateFPExt(value, llvm_to, "fpexttmp");
+      } else if (value->getType()->getPrimitiveSizeInBits() > llvm_to->getPrimitiveSizeInBits()) {
+        return builder.CreateFPTrunc(value, llvm_to, "fptrunctmp");
+      }
     }
-  } else if (value->getType()->isPointerTy() && type->isPointerTy()) {
-    return builder.CreateBitCast(value, type, "bitcasttmp");
   }
 
   return nullptr;
@@ -634,14 +659,13 @@ llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, 
     // this might not work when path is for a function without an address of operator
     right = builder.CreateLoad(llvm_typeof(right_ty), right);
   }
-  right = cast_scalar(right, llvm_left_ty, right_info->is_signed(), expr_ty_info->is_signed());
+  right = cast_scalar(right, right_ty, left_ty);
 
   if (!is_assignment) {
     if (left_ast->get_node_type() == AST_NODE_PATH) {
       // this might not work when path is for a function without an address of operator
       left = builder.CreateLoad(llvm_left_ty, left);
     }
-    left = cast_scalar(left, llvm_left_ty, left_info->is_signed(), expr_ty_info->is_signed());
   }
 
   auto type = llvm_typeof(expr_ty);
