@@ -102,12 +102,19 @@ int CompileCommand::compile() {
       return 1;
     }
 
+    if (llvm::verifyModule(*emitter.module, &llvm::errs())) {
+      std::cerr << "Error: Module verification failed." << std::endl;
+      return 1;
+    }
+
     emitter.di_builder->finalize();
     emitter.module->print(dest, nullptr);
     dest.flush();
 
     auto llc_command = std::format("clang -g -lc -lm {}.ll -o {}", output_filename, output_filename);
-    system(llc_command.c_str());
+    if (system(llc_command.c_str()) != 0) {
+      return 1;
+    }
   }
   std::filesystem::current_path(original_path);
   print_metrics();

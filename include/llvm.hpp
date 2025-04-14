@@ -13,6 +13,7 @@
 #include <llvm/IR/DebugInfoMetadata.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Value.h>
+#include <llvm/IR/Verifier.h>
 #include <llvm/Support/CodeGen.h>
 #include <llvm/Support/CommandLine.h>
 #include <llvm/Support/TargetSelect.h>
@@ -226,13 +227,15 @@ struct DIManager {
     return block;
   }
 
-  llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, llvm::DIFile *file, unsigned line,
+  llvm::DIVariable *create_variable(DIScope *scope, const std::string &name, llvm::DIFile *file, SourceRange range,
                                     llvm::DIType *type) {
+    auto [basename, dirpath, line, column] = extract_source_range(range);
     return di_builder->createAutoVariable(scope, name, file, line, type, true);
   }
 
-  void attach_debug_info(llvm::Instruction *instruction, llvm::DIVariable *variable, unsigned line, unsigned column) {
-    auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, variable->getScope());
+  void attach_debug_info(llvm::Instruction *instruction, SourceRange range) {
+    auto [basename, dirpath, line, column] = extract_source_range(range);
+    auto *debug_loc = llvm::DILocation::get(instruction->getContext(), line, column, current_scope());
     instruction->setDebugLoc(debug_loc);
   }
 
@@ -435,7 +438,7 @@ struct LLVMEmitter {
           }
 
           member_debug_info.push_back(
-              dbg.create_variable(dbg.current_scope(), name.get_str(), file, 0, di_member_type));
+              dbg.create_variable(dbg.current_scope(), name.get_str(), file, {}, di_member_type));
         }
 
         if (is_union) {
@@ -496,7 +499,7 @@ struct LLVMEmitter {
           auto [llvm_element_type, di_element_type] = llvm_typeof_impl(element_type);
           element_types.push_back(llvm_element_type);
           element_debug_info.push_back(
-              dbg.create_variable(dbg.current_scope(), std::to_string(index), file, 0, di_element_type));
+              dbg.create_variable(dbg.current_scope(), std::to_string(index), file, {}, di_element_type));
           ++index;
         }
 
