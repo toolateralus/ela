@@ -87,9 +87,6 @@ int CompileCommand::compile() {
   lower.end("lowering to cpp complete");
   int result = 0;
 
-  /*
-    TODO: we need to use a 'target_machine' thing to setup the target triple etc.
-  */
   {
     // Finalize the LLVM IR and compile it to an executable
     std::string output_filename =
@@ -110,7 +107,14 @@ int CompileCommand::compile() {
     emitter.module->print(dest, nullptr);
     dest.flush();
 
-    auto llc_command = std::format("clang -g -lc -lm {}.ll -o {}", output_filename, output_filename);
+    std::string extra_flags = compile_command.c_flags;
+
+    if (has_flag("release"))
+      extra_flags += " -O3 ";
+    else
+      extra_flags += " -g ";
+
+    auto llc_command = std::format("clang -lc -lm {}.ll -o {} {}", output_filename, output_filename, extra_flags);
     if (system(llc_command.c_str()) != 0) {
       return 1;
     }

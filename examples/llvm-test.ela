@@ -1,0 +1,74 @@
+#foreign printf :: fn(fmt: *const u8, ...);
+#foreign malloc :: fn(size: u64) -> *mut void;
+
+// Dyn_Allocator :: struct {}
+
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/typedef.ela"
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/interfaces.ela";
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/option.ela";
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/result.ela";
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/iter.ela";
+// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/numeric.ela";
+
+const gY: s32 = 100 * 100;
+gX: s32 = gY * 10;
+
+Choice :: choice {
+  A, 
+  B,
+  C,
+  D,
+  E(f32),
+  F(f64),
+  SKream{
+    a: s32,
+    f: f32,
+    b: bool,
+  }
+}
+
+Skibidi :: enum {
+  Toilet,
+  Rizzler
+}
+
+Kream :: struct {
+  x: s32,
+}
+
+impl Kream {
+  print :: fn(self, value: s32) {
+    printf("\033[1;34min 'Kream'                 :: got value: %d\n"c, value);
+  }
+  print_red :: fn(*mut self, value: s32) {
+    printf("\033[1;31min 'Kream'                 :: got value: %d\n\033[0m"c, value);
+  }
+  print_purple :: fn(*const self, value: s32) {
+    printf("\033[1;35min 'Kream'                 :: got value: %d\n\033[0m"c, value+2);
+  }
+}
+
+main :: fn() -> s64 {
+  tuple := (0, 0, "");
+
+  mut k1: Kream;
+  printf("%d\n"c, k1.x);
+
+  k: *mut Kream = malloc(sizeof(Kream));
+  k.x = 100;
+  printf("dot expressions            :: k.x=%d, k1.x=%d\n"c, k.x, k1.x);
+  k1.print(k1.x);
+  k1.print_red(k1.x);
+  k.print(k.x);
+  k.print_red(k.x);
+  k.print_purple(k.x);
+
+  printf("global variables/constants :: gX=%d, gY=%d\n"c, gX, gY);
+
+  mut array: s32[10];
+  printf("pre assign                 :: array[5]=%d\n"c, array[5]);
+  array[5] = 10;
+  printf("post assign                :: array[5]=%d\n"c, array[5]);
+
+  return 0;
+}
