@@ -5,7 +5,10 @@
 #include "scope.hpp"
 #include "type.hpp"
 #include <alloca.h>
+#include <cstdio>
 #include <llvm/BinaryFormat/Dwarf.h>
+#include <llvm/IR/Attributes.h>
+#include <llvm/IR/CallingConv.h>
 #include <llvm/IR/DerivedTypes.h>
 #include <llvm/IR/Function.h>
 #include <llvm/IR/GlobalValue.h>
@@ -73,15 +76,73 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto return_type = global_get_type(node->return_type->resolved_type);
 
   std::vector<llvm::Type *> param_types;
-  for (const auto &param : node->params->params) {
-    auto param_type = global_get_type(param->resolved_type);
-    param_types.push_back(llvm_typeof(param_type));
+  std::vector<std::optional<llvm::Attribute>> attributes;
+
+  attributes.resize(node->params->params.size());
+
+  // Handle sret for return type if necessary
+  bool has_sret = false;
+  if ((!return_type->is_kind(TYPE_ENUM) && !return_type->is_kind(TYPE_SCALAR)) &&
+      return_type->get_ext().has_no_extensions()) {
+    auto sret_type = llvm::PointerType::get(llvm_typeof(return_type), 0);
+    param_types.push_back(sret_type);
+    has_sret = true;
   }
 
-  auto func_type = llvm::FunctionType::get(llvm_typeof(return_type), param_types, node->params->is_varargs);
+  auto index = 0;
+  for (const auto &param : node->params->params) {
+    auto param_type = global_get_type(param->resolved_type);
+    auto llvm_type = llvm_typeof(param_type);
+    if (llvm_type->isStructTy()) {
+      attributes[index] = (llvm::Attribute::getWithByValType(llvm_ctx, llvm_type));
+      llvm_type = llvm_type->getPointerTo();
+    }
+    param_types.push_back(llvm_type);
+    index++;
+  }
+
+  auto func_type = llvm::FunctionType::get(has_sret ? llvm::Type::getVoidTy(llvm_ctx) : llvm_typeof(return_type),
+                                           param_types, node->params->is_varargs);
   auto func = llvm::Function::Create(func_type, llvm::Function::LinkageTypes::ExternalLinkage, name, module.get());
+  func->setCallingConv(llvm::CallingConv::C);
 
   sym->llvm_value = func;
+
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+
+  auto old_sret_dest = sret_destination;
+  Defer _([&] {
+    sret_destination = old_sret_dest;
+    ctx.scope = old_scope;
+  });
+
+  index = 0;
+  for (auto param = func->arg_begin(); param != func->arg_end(); ++param) {
+    if (has_sret && index == 0) {
+      sret_destination = param;
+      param->addAttr(llvm::Attribute::getWithStructRetType(llvm_ctx, llvm_typeof(return_type)));
+      index++;
+      continue;
+    }
+    auto ast_param = node->params->params[index];
+
+    if (attributes[index]) {
+      param->addAttr(*attributes[index]);
+    }
+
+    if (ast_param->tag == ASTParamDecl::Normal) {
+      auto type = global_get_type(ast_param->normal.type->resolved_type);
+      Symbol *symbol = ctx.scope->local_lookup(ast_param->normal.name);
+      if (symbol)
+        symbol->llvm_value = param;
+    } else {
+      Symbol *symbol = ctx.scope->local_lookup("self");
+      if (symbol)
+        symbol->llvm_value = param;
+    }
+    index++;
+  }
 
   if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN) || HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     return;
@@ -96,33 +157,23 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto entry_block = llvm::BasicBlock::Create(llvm_ctx, "entry", func);
   builder.SetInsertPoint(entry_block);
 
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-
-  Defer _([&] { ctx.scope = old_scope; });
-
-  auto index = 0;
-  for (auto param = func->arg_begin(); param != func->arg_end(); ++param) {
-    auto ast_param = node->params->params[index];
-    if (ast_param->tag == ASTParamDecl::Normal) {
-      Symbol *symbol = ctx.scope->local_lookup(ast_param->normal.name);
-      symbol->llvm_value = param;
-    } else {
-      Symbol *symbol = ctx.scope->local_lookup("self");
-      symbol->llvm_value = param;
-    }
-    index++;
-  }
+  auto subprogram = dbg.enter_function_scope(dbg.current_scope(), func, name, node->source_range);
+  func->setSubprogram(subprogram);
 
   visit_block(node->block.get());
 
   if (!builder.GetInsertBlock()->getTerminator()) {
     if (return_type->id == void_type()) {
       builder.CreateRetVoid();
+    } else if (has_sret) {
+      builder.CreateStore(llvm::Constant::getNullValue(llvm_typeof(return_type)), sret_destination.get());
+      // sret functions have to return void
+      builder.CreateRetVoid();
     } else {
       builder.CreateRet(llvm::Constant::getNullValue(llvm_typeof(return_type)));
     }
   }
+
   dbg.pop_scope();
 
   // Make sure we're not going to insert in this function anymore.
@@ -148,7 +199,17 @@ llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
   if (node->expression) {
     auto expr_ast = node->expression.get();
     auto expr_val = load_value(expr_ast, visit_expr(expr_ast));
-    return builder.CreateRet(expr_val);
+
+    // Sret functions have to return through a hidden out parameter,
+    // which is always the 0th parameter.
+    if (sret_destination.is_not_null()) {
+      auto destination = sret_destination.get();
+      builder.CreateStore(expr_val, destination);
+      return builder.CreateRetVoid();
+    } else {
+      return builder.CreateRet(expr_val);
+    }
+
   } else {
     return builder.CreateRetVoid();
   }
@@ -506,18 +567,32 @@ llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
 
   // normal named function.
   if (auto *func = llvm::dyn_cast<llvm::Function>(callee)) {
+    // if the function has the sret attribute, we need to allocate for a return value,
+    // then we pass it as the 0th parameter, then we will return it at the end of the function.
+    if (func->hasParamAttribute(0, llvm::Attribute::StructRet)) {
+      auto symbol = ctx.get_symbol(node->function);
+
+      auto ret_ty = global_get_type(symbol.get()->function.declaration->return_type->resolved_type);
+      auto arg_ty = global_get_type(ret_ty->take_pointer_to(false));
+
+      auto sret_return_value = builder.CreateAlloca(llvm_typeof(arg_ty));
+      args.insert(args.begin(), sret_return_value);
+      auto inst = builder.CreateCall(func, args);
+      dbg.attach_debug_info(inst, node->source_range);
+      return builder.CreateLoad(llvm_typeof(ret_ty), sret_return_value);
+    }
     auto inst = builder.CreateCall(func, args);
     dbg.attach_debug_info(inst, node->source_range);
+
     return inst;
   }
 
-  // call a function pointer.
-  // the fn ptr type
+  // Calling a function pointer.
   auto fn_ptr_ty = global_get_type(node->function->resolved_type);
   auto fn_ty = global_get_type(fn_ptr_ty->get_element_type());
-  // convert to llvm
   auto llvm_fn_ty = llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(fn_ty));
   auto inst = builder.CreateCall(llvm_fn_ty, callee, args);
+
   dbg.attach_debug_info(inst, node->source_range);
   return inst;
 }
@@ -632,8 +707,6 @@ std::vector<llvm::Value *> LLVMEmitter::visit_arguments(ASTArguments *node) {
   auto index = 0;
   for (const auto &arg : node->arguments) {
     auto value = visit_expr(arg);
-    auto type = global_get_type(arg->resolved_type);
-
     value = load_value(arg, value);
     args.push_back(value);
   }

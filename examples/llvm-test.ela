@@ -1,15 +1,6 @@
 #foreign printf :: fn(fmt: *const u8, ...);
 #foreign malloc :: fn(size: u64) -> *mut void;
 
-// Dyn_Allocator :: struct {}
-
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/typedef.ela"
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/interfaces.ela";
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/option.ela";
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/result.ela";
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/iter.ela";
-// #include "/home/josh_arch/source/c++/ela-stdlib/bootstrap/numeric.ela";
-
 const gY: s32 = 100 * 100;
 gX: s32 = gY * 10;
 
@@ -48,27 +39,97 @@ impl Kream {
   }
 }
 
+BigStruct :: struct {
+  x: f64,
+  y: f64,
+  z: f64,
+  w: f64,
+}
+
+BigStructWithIntegers :: struct {
+  integers: s32[64],
+}
+
+
+get_integer_value :: fn() -> s32 => 100 * 200 % 12 | 3 & 11 & 12;
+
+
+take_big_struct_as_param :: fn(b: BigStruct) {
+  printf("from param                   :: b.x = %f", b.x);
+}
+
+
+/* 
+  TODO: we now need to write to the 0th parameter
+  when a function is sret, and then return void, 
+  instead of actually returning the value.
+*/
+get_big_struct :: fn() -> BigStruct {
+  return .{
+    x: 10.0,
+    y: 11.0,
+    z: 12.0,
+    w: 13.0,
+  };
+}
+
+function :: fn() {
+
+}
+
 main :: fn() -> s64 {
+  // this just hangs the compiler up for some reason.
+  // f := &mut function;
+
+  if true {
+    printf("global variables/constants :: gX=%d, gY=%d\n"c, gX, gY);
+  }
+
+  if true {
+    printf("fixed array subscript stuff\n");
+    mut array: s32[10];
+    printf("pre assign                 :: array[5]=%d\n"c, array[5]);
+    array[5] = 10;
+    printf("post assign                :: array[5]=%d\n"c, array[5]);
+  }
+
+  if true {
+    printf("return value               :: get_integer_value()=%d\n", get_integer_value());
+  }
+
   tuple := (0, 0, "");
 
   mut k1: Kream;
   printf("%d\n"c, k1.x);
-
   k: *mut Kream = malloc(sizeof(Kream));
   k.x = 100;
+
+  if 1 as bool {
+    big_struct := get_big_struct();
+
+    printf("sret value                 :: big_struct.x=%f, big_struct.y=%f, big_struct.z=%f, big_struct.z=%f\n", 
+      big_struct.x,
+      big_struct.y,
+      big_struct.z,
+      big_struct.w
+    );
+  }
+
+  // this is busted because of byval() parameters.
+  // take_big_struct_as_param(big_struct);
+
   printf("dot expressions            :: k.x=%d, k1.x=%d\n"c, k.x, k1.x);
-  k1.print(k1.x);
+
+  printf("k1 (non pointer methods)\n");
+  // k1.print(k1.x);
   k1.print_red(k1.x);
-  k.print(k.x);
+  k1.print_purple(k1.x);
+
+  printf("k (pointer methods)\n");
+  // k.print(k.x); 
   k.print_red(k.x);
   k.print_purple(k.x);
-
-  printf("global variables/constants :: gX=%d, gY=%d\n"c, gX, gY);
-
-  mut array: s32[10];
-  printf("pre assign                 :: array[5]=%d\n"c, array[5]);
-  array[5] = 10;
-  printf("post assign                :: array[5]=%d\n"c, array[5]);
+  
 
   return 0;
 }

@@ -277,6 +277,8 @@ struct LLVMEmitter {
   llvm::TargetMachine *target_machine;
   DIManager dbg;
 
+  Nullable<llvm::Value> sret_destination = nullptr;
+
   inline LLVMEmitter(Context &ctx)
       : ctx(ctx), llvm_ctx(), builder(llvm_ctx), module(std::make_unique<llvm::Module>("module", llvm_ctx)),
         di_builder(std::make_shared<DIBuilder>(*module)), dbg(di_builder), data_layout("") {
