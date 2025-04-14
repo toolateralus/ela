@@ -12,6 +12,8 @@
 #include <llvm/IR/GlobalVariable.h>
 #include <llvm/IR/IRBuilder.h>
 #include <llvm/IR/Type.h>
+#include <llvm/IR/Value.h>
+#include <llvm/Support/Casting.h>
 #include <llvm/Support/raw_ostream.h>
 #include <llvm/Target/TargetMachine.h>
 #include <llvm/TargetParser/Triple.h>
@@ -56,7 +58,18 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
     node->is_emitted = true;
   }
 
-  auto name = get_mangled_name(ctx.scope->lookup(node->name));
+  /*
+    I'm not sure why we have to do this, but if we don't the symbol often comes up
+    null and crashes out.
+  */
+  Symbol *sym;
+  if (node->declaring_type != Type::INVALID_TYPE_ID) {
+    sym = global_get_type(node->declaring_type)->get_info()->scope->local_lookup(node->name);
+  } else {
+    sym = ctx.scope->lookup(node->name);
+  }
+
+  auto name = get_mangled_name(sym);
   auto return_type = global_get_type(node->return_type->resolved_type);
 
   std::vector<llvm::Type *> param_types;
@@ -68,8 +81,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   auto func_type = llvm::FunctionType::get(llvm_typeof(return_type), param_types, node->params->is_varargs);
   auto func = llvm::Function::Create(func_type, llvm::Function::LinkageTypes::ExternalLinkage, name, module.get());
 
-  auto function_symbol = ctx.scope->local_lookup(name);
-  function_symbol->llvm_value = func;
+  sym->llvm_value = func;
 
   if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN) || HAS_FLAG(node->flags, FUNCTION_IS_TEST)) {
     return;
@@ -119,17 +131,10 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
 
 llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
   llvm::Value *callee = visit_expr(node->function);
-  std::vector<llvm::Value *> args;
-  for (const auto &arg : node->arguments->arguments) {
-    auto arg_value = visit_expr(arg);
-    arg_value = load_value(arg, arg_value);
-    args.push_back(arg_value);
-  }
-
+  std::vector<llvm::Value *> args = visit_arguments(node->arguments);
   if (auto *func = llvm::dyn_cast<llvm::Function>(callee)) {
     return builder.CreateCall(func, args);
   }
-
   // TODO: handle calling function pointers.
   return nullptr;
 }
@@ -151,8 +156,7 @@ llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) {
 llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
   if (node->expression) {
     auto expr_ast = node->expression.get();
-    auto expr_val = visit_expr(expr_ast);
-    expr_val = load_value(expr_ast, expr_val);
+    auto expr_val = load_value(expr_ast, visit_expr(expr_ast));
     return builder.CreateRet(expr_val);
   } else {
     return builder.CreateRetVoid();
@@ -184,10 +188,20 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
         return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stof(node->value.get_str())));
       }
     }
+    /*
+      TODO: we need to be creating an instance of the 'str' struct
+      if this node has that resolved type. right now we arent compiling any of the
+      stdlib so this isn't quite possible yet.
+    */
     case ASTLiteral::String: {
       return builder.CreateGlobalString(unescape_string_lit(node->value.get_str()));
     }
     case ASTLiteral::Char: {
+      /*
+        TODO:
+        we can't just do this like this, 0th character in the string.
+        we support utf8 characters, so we'll have to do something better than this
+      */
       auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
       return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, node->value.get_str()[0], false));
     }
@@ -227,26 +241,16 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
   return result;
 }
 
-llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) { return nullptr; }
-
 llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
   auto type = global_get_type(symbol.get()->type_id);
   return symbol.get()->llvm_value;
 }
 
-llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
-
 llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
   visit_expr(node->expression);
   return nullptr;
 }
-
-llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_subscript(ASTSubscript *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
   auto type = global_get_type(node->resolved_type);
@@ -263,7 +267,7 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
       auto info = type->get_info()->as<StructTypeInfo>();
 
       for (const auto &[key, value] : node->key_values) {
-        const auto field_index = info->get_field_index(key);
+        const auto field_index = info->get_llvm_field_index(key);
         const auto field_type = global_get_type(value->resolved_type);
         auto field_value = visit_expr(value);
         field_value = load_value(value, field_value);
@@ -305,9 +309,106 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
   return nullptr;
 }
 
-llvm::Value *LLVMEmitter::visit_range(ASTRange *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_range(ASTRange *node) {
+  const auto type = global_get_type(node->resolved_type);
+  const auto llvm_type = llvm_typeof(type);
+  auto alloca_inst = builder.CreateAlloca(llvm_type, nullptr, "range_init");
+  auto gep = builder.CreateStructGEP(llvm_type, alloca_inst, 0);
+  auto left_value = visit_expr(node->left);
+  builder.CreateStore(left_value, gep);
+
+  gep = builder.CreateStructGEP(llvm_type, alloca_inst, 1);
+  auto right_value = visit_expr(node->left);
+  builder.CreateStore(right_value, gep);
+
+  return alloca_inst;
+}
+
+llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) {
+  const auto type = global_get_type(node->resolved_type);
+  const auto llvm_type = llvm_typeof(type);
+  auto alloca_inst = builder.CreateAlloca(llvm_type, nullptr, "tuple_init");
+  size_t index = 0;
+  for (const auto &value : node->values) {
+    auto gep = builder.CreateStructGEP(llvm_type, alloca_inst, index);
+    auto field_value = visit_expr(value);
+    builder.CreateStore(field_value, gep);
+    index++;
+  }
+  return alloca_inst;
+}
+
+llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
+  auto function_symbol = ctx.get_symbol(node->dot).get();
+  auto arguments = visit_arguments(node->arguments);
+
+  if (function_symbol->is_variable()) {
+    /*
+      TODO: handle calling a function pointer via a 'dyn' interface object.
+    */
+    return nullptr;
+  }
+
+  auto decl = function_symbol->function.declaration;
+  auto &self_param = decl->params->params[0]->self;
+
+  auto dot_type = global_get_type(node->dot->base->resolved_type);
+  auto dot_ext = dot_type->get_ext();
+
+  auto dot_llvm_type = llvm_typeof(dot_type);
+
+  llvm::Value *self_argument = visit_expr(node->dot->base); // Evaluate the `dot` expression
+
+  if (self_param.is_pointer && !dot_ext.is_pointer() && !self_argument->getType()->isPointerTy()) {
+    auto alloca_inst = builder.CreateAlloca(dot_llvm_type, nullptr, "self_ref");
+    builder.CreateStore(self_argument, alloca_inst);
+    self_argument = alloca_inst;
+  } else if (!self_param.is_pointer && dot_ext.is_pointer()) {
+    self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
+  }
+
+  arguments.insert(arguments.begin(), self_argument);
+  auto *function = llvm::dyn_cast<llvm::Function>(function_symbol->llvm_value);
+  return builder.CreateCall(function, arguments);
+}
+
+llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
+  auto base_ty = global_get_type(node->base->resolved_type);
+  auto base = visit_expr(node->base);
+
+  auto struct_info = base_ty->get_info()->as<StructTypeInfo>();
+  auto base_llvm_type = llvm_typeof(base_ty);
+
+  auto member_index = struct_info->get_llvm_field_index(node->member.identifier);
+
+  // We take a pointer to the member type because both ExtractValue and GEP require
+  // to take the extracted value by pointer.
+  auto member_ty = global_get_type(global_get_type(node->resolved_type)->take_pointer_to(false));
+
+  auto member_ptr = builder.CreateStructGEP(base_llvm_type, base, member_index, "gep_dot_member");
+
+  /*
+    I am not sure if we always want to load this,
+    but if I dont when doing things like printing `printf("...", x.y)`
+    i just get a junk pointer.
+  */
+  return builder.CreateLoad(llvm_typeof(member_ty), member_ptr, "load_dot_member");
+}
+
+llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
+
+llvm::Value *LLVMEmitter::visit_subscript(ASTSubscript *node) { return nullptr; }
+
+/*
+  TODO: verify that this won't go completely unused? it doesn't have the same purpose as it did in the old emitter,
+  and simply using llvm_typeof() is probably sufficient enough for 90% of nodes.
+*/
+llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
+
 llvm::Value *LLVMEmitter::visit_switch(ASTSwitch *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) { return nullptr; }
+
 llvm::Value *LLVMEmitter::visit_lambda(ASTLambda *node) { return nullptr; }
 
 llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
@@ -319,7 +420,25 @@ llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   return llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), size);
 }
 
+/*
+  This only loads values when neccesary.
+*/
 llvm::Value *LLVMEmitter::load_value(ASTNode *node, llvm::Value *expr) {
+
+  // We have to fetch the value of the global variable if and when we get one,
+  // otherwise we get a pointer, and loading a global variable is completely invalid.
+  if (auto gv = llvm::dyn_cast<llvm::GlobalVariable>(expr)) {
+
+    // this is a hack to get strings to work, but I have no idea if this is a proper thing to do.
+    // if we don't do this, we get an array of chars, instead a pointer to the strings data.
+    static const auto c_string_type = global_find_type_id(u8_type(), {{{TYPE_EXT_POINTER_CONST}}});
+    if (node->resolved_type == c_string_type) {
+      return gv;
+    }
+
+    return gv->getOperand(0);
+  }
+
   if (auto symbol = ctx.get_symbol(node)) {
     if (!symbol.get()->is_param()) {
       auto type = global_get_type(node->resolved_type);
@@ -341,14 +460,33 @@ void LLVMEmitter::visit_variable(ASTVariable *node) {
   auto var_type = global_get_type(node->type->resolved_type);
   auto llvm_var_type = llvm_typeof(var_type);
 
-  llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
-  ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
-
-  if (node->value) {
+  /*
+    The constants need a lot of work.
+    We'll need to implement a 'global static initializer' kind of thing, like C++,
+    so we can have constant values of arbitrary contents.
+  */
+  if (!builder.GetInsertBlock() || node->is_constexpr) {
     auto init_value = visit_expr(node->value.get());
-    builder.CreateStore(init_value, alloca_inst);
+    if (auto constant = llvm::dyn_cast<llvm::Constant>(init_value)) {
+      auto gv = new llvm::GlobalVariable(llvm_var_type, node->is_constexpr, llvm::GlobalValue::ExternalLinkage, constant);
+      ctx.scope->local_lookup(node->name)->llvm_value = gv;
+      module->insertGlobalVariable(gv);
+    } else {
+      throw_error("for now, we can only have statically compile-able constant variables. this is limited to numerical "
+                  "types mostly",
+                  node->source_range);
+    }
   } else {
-    builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
+    // All local variables.
+    llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
+    ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
+
+    if (node->value) {
+      auto init_value = visit_expr(node->value.get());
+      builder.CreateStore(init_value, alloca_inst);
+    } else {
+      builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
+    }
   }
 }
 
@@ -377,16 +515,29 @@ void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
 
 void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
 
-/* These probably will never ever get used. We should remove them */
-void LLVMEmitter::visit_interface_declaration(ASTInterfaceDeclaration *node) {}
-void LLVMEmitter::visit_alias(ASTAlias *node) {}
-void LLVMEmitter::visit_params_decl(ASTParamsDecl *node) {}
-void LLVMEmitter::visit_param_decl(ASTParamDecl *node) {}
-void LLVMEmitter::visit_arguments(ASTArguments *node) {}
-void LLVMEmitter::visit_where(ASTWhere *node) {}
-/* end unneccesary nodes. */
+std::vector<llvm::Value *> LLVMEmitter::visit_arguments(ASTArguments *node) {
+  std::vector<llvm::Value *> args;
+  for (const auto &value : node->arguments) {
+    args.push_back(load_value(value, visit_expr(value)));
+  }
+  return args;
+}
 
-void LLVMEmitter::visit_impl(ASTImpl *node) {}
+void LLVMEmitter::visit_impl(ASTImpl *node) {
+  if (node->generic_parameters.size())
+    return;
+  if (node->is_emitted)
+    return;
+  node->is_emitted = true;
+
+  auto old_scope = ctx.scope;
+  ctx.scope = node->scope;
+  Defer _([&] { ctx.scope = old_scope; });
+
+  for (const auto &method : node->methods) {
+    visit_function_declaration(method);
+  }
+}
 void LLVMEmitter::visit_module(ASTModule *node) {}
 void LLVMEmitter::visit_import(ASTImport *node) {}
 
@@ -419,7 +570,6 @@ void LLVMEmitter::visit_if(ASTIf *node) {
 }
 void LLVMEmitter::visit_else(ASTElse *node) {}
 void LLVMEmitter::visit_while(ASTWhile *node) {}
-
 void LLVMEmitter::visit_defer(ASTDefer *node) {}
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {

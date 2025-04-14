@@ -956,14 +956,53 @@ int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const 
   return -1;
 }
 
-int StructTypeInfo::get_field_index(const InternedString &name) const {
+/*
+  This can have some strange behaviour if used outside of the context of
+  LLVM, because unions get treated very differently than expected.
+
+  in LLVM, the union is a single field object, that field being the largest of
+  it's fields. somewhat expected, but in turn, the output of this function can
+  be slightly unexpected if you're not aware of this.
+*/
+int TypeInfo::get_llvm_field_index(const InternedString &name) const {
   int index = 0;
-  for (const auto &[sym_name, sym] : scope->symbols) {
-    if (!sym.is_variable()) continue;
-    if (sym_name == name) {
-      return index;
+
+  if (auto struct_info = try_as<StructTypeInfo>()) {
+    // TODO: Does this make sense? I think so.
+    if (HAS_FLAG(struct_info->flags, STRUCT_FLAG_IS_UNION)) {
+      return 0;
     }
-    ++index;
+
+    // TODO: this will be problematic for symbols that come from an
+    // '#anon :: union' since we just kind of dump the symbols into
+    // the scope of the parent struct. We'll have to find the index of the
+    // parent and use that instead, which will require some refactoring in how
+    // anonymous subunions are handled in general.
+    for (const auto &sym_name : scope->ordered_symbols) {
+      auto sym = scope->local_lookup(sym_name);
+      if (!sym->is_variable())
+        continue;
+      if (sym_name == name) {
+        return index;
+      }
+      ++index;
+    }
   }
+
+  if (auto choice_info = try_as<ChoiceTypeInfo>()) {
+    for (const auto &variant : choice_info->variants) {
+      if (variant.name == name) {
+        /*
+          We always return 1 here because choice types always have the same exact data layout:
+          struct {
+            int discriminant;           // the index of the occupied variant.
+            LargestVariantType payload; // the actual payload.
+          }
+        */
+        return 1;
+      }
+    }
+  }
+
   return -1;
 }

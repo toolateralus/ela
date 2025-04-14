@@ -171,6 +171,7 @@ struct TypeInfo {
   Scope *scope = nullptr;
   std::vector<int> implemented_interfaces;
   TypeInfo() {}
+
   // Use this instead of the clunky static casts everywhere.
   template <class T>
     requires std::derived_from<T, TypeInfo>
@@ -178,8 +179,17 @@ struct TypeInfo {
     return static_cast<T *>(this);
   }
 
+  // just a dynamic_cast
+  template <class T>
+    requires std::derived_from<T, TypeInfo>
+  inline T const*try_as() const {
+    return dynamic_cast<T const*>(this);
+  }
+
   virtual ~TypeInfo() = default;
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
+
+  int get_llvm_field_index(const InternedString &name) const;
 };
 
 struct InterfaceTypeInfo : TypeInfo {
@@ -239,7 +249,6 @@ struct StructTypeInfo : TypeInfo {
   int flags;
   virtual std::string to_string() const override { return ""; }
   StructTypeInfo() {}
-  int get_field_index(const InternedString &name) const;
 };
 
 struct TupleTypeInfo : TypeInfo {

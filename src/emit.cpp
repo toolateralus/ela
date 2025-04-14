@@ -1689,6 +1689,7 @@ void Emitter::visit(ASTImpl *node) {
   if (!target) {
     throw_error("internal compiler error: impl target type was null in the emitter", node->source_range);
   }
+  
   auto old_type = type_context;
   type_context = node->target;
   Defer _([&] { type_context = old_type; });
@@ -2179,6 +2180,7 @@ void Emitter::visit(ASTMethodCall *node) {
   std::vector<int> generic_args = node->dot->member.get_resolved_generics();
 
   auto symbol = ctx.get_symbol(node->dot).get();
+
   // Call a function pointer via a dot expression
   if (symbol->is_variable()) {
     auto func = node->dot;
@@ -2191,6 +2193,7 @@ void Emitter::visit(ASTMethodCall *node) {
   auto func = symbol->function.declaration;
 
   Type *function_type = global_get_type(symbol->type_id);
+  
   // if generic function
   if (!func->generic_parameters.empty()) {
     func = (ASTFunctionDeclaration *)find_generic_instance(func->generic_instantiations, generic_args);

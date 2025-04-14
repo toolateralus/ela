@@ -658,16 +658,14 @@ struct LLVMEmitter {
   llvm::Value *visit_cast(ASTCast *node);
   llvm::Value *visit_lambda(ASTLambda *node);
   llvm::Value *visit_size_of(ASTSize_Of *node);
+  std::vector<llvm::Value *> visit_arguments(ASTArguments *node);
 
   void visit_struct_declaration(ASTStructDeclaration *node);
   void visit_module(ASTModule *node);
   void visit_import(ASTImport *node);
   void visit_program(ASTProgram *node);
   void visit_function_declaration(ASTFunctionDeclaration *node);
-  void visit_params_decl(ASTParamsDecl *node);
-  void visit_param_decl(ASTParamDecl *node);
   void visit_variable(ASTVariable *node);
-  void visit_arguments(ASTArguments *node);
   void visit_continue(ASTContinue *node);
   void visit_break(ASTBreak *node);
   void visit_for(ASTFor *node);
@@ -676,12 +674,9 @@ struct LLVMEmitter {
   void visit_while(ASTWhile *node);
   void visit_enum_declaration(ASTEnumDeclaration *node);
   void visit_tuple_deconstruction(ASTTupleDeconstruction *node);
-  void visit_alias(ASTAlias *node);
   void visit_impl(ASTImpl *node);
   void visit_defer(ASTDefer *node);
   void visit_choice_declaration(ASTChoiceDeclaration *node);
-  void visit_interface_declaration(ASTInterfaceDeclaration *node);
-  void visit_where(ASTWhere *node);
 
   inline void visit_statement_list(ASTStatementList *node) {
     for (const auto &stmt : node->statements) {
@@ -696,9 +691,6 @@ struct LLVMEmitter {
         break;
       case AST_NODE_FUNCTION_DECLARATION:
         visit_function_declaration(static_cast<ASTFunctionDeclaration *>(statement));
-        break;
-      case AST_NODE_ALIAS:
-        visit_alias(static_cast<ASTAlias *>(statement));
         break;
       case AST_NODE_IMPL:
         visit_impl(static_cast<ASTImpl *>(statement));
@@ -738,12 +730,6 @@ struct LLVMEmitter {
         break;
       case AST_NODE_CHOICE_DECLARATION:
         visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(statement));
-        break;
-      case AST_NODE_INTERFACE_DECLARATION:
-        visit_interface_declaration(static_cast<ASTInterfaceDeclaration *>(statement));
-        break;
-      case AST_NODE_PARAMS_DECL:
-        visit_params_decl(static_cast<ASTParamsDecl *>(statement));
         break;
       case AST_NODE_VARIABLE:
         visit_variable(static_cast<ASTVariable *>(statement));
@@ -851,16 +837,12 @@ struct LLVMEmitter {
         return visit_switch(static_cast<ASTSwitch *>(node));
       case AST_NODE_PATTERN_MATCH:
         return visit_pattern_match(static_cast<ASTPatternMatch *>(node));
-
       // Statement nodes
       case AST_NODE_BLOCK:
         visit_block(static_cast<ASTBlock *>(node));
         return nullptr;
       case AST_NODE_FUNCTION_DECLARATION:
         visit_function_declaration(static_cast<ASTFunctionDeclaration *>(node));
-        return nullptr;
-      case AST_NODE_ALIAS:
-        visit_alias(static_cast<ASTAlias *>(node));
         return nullptr;
       case AST_NODE_IMPL:
         visit_impl(static_cast<ASTImpl *>(node));
@@ -901,15 +883,6 @@ struct LLVMEmitter {
       case AST_NODE_CHOICE_DECLARATION:
         visit_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
         return nullptr;
-      case AST_NODE_INTERFACE_DECLARATION:
-        visit_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
-        return nullptr;
-      case AST_NODE_PARAMS_DECL:
-        visit_params_decl(static_cast<ASTParamsDecl *>(node));
-        return nullptr;
-      case AST_NODE_PARAM_DECL:
-        visit_param_decl(static_cast<ASTParamDecl *>(node));
-        return nullptr;
       case AST_NODE_VARIABLE:
         visit_variable(static_cast<ASTVariable *>(node));
         return nullptr;
@@ -926,7 +899,6 @@ struct LLVMEmitter {
         visit_statement_list(static_cast<ASTStatementList *>(node));
         return nullptr;
       default:
-        throw_error("unhandled node in visit_node", node->source_range);
         return nullptr;
     }
   }

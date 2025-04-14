@@ -2790,7 +2790,6 @@ void Typer::visit(ASTMethodCall *node) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
-
       if (!func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
@@ -2841,7 +2840,7 @@ void Typer::visit(ASTMethodCall *node) {
   // else, use the type.
   if (func_decl) {
     if (!func_decl->params->has_self) {
-      throw_error("Calling static methods with instance not allowed", node->source_range);
+      throw_error("calling associated functions through an instance is not allowed", node->source_range);
     }
     type_check_args_from_params(node->arguments, func_decl->params, node->dot->base);
   } else {
