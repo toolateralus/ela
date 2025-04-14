@@ -275,12 +275,11 @@ struct LLVMEmitter {
   llvm::Target *target;
   llvm::DataLayout data_layout;
   llvm::TargetMachine *target_machine;
-  bool dont_load;
   DIManager dbg;
 
   inline LLVMEmitter(Context &ctx)
       : ctx(ctx), llvm_ctx(), builder(llvm_ctx), module(std::make_unique<llvm::Module>("module", llvm_ctx)),
-        di_builder(std::make_shared<DIBuilder>(*module)), dont_load(false), dbg(di_builder), data_layout("") {
+        di_builder(std::make_shared<DIBuilder>(*module)), dbg(di_builder), data_layout("") {
     llvm::InitializeAllTargetInfos();
     llvm::InitializeAllTargets();
     llvm::InitializeAllTargetMCs();

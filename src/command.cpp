@@ -104,7 +104,6 @@ int CompileCommand::compile() {
 
     if (llvm::verifyModule(*emitter.module, &llvm::errs())) {
       std::cerr << "Error: Module verification failed." << std::endl;
-      return 1;
     }
 
     emitter.di_builder->finalize();

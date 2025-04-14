@@ -181,7 +181,7 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
     auto alloca_inst = builder.CreateAlloca(dot_llvm_type, nullptr, "self_ref");
     builder.CreateStore(self_argument, alloca_inst);
     self_argument = alloca_inst;
-  } else if (!self_param.is_pointer) {
+  } else {
     self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
   }
 
@@ -395,8 +395,17 @@ llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
   auto base_ty = global_get_type(node->base->resolved_type);
   auto base = visit_expr(node->base);
 
-  auto struct_info = base_ty->get_info()->as<StructTypeInfo>();
-  auto base_llvm_type = llvm_typeof(base_ty);
+
+  StructTypeInfo *struct_info;
+  llvm::Type *base_llvm_type = llvm_typeof(base_ty);
+  if (base_ty->get_ext().is_pointer()) {
+    auto element = base_ty->get_element_type();
+    auto elem_ty = global_get_type(element);
+    struct_info = elem_ty->get_info()->as<StructTypeInfo>();
+    base_llvm_type = llvm_typeof(elem_ty);
+  } else {
+    struct_info = base_ty->get_info()->as<StructTypeInfo>();
+  }
 
   auto member_index = struct_info->get_llvm_field_index(node->member.identifier);
 
