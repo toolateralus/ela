@@ -172,7 +172,7 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
 
   llvm::Value *self_argument = visit_expr(node->dot->base); // Evaluate the `dot` expression
 
-  if (self_param.is_pointer && !dot_ext.is_pointer() && !self_argument->getType()->isPointerTy()) {
+  if (self_param.is_pointer && !dot_ext.is_pointer()) {
     // TODO:{}
     // Do we need to do this?
     // we can probably only do this when we pass a value that's not a pointer to a *mut/*const self function.
@@ -181,7 +181,14 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
     auto alloca_inst = builder.CreateAlloca(dot_llvm_type, nullptr, "self_ref");
     builder.CreateStore(self_argument, alloca_inst);
     self_argument = alloca_inst;
+  } else if (self_param.is_pointer && dot_ext.is_pointer()) {
+    // we dont need to do anything here i think?
   } else {
+    // get the correct type if we're dereferencing a pointer.
+    if (dot_ext.is_pointer()) {
+      auto element_ty = global_get_type(dot_type->get_element_type());
+      dot_llvm_type = llvm_typeof(element_ty);
+    }
     self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
   }
 
@@ -395,7 +402,6 @@ llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
   auto base_ty = global_get_type(node->base->resolved_type);
   auto base = visit_expr(node->base);
 
-
   StructTypeInfo *struct_info;
   llvm::Type *base_llvm_type = llvm_typeof(base_ty);
   if (base_ty->get_ext().is_pointer()) {
@@ -416,11 +422,11 @@ llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
   auto member_ptr = builder.CreateStructGEP(base_llvm_type, base, member_index, "gep_dot_member");
 
   /*
-    I am not sure if we always want to load this,
-    but if I dont when doing things like printing `printf("...", x.y)`
-    i just get a junk pointer.
+    I don't think we should do this load.
   */
-  return builder.CreateLoad(llvm_typeof(member_ty), member_ptr, "load_dot_member");
+  // return builder.CreateLoad(llvm_typeof(member_ty), member_ptr, "load_dot_member");
+  
+  return member_ptr;
 }
 
 llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
