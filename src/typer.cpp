@@ -747,8 +747,8 @@ bool is_const_pointer(ASTNode *node) {
   if (node == nullptr)
     return false;
 
-  if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
-    return is_const_pointer(subscript->left);
+  if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
+    return is_const_pointer(subscript->base);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
   }
@@ -1836,14 +1836,14 @@ void Typer::visit(ASTBinExpr *node) {
       }
 
     } else if (node->left->get_node_type() == AST_NODE_SUBSCRIPT) {
-      auto subscript = (ASTSubscript *)node->left;
+      auto subscript = (ASTIndex *)node->left;
 
-      auto subscript_left_ty = global_get_type(subscript->left->resolved_type);
+      auto subscript_left_ty = global_get_type(subscript->base->resolved_type);
       if (subscript_left_ty->get_ext().is_const_pointer()) {
         throw_error("cannot subscript-assign into a const pointer!", node->source_range);
       }
 
-      auto symbol = ctx.get_symbol(subscript->left);
+      auto symbol = ctx.get_symbol(subscript->base);
       if (symbol.is_not_null() && symbol.get()->is_const() && !subscript_left_ty->get_ext().is_mut_pointer()) {
         throw_error("cannot subscript-assign into a const variable!", node->source_range);
       }
@@ -2107,16 +2107,16 @@ void Typer::visit(ASTDotExpr *node) {
   }
 }
 
-void Typer::visit(ASTSubscript *node) {
-  node->left->accept(this);
-  node->subscript->accept(this);
-  auto left_ty = global_get_type(node->left->resolved_type);
-  auto subscript_ty = global_get_type(node->subscript->resolved_type);
+void Typer::visit(ASTIndex *node) {
+  node->base->accept(this);
+  node->index->accept(this);
+  auto left_ty = global_get_type(node->base->resolved_type);
+  auto subscript_ty = global_get_type(node->index->resolved_type);
 
-  auto symbol = ctx.get_symbol(node->left);
+  auto symbol = ctx.get_symbol(node->base);
 
   Mutability mutability = symbol ? symbol.get()->mutability : CONST;
-  auto overload = find_operator_overload(mutability, left_ty, TType::LBrace, OPERATION_SUBSCRIPT);
+  auto overload = find_operator_overload(mutability, left_ty, TType::LBrace, OPERATION_INDEX);
 
   if (overload != Type::INVALID_TYPE_ID) {
     node->is_operator_overload = true;

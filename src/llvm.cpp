@@ -133,72 +133,6 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   builder.ClearInsertionPoint();
 }
 
-llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
-  llvm::Value *callee = visit_expr(node->function);
-  std::vector<llvm::Value *> args = visit_arguments(node->arguments);
-
-  // normal named function.
-  if (auto *func = llvm::dyn_cast<llvm::Function>(callee)) {
-    return builder.CreateCall(func, args);
-  }
-
-  // call a function pointer.
-  // the fn ptr type
-  auto fn_ptr_ty = global_get_type(node->function->resolved_type);
-  auto fn_ty = global_get_type(fn_ptr_ty->get_element_type());
-  // convert to llvm
-  auto llvm_fn_ty = llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(fn_ty));
-  return builder.CreateCall(llvm_fn_ty, callee, args);
-}
-
-llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
-  auto function_symbol = ctx.get_symbol(node->dot).get();
-  auto arguments = visit_arguments(node->arguments);
-
-  if (function_symbol->is_variable()) {
-    /*
-      TODO: handle calling a function pointer via a 'dyn' interface object.
-    */
-    return nullptr;
-  }
-
-  auto decl = function_symbol->function.declaration;
-  auto &self_param = decl->params->params[0]->self;
-
-  auto dot_type = global_get_type(node->dot->base->resolved_type);
-  auto dot_ext = dot_type->get_ext();
-
-  auto dot_llvm_type = llvm_typeof(dot_type);
-
-  llvm::Value *self_argument = visit_expr(node->dot->base); // Evaluate the `dot` expression
-
-  if (self_param.is_pointer && !dot_ext.is_pointer()) {
-    // TODO:{}
-    // Do we need to do this?
-    // we can probably only do this when we pass a value that's not a pointer to a *mut/*const self function.
-    // but if it's already an alloca or a reference to some memory,
-    // we don't need to do this.
-    auto alloca_inst = builder.CreateAlloca(dot_llvm_type, nullptr, "self_ref");
-    builder.CreateStore(self_argument, alloca_inst);
-    self_argument = alloca_inst;
-  } else if (self_param.is_pointer && dot_ext.is_pointer()) {
-    // we dont need to do anything here i think?
-  } else {
-    // get the correct type if we're dereferencing a pointer.
-    if (dot_ext.is_pointer()) {
-      auto element_ty = global_get_type(dot_type->get_element_type());
-      dot_llvm_type = llvm_typeof(element_ty);
-    }
-    self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
-  }
-
-  arguments.insert(arguments.begin(), self_argument);
-  auto *function = llvm::dyn_cast<llvm::Function>(function_symbol->llvm_value);
-  auto inst = builder.CreateCall(function, arguments);
-  dbg.attach_debug_info(inst, node->source_range);
-  return inst;
-}
-
 llvm::Value *LLVMEmitter::visit_block(ASTBlock *node) {
   auto old_scope = ctx.scope;
   ctx.scope = node->scope;
@@ -222,6 +156,130 @@ llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
     return builder.CreateRetVoid();
   }
 }
+
+llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
+
+/*
+  TODO: verify that this won't go completely unused? it doesn't have the same purpose as it did in the old emitter,
+  and simply using llvm_typeof() is probably sufficient enough for 90% of nodes.
+*/
+llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
+
+llvm::Value *LLVMEmitter::visit_lambda(ASTLambda *node) { return nullptr; }
+
+void LLVMEmitter::visit_variable(ASTVariable *node) {
+  auto var_type = global_get_type(node->type->resolved_type);
+  auto llvm_var_type = llvm_typeof(var_type);
+
+  /*
+    The constants need a lot of work.
+    We'll need to implement a 'global static initializer' kind of thing, like C++,
+    so we can have constant values of arbitrary contents.
+  */
+  if (!builder.GetInsertBlock() || node->is_constexpr) {
+    auto init_value = visit_expr(node->value.get());
+    if (auto constant = llvm::dyn_cast<llvm::Constant>(init_value)) {
+      auto gv =
+          new llvm::GlobalVariable(llvm_var_type, node->is_constexpr, llvm::GlobalValue::ExternalLinkage, constant);
+      ctx.scope->local_lookup(node->name)->llvm_value = gv;
+      module->insertGlobalVariable(gv);
+    } else {
+      throw_error("for now, we can only have statically compile-able constant variables. this is limited to numerical "
+                  "types mostly",
+                  node->source_range);
+    }
+  } else {
+    // All local variables.
+    llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
+    ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
+
+    if (node->value) {
+      auto init_value = visit_expr(node->value.get());
+      builder.CreateStore(init_value, alloca_inst);
+    } else {
+      builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
+    }
+  }
+}
+
+void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {
+  if (node->is_emitted)
+    return;
+  if (node->generic_parameters.size())
+    return;
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+
+void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+
+void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
+  if (node->generic_parameters.size())
+    return;
+  if (node->is_emitted)
+    return;
+  node->is_emitted = true;
+  llvm_typeof(global_get_type(node->resolved_type));
+}
+
+void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
+
+void LLVMEmitter::visit_impl(ASTImpl *node) {
+  if (node->generic_parameters.size())
+    return;
+  if (node->is_emitted)
+    return;
+  node->is_emitted = true;
+
+  auto old_scope = ctx.scope;
+  ctx.scope = node->scope;
+  Defer _([&] { ctx.scope = old_scope; });
+
+  for (const auto &method : node->methods) {
+    visit_function_declaration(method);
+  }
+}
+void LLVMEmitter::visit_module(ASTModule *node) {}
+void LLVMEmitter::visit_import(ASTImport *node) {}
+
+void LLVMEmitter::visit_for(ASTFor *node) {}
+
+llvm::Value *LLVMEmitter::visit_switch(ASTSwitch *node) { return nullptr; }
+void LLVMEmitter::visit_continue(ASTContinue *node) {}
+void LLVMEmitter::visit_break(ASTBreak *node) {}
+void LLVMEmitter::visit_if(ASTIf *node) {
+  llvm::Function *function = builder.GetInsertBlock()->getParent();
+
+  // decalare blocks
+  auto *ifBlock = llvm::BasicBlock::Create(llvm_ctx, "if");
+  auto *mergeBlock = llvm::BasicBlock::Create(llvm_ctx, "ifcont");
+
+  // if condition
+  auto cond_result = visit_expr(node->condition);
+  builder.CreateCondBr(cond_result, ifBlock, mergeBlock);
+
+  // if block
+  function->insert(function->end(), ifBlock);
+  builder.SetInsertPoint(ifBlock);
+
+  visit_block(node->block);
+  if (HAS_FLAG(node->block->control_flow.flags, BLOCK_FLAGS_FALL_THROUGH)) {
+    builder.CreateBr(mergeBlock);
+  }
+
+  // merge block
+  function->insert(function->end(), mergeBlock);
+  builder.SetInsertPoint(mergeBlock);
+}
+
+void LLVMEmitter::visit_else(ASTElse *node) {}
+void LLVMEmitter::visit_while(ASTWhile *node) {}
+void LLVMEmitter::visit_defer(ASTDefer *node) {}
 
 llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
   switch (node->tag) {
@@ -305,11 +363,6 @@ llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
   auto type = global_get_type(symbol.get()->type_id);
   return symbol.get()->llvm_value;
-}
-
-llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
-  visit_expr(node->expression);
-  return nullptr;
 }
 
 llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
@@ -425,23 +478,92 @@ llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
     I don't think we should do this load.
   */
   // return builder.CreateLoad(llvm_typeof(member_ty), member_ptr, "load_dot_member");
-  
+
   return member_ptr;
 }
 
-llvm::Value *LLVMEmitter::visit_pattern_match(ASTPatternMatch *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_dyn_of(ASTDyn_Of *node) { return nullptr; }
-llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
+  visit_expr(node->expression);
+  return nullptr;
+}
 
-llvm::Value *LLVMEmitter::visit_subscript(ASTSubscript *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_subscript(ASTIndex *node) {
+  auto base_ty = global_get_type(node->base->resolved_type);
+  auto base_value = load_value(node->base, visit_expr(node->base));
+  auto index_value = load_value(node->index, visit_expr(node->index));
+  if (node->is_operator_overload) {
+    // TODO: call operator overload.
+    return nullptr;
+  }
+  auto element_type = llvm_typeof(global_get_type(base_ty->get_element_type()));
+  return builder.CreateGEP(element_type, base_value, {index_value});
+}
 
-/*
-  TODO: verify that this won't go completely unused? it doesn't have the same purpose as it did in the old emitter,
-  and simply using llvm_typeof() is probably sufficient enough for 90% of nodes.
-*/
-llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
+llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
+  llvm::Value *callee = visit_expr(node->function);
+  std::vector<llvm::Value *> args = visit_arguments(node->arguments);
 
-llvm::Value *LLVMEmitter::visit_lambda(ASTLambda *node) { return nullptr; }
+  // normal named function.
+  if (auto *func = llvm::dyn_cast<llvm::Function>(callee)) {
+    return builder.CreateCall(func, args);
+  }
+
+  // call a function pointer.
+  // the fn ptr type
+  auto fn_ptr_ty = global_get_type(node->function->resolved_type);
+  auto fn_ty = global_get_type(fn_ptr_ty->get_element_type());
+  // convert to llvm
+  auto llvm_fn_ty = llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(fn_ty));
+  return builder.CreateCall(llvm_fn_ty, callee, args);
+}
+
+llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
+  auto function_symbol = ctx.get_symbol(node->dot).get();
+  auto arguments = visit_arguments(node->arguments);
+
+  if (function_symbol->is_variable()) {
+    /*
+      TODO: handle calling a function pointer via a 'dyn' interface object.
+    */
+    return nullptr;
+  }
+
+  auto decl = function_symbol->function.declaration;
+  auto &self_param = decl->params->params[0]->self;
+
+  auto dot_type = global_get_type(node->dot->base->resolved_type);
+  auto dot_ext = dot_type->get_ext();
+
+  auto dot_llvm_type = llvm_typeof(dot_type);
+
+  llvm::Value *self_argument = visit_expr(node->dot->base); // Evaluate the `dot` expression
+
+  if (self_param.is_pointer && !dot_ext.is_pointer()) {
+    // TODO:{}
+    // Do we need to do this?
+    // we can probably only do this when we pass a value that's not a pointer to a *mut/*const self function.
+    // but if it's already an alloca or a reference to some memory,
+    // we don't need to do this.
+    auto alloca_inst = builder.CreateAlloca(dot_llvm_type, nullptr, "self_ref");
+    builder.CreateStore(self_argument, alloca_inst);
+    self_argument = alloca_inst;
+  } else if (self_param.is_pointer && dot_ext.is_pointer()) {
+    // we dont need to do anything here i think?
+  } else {
+    // get the correct type if we're dereferencing a pointer.
+    if (dot_ext.is_pointer()) {
+      auto element_ty = global_get_type(dot_type->get_element_type());
+      dot_llvm_type = llvm_typeof(element_ty);
+    }
+    self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
+  }
+
+  arguments.insert(arguments.begin(), self_argument);
+  auto *function = llvm::dyn_cast<llvm::Function>(function_symbol->llvm_value);
+  auto inst = builder.CreateCall(function, arguments);
+  dbg.attach_debug_info(inst, node->source_range);
+  return inst;
+}
 
 llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
   auto type = global_get_type(node->target_type->resolved_type);
@@ -486,66 +608,6 @@ llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
   return cast_scalar(expr, from, target);
 }
 
-void LLVMEmitter::visit_variable(ASTVariable *node) {
-  auto var_type = global_get_type(node->type->resolved_type);
-  auto llvm_var_type = llvm_typeof(var_type);
-
-  /*
-    The constants need a lot of work.
-    We'll need to implement a 'global static initializer' kind of thing, like C++,
-    so we can have constant values of arbitrary contents.
-  */
-  if (!builder.GetInsertBlock() || node->is_constexpr) {
-    auto init_value = visit_expr(node->value.get());
-    if (auto constant = llvm::dyn_cast<llvm::Constant>(init_value)) {
-      auto gv =
-          new llvm::GlobalVariable(llvm_var_type, node->is_constexpr, llvm::GlobalValue::ExternalLinkage, constant);
-      ctx.scope->local_lookup(node->name)->llvm_value = gv;
-      module->insertGlobalVariable(gv);
-    } else {
-      throw_error("for now, we can only have statically compile-able constant variables. this is limited to numerical "
-                  "types mostly",
-                  node->source_range);
-    }
-  } else {
-    // All local variables.
-    llvm::Value *alloca_inst = builder.CreateAlloca(llvm_var_type, nullptr, node->name.get_str());
-    ctx.scope->local_lookup(node->name)->llvm_value = alloca_inst;
-
-    if (node->value) {
-      auto init_value = visit_expr(node->value.get());
-      builder.CreateStore(init_value, alloca_inst);
-    } else {
-      builder.CreateStore(llvm::Constant::getNullValue(llvm_var_type), alloca_inst);
-    }
-  }
-}
-
-void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {
-  if (node->is_emitted)
-    return;
-  if (node->generic_parameters.size())
-    return;
-  node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
-}
-
-void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
-  node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
-}
-
-void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
-  if (node->generic_parameters.size())
-    return;
-  if (node->is_emitted)
-    return;
-  node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
-}
-
-void LLVMEmitter::visit_tuple_deconstruction(ASTTupleDeconstruction *node) {}
-
 std::vector<llvm::Value *> LLVMEmitter::visit_arguments(ASTArguments *node) {
   std::vector<llvm::Value *> args;
   for (const auto &value : node->arguments) {
@@ -553,58 +615,6 @@ std::vector<llvm::Value *> LLVMEmitter::visit_arguments(ASTArguments *node) {
   }
   return args;
 }
-
-void LLVMEmitter::visit_impl(ASTImpl *node) {
-  if (node->generic_parameters.size())
-    return;
-  if (node->is_emitted)
-    return;
-  node->is_emitted = true;
-
-  auto old_scope = ctx.scope;
-  ctx.scope = node->scope;
-  Defer _([&] { ctx.scope = old_scope; });
-
-  for (const auto &method : node->methods) {
-    visit_function_declaration(method);
-  }
-}
-void LLVMEmitter::visit_module(ASTModule *node) {}
-void LLVMEmitter::visit_import(ASTImport *node) {}
-
-void LLVMEmitter::visit_for(ASTFor *node) {}
-
-llvm::Value *LLVMEmitter::visit_switch(ASTSwitch *node) { return nullptr; }
-void LLVMEmitter::visit_continue(ASTContinue *node) {}
-void LLVMEmitter::visit_break(ASTBreak *node) {}
-void LLVMEmitter::visit_if(ASTIf *node) {
-  llvm::Function *function = builder.GetInsertBlock()->getParent();
-
-  // decalare blocks
-  auto *ifBlock = llvm::BasicBlock::Create(llvm_ctx, "if");
-  auto *mergeBlock = llvm::BasicBlock::Create(llvm_ctx, "ifcont");
-
-  // if condition
-  auto cond_result = visit_expr(node->condition);
-  builder.CreateCondBr(cond_result, ifBlock, mergeBlock);
-
-  // if block
-  function->insert(function->end(), ifBlock);
-  builder.SetInsertPoint(ifBlock);
-
-  visit_block(node->block);
-  if (HAS_FLAG(node->block->control_flow.flags, BLOCK_FLAGS_FALL_THROUGH)) {
-    builder.CreateBr(mergeBlock);
-  }
-
-  // merge block
-  function->insert(function->end(), mergeBlock);
-  builder.SetInsertPoint(mergeBlock);
-}
-
-void LLVMEmitter::visit_else(ASTElse *node) {}
-void LLVMEmitter::visit_while(ASTWhile *node) {}
-void LLVMEmitter::visit_defer(ASTDefer *node) {}
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit_expr(node->operand);

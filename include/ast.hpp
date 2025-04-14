@@ -670,10 +670,10 @@ struct ASTWhile : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_WHILE; }
 };
 
-struct ASTSubscript : ASTExpr {
+struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
-  ASTExpr *left;
-  ASTExpr *subscript;
+  ASTExpr *base;
+  ASTExpr *index;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
 };

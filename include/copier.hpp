@@ -41,7 +41,7 @@ struct ASTCopier {
   ASTWhile *copy_while(ASTWhile *node);
   ASTStructDeclaration *copy_struct_declaration(ASTStructDeclaration *node);
   ASTDotExpr *copy_dot_expr(ASTDotExpr *node);
-  ASTSubscript *copy_subscript(ASTSubscript *node);
+  ASTIndex *copy_subscript(ASTIndex *node);
   ASTInitializerList *copy_initializer_list(ASTInitializerList *node);
   ASTEnumDeclaration *copy_enum_declaration(ASTEnumDeclaration *node);
   ASTRange *copy_range(ASTRange *node);

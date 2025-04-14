@@ -651,7 +651,7 @@ struct LLVMEmitter {
   llvm::Value *visit_call(ASTCall *node);
   llvm::Value *visit_return(ASTReturn *node);
   llvm::Value *visit_dot_expr(ASTDotExpr *node);
-  llvm::Value *visit_subscript(ASTSubscript *node);
+  llvm::Value *visit_subscript(ASTIndex *node);
   llvm::Value *visit_initializer_list(ASTInitializerList *node);
   llvm::Value *visit_range(ASTRange *node);
   llvm::Value *visit_switch(ASTSwitch *node);
@@ -776,7 +776,7 @@ struct LLVMEmitter {
       case AST_NODE_DOT_EXPR:
         return visit_dot_expr(static_cast<ASTDotExpr *>(expr));
       case AST_NODE_SUBSCRIPT:
-        return visit_subscript(static_cast<ASTSubscript *>(expr));
+        return visit_subscript(static_cast<ASTIndex *>(expr));
       case AST_NODE_INITIALIZER_LIST:
         return visit_initializer_list(static_cast<ASTInitializerList *>(expr));
       case AST_NODE_SIZE_OF:
@@ -822,7 +822,7 @@ struct LLVMEmitter {
       case AST_NODE_DOT_EXPR:
         return visit_dot_expr(static_cast<ASTDotExpr *>(node));
       case AST_NODE_SUBSCRIPT:
-        return visit_subscript(static_cast<ASTSubscript *>(node));
+        return visit_subscript(static_cast<ASTIndex *>(node));
       case AST_NODE_INITIALIZER_LIST:
         return visit_initializer_list(static_cast<ASTInitializerList *>(node));
       case AST_NODE_SIZE_OF:
