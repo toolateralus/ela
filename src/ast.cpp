@@ -388,22 +388,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return node;
     }},
 
-    // #typeid, integer version of typeof. can be used to compare types without
-    // the pointers.
-    {.identifier = "typeid",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTLiteral, literal, range, _, parser)
-        parser->expect(TType::LParen);
-        auto type = parser->parse_type();
-        parser->expect(TType::RParen);
-        type->accept(parser->typer);
-        literal->tag = ASTLiteral::Integer;
-        // TODO: we should move this out of here.
-        literal->value = std::to_string(type->resolved_type->uid);
-        literal->source_range = type->source_range;
-        return literal;
-    }},
 
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
