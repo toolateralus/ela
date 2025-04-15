@@ -868,7 +868,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
   if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
     if (arguments->arguments.empty() && func->generic_parameters.size() == 1) {
-      if (expected_type == Type::INVALID_TYPE) {
+
+      if (!type_is_valid(expected_type)) {
         throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so "
                     "none can be substituted.",
                     source_range);
@@ -967,6 +968,11 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       for (auto i = 0; i < generics.size(); ++i) {
         auto type = ast_alloc<ASTType>();
         type->source_range = source_range;
+
+        if (!type_is_valid(inferred_generics[i])) {
+          throw_error("failed in inferring type argument from function argument list", arguments->source_range);
+        }
+
         type->resolved_type = inferred_generics[i];
         generic_args->push_back(type);
       }
@@ -1559,6 +1565,10 @@ void Typer::visit(ASTCall *node) {
       }
 
       type = func_decl->resolved_type;
+
+      // Why did I have to add this, when refactoring the type system??
+      node->function->resolved_type = func_decl->resolved_type;
+
     }
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
@@ -2976,5 +2986,6 @@ void Typer::visit(ASTPath *node) {
     }
     index++;
   }
+
   node->resolved_type = node->segments[node->segments.size() - 1].resolved_type;
 }

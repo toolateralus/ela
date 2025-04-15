@@ -818,7 +818,8 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
   int i = 0;
   for (const auto &arg : args) {
     if (!type_is_valid(arg)) {
-      throw_error("unable to mangle type args, a type arg was null or invalid", {});
+      s += "$-1";
+      continue;
     }
 
     if (i > 0) {

@@ -51,7 +51,7 @@
       "request": "launch",
       "name": "Debug ela_source/main",
       "program": "${workspaceFolder}/bin/ela",
-      "args": ["main.ela", "--s", "--nl", "--nostdlib"],
+      "args": ["main.ela", "--s", "--nl"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
         "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
