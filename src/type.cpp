@@ -151,7 +151,7 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
 }
 
 Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions) {
-  for (const auto &type : type_table) {
+  for (auto &type : type_table) {
     if (!type->is_kind(TYPE_TUPLE))
       continue;
 
@@ -452,7 +452,7 @@ Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
   return type;
 }
 
-Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, size_t element_type) {
+Type *global_create_enum_type(const InternedString &name, Scope *scope, bool is_flags, Type *element_type) {
   type_table.push_back(new Type(type_table.size(), TYPE_ENUM));
   Type *type = type_table.back();
   type->set_base(name);
@@ -708,7 +708,7 @@ InternedString get_tuple_type_name(const std::vector<Type *> &types) {
 Type *Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
   ext.extensions.push_back({is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
-  return global_find_type_id(base_type == Type::INVALID_TYPE ? this : base_type, ext);
+  return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type*)this : base_type, ext);
 }
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
@@ -817,6 +817,10 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
   std::string s;
   int i = 0;
   for (const auto &arg : args) {
+    if (!type_is_valid(arg)) {
+      throw_error("unable to mangle type args, a type arg was null or invalid", {});
+    }
+
     if (i > 0) {
       s += "_" + std::to_string(arg->uid);
     } else {

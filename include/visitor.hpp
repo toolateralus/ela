@@ -246,7 +246,6 @@ struct Emitter : VisitorBase {
       return;
     }
     auto loc = node->source_range.begin_location.line;
-    // if (loc != last_loc) {
     auto filename = get_source_filename(node->source_range);
     if (filename.empty()) {
       printf("Empty filename for line directive.\n");
@@ -256,7 +255,6 @@ struct Emitter : VisitorBase {
     auto line = std::format("#line {} \"{}\"\n", loc, filename);
     code << line;
     last_loc = loc;
-    // }
   }
 
   void emit_dyn_dispatch_object(Type *interface_type, Type *dyn_type);
