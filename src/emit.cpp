@@ -1581,7 +1581,7 @@ std::string Emitter::to_type_struct(Type *type, Context &context) {
 
   static bool *type_cache = [] {
     auto arr = new bool[type_table.size()];
-    memset(arr, 0, type_table.size());
+    memset(arr, 0, type_table.size() * sizeof(bool));
     return arr;
   }();
 

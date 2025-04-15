@@ -1,23 +1,23 @@
 -----------------------------------------------------------------------------------------
 File                                       blank        comment           code
 -----------------------------------------------------------------------------------------
-src/typer.cpp                                406            128           2463
-src/ast.cpp                                  313            112           2296
-src/emit.cpp                                 375             93           2079
-include/ast.hpp                              163            110            844
-src/type.cpp                                 132             59            766
+src/typer.cpp                                405            133           2453
+src/ast.cpp                                  313            109           2283
+src/emit.cpp                                 375             93           2074
+include/ast.hpp                              160            100            834
+src/type.cpp                                 134             70            685
 src/copier.cpp                                15              1            574
-src/dependency_emitter.cpp                    75              8            501
+src/dependency_emitter.cpp                    77              8            498
 include/lex.hpp                               80              5            407
-include/visitor.hpp                           49             10            356
-include/type.hpp                              70             14            319
+include/visitor.hpp                           52             15            362
 src/lex.cpp                                   23              7            308
-include/scope.hpp                             45             10            265
+include/type.hpp                              83             35            297
+include/scope.hpp                             44             10            265
 include/constexpr.hpp                         29              6            241
 src/command.cpp                               38              0            211
 include/error.hpp                             32              0            173
 include/core.hpp                              23              2            143
-include/llvm.hpp                              22              0            114
+include/llvm.hpp                              22              0            113
 src/constexpr.cpp                              4              0            107
 include/builder.hpp                           22              0            101
 include/strings.hpp                           26              5             99
@@ -29,5 +29,5 @@ src/visitor.cpp                                3             14             52
 include/arena.hpp                             12             12             35
 src/llvm.cpp                                   0              0              3
 -----------------------------------------------------------------------------------------
-SUM:                                        2009            610          12724
+SUM:                                        2024            639          12585
 -----------------------------------------------------------------------------------------

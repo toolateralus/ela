@@ -2641,7 +2641,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
       auto return_type = declaration->return_type->resolved_type;
 
       FunctionTypeInfo type_info;
-      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(int));
+      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(Type*));
       type_info.params_len = parameters.size();
       type_info.return_type = return_type;
 
@@ -2933,10 +2933,10 @@ void Typer::visit(ASTPath *node) {
   for (auto &segment in node->segments) {
     auto &ident = segment.identifier;
     auto symbol = scope->lookup(ident);
-    scope = nullptr;
     if (!symbol) {
       throw_error(std::format("use of undeclared identifier '{}'", segment.identifier), node->source_range);
     }
+    scope = nullptr;
 
     if (previous_type && previous_type->is_kind(TYPE_CHOICE) && index == node->length() - 1) {
       /* we need to return the parent type here? but we need to maintain the variant. hmm. */
