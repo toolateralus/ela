@@ -868,7 +868,6 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
   if (generic_args->empty()) {
     // infer generic parameter (return type only) from expected type
     if (arguments->arguments.empty() && func->generic_parameters.size() == 1) {
-
       if (!type_is_valid(expected_type)) {
         throw_error("cannot infer a generic parameter to this function with no arguments, no type was expected, so "
                     "none can be substituted.",
@@ -1465,12 +1464,18 @@ void Typer::visit(ASTFor *node) {
 }
 
 void Typer::visit(ASTIf *node) {
-  if (node->condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
-    auto pattern = (ASTPatternMatch *)node->condition;
+  auto condition = node->condition;
+  if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+    auto pattern = (ASTPatternMatch *)condition;
+    auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
     node->block->scope->parent = pattern->scope;
+    condition->accept(this);
+    ctx.scope = old_scope; // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
+                           // HACKING IT IN!
+  } else {
+    condition->accept(this);
   }
-
-  node->condition->accept(this);
+  
   auto cond_ty = node->condition->resolved_type;
   auto conversion_rule = type_conversion_rule(cond_ty, bool_type());
 
@@ -1568,7 +1573,6 @@ void Typer::visit(ASTCall *node) {
 
       // Why did I have to add this, when refactoring the type system??
       node->function->resolved_type = func_decl->resolved_type;
-
     }
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
@@ -2641,7 +2645,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
       auto return_type = declaration->return_type->resolved_type;
 
       FunctionTypeInfo type_info;
-      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(Type*));
+      memcpy(type_info.parameter_types, parameters.data(), parameters.size() * sizeof(Type *));
       type_info.params_len = parameters.size();
       type_info.return_type = return_type;
 
