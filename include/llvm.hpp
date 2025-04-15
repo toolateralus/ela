@@ -315,8 +315,8 @@ struct LLVMEmitter {
     }
 
     // Handle pointer types
-    if (type->get_ext().is_pointer()) {
-      auto elem_ty = global_get_type(type->get_element_type());
+    if (type->extensions.is_pointer()) {
+      auto elem_ty = type->get_element_type();
       const auto &[element_type, element_di_type] = llvm_typeof_impl(elem_ty);
       auto llvm_type = llvm::PointerType::get(element_type, 0);
       auto di_type = dbg.create_pointer_type(element_di_type, 64);
@@ -326,10 +326,10 @@ struct LLVMEmitter {
     }
 
     // Handle fixed-sized arrays
-    if (type->get_ext().is_fixed_sized_array()) {
-      auto elem_ty = global_get_type(type->get_element_type());
+    if (type->extensions.is_fixed_sized_array()) {
+      auto elem_ty = type->get_element_type();
       const auto &[element_type, element_di_type] = llvm_typeof_impl(elem_ty);
-      auto array_size = type->get_ext().extensions.back().array_size;
+      auto array_size = type->extensions.extensions.back().array_size;
       auto llvm_type = llvm::ArrayType::get(element_type, array_size);
       auto di_type = dbg.create_array_type(array_size * element_type->getPrimitiveSizeInBits(),
                                            element_type->getPrimitiveSizeInBits(), element_di_type, {});
@@ -340,7 +340,7 @@ struct LLVMEmitter {
 
     switch (type->kind) {
       case TYPE_SCALAR: {
-        auto info = type->get_info()->as<ScalarTypeInfo>();
+        auto info = type->info->as<ScalarTypeInfo>();
         llvm::Type *llvm_type;
         llvm::DIType *di_type;
         switch (info->scalar_type) {
@@ -403,7 +403,7 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_STRUCT: {
-        auto info = type->get_info()->as<StructTypeInfo>();
+        auto info = type->info->as<StructTypeInfo>();
 
         // Forward declaration for recursive types
         auto struct_name = info->scope->full_name();
@@ -424,7 +424,7 @@ struct LLVMEmitter {
           if (!symbol.is_variable())
             continue;
 
-          auto member_type = global_get_type(symbol.type_id);
+          auto member_type = symbol.type_id;
           auto [llvm_member_type, di_member_type] = llvm_typeof_impl(member_type);
 
           if (is_union) {
@@ -458,7 +458,7 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_ENUM: {
-        auto info = type->get_info()->as<EnumTypeInfo>();
+        auto info = type->info->as<EnumTypeInfo>();
 
         std::vector<llvm::Metadata *> enumerators;
         for (const auto &[name, value] : info->scope->symbols) {
@@ -468,7 +468,7 @@ struct LLVMEmitter {
           }
         }
 
-        auto [underlying_type, underlying_di_type] = llvm_typeof_impl(global_get_type(info->element_type));
+        auto [underlying_type, underlying_di_type] = llvm_typeof_impl(info->element_type);
         auto enum_name = info->scope->full_name();
         auto di_enum_type =
             di_builder->createEnumerationType(dbg.current_scope(), enum_name, file, 0, 32, 32,
@@ -480,10 +480,10 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_TUPLE: {
-        auto info = type->get_info()->as<TupleTypeInfo>();
+        auto info = type->info->as<TupleTypeInfo>();
 
         // Forward declaration for recursive types
-        auto tuple_name = type->get_base().get_str();
+        auto tuple_name = type->basename.get_str();
         auto llvm_tuple_type = llvm::StructType::create(llvm_ctx, tuple_name);
 
         // Memoize the forward declaration
@@ -496,7 +496,7 @@ struct LLVMEmitter {
 
         unsigned index = 0;
         for (const auto &element : info->types) {
-          auto element_type = global_get_type(element);
+          auto element_type = element;
           auto [llvm_element_type, di_element_type] = llvm_typeof_impl(element_type);
           element_types.push_back(llvm_element_type);
           element_debug_info.push_back(
@@ -516,10 +516,10 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_CHOICE: {
-        auto info = type->get_info()->as<ChoiceTypeInfo>();
+        auto info = type->info->as<ChoiceTypeInfo>();
 
         // Forward declaration for recursive types
-        auto choice_name = type->get_base().get_str();
+        auto choice_name = type->basename.get_str();
         auto llvm_choice_type = llvm::StructType::create(llvm_ctx, choice_name);
 
         // Memoize the forward declaration
@@ -536,9 +536,9 @@ struct LLVMEmitter {
         llvm::Type *largest_payload_type = nullptr;
 
         for (const auto &[variant_name, variant_info] : info->variants) {
-          auto variant_type = global_get_type(variant_info);
+          auto variant_type = variant_info;
 
-          if (variant_type->id != void_type()) {
+          if (variant_type != void_type()) {
             auto [llvm_payload_type, di_payload_type] = llvm_typeof_impl(variant_type);
 
             uint64_t member_size = data_layout.getTypeAllocSize(llvm_payload_type);
@@ -570,10 +570,10 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_DYN: {
-        auto info = type->get_info()->as<DynTypeInfo>();
+        auto info = type->info->as<DynTypeInfo>();
 
         // Forward declaration for recursive types
-        auto dyn_name = type->get_base().get_str();
+        auto dyn_name = type->basename.get_str();
         auto llvm_dyn_type = llvm::StructType::create(llvm_ctx, dyn_name);
 
         // Memoize the forward declaration
@@ -605,19 +605,19 @@ struct LLVMEmitter {
       } break;
 
       case TYPE_FUNCTION: {
-        auto info = type->get_info()->as<FunctionTypeInfo>();
+        auto info = type->info->as<FunctionTypeInfo>();
 
         std::vector<llvm::Type *> param_types;
         std::vector<llvm::Metadata *> param_debug_info;
 
         for (int i = 0; i < info->params_len; ++i) {
-          auto param_type = global_get_type(info->parameter_types[i]);
+          auto param_type = info->parameter_types[i];
           auto [llvm_param_type, di_param_type] = llvm_typeof_impl(param_type);
           param_types.push_back(llvm_param_type);
           param_debug_info.push_back(di_param_type);
         }
 
-        auto [llvm_return_type, di_return_type] = llvm_typeof_impl(global_get_type(info->return_type));
+        auto [llvm_return_type, di_return_type] = llvm_typeof_impl(info->return_type);
         auto llvm_function_type = llvm::FunctionType::get(llvm_return_type, param_types, info->is_varargs);
 
         auto di_function_type = dbg.create_function_type(param_debug_info);

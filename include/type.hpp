@@ -30,6 +30,7 @@ enum ConversionRule {
   CONVERT_EXPLICIT,
 };
 
+struct Token;
 Token get_unique_identifier();
 
 enum ScalarType {
@@ -85,7 +86,7 @@ enum StructTypeFlags {
 
 struct ASTExpr;
 
-std::string mangled_type_args(const std::vector<int> &args);
+std::string mangled_type_args(const std::vector<Type *> &args);
 
 struct TypeExtension {
   TypeExtEnum type;
@@ -167,12 +168,11 @@ struct TypeExtensions {
 using GenericParameter = InternedString;
 
 struct TypeInfo {
-  // Now that we have impl & our own free-func methods, any object can have a method.
   Scope *scope = nullptr;
-  std::vector<int> implemented_interfaces;
+
   TypeInfo() {}
 
-  // Use this instead of the clunky static casts everywhere.
+
   template <class T>
     requires std::derived_from<T, TypeInfo>
   inline T *as() {
@@ -198,7 +198,7 @@ struct InterfaceTypeInfo : TypeInfo {
 
 struct ChoiceVariant {
   InternedString name;
-  int type;
+  Type *type;
 };
 
 struct ChoiceTypeInfo : TypeInfo {
@@ -210,12 +210,11 @@ struct ChoiceTypeInfo : TypeInfo {
 struct ASTFunctionDeclaration;
 
 struct FunctionTypeInfo : TypeInfo {
-  FunctionTypeInfo() { memset(parameter_types, -1, 256 * sizeof(int)); }
-  int return_type = -1;
-  int parameter_types[256]; // max no of params in c++.
-  int params_len = 0;
+  FunctionTypeInfo() { memset(parameter_types, 0, 256 * sizeof(Type *)); }
+  Type *return_type = nullptr;
+  Type *parameter_types[256]; // max no of params in c++.
+  size_t params_len = 0;
   bool is_varargs = false;
-  // defined in cpp file
   virtual std::string to_string() const override;
   std::string to_string(const TypeExtensions &ext) const;
 };
@@ -240,7 +239,7 @@ struct ScalarTypeInfo : TypeInfo {
 };
 
 struct EnumTypeInfo : TypeInfo {
-  int element_type = 0;
+  Type *element_type = nullptr;
   bool is_flags = false;
   EnumTypeInfo() {};
 };
@@ -252,73 +251,68 @@ struct StructTypeInfo : TypeInfo {
 };
 
 struct TupleTypeInfo : TypeInfo {
-  std::vector<int> types;
+  std::vector<Type *> types;
 };
 
 struct DynTypeInfo : TypeInfo {
-  int interface_type;
+  Type *interface_type;
   std::vector<std::pair<InternedString, Type *>> methods;
 };
 
 // helpers to get scalar types for fast comparison
-int bool_type();
-int void_type();
-int s8_type();
-int s16_type();
-int s32_type();
-int s64_type();
-int u8_type();
-int u16_type();
-int u32_type();
-int u64_type();
-int f64_type();
-int f32_type();
+Type *bool_type();
+Type *void_type();
+Type *s8_type();
+Type *s16_type();
+Type *s32_type();
+Type *s64_type();
+Type *u8_type();
+Type *u16_type();
+Type *u32_type();
+Type *u64_type();
+Type *f64_type();
+Type *f32_type();
 
-int is_tuple_interface();
-int is_array_interface();
-int is_pointer_interface();
-int is_mut_pointer_interface();
-int is_const_pointer_interface();
+Type *is_tuple_interface();
+Type *is_array_interface();
+Type *is_pointer_interface();
+Type *is_mut_pointer_interface();
+Type *is_const_pointer_interface();
 
-inline Type *global_get_type(const int id) {
-  [[unlikely]]
-  if (id < 0 || id > type_table.size())
-    return nullptr;
+InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
-  return type_table[id];
-}
-InternedString get_tuple_type_name(const std::vector<int> &types);
-int global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
-                       const int = -1);
-int global_create_struct_type(const InternedString &, Scope *, std::vector<int> generic_args = {});
+Type *global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr, const TypeExtensions & = {},
+                         Type * = nullptr);
 
-int global_create_interface_type(const InternedString &name, Scope *scope, std::vector<int> generic_args);
+Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Type *> generic_args = {});
 
-int global_create_tagged_union_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args);
-int global_create_enum_type(const InternedString &, Scope *, bool = false, size_t element_type = s32_type());
+Type *global_create_interface_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
 
-int global_create_tuple_type(const std::vector<int> &types);
+Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
+                                      const std::vector<Type *> &generic_args);
+Type *global_create_enum_type(const InternedString &, Scope *, bool = false, Type *element_type = s32_type());
+
+Type *global_create_tuple_type(const std::vector<Type *> &types);
+
 ConversionRule type_conversion_rule(const Type *from, const Type *to, const SourceRange & = {});
-// char *
-int global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
-int global_find_type_id(std::vector<int> &tuple_types, const TypeExtensions &type_extensions);
-int global_find_type_id(const int, const TypeExtensions &);
-struct Token;
+
+Type *global_find_function_type_id(const FunctionTypeInfo &, const TypeExtensions &);
+Type *global_find_type_id(std::vector<Type *> &tuple_types, const TypeExtensions &type_extensions);
+Type *global_find_type_id(Type *, const TypeExtensions &);
 void init_type_system();
 bool type_is_numerical(const Type *t);
 constexpr bool numerical_type_safe_to_upcast(const Type *from, const Type *to);
 // returns false for failure, else true and passed param signature as out.
-bool get_function_type_parameter_signature(Type *type, std::vector<int> &out);
-void emit_warnings_or_errors_for_operator_overloads(const TType type, SourceRange &range);
 
 struct ASTNode;
 
 struct Type {
-  int id = INVALID_TYPE_ID;
-  int base_id = INVALID_TYPE_ID;
-  int generic_base_id = INVALID_TYPE_ID;
-  std::vector<int> generic_args{};
-  std::vector<int> interfaces{};
+  // used for mangling and stuff, not used for any comparisons, nor lookups anymore.
+  size_t uid;
+  Type *base_type = INVALID_TYPE;
+  Type *generic_base_type = INVALID_TYPE;
+  std::vector<Type *> generic_args{};
+  std::vector<Type *> interfaces{};
   Nullable<ASTNode> declaring_node;
 
   bool dyn_emitted = false;
@@ -328,60 +322,77 @@ struct Type {
   // probably have a better default than this.
   const TypeKind kind = TYPE_SCALAR;
 
-  inline void set_base(const InternedString &base) { this->base = base; }
+  inline void set_base(const InternedString &base) { this->basename = base; }
   inline void set_ext(const TypeExtensions &ext) { this->extensions = ext; }
   inline void set_info(TypeInfo *info) { this->info = info; }
-  inline InternedString const get_base() const { return base; }
-  TypeExtensions const get_ext() const { return extensions; }
-  TypeExtensions const get_ext_no_compound() const { return extensions; }
-  TypeInfo *get_info() const { return info; }
 
-  inline bool implements(const int interface) {
-    auto found = std::ranges::find(interfaces, interface);
-    if (found != interfaces.end()) {
-      return true;
-    }
-    for (auto &interface_id : interfaces) {
-      auto type = global_get_type(interface_id);
-      if (type->generic_base_id == interface) {
-        return true;
-      }
-    }
-    return false;
-  }
+  bool implements(const Type *interface);
 
-private:
+  // TODO: move a lot of the querying methods from *info into here too.
   TypeInfo *info;
-  InternedString base{};
+
+  InternedString basename{};
+
+  // TODO: refactor the way type extensions work.
+  // most of this should just be on the type itself,
+  // especially the querying methods, it's a pain to get the extensions everywhere.
   TypeExtensions extensions{};
 
-public:
-  inline bool equals(const int base, const TypeExtensions &type_extensions) const {
-    return base_id == base && type_extensions.extensions == get_ext().extensions;
+  // TODO: also remove me. this can be hand inlined to the one place this is used.
+  inline bool equals(const Type *base, const TypeExtensions &type_extensions) const {
+    return base_type == base && type_extensions.extensions == extensions.extensions;
   }
 
+  /*
+    TODO: remove me. this is used in one place.
+  */
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
   inline Type() = default;
-  inline Type(const int id, const TypeKind kind) : id(id), kind(kind) {
-    if (kind == TYPE_TUPLE)
+
+  inline Type(size_t uid, const TypeKind kind) : uid(uid), kind(kind) {
+    if (kind == TYPE_TUPLE) {
       interfaces.push_back(is_tuple_interface());
+    }
   }
 
+  /*
+    check if the 'kind' is of a certain value.
+    note that 'kind' has nothing to do with pointers nor array extensions
+    this is effectively checking the 'base type' if this is a pointer.
+    use the 'extensions' and it's utilities for more thorough query.
+  */
   inline bool is_kind(const TypeKind kind) const { return this->kind == kind; }
 
+  /* convert it to the in-language recognizable representation of the type's name.
+      - fn *(s32, s32) -> *mut void;
+      - s32[10];
+      - List!<(s32, s32)>
+    and so on.
+  */
   std::string to_string() const;
 
-  // returns -1 for non-arrays. use 'remove_one_pointer_depth' for pointers.
-  int get_element_type() const;
-  int take_pointer_to(bool) const;
+  // Get the element type of a pointer, or an array.
+  Type *get_element_type() const;
 
-  constexpr static int UNRESOLVED_GENERIC_TYPE_ID = -2;
-  constexpr static int INVALID_TYPE_ID = -1;
+  // take a mut/const pointer to this type.
+  Type *take_pointer_to(bool) const;
+
+  // To have a null, yet identifyable unresolved generic type,
+  // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
+  // but will still effectively be a poison value.
+  static Type *UNRESOLVED_GENERIC_TYPE_ID;
+  constexpr static Type *INVALID_TYPE = nullptr;
 };
 
+static inline constexpr bool type_is_valid(Type *type) {
+  return type != Type::UNRESOLVED_GENERIC_TYPE_ID && type != Type::INVALID_TYPE;
+}
+
 struct ASTFunctionDeclaration;
+
 InternedString get_function_typename(ASTFunctionDeclaration *);
+
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
 
 enum OperationKind {
@@ -390,11 +401,12 @@ enum OperationKind {
   OPERATION_INDEX,
 };
 
-int find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
+Type *find_operator_overload(int mutability, Type *left_ty, TType op, OperationKind kind);
+
 std::string get_operator_overload_name(TType op, OperationKind kind);
 
 static std::string get_unmangled_name(const Type *type) {
-  std::string base = type->get_base().get_str();
+  std::string base = type->basename.get_str();
   auto first = base.find("$");
   if (first != std::string::npos) {
     base = base.substr(0, first);
@@ -404,7 +416,7 @@ static std::string get_unmangled_name(const Type *type) {
     base += "!<";
     auto it = 0;
     for (auto id : type->generic_args) {
-      base += get_unmangled_name(global_get_type(id));
+      base += get_unmangled_name(id);
       if (it != type->generic_args.size() - 1) {
         base += ", ";
       }
@@ -413,7 +425,7 @@ static std::string get_unmangled_name(const Type *type) {
     base += ">";
   }
 
-  auto output = type->get_ext().to_string();
+  auto output = type->extensions.to_string();
   if (!output.empty()) {
     output += " ";
   }

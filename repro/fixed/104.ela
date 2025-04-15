@@ -1,7 +1,7 @@
 import fmt::*;
 
 /* 
-  We still have reflection problems.
+  This was fixed and randomly stopped working again with no cahnges. I have no flipping idea.
 */
 
 AltOption :: struct!<T> {

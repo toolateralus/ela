@@ -36,7 +36,7 @@ struct Scope;
 
 struct Symbol {
   InternedString name;
-  int type_id = -1;
+  Type *type_id = Type::INVALID_TYPE;
   int flags = SYMBOL_IS_VARIABLE;
   llvm::Value *llvm_value;
   Mutability mutability = CONST;
@@ -79,7 +79,7 @@ struct Symbol {
   Symbol() {}
   ~Symbol() {}
 
-  static Symbol create_variable(const InternedString &name, int type_id, ASTExpr *initial_value, ASTNode *decl,
+  static Symbol create_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, ASTNode *decl,
                                 Mutability mutability) {
     Symbol symbol;
     symbol.name = name;
@@ -91,7 +91,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration,
+  static Symbol create_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
                                 SymbolFlags flags) {
     Symbol symbol;
     symbol.type_id = type_id;
@@ -101,7 +101,7 @@ struct Symbol {
     return symbol;
   }
 
-  static Symbol create_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+  static Symbol create_type(Type *type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
     Symbol symbol;
     symbol.name = name;
     symbol.flags = SYMBOL_IS_TYPE;
@@ -168,7 +168,7 @@ struct Scope {
     return fields;
   }
 
-  void insert_variable(const InternedString &name, int type_id, ASTExpr *initial_value, Mutability mutability,
+  void insert_variable(const InternedString &name, Type *type_id, ASTExpr *initial_value, Mutability mutability,
                        ASTNode *decl = nullptr) {
     auto sym = Symbol::create_variable(name, type_id, initial_value, decl, mutability);
     sym.scope = this;
@@ -176,7 +176,7 @@ struct Scope {
     ordered_symbols.push_back(name);
   }
 
-  void insert_function(const InternedString &name, const int type_id, ASTFunctionDeclaration *declaration,
+  void insert_function(const InternedString &name, Type *type_id, ASTFunctionDeclaration *declaration,
                        SymbolFlags flags = SYMBOL_IS_FUNCTION) {
     auto sym = Symbol::create_function(name, type_id, declaration, flags);
     sym.scope = this;
@@ -184,7 +184,7 @@ struct Scope {
     ordered_symbols.push_back(name);
   }
 
-  void insert_type(const int type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
+  void insert_type(Type *type_id, const InternedString &name, TypeKind kind, ASTNode *declaration) {
     auto sym = Symbol::create_type(type_id, name, kind, declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
@@ -204,7 +204,7 @@ struct Scope {
 
   void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
-  int create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
+  Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
     auto sym = Symbol::create_type(id, name, TYPE_CHOICE, (ASTNode *)declaration);
     sym.scope = this;
@@ -212,8 +212,8 @@ struct Scope {
     return id;
   }
 
-  int create_interface_type(const InternedString &name, Scope *scope, const std::vector<int> &generic_args,
-                            ASTInterfaceDeclaration *declaration) {
+  Type *create_interface_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
+                              ASTInterfaceDeclaration *declaration) {
     auto id = global_create_interface_type(name, scope, generic_args);
     auto sym = Symbol::create_type(id, name, TYPE_INTERFACE, (ASTNode *)declaration);
     sym.scope = this;
@@ -221,7 +221,7 @@ struct Scope {
     return id;
   }
 
-  int create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
+  Type *create_struct_type(const InternedString &name, Scope *scope, ASTStructDeclaration *declaration) {
     auto id = global_create_struct_type(name, scope);
     auto sym = Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode *)declaration);
     sym.scope = this;
@@ -229,7 +229,7 @@ struct Scope {
     return id;
   }
 
-  void create_type_alias(const InternedString &name, int type_id, TypeKind kind, ASTNode *declaring_node) {
+  void create_type_alias(const InternedString &name, Type *type_id, TypeKind kind, ASTNode *declaring_node) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = type_id;
@@ -241,7 +241,7 @@ struct Scope {
     symbols.insert_or_assign(name, symbol);
   }
 
-  void forward_declare_type(const InternedString &name, int default_id) {
+  void forward_declare_type(const InternedString &name, Type *default_id) {
     Symbol symbol;
     symbol.name = name;
     symbol.type_id = default_id;
@@ -250,7 +250,7 @@ struct Scope {
     symbols.insert_or_assign(name, symbol);
   }
 
-  int create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
+  Type *create_enum_type(const InternedString &name, Scope *scope, bool flags, ASTEnumDeclaration *declaration) {
     auto id = global_create_enum_type(name, scope, flags);
     auto sym = Symbol::create_type(id, name, TYPE_STRUCT, (ASTNode *)declaration);
     sym.scope = this;
@@ -264,7 +264,7 @@ struct Scope {
     symbols.insert_or_assign(name, sym);
   }
 
-  int create_tuple_type(const std::vector<int> &types) {
+  Type *create_tuple_type(const std::vector<Type *> &types) {
     auto id = global_create_tuple_type(types);
     auto name = get_tuple_type_name(types);
     // Tuples don't have a declaration node, so we pass nullptr here. Something to be aware of!
@@ -274,19 +274,19 @@ struct Scope {
     return id;
   }
 
-  int find_type_id(const InternedString &name, const TypeExtensions &ext) {
+  Type *find_type_id(const InternedString &name, const TypeExtensions &ext) {
     auto symbol = lookup(name);
     if (!symbol || !symbol->is_type()) {
       if (parent) {
         return parent->find_type_id(name, ext);
       } else {
-        return Type::INVALID_TYPE_ID;
+        return Type::INVALID_TYPE;
       }
     }
     return global_find_type_id(symbol->type_id, ext);
   }
 
-  int find_or_create_dyn_type_of(int interface_type, SourceRange range, Typer *typer);
+  Type *find_or_create_dyn_type_of(Type *interface_type, SourceRange range, Typer *typer);
 };
 
 static Scope *create_child(Scope *parent) {
@@ -305,7 +305,6 @@ struct Context {
     }
     scope = in_scope;
   }
-
 
   // ONLY use this for exiting a scope you JUST created.
   // just store the scope you left in any other case,

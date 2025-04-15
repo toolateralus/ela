@@ -66,14 +66,14 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
     null and crashes out.
   */
   Symbol *sym;
-  if (node->declaring_type != Type::INVALID_TYPE_ID) {
-    sym = global_get_type(node->declaring_type)->get_info()->scope->local_lookup(node->name);
+  if (type_is_valid(node->declaring_type)) {
+    sym = node->declaring_type->info->scope->local_lookup(node->name);
   } else {
     sym = ctx.scope->lookup(node->name);
   }
 
   auto name = get_mangled_name(sym);
-  auto return_type = global_get_type(node->return_type->resolved_type);
+  auto return_type = node->return_type->resolved_type;
 
   std::vector<llvm::Type *> param_types;
   std::vector<std::optional<llvm::Attribute>> attributes;
@@ -83,7 +83,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   // Handle sret for return type if necessary
   bool has_sret = false;
   if ((!return_type->is_kind(TYPE_ENUM) && !return_type->is_kind(TYPE_SCALAR)) &&
-      return_type->get_ext().has_no_extensions()) {
+      return_type->extensions.has_no_extensions()) {
     auto sret_type = llvm::PointerType::get(llvm_typeof(return_type), 0);
     param_types.push_back(sret_type);
     has_sret = true;
@@ -91,7 +91,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
 
   auto index = 0;
   for (const auto &param : node->params->params) {
-    auto param_type = global_get_type(param->resolved_type);
+    auto param_type = param->resolved_type;
     auto llvm_type = llvm_typeof(param_type);
     if (llvm_type->isStructTy()) {
       attributes[index] = (llvm::Attribute::getWithByValType(llvm_ctx, llvm_type));
@@ -132,7 +132,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
     }
 
     if (ast_param->tag == ASTParamDecl::Normal) {
-      auto type = global_get_type(ast_param->normal.type->resolved_type);
+      auto type = ast_param->normal.type->resolved_type;
       Symbol *symbol = ctx.scope->local_lookup(ast_param->normal.name);
       if (symbol)
         symbol->llvm_value = param;
@@ -163,7 +163,7 @@ void LLVMEmitter::visit_function_declaration(ASTFunctionDeclaration *node) {
   visit_block(node->block.get());
 
   if (!builder.GetInsertBlock()->getTerminator()) {
-    if (return_type->id == void_type()) {
+    if (return_type == void_type()) {
       builder.CreateRetVoid();
     } else if (has_sret) {
       builder.CreateStore(llvm::Constant::getNullValue(llvm_typeof(return_type)), sret_destination.get());
@@ -222,7 +222,7 @@ llvm::Value *LLVMEmitter::visit_return(ASTReturn *node) {
 llvm::Value *LLVMEmitter::visit_type(ASTType *node) { return nullptr; }
 
 void LLVMEmitter::visit_variable(ASTVariable *node) {
-  auto var_type = global_get_type(node->type->resolved_type);
+  auto var_type = node->type->resolved_type;
   auto llvm_var_type = llvm_typeof(var_type);
 
   /*
@@ -262,12 +262,12 @@ void LLVMEmitter::visit_struct_declaration(ASTStructDeclaration *node) {
   if (node->generic_parameters.size())
     return;
   node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
+  llvm_typeof(node->resolved_type);
 }
 
 void LLVMEmitter::visit_enum_declaration(ASTEnumDeclaration *node) {
   node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
+  llvm_typeof(node->resolved_type);
 }
 
 void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
@@ -276,7 +276,7 @@ void LLVMEmitter::visit_choice_declaration(ASTChoiceDeclaration *node) {
   if (node->is_emitted)
     return;
   node->is_emitted = true;
-  llvm_typeof(global_get_type(node->resolved_type));
+  llvm_typeof(node->resolved_type);
 }
 
 void LLVMEmitter::visit_impl(ASTImpl *node) {
@@ -342,7 +342,7 @@ llvm::Value *LLVMEmitter::visit_type_of(ASTType_Of *node) { return nullptr; }
 llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
-      auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
+      auto info = node->resolved_type->info->as<ScalarTypeInfo>();
       std::string value_str = node->value.get_str();
       int64_t value = 0;
 
@@ -357,7 +357,7 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
       return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, value, true));
     }
     case ASTLiteral::Float: {
-      auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
+      auto info = node->resolved_type->info->as<ScalarTypeInfo>();
       if (info->size == 8) {
         return llvm::ConstantFP::get(llvm_ctx, llvm::APFloat(std::stod(node->value.get_str())));
       } else if (info->size == 4) {
@@ -378,7 +378,7 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
         we can't just do this like this, 0th character in the string.
         we support utf8 characters, so we'll have to do something better than this
       */
-      auto info = global_get_type(node->resolved_type)->get_info()->as<ScalarTypeInfo>();
+      auto info = node->resolved_type->info->as<ScalarTypeInfo>();
       return llvm::ConstantInt::get(llvm_ctx, llvm::APInt(info->size * 8, node->value.get_str()[0], false));
     }
     case ASTLiteral::Bool: {
@@ -394,9 +394,9 @@ llvm::Value *LLVMEmitter::visit_literal(ASTLiteral *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
-  auto left_ty = global_get_type(node->left->resolved_type);
-  auto right_ty = global_get_type(node->right->resolved_type);
-  auto expr_ty = global_get_type(node->resolved_type);
+  auto left_ty = node->left->resolved_type;
+  auto right_ty = node->right->resolved_type;
+  auto expr_ty = node->resolved_type;
 
   if (node->is_operator_overload) {
     /// TODO:
@@ -404,7 +404,7 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
     return nullptr;
   }
 
-  if (left_ty->get_ext().has_extensions() || right_ty->get_ext().has_extensions()) {
+  if (left_ty->extensions.has_extensions() || right_ty->extensions.has_extensions()) {
     /// TODO:
     /// pointer arithmetic.
     return nullptr;
@@ -419,12 +419,12 @@ llvm::Value *LLVMEmitter::visit_bin_expr(ASTBinExpr *node) {
 
 llvm::Value *LLVMEmitter::visit_path(ASTPath *node) {
   auto symbol = ctx.get_symbol(node);
-  auto type = global_get_type(symbol.get()->type_id);
+  auto type = symbol.get()->type_id;
   return symbol.get()->llvm_value;
 }
 
 llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
-  auto type = global_get_type(node->resolved_type);
+  auto type = node->resolved_type;
   switch (node->tag) {
     case ASTInitializerList::INIT_LIST_EMPTY: {
       auto llvm_type = llvm_typeof(type);
@@ -435,11 +435,11 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
     case ASTInitializerList::INIT_LIST_NAMED: {
       auto struct_type = llvm::cast<llvm::StructType>(llvm_typeof(type));
       auto alloca_inst = builder.CreateAlloca(struct_type);
-      auto info = type->get_info()->as<StructTypeInfo>();
+      auto info = type->info->as<StructTypeInfo>();
 
       for (const auto &[key, value] : node->key_values) {
         const auto field_index = info->get_llvm_field_index(key);
-        const auto field_type = global_get_type(value->resolved_type);
+        const auto field_type = value->resolved_type;
         auto field_value = visit_expr(value);
         field_value = load_value(value, field_value);
         auto field_ptr = builder.CreateStructGEP(struct_type, alloca_inst, field_index);
@@ -449,7 +449,7 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
       return alloca_inst;
     }
     case ASTInitializerList::INIT_LIST_COLLECTION: {
-      auto element_type = global_get_type(type->generic_args[0]);
+      auto element_type = type->generic_args[0];
       auto llvm_element_type = llvm_typeof(element_type);
 
       auto array_size = llvm::ConstantInt::get(llvm::Type::getInt64Ty(llvm_ctx), node->values.size());
@@ -464,7 +464,7 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
         builder.CreateStore(value, element_ptr);
       }
 
-      if (type->get_base().get_str().starts_with("InitList$")) {
+      if (type->basename.get_str().starts_with("InitList$")) {
         auto struct_type = llvm::cast<llvm::StructType>(llvm_typeof(type));
         auto alloca_inst = builder.CreateAlloca(struct_type);
         auto array_ptr = builder.CreateStructGEP(struct_type, alloca_inst, 0);
@@ -481,7 +481,7 @@ llvm::Value *LLVMEmitter::visit_initializer_list(ASTInitializerList *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_range(ASTRange *node) {
-  const auto type = global_get_type(node->resolved_type);
+  const auto type = node->resolved_type;
   const auto llvm_type = llvm_typeof(type);
   auto alloca_inst = builder.CreateAlloca(llvm_type, nullptr, "range_init");
   auto gep = builder.CreateStructGEP(llvm_type, alloca_inst, 0);
@@ -496,7 +496,7 @@ llvm::Value *LLVMEmitter::visit_range(ASTRange *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) {
-  const auto type = global_get_type(node->resolved_type);
+  const auto type = node->resolved_type;
   const auto llvm_type = llvm_typeof(type);
   auto alloca_inst = builder.CreateAlloca(llvm_type, nullptr, "tuple_init");
   size_t index = 0;
@@ -510,25 +510,25 @@ llvm::Value *LLVMEmitter::visit_tuple(ASTTuple *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_dot_expr(ASTDotExpr *node) {
-  auto base_ty = global_get_type(node->base->resolved_type);
+  auto base_ty = node->base->resolved_type;
   auto base = visit_expr(node->base);
 
   StructTypeInfo *struct_info;
   llvm::Type *base_llvm_type = llvm_typeof(base_ty);
-  if (base_ty->get_ext().is_pointer()) {
+  if (base_ty->extensions.is_pointer()) {
     auto element = base_ty->get_element_type();
-    auto elem_ty = global_get_type(element);
-    struct_info = elem_ty->get_info()->as<StructTypeInfo>();
+    auto elem_ty = element;
+    struct_info = elem_ty->info->as<StructTypeInfo>();
     base_llvm_type = llvm_typeof(elem_ty);
   } else {
-    struct_info = base_ty->get_info()->as<StructTypeInfo>();
+    struct_info = base_ty->info->as<StructTypeInfo>();
   }
 
   auto member_index = struct_info->get_llvm_field_index(node->member.identifier);
 
   // We take a pointer to the member type because both ExtractValue and GEP require
   // to take the extracted value by pointer.
-  auto member_ty = global_get_type(global_get_type(node->resolved_type)->take_pointer_to(false));
+  auto member_ty = node->resolved_type->take_pointer_to(false);
 
   auto member_ptr = builder.CreateStructGEP(base_llvm_type, base, member_index, "gep_dot_member");
 
@@ -546,7 +546,7 @@ llvm::Value *LLVMEmitter::visit_expr_statement(ASTExprStatement *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_subscript(ASTIndex *node) {
-  auto base_ty = global_get_type(node->base->resolved_type);
+  auto base_ty = node->base->resolved_type;
   auto base_value = visit_expr(node->base);
   auto index_value = load_value(node->index, visit_expr(node->index));
 
@@ -555,7 +555,7 @@ llvm::Value *LLVMEmitter::visit_subscript(ASTIndex *node) {
     return nullptr;
   }
 
-  auto element_type = llvm_typeof(global_get_type(base_ty->get_element_type()));
+  auto element_type = llvm_typeof(base_ty->get_element_type());
   auto gep = builder.CreateGEP(element_type, base_value, {index_value});
 
   return gep;
@@ -572,8 +572,8 @@ llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
     if (func->hasParamAttribute(0, llvm::Attribute::StructRet)) {
       auto symbol = ctx.get_symbol(node->function);
 
-      auto ret_ty = global_get_type(symbol.get()->function.declaration->return_type->resolved_type);
-      auto arg_ty = global_get_type(ret_ty->take_pointer_to(false));
+      auto ret_ty = symbol.get()->function.declaration->return_type->resolved_type;
+      auto arg_ty = ret_ty->take_pointer_to(false);
 
       auto sret_return_value = builder.CreateAlloca(llvm_typeof(arg_ty));
       args.insert(args.begin(), sret_return_value);
@@ -588,8 +588,8 @@ llvm::Value *LLVMEmitter::visit_call(ASTCall *node) {
   }
 
   // Calling a function pointer.
-  auto fn_ptr_ty = global_get_type(node->function->resolved_type);
-  auto fn_ty = global_get_type(fn_ptr_ty->get_element_type());
+  auto fn_ptr_ty = node->function->resolved_type;
+  auto fn_ty = fn_ptr_ty->get_element_type();
   auto llvm_fn_ty = llvm::dyn_cast<llvm::FunctionType>(llvm_typeof(fn_ty));
   auto inst = builder.CreateCall(llvm_fn_ty, callee, args);
 
@@ -611,8 +611,8 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
   auto decl = function_symbol->function.declaration;
   auto &self_param = decl->params->params[0]->self;
 
-  auto dot_type = global_get_type(node->dot->base->resolved_type);
-  auto dot_ext = dot_type->get_ext();
+  auto dot_type = node->dot->base->resolved_type;
+  auto dot_ext = dot_type->extensions;
 
   auto dot_llvm_type = llvm_typeof(dot_type);
 
@@ -632,7 +632,7 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
   } else {
     // get the correct type if we're dereferencing a pointer.
     if (dot_ext.is_pointer()) {
-      auto element_ty = global_get_type(dot_type->get_element_type());
+      auto element_ty = dot_type->get_element_type();
       dot_llvm_type = llvm_typeof(element_ty);
     }
     self_argument = builder.CreateLoad(dot_llvm_type, self_argument, "self_deref");
@@ -646,7 +646,7 @@ llvm::Value *LLVMEmitter::visit_method_call(ASTMethodCall *node) {
 }
 
 llvm::Value *LLVMEmitter::visit_size_of(ASTSize_Of *node) {
-  auto type = global_get_type(node->target_type->resolved_type);
+  auto type = node->target_type->resolved_type;
   auto llvm_type = llvm_typeof(type);
   auto data_layout = module->getDataLayout();
   auto bitsize = data_layout.getTypeSizeInBits(llvm_type);
@@ -681,13 +681,13 @@ llvm::Value *LLVMEmitter::load_value(ASTNode *node, llvm::Value *expr) {
 
     perhaps this first if will take care of most of the cases I'm thining about.
   */
-  auto type = global_get_type(node->resolved_type);
-  auto ext = type->get_ext();
+  auto type = node->resolved_type;
+  auto ext = type->extensions;
   if (!ext.is_pointer() && expr->getType()->isPointerTy()) {
     expr = builder.CreateLoad(llvm_typeof(type), expr);
   } else if (auto symbol = ctx.get_symbol(node)) {
     if (!symbol.get()->is_param()) {
-      auto type = global_get_type(node->resolved_type);
+      auto type = node->resolved_type;
       expr = builder.CreateLoad(llvm_typeof(type), expr);
     }
   }
@@ -695,8 +695,8 @@ llvm::Value *LLVMEmitter::load_value(ASTNode *node, llvm::Value *expr) {
 }
 
 llvm::Value *LLVMEmitter::visit_cast(ASTCast *node) {
-  auto target = global_get_type(node->target_type->resolved_type);
-  auto from = global_get_type(node->expression->resolved_type);
+  auto target = node->target_type->resolved_type;
+  auto from = node->expression->resolved_type;
   auto expr = visit_expr(node->expression);
   expr = load_value(node->expression, expr);
   return cast_scalar(expr, from, target);
@@ -715,7 +715,7 @@ std::vector<llvm::Value *> LLVMEmitter::visit_arguments(ASTArguments *node) {
 
 llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
   auto operand = visit_expr(node->operand);
-  auto type = global_get_type(node->operand->resolved_type);
+  auto type = node->operand->resolved_type;
   auto llvm_type = llvm_typeof(type);
 
   /*
@@ -753,7 +753,7 @@ llvm::Value *LLVMEmitter::visit_unary_expr(ASTUnaryExpr *node) {
         return builder.CreateNeg(operand, "negtmp");
       }
     case TType::Mul: {
-      auto element_type = llvm_typeof(global_get_type(node->resolved_type));
+      auto element_type = llvm_typeof(node->resolved_type);
       return builder.CreateLoad(element_type, operand);
     }
     case TType::And: {
@@ -1057,12 +1057,12 @@ llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, Type *from, Type *to) 
     return value;
   }
 
-  auto from_info = from->get_info()->as<ScalarTypeInfo>();
-  auto to_info = to->get_info()->as<ScalarTypeInfo>();
+  auto from_info = from->info->as<ScalarTypeInfo>();
+  auto to_info = to->info->as<ScalarTypeInfo>();
   auto llvm_to = llvm_typeof(to);
 
-  if (to->get_ext().is_pointer()) {
-    if (from->get_ext().is_pointer()) {
+  if (to->extensions.is_pointer()) {
+    if (from->extensions.is_pointer()) {
       return builder.CreateBitCast(value, llvm_to, "bitcasttmp");
     }
   } else if (to_info->scalar_type == TYPE_BOOL) {
@@ -1113,7 +1113,7 @@ llvm::Value *LLVMEmitter::cast_scalar(llvm::Value *value, Type *from, Type *to) 
 }
 
 llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, TType op, Type *expr_ty) {
-  auto expr_ty_info = expr_ty->get_info()->as<ScalarTypeInfo>();
+  auto expr_ty_info = expr_ty->info->as<ScalarTypeInfo>();
 
   auto left = visit_expr(left_ast);
   auto right = visit_expr(right_ast);
@@ -1122,11 +1122,11 @@ llvm::Value *LLVMEmitter::binary_scalars(ASTExpr *left_ast, ASTExpr *right_ast, 
   temp_token.type = op;
   const bool is_assignment = temp_token.is_comp_assign() || op == TType::Assign;
 
-  auto right_ty = global_get_type(right_ast->resolved_type);
-  auto left_ty = global_get_type(left_ast->resolved_type);
+  auto right_ty = right_ast->resolved_type;
+  auto left_ty = left_ast->resolved_type;
   auto llvm_left_ty = llvm_typeof(left_ty);
-  auto right_info = right_ty->get_info()->as<ScalarTypeInfo>();
-  auto left_info = left_ty->get_info()->as<ScalarTypeInfo>();
+  auto right_info = right_ty->info->as<ScalarTypeInfo>();
+  auto left_info = left_ty->info->as<ScalarTypeInfo>();
 
   right = load_value(right_ast, right);
   right = cast_scalar(right, right_ty, left_ty);

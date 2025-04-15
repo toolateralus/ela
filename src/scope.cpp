@@ -29,10 +29,10 @@ Context::Context() {
   }
 
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i]->get_info()->scope) {
-      type_table[i]->get_info()->scope->parent = scope;
+    if (type_table[i]->info->scope) {
+      type_table[i]->info->scope->parent = scope;
     }
-    scope->create_type_alias(type_table[i]->get_base(), i, type_table[i]->kind, nullptr);
+    scope->create_type_alias(type_table[i]->basename, type_table[i], type_table[i]->kind, nullptr);
   }
 }
 
@@ -51,7 +51,7 @@ void Scope::erase(const InternedString &name) {
 }
 
 void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
-  auto sym = Symbol::create_type(-1, name, TYPE_INTERFACE, node);
+  auto sym = Symbol::create_type(Type::INVALID_TYPE, name, TYPE_INTERFACE, node);
   sym.scope = this;
   symbols.insert({name, sym});
 }

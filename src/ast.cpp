@@ -355,8 +355,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto tok = parser->expect(TType::DoubleColon);
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           auto decl = parser->parse_struct_declaration(get_unique_identifier());
-          auto t = global_get_type(decl->resolved_type);
-          auto info = (t->get_info()->as<StructTypeInfo>());
+          auto t = decl->resolved_type;
+          auto info = (t->info->as<StructTypeInfo>());
           info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
           return decl;
         } else {
@@ -388,22 +388,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         return node;
     }},
 
-    // #typeid, integer version of typeof. can be used to compare types without
-    // the pointers.
-    {.identifier = "typeid",
-      .kind = DIRECTIVE_KIND_EXPRESSION,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTLiteral, literal, range, _, parser)
-        parser->expect(TType::LParen);
-        auto type = parser->parse_type();
-        parser->expect(TType::RParen);
-        type->accept(parser->typer);
-        literal->tag = ASTLiteral::Integer;
-        // TODO: we should move this out of here.
-        literal->value = std::to_string(type->resolved_type);
-        literal->source_range = type->source_range;
-        return literal;
-    }},
 
     // #bitfield, for declaring bitfields. Pretty much only to interop with C:
     // most cases for bitfields are completely useless, and can be replaced with
@@ -1234,7 +1218,7 @@ ASTType *Parser::parse_type() {
   }
 
   if (peek().type == TType::LParen) {
-    node->resolved_type = Type::INVALID_TYPE_ID;
+    node->resolved_type = Type::INVALID_TYPE;
     node->kind = ASTType::TUPLE;
     eat();
     while (peek().type != TType::RParen) {
@@ -1348,7 +1332,7 @@ ASTStatement *Parser::parse_statement() {
     eat();
     auto variable = parse_variable();
     variable->is_constexpr = true;
-    ctx.scope->insert_variable(variable->name, -1, variable->value.get(), CONST);
+    ctx.scope->insert_variable(variable->name, Type::INVALID_TYPE, variable->value.get(), CONST);
     return variable;
   }
 
@@ -1742,7 +1726,7 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->find_type_id(tok.value, {}) == Type::INVALID_TYPE_ID) {
+    if (ctx.scope->find_type_id(tok.value, {}) == Type::INVALID_TYPE) {
       eat();
       throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
     }
@@ -1807,14 +1791,14 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
         throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
                     "the identifiers",
                     node->source_range);
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
+      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
     } else {
       // TODO: reimplement this error in a sane way.
       if (!symbol)
         throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
                     node->source_range);
 
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE_ID, nullptr, destruct.mutability);
+      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
     }
   }
 
@@ -1833,7 +1817,7 @@ ASTVariable *Parser::parse_variable() {
   auto iden = eat();
   decl->name = iden.value;
 
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE_ID || keywords.contains(iden.value.get_str())) {
+  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE || keywords.contains(iden.value.get_str())) {
     end_node(nullptr, range);
     throw_error("Invalid variable declaration: a type or keyword exists with "
                 "that name,",
@@ -2034,7 +2018,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
     }
   }
 
-  ctx.scope->insert_function(name.value, Type::INVALID_TYPE_ID, function);
+  ctx.scope->insert_function(name.value, Type::INVALID_TYPE, function);
 
   if (peek().type != TType::Arrow) {
     function->return_type = ASTType::get_void();
@@ -2084,7 +2068,7 @@ ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
   expect(TType::Enum);
   node->name = tok.value;
   expect(TType::LCurly);
-  if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE_ID) {
+  if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE) {
     end_node(node, range);
     throw_error("Redefinition of enum " + tok.value.get_str(), range);
   }
@@ -2161,7 +2145,7 @@ ASTImpl *Parser::parse_impl() {
     node->target = target;
   }
 
-  node->target->resolved_type = Type::INVALID_TYPE_ID;
+  node->target->resolved_type = Type::INVALID_TYPE;
   if (peek().type == TType::Where) {
     node->where_clause = parse_where_clause();
   }
@@ -2271,11 +2255,11 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   auto type_id = ctx.scope->find_type_id(name.value, {});
 
-  if (type_id != Type::INVALID_TYPE_ID) {
-    auto type = global_get_type(type_id);
+  if (type_id != Type::INVALID_TYPE) {
+    auto type = type_id;
     end_node(nullptr, range);
     if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->get_info()->as<StructTypeInfo>());
+      auto info = (type->info->as<StructTypeInfo>());
       if (DOESNT_HAVE_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED)) {
         throw_error("Redefinition of struct", range);
       }
@@ -2288,8 +2272,8 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
 
   node->name = name.value;
   node->resolved_type = type_id;
-  auto type = global_get_type(type_id);
-  auto info = type->get_info()->as<StructTypeInfo>();
+  auto type = type_id;
+  auto info = type->info->as<StructTypeInfo>();
   node->scope = info->scope;
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
@@ -2357,11 +2341,11 @@ ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
     node->where_clause = parse_where_clause();
   }
   auto scope = create_child(ctx.scope);
-  auto type = global_get_type(ctx.scope->create_tagged_union(name.value, scope, node));
+  auto type = ctx.scope->create_tagged_union(name.value, scope, node);
   ctx.set_scope(scope);
   node->name = name.value;
   node->scope = scope;
-  node->resolved_type = type->id;
+  node->resolved_type = type;
 
   expect(TType::LCurly);
 
@@ -2483,7 +2467,7 @@ void Parser::append_type_extensions(ASTType *&node) {
   }
 }
 
-ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<int> &gen_args) {
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args) {
   for (auto &instantiation : instantiations) {
     if (instantiation.arguments == gen_args) {
       return instantiation.declaration;
