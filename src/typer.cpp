@@ -1475,7 +1475,7 @@ void Typer::visit(ASTIf *node) {
   } else {
     condition->accept(this);
   }
-  
+
   auto cond_ty = node->condition->resolved_type;
   auto conversion_rule = type_conversion_rule(cond_ty, bool_type());
 
@@ -2308,9 +2308,16 @@ void Typer::visit(ASTSwitch *node) {
 
   if (node->is_pattern_match) {
     for (auto _case = node->cases.begin(); _case != node->cases.end(); _case++) {
-      if (_case->expression->get_node_type() == AST_NODE_PATTERN_MATCH) {
-        auto pattern = (ASTPatternMatch *)_case->expression;
+      auto condition = _case->expression;
+      if (condition->get_node_type() == AST_NODE_PATTERN_MATCH) {
+        auto pattern = (ASTPatternMatch *)condition;
+        auto old_scope = ctx.scope; // ! We should not have to manually set this scope here!!!!
         _case->block->scope->parent = pattern->scope;
+        condition->accept(this);
+        ctx.scope = old_scope; // ! For some reason the scope gets mismanaged when I don't set the scope here !!!! JUST
+                               // HACKING IT IN!
+      } else {
+        condition->accept(this);
       }
     }
   }
@@ -2338,7 +2345,9 @@ void Typer::visit(ASTSwitch *node) {
   int flags = BLOCK_FLAGS_FALL_THROUGH;
 
   for (const auto &_case : node->cases) {
-    _case.expression->accept(this);
+    if (!node->is_pattern_match)
+      _case.expression->accept(this);
+    
     auto expr_type = _case.expression->resolved_type;
     _case.block->accept(this);
     auto &block_cf = _case.block->control_flow;
