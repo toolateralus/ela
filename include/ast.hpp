@@ -4,7 +4,6 @@
 #include <cstdio>
 #include <deque>
 #include <functional>
-#include <optional>
 #include <vector>
 
 #include "arena.hpp"
@@ -85,7 +84,7 @@ enum BlockFlags {
 
 struct ControlFlow {
   int flags;
-  int type;
+  Type *type;
 };
 
 struct ASTBlock;
@@ -93,11 +92,11 @@ struct ASTBlock;
 struct ASTNode {
   ControlFlow control_flow = {
       .flags = BLOCK_FLAGS_FALL_THROUGH,
-      .type = -1,
+      .type = Type::INVALID_TYPE,
   };
   Nullable<ASTBlock> declaring_block;
   SourceRange source_range{};
-  int resolved_type = Type::INVALID_TYPE_ID;
+  Type *resolved_type = Type::INVALID_TYPE;
   bool is_emitted = false;
   virtual ~ASTNode() = default;
   virtual void accept(VisitorBase *visitor) = 0;
@@ -234,31 +233,9 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
-struct ImplicitConversion {
-  int to = Type::INVALID_TYPE_ID;
-  int from = Type::INVALID_TYPE_ID;
-  enum {
-    /*
-      this is for things like:
-        `n : any = 100;`
-
-      where we need to construct & reflect to create the instance.
-    */
-    TO_ANY,
-    /*
-      this is when we do like:
-
-        `n : Option = Option::Some(x);`
-
-      we are convertion Option::Some to Option technically.
-    */
-    VARIANT_TO_TAGGED_UNION,
-  } kind;
-};
 
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
-  std::optional<ImplicitConversion> conversion = std::nullopt;
 };
 
 struct ASTTypeExtension {
@@ -275,10 +252,10 @@ struct ASTPath : ASTExpr {
     */
     std::vector<ASTExpr *> generic_arguments;
 
-    int resolved_type = Type::INVALID_TYPE_ID;
+    Type *resolved_type = Type::INVALID_TYPE;
 
-    inline std::vector<int> get_resolved_generics() {
-      std::vector<int> generics;
+    inline std::vector<Type *> get_resolved_generics() {
+      std::vector<Type *> generics;
       for (auto arg : generic_arguments) {
         generics.push_back(arg->resolved_type);
       }
@@ -488,7 +465,7 @@ struct ASTParamsDecl : ASTStatement {
 struct ASTDeclaration;
 
 struct GenericInstance {
-  std::vector<int> arguments;
+  std::vector<Type *> arguments;
   ASTDeclaration *declaration;
 };
 
@@ -508,9 +485,9 @@ struct ASTFunctionDeclaration : ASTDeclaration {
   size_t flags = 0;
   bool has_defer = false;
   bool is_declared = false;
-  int declaring_type = Type::INVALID_TYPE_ID;
+  Type *declaring_type = Type::INVALID_TYPE;
   Nullable<ASTWhere> where_clause;
-  std::vector<int> generic_arguments;
+  std::vector<Type *> generic_arguments;
   Scope *scope;
   ASTParamsDecl *params;
   Nullable<ASTBlock> block;
@@ -522,7 +499,7 @@ struct ASTFunctionDeclaration : ASTDeclaration {
 
 struct ASTArguments : ASTNode {
   std::vector<ASTExpr *> arguments;
-  std::vector<int> resolved_argument_types;
+  std::vector<Type *> resolved_argument_types;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_ARGUMENTS; }
 };
@@ -600,11 +577,11 @@ struct ASTFor : ASTStatement {
   } iteration_kind;
 
   // This is the type of the container/sequence, whatever implements .iter() / .enumerator()
-  int iterable_type = Type::INVALID_TYPE_ID;
+  Type *iterable_type = Type::INVALID_TYPE;
   // This is either the type of that implements Enumerator![T], or is Iter![T];
-  int iterator_type = Type::INVALID_TYPE_ID;
+  Type *iterator_type = Type::INVALID_TYPE;
   // This is the 'i' part of 'for i in...', the type of the whatchamacallit.
-  int identifier_type = Type::INVALID_TYPE_ID;
+  Type *identifier_type = Type::INVALID_TYPE;
   union Left {
     Left() {}
     ~Left() {}
@@ -735,7 +712,7 @@ struct ASTInterfaceDeclaration : ASTDeclaration {
 
 struct ASTEnumDeclaration : ASTStatement {
   bool is_flags = false;
-  int element_type;
+  Type *element_type;
   InternedString name;
   std::vector<std::pair<InternedString, ASTExpr *>> key_values;
   void accept(VisitorBase *visitor) override;
@@ -803,7 +780,7 @@ struct SwitchCase {
 
 struct ASTSwitch : ASTExpr {
   bool is_statement = false;
-  int return_type = void_type();
+  Type *return_type = void_type();
   bool is_pattern_match = false;
   ASTExpr *target;
   Nullable<ASTBlock> default_case;
@@ -893,7 +870,7 @@ struct TuplePattern {
     Mutability mutability = CONST;
     InternedString var_name;
     PatternMatchPointerSemantic semantic;
-    int resolved_type;
+    Type *resolved_type;
   };
   std::vector<Part> parts;
 };
@@ -904,7 +881,7 @@ struct StructPattern {
     InternedString var_name;
     Mutability mutability = CONST;
     PatternMatchPointerSemantic semantic;
-    int resolved_type;
+    Type *resolved_type;
   };
   std::vector<Part> parts;
 };
@@ -1101,7 +1078,7 @@ template <class T> static inline T *ast_alloc(size_t n = 1) {
   return node;
 }
 
-ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<int> &gen_args);
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args);
 
 #define NODE_ALLOC(type, node, range, defer, parser)                                                                   \
   type *node = ast_alloc<type>();                                                                                      \

@@ -72,30 +72,39 @@ struct VisitorBase {
 struct Typer : VisitorBase {
   Nullable<ASTType> type_context = nullptr;
   bool in_call = false;
-  int expected_type = -1;
+  Type *expected_type = Type::INVALID_TYPE;
 
-  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<int> args, SourceRange source_range);
+  ASTDeclaration *visit_generic(ASTDeclaration *definition, std::vector<Type *> args, SourceRange source_range);
 
   Typer(Context &context) : ctx(context) {}
   Context &ctx;
   std::vector<TypeExtension> accept_extensions(std::vector<ASTTypeExtension> ast_extensions);
   std::string getIndent();
 
-  int iterator_interface() {
-    static int iter_id = ctx.scope->lookup("Iterator")->type_id;
+  /*
+    TODO:
+    Why are these in the typer and not just globally available?
+    they're static and lazily evaluated, and these things are all
+    from the stdlib, which is in Context::root_scope, which is also
+    statically available I think.
+  */
+  Type *iterator_interface() {
+    static Type *iter_id = ctx.scope->lookup("Iterator")->type_id;
     return iter_id;
   }
-  int iterable_interface() {
-    static int iterable_id = ctx.scope->lookup("Iterable")->type_id;
+
+  Type *iterable_interface() {
+    static Type *iterable_id = ctx.scope->lookup("Iterable")->type_id;
     return iterable_id;
   }
-  int init_interface() {
-    static int init_id = ctx.scope->lookup("Init")->type_id;
+
+  Type *init_interface() {
+    static Type *init_id = ctx.scope->lookup("Init")->type_id;
     return init_id;
   }
 
-  int find_generic_type_of(const InternedString &base, const std::vector<int> &generic_args,
-                           const SourceRange &source_range);
+  Type *find_generic_type_of(const InternedString &base, const std::vector<Type *> &generic_args,
+                             const SourceRange &source_range);
 
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
@@ -120,26 +129,30 @@ struct Typer : VisitorBase {
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
 
-  std::vector<int> get_generic_arg_types(const std::vector<ASTExpr *> &args);
+  std::vector<Type *> get_generic_arg_types(const std::vector<ASTExpr *> &args);
+
   // For generics.
   void visit_function_header(ASTFunctionDeclaration *node, bool generic_instantiation,
-                             std::vector<int> generic_args = {});
+                             std::vector<Type *> generic_args = {});
   void visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
-                                std::vector<int> generic_args = {});
+                                std::vector<Type *> generic_args = {});
   void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
-                                      std::vector<int> generic_args = {});
-  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<int> generic_args = {});
+                                std::vector<Type *> generic_args = {});
+  void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args = {});
   void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
-                                   std::vector<int> generic_args = {});
+                                   std::vector<Type *> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node);
 
-  int get_self_type();
+  Type *get_self_type();
 
   void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
-  ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func, std::vector<ASTExpr*> *generic_args, ASTArguments *arguments, SourceRange range);
+  ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
+                                                        std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
+                                                        SourceRange range);
 
-  void compiler_mock_method_call_visit_impl(int type, const InternedString &method_name);
+  void compiler_mock_method_call_visit_impl(Type *type, const InternedString &method_name);
+  void compiler_mock_associated_function_call_visit_impl(Type *left_type, const InternedString &method_name);
 
   void visit(ASTCall *node) override;
   void visit(ASTArguments *node) override;
@@ -167,7 +180,6 @@ struct Typer : VisitorBase {
   void visit(ASTWhere *node) override;
   bool visit_where_predicate(Type *type, ASTExpr *node);
 
-  void compiler_mock_associated_function_call_visit_impl(int left_type, const InternedString &method_name);
   InternedString type_name(ASTExpr *node);
 };
 
@@ -185,10 +197,10 @@ struct DeferBlock {
 struct DependencyEmitter;
 
 struct Emitter : VisitorBase {
-  std::vector<InternedString> type_info_strings {};
+  std::vector<InternedString> type_info_strings{};
   std::unordered_set<int> reflected_upon_types;
   DependencyEmitter *dep_emitter;
-  
+
   static constexpr const char *defer_return_value_key = "$defer$return$value";
   bool has_user_defined_main = false;
 
@@ -228,7 +240,8 @@ struct Emitter : VisitorBase {
   // do this.
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
-    static bool is_release_or_omitting_line_info = compile_command.has_flag("release") || compile_command.has_flag("nl");
+    static bool is_release_or_omitting_line_info =
+        compile_command.has_flag("release") || compile_command.has_flag("nl");
     if (is_release_or_omitting_line_info) {
       return;
     }
@@ -246,8 +259,8 @@ struct Emitter : VisitorBase {
     // }
   }
 
-  void emit_dyn_dispatch_object(int interface_type, int dyn_type);
-  void emit_tuple(int type);
+  void emit_dyn_dispatch_object(Type *interface_type, Type *dyn_type);
+  void emit_tuple(Type *type);
   std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
   void call_operator_overload(const SourceRange &range, Type *left_ty, OperationKind operation, TType op, ASTExpr *left,
@@ -272,16 +285,17 @@ struct Emitter : VisitorBase {
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);
   std::string to_cpp_string(Type *type);
-  std::string get_cpp_scalar_type(int id);
+  std::string get_cpp_scalar_type(Type *id);
 
   std::string get_type_struct(Type *type, int id, Context &context, const std::string &fields);
   std::string get_field_struct(const std::string &name, Type *type, Type *parent_type, Context &context);
   std::string get_elements_function(Type *type);
 
-  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr, bool type_erase_self = false);
+  std::string get_function_pointer_type_string(Type *type, Nullable<std::string> identifier = nullptr,
+                                               bool type_erase_self = false);
   std::string get_declaration_type_signature_and_identifier(const std::string &name, Type *type);
 
-  int get_expr_left_type_sr_dot(ASTNode *node);
+  Type *get_expr_left_type_sr_dot(ASTNode *node);
 
   void visit(ASTMethodCall *node) override;
   void visit(ASTPatternMatch *node) override;
@@ -337,9 +351,11 @@ struct Emitter : VisitorBase {
   };
   void emit_pattern_match_for_if(ASTIf *the_if, ASTPatternMatch *path);
   void emit_pattern_match_for_while(ASTWhile *the_while, ASTPatternMatch *path);
-  void emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target, const SwitchCase &the_while, ASTPatternMatch *path);
+  void emit_pattern_match_for_switch_case(const Type *target_type, const std::string &target,
+                                          const SwitchCase &the_while, ASTPatternMatch *path);
 
-  void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern, Type *variant_type);
+  void emit_pattern_match_destructure(ASTExpr *object, const std::string &variant_name, ASTPatternMatch *pattern,
+                                      Type *variant_type);
 
   void emit_choice_tuple_variant_instantiation(ASTPath *path, ASTArguments *arguments);
   void emit_choice_struct_variant_instantation(ASTPath *path, ASTInitializerList *initializer);
@@ -350,12 +366,12 @@ struct DependencyEmitter : VisitorBase {
   Context &ctx;
   Emitter *emitter;
   std::set<ASTFunctionDeclaration *> visited_functions = {};
-  std::unordered_set<int> reflected_upon_types;
+  std::unordered_set<Type *> reflected_upon_types;
   inline DependencyEmitter(Context &context, Emitter *emitter) : ctx(context), emitter(emitter) {}
   void visit_operator_overload(ASTExpr *base, const std::string &operator_name, ASTExpr *argument);
 
-  void define_type(int type_id);
-  void declare_type(int type_id);
+  void define_type(Type *type_id);
+  void declare_type(Type *type_id);
   void visit(ASTMethodCall *node) override;
   void visit(ASTPath *node) override;
   void visit(ASTPatternMatch *node) override;

@@ -6,26 +6,24 @@
 #include "visitor.hpp"
 #include <set>
 
-void DependencyEmitter::declare_type(int type_id) {
-  auto type = global_get_type(type_id);
-  auto extensions = type->get_ext().extensions;
+void DependencyEmitter::declare_type(Type *type) {
+  auto extensions = type->extensions.extensions;
   for (auto ext : extensions) {
     if (ext.type == TYPE_EXT_POINTER_CONST || ext.type == TYPE_EXT_POINTER_MUT) {
       emitter->forward_decl_type(type);
       return;
     }
   }
-  define_type(type_id);
+  define_type(type);
 }
 
-void DependencyEmitter::define_type(int type_id) {
-  auto type = global_get_type(type_id);
-  if (type->base_id != Type::INVALID_TYPE_ID) {
-    type = global_get_type(type->base_id);
+void DependencyEmitter::define_type(Type *type) {
+  if (type->base_type != Type::INVALID_TYPE) {
+    type = type->base_type;
   }
   switch (type->kind) {
     case TYPE_FUNCTION: {
-      auto info = type->get_info()->as<FunctionTypeInfo>();
+      auto info = type->info->as<FunctionTypeInfo>();
       declare_type(info->return_type);
       for (int index = 0; index < info->params_len; index++) {
         auto param_ty = info->parameter_types[index];
@@ -41,36 +39,36 @@ void DependencyEmitter::define_type(int type_id) {
       }
     } break;
     case TYPE_TUPLE: {
-      auto info = type->get_info()->as<TupleTypeInfo>();
+      auto info = type->info->as<TupleTypeInfo>();
       for (auto type : info->types) {
         define_type(type);
       }
-      emitter->emit_tuple(type_id);
+      emitter->emit_tuple(type);
     } break;
     case TYPE_DYN: {
       if (type->dyn_emitted) {
         return;
       }
       type->dyn_emitted = true;
-      auto info = type->get_info()->as<DynTypeInfo>();
-      auto interface_type = global_get_type(info->interface_type);
-      auto interface_info = interface_type->get_info()->as<InterfaceTypeInfo>();
+      auto info = type->info->as<DynTypeInfo>();
+      auto interface_type = info->interface_type;
+      auto interface_info = interface_type->info->as<InterfaceTypeInfo>();
       for (auto [name, sym] : interface_info->scope->symbols) {
         if (sym.is_function() && !sym.is_generic_function()) {
           auto declaration = sym.function.declaration;
           for (auto param : declaration->params->params) {
-            if (param->resolved_type != -1) {
+            if (type_is_valid(param->resolved_type)) {
               define_type(param->resolved_type);
             }
           }
           auto return_type = declaration->return_type->resolved_type;
-          if (return_type != -1) {
+          if (type_is_valid(return_type)) {
             define_type(return_type);
           }
         }
       }
       define_type(info->interface_type);
-      emitter->emit_dyn_dispatch_object(info->interface_type, type_id);
+      emitter->emit_dyn_dispatch_object(info->interface_type, type);
     } break;
     case TYPE_INTERFACE:
     case TYPE_SCALAR:
@@ -93,23 +91,24 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   }
 }
 
-void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, int id) {
-  static std::set<int> visited_type_ids = {};
-  if (visited_type_ids.contains(id)) {
+void emit_dependencies_for_reflection(DependencyEmitter *dep_resolver, Type *id) {
+  static std::set<Type *> visited = {};
+  if (visited.contains(id)) {
     return;
   } else {
-    visited_type_ids.insert(id);
+    visited.insert(id);
   }
-  auto type = global_get_type(id);
-  if (type->get_ext().is_pointer() || type->get_ext().is_fixed_sized_array()) {
-    type = global_get_type(type->get_element_type());
+
+  auto type = id;
+  if (type->extensions.is_pointer() || type->extensions.is_fixed_sized_array()) {
+    type = type->get_element_type();
   }
-  auto scope = type->get_info()->scope;
+  auto scope = type->info->scope;
 
   for (auto &[name, symbol] : scope->symbols) {
     if (symbol.is_function() && !symbol.is_generic_function()) {
       symbol.function.declaration->accept(dep_resolver);
-    } else if (symbol.type_id >= 0) {
+    } else if (type_is_valid(symbol.type_id)) {
       emit_dependencies_for_reflection(dep_resolver, symbol.type_id);
     }
   }
@@ -119,21 +118,25 @@ void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
 
   if (!compile_command.has_flag("nostdlib")) {
+
     // We have to do this here because the reflection system depends on this type and it doesn't
     // neccesarily get instantiatied.
     // see the `Emitter:get_type_struct`
     // and `bootstrap/reflection.ela/Type :: struct`
-    auto sub_types = std::vector<int>{
-        ctx.scope->find_type_id("str", {}),
-        ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
+
+    auto sub_types = std::vector<Type *>{
+      ctx.scope->find_type_id("str", {}),
+      ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
     };
+
     auto tuple_id = global_find_type_id(sub_types, {});
+    
     define_type(tuple_id);
     declare_type(tuple_id);
   }
 
   if (auto env_sym = ctx.root_scope->local_lookup("Env")) {
-    auto env_scope = global_get_type(env_sym->type_id)->get_info()->scope;
+    auto env_scope = env_sym->type_id->info->scope;
     if (auto initialize_sym = env_scope->local_lookup("initialize")) {
       initialize_sym->function.declaration->accept(this);
     }
@@ -171,7 +174,7 @@ void DependencyEmitter::visit(ASTProgram *node) {
       }
     }
   };
-  
+
   emit_symbol("Type");
   emit_symbol("Field");
   emit_symbol("calloc");
@@ -183,7 +186,6 @@ void DependencyEmitter::visit(ASTProgram *node) {
 }
 
 void DependencyEmitter::visit(ASTBlock *node) {
-  
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
@@ -278,9 +280,8 @@ void DependencyEmitter::visit(ASTSubscript *node) {
 }
 
 void DependencyEmitter::visit(ASTPath *node) {
-
   // TODO: this should be handled by ASTType ... update: what does this mean by 'this'? I think this is irrelevant.
-  auto type = global_get_type(node->resolved_type);
+  auto type = node->resolved_type;
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
     type->declaring_node.get()->accept(emitter);
@@ -306,8 +307,8 @@ void DependencyEmitter::visit(ASTPath *node) {
       if (symbol->is_type()) {
         auto decl = (ASTDeclaration *)symbol->type.declaration.get();
         instantiation = find_generic_instance(decl->generic_instantiations, generic_args);
-        auto type = global_get_type(instantiation->resolved_type);
-        scope = type->get_info()->scope;
+        auto type = instantiation->resolved_type;
+        scope = type->info->scope;
       } else if (symbol->is_function()) {
         instantiation = find_generic_instance(symbol->function.declaration->generic_instantiations, generic_args);
       }
@@ -315,7 +316,7 @@ void DependencyEmitter::visit(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
-        scope = global_get_type(symbol->type_id)->get_info()->scope;
+        scope = symbol->type_id->info->scope;
       }
     }
 
@@ -380,8 +381,8 @@ void DependencyEmitter::visit(ASTFor *node) {
 
   node->right->accept(this);
 
-  auto range_scope = global_get_type(node->iterable_type)->get_info()->scope;
-  auto iter_scope = global_get_type(node->iterator_type)->get_info()->scope;
+  auto range_scope = node->iterable_type->info->scope;
+  auto iter_scope = node->iterator_type->info->scope;
 
   switch (node->iteration_kind) {
     case ASTFor::ITERABLE: {
@@ -503,7 +504,7 @@ void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
     return;
   }
-  
+
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
@@ -547,9 +548,9 @@ void DependencyEmitter::visit(ASTModule *node) {}
 void DependencyEmitter::visit(ASTDyn_Of *node) {
   define_type(node->resolved_type);
   node->object->accept(this);
-  auto element_type = global_get_type(node->object->resolved_type)->get_element_type();
-  auto element_scope = global_get_type(element_type)->get_info()->scope;
-  auto interface_scope = global_get_type(node->interface_type->resolved_type)->get_info()->scope;
+  auto element_type = node->object->resolved_type->get_element_type();
+  auto element_scope = element_type->info->scope;
+  auto interface_scope = node->interface_type->resolved_type->info->scope;
   for (auto [name, interface_sym] : interface_scope->symbols) {
     if (!interface_sym.is_function() || interface_sym.is_generic_function()) {
       continue;
@@ -559,9 +560,7 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTPatternMatch *node) {
-
-}
+void DependencyEmitter::visit(ASTPatternMatch *node) {}
 
 void DependencyEmitter::visit(ASTMethodCall *node) {
   node->arguments->accept(this);

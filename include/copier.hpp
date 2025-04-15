@@ -8,7 +8,7 @@ struct ASTCopier {
   template<class T>
   T *copy(T *node) requires std::is_base_of_v<ASTNode, T> {
     auto new_node = new (ast_alloc<T>()) T(*node);
-    new_node->control_flow.type = -1;
+    new_node->control_flow.type = Type::INVALID_TYPE;
 
     if constexpr (std::is_base_of<ASTStatement, T>::value) {
       new_node->attributes = node->attributes;

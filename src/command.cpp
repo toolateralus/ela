@@ -57,7 +57,7 @@ int CompileCommand::compile() {
       dependencyEmitter.declare_type(type_list);
       dependencyEmitter.define_type(type_list);
       emit.code << "typedef struct Type Type;\n";
-      emit.code << std::format("extern {} _type_info;\n", emit.to_cpp_string(global_get_type(type_list)));
+      emit.code << std::format("extern {} _type_info;\n", emit.to_cpp_string(type_list));
     }
 
     if (testing) {
