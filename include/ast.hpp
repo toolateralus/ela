@@ -826,7 +826,6 @@ struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic al
   void accept(VisitorBase *visitor) override;
 };
 
-// TODO: add interface field, once we have interfaces lol.
 struct ASTImpl : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   // impl 'target' or impl *interface for 'target'
