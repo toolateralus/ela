@@ -318,13 +318,9 @@ struct Type {
   // especially the querying methods, it's a pain to get the extensions everywhere.
   TypeExtensions extensions{};
 
-  // TODO: also remove me. this can be hand inlined to the one place this is used.
-  inline bool equals(const Type *base, const TypeExtensions &type_extensions) const {
-    return base_type == base && type_extensions.extensions == extensions.extensions;
-  }
-
   /*
     TODO: remove me. this is used in one place.
+    Or, at least move it out of the type.
   */
   bool type_info_equals(const TypeInfo *info, TypeKind kind) const;
 
@@ -360,7 +356,7 @@ struct Type {
 
   // To have a null, yet identifyable unresolved generic type,
   // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
-  // but will still effectively be a poison value.
+  // but will still effectively be a poison/invalid, but distinct and comparable value.
   static Type *UNRESOLVED_GENERIC_TYPE_ID;
   constexpr static Type *INVALID_TYPE = nullptr;
 };
@@ -370,8 +366,6 @@ static inline constexpr bool type_is_valid(Type *type) {
 }
 
 struct ASTFunctionDeclaration;
-
-InternedString get_function_typename(ASTFunctionDeclaration *);
 
 template <class T> static inline T *type_info_alloc() { return new (type_info_arena.allocate(sizeof(T))) T(); }
 

@@ -1983,7 +1983,6 @@ void Typer::visit(ASTUnaryExpr *node) {
     }
   }
 
-  // TODO: is this correct?
   node->resolved_type = operand_ty;
   return;
 }
@@ -1992,6 +1991,7 @@ void Typer::visit(ASTLiteral *node) {
   switch (node->tag) {
     case ASTLiteral::Integer: {
       auto value = node->value.get_str();
+
       if (value.starts_with("0x")) {
         if (value.length() > 18) {
           throw_error("Hexidecimal literal is too large to be represented by a 64 bit integer.", node->source_range);
@@ -2000,26 +2000,13 @@ void Typer::visit(ASTLiteral *node) {
         if (value.length() > 64 + 2) {
           throw_error("Binary literal is too large to be represented by a 64 bit integer", node->source_range);
         }
-      } else {
-        // errno = 0;
-        // auto parsed_unsigned = strtoull(value.c_str(), nullptr, 10);
-        // if (errno == ERANGE && parsed_unsigned == ULLONG_MAX) {
-        //   throw_error("Unsigned integer literal is too large to be represented by a 64 bit integer.",
-        //               node->source_range);
-        // }
-
-        // errno = 0;
-        // auto parsed_signed = strtoll(value.c_str(), nullptr, 10);
-        // if (errno == ERANGE && (parsed_signed == LLONG_MAX || parsed_signed == LLONG_MIN)) {
-        //   throw_error("Signed integer literal is too large to be represented by a 64 bit integer.",
-        //   node->source_range);
-        // }
       }
 
       if (expected_type != Type::INVALID_TYPE && type_is_numerical(expected_type)) {
         node->resolved_type = expected_type;
         return;
       }
+
       node->resolved_type = s32_type();
       return;
     }

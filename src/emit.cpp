@@ -38,6 +38,7 @@ constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
 constexpr auto TYPE_FLAGS_INTERFACE = 1 << 13;
 constexpr auto TYPE_FLAGS_DYN = 1 << 14;
+constexpr auto TYPE_FLAGS_UNION = 1 << 15;
 
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {
@@ -405,13 +406,6 @@ void Emitter::visit(ASTLiteral *node) {
       if (node->is_c_string) {
         output = std::format("\"{}\"", node->value.get_str());
       } else {
-        // TODO:
-        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of
-        // bytes, then all of our string literals are stack allocated. If we make them static, then there's a chance
-        // that the user mutates the string literal, and it will change it's meaning for the rest of the program
-
-        // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
-        // we will keep the null terminated strings until we have a solution for this.
         auto str = node->value.get_str();
         code << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
         return;
@@ -424,8 +418,6 @@ void Emitter::visit(ASTLiteral *node) {
         output = node->value.get_str();
       }
       break;
-    // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
-    // that's why we have fat u32 chars anyway.
     case ASTLiteral::Char:
       output = node->value.get_str();
       break;
@@ -1325,16 +1317,16 @@ std::string get_type_flags(Type *type) {
     case TYPE_FUNCTION:
       kind_flags = TYPE_FLAGS_FUNCTION;
       break;
-    case TYPE_STRUCT:
+    case TYPE_STRUCT: {
       kind_flags = TYPE_FLAGS_STRUCT;
-      break;
+      auto info = type->info->as<StructTypeInfo>();
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+        kind_flags = TYPE_FLAGS_UNION;
+      }
+    } break;
     case TYPE_ENUM:
       kind_flags = TYPE_FLAGS_ENUM;
       break;
-    // TODO: We need to let struct types know that they're a union when they are.
-    // case TYPE_UNION:
-    //   kind_flags = TYPE_FLAGS_UNION;
-    //   break;
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;

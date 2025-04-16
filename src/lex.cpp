@@ -5,8 +5,7 @@
 using std::string;
 using std::stringstream;
 
-// TODO: if we encounterthese, just prefix them in tokenizer with $ so they become valid identifiers.
-// TODO: we should not have reserved words from host language leak into this langauge.
+
 static std::set<std::string> reserved = {"auto",   "break",  "case",    "const",    "continue", "default",  "do",
                                          "double", "else",   "enum",    "extern",   "float",    "for",      "goto",
                                          "if",     "int",    "long",    "register", "return",   "short",    "signed",

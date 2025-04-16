@@ -280,7 +280,6 @@ void DependencyEmitter::visit(ASTSubscript *node) {
 }
 
 void DependencyEmitter::visit(ASTPath *node) {
-  // TODO: this should be handled by ASTType ... update: what does this mean by 'this'? I think this is irrelevant.
   auto type = node->resolved_type;
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);

@@ -108,8 +108,9 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
   }
 
   for (const auto &type : type_table) {
-    if (type->equals(base_t, extensions_copy))
+    if (type->base_type == base_t && extensions_copy.extensions == type->extensions.extensions) {
       return type;
+    }
   }
 
   // Base types have a seperate scope from the extended types now.
@@ -359,11 +360,9 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
 }
 
 bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
-  [[likely]]
   if (this->kind != kind)
     return false;
 
-  [[unlikely]]
   if (kind == TypeKind::TYPE_FUNCTION) {
     auto finfo = static_cast<const FunctionTypeInfo *>(info);
     auto sinfo = static_cast<const FunctionTypeInfo *>(this->info);
@@ -383,7 +382,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
     return finfo->return_type == sinfo->return_type;
   }
 
-  [[likely]] return false;
+  return false;
 }
 
 std::string Type::to_string() const {
@@ -488,25 +487,6 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   }
   info->scope->name = name;
   return type;
-}
-
-// Doesn't this just do the same exact thing as FunctionTypeInfo::to_string()?
-// Why is this even in here?
-// TODO: remove me.
-InternedString get_function_typename(ASTFunctionDeclaration *decl) {
-  std::stringstream ss;
-  auto return_type = decl->return_type;
-  ss << "fn ";
-  ss << "(";
-  for (const auto &param : decl->params->params) {
-    ss << param->resolved_type->to_string();
-    if (param != decl->params->params.back()) {
-      ss << ", ";
-    }
-  }
-  ss << ")";
-  ss << " -> " << return_type->resolved_type->to_string();
-  return ss.str();
 }
 
 Type *Type::get_element_type() const {
@@ -817,6 +797,18 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
   std::string s;
   int i = 0;
   for (const auto &arg : args) {
+
+    /* 
+      ! BUG
+      Why did I have to add this when refactoring the type system??
+      This seems very wrong.
+      
+
+      Although, it kind of makes sense,
+      because we call this when creating generic types that don't have type args,
+      and since theyre not yet concrete, this probably just eneded up happening on the 
+      -1's in the args array anyway.
+    */
     if (!type_is_valid(arg)) {
       s += "$-1";
       continue;

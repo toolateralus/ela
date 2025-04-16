@@ -1484,12 +1484,6 @@ ASTStatement *Parser::parse_statement() {
     return parse_multiple_asssignment();
   }
 
-  // * Variable declarations
-  // * 'n := 10;'
-  // * 'n : int = 10;'
-  // * 'const_n :: 10;' (remove me from here)
-  // TODO: this condition seems excessively complicated.
-
   bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
                                                                     lookahead_buf()[1].type == TType::ColonEquals);
 
@@ -1640,8 +1634,6 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-  // * Type declarations.
-  // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family == TFamily::Keyword) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
