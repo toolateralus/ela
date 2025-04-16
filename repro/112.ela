@@ -3,6 +3,21 @@ Math :: choice {
   Vector3 { x: f32, y: f32, z: f32 },
 }
 
+/* 
+  pattern matching a variable with the same name as the choice you're matching against, 
+  causes nasty nasty C errors.
+
+  So, 
+  in the below example, we extract an 'x' variable, from the 'x' choice type.
+  this just breaks C because in C, you can do things like:
+
+  `int x = x;`
+
+  where you can use a variable in its initialization. Stupid as frick.
+
+  Probably won't worry about this since we're moving to LLVM IR.
+*/
+
 main :: fn() {
   x := Math::Vector2.{x: 10, y: 10};
   /* pattern match, named args. mutability optional */

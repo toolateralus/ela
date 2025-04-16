@@ -12,6 +12,12 @@ Struct :: struct {
 // We could just ban global variables since we offer statics and singletons, 
 
 // but statics share the same problem where a non-constant initialization is an error in c.
+
+/* 
+  * we're not going to fix this until we rewrite in LLVM completely.
+  * We'll just have a system for doing global initializers, much like C++.
+*/
+
 error: Struct = .{
   a: 0,
   b: 0,

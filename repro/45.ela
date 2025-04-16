@@ -16,6 +16,6 @@ impl Struct {
   }
 }
 
-CONSTANT :: 45;
+const CONSTANT := 45;
 
 main :: fn() {}

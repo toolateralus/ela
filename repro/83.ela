@@ -21,4 +21,10 @@ main :: fn() {
   // also, this will take is down to a more assembly-level way of emitting things, as if we have registers etc.
   // so, maybe in the future when we write our own backend, whether its just x86 or LLVM,
   // it may be a simpler transition if we're already at that lower level of emitting expressions.
+
+
+  /* 
+    * As stated above, we're not going to worry about this until we do a MIR for LLVM emission
+    * which is coming very soon.
+  */
 }
