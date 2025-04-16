@@ -225,7 +225,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return func;
         } else {
           parser->ctx.scope->erase(func->name);
-          return ast_alloc<ASTNoop>();
+          return nullptr;
         }
     }},
 
@@ -428,7 +428,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
         while (parser->peek().type == TType::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return nullptr;
     }},
 
     // #undef, remove a #def
@@ -437,7 +437,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
         while (parser->peek().type == TType::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return nullptr;
     }},
 
     // #ifdef, conditional compilation based on a #def being present.
@@ -1360,6 +1360,13 @@ ASTStatement *Parser::parse_statement() {
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
     if (!statement) {
+      /* 
+        TODO: is there a way we can do this without returning a node?
+        We should probably get rid of most of the directives, if they can be
+        replaced with a keyword and a node.
+
+        this is just a useful tool for 
+      */
       static auto noop = ast_alloc<ASTNoop>();
       statement = noop;
     }

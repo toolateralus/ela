@@ -388,7 +388,7 @@ bool Type::type_info_equals(const TypeInfo *info, TypeKind kind) const {
 std::string Type::to_string() const {
   switch (kind) {
     case TYPE_FUNCTION:
-      return (info->as<FunctionTypeInfo>())->to_string(extensions) + extensions.to_string();
+      return (info->as<FunctionTypeInfo>())->to_string(extensions);
     case TYPE_DYN:
       return "dyn " + get_unmangled_name(info->as<DynTypeInfo>()->interface_type);
     case TYPE_STRUCT:
@@ -644,7 +644,7 @@ std::string TypeExtensions::to_string() const {
         ss << "*const";
         break;
       case TYPE_EXT_ARRAY:
-        ss << "[]";
+        ss << "[" << ext.array_size << "]";
         break;
     }
   }
