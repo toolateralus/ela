@@ -245,7 +245,7 @@ struct Emitter : VisitorBase {
       return;
     }
 
-    auto loc = node->source_range.begin_location.line;
+    auto loc = node->source_range.line;
     auto filename = get_source_filename(node->source_range);
 
     auto line = std::format("#line {} \"{}\"\n", loc, filename);

@@ -88,12 +88,9 @@ struct CompileCommand {
 
 extern CompileCommand compile_command;
 
-struct SourceRange {
-  SourceLocation begin_location;
-};
 
 static std::string get_source_filename(const SourceRange &range) {
-  return SourceLocation::files()[range.begin_location.file];
+  return SourceRange::files()[range.file];
 }
 
 struct Defer {

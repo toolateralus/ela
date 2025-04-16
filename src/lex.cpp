@@ -70,7 +70,7 @@ void Lexer::get_token(State &state) {
       continue;
     }
 
-    SourceLocation location{state.line, state.col, state.file_idx};
+    SourceRange location{state.line, state.col, state.file_idx};
 
     if (c == '\'') {
         auto start = pos;

@@ -266,7 +266,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) {
         auto location = parser->peek().location;
-        auto formatted = std::format("{}:{}:{}", SourceLocation::files()[location.file], location.line, location.column);
+        auto formatted = std::format("{}:{}:{}", SourceRange::files()[location.file], location.line, location.column);
         auto literal = ast_alloc<ASTLiteral>();
         literal->tag = ASTLiteral::String;
         literal->value = formatted;
@@ -2658,9 +2658,8 @@ bool Parser::import(InternedString name, Scope **scope) {
 Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
-    SourceRange range = {
-        .begin_location = peek().location,
-    };
+    SourceRange range = peek().location;
+
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
   }
@@ -2669,9 +2668,7 @@ Token Parser::expect(TType type) {
 
 SourceRange Parser::begin_node() {
   auto location = peek().location;
-  return SourceRange{
-      .begin_location = location,
-  };
+  return location;
 }
 
 void Parser::end_node(ASTNode *node, SourceRange &range) {

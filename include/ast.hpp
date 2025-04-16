@@ -233,7 +233,6 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
-
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
 };

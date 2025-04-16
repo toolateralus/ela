@@ -53,8 +53,8 @@ struct ScopeManager {
 
   DIScope *current() const { return scope_stack.empty() ? nullptr : scope_stack.top(); }
 
-  std::tuple<std::string, std::string, unsigned, unsigned> extract_source_range(SourceRange range) {
-    auto location = range.begin_location;
+  std::tuple<std::string, std::string, unsigned, unsigned> extract_source_range(SourceLocation range) {
+    auto location = range;
     auto line = location.line, column = location.column;
     std::filesystem::path abs_path = location.files()[location.file];
 
@@ -63,14 +63,14 @@ struct ScopeManager {
     return {basename, dirpath, line, column};
   }
 
-  std::pair<DIFile *, ScopeDropStub> enter_file_scope(const SourceRange &range) {
+  std::pair<DIFile *, ScopeDropStub> enter_file_scope(const SourceLocation &range) {
     auto [basename, dirpath, line, column] = extract_source_range(range);
     auto *file = di_builder->createFile(basename, dirpath);
     auto stub = push_scope(file);
     return {file, std::move(stub)};
   }
 
-  std::pair<DISubprogram *, ScopeDropStub> enter_function_scope(DIScope *parent, Function *function, const std::string &name, const SourceRange &range) {
+  std::pair<DISubprogram *, ScopeDropStub> enter_function_scope(DIScope *parent, Function *function, const std::string &name, const SourceLocation &range) {
     auto [basename, dirpath, line, column] = extract_source_range(range);
     auto *file = dyn_cast<DIFile>(parent);
     auto *func_type = di_builder->createSubroutineType(di_builder->getOrCreateTypeArray({}));
@@ -81,7 +81,7 @@ struct ScopeManager {
     return {subprogram, std::move(stub)};
   }
 
-  std::pair<DILexicalBlock *, ScopeDropStub> enter_lexical_scope(DIScope *parent, const SourceRange &range) {
+  std::pair<DILexicalBlock *, ScopeDropStub> enter_lexical_scope(DIScope *parent, const SourceLocation &range) {
     auto [basename, dirpath, line, column] = extract_source_range(range);
     auto *block = di_builder->createLexicalBlock(parent, di_builder->createFile(basename, dirpath), line, column);
     auto stub = push_scope(block);
