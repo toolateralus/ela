@@ -332,14 +332,14 @@ ConversionRule type_conversion_rule(const Type *from, const Type *to, const Sour
   {
     if (from->is_kind(TYPE_ENUM) && from->extensions.has_no_extensions()) {
       auto enum_info = (from->info->as<EnumTypeInfo>());
-      return type_conversion_rule(enum_info->element_type, to, source_range);
+      return type_conversion_rule(enum_info->underlying_type, to, source_range);
     }
 
     // TODO: do a runtime bounds check on explicit casting of an integer to an enum type?
     // You can get segfaults from that easily.
     if (to->is_kind(TYPE_ENUM) && to->extensions.has_no_extensions()) {
       auto enum_info = (to->info->as<EnumTypeInfo>());
-      return type_conversion_rule(from, enum_info->element_type, source_range);
+      return type_conversion_rule(from, enum_info->underlying_type, source_range);
     }
   }
 

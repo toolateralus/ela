@@ -296,9 +296,7 @@ void Emitter::visit(ASTType *node) {
 
   if (type->is_kind(TYPE_ENUM)) {
     auto enum_info = (type->info->as<EnumTypeInfo>());
-    auto elem_ty = enum_info->element_type;
-    code << to_cpp_string(elem_ty);
-    return;
+    type = global_find_type_id(enum_info->underlying_type, type->extensions);
   }
 
   auto type_string = to_cpp_string(type);

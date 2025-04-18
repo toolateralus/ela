@@ -1199,7 +1199,7 @@ void Typer::visit(ASTEnumDeclaration *node) {
   }
 
   node->element_type = elem_type;
-  info->element_type = elem_type;
+  info->underlying_type = elem_type;
   node->resolved_type = enum_type;
 }
 

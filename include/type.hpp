@@ -219,7 +219,7 @@ struct ScalarTypeInfo : TypeInfo {
 };
 
 struct EnumTypeInfo : TypeInfo {
-  Type *element_type = nullptr;
+  Type *underlying_type = nullptr;
   bool is_flags = false;
   EnumTypeInfo() {};
 };
