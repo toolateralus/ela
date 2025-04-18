@@ -2224,7 +2224,7 @@ void Typer::visit(ASTInitializerList *node) {
         value->accept(this);
 
         assert_types_can_cast_or_equal(value, symbol->type_id, value->source_range,
-                                       "Unable to cast type to target field for named initializer list");
+                                       std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
       }
 
       scope = old_scope;
