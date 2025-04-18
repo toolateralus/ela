@@ -828,7 +828,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     n++;
   }
   indent_level--;
-  code << indent() << "} " << emit_symbol(ctx.scope->lookup(node->name)) << ";\n";
+  code << indent() << "} " << scope->full_name() << ";\n";
 
   auto type = node->resolved_type;
   return;
