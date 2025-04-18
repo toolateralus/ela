@@ -197,13 +197,16 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
 
   using alias_variant = std::tuple<InternedString, Type *, TypeKind, ASTNode *>;
   using struct_variant = std::tuple<InternedString, Scope *>;
+
+  constexpr auto ALIAS_VARIANT_INDEX  = 0;
+  constexpr auto STRUCT_VARIANT_INDEX = 1;
+
   std::vector<std::variant<alias_variant, struct_variant>> variants;
 
   info->scope = node->scope;
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL: {
-        info->variants.push_back({variant.name, void_type()});
         variants.emplace_back(alias_variant{variant.name, void_type(), TYPE_SCALAR, nullptr});
       } break;
       case ASTChoiceVariant::TUPLE: {
@@ -223,17 +226,16 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
   }
 
   for (const auto variant : variants) {
-    const auto index = variant.index();
-    switch (index) {
-      case 0: {
-        const auto &[name, type, kind, declaring_node] = std::get<0>(variant);
+    switch (variant.index()) {
+      case ALIAS_VARIANT_INDEX: {
+        const auto &[name, type, kind, declaring_node] = std::get<ALIAS_VARIANT_INDEX>(variant);
         info->scope->create_type_alias(name, type, kind, declaring_node);
         info->variants.push_back({name, type});
         info->scope->local_lookup(name)->type.choice = node;
       } break;
-      case 1: {
-        const auto &[name, scope] = std::get<1>(variant);
-        auto type = info->scope->create_struct_type(name, scope, nullptr);
+      case STRUCT_VARIANT_INDEX: {
+        const auto &[name, scope] = std::get<STRUCT_VARIANT_INDEX>(variant);
+        const auto type = info->scope->create_struct_type(name, scope, nullptr);
         info->variants.push_back({name, type});
         info->scope->local_lookup(name)->type.choice = node;
       } break;
