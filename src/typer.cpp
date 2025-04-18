@@ -172,18 +172,44 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
   }
+
+  /*
+    * important!
+
+    I'm doing this because you may make variants that have the same name as types that are used
+    in the variants themselves.
+
+    In doing so, you will inadvertently get the wrong type when you say
+
+    ... :: choice {
+      Expression(*mut Expression),
+      If {
+        expression: *mut Expression
+      }
+    }
+
+    because the type system will look up the previous variant, isntead of taking *mut Expression,
+    which is either the parent type, or whatever external type.
+
+    So, we defer the creation of all aliases and substruct types, and this is fine because
+    you can't even refer to them directly anyway.
+  */
+
+  using alias_variant = std::tuple<InternedString, Type *, TypeKind, ASTNode *>;
+  using struct_variant = std::tuple<InternedString, Scope *>;
+  std::vector<std::variant<alias_variant, struct_variant>> variants;
+
   info->scope = node->scope;
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL: {
         info->variants.push_back({variant.name, void_type()});
-        info->scope->create_type_alias(variant.name, void_type(), TYPE_SCALAR, nullptr);
+        variants.emplace_back(alias_variant{variant.name, void_type(), TYPE_SCALAR, nullptr});
       } break;
       case ASTChoiceVariant::TUPLE: {
         variant.tuple->accept(this);
         auto type = variant.tuple->resolved_type;
-        info->variants.push_back({variant.name, type});
-        info->scope->create_type_alias(variant.name, type, TYPE_TUPLE, variant.tuple);
+        variants.emplace_back(alias_variant{variant.name, type, TYPE_TUPLE, variant.tuple});
       } break;
       case ASTChoiceVariant::STRUCT: {
         ctx.set_scope();
@@ -191,11 +217,27 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
           field->accept(this);
           field->resolved_type = field->type->resolved_type;
         }
-        auto type = info->scope->create_struct_type(variant.name, ctx.exit_scope(), nullptr);
-        info->variants.push_back({variant.name, type});
+        variants.emplace_back(struct_variant{variant.name, ctx.exit_scope()});
       } break;
     }
-    info->scope->local_lookup(variant.name)->type.choice = node;
+  }
+
+  for (const auto variant : variants) {
+    const auto index = variant.index();
+    switch (index) {
+      case 0: {
+        const auto &[name, type, kind, declaring_node] = std::get<0>(variant);
+        info->scope->create_type_alias(name, type, kind, declaring_node);
+        info->variants.push_back({name, type});
+        info->scope->local_lookup(name)->type.choice = node;
+      } break;
+      case 1: {
+        const auto &[name, scope] = std::get<1>(variant);
+        auto type = info->scope->create_struct_type(name, scope, nullptr);
+        info->variants.push_back({name, type});
+        info->scope->local_lookup(name)->type.choice = node;
+      } break;
+    }
   }
 }
 
@@ -2223,8 +2265,9 @@ void Typer::visit(ASTInitializerList *node) {
 
         value->accept(this);
 
-        assert_types_can_cast_or_equal(value, symbol->type_id, value->source_range,
-                                       std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
+        assert_types_can_cast_or_equal(
+            value, symbol->type_id, value->source_range,
+            std::format("Unable to cast type to target field for named initializer list, field: {}", id.get_str()));
       }
 
       scope = old_scope;
@@ -2334,7 +2377,7 @@ void Typer::visit(ASTSwitch *node) {
   for (const auto &_case : node->cases) {
     if (!node->is_pattern_match)
       _case.expression->accept(this);
-    
+
     auto expr_type = _case.expression->resolved_type;
     _case.block->accept(this);
     auto &block_cf = _case.block->control_flow;

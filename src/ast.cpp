@@ -1662,7 +1662,7 @@ ASTStatement *Parser::parse_statement() {
     }
     if (peek().type == TType::Choice) {
       eat();
-      auto tagged_union = parse_tagged_union_declaration(tok);
+      auto tagged_union = parse_choice_declaration(tok);
       return tagged_union;
     }
   } else if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -2340,7 +2340,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return node;
 }
 
-ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+ASTChoiceDeclaration *Parser::parse_choice_declaration(Token name) {
   NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this)
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
