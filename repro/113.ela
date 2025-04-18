@@ -1,0 +1,11 @@
+
+BType :: enum {
+  Integer,
+  Function,
+  Pointer
+}
+
+main :: fn() {
+  mut args: List!<BType>;
+  args.push(BType::Integer);
+}
