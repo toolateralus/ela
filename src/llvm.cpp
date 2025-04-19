@@ -22,7 +22,7 @@
 #include <llvm/TargetParser/Triple.h>
 
 void LLVMEmitter::visit_program(ASTProgram *node) {
-  this->module->setSourceFileName(node->source_range.begin_location.filename());
+  this->module->setSourceFileName(node->source_range.filename());
   file = dbg.enter_file_scope(node->source_range);
   di_builder->createCompileUnit(llvm::dwarf::DW_LANG_C, file, "0.01", false, "", 0);
 

@@ -38,6 +38,7 @@ constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
 constexpr auto TYPE_FLAGS_INTERFACE = 1 << 13;
 constexpr auto TYPE_FLAGS_DYN = 1 << 14;
+constexpr auto TYPE_FLAGS_UNION = 1 << 15;
 
 void Emitter::forward_decl_type(Type *type) {
   if (type->base_type != Type::INVALID_TYPE) {
@@ -167,7 +168,11 @@ void Emitter::visit(ASTFor *node) {
 
   // end condition
   emit_line_directive(node);
-  code << indent() << "if (!$next.index != 1) break;\n";
+
+  /// TODO: we should use a ASTPatternMatch here so that the compiler isn't completely tied to the Option!<T> implementation,
+  /// For example, I changed the order of the type (switch Some and None) and every for loop was broken.
+  /// It would be more reliable to just use a stack allocated ASTPatternMatch to emit here.
+  code << indent() << "if ($next.index == 0) break;\n";
 
   auto identifier_type_str = to_cpp_string(node->identifier_type);
 
@@ -295,9 +300,7 @@ void Emitter::visit(ASTType *node) {
 
   if (type->is_kind(TYPE_ENUM)) {
     auto enum_info = (type->info->as<EnumTypeInfo>());
-    auto elem_ty = enum_info->element_type;
-    code << to_cpp_string(elem_ty);
-    return;
+    type = global_find_type_id(enum_info->underlying_type, type->extensions);
   }
 
   auto type_string = to_cpp_string(type);
@@ -405,13 +408,6 @@ void Emitter::visit(ASTLiteral *node) {
       if (node->is_c_string) {
         output = std::format("\"{}\"", node->value.get_str());
       } else {
-        // TODO:
-        // We don't want null terminated strings, but the problem is, if we use an initializer list for an array of
-        // bytes, then all of our string literals are stack allocated. If we make them static, then there's a chance
-        // that the user mutates the string literal, and it will change it's meaning for the rest of the program
-
-        // I have spent literally all day figting these two probelms, and I have decided it is time to move on, for now,
-        // we will keep the null terminated strings until we have a solution for this.
         auto str = node->value.get_str();
         code << std::format("(str) {{ .data = \"{}\", .length = {} }}", str, calculate_actual_length(str));
         return;
@@ -424,8 +420,6 @@ void Emitter::visit(ASTLiteral *node) {
         output = node->value.get_str();
       }
       break;
-    // TODO : emit character literals as hexadecimal values so we're UTF8 friendly.
-    // that's why we have fat u32 chars anyway.
     case ASTLiteral::Char:
       output = node->value.get_str();
       break;
@@ -838,7 +832,7 @@ void Emitter::visit(ASTEnumDeclaration *node) {
     n++;
   }
   indent_level--;
-  code << indent() << "} " << emit_symbol(ctx.scope->lookup(node->name)) << ";\n";
+  code << indent() << "} " << scope->full_name() << ";\n";
 
   auto type = node->resolved_type;
   return;
@@ -1325,16 +1319,16 @@ std::string get_type_flags(Type *type) {
     case TYPE_FUNCTION:
       kind_flags = TYPE_FLAGS_FUNCTION;
       break;
-    case TYPE_STRUCT:
+    case TYPE_STRUCT: {
       kind_flags = TYPE_FLAGS_STRUCT;
-      break;
+      auto info = type->info->as<StructTypeInfo>();
+      if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
+        kind_flags = TYPE_FLAGS_UNION;
+      }
+    } break;
     case TYPE_ENUM:
       kind_flags = TYPE_FLAGS_ENUM;
       break;
-    // TODO: We need to let struct types know that they're a union when they are.
-    // case TYPE_UNION:
-    //   kind_flags = TYPE_FLAGS_UNION;
-    //   break;
     case TYPE_TUPLE:
       kind_flags = TYPE_FLAGS_TUPLE;
       break;

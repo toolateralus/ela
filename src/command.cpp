@@ -233,28 +233,28 @@ CompileCommand::CompileCommand(const std::vector<std::string> &args, std::vector
   }
 
   {
-    if (has_flag("--Wignore-all")) {
+    if (has_flag("Wignore-all")) {
       ignored_warnings |= WarningIgnoreAll;
     }
-    if (has_flag("--Wno-arrow-operator")) {
+    if (has_flag("Wno-arrow-operator")) {
       ignored_warnings |= WarningUseDotNotArrowOperatorOverload;
     }
-    if (has_flag("--Wno-inaccessible-decl")) {
+    if (has_flag("Wno-inaccessible-decl")) {
       ignored_warnings |= WarningInaccessibleDeclaration;
     }
-    if (has_flag("--Wno-empty-string-interp")) {
+    if (has_flag("Wno-empty-string-interp")) {
       ignored_warnings |= WarningEmptyStringInterpolation;
     }
-    if (has_flag("--Wno-non-null-deleted")) {
+    if (has_flag("Wno-non-null-deleted")) {
       ignored_warnings |= WarningNonNullDeletedPointer;
     }
-    if (has_flag("--Wno-ambiguous-variant")) {
+    if (has_flag("Wno-ambiguous-variant")) {
       ignored_warnings |= WarningAmbigousVariants;
     }
-    if (has_flag("--Wno-switch-break")) {
+    if (has_flag("Wno-switch-break")) {
       ignored_warnings |= WarningSwitchBreak;
     }
-    if (has_flag("--Wno-array-param")) {
+    if (has_flag("Wno-array-param")) {
       ignored_warnings |= WarningDownCastFixedArrayParam;
     }
   }

@@ -238,12 +238,11 @@ enum struct TFamily {
   Identifier,
 };
 
-struct SourceLocation {
-  SourceLocation() {}
-  SourceLocation(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
+struct SourceRange {
+  SourceRange() {}
+  SourceRange(size_t line, size_t column, std::size_t file) : line(line), column(column), file(file) {}
   size_t line = 0, column = 0;
   size_t file = 0;
-
   static std::vector<std::string> &files() {
     static std::vector<std::string> files;
     return files;
@@ -279,14 +278,14 @@ struct Token {
 
   Token() {}
 
-  Token(SourceLocation location, InternedString value, TType type, TFamily family)
+  Token(SourceRange location, InternedString value, TType type, TFamily family)
       : value(std::move(value)), type(type), family(family), location(location) {}
   InternedString value;
   TType type;
   TFamily family;
-  SourceLocation location;
+  SourceRange location;
   static Token &Eof() {
-    static Token eof = Token(SourceLocation(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
+    static Token eof = Token(SourceRange(0, 0, 0), {""}, TType::Eof, TFamily::Operator);
     return eof;
   }
 
@@ -478,7 +477,7 @@ struct Lexer {
 
       bool found = false;
       size_t file_idx = 0;
-      for (const auto &file : SourceLocation::files()) {
+      for (const auto &file : SourceRange::files()) {
         if (file == path) {
           found = 1;
         } else {
@@ -486,7 +485,7 @@ struct Lexer {
         }
       }
       if (!found) {
-        SourceLocation::files().push_back(path);
+        SourceRange::files().push_back(path);
       }
       return State(input, file_idx, input.length(), canonical);
     }

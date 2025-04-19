@@ -62,8 +62,8 @@ static std::string get_text_representation_of_source_range(const SourceRange &so
   std::stringstream ss;
   if (num_lines_of_source_to_show > 0) {
     ss << '\n';
-    auto first = source_range.begin_location;
-    std::ifstream src_file(SourceLocation::files()[first.file]);
+    auto first = source_range;
+    std::ifstream src_file(SourceRange::files()[first.file]);
 
     if (!src_file.is_open()) {
       return "Error: Unable to open source file\n";
@@ -121,7 +121,7 @@ static std::string format_source_location(const SourceRange &source_range, Error
   }
 
   std::stringstream ss;
-  ss << color << source_range.begin_location.ToString() << (terminal_supports_color ? "\033[0m" : "");
+  ss << color << source_range.ToString() << (terminal_supports_color ? "\033[0m" : "");
   ss << get_text_representation_of_source_range(source_range, num_lines_of_source_to_show);
 
   if (terminal_supports_color)

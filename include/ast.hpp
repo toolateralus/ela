@@ -233,7 +233,6 @@ struct ASTProgram : ASTNode {
   ASTNodeType get_node_type() const override { return AST_NODE_PROGRAM; }
 };
 
-
 struct ASTExpr : ASTNode {
   virtual ASTNodeType get_node_type() const = 0;
 };
@@ -1009,7 +1008,7 @@ struct Parser {
   ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
-  ASTChoiceDeclaration *parse_tagged_union_declaration(Token name);
+  ASTChoiceDeclaration *parse_choice_declaration(Token name);
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
   ASTEnumDeclaration *parse_enum_declaration(Token);
   ASTLambda *parse_lambda();

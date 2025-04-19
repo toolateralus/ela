@@ -50,7 +50,7 @@ constexpr auto MAIN_INIT_CODE = R"__(
 import fmt;
 
 main :: fn() {
-  hellos := str[]::init(.[
+  mut hellos := List!<str>::init(.[
     "Hello, World!",
     "Привет, Мир!",
     "Hola, Mundo!",

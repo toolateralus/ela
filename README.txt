@@ -1,11 +1,16 @@
-The Ela language is very immature (2 months of daily development), but has a few key features:
+NOTE: The compiler does not compile on windows currently! it is primarily developed on Arch and Linux Mint.
+Most linux distributions, it should work. You just need CMake and Ninja to compile it, as far as I know.
+
+The Ela language is very immature (~4-6 months of daily development), but has a few key features:
 
 
 - C-like memory simplicity.
-- Strong typing, with structs, enums, unions, tagged unions, and interface types.
-- Generic structs, interfaces, impl's, and functions/methods.
+- Strong typing, with structs, enums, unions, tagged unions (choice), and interface types.
+- Powerful runtime reflection.
+- 'dyn' Dynamic dispatch objects for interface types.
+- Generic structs, choices, interfaces, impl's, and functions/methods.
 - Methods implemented for any type.
-- A built-in dynamic array type, and a dynamic string built-in as well.
+- A small but powerful core library. (hash map, dynamic list, full raylib library, an immature 'rayui' library, full llvm library).
 - Many other features!
 
   Right now, the compiler is in it's third reiteration, where we've transformed a lot of features, and added a lot of features.
@@ -15,6 +20,9 @@ The Ela language is very immature (2 months of daily development), but has a few
   Note: The documentation that exists, is likely all wrong, and there is little of it.
   To get an idea of how most features work, you can check out the compiler's testing directory,
   Where many features have a test document which display how they can be used, but usually not in depth.
+
+  Also, for more practical examples, check out the 'lib' directory, which is essentially the core/std library.
+  There are some examples in the 'examples' directory, but many of them are super old and super buggy. unfortunately.
   
   Feel free to leave a github issue, or send an email to ela-language@gmail.com with any questions or remarks about the language.
   also, contributors of any capacity are welcome, and that includes additions to the standard library, such as a http library, tcp, ui frameworks, etc.

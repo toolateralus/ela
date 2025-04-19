@@ -235,22 +235,18 @@ struct Emitter : VisitorBase {
   const bool is_freestanding =
       compile_command.c_flags.contains("-ffreestanding") || compile_command.c_flags.contains("-nostdlib");
 
-  // TODO(Josh) 10/1/2024, 10:10:17 AM
-  // This causes a lot of empty lines. It would be nice to have a way to neatly
-  // do this.
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
+    
     static bool is_release_or_omitting_line_info =
         compile_command.has_flag("release") || compile_command.has_flag("nl");
+
     if (is_release_or_omitting_line_info) {
       return;
     }
-    auto loc = node->source_range.begin_location.line;
+
+    auto loc = node->source_range.line;
     auto filename = get_source_filename(node->source_range);
-    if (filename.empty()) {
-      printf("Empty filename for line directive.\n");
-      return;
-    }
 
     auto line = std::format("#line {} \"{}\"\n", loc, filename);
     code << line;

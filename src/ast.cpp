@@ -225,7 +225,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           return func;
         } else {
           parser->ctx.scope->erase(func->name);
-          return ast_alloc<ASTNoop>();
+          return nullptr;
         }
     }},
 
@@ -266,7 +266,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_EXPRESSION,
       .run = [](Parser *parser) {
         auto location = parser->peek().location;
-        auto formatted = std::format("{}:{}:{}", SourceLocation::files()[location.file], location.line, location.column);
+        auto formatted = std::format("{}:{}:{}", SourceRange::files()[location.file], location.line, location.column);
         auto literal = ast_alloc<ASTLiteral>();
         literal->tag = ASTLiteral::String;
         literal->value = formatted;
@@ -428,7 +428,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->ctx.scope->add_def(parser->expect(TType::Identifier).value);
         while (parser->peek().type == TType::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return nullptr;
     }},
 
     // #undef, remove a #def
@@ -437,7 +437,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         parser->ctx.scope->undef(parser->expect(TType::Identifier).value);
         while (parser->peek().type == TType::Semi) parser->eat();
-        return ast_alloc<ASTNoop>();
+        return nullptr;
     }},
 
     // #ifdef, conditional compilation based on a #def being present.
@@ -1351,6 +1351,13 @@ ASTStatement *Parser::parse_statement() {
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
     if (!statement) {
+      /* 
+        TODO: is there a way we can do this without returning a node?
+        We should probably get rid of most of the directives, if they can be
+        replaced with a keyword and a node.
+
+        this is just a useful tool for 
+      */
       static auto noop = ast_alloc<ASTNoop>();
       statement = noop;
     }
@@ -1474,12 +1481,6 @@ ASTStatement *Parser::parse_statement() {
   if (is_const_multiple_assign || is_mut_multiple_assign) {
     return parse_multiple_asssignment();
   }
-
-  // * Variable declarations
-  // * 'n := 10;'
-  // * 'n : int = 10;'
-  // * 'const_n :: 10;' (remove me from here)
-  // TODO: this condition seems excessively complicated.
 
   bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
                                                                     lookahead_buf()[1].type == TType::ColonEquals);
@@ -1631,8 +1632,6 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-  // * Type declarations.
-  // * Todo: handle constant 'CONST :: VALUE' Declarations here.
   if (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family == TFamily::Keyword) {
     expect(TType::Identifier);
     expect(TType::DoubleColon);
@@ -1654,7 +1653,7 @@ ASTStatement *Parser::parse_statement() {
     }
     if (peek().type == TType::Choice) {
       eat();
-      auto tagged_union = parse_tagged_union_declaration(tok);
+      auto tagged_union = parse_choice_declaration(tok);
       return tagged_union;
     }
   } else if (lookahead_buf()[1].type == TType::DoubleColon) {
@@ -2332,7 +2331,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
   return node;
 }
 
-ASTChoiceDeclaration *Parser::parse_tagged_union_declaration(Token name) {
+ASTChoiceDeclaration *Parser::parse_choice_declaration(Token name) {
   NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this)
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
@@ -2650,9 +2649,8 @@ bool Parser::import(InternedString name, Scope **scope) {
 Token Parser::expect(TType type) {
   fill_buffer_if_needed();
   if (peek().type != type) {
-    SourceRange range = {
-        .begin_location = peek().location,
-    };
+    SourceRange range = peek().location;
+
     throw_error(std::format("Expected {}, got {} : {}", TTypeToString(type), TTypeToString(peek().type), peek().value),
                 range);
   }
@@ -2661,9 +2659,7 @@ Token Parser::expect(TType type) {
 
 SourceRange Parser::begin_node() {
   auto location = peek().location;
-  return SourceRange{
-      .begin_location = location,
-  };
+  return location;
 }
 
 void Parser::end_node(ASTNode *node, SourceRange &range) {

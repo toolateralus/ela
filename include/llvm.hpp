@@ -192,7 +192,7 @@ struct DIManager {
   DIScope *current_scope() const { return scope_stack.empty() ? nullptr : scope_stack.top(); }
 
   std::tuple<std::string, std::string, unsigned, unsigned> extract_source_range(SourceRange range) {
-    auto location = range.begin_location;
+    auto location = range;
     auto line = location.line, column = location.column;
     std::filesystem::path abs_path = location.files()[location.file];
 
@@ -468,7 +468,7 @@ struct LLVMEmitter {
           }
         }
 
-        auto [underlying_type, underlying_di_type] = llvm_typeof_impl(info->element_type);
+        auto [underlying_type, underlying_di_type] = llvm_typeof_impl(info->underlying_type);
         auto enum_name = info->scope->full_name();
         auto di_enum_type =
             di_builder->createEnumerationType(dbg.current_scope(), enum_name, file, 0, 32, 32,

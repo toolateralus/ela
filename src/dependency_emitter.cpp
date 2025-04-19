@@ -41,7 +41,7 @@ void DependencyEmitter::define_type(Type *type) {
     case TYPE_TUPLE: {
       auto info = type->info->as<TupleTypeInfo>();
       for (auto type : info->types) {
-        define_type(type);
+        declare_type(type);
       }
       emitter->emit_tuple(type);
     } break;
@@ -280,7 +280,6 @@ void DependencyEmitter::visit(ASTIndex *node) {
 }
 
 void DependencyEmitter::visit(ASTPath *node) {
-  // TODO: this should be handled by ASTType ... update: what does this mean by 'this'? I think this is irrelevant.
   auto type = node->resolved_type;
   if (type && type->kind == TYPE_ENUM) {
     type->declaring_node.get()->accept(this);
@@ -501,13 +500,16 @@ void DependencyEmitter::visit(ASTImpl *node) {
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
 void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
-  if (!node->generic_parameters.empty()) {
+  if (!node->generic_parameters.empty()) {  
     return;
   }
 
   auto old_scope = ctx.scope;
+
   ctx.set_scope(node->scope);
+
   Defer _([&] { ctx.set_scope(old_scope); });
+
   for (const auto &variant : node->variants) {
     switch (variant.kind) {
       case ASTChoiceVariant::NORMAL:
