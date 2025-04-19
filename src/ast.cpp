@@ -879,10 +879,10 @@ ASTExpr *Parser::parse_postfix() {
       unary->op = eat();
       return unary;
     } else if (peek().type == TType::LBrace) {
-      NODE_ALLOC(ASTSubscript, subscript, range, _, this)
+      NODE_ALLOC(ASTIndex, subscript, range, _, this)
       subscript->left = left;
       eat();
-      subscript->subscript = parse_expr();
+      subscript->index = parse_expr();
       expect(TType::RBrace);
       left = subscript;
     } else if (peek().type == TType::Range) {

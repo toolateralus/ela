@@ -46,7 +46,7 @@ void ASTElse::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTWhile::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTStructDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTDotExpr::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTSubscript::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTIndex::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTCast::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTEnumDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTInitializerList::accept(VisitorBase *visitor) { visitor->visit(this); }

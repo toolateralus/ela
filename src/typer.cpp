@@ -781,7 +781,7 @@ bool is_const_pointer(ASTNode *node) {
   if (node == nullptr)
     return false;
 
-  if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
+  if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
     return is_const_pointer(subscript->left);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
@@ -1878,8 +1878,8 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("cannot assign into a const variable!", node->source_range);
       }
 
-    } else if (node->left->get_node_type() == AST_NODE_SUBSCRIPT) {
-      auto subscript = (ASTSubscript *)node->left;
+    } else if (node->left->get_node_type() == AST_NODE_INDEX) {
+      auto subscript = (ASTIndex *)node->left;
 
       auto subscript_left_ty = subscript->left->resolved_type;
       if (subscript_left_ty->extensions.is_const_pointer()) {
@@ -2134,11 +2134,11 @@ void Typer::visit(ASTDotExpr *node) {
   }
 }
 
-void Typer::visit(ASTSubscript *node) {
+void Typer::visit(ASTIndex *node) {
   node->left->accept(this);
-  node->subscript->accept(this);
+  node->index->accept(this);
   auto left_ty = node->left->resolved_type;
-  auto subscript_ty = node->subscript->resolved_type;
+  auto subscript_ty = node->index->resolved_type;
 
   auto symbol = ctx.get_symbol(node->left);
 

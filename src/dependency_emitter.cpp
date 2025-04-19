@@ -267,15 +267,15 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTSubscript *node) {
+void DependencyEmitter::visit(ASTIndex *node) {
   if (node->is_operator_overload) {
     visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT),
-                            node->subscript);
+                            node->index);
   } else {
     // make sure type is defined for size
     define_type(node->left->resolved_type);
     node->left->accept(this);
-    node->subscript->accept(this);
+    node->index->accept(this);
   }
 }
 

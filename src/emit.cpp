@@ -998,12 +998,12 @@ void Emitter::visit(ASTDotExpr *node) {
   return;
 }
 
-void Emitter::visit(ASTSubscript *node) {
+void Emitter::visit(ASTIndex *node) {
   auto left_ty = node->left->resolved_type;
   if (left_ty && node->is_operator_overload) {
     code << "(*"; // always dereference via subscript. for `type[10] = 10` and such.
     call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, TType::LBrace, node->left,
-                           node->subscript);
+                           node->index);
     code << ")";
 
     return;
@@ -1011,7 +1011,7 @@ void Emitter::visit(ASTSubscript *node) {
 
   node->left->accept(this);
   code << '[';
-  node->subscript->accept(this);
+  node->index->accept(this);
   code << ']';
   return;
 }

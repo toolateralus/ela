@@ -59,7 +59,7 @@ enum ASTNodeType {
   AST_NODE_ARGUMENTS,
 
   AST_NODE_DOT_EXPR,
-  AST_NODE_SUBSCRIPT,
+  AST_NODE_INDEX,
   AST_NODE_INITIALIZER_LIST,
   AST_NODE_SIZE_OF,
   AST_NODE_TYPE_OF,
@@ -112,7 +112,7 @@ struct ASTNode {
       case AST_NODE_CALL:
       case AST_NODE_ARGUMENTS:
       case AST_NODE_DOT_EXPR:
-      case AST_NODE_SUBSCRIPT:
+      case AST_NODE_INDEX:
       case AST_NODE_INITIALIZER_LIST:
       case AST_NODE_CAST:
       case AST_NODE_RANGE:
@@ -646,12 +646,12 @@ struct ASTWhile : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_WHILE; }
 };
 
-struct ASTSubscript : ASTExpr {
+struct ASTIndex : ASTExpr {
   bool is_operator_overload = false;
   ASTExpr *left;
-  ASTExpr *subscript;
+  ASTExpr *index;
   void accept(VisitorBase *visitor) override;
-  ASTNodeType get_node_type() const override { return AST_NODE_SUBSCRIPT; }
+  ASTNodeType get_node_type() const override { return AST_NODE_INDEX; }
 };
 
 struct ASTImpl;

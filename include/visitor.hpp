@@ -47,7 +47,7 @@ struct VisitorBase {
   virtual void visit(ASTWhile *node) = 0;
   virtual void visit(ASTStructDeclaration *node) = 0;
   virtual void visit(ASTDotExpr *node) = 0;
-  virtual void visit(ASTSubscript *node) = 0;
+  virtual void visit(ASTIndex *node) = 0;
   virtual void visit(ASTInitializerList *node) = 0;
   virtual void visit(ASTEnumDeclaration *node) = 0;
   virtual void visit(ASTRange *node) = 0;
@@ -165,7 +165,7 @@ struct Typer : VisitorBase {
   void visit(ASTElse *node) override;
   void visit(ASTWhile *node) override;
   void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
+  void visit(ASTIndex *node) override;
   void visit(ASTInitializerList *node) override;
   void visit(ASTEnumDeclaration *node) override;
   void visit(ASTRange *node) override;
@@ -321,7 +321,7 @@ struct Emitter : VisitorBase {
   void visit(ASTElse *node) override;
   void visit(ASTWhile *node) override;
   void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
+  void visit(ASTIndex *node) override;
   void visit(ASTInitializerList *node) override;
   void visit(ASTEnumDeclaration *node) override;
   void visit(ASTRange *node) override;
@@ -395,7 +395,7 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTElse *node) override;
   void visit(ASTWhile *node) override;
   void visit(ASTDotExpr *node) override;
-  void visit(ASTSubscript *node) override;
+  void visit(ASTIndex *node) override;
   void visit(ASTInitializerList *node) override;
   void visit(ASTEnumDeclaration *node) override;
   void visit(ASTRange *node) override;
