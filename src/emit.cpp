@@ -168,7 +168,11 @@ void Emitter::visit(ASTFor *node) {
 
   // end condition
   emit_line_directive(node);
-  code << indent() << "if (!$next.index != 1) break;\n";
+
+  /// TODO: we should use a ASTPatternMatch here so that the compiler isn't completely tied to the Option!<T> implementation,
+  /// For example, I changed the order of the type (switch Some and None) and every for loop was broken.
+  /// It would be more reliable to just use a stack allocated ASTPatternMatch to emit here.
+  code << indent() << "if ($next.index == 0) break;\n";
 
   auto identifier_type_str = to_cpp_string(node->identifier_type);
 
