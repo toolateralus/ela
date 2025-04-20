@@ -357,12 +357,12 @@ struct Type {
   // To have a null, yet identifyable unresolved generic type,
   // we just reinterpret cast 1 to a Type *. this won't be 'nullptr',
   // but will still effectively be a poison/invalid, but distinct and comparable value.
-  static Type *UNRESOLVED_GENERIC_TYPE_ID;
+  static Type *UNRESOLVED_GENERIC;
   constexpr static Type *INVALID_TYPE = nullptr;
 };
 
 static inline constexpr bool type_is_valid(Type *type) {
-  return type != Type::UNRESOLVED_GENERIC_TYPE_ID && type != Type::INVALID_TYPE;
+  return type != Type::UNRESOLVED_GENERIC && type != Type::INVALID_TYPE;
 }
 
 struct ASTFunctionDeclaration;

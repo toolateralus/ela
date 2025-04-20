@@ -12,7 +12,7 @@
 #include "lex.hpp"
 #include "scope.hpp"
 
-Type *Type::UNRESOLVED_GENERIC_TYPE_ID = reinterpret_cast<Type *>(1);
+Type *Type::UNRESOLVED_GENERIC = reinterpret_cast<Type *>(1);
 
 /*
   There's two copies of this, one for function pointers, and one for regular function types.

@@ -208,10 +208,10 @@ ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
   return new_node;
 }
 
-ASTSubscript *ASTCopier::copy_subscript(ASTSubscript *node) {
+ASTIndex *ASTCopier::copy_subscript(ASTIndex *node) {
   auto new_node = copy(node);
   new_node->left = static_cast<ASTExpr *>(copy_node(node->left));
-  new_node->subscript = static_cast<ASTExpr *>(copy_node(node->subscript));
+  new_node->index = static_cast<ASTExpr *>(copy_node(node->index));
   return new_node;
 }
 ASTInitializerList *ASTCopier::copy_initializer_list(ASTInitializerList *node) {
@@ -411,8 +411,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_struct_declaration(static_cast<ASTStructDeclaration *>(node));
     case AST_NODE_DOT_EXPR:
       return copy_dot_expr(static_cast<ASTDotExpr *>(node));
-    case AST_NODE_SUBSCRIPT:
-      return copy_subscript(static_cast<ASTSubscript *>(node));
+    case AST_NODE_INDEX:
+      return copy_subscript(static_cast<ASTIndex *>(node));
     case AST_NODE_INITIALIZER_LIST:
       return copy_initializer_list(static_cast<ASTInitializerList *>(node));
     case AST_NODE_ENUM_DECLARATION:

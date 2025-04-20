@@ -433,7 +433,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     info.params_len++;
   }
 
-  if (info.return_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+  if (info.return_type == Type::UNRESOLVED_GENERIC) {
     throw_error("internal compiler error: unresolved generic return type.", node->source_range);
   }
   node->resolved_type = global_find_function_type_id(info, {});
@@ -510,7 +510,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
   node->target->accept(this);
 
-  if (node->target->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+  if (node->target->resolved_type == Type::UNRESOLVED_GENERIC) {
     throw_error("the target of an impl was a generic type, but no type arguments were provided. use `impl!<T> "
                 "MyType!<T> {...}`, or provide a concrete type, such as `impl MyType!<s32> {...}`",
                 node->source_range);
@@ -522,7 +522,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   if (!target_ty) {
     if (node->target->resolved_type == Type::INVALID_TYPE) {
       throw_error("use of undeclared type", node->target->source_range);
-    } else if (node->target->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+    } else if (node->target->resolved_type == Type::UNRESOLVED_GENERIC) {
       throw_error("use of unresolved generic type", node->target->source_range);
     }
   }
@@ -566,7 +566,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
     if (!method->generic_parameters.empty()) {
       // TODO: actually generate a signature for a generic function so that you can compare them
-      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
+      type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC, method);
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
       continue;
     }
@@ -644,7 +644,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 
         if (!method->generic_parameters.empty()) {
           // TODO: actually generate a signature for a generic function so that you can compare them
-          type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC_TYPE_ID, method);
+          type_scope->insert_function(method->name, Type::UNRESOLVED_GENERIC, method);
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
           continue;
         }
@@ -709,6 +709,10 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
 
   auto type = global_create_interface_type(node->name.get_str(), ctx.scope, generic_args);
 
+  if (auto symbol = ctx.scope->lookup(node->name)) {
+    type->generic_base_type = symbol->type_id;
+  }
+
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -716,7 +720,6 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
       ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
-    type->generic_base_type = ctx.scope->lookup(node->name)->type_id;
   }
 
   node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
@@ -781,7 +784,7 @@ bool is_const_pointer(ASTNode *node) {
   if (node == nullptr)
     return false;
 
-  if (auto subscript = dynamic_cast<ASTSubscript *>(node)) {
+  if (auto subscript = dynamic_cast<ASTIndex *>(node)) {
     return is_const_pointer(subscript->left);
   } else if (auto dot = dynamic_cast<ASTDotExpr *>(node)) {
     return is_const_pointer(dot->base);
@@ -1130,7 +1133,7 @@ void Typer::visit(ASTProgram *node) {
 
 void Typer::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_CHOICE, node);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_CHOICE, node);
     return;
   }
   visit_choice_declaration(node, false);
@@ -1170,7 +1173,7 @@ void Typer::visit(ASTLambda *node) {
 
 void Typer::visit(ASTStructDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, TYPE_STRUCT, node);
+    ctx.scope->create_type_alias(node->name, Type::UNRESOLVED_GENERIC, TYPE_STRUCT, node);
   } else {
     visit_struct_declaration(node, false);
   }
@@ -1212,7 +1215,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   if (!node->generic_parameters.empty()) {
     // TODO: actually generate a signature for a generic function so that you can compare them
-    ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC_TYPE_ID, node);
+    ctx.scope->insert_function(node->name, Type::UNRESOLVED_GENERIC, node);
     return;
   }
 
@@ -1772,7 +1775,7 @@ void Typer::visit(ASTType *node) {
     if (!base_ty) {
       if (normal_ty.path->resolved_type == Type::INVALID_TYPE) {
         throw_error("use of undeclared type", node->source_range);
-      } else if (normal_ty.path->resolved_type == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+      } else if (normal_ty.path->resolved_type == Type::UNRESOLVED_GENERIC) {
         throw_error("use of unresolved generic type", node->source_range);
       }
     }
@@ -1878,8 +1881,8 @@ void Typer::visit(ASTBinExpr *node) {
         throw_error("cannot assign into a const variable!", node->source_range);
       }
 
-    } else if (node->left->get_node_type() == AST_NODE_SUBSCRIPT) {
-      auto subscript = (ASTSubscript *)node->left;
+    } else if (node->left->get_node_type() == AST_NODE_INDEX) {
+      auto subscript = (ASTIndex *)node->left;
 
       auto subscript_left_ty = subscript->left->resolved_type;
       if (subscript_left_ty->extensions.is_const_pointer()) {
@@ -2134,11 +2137,11 @@ void Typer::visit(ASTDotExpr *node) {
   }
 }
 
-void Typer::visit(ASTSubscript *node) {
+void Typer::visit(ASTIndex *node) {
   node->left->accept(this);
-  node->subscript->accept(this);
+  node->index->accept(this);
   auto left_ty = node->left->resolved_type;
-  auto subscript_ty = node->subscript->resolved_type;
+  auto subscript_ty = node->index->resolved_type;
 
   auto symbol = ctx.get_symbol(node->left);
 
@@ -2540,11 +2543,7 @@ void Typer::visit(ASTCast *node) {
 
 void Typer::visit(ASTInterfaceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    std::vector<Type *> args;
-    for (auto &param : node->generic_parameters) {
-      args.push_back(Type::UNRESOLVED_GENERIC_TYPE_ID);
-    }
-    ctx.scope->create_interface_type(node->name, node->scope, args, node);
+    ctx.scope->create_interface_type(node->name, node->scope, {}, node);
   } else {
     visit_interface_declaration(node, false);
     ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE, node);
@@ -3017,7 +3016,7 @@ void Typer::visit(ASTPath *node) {
       if (symbol->is_module()) {
         scope = symbol->module.declaration->scope;
       } else if (symbol->is_type()) {
-        if (symbol->type_id == Type::UNRESOLVED_GENERIC_TYPE_ID) {
+        if (symbol->type_id == Type::UNRESOLVED_GENERIC) {
           throw_error("use of generic type, but no type arguments were provided.", node->source_range);
         }
         previous_type = symbol->type_id;
