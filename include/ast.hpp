@@ -1,6 +1,5 @@
 #pragma once
 
-#include <cstdint>
 #include <cstdio>
 #include <deque>
 #include <functional>
@@ -994,9 +993,7 @@ static Precedence get_operator_precedence(Token token);
 
 struct Typer;
 
-struct Parser {
-  Typer *typer;
-  static Nullable<ASTBlock> current_block;
+struct Parser {  
   ASTProgram *parse_program();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
@@ -1021,53 +1018,45 @@ struct Parser {
   ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();
   ASTWhere *parse_where_clause();
-
-  // ASTType* parsing routines
   ASTType *parse_type();
 
   void parse_pointer_extensions(ASTType *type);
-
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *&type);
-
   ASTType *parse_function_type();
-
+  
   ASTDefer *parse_defer();
-
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<ASTExpr> try_parse_directive_expr();
-
-  inline bool not_eof() const { return !peek().is_eof(); }
-  inline bool eof() const { return peek().is_eof(); }
-  inline bool semicolon() const { return peek().type == TType::Semi; }
-  InternedString type_name(ASTExpr *node);
-
+  bool import(InternedString name, Scope **scope);
   inline std::deque<Token> &lookahead_buf() { return states.back().lookahead_buffer; }
-
+  
   Token eat();
   Token expect(TType type);
   Token peek() const;
-
   void fill_buffer_if_needed();
+  
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
-
-  // returns true if successful, false if already included
-  bool import(InternedString name, Scope **scope);
+  inline bool not_eof() const { return !peek().is_eof(); }
+  inline bool eof() const { return peek().is_eof(); }
+  inline bool semicolon() const { return peek().type == TType::Semi; }
 
   Parser(const std::string &filename, Context &context);
   ~Parser();
 
+  Typer *typer;
   Context &ctx;
   Lexer lexer{};
+  
   std::vector<Lexer::State> states;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl_decl = nullptr;
   Nullable<ASTInterfaceDeclaration> current_interface_decl = nullptr;
 
+  static Nullable<ASTBlock> current_block;
   static std::vector<DirectiveRoutine> directive_routines;
-  int64_t token_idx{};
 };
 
 template <class T> static inline T *ast_alloc(size_t n = 1) {

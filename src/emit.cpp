@@ -1751,7 +1751,7 @@ void Emitter::visit(ASTChoiceDeclaration *node) {
 
   emit_default_init = old_init;
   code << "typedef struct " << name << " {\n";
-  code << "  int index;\n";
+  code << "  int index;\n"; // TODO: we can compress this by the max value of the discriminant.
   code << "  union {\n";
   for (const auto &variant : node->variants) {
     auto variant_name = variant.name.get_str();

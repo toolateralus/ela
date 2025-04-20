@@ -17,13 +17,6 @@ struct Value {
     int integer;
     float floating;
     bool boolean;
-
-    // ! We should add this for manipulating compile time structs.s
-    // ! We'll just replace every usage of it with an initializer list, or something.
-    // struct { 
-    //   int type = Type::INVALID_TYPE;
-    //   std::unordered_map<InternedString, Value> values;
-    // } $struct;
   };
 
   bool is_truthy() {
