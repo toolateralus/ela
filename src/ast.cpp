@@ -754,14 +754,6 @@ ASTExpr *Parser::parse_unary() {
     auto is_rvalue =
         expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
 
-    if ((is_rvalue) && (op.type == TType::And || op.type == TType::Mul)) {
-      end_node(nullptr, range);
-      throw_error("Cannot take the address of, or dereference a literal or "
-                  "'rvalue'\nlike a function result or constructor result. It "
-                  "is a temporary value\nand would be invalid once this "
-                  "statement completed executing",
-                  range);
-    }
 
     unaryexpr->mutability = mutability;
     unaryexpr->op = op;
@@ -2596,7 +2588,6 @@ ASTType *ASTType::get_void() {
 }
 
 Token Parser::eat() {
-  token_idx++;
   fill_buffer_if_needed();
   auto tok = peek();
   lookahead_buf().pop_front();
