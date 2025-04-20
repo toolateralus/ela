@@ -2055,7 +2055,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
 
   // TODO: find a better solution to this.
   for (const auto &param : function->generic_parameters) {
-    ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+    ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC);
   }
 
   function->block = parse_block();
@@ -2287,7 +2287,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     info->flags |= STRUCT_FLAG_IS_UNION;
 
   for (const auto &param : node->generic_parameters) {
-    info->scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC_TYPE_ID);
+    info->scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC);
   }
 
   if (!semicolon()) {
