@@ -5,9 +5,7 @@ add :: fn(a: s32, b: s32) -> s32 {
   return a + b;
 }
 
-
-
-// Note: for all generics, (structs, functions, unions, tagged unions, interfaces)
+// Note: for all generics, (structs, functions, unions, tagged unions, ttraits)
 // the syntax will always be the same. !<T, T1, T2>;
 
 // No function overloading. Use generics instead, as such:
@@ -52,7 +50,7 @@ main :: fn() {
 }
   
 // You can use 'where' clauses to add arbitrary type constraints to generic parameters.
-// you can match against concrete types, or even use an empty interface that has another 
+// you can match against concrete types, or even use an empty trait that has another 
 // where clause to just check that it passes some kind of set of conditions.
 // & and | are the only valid operators in these constraint expressions.
 Struct :: struct!<T> where T: s32 | Is_Numeric | Is_Mut_Pointer {

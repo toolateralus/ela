@@ -555,7 +555,7 @@ ASTProgram *Parser::parse_program() {
     switch (type) {
       case AST_NODE_STRUCT_DECLARATION:
       case AST_NODE_FUNCTION_DECLARATION:
-      case AST_NODE_INTERFACE_DECLARATION:
+      case AST_NODE_TRAIT_DECLARATION:
       case AST_NODE_ENUM_DECLARATION:
       case AST_NODE_CHOICE_DECLARATION:
       case AST_NODE_ALIAS:
@@ -951,7 +951,7 @@ ASTExpr *Parser::parse_primary() {
 
       if (peek().type == TType::Comma) {
         expect(TType::Comma);
-        dyn_of->interface_type = parse_type();
+        dyn_of->trait_type = parse_type();
       }
 
       expect(TType::RParen);
@@ -1640,9 +1640,9 @@ ASTStatement *Parser::parse_statement() {
       auto node = parse_function_declaration(tok);
       return node;
     }
-    if (peek().type == TType::Interface) {
-      auto interface = parse_interface_declaration(tok);
-      return interface;
+    if (peek().type == TType::Trait) {
+      auto trait = parse_trait_declaration(tok);
+      return trait;
     }
     if (peek().type == TType::Struct || peek().type == TType::Union) {
       auto struct_decl = parse_struct_declaration(tok);
@@ -2135,12 +2135,12 @@ ASTImpl *Parser::parse_impl() {
   current_impl_decl = node;
   auto target = parse_type();
 
-  ASTType *interface = nullptr;
+  ASTType *trait = nullptr;
   if (peek().type == TType::For) {
     expect(TType::For);
-    interface = parse_type();
-    node->interface = target;
-    node->target = interface;
+    trait = parse_type();
+    node->trait = target;
+    node->target = trait;
   } else {
     node->target = target;
   }
@@ -2204,13 +2204,13 @@ ASTWhere *Parser::parse_where_clause() {
   return node;
 }
 
-ASTInterfaceDeclaration *Parser::parse_interface_declaration(Token name) {
-  auto previous = current_interface_decl;
-  NODE_ALLOC_EXTRA_DEFER(ASTInterfaceDeclaration, node, range, _, this, { current_interface_decl = previous; });
-  expect(TType::Interface);
+ASTTraitDeclaration *Parser::parse_trait_declaration(Token name) {
+  auto previous = current_trait_decl;
+  NODE_ALLOC_EXTRA_DEFER(ASTTraitDeclaration, node, range, _, this, { current_trait_decl = previous; });
+  expect(TType::Trait);
 
   node->name = name.value;
-  current_interface_decl = node;
+  current_trait_decl = node;
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }

@@ -51,9 +51,9 @@ void DependencyEmitter::define_type(Type *type) {
       }
       type->dyn_emitted = true;
       auto info = type->info->as<DynTypeInfo>();
-      auto interface_type = info->interface_type;
-      auto interface_info = interface_type->info->as<InterfaceTypeInfo>();
-      for (auto [name, sym] : interface_info->scope->symbols) {
+      auto trait_type = info->trait_type;
+      auto trait_info = trait_type->info->as<TraitTypeInfo>();
+      for (auto [name, sym] : trait_info->scope->symbols) {
         if (sym.is_function() && !sym.is_generic_function()) {
           auto declaration = sym.function.declaration;
           for (auto param : declaration->params->params) {
@@ -67,10 +67,10 @@ void DependencyEmitter::define_type(Type *type) {
           }
         }
       }
-      define_type(info->interface_type);
-      emitter->emit_dyn_dispatch_object(info->interface_type, type);
+      define_type(info->trait_type);
+      emitter->emit_dyn_dispatch_object(info->trait_type, type);
     } break;
-    case TYPE_INTERFACE:
+    case TYPE_TRAIT:
     case TYPE_SCALAR:
       break;
   }
@@ -530,7 +530,7 @@ void DependencyEmitter::visit(ASTCast *node) {
   node->target_type->accept(this);
 }
 
-void DependencyEmitter::visit(ASTInterfaceDeclaration *node) {}
+void DependencyEmitter::visit(ASTTraitDeclaration *node) {}
 
 void DependencyEmitter::visit(ASTLambda *node) {
   node->params->accept(this);
@@ -552,9 +552,9 @@ void DependencyEmitter::visit(ASTDyn_Of *node) {
   node->object->accept(this);
   auto element_type = node->object->resolved_type->get_element_type();
   auto element_scope = element_type->info->scope;
-  auto interface_scope = node->interface_type->resolved_type->info->scope;
-  for (auto [name, interface_sym] : interface_scope->symbols) {
-    if (!interface_sym.is_function() || interface_sym.is_generic_function()) {
+  auto trait_scope = node->trait_type->resolved_type->info->scope;
+  for (auto [name, trait_sym] : trait_scope->symbols) {
+    if (!trait_sym.is_function() || trait_sym.is_generic_function()) {
       continue;
     }
     auto decl = element_scope->local_lookup(name)->function.declaration;

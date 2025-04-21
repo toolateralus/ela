@@ -1,4 +1,4 @@
-DynInterface :: interface {
+DynInterface :: trait {
   default_getter :: fn(*const self) -> s32 {
     return 0;
   }

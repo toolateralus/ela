@@ -57,7 +57,7 @@ struct VisitorBase {
   virtual void visit(ASTImpl *node) = 0;
   virtual void visit(ASTTupleDeconstruction *node) = 0;
   virtual void visit(ASTDefer *node) = 0;
-  virtual void visit(ASTInterfaceDeclaration *node) = 0;
+  virtual void visit(ASTTraitDeclaration *node) = 0;
   virtual void visit(ASTChoiceDeclaration *node) = 0;
   virtual void visit(ASTModule *node) = 0;
   virtual void visit(ASTType_Of *node) = 0;
@@ -88,17 +88,17 @@ struct Typer : VisitorBase {
     from the stdlib, which is in Context::root_scope, which is also
     statically available I think.
   */
-  Type *iterator_interface() {
+  Type *iterator_trait() {
     static Type *iter_id = ctx.scope->lookup("Iterator")->type_id;
     return iter_id;
   }
 
-  Type *iterable_interface() {
+  Type *iterable_trait() {
     static Type *iterable_id = ctx.scope->lookup("Iterable")->type_id;
     return iterable_id;
   }
 
-  Type *init_interface() {
+  Type *init_trait() {
     static Type *init_id = ctx.scope->lookup("Init")->type_id;
     return init_id;
   }
@@ -125,7 +125,7 @@ struct Typer : VisitorBase {
   void visit(ASTLiteral *node) override;
   void visit(ASTCast *node) override;
   void visit(ASTType *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTTraitDeclaration *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTType_Of *node) override;
 
@@ -139,7 +139,7 @@ struct Typer : VisitorBase {
   void visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,
                                 std::vector<Type *> generic_args = {});
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args = {});
-  void visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
+  void visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                    std::vector<Type *> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node);
 
@@ -253,7 +253,7 @@ struct Emitter : VisitorBase {
     last_loc = loc;
   }
 
-  void emit_dyn_dispatch_object(Type *interface_type, Type *dyn_type);
+  void emit_dyn_dispatch_object(Type *trait, Type *dyn_type);
   void emit_tuple(Type *type);
   std::string emit_symbol(Symbol *symbol);
   void emit_lambda(ASTLambda *node);
@@ -334,7 +334,7 @@ struct Emitter : VisitorBase {
   void visit(ASTDefer *node) override;
   void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
   void visit(ASTStatementList *node) override {
@@ -408,7 +408,7 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTDefer *node) override;
   void visit(ASTChoiceDeclaration *node) override;
   void visit(ASTCast *node) override;
-  void visit(ASTInterfaceDeclaration *node) override;
+  void visit(ASTTraitDeclaration *node) override;
   void visit(ASTLambda *node) override;
   void visit(ASTWhere *node) override;
   void visit(ASTStatementList *node) override {

@@ -1,0 +1,24 @@
+
+/* 
+  using a where constraint with #self as the target in 
+  an trait declaration causes #self not to be found, 
+  because this gets visited before it gets implemented.
+
+
+  if we visit it when we implement it, it's also problematic (if it's a generic)
+  because the generic arguments have been substituted with their concrete resolved types
+  and then it fails to get the generic arguments (this is speculation, it's likely not that.)
+
+
+  This may seem strange, and it is, but it's useful for marker traits that need 'supertrait bindings'
+  i.e defining a dependency hierarchy for types that implement this.
+
+  Specifically, the use case that this surfaced from, is the PartialOrd/Ord interfaces 
+  where we need to bind #self to other traits.
+
+*/
+Trait :: trait where #self: s32 {
+
+}
+
+main :: fn() { }

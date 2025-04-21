@@ -36,7 +36,7 @@ constexpr auto TYPE_FLAGS_POINTER = 1 << 10;
 
 constexpr auto TYPE_FLAGS_SIGNED = 1 << 11;
 constexpr auto TYPE_FLAGS_UNSIGNED = 1 << 12;
-constexpr auto TYPE_FLAGS_INTERFACE = 1 << 13;
+constexpr auto TYPE_FLAGS_TRAIT = 1 << 13;
 constexpr auto TYPE_FLAGS_DYN = 1 << 14;
 constexpr auto TYPE_FLAGS_UNION = 1 << 15;
 
@@ -901,8 +901,8 @@ void $deinit_type(Type *type) {
   if (type->methods.length > 0 || type->methods.data != NULL)
     free(type->methods.data);
 
-  if (type->interfaces.length  > 0 || type->interfaces.data != NULL)
-    free(type->interfaces.data);
+  if (type->traits.length  > 0 || type->traits.data != NULL)
+    free(type->traits.data);
 
   if (type->fields.length  > 0 || type->fields.data != NULL)
     free(type->fields.data);
@@ -1335,8 +1335,8 @@ std::string get_type_flags(Type *type) {
     case TYPE_CHOICE:
       kind_flags = TYPE_FLAGS_CHOICE;
       break;
-    case TYPE_INTERFACE:
-      kind_flags = TYPE_FLAGS_INTERFACE;
+    case TYPE_TRAIT:
+      kind_flags = TYPE_FLAGS_TRAIT;
       break;
     case TYPE_DYN:
       kind_flags = TYPE_FLAGS_DYN;
@@ -1371,7 +1371,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << std::format("*_type_info.data[{}] = (Type){{ .id = {}, .name = (str){{.data=\"{}\", .length = {}}}, ", id, id,
                     type_string, calculate_actual_length(type_string));
 
-  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_INTERFACE) && !type->is_kind(TYPE_FUNCTION)) {
+  if (!type->is_kind(TYPE_ENUM) && !type->is_kind(TYPE_TRAIT) && !type->is_kind(TYPE_FUNCTION)) {
     if (type->extensions.is_pointer()) {
       ss << ".size = sizeof(void*), ";
     } else {
@@ -1477,30 +1477,30 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     return generics_ss.str();
   };
 
-  auto get_interfaces_init_statements = [&] {
-    std::stringstream interfaces_ss;
+  auto get_traits_init_stmts = [&] {
+    std::stringstream traits_ss;
 
-    if (type->interfaces.empty()) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->interfaces;\nargs->length = 0;\nargs->data = "
+    if (type->traits.empty()) {
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->traits;\nargs->length = 0;\nargs->data = "
                          "NULL\n;args->capacity = 0;\n }}",
                          id);
     }
 
-    int count = type->interfaces.size();
+    int count = type->traits.size();
     {
-      interfaces_ss << "_type_info.data[" << id << "]->interfaces.data = malloc(" << count << " * sizeof(Type));\n";
-      interfaces_ss << "_type_info.data[" << id << "]->interfaces.length = " << count << ";\n";
-      interfaces_ss << "_type_info.data[" << id << "]->interfaces.capacity = " << count << ";\n";
+      traits_ss << "_type_info.data[" << id << "]->traits.data = malloc(" << count << " * sizeof(Type));\n";
+      traits_ss << "_type_info.data[" << id << "]->traits.length = " << count << ";\n";
+      traits_ss << "_type_info.data[" << id << "]->traits.capacity = " << count << ";\n";
     }
 
     int idx = 0;
-    for (const auto &interface : type->interfaces) {
-      interfaces_ss << "_type_info.data[" << id << "]->interfaces.data[" << idx << "] = ";
-      interfaces_ss << to_type_struct(interface, ctx) << ";\n";
+    for (const auto &trait : type->traits) {
+      traits_ss << "_type_info.data[" << id << "]->traits.data[" << idx << "] = ";
+      traits_ss << to_type_struct(trait, ctx) << ";\n";
       ++idx;
     }
 
-    return interfaces_ss.str();
+    return traits_ss.str();
   };
 
   auto get_methods_init_statements = [&] {
@@ -1521,7 +1521,7 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
     }
 
     if (count == 0) {
-      return std::format(";\n{{ auto args = &_type_info.data[{}]->interfaces;\nargs->length = 0;\nargs->data = "
+      return std::format(";\n{{ auto args = &_type_info.data[{}]->traits;\nargs->length = 0;\nargs->data = "
                          "NULL\n;args->capacity = 0;\n }}",
                          id);
     }
@@ -1556,9 +1556,9 @@ std::string Emitter::get_type_struct(Type *type, int id, Context &context, const
   ss << get_fields_init_statements();
   ss << get_generic_args_init_statements();
 
-  ss << get_interfaces_init_statements();
+  ss << get_traits_init_stmts();
 
-  if (!type->is_kind(TYPE_INTERFACE))
+  if (!type->is_kind(TYPE_TRAIT))
     ss << get_methods_init_statements();
 
   type_info_strings.push_back(ss.str());
@@ -1643,7 +1643,7 @@ std::string Emitter::to_cpp_string(Type *type) {
   switch (type->kind) {
     case TYPE_DYN: {
       auto info = type->info->as<DynTypeInfo>();
-      output = "dyn$" + to_cpp_string(info->interface_type);
+      output = "dyn$" + to_cpp_string(info->trait_type);
       output = to_cpp_string(type->extensions, output);
     } break;
     case TYPE_FUNCTION:
@@ -1651,7 +1651,7 @@ std::string Emitter::to_cpp_string(Type *type) {
     case TYPE_SCALAR:
     case TYPE_ENUM:
     case TYPE_STRUCT:
-    case TYPE_INTERFACE:
+    case TYPE_TRAIT:
     case TYPE_CHOICE: {
       output = to_cpp_string(type->extensions, type->info->scope->full_name());
       break;
@@ -1704,7 +1704,7 @@ void Emitter::visit(ASTCast *node) {
   return;
 }
 
-void Emitter::visit(ASTInterfaceDeclaration *node) { return; }
+void Emitter::visit(ASTTraitDeclaration *node) { return; }
 
 void Emitter::visit(ASTChoiceDeclaration *node) {
   if (!node->generic_parameters.empty()) {
@@ -2118,12 +2118,12 @@ void Emitter::visit(ASTDyn_Of *node) {
   code << ",\n";
 
   // ugliest code ever freaking written.
-  auto interface_scope = node->resolved_type->info->as<DynTypeInfo>()->interface_type->info->scope;
+  auto trait_scope = node->resolved_type->info->as<DynTypeInfo>()->trait_type->info->scope;
 
   auto object_scope_bare = node->object->resolved_type->get_element_type();
   auto object_scope = object_scope_bare->info->scope;
 
-  for (auto [name, sym] : interface_scope->symbols) {
+  for (auto [name, sym] : trait_scope->symbols) {
     if (sym.is_function() && !sym.is_generic_function()) {
       indent();
       code << "." << name.get_str() << " = ";
@@ -2137,14 +2137,13 @@ void Emitter::visit(ASTDyn_Of *node) {
   code << "}";
 }
 
-void Emitter::emit_dyn_dispatch_object(Type *interface_type, Type *dyn_type) {
-  Type *interface = interface_type;
+void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
 
-  if (interface->dyn_emitted) {
+  if (trait->dyn_emitted) {
     return;
   }
 
-  interface->dyn_emitted = true;
+  trait->dyn_emitted = true;
 
   auto dyn_ty = dyn_type;
   auto methods_to_emit = dyn_ty->info->as<DynTypeInfo>()->methods;

@@ -1,27 +1,27 @@
 
 
 /* 
-  Ela has interfaces that can declare methods, default or 'overriden'. This doesn't create a vtable,
+  Ela has traits that can declare methods, default or 'overriden'. This doesn't create a vtable,
   it's all done statically, it's just a powerful tool in the type system.
 
-  You cannot have an instance of an interface, by any means in the language now.
+  You cannot have an instance of an trait, by any means in the language now. // TODO: cover dyn traits.
 */
 
 
-Iter :: interface {
+Iter :: trait {
   // some methods.
 }
 
-Interface :: interface {
-  // referring to 'self' in an interface will refer to the implementer's type.
+Trait :: trait {
+  // referring to 'self' in an trait will refer to the implementer's type.
   to_string :: fn(*const self) -> String;
 
-  // the return types, or parameter types, can be interfaces themselves.
+  // the return types, or parameter types, can be traits themselves.
   // they will just be substituted for their actual types, and applied as a constraint when 
   // implemented. 
 
   // this is very useful for avoiding using a generic where it's really not needed.
 
-  // this is only valid for interface declarations themselves right now.
+  // this is only valid for trait declarations themselves right now.
   as_iter :: fn(*const self) -> Iter!<#self>
 }

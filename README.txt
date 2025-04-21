@@ -5,10 +5,10 @@ The Ela language is very immature (~4-6 months of daily development), but has a 
 
 
 - C-like memory simplicity.
-- Strong typing, with structs, enums, unions, tagged unions (choice), and interface types.
+- Strong typing, with structs, enums, unions, tagged unions (choice), and trait types.
 - Powerful runtime reflection.
-- 'dyn' Dynamic dispatch objects for interface types.
-- Generic structs, choices, interfaces, impl's, and functions/methods.
+- 'dyn' Dynamic dispatch objects for trait types.
+- Generic structs, choices, traits, impl's, and functions/methods.
 - Methods implemented for any type.
 - A small but powerful core library. (hash map, dynamic list, full raylib library, an immature 'rayui' library, full llvm library).
 - Many other features!

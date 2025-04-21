@@ -99,7 +99,7 @@ enum struct TType {
   Defer,
 
   Impl,      // impl
-  Interface, // interface
+  Trait, // trait
   Where,
 
   Size_Of,
@@ -207,7 +207,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Size_Of);
     TTYPE_CASE(Type_Of);
 
-    TTYPE_CASE(Interface);
+    TTYPE_CASE(Trait);
     TTYPE_CASE(Where);
     TTYPE_CASE(Defer);
     TTYPE_CASE(Fn);
@@ -373,8 +373,8 @@ static std::unordered_map<std::string, TType> keywords{
     {"defer", TType::Defer},
     {"отложить", TType::Defer},
 
-    {"interface", TType::Interface},
-    {"интерфейс", TType::Interface},
+    {"trait", TType::Trait},
+    {"интерфейс", TType::Trait},
 
     {"dyn", TType::Dyn},
     {"dynof", TType::Dyn_Of},

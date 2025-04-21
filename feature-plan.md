@@ -5,7 +5,7 @@
 -- LLVM Backend.
 
 #### Language Features
--- `Drop :: interface` destructors.
+-- `Drop :: trait` destructors.
 -- `choice` tagged unions.
 
 

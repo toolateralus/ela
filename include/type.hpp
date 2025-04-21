@@ -57,7 +57,7 @@ enum TypeKind {
   TYPE_ENUM,
   TYPE_TUPLE,
   TYPE_CHOICE,
-  TYPE_INTERFACE,
+  TYPE_TRAIT,
   TYPE_DYN,
 };
 
@@ -183,7 +183,7 @@ struct TypeInfo {
   virtual std::string to_string() const { return "Abstract TypeInfo base."; }
 };
 
-struct InterfaceTypeInfo : TypeInfo {
+struct TraitTypeInfo : TypeInfo {
   InternedString name;
 };
 
@@ -235,7 +235,7 @@ struct TupleTypeInfo : TypeInfo {
 };
 
 struct DynTypeInfo : TypeInfo {
-  Type *interface_type;
+  Type *trait_type;
   std::vector<std::pair<InternedString, Type *>> methods;
 };
 
@@ -253,11 +253,11 @@ Type *u64_type();
 Type *f64_type();
 Type *f32_type();
 
-Type *is_tuple_interface();
-Type *is_array_interface();
-Type *is_pointer_interface();
-Type *is_mut_pointer_interface();
-Type *is_const_pointer_interface();
+Type *is_tuple_trait();
+Type *is_array_trait();
+Type *is_pointer_trait();
+Type *is_mut_pointer_trait();
+Type *is_const_pointer_trait();
 
 InternedString get_tuple_type_name(const std::vector<Type *> &types);
 
@@ -266,7 +266,7 @@ Type *global_create_type(TypeKind, const InternedString &, TypeInfo * = nullptr,
 
 Type *global_create_struct_type(const InternedString &, Scope *, std::vector<Type *> generic_args = {});
 
-Type *global_create_interface_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
+Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args);
 
 Type *global_create_tagged_union_type(const InternedString &name, Scope *scope,
                                       const std::vector<Type *> &generic_args);
@@ -292,7 +292,7 @@ struct Type {
   Type *base_type = INVALID_TYPE;
   Type *generic_base_type = INVALID_TYPE;
   std::vector<Type *> generic_args{};
-  std::vector<Type *> interfaces{};
+  std::vector<Type *> traits{};
   Nullable<ASTNode> declaring_node;
 
   bool dyn_emitted = false;
@@ -306,7 +306,7 @@ struct Type {
   inline void set_ext(const TypeExtensions &ext) { this->extensions = ext; }
   inline void set_info(TypeInfo *info) { this->info = info; }
 
-  bool implements(const Type *interface);
+  bool implements(const Type *trait);
 
   // TODO: move a lot of the querying methods from *info into here too.
   TypeInfo *info;
@@ -328,7 +328,7 @@ struct Type {
 
   inline Type(size_t uid, const TypeKind kind) : uid(uid), kind(kind) {
     if (kind == TYPE_TUPLE) {
-      interfaces.push_back(is_tuple_interface());
+      traits.push_back(is_tuple_trait());
     }
   }
 

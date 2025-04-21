@@ -322,7 +322,7 @@ bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
       predicate->accept(this);
       // return whether this type implements this trait or not.
       // also can be used to assert whether it's equal to the type provided or not.
-      return std::ranges::find(target_type->interfaces, predicate->resolved_type) != target_type->interfaces.end() ||
+      return std::ranges::find(target_type->traits, predicate->resolved_type) != target_type->traits.end() ||
              target_type == predicate->resolved_type;
     } break;
     default:
@@ -365,7 +365,7 @@ Type *Typer::find_generic_type_of(const InternedString &base, const std::vector<
   switch (declaring_node->get_node_type()) {
     case AST_NODE_STRUCT_DECLARATION:
     case AST_NODE_FUNCTION_DECLARATION:
-    case AST_NODE_INTERFACE_DECLARATION:
+    case AST_NODE_TRAIT_DECLARATION:
       break;
     default:
       throw_error("Invalid target to generic args", source_range);
@@ -439,44 +439,44 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   node->resolved_type = global_find_function_type_id(info, {});
 }
 
-bool impl_method_matches_interface(Type *interface_method, Type *impl_method) {
-  auto interface = interface_method->info->as<FunctionTypeInfo>();
-  auto impl = impl_method->info->as<FunctionTypeInfo>();
-  if (interface->params_len != impl->params_len) {
+bool impl_method_matches_trait(Type *trait_method, Type *impl_method) {
+  auto trait_method_info = trait_method->info->as<FunctionTypeInfo>();
+  auto impl_method_info = impl_method->info->as<FunctionTypeInfo>();
+  if (trait_method_info->params_len != impl_method_info->params_len) {
     return false;
   }
-  for (int i = 0; i < interface->params_len; ++i) {
-    auto interface_param = interface->parameter_types[i];
-    auto impl_param = impl->parameter_types[i];
-    if (interface_param->is_kind(TYPE_INTERFACE)) {
-      if (!impl_param->implements(interface_param)) {
+  for (int i = 0; i < trait_method_info->params_len; ++i) {
+    auto trait_param = trait_method_info->parameter_types[i];
+    auto impl_param = impl_method_info->parameter_types[i];
+    if (trait_param->is_kind(TYPE_TRAIT)) {
+      if (!impl_param->implements(trait_param)) {
         return false;
       }
-      if (interface_param->generic_args != impl_param->generic_args) {
+      if (trait_param->generic_args != impl_param->generic_args) {
         return false;
       }
-    } else if (interface_param != impl_param) {
+    } else if (trait_param != impl_param) {
       return false;
     }
   }
 
   {
-    auto interface_return = interface->return_type;
-    auto impl_return = impl->return_type;
-    if (interface_return->is_kind(TYPE_INTERFACE)) {
-      if (interface_return->generic_base_type != Type::INVALID_TYPE) {
-        if (!impl_return->implements(interface_return->generic_base_type)) {
+    auto trait_return = trait_method_info->return_type;
+    auto impl_return = impl_method_info->return_type;
+    if (trait_return->is_kind(TYPE_TRAIT)) {
+      if (trait_return->generic_base_type != Type::INVALID_TYPE) {
+        if (!impl_return->implements(trait_return->generic_base_type)) {
           return false;
         }
-        if (interface_return->generic_args != impl_return->generic_args) {
+        if (trait_return->generic_args != impl_return->generic_args) {
           return false;
         }
       } else {
-        if (!impl_return->implements(interface_return)) {
+        if (!impl_return->implements(trait_return)) {
           return false;
         }
       }
-    } else if (interface_return != impl_return) {
+    } else if (trait_return != impl_return) {
       return false;
     }
   }
@@ -526,16 +526,16 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
       throw_error("use of unresolved generic type", node->target->source_range);
     }
   }
-  Type *interface_ty = nullptr;
+  Type *trait_ty = nullptr;
 
-  if (node->interface) {
-    node->interface.get()->accept(this);
-    auto interface_id = node->interface.get()->resolved_type;
-    if (interface_id == Type::INVALID_TYPE) {
-      throw_error("internal compiler error: type of impl interface was invalid", node->source_range);
+  if (node->trait) {
+    node->trait.get()->accept(this);
+    auto trait_id = node->trait.get()->resolved_type;
+    if (trait_id == Type::INVALID_TYPE) {
+      throw_error("internal compiler error: type of impl trait was invalid", node->source_range);
     }
-    interface_ty = interface_id;
-    node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(interface_id->uid);
+    trait_ty = trait_id;
+    node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
   } else {
   }
 
@@ -550,11 +550,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   for (const auto &alias : node->aliases) {
-    // auto old_scope = ctx.scope;
-    // Defer _([&]{
-    //   ctx.scope = old_scope;
-    // });
-    // ctx.set_scope(type_scope); // is this correct?
     alias->accept(this);
   }
 
@@ -614,25 +609,25 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     visit_function_body(method);
   }
 
-  if (interface_ty) {
-    auto declaring_node = interface_ty->declaring_node.get();
+  if (trait_ty) {
+    auto declaring_node = trait_ty->declaring_node.get();
 
-    if (!declaring_node || declaring_node->get_node_type() != AST_NODE_INTERFACE_DECLARATION) {
+    if (!declaring_node || declaring_node->get_node_type() != AST_NODE_TRAIT_DECLARATION) {
       throw_error(
-          std::format("\'impl <interface> for <type>\' must implement an interface. got {}", interface_ty->to_string()),
+          std::format("\'impl <trait> for <type>\' must implement an trait. got {}", trait_ty->to_string()),
           node->source_range);
     }
 
-    auto interface = static_cast<ASTInterfaceDeclaration *>(declaring_node);
-    ctx.scope = interface->scope;
+    auto trait = static_cast<ASTTraitDeclaration *>(declaring_node);
+    ctx.scope = trait->scope;
 
-    for (auto interface_method : interface->methods) {
-      auto method = (ASTFunctionDeclaration *)deep_copy_ast(interface_method);
+    for (auto trait_method : trait->methods) {
+      auto method = (ASTFunctionDeclaration *)deep_copy_ast(trait_method);
       if (auto impl_symbol = impl_scope.local_lookup(method->name)) {
         method->accept(this);
-        if (!impl_method_matches_interface(method->resolved_type, impl_symbol->type_id)) {
+        if (!impl_method_matches_trait(method->resolved_type, impl_symbol->type_id)) {
           if (method->resolved_type != Type::INVALID_TYPE && impl_symbol->type_id != Type::INVALID_TYPE) {
-            throw_error(std::format("method \"{}\" doesn't match interface.\nexpected {},\ngot {}", method->name,
+            throw_error(std::format("method \"{}\" doesn't match trait.\nexpected {},\ngot {}", method->name,
                                     method->resolved_type->to_string(), impl_symbol->type_id->to_string()),
                         node->source_range);
           } else {
@@ -672,32 +667,32 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         }
         visit_function_body(method);
       } else {
-        throw_error(std::format("required method \"{}\" (from interface {}) not implemented in impl", method->name,
-                                interface_ty->to_string()),
+        throw_error(std::format("required method \"{}\" (from trait {}) not implemented in impl", method->name,
+                                trait_ty->to_string()),
                     node->source_range);
       }
     }
 
     for (auto &[name, impl_sym] : impl_scope.symbols) {
-      if (!interface->scope->local_lookup(name)) {
-        throw_error(std::format("impl method \"{}\" not found in interface", name), node->source_range);
+      if (!trait->scope->local_lookup(name)) {
+        throw_error(std::format("impl method \"{}\" not found in trait", name), node->source_range);
       }
     }
 
-    target_ty->interfaces.push_back(interface_ty);
+    target_ty->traits.push_back(trait_ty);
   }
 
   node->resolved_type = target_ty;
 }
 
-void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool generic_instantiation,
+void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
                                         std::vector<Type *> generic_args) {
   auto id = ctx.scope->find_type_id(node->name, {});
   if (id != Type::INVALID_TYPE) {
     auto type = id;
-    if (type->is_kind(TYPE_INTERFACE)) {
+    if (type->is_kind(TYPE_TRAIT)) {
       if (!generic_instantiation)
-        throw_error("re-definition of interface type.", node->source_range);
+        throw_error("re-definition of trait type.", node->source_range);
     } else {
       throw_error("re-definition of a type", node->source_range);
     }
@@ -707,7 +702,7 @@ void Typer::visit_interface_declaration(ASTInterfaceDeclaration *node, bool gene
   Defer _([&] { ctx.set_scope(previous); });
   ctx.set_scope(node->scope);
 
-  auto type = global_create_interface_type(node->name.get_str(), ctx.scope, generic_args);
+  auto type = global_create_trait_type(node->name.get_str(), ctx.scope, generic_args);
 
   if (auto symbol = ctx.scope->lookup(node->name)) {
     type->generic_base_type = symbol->type_id;
@@ -1063,8 +1058,8 @@ ASTDeclaration *Typer::visit_generic(ASTDeclaration *definition, std::vector<Typ
           func->generic_arguments = args;
           visit_function_body(func);
         } break;
-        case AST_NODE_INTERFACE_DECLARATION:
-          visit_interface_declaration((ASTInterfaceDeclaration *)instantiation, true, args);
+        case AST_NODE_TRAIT_DECLARATION:
+          visit_trait_declaration((ASTTraitDeclaration *)instantiation, true, args);
           break;
         case AST_NODE_CHOICE_DECLARATION: {
           visit_choice_declaration((ASTChoiceDeclaration *)instantiation, true, args);
@@ -1425,7 +1420,7 @@ void Typer::visit(ASTFor *node) {
   Type *iter_ty = Type::INVALID_TYPE;
   auto scope = iterable_type->info->scope;
 
-  if (iterable_type->implements(iterable_interface())) { // can return an iterator.
+  if (iterable_type->implements(iterable_trait())) { // can return an iterator.
     node->iteration_kind = ASTFor::ITERABLE;
 
     compiler_mock_method_call_visit_impl(iterable_type_id, "iter");
@@ -1440,7 +1435,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = symbol->type_id->info->as<FunctionTypeInfo>()->return_type;
     auto option = iter_ty;
     iter_ty = option->generic_args[0];
-  } else if (iterable_type->implements(iterator_interface())) { // directly an iterator.
+  } else if (iterable_type->implements(iterator_trait())) { // directly an iterator.
     node->iteration_kind = ASTFor::ITERATOR;
     node->iterator_type = iterable_type_id;
 
@@ -1453,7 +1448,7 @@ void Typer::visit(ASTFor *node) {
     iter_ty = option->generic_args[0];
   } else {
     throw_error("cannot iterate with for-loop on a type that doesn't implement either the 'Iterable!<T>' or the "
-                "'Iterator!<T>' interface. ",
+                "'Iterator!<T>' trait. ",
                 node->source_range);
   }
 
@@ -2170,7 +2165,7 @@ void Typer::visit(ASTIndex *node) {
   if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
     throw_error(
         std::format(
-            "cannot index into non-array, non-pointer type that doesn't implement the `Subscript` interface. {}",
+            "cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
             left_ty->to_string()),
         node->source_range);
   }
@@ -2541,12 +2536,12 @@ void Typer::visit(ASTCast *node) {
   node->resolved_type = type;
 }
 
-void Typer::visit(ASTInterfaceDeclaration *node) {
+void Typer::visit(ASTTraitDeclaration *node) {
   if (!node->generic_parameters.empty()) {
-    ctx.scope->create_interface_type(node->name, node->scope, {}, node);
+    ctx.scope->create_trait_type(node->name, node->scope, {}, node);
   } else {
-    visit_interface_declaration(node, false);
-    ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_INTERFACE, node);
+    visit_trait_declaration(node, false);
+    ctx.scope->create_type_alias(node->name, node->resolved_type, TYPE_TRAIT, node);
   }
   return;
 }
@@ -2568,19 +2563,19 @@ void Typer::visit(ASTModule *node) {
 }
 
 void Typer::visit(ASTDyn_Of *node) {
-  if (!node->interface_type) {
+  if (!node->trait_type) {
     auto type = expected_type;
     if (type && type->is_kind(TYPE_DYN)) {
-      node->interface_type = ast_alloc<ASTType>();
-      node->interface_type->resolved_type = type->info->as<DynTypeInfo>()->interface_type;
+      node->trait_type = ast_alloc<ASTType>();
+      node->trait_type->resolved_type = type->info->as<DynTypeInfo>()->trait_type;
     } else {
       throw_error("if a dyn type isn't already expected (via an argument, or an explicitly typed variable declaration, "
-                  "etc), you must pass the _interface_ type as the second parameter to 'dynof'\nSo, if you wanted a "
+                  "etc), you must pass the trait type as the second parameter to 'dynof'\nSo, if you wanted a "
                   "'dyn Format', youd use 'dynof(my_instance, Format)'",
                   node->source_range);
     }
   } else {
-    node->interface_type->accept(this);
+    node->trait_type->accept(this);
   }
 
   node->object->accept(this);
@@ -2593,15 +2588,15 @@ void Typer::visit(ASTDyn_Of *node) {
                 node->source_range);
   }
 
-  auto type = node->interface_type->resolved_type;
-  if (!type->is_kind(TYPE_INTERFACE)) {
-    throw_error("cannot use 'dynof(Type, $expr)' on types that aren't interfaces.", node->source_range);
+  auto type = node->trait_type->resolved_type;
+  if (!type->is_kind(TYPE_TRAIT)) {
+    throw_error("cannot use 'dynof(Type, $expr)' on types that aren't traits.", node->source_range);
   }
 
   auto element_type = object_type->get_element_type();
-  if (!element_type->implements(node->interface_type->resolved_type)) {
+  if (!element_type->implements(node->trait_type->resolved_type)) {
     throw_error(
-        std::format("cannot create 'dyn {}' from object of type '{}' because it does not implement the interface.",
+        std::format("cannot create 'dyn {}' from object of type '{}' because it does not implement the trait.",
                     type->to_string(), element_type->to_string()),
         node->source_range);
   }
@@ -2614,28 +2609,27 @@ void Typer::visit(ASTDyn_Of *node) {
 /*
   TODO: this shouldn't be on the scope. it's an absolute eye sore, and could certainly be tidied up and cleaned
 */
-Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range, Typer *typer) {
+Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typer *typer) {
   for (int i = 0; i < type_table.size(); ++i) {
-    if (type_table[i]->is_kind(TYPE_DYN) && type_table[i]->info->as<DynTypeInfo>()->interface_type == interface_type) {
+    if (type_table[i]->is_kind(TYPE_DYN) && type_table[i]->info->as<DynTypeInfo>()->trait_type == trait_type) {
       return type_table[i];
     }
   }
-  auto iface_type = interface_type;
-  auto interface_name = "dyn$" + iface_type->to_string();
+  auto trait_name = "dyn$" + trait_type->to_string();
   auto dyn_info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo();
-  dyn_info->interface_type = interface_type;
+  dyn_info->trait_type = trait_type;
 
   // TODO: * determine whether 'dyn' should actually be in the type name itself. *
-  auto ty = global_create_type(TYPE_DYN, interface_name, dyn_info);
+  auto ty = global_create_type(TYPE_DYN, trait_name, dyn_info);
 
   dyn_info->scope->insert_variable("instance", global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}}), nullptr,
                                    MUT);
 
-  ty->info->as<DynTypeInfo>()->interface_type = interface_type;
+  ty->info->as<DynTypeInfo>()->trait_type = trait_type;
 
-  auto interface_info = iface_type->info->as<InterfaceTypeInfo>();
+  auto trait_info = trait_type->info->as<TraitTypeInfo>();
 
-  for (auto [name, sym] : interface_info->scope->symbols) {
+  for (auto [name, sym] : trait_info->scope->symbols) {
     if (sym.is_function() && !sym.is_generic_function()) {
       auto declaration = sym.function.declaration;
 
@@ -2647,7 +2641,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
           if (param->self.is_pointer) {
             parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
           } else {
-            throw_error("cannot use 'dyn' on interfaces that take 'self' by value because that would be a zero-sized "
+            throw_error("cannot use 'dyn' on traits that take 'self' by value because that would be a zero-sized "
                         "parameter, as we don't know the type of the 'self' at compile time definitively.",
                         range);
           }
@@ -2655,17 +2649,17 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
         } else {
           if (!has_self) {
             throw_error(
-                "'dyn' can only be used with interfaces that do not have any associated functions, e.g functions "
+                "'dyn' can only be used with traits that do not have any associated functions, e.g functions "
                 "that\n"
                 "do not take a '*mut self', nor a '*const self' (in the case of 'dyn' self must always be a pointer)",
                 range);
           }
 
           param->accept(typer);
-          // There's an exception here for interface typed parameters.
+          // There's an exception here for trait typed parameters.
           auto parameter_type = param->resolved_type;
-          if (parameter_type->is_kind(TYPE_INTERFACE)) {
-            throw_error("you cannot take a 'dyn' of an interface that uses other interfaces as parameter constraints.\n"
+          if (parameter_type->is_kind(TYPE_TRAIT)) {
+            throw_error("you cannot take a 'dyn' of an trait that uses other traits as parameter constraints.\n"
                         "the parameters all must be concrete types, with the exception of '*const/mut self' params.",
                         range);
           }
@@ -2676,7 +2670,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
 
       if (declaration->return_type->kind == ASTType::SELF) {
         throw_error(
-            "just as we can't take 'self' by value in a 'dyn' interface, you can't return '#self', even by pointer, "
+            "just as we can't take 'self' by value in a 'dyn' trait, you can't return '#self', even by pointer, "
             "because we would have to return it as a type erased *const void. return the concrete type.",
             range);
       }
@@ -2691,7 +2685,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
 
       // ! TODO: @Cooper-Pilot Why do i have to call back into the dependency emitter here, even though the dependency
       // emitter ! Tries to resolve each of the parameter and return types of every method in the freaking dang
-      // Interface??? ! This is a last ditch effort hack so I can just continue writing the rest of the stuff like
+      // Trait??? ! This is a last ditch effort hack so I can just continue writing the rest of the stuff like
       // calling dyn's.
       auto function_type = global_find_function_type_id(type_info, {{{TYPE_EXT_POINTER_MUT}}});
       dyn_info->methods.push_back({name.get_str(), function_type});
@@ -2699,10 +2693,10 @@ Type *Scope::find_or_create_dyn_type_of(Type *interface_type, SourceRange range,
     }
   }
 
-  auto sym = Symbol::create_type(ty, interface_name, TYPE_DYN, nullptr);
+  auto sym = Symbol::create_type(ty, trait_name, TYPE_DYN, nullptr);
   sym.scope = this; // TODO: we have to fit this in modules or some stuff.
 
-  symbols.insert_or_assign(interface_name, sym);
+  symbols.insert_or_assign(trait_name, sym);
   return ty;
 }
 

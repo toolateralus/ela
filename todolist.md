@@ -3,7 +3,7 @@
 To search for all info comments in the source just use vscodes regex search with
 `TODO|todo|Todo|SIMPLIFY|CLEANUP|PERFORMANCE|FIX|BUG|FEATURE`
 
-#### Drop interface / "destructors"
+#### Drop trait / "destructors"
 
 #### Fix any type and add ability to do implicit casting routine stuff.
 
@@ -34,13 +34,13 @@ like
 ```rust
   fmod :: fn() @foreign(fmod) @const;
 
-  // we can also do auto impl's for common interfaces like Debug or Clone or whatever.
+  // we can also do auto impl's for common traits like Debug or Clone or whatever.
   Result :: union![_Ok, _Err] @impl[Clone, Debug] {
 
   }
 
   // we could also use this on even normal declarations / types.
-  f: @dyn Interface;
+  f: @dyn Trait;
 
 ```
 

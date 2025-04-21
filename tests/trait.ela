@@ -7,7 +7,7 @@
     c: bool,
   }
 
-  Basic :: interface {
+  Basic :: trait {
     static_get :: fn() -> s32;
     method_get :: fn(self) -> s32;
     method_get_ptr :: fn(*mut self) -> s32;
@@ -35,16 +35,16 @@
 }
 
 #test basic_struct :: fn() {
-  assert("interface failed", Struct::static_get() == 0);
-  assert("interface failed", Struct::static_get_self().a == 100);
+  assert("trait failed", Struct::static_get() == 0);
+  assert("trait failed", Struct::static_get_self().a == 100);
   mut instance: Struct;
-  assert("interface failed", instance.method_get() == 0);
-  assert("interface failed", instance.method_get_ptr() == 0);
-  assert("interface failed", instance.method_get_self().a == 100);
+  assert("trait failed", instance.method_get() == 0);
+  assert("trait failed", instance.method_get_ptr() == 0);
+  assert("trait failed", instance.method_get_self().a == 100);
 }
 
 #region generic_interface_regular_struct {
-  GenericInterface :: interface!<T> {
+  GenericInterface :: trait!<T> {
     static_get :: fn() -> T;
     method_get :: fn(self) -> T;
     method_get_ptr :: fn(*mut self) -> T;
@@ -78,15 +78,15 @@
 }
 
 #test generic_interface_regular_struct :: fn() {
-  assert("interface failed", Struct1::static_get() == 0);
-  assert("interface failed", Struct1::static_get_self().a == 100);
+  assert("trait failed", Struct1::static_get() == 0);
+  assert("trait failed", Struct1::static_get_self().a == 100);
   mut instance: Struct1;
-  assert("interface failed", instance.method_get() == 0);
-  assert("interface failed", instance.method_get_ptr() == 0);
-  assert("interface failed", instance.method_get_self().a == 100);
+  assert("trait failed", instance.method_get() == 0);
+  assert("trait failed", instance.method_get_ptr() == 0);
+  assert("trait failed", instance.method_get_self().a == 100);
 }
 
-#region generic interface generic struct {
+#region generic trait generic struct {
   Struct2 :: struct!<T> {
     n: T
   }  
@@ -116,12 +116,12 @@
 }
 
 #test generic_struct_generic_interface :: fn() {
-  assert("interface failed", Struct2!<s32>::static_get() == 0);
-  assert("interface failed", Struct2!<s32>::static_get_self().n == 0);
+  assert("trait failed", Struct2!<s32>::static_get() == 0);
+  assert("trait failed", Struct2!<s32>::static_get_self().n == 0);
   mut instance: Struct2!<s32>;
-  assert("interface failed", instance.method_get() == 0);
-  assert("interface failed", instance.method_get_ptr() == 0);
-  assert("interface failed", instance.method_get_self().n == 0);
+  assert("trait failed", instance.method_get() == 0);
+  assert("trait failed", instance.method_get_ptr() == 0);
+  assert("trait failed", instance.method_get_self().n == 0);
 }
 
 #region uninstantiated generic {

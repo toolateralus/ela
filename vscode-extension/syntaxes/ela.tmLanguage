@@ -224,7 +224,7 @@
 			<array>
 				<dict>
 					<key>match</key>
-					<string>\b(struct|структ|enum|перечень|union|союз|interface|интерфейс|impl|реализуйте)\b(?:(\{)(\}))?</string>
+					<string>\b(struct|структ|enum|перечень|union|союз|trait|интерфейс|impl|реализуйте)\b(?:(\{)(\}))?</string>
 					<key>name</key>
 					<string>storage.type.ela</string>
 				</dict>
@@ -303,7 +303,7 @@
 				</dict>
 				<dict>
 					<key>match</key>
-					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct|union|enum|interface)</string>
+					<string>\b(\b[[:alpha:]_]+[[:alnum:]_]*\b)\s*[:]\s*[:]\s*(struct|union|enum|trait)</string>
 					<key>captures</key>
 					<dict>
 						<key>1</key>

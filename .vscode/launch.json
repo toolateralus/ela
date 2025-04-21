@@ -13,7 +13,7 @@
       "cwd": "${fileDirname}",
       "args": ["${file}"],
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
       }
     },
     {
@@ -24,7 +24,7 @@
       "cwd": "${fileDirname}",
       "args": ["${file}", "--test"],
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
       }
     },
     {
@@ -54,7 +54,7 @@
       "args": ["main.ela", "--s", "--nl"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
       }
     },
     {
@@ -65,7 +65,7 @@
       "args": ["main.ela", "--s", "--nostdlib"],
       "cwd": "${workspaceFolder}/ela_source",
       "env": {
-        // "ELA_LIB_PATH": "/home/josh_arch/source/c++/ela-stdlib"
+        // "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
       }
     },
     {

@@ -225,21 +225,21 @@ main :: fn() {
   { // * 'dyn' literals.
 
     /* 
-      'dyn' objects are a way to use a type erased instance of a type that uses an interface,
-      while being typed as that interface itself. 
+      'dyn' objects are a way to use a type erased instance of a type that uses an trait,
+      while being typed as that trait itself. 
 
-      to be dyn compatible an interface must meet these requirements:
+      to be dyn compatible an trait must meet these requirements:
 
       all functions are methods, i.e takes a 'self' parameter.
       all 'self' parameters must be taken by '*const self' or '*mut self' pointer semantic.
       the #self type is never returned, only concrete types.
 
 
-      to create a dyn interface, aka an 'interface object'
+      to create a dyn trait, aka an 'trait object'
     */
 
-    // We must have an interface, and a type that implements it.
-    Interface :: interface {
+    // We must have an trait, and a type that implements it.
+    Trait :: trait {
       function :: fn(*mut self);
     }
     
@@ -247,26 +247,26 @@ main :: fn() {
       x: s32,
     }
 
-    impl Interface for MyThing {
+    impl Trait for MyThing {
       function :: fn(*mut self) {
-        println("hello from MyThing (dyn Interface)");
+        println("hello from MyThing (dyn Trait)");
       }
     }
 
     // then,
     mut instance: MyThing;
     
-    // we can infer the interface type via the declaration
-    dynamic : dyn Interface = dynof(&mut instance);
+    // we can infer the trait type via the declaration
+    dynamic : dyn Trait = dynof(&mut instance);
 
     // or provide it manually
-    dynamic1 := dynof(&mut instance, Interface);
+    dynamic1 := dynof(&mut instance, Trait);
     
-    // the 'instance' argument to the dyn interface must be a '*mut/*const' pointer, 
+    // the 'instance' argument to the dyn trait must be a '*mut/*const' pointer, 
     // because the type erasure requires holding on the the original instance as a '*mut/*const void'
 
     // Then, we can just call the methods as if we had 'MyThing', except without all of its type specific members and methods.
-    dynamic.function(); // prints 'hello from MyThing (dyn Interface)'
+    dynamic.function(); // prints 'hello from MyThing (dyn Trait)'
   }
 
   { // * choice variant literals. (this section basically describes all there is about choice types, anyway.)

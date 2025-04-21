@@ -4,7 +4,7 @@
  * @class Arena
  * @brief Represents an arena for allocating memory in a fixed-size buffer.
  *
- * The Arena class provides a simple interface for allocating memory in a
+ * The Arena class provides a simple trait for allocating memory in a
  * fixed-size buffer. It prevents dynamic memory allocation by using a
  * pre-allocated buffer. The buffer size is specified during construction and
  * cannot be changed afterwards. Memory is allocated sequentially from the

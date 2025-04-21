@@ -135,8 +135,8 @@ Type *global_find_type_id(Type *base_t, const TypeExtensions &type_extensions) {
     case TYPE_CHOICE: {
       info = new (type_info_alloc<ChoiceTypeInfo>()) ChoiceTypeInfo(*base_t->info->as<ChoiceTypeInfo>());
     } break;
-    case TYPE_INTERFACE: {
-      info = new (type_info_alloc<InterfaceTypeInfo>()) InterfaceTypeInfo(*base_t->info->as<InterfaceTypeInfo>());
+    case TYPE_TRAIT: {
+      info = new (type_info_alloc<TraitTypeInfo>()) TraitTypeInfo(*base_t->info->as<TraitTypeInfo>());
     } break;
     case TYPE_DYN: {
       info = new (type_info_alloc<DynTypeInfo>()) DynTypeInfo(*base_t->info->as<DynTypeInfo>());
@@ -390,20 +390,20 @@ std::string Type::to_string() const {
     case TYPE_FUNCTION:
       return (info->as<FunctionTypeInfo>())->to_string(extensions);
     case TYPE_DYN:
-      return "dyn " + get_unmangled_name(info->as<DynTypeInfo>()->interface_type);
+      return "dyn " + get_unmangled_name(info->as<DynTypeInfo>()->trait_type);
     case TYPE_STRUCT:
     case TYPE_TUPLE:
     case TYPE_SCALAR:
     case TYPE_ENUM:
     case TYPE_CHOICE:
-    case TYPE_INTERFACE:
+    case TYPE_TRAIT:
       return get_unmangled_name(this);
       break;
   }
 }
 
-Type *global_create_interface_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
-  type_table.push_back(new Type(type_table.size(), TYPE_INTERFACE));
+Type *global_create_trait_type(const InternedString &name, Scope *scope, std::vector<Type *> generic_args) {
+  type_table.push_back(new Type(type_table.size(), TYPE_TRAIT));
   Type *type = type_table.back();
   std::string base = name.get_str();
   if (!generic_args.empty()) {
@@ -411,7 +411,7 @@ Type *global_create_interface_type(const InternedString &name, Scope *scope, std
   }
   type->set_base(base);
   type->generic_args = generic_args;
-  InterfaceTypeInfo *info = type_info_alloc<InterfaceTypeInfo>();
+  TraitTypeInfo *info = type_info_alloc<TraitTypeInfo>();
   info->scope = scope;
   type->set_info(info);
   info->scope->name = name;
@@ -473,12 +473,12 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   type->set_info(info);
 
   if (extensions.is_pointer() &&
-      std::ranges::find(type->interfaces, is_pointer_interface()) == type->interfaces.end()) {
-    type->interfaces.push_back(is_pointer_interface());
+      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+    type->traits.push_back(is_pointer_trait());
     if (extensions.is_const_pointer()) {
-      type->interfaces.push_back(is_const_pointer_interface());
+      type->traits.push_back(is_const_pointer_trait());
     } else {
-      type->interfaces.push_back(is_mut_pointer_interface());
+      type->traits.push_back(is_mut_pointer_trait());
     }
   }
 
@@ -604,12 +604,12 @@ void init_type_system() {
     void_type();
   }
 
-  is_const_pointer_interface();
-  is_mut_pointer_interface();
-  is_pointer_interface();
+  is_const_pointer_trait();
+  is_mut_pointer_trait();
+  is_pointer_trait();
 
-  is_tuple_interface();
-  is_array_interface();
+  is_tuple_trait();
+  is_array_trait();
 }
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
@@ -702,7 +702,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     // copy constructor, copy assign, copy assign ref, move constructor , etc.
     case TType::Assign:
 
-    // via interface Arithmetic
+    // via trait Arithmetic
     case TType::Add:
     case TType::Sub: {
       if (kind == OPERATION_UNARY) {
@@ -717,12 +717,12 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::Div:
     case TType::Modulo:
 
-    // via interface Logical
+    // via trait Logical
     case TType::LogicalNot:
     case TType::LogicalOr:
     case TType::LogicalAnd:
 
-    // via interface Bitwise
+    // via trait Bitwise
     case TType::Not:
     case TType::Or:
     case TType::And:
@@ -730,7 +730,7 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::SHR:
     case TType::Xor:
 
-    // via interface Compare.
+    // via trait Compare.
     case TType::LT:
     case TType::GT:
     case TType::EQ:
@@ -738,11 +738,11 @@ std::string get_operator_overload_name(TType op, OperationKind kind) {
     case TType::LE:
     case TType::GE:
 
-    // via interface Inc/Dec
+    // via trait Inc/Dec
     case TType::Increment:
     case TType::Decrement:
 
-    // via interfaces CompArith/CompBitwise/CompLogical etc.
+    // via traits CompArith/CompBitwise/CompLogical etc.
     case TType::CompAdd:
     case TType::CompSub:
     case TType::CompMul:
@@ -824,28 +824,28 @@ std::string mangled_type_args(const std::vector<Type *> &args) {
   return s;
 }
 
-Type *is_tuple_interface() {
-  static Type *id = global_create_interface_type("IsTuple", create_child(nullptr), {});
+Type *is_tuple_trait() {
+  static Type *id = global_create_trait_type("IsTuple", create_child(nullptr), {});
   return id;
 }
 
-Type *is_array_interface() {
-  static Type *id = global_create_interface_type("IsArray", create_child(nullptr), {});
+Type *is_array_trait() {
+  static Type *id = global_create_trait_type("IsArray", create_child(nullptr), {});
   return id;
 }
 
-Type *is_pointer_interface() {
-  static Type *id = global_create_interface_type("IsPointer", create_child(nullptr), {});
+Type *is_pointer_trait() {
+  static Type *id = global_create_trait_type("IsPointer", create_child(nullptr), {});
   return id;
 }
 
-Type *is_mut_pointer_interface() {
-  static Type *id = global_create_interface_type("IsMutPointer", create_child(nullptr), {});
+Type *is_mut_pointer_trait() {
+  static Type *id = global_create_trait_type("IsMutPointer", create_child(nullptr), {});
   return id;
 }
 
-Type *is_const_pointer_interface() {
-  static Type *id = global_create_interface_type("IsConstPointer", create_child(nullptr), {});
+Type *is_const_pointer_trait() {
+  static Type *id = global_create_trait_type("IsConstPointer", create_child(nullptr), {});
   return id;
 }
 
@@ -866,14 +866,13 @@ int ChoiceTypeInfo::get_variant_index(const InternedString &variant_name) const 
   return -1;
 }
 
-bool Type::implements(const Type *interface) {
-  auto found = std::ranges::find(interfaces, interface);
-  if (found != interfaces.end()) {
+bool Type::implements(const Type *trait) {
+  auto found = std::ranges::find(traits, trait);
+  if (found != traits.end()) {
     return true;
   }
-  for (auto &interface_id : interfaces) {
-    auto type = interface_id;
-    if (type->generic_base_type == interface) {
+  for (auto &the_trait : traits) {
+    if (the_trait->generic_base_type == trait) {
       return true;
     }
   }

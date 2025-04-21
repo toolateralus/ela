@@ -3,7 +3,7 @@ Vec2 :: struct {
   y: f32,
 }
 
-Add :: interface!<Right, Result> {
+Add :: trait!<Right, Result> {
   add :: fn(*mut self, right: Right) -> Result;
 }
 
@@ -23,7 +23,7 @@ impl Add!<Vec2, Vec2> for Vec2 {
   assert("+ failed",  result.x == 2 && result.y == 2);
 }
 
-Sub :: interface!<Right, Result> {
+Sub :: trait!<Right, Result> {
   sub :: fn(*mut self, right: Right) -> Result;
 }
 
@@ -36,7 +36,7 @@ impl Sub!<Vec2, Vec2> for Vec2 {
   }
 }
 
-Neg :: interface!<Result> {  neg :: fn(*mut self) -> Result;
+Neg :: trait!<Result> {  neg :: fn(*mut self) -> Result;
 }
 
 impl Neg!<Vec2> for Vec2 {

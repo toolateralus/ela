@@ -121,7 +121,7 @@ struct Symbol {
 
 struct Typer;
 struct ASTFunctionDeclaration;
-struct ASTInterfaceDeclaration;
+struct ASTTraitDeclaration;
 
 struct Scope {
   std::vector<InternedString> ordered_symbols = {};
@@ -199,7 +199,6 @@ struct Scope {
 
   void erase(const InternedString &name);
 
-  void declare_interface(const InternedString &name, ASTInterfaceDeclaration *node);
 
   Type *create_tagged_union(const InternedString &name, Scope *scope, ASTChoiceDeclaration *declaration) {
     auto id = global_create_tagged_union_type(name, scope, {});
@@ -209,10 +208,10 @@ struct Scope {
     return id;
   }
 
-  Type *create_interface_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
-                              ASTInterfaceDeclaration *declaration) {
-    auto id = global_create_interface_type(name, scope, generic_args);
-    auto sym = Symbol::create_type(id, name, TYPE_INTERFACE, (ASTNode *)declaration);
+  Type *create_trait_type(const InternedString &name, Scope *scope, const std::vector<Type *> &generic_args,
+                              ASTTraitDeclaration *declaration) {
+    auto id = global_create_trait_type(name, scope, generic_args);
+    auto sym = Symbol::create_type(id, name, TYPE_TRAIT, (ASTNode *)declaration);
     sym.scope = this;
     symbols.insert_or_assign(name, sym);
     return id;
@@ -283,7 +282,7 @@ struct Scope {
     return global_find_type_id(symbol->type_id, ext);
   }
 
-  Type *find_or_create_dyn_type_of(Type *interface_type, SourceRange range, Typer *typer);
+  Type *find_or_create_dyn_type_of(Type *trait, SourceRange range, Typer *typer);
 };
 
 static Scope *create_child(Scope *parent) {

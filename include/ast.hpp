@@ -37,7 +37,7 @@ enum ASTNodeType {
   AST_NODE_STRUCT_DECLARATION,
   AST_NODE_ENUM_DECLARATION,
   AST_NODE_CHOICE_DECLARATION,
-  AST_NODE_INTERFACE_DECLARATION,
+  AST_NODE_TRAIT_DECLARATION,
 
   AST_NODE_PARAMS_DECL,
   AST_NODE_PARAM_DECL,
@@ -131,7 +131,7 @@ enum AttributeTag {
   ATTRIBUTE_FOREIGN,
   // @[entry]                               : program entry point
   ATTRIBUTE_ENTRY,
-  // @[impl(Clone, Format, ...)]            : auto implement interface on type declaration
+  // @[impl(Clone, Format, ...)]            : auto implement trait on type declaration
   ATTRIBUTE_IMPL,
   // @[const]                               : make a function/struct compile-time-compatible
   ATTRIBUTE_CONST,
@@ -687,7 +687,7 @@ struct ASTSize_Of : ASTExpr {
 };
 
 struct ASTDyn_Of : ASTExpr {
-  ASTType *interface_type;
+  ASTType *trait_type;
   ASTExpr *object;
   ASTNodeType get_node_type() const override { return AST_NODE_DYN_OF; }
   void accept(VisitorBase *visitor) override;
@@ -699,12 +699,12 @@ struct ASTType_Of : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-struct ASTInterfaceDeclaration : ASTDeclaration {
+struct ASTTraitDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   InternedString name;
   Scope *scope;
   std::vector<ASTFunctionDeclaration *> methods;
-  ASTNodeType get_node_type() const override { return AST_NODE_INTERFACE_DECLARATION; }
+  ASTNodeType get_node_type() const override { return AST_NODE_TRAIT_DECLARATION; }
   void accept(VisitorBase *visitor) override;
 };
 
@@ -803,9 +803,9 @@ struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic al
 
 struct ASTImpl : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
-  // impl 'target' or impl *interface for 'target'
+  // impl 'target' or impl *trait for 'target'
   ASTType *target;
-  Nullable<ASTType> interface;
+  Nullable<ASTType> trait;
   Scope *scope;
 
   // methods / static methods this is implementing for the type.
@@ -998,7 +998,7 @@ struct Parser {
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
-  ASTInterfaceDeclaration *parse_interface_declaration(Token);
+  ASTTraitDeclaration *parse_trait_declaration(Token);
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTStructDeclaration *parse_struct_declaration(Token);
   ASTVariable *parse_variable();
@@ -1053,7 +1053,7 @@ struct Parser {
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;
   Nullable<ASTImpl> current_impl_decl = nullptr;
-  Nullable<ASTInterfaceDeclaration> current_interface_decl = nullptr;
+  Nullable<ASTTraitDeclaration> current_trait_decl = nullptr;
 
   static Nullable<ASTBlock> current_block;
   static std::vector<DirectiveRoutine> directive_routines;

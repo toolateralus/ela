@@ -259,7 +259,7 @@ ASTStructDeclaration *ASTCopier::copy_struct_declaration(ASTStructDeclaration *n
   current_scope = old_scope;
   return new_node;
 }
-ASTInterfaceDeclaration *ASTCopier::copy_interface_declaration(ASTInterfaceDeclaration *node) {
+ASTTraitDeclaration *ASTCopier::copy_trait_declaration(ASTTraitDeclaration *node) {
   auto new_node = copy(node);
   new_node->scope = copy_scope(new_node->scope);
   auto old_scope = current_scope;
@@ -313,8 +313,8 @@ ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruct
 ASTImpl *ASTCopier::copy_impl(ASTImpl *node) {
   auto new_node = copy(node);
   new_node->target = static_cast<ASTType *>(copy_node(node->target));
-  if (new_node->interface) {
-    new_node->interface = static_cast<ASTType *>(copy_node(new_node->interface.get()));
+  if (new_node->trait) {
+    new_node->trait = static_cast<ASTType *>(copy_node(new_node->trait.get()));
   }
 
   new_node->scope = copy_scope(new_node->scope);
@@ -423,8 +423,8 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
       return copy_switch(static_cast<ASTSwitch *>(node));
     case AST_NODE_TUPLE_DECONSTRUCTION:
       return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
-    case AST_NODE_INTERFACE_DECLARATION:
-      return copy_interface_declaration(static_cast<ASTInterfaceDeclaration *>(node));
+    case AST_NODE_TRAIT_DECLARATION:
+      return copy_trait_declaration(static_cast<ASTTraitDeclaration *>(node));
     case AST_NODE_CHOICE_DECLARATION:
       return copy_choice_declaration(static_cast<ASTChoiceDeclaration *>(node));
     case AST_NODE_NOOP:

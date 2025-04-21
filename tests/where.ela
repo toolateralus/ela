@@ -1,6 +1,6 @@
 TestStruct :: struct {}
-TestInterface :: interface {}
-TestInterface1 :: interface {}
+TestInterface :: trait {}
+TestInterface1 :: trait {}
 impl TestInterface for TestStruct {}
 impl TestInterface1 for TestStruct {}
 TestStruct1 :: struct!<T> where T: TestInterface & TestInterface1 {}
@@ -21,7 +21,7 @@ TestFn1 :: fn!<T>() -> T where T: s32 | f32 {
 
 TestStruct5 :: struct!<T> where T: s32 | f32 {}
 
-TestInterface2 :: interface!<T> where T: s32 | f32 {}
+TestInterface2 :: trait!<T> where T: s32 | f32 {}
 
 impl TestInterface2!<s32> for TestStruct {}
 

@@ -50,12 +50,6 @@ void Scope::erase(const InternedString &name) {
   ordered_symbols.erase(std::remove(ordered_symbols.begin(), ordered_symbols.end(), name), ordered_symbols.end());
 }
 
-void Scope::declare_interface(const InternedString &name, ASTInterfaceDeclaration *node) {
-  auto sym = Symbol::create_type(Type::INVALID_TYPE, name, TYPE_INTERFACE, node);
-  sym.scope = this;
-  symbols.insert({name, sym});
-}
-
 bool Symbol::is_generic_function() const {
   if (!is_function())
     return false;
