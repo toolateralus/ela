@@ -1,40 +1,40 @@
 
 #region basic_struct {
 
-  Struct :: struct {
+  struct Struct {
     a: s32,
     b: f32,
     c: bool,
   }
 
-  Basic :: trait {
-    static_get :: fn() -> s32;
-    method_get :: fn(self) -> s32;
-    method_get_ptr :: fn(*mut self) -> s32;
-    method_get_self :: fn(*mut self) -> #self;
-    static_get_self :: fn() -> #self;
+  trait Basic {
+    fn static_get() -> s32;
+    fn method_get(self) -> s32;
+    fn method_get_ptr(*mut self) -> s32;
+    fn method_get_self(*mut self) -> #self;
+    fn static_get_self() -> #self;
   }
 
   impl Basic for Struct {
-    static_get :: fn() -> s32 {
+    fn static_get() -> s32 {
       return 0;
     }
-    method_get :: fn(self) -> s32 {
+    fn method_get(self) -> s32 {
       return self.a;
     }
-    method_get_ptr :: fn(*mut self) -> s32 {
+    fn method_get_ptr(*mut self) -> s32 {
       return self.a
     }
-    method_get_self :: fn(*mut self) -> #self {
+    fn method_get_self(*mut self) -> #self {
       return .{a: 100};
     }
-    static_get_self :: fn() -> #self {
+    fn static_get_self() -> #self {
       return .{a: 100};
     }
   }
 }
 
-#test basic_struct :: fn() {
+#test fn basic_struct() {
   assert("trait failed", Struct::static_get() == 0);
   assert("trait failed", Struct::static_get_self().a == 100);
   mut instance: Struct;
@@ -44,40 +44,40 @@
 }
 
 #region generic_interface_regular_struct {
-  GenericInterface :: trait!<T> {
-    static_get :: fn() -> T;
-    method_get :: fn(self) -> T;
-    method_get_ptr :: fn(*mut self) -> T;
-    method_get_self :: fn(*mut self) -> #self;
-    static_get_self :: fn() -> #self;
+  trait GenericInterface!<T> {
+    fn static_get() -> T;
+    fn method_get(self) -> T;
+    fn method_get_ptr(*mut self) -> T;
+    fn method_get_self(*mut self) -> #self;
+    fn static_get_self() -> #self;
   }
 
-  Struct1 :: struct {
+  struct Struct1 {
     a: s32,
     b: f32,
     c: bool,
   }
 
   impl GenericInterface!<s32> for Struct1 {
-    static_get :: fn() -> s32 {
+    fn static_get() -> s32 {
       return 0;
     }
-    method_get :: fn(self) -> s32 {
+    fn method_get(self) -> s32 {
       return self.a;
     }
-    method_get_ptr :: fn(*mut self) -> s32 {
+    fn method_get_ptr(*mut self) -> s32 {
       return self.a
     }
-    method_get_self :: fn(*mut self) -> #self {
+    fn method_get_self(*mut self) -> #self {
       return Struct1 .{a: 100};
     }
-    static_get_self :: fn() -> #self {
+    fn static_get_self() -> #self {
       return Struct1 .{a: 100};
     }
   }
 }
 
-#test generic_interface_regular_struct :: fn() {
+#test fn generic_interface_regular_struct() {
   assert("trait failed", Struct1::static_get() == 0);
   assert("trait failed", Struct1::static_get_self().a == 100);
   mut instance: Struct1;
@@ -87,35 +87,35 @@
 }
 
 #region generic trait generic struct {
-  Struct2 :: struct!<T> {
+  struct Struct2!<T> {
     n: T
   }  
 
   impl!<T> GenericInterface!<T> for Struct2!<T> {
-    static_get :: fn() -> T {
+    fn static_get() -> T {
       t: T;
       return t;
     }
-    method_get :: fn(self) -> T {
+    fn method_get(self) -> T {
       t: T;
       return t;
     }
-    method_get_ptr :: fn(*mut self) -> T {
+    fn method_get_ptr(*mut self) -> T {
       t: T;
       return t;
     }
-    method_get_self :: fn(*mut self) -> #self {
+    fn method_get_self(*mut self) -> #self {
       t: T;
       return .{n: t};
     }
-    static_get_self :: fn() -> #self {
+    fn static_get_self() -> #self {
       t: T;
       return .{n: t};
     }
   }
 }
 
-#test generic_struct_generic_interface :: fn() {
+#test fn generic_struct_generic_interface() {
   assert("trait failed", Struct2!<s32>::static_get() == 0);
   assert("trait failed", Struct2!<s32>::static_get_self().n == 0);
   mut instance: Struct2!<s32>;
@@ -125,9 +125,9 @@
 }
 
 #region uninstantiated generic {
-  GenericWithoutInstance :: struct!<T> { }
+  struct GenericWithoutInstance!<T> { }
 
   impl!<T> GenericWithoutInstance!<T> {
-    thing :: fn(*mut self, t: T) { }
+    fn thing(*mut self, t: T) { }
   }
 }

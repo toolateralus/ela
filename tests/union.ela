@@ -1,18 +1,18 @@
 ;
 
-Union :: union {
+union Union {
   a: s32,
   b: s32,
   c: s32,
 }
 
 impl Union {
-  method :: fn(*mut self, n: s32) {
+  fn method(*mut self, n: s32) {
     assert("union equality check in method failed", n == self.a && n == self.b && n == self.c);
   }
 }
 
-_Vec2 :: union {
+union _Vec2 {
   #anon :: struct {
     x: s32,
     y: s32,
@@ -22,23 +22,23 @@ _Vec2 :: union {
 }
 
 impl _Vec2 {
-  method :: fn(*mut self, n: s32) {
+  fn method(*mut self, n: s32) {
     assert("union equality check in method failed", n == self.x && n == self.y && n == self.z);
     assert("union equality check in method failed", n == self.values[0] && n == self.values[1] && n == self.values[2]);
   }
-  something :: fn() -> #self {
+  fn something() -> #self {
     return .{};
   }
 }
 
-#test test_union_type_anonymous_sub_struct :: fn() {
+#test fn test_union_type_anonymous_sub_struct() {
   mut vec: _Vec2;
   vec.method(0); // this does the assertions
 }
 
 
 
-#test test_union_type :: fn() {
+#test fn test_union_type() {
   mut test_union: Union;
   test_union.a = 10;
   assert("union variants failed to equal each other", test_union.a == test_union.b && test_union.b == test_union.c);
@@ -46,13 +46,13 @@ impl _Vec2 {
 }
 
 
-AnonSubUnion :: struct {
+struct AnonSubUnion {
   #anon :: union {
     a: s32,
   }
 }
 
-#test test_anon_union_in_struct :: fn() {
+#test fn test_anon_union_in_struct() {
   mut anon: AnonSubUnion;
   anon.a = 100;
   assert("Anon sub union failed", anon.a == 100);

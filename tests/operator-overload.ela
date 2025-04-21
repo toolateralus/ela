@@ -1,14 +1,14 @@
-Vec2 :: struct {
+struct Vec2 {
   x: f32,
   y: f32,
 }
 
-Add :: trait!<Right, Result> {
-  add :: fn(*mut self, right: Right) -> Result;
+trait Add!<Right, Result> {
+  fn add(*mut self, right: Right) -> Result;
 }
 
 impl Add!<Vec2, Vec2> for Vec2 {
-  add :: fn(*mut self, right: Vec2) -> Vec2 {
+  fn add(*mut self, right: Vec2) -> Vec2 {
     return .{
       x: self.x + right.x,
       y: self.y + right.y
@@ -16,19 +16,19 @@ impl Add!<Vec2, Vec2> for Vec2 {
   }
 }
 
-#test test_main :: fn() {
+#test fn test_main() {
   mut a, mut b := (Vec2.{x: 1, y: 1}, Vec2.{x: 1, y: 1});
   
   result := a.add(b);
   assert("+ failed",  result.x == 2 && result.y == 2);
 }
 
-Sub :: trait!<Right, Result> {
-  sub :: fn(*mut self, right: Right) -> Result;
+trait Sub!<Right, Result> {
+  fn sub(*mut self, right: Right) -> Result;
 }
 
 impl Sub!<Vec2, Vec2> for Vec2 {
-  sub :: fn(*mut self, right: Vec2) -> Vec2 {
+  fn sub(*mut self, right: Vec2) -> Vec2 {
     return .{
       x: self.x - right.x,
       y: self.y - right.y
@@ -36,11 +36,11 @@ impl Sub!<Vec2, Vec2> for Vec2 {
   }
 }
 
-Neg :: trait!<Result> {  neg :: fn(*mut self) -> Result;
+trait Neg!<Result> {  fn neg(*mut self) -> Result;
 }
 
 impl Neg!<Vec2> for Vec2 {
-  neg :: fn(*mut self) -> Vec2 {
+  fn neg(*mut self) -> Vec2 {
     return .{
       x: -self.x,
       y: -self.y
@@ -49,7 +49,7 @@ impl Neg!<Vec2> for Vec2 {
 }
 
 impl Vec2 {
-  subscript :: fn(*const self, index: s32) -> *const f32 {
+  fn subscript(*const self, index: s32) -> *const f32 {
     if index == 0 {
       return &const self.x;
     } else {
@@ -57,7 +57,7 @@ impl Vec2 {
     }
   }
 
-  subscript_mut :: fn(*mut self, index: s32) -> *mut f32 {
+  fn subscript_mut(*mut self, index: s32) -> *mut f32 {
     if index == 0 {
       return &mut self.x;
     } else {
@@ -66,21 +66,21 @@ impl Vec2 {
   }
 }
 
-#test test_sub :: fn() {
+#test fn test_sub() {
   mut a, b := (Vec2.{x: 3, y: 2}, Vec2.{x: 1, y: 1});
   
   result := a.sub(b);
   assert("- failed",  result.x == 2 && result.y == 1);
 }
 
-#test test_neg :: fn() {
+#test fn test_neg() {
   mut a := Vec2.{x: 3, y: 2};
   
   result := a.neg();
   assert("neg failed",  result.x == -3 && result.y == -2);
 }
 
-#test test_index :: fn() {
+#test fn test_index() {
   mut a := Vec2.{x: 3, y: 2};
   
   assert("index 0 failed", a[0] == 3);
@@ -88,12 +88,12 @@ impl Vec2 {
 }
 
 impl Vec2 {
-  deref :: fn(*mut self) -> *mut f32 {
+  fn deref(*mut self) -> *mut f32 {
     return &mut self.x;
   }
 }
 
-#test test_deref :: fn() {
+#test fn test_deref() {
   mut a := Vec2.{
     x: 100.0,
     y: 200.0,

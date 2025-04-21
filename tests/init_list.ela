@@ -1,45 +1,45 @@
 ;
 
-#test test_initializer_lists :: fn() {
+#test fn test_initializer_lists() {
   scalar: s32;
   fixed: s32[3] = .[0, 1, 2];
 }
 
-XarBarInitListTestStruct :: struct {
+struct XarBarInitListTestStruct {
   x: f32,
   y: f32,
 }
 
-New :: fn(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
+fn New(v: XarBarInitListTestStruct) -> XarBarInitListTestStruct {
   return v;
 }
 
-#test test_init_list_as_implicit_parameter :: fn() {
+#test fn test_init_list_as_implicit_parameter() {
   v := New(.{x: 0.0, y: 0.0});
   v1 := New(XarBarInitListTestStruct.{x: 0.0, y: 0.0});
   assert("failed", v.x == 0.0 && v.y == 0.0);
   assert("failed", v1.x == 0.0 && v1.y == 0.0);
 }
 
-InitListTest :: struct {
+struct InitListTest {
   n : s32
 }
 
-InitListStruct :: struct {
+struct InitListStruct {
   a: s32,
   b: s32,
   c: s32,
 }
 
-returns_an_init_list  :: fn() -> InitListTest {
+fn returns_an_init_list() -> InitListTest {
   return .{n: 0};
 }
 
-infers_argument_from_init_list :: fn(t: InitListTest) -> InitListTest {
+fn infers_argument_from_init_list(t: InitListTest) -> InitListTest {
   return t;
 }
 
-#test test_init_list_comprehensive :: fn() {
+#test fn test_init_list_comprehensive() {
   assert("Init list failed to return from function", returns_an_init_list().n == 0);
   assert("Init list failed to infer from parameter signature", infers_argument_from_init_list(InitListTest.{n: 0}).n == 0);
   empty_init_list := InitListTest.{};

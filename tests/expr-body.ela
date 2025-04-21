@@ -1,10 +1,10 @@
-getter :: fn() -> s32 => 100;
+fn getter() -> s32 => 100;
 
-#test test_expr_body_fn :: fn() {
+#test fn test_expr_body_fn() {
   assert("expr body != 100", getter() == 100);
 }
 
-#test test_expr_body_switch :: fn() {
+#test fn test_expr_body_switch() {
   v := switch true {
     true: => 100,
     false: => 200,

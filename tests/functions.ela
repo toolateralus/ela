@@ -1,7 +1,7 @@
 
 ; 
 
-#test test_malloc :: fn() {
+#test fn test_malloc() {
   mut ptr: *const s32 = malloc(4);
   assert("malloc'd pointer was null", ptr != null);
   free(ptr);
@@ -9,24 +9,24 @@
   assert("freed ptr and set to null was not == null", ptr == null);
 }
 
-many_params :: fn(a: f32, b: f32, c: f32, d : f32) -> f32 {
+fn many_params(a: f32, b: f32, c: f32, d : f32) -> f32 {
   return a * b * c * d;
 }
 
-mul_params :: fn(n: f32, f: f32) -> f32 {
+fn mul_params(n: f32, f: f32) -> f32 {
   return n * f;
 }
 
-#test test_param :: fn() {
+#test fn test_param() {
   assert("params of 1.5 * 2.0 expected to equal 3.0", mul_params(1.5, 2.0) == 3.0);
   assert("multiplying many params failed, or default param", many_params(1.0, 2.0, 4.0, 1.0) == 8.0);
 }
 
-returns :: fn() -> s32  {
+fn returns() -> s32  {
   return 1;
 }
 
-#test test_return_value :: fn() { 
+#test fn test_return_value() { 
   assert("function expected to return 1", returns() == 1);
 }
 

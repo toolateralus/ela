@@ -1,6 +1,6 @@
 ;
 
-#test test_comp_assign :: fn() {
+#test fn test_comp_assign() {
   mut deref: s32 = 1;
   deref += deref;
   assert("+=", deref == 2);
@@ -26,7 +26,7 @@
   assert(">>=", deref == 0);
 }
 
-#test test_operators :: fn() {
+#test fn test_operators() {
   mut left: s32 = 1;
   mut right: s32 = 1;
   mut result: s32;
@@ -70,7 +70,7 @@
   assert("left >> right should be 0", result == 0);
 }
 
-#test test_relational_results :: fn() {
+#test fn test_relational_results() {
   test1: bool = (1 == 1 + 2) || 1 == 2;
   test2: bool = (3 > 2) && (2 < 4);
   test3: bool = !(5 <= 5) || (6 >= 6);
@@ -81,7 +81,7 @@
   assert("test4 should be true", test4 == true);
 }
 
-#test test_address_of :: fn() {
+#test fn test_address_of() {
   mut v: s32 = 0;
   addr_of_v: *const s32 = &const v;
   assert("address of grabbed a non-null ptr", addr_of_v != null);
@@ -89,7 +89,7 @@
   assert("deref'ing a ptr grabbed with &v failed to == the same value as when it was defined.", v == 0);
 }
 
-#test test_implicit_numerical_casting :: fn() {
+#test fn test_implicit_numerical_casting() {
   u1: u8;
   u2: u16 = u1;
   u3: u32 = u2;
@@ -107,22 +107,22 @@
   assert("unable to upcast successfully", f == f1);
 }
 
-#test test_two_way_implicit_conversion_bin_ops :: fn() {
+#test fn test_two_way_implicit_conversion_bin_ops() {
   v: s32;
   v1: s8;
   f: f32;
   assert("failed to convert both ways", v + v1 == 0 && v1 + v == 0);
 }
 
-Node :: struct {
+struct Node {
   next: *mut Node
 }
 
-Array :: struct {
+struct Array {
   ptr: Node[10]
 }
 
-#test test_chained_dot_subscript :: fn() {
+#test fn test_chained_dot_subscript() {
   a: Array;
   a.ptr[0].next = null;
   assert("failure: a.ptr[0].next != null", a.ptr[0].next == null);
@@ -132,7 +132,7 @@ Array :: struct {
   assert("failure: a.ptr[0].next != null", a.ptr[0].next != null);
 }
 
-#test test_subscript :: fn() {
+#test fn test_subscript() {
   mut arr: s32[100];
   arr[50] = 0;
   assert("subscript 50 on s32[100] failed to == 0", arr[50] == 0);
@@ -140,7 +140,7 @@ Array :: struct {
   ++n;
 }
 
-#test test_referencing_pointer :: fn() {
+#test fn test_referencing_pointer() {
   mut node: Node;
   node.next = malloc(sizeof(Node));
   mut other: Node;
@@ -150,17 +150,17 @@ Array :: struct {
   free(node.next);
 }
 
-#test test_cast :: fn() {
+#test fn test_cast() {
   big:  u16 = 65365 as u16;
   small: u8 = big as u8;
   assert("failed to down cast", small == (big % 255));
 }
 
-XaryuStruct :: struct {
+struct XaryuStruct {
   f: f32
 }
 
-#test test_comp_assign_non_iden :: fn() {
+#test fn test_comp_assign_non_iden() {
   mut arr: f32[12];
   arr[0] = 10;
   arr[0] += 10;
@@ -172,7 +172,7 @@ XaryuStruct :: struct {
   assert("omp assign xarbars[0].f += 10.0; failed to == 20.0", xarbars[0].f == 20.0);
 }
 
-#test test_underscores_in_number_literals :: fn() {
+#test fn test_underscores_in_number_literals() {
   n: s32 = 1_000_000;
   assert("number literal with underscores failed to equal expected value", n == 1000000);
 }

@@ -1,17 +1,17 @@
 ;
 
-IHaveAMethod :: struct {}
+struct IHaveAMethod {}
 
 impl IHaveAMethod {
-  method :: fn(*mut self) -> f32 {
+  fn method(*mut self) -> f32 {
     return 0.0;
   }
-  parameter_method :: fn(*mut self, x: f32) -> f32 {
+  fn parameter_method(*mut self, x: f32) -> f32 {
       return x;
   }
 }
 
-#test test_method :: fn() {
+#test fn test_method() {
   mut owner: IHaveAMethod ;
   assert("failed to get 0.0 from method.", owner.method() == 0.0);
   assert("failed to get 0.0 from method (passing back param).", owner.parameter_method(0.0) == 0.0);

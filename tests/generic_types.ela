@@ -1,27 +1,27 @@
-GenericStruct :: struct!<T> {
+struct GenericStruct!<T> {
   a: T,
   b: T,
 }
 
 impl!<T> GenericStruct!<T> {
-  add :: fn(*mut self) -> T {
+  fn add(*mut self) -> T {
     return self.a + self.b;
   }
 }
 
-#test test_generic_struct :: fn() {
+#test fn test_generic_struct() {
   mut int_adder: GenericStruct!<s32> = .{a: 5, b: 6};
   assert("generic type failure", int_adder.add() == 5 + 6);
   mut float_adder: GenericStruct!<f32> = .{a: 1.23, b: 4.56};
   assert("generic type failure", float_adder.add() == 1.23 + 4.56);
 }
 
-GenericUnion :: union!<T, T1> {
+union GenericUnion!<T, T1> {
   a: T,
   b: T1,
 }
 
-#test test_generic_union :: fn() {
+#test fn test_generic_union() {
   mut int_adder: GenericUnion!<s32, f32>;
   int_adder.a = 11;
   assert("generic type failure", int_adder.a == 5 + 6);

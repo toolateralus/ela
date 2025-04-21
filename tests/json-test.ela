@@ -1,25 +1,25 @@
 import json::*;
 import fs::*;
 
-JsonValue :: struct {}
+struct JsonValue {}
 
-JsonValueDeleter :: struct {
+struct JsonValueDeleter {
   vals: List!<*const JsonValue>,
 }
 
 impl JsonValueDeleter {
-  add :: fn(*mut self, val: *const JsonValue) {
+  fn add(*mut self, val: *const JsonValue) {
     self.vals.push(val);
   }
   // *fixme
-  destroy :: fn(*mut self) {
+  fn destroy(*mut self) {
     for val in self.vals {
       free(val);
     }
   }
 }
 
-// #test test_json_types :: fn() {
+// #test fn test_json_types() {
 //   deleter: JsonValueDeleter;
 //   defer deleter.destroy();
 
@@ -72,7 +72,7 @@ impl JsonValueDeleter {
 //   assert("null", val.is_null());
 // }
 
-// #test test_json_values :: fn() {
+// #test fn test_json_values() {
 //   deleter: JsonValueDeleter;
 //   val : JsonValue*;
 //   err : JsonError;
@@ -116,7 +116,7 @@ impl JsonValueDeleter {
 //   assert("object key", val.get("key").as_string() == "value");
 // }
 
-// #test test_scalar_deserialization :: fn() {
+// #test fn test_scalar_deserialization() {
 //   n : s32 = 100;
 //   err, json := json_serialize(&n, typeof(s32));
 //   if err.has_value {
@@ -131,17 +131,17 @@ impl JsonValueDeleter {
 //   assert("json deserialize scalar, s32", n == 100);
 // }
 
-// MyJsonStruct :: struct {
+// struct MyJsonStruct {
 //   n: s64,
 //   b: f32,
 // }
 // impl MyJsonStruct {
-//   to_string ::fn(*mut self) -> str {
+//   fn to_string(*mut self) -> str {
 //     return $"MyJsonStruct [n: {self.n}, b: {self.b}]";
 //   }
 // }
 
-// #test test_struct_deserialization :: fn() {
+// #test fn test_struct_deserialization() {
 //   n : MyJsonStruct = {
 //     n: 100,
 //     b: 200.0
@@ -159,7 +159,7 @@ impl JsonValueDeleter {
 //   assert("json deserialize object", n.n == 100 && n.b == 200.0);
 // }
 
-// #test test_json_comprehensive :: fn() {
+// #test fn test_json_comprehensive() {
 //   deleter: JsonValueDeleter;
 //   val : JsonValue*; err: JsonError;
 

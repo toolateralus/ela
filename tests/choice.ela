@@ -1,14 +1,14 @@
-OptionT :: choice!<T> {
+choice OptionT!<T> {
   Some(T),
   None,
 }
 
-Math :: choice {
+choice Math {
   Vector2 { x: f32, y: f32 },
   Vector3 { x: f32, y: f32, z: f32 },
 }
 
-#test test_init_tuple :: fn() {
+#test fn test_init_tuple() {
   /* 
     this treats what would get normally parsed as a call,
     as some sort of a tuple literal.
@@ -19,7 +19,7 @@ Math :: choice {
   mut x := OptionT!<s32>::Some(10);
 }
 
-#test test_init_struct :: fn() {
+#test fn test_init_struct() {
   /* struct thing, kinda would just work with init list. */
   x := Math::Vector2.{
     x: 0.0,
@@ -27,20 +27,20 @@ Math :: choice {
   };
 }
 
-#test test_reassign_and_marker_style :: fn() {
+#test fn test_reassign_and_marker_style() {
   mut x := OptionT!<s32>::Some(10);
   x = OptionT!<s32>::None;
 }
 
-return_choice :: fn() -> Math {
+fn return_choice() -> Math {
   return Math::Vector2.{x: 0, y: 0};
 }
 
-get_value :: fn() -> Math {
+fn get_value() -> Math {
   return Math::Vector2.{x: 10, y: 10};
 }
 
-#test test_pattern_matching_struct_patterns :: fn() {
+#test fn test_pattern_matching_struct_patterns() {
   val := get_value();
   /* pattern match, named args. mutability optional */
   if val is Math::Vector2.{ x: mut x, y: mut y } {
@@ -57,7 +57,7 @@ get_value :: fn() -> Math {
   }
 }
 
-#test test_pattern_matching_tuple_patterns :: fn() {
+#test fn test_pattern_matching_tuple_patterns() {
   x := OptionT!<s32>::Some(10);
   /* pattern match, take tuple members as a destructured list */
   if x is OptionT!<s32>::Some(v) {
@@ -65,7 +65,7 @@ get_value :: fn() -> Math {
   }
 }
 
-#test test_pattern_matching_in_switch :: fn() {
+#test fn test_pattern_matching_in_switch() {
   const widget := Math::Vector2.{
     x: 0.0,
     y: 1.0,
@@ -84,7 +84,7 @@ get_value :: fn() -> Math {
   assert("'switch is' failed", hit);
 }
 
-choice_as_param :: fn(math: Math) {
+fn choice_as_param(math: Math) {
   // TODO: do we want to allow  { !(math is Pattern)  } ?
   // TODO: or do we want        { math is not Pattern } ?
   if math is Math::Vector2.{x: _, y: _1} {
@@ -94,6 +94,6 @@ choice_as_param :: fn(math: Math) {
   }
 }
 
-#test test_choice_as_param :: fn() {
+#test fn test_choice_as_param() {
   choice_as_param(Math::Vector2.{x: 0, y: 0});
 }

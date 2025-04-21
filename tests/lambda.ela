@@ -1,11 +1,11 @@
-alias Lambda :: fn*(s32, s32) -> s32;
+alias Lambda :: fn *(s32, s32) -> s32;
 
-takes_lambda :: fn(lambda: Lambda, a: s32, b: s32) -> s32{
+fn takes_lambda(lambda: Lambda, a: s32, b: s32) -> s32{
   return lambda(a, b);
 }
 
 
-#test test_lambda :: fn() {
+#test fn test_lambda() {
   n := fn(a: s32, b: s32) -> s32 {
     return a + b;
   }

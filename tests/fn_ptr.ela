@@ -1,10 +1,10 @@
-function_pointer_helper :: fn(x: s32, y: s32) -> s32 { return x * y; }
+fn function_pointer_helper(x: s32, y: s32) -> s32 { return x * y; }
 
 // #error "Still broken!";
 
 alias FunctionPointer :: fn* (s32, s32) -> s32;
 
-#test test_function_pointer_alias :: fn() {
+#test fn test_function_pointer_alias() {
   ptr := &mut function_pointer_helper;
   assert("Function pointer call", ptr(2, 3) == 6);
 

@@ -1,29 +1,29 @@
 ;
 
-Vector2 :: struct {
+struct Vector2 {
   x: f32,
   y: f32,
 }
 
-Vector3 :: struct {
+struct Vector3 {
   vec2: Vector2,
   z: f32,
 }
 
-#test test_struct_single_level :: fn() {
+#test fn test_struct_single_level() {
   v: Vector2 = .{};
   assert("v.x != 0.0", v.x == 0.0);
   assert("v.y != 0.0", v.y == 0.0);
 }
 
-#test test_struct_nested_once :: fn() {
+#test fn test_struct_nested_once() {
   v: Vector3;
   assert("v.vec2.x != 0.0", v.vec2.x == 0.0);
   assert("v.vec2.y != 0.0", v.vec2.y == 0.0);
   assert("v.z != 0.0", v.z == 0.0);
 }
 
-#test test_struct_assign_member :: fn() {
+#test fn test_struct_assign_member() {
   mut v: Vector2;
   v.x = 10.0;
   v.y = 10.0;
@@ -31,7 +31,7 @@ Vector3 :: struct {
   assert("assigning v.y = 10.0 failed", v.y == 10.0);
 }
 
-#test test_struct_assign_nested_member :: fn() {
+#test fn test_struct_assign_nested_member() {
   mut v: Vector3;
   v.vec2.x = 1.0;
   v.vec2.y = 2.0;
@@ -41,31 +41,31 @@ Vector3 :: struct {
   assert("assigning v.z = 3.0 failed", v.z == 3.0);
 }
 
-struct_as_param :: fn(v: Vector2)  -> f32 {
+fn struct_as_param(v: Vector2)  -> f32 {
   return v.x;
 }
 
-#test test_struct_as_param :: fn() {
+#test fn test_struct_as_param() {
   v: Vector2;
   assert("", struct_as_param(v) == 0.0);
 }
 
-something :: fn(f: f32) -> f32 {
+fn something(f: f32) -> f32 {
   return f;
 }
 
-#test test_struct_member_as_param :: fn() {
+#test fn test_struct_member_as_param() {
   v: Vector2;
   assert("passing dot expr struct member as param failed", something(v.x) == 0.0);
 }
 
 
-BitfieldTest :: struct {
+struct BitfieldTest {
   #bitfield(1) i: u32,
   #bitfield(2) z: u32,
 }
 
-#test test_bitfield_in_struct :: fn() {
+#test fn test_bitfield_in_struct() {
   test: BitfieldTest = .{
     i: 0,
     z: 3
@@ -75,15 +75,15 @@ BitfieldTest :: struct {
 }
 
 
-Static :: struct;
+struct Static;
 impl Static {
-  counter :: fn() -> s32 {
+  fn counter() -> s32 {
     #static i: s32 = 0;
     return i++;
   }
 }
 
-#test test_call_statics :: fn() {
+#test fn test_call_statics() {
   for i in 0..10 {
     assert("Static member method with static local failed", Static::counter() == i);
   }

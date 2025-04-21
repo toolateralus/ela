@@ -7,7 +7,7 @@
 */
 
 
-nested_defer_test :: fn() -> s32 {
+fn nested_defer_test() -> s32 {
   mut x := 0;
   defer x += 1;
   if (true) {
@@ -16,11 +16,11 @@ nested_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_nested_defer :: fn() {
+#test fn test_nested_defer() {
   assert("nested defer failed", nested_defer_test() == 2);
 }
 
-loop_defer_test :: fn() -> s32 {
+fn loop_defer_test() -> s32 {
   mut x := 0;
   for i in 0..3 {
     defer x += i;
@@ -28,11 +28,11 @@ loop_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_loop_defer :: fn() {
+#test fn test_loop_defer() {
   assert("loop defer failed", loop_defer_test() == 3);
 }
 
-early_return_defer_test :: fn() -> s32 {
+fn early_return_defer_test() -> s32 {
   mut x := 0;
   defer x += 1;
   if (true) {
@@ -42,11 +42,11 @@ early_return_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_early_return_defer :: fn() {
+#test fn test_early_return_defer() {
   assert("early return defer failed", early_return_defer_test() == 0);
 }
 
-DeferCleanup :: struct {
+struct DeferCleanup {
   ptr : *mut void
 }
 
@@ -56,7 +56,7 @@ DeferCleanup :: struct {
 
 // here we show that the ptr as a u64 is passed back to the caller before it's set to null
 // in the defer block. which is absolutely expected behaviour.
-defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
+fn defer_cleanup_routine(mut c: *mut DeferCleanup) -> u64 {
   defer {
     free(c.ptr);
     c.ptr = null;
@@ -65,7 +65,7 @@ defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
   return (c.ptr as *mut u64) as u64;
 }
 
-#test test_defer_cleanup_routine :: fn() {
+#test fn test_defer_cleanup_routine() {
   ptr := malloc(8);
   mut cleanup := DeferCleanup .{
     ptr: ptr
@@ -77,7 +77,7 @@ defer_cleanup_routine :: fn(mut c: *mut DeferCleanup) -> u64 {
 }
 
 // Additional comprehensive tests
-continue_defer_test :: fn() -> s32 {
+fn continue_defer_test() -> s32 {
   mut x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -89,11 +89,11 @@ continue_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_continue_defer :: fn() {
+#test fn test_continue_defer() {
   assert("ontinue defer failed", continue_defer_test() == 7);
 }
 
-break_defer_test :: fn() -> s32 {
+fn break_defer_test() -> s32 {
   mut x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -105,22 +105,22 @@ break_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_break_defer :: fn() {
+#test fn test_break_defer() {
   assert("break defer failed", break_defer_test() == 4);
 }
 
-multiple_defer_test :: fn() -> s32 {
+fn multiple_defer_test() -> s32 {
   mut x := 0;
   defer x += 1;
   defer x += 2;
   return x;
 }
 
-#test test_multiple_defer :: fn() {
+#test fn test_multiple_defer() {
   assert("multiple defer failed", multiple_defer_test() == 0);
 }
 
-nested_control_flow_defer_test :: fn() -> s32 {
+fn nested_control_flow_defer_test() -> s32 {
   mut x := 0;
   for i in 0..3 {
     defer x += 1;
@@ -133,6 +133,6 @@ nested_control_flow_defer_test :: fn() -> s32 {
   return x;
 }
 
-#test test_nested_control_flow_defer :: fn() {
+#test fn test_nested_control_flow_defer() {
   assert("nested control flow defer failed", nested_control_flow_defer_test() == 7);
 }

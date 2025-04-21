@@ -1,6 +1,6 @@
 ;
 
-#test test_conditional_compilation :: fn() {
+#test fn test_conditional_compilation() {
   #def CHEESE;
 
   #ifdef HAMBURGER {
@@ -87,7 +87,7 @@
 }
 
 
-#test test_constexpr_if :: fn() {
+#test fn test_constexpr_if() {
   #if true {
     mut n := 0;
   } else {

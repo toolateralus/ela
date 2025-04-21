@@ -1,6 +1,6 @@
 ;
 
-#flags Banana :: enum  {
+#flags enum Banana  {
   Unripe,
   Ripe,
   Overripe,
@@ -12,17 +12,17 @@
   We broke flags by auto assigning values to all enums.
   We need to change that somehow, at parse time likely.
 */
-#test test_flags_enum :: fn() {
+#test fn test_flags_enum() {
   flags := Banana::Unripe | Banana::Overripe;
   assert("flags & Banana::Unripe failed.", (flags & Banana::Unripe) != 0);
 }
 
-MyEnum :: enum {
+enum MyEnum {
   Some,
   Other,
   Value = 100 * 2,
 }
-#test test_regular_enum :: fn() {
+#test fn test_regular_enum() {
   value := MyEnum::Some;
   value1 := MyEnum::Value;
   assert("MyEnum::Value failed to == 100 * 2", value1 == 100 * 2);

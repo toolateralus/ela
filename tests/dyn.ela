@@ -1,41 +1,41 @@
-DynInterface :: trait {
-  default_getter :: fn(*const self) -> s32 {
+trait DynInterface {
+  fn default_getter(*const self) -> s32 {
     return 0;
   }
-  scrut :: fn(*const self) -> f64;
+  fn scrut(*const self) -> f64;
 }
 
 impl DynInterface for s32 {
-  scrut :: fn(*const self) -> f64 {
+  fn scrut(*const self) -> f64 {
     return 100.0;
   }
 }
 
 impl DynInterface for u32 {
-  scrut :: fn(*const self) -> f64 {
+  fn scrut(*const self) -> f64 {
     return 200.0;
   }
 }
 
-#test test_dynamic_dispatch :: fn() {
+#test fn test_dynamic_dispatch() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
   assert("dyn default method failed", d.default_getter() == 0);
 }
 
-#test test_dynamic_dispatch_non_default :: fn() {
+#test fn test_dynamic_dispatch_non_default() {
   mut num := 0;
   d := dynof(&mut num, DynInterface);
   assert("dyn default method failed", d.scrut() == 100.0);
 }
 
-#test test_dynamic_dispatch_non_default_2 :: fn() {
+#test fn test_dynamic_dispatch_non_default_2() {
   mut num : u32 = 0;
   d := dynof(&mut num, DynInterface);
   assert("dyn default method failed", d.scrut() == 200.0);
 }
 
-#test test_dynamic_dispatch_non_default_3 :: fn() {
+#test fn test_dynamic_dispatch_non_default_3() {
   mut num1 : s32 = 0;
   mut num : u32 = 0;
   mut d := dynof(&mut num, DynInterface);
@@ -44,26 +44,26 @@ impl DynInterface for u32 {
   assert("dyn default method failed", d.scrut() == 100.0);
 }
 
-dyn_func :: fn(o: dyn DynInterface) {
+fn dyn_func(o: dyn DynInterface) {
   assert("dyn as param failed", o.scrut() == 100.0);
 }
 
-dyn_returns :: fn() -> dyn DynInterface {
+fn dyn_returns() -> dyn DynInterface {
   mut num := 0;
   return dynof(&mut num);
 }
 
-#test test_dyn_as_param_and_return_value :: fn() {
+#test fn test_dyn_as_param_and_return_value() {
   iface := dyn_returns();
   dyn_func(iface);
   assert("dyn returned from func failed", iface.scrut() == 100.0);
 }
 
-Strakt :: struct {
+struct Strakt {
   obj: dyn DynInterface,
 }
 
-#test test_dyn_as_struct_member :: fn() {
+#test fn test_dyn_as_struct_member() {
   mut x := 0;
   s: Strakt = .{
     obj: dynof(&mut x),
@@ -71,14 +71,14 @@ Strakt :: struct {
   assert("nested call of dyn failed", s.obj.scrut() == 100.0);
 }
 
-#test test_dyn_from_array :: fn() {
+#test fn test_dyn_from_array() {
   mut x := 0;
   mut array: dyn DynInterface[100];
   array[0] = dynof(&mut x);
   assert("dyn call from array failed", array[0].scrut() == 100.0);
 }
 
-#test test_dyn_from_list :: fn() {
+#test fn test_dyn_from_list() {
   mut x := 0;
   mut array: List!<dyn DynInterface>;
   array.push(dynof(&mut x));
@@ -86,13 +86,13 @@ Strakt :: struct {
 }
 
 impl Strakt {
-  new :: fn() -> #self {
+  fn new() -> #self {
     mut self: #self;
     self.obj = dynof(new(0));
     return self;
   }
 
-  init :: fn(*mut self) {
+  fn init(*mut self) {
     self.obj = dynof(new(0));
   }
 }
