@@ -536,7 +536,14 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     }
     trait_ty = trait_id;
     node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
-  } else {
+
+    auto decl_node = (ASTTraitDeclaration*)trait_id->declaring_node.get();
+
+    if (decl_node && decl_node->where_clause) {
+      ctx.set_scope(decl_node->scope);
+      decl_node->where_clause.get()->accept(this);
+      ctx.set_scope(node->scope);
+    }
   }
 
   auto type_scope = target_ty->info->scope;
@@ -719,9 +726,9 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
 
   node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
 
-  if (node->where_clause) {
-    node->where_clause.get()->accept(this);
-  }
+  // if (node->where_clause) {
+    // node->where_clause.get()->accept(this);
+  // }
 
   type->declaring_node = node;
   node->resolved_type = type;
