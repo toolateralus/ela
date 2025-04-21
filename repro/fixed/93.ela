@@ -3,10 +3,10 @@ alias Tuple :: (s32, *const Type);
 // ! We can not do this, unless we have some scratch field like
 // * _: Tuple;
 
-Pack :: struct {
+struct Pack {
   tuples: List!<Tuple>,
 }
 
-main :: fn() { 
+fn main() { 
 
 }

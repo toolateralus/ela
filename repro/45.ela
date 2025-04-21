@@ -1,15 +1,15 @@
-Struct :: struct {
+struct Struct {
   fd: s32
 }
 
-#foreign read :: fn(fd: s32, buffer: *const void, len: s32) -> s32;
+#foreign fn read(fd: s32, buffer: *const void, len: s32) -> s32;
 
 // This works because the CT interpreter doesn't care about type checking,
 // it just evaluates the expression and infers the type.
 buffer: u8[CONSTANT]; 
 
 impl Struct {
-  read_from :: fn(*mut self) {
+  fn read_from(*mut self) {
     // This doesn't work, because the arguments depend on a resolved type to check,
     // of course, and since we use-before-declare, we don't know the type and it says the type is -1.
     read(self.fd, null, CONSTANT); 
@@ -18,4 +18,4 @@ impl Struct {
 
 const CONSTANT := 45;
 
-main :: fn() {}
+fn main() {}

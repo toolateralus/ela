@@ -1,9 +1,9 @@
 // !NO_COMPILE
 
-Struct :: struct!<T> {
+struct Struct!<T> {
   n: T
 }
 
-main :: fn() {
+fn main() {
   n: Struct; // This passes our compiler, but clearly it's not possible.
 }

@@ -1,4 +1,4 @@
-main :: fn() { 
+fn main() { 
   // We take the address of a r-value here.
   abc := "Hello".as_char_slice().clone();
 

@@ -1,7 +1,7 @@
 import fmt::*;
 
 impl!<T> List!<T> {
-  reverse :: fn(*mut self) {
+  fn reverse(*mut self) {
     len := self.length;
 
     if len <= 1 then return;
@@ -28,7 +28,7 @@ impl!<T> List!<T> {
 
   possibly it's just the List!<T> subscript operator.
 */
-main :: fn() { 
+fn main() { 
   mut list: List!<s64>;
   for i in 0..100 {
     list.push(i);

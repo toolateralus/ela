@@ -1,6 +1,6 @@
 import fmt::*;
 
-main :: fn() { 
+fn main() { 
   mut builder: StringBuilder;
   defer builder.deinit();
   builder.append('c');

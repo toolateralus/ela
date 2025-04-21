@@ -1,8 +1,8 @@
-thing :: struct!<T> {
+struct thing!<T> {
 	next: *mut thing!<T>
 }
 
-main :: fn() {
+fn main() {
 	mut a: thing!<s32>;
 	mut b: thing!<s32>;
 	a.next = &mut b;
@@ -11,7 +11,7 @@ main :: fn() {
 
 /* Member "next" not found in type "thing"
         at: /home/cooper/repos/languages/ela/repro/89.ela:9:3
-main :: fn() {
+fn main() {
         a: thing!<s32>;
         b: thing!<s32>;
         a.next = &b;

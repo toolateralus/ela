@@ -1,6 +1,6 @@
 
 
-main :: fn() { 
+fn main() { 
   t := typeof(List!<s32>);
   s : List!<s32>;
   t.fields[0].get(&const s);

@@ -1,4 +1,4 @@
-Math :: choice {
+choice Math {
   Vector2 { x: f32, y: f32 },
   Vector3 { x: f32, y: f32, z: f32 },
 }
@@ -18,7 +18,7 @@ Math :: choice {
   Probably won't worry about this since we're moving to LLVM IR.
 */
 
-main :: fn() {
+fn main() {
   x := Math::Vector2.{x: 10, y: 10};
   /* pattern match, named args. mutability optional */
   if x is Math::Vector2.{ x: mut x, y: mut y } {

@@ -1,10 +1,10 @@
 import fmt::printlnf;
 
-V2 :: struct {
+struct V2 {
   x: f32, y: f32
 }
 
-returns_tuple :: fn() -> (s32, s32) {
+fn returns_tuple() -> (s32, s32) {
   // when the 'expected_type' in the typer is set to the tuple for the
   // return type, we don't unset it when inferring arguments, and since 
   // the argument is a tuple type, it assumes that it's type checking against
@@ -17,4 +17,4 @@ returns_tuple :: fn() -> (s32, s32) {
   return (0, 0);
 }
 
-main :: fn() { }
+fn main() { }

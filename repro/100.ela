@@ -11,7 +11,7 @@ import raylib::{
 // ! use of undeclared identifier, WHITE
 // ! unless we do `import raylib::*;`
 
-main :: fn() {
+fn main() {
   InitWindow(800, 600, "Hello, World!"c);
   while !WindowShouldClose() {
     BeginDrawing();

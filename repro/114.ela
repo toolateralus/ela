@@ -17,8 +17,10 @@
   where we need to bind #self to other traits.
 
 */
-Trait :: trait where #self: s32 {
+trait Trait where #self: s32 {
 
 }
 
-main :: fn() { }
+fn main() {
+  
+}

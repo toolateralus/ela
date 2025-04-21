@@ -1,4 +1,4 @@
-S :: enum {
+enum S {
   S1,
 }
 /* 
@@ -9,6 +9,6 @@ S :: enum {
 */
 alias Tuple :: (S, s32);
 
-main :: fn() {
+fn main() {
   t: Tuple;
 }

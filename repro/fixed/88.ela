@@ -1,11 +1,11 @@
-thing :: struct {
+struct thing {
 	next: *mut #self
 }
 /* Cannot locate #self type.
         at: /home/cooper/repos/languages/ela/repro/88.ela:2:13
-thing :: struct {
+struct thing {
         next: #*mut self
              ^^^
 } */
 
-main :: fn() {}
+fn main() {}

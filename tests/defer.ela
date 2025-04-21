@@ -6,7 +6,6 @@
   - Be aware that defers will not modify the value of the thing being returned as they are executed after the return expression is already evaluated.
 */
 
-
 fn nested_defer_test() -> s32 {
   mut x := 0;
   defer x += 1;

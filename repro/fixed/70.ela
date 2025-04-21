@@ -1,5 +1,5 @@
 
-generic :: fn!<T>() {
+fn generic!<T>() {
   /* 
     * internal compiler error: ASTType* resolved to null in emitter.
     *    at: /home/josh_arch/source/c++/ela/repro/70.ela:5:30
@@ -17,4 +17,4 @@ generic :: fn!<T>() {
   }
 }
 
-main :: fn() { }
+fn main() { }

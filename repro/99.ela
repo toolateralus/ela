@@ -1,9 +1,9 @@
 // !NO_COMPILE
 
-go :: fn(a: s32) {
+fn go(a: s32) {
 
 }
 
-main :: fn() {
+fn main() {
   go();
 }

@@ -2,7 +2,7 @@
 
 // Another test that we cannot actuall test for regression because it needs to NOT compile.
 
-main :: fn() { 
+fn main() { 
   // this is an insane example of how broken the freaking parser is in accordance to types
   // as well as the typer not caring whether a symbol is a type or not.
   s: str = .{

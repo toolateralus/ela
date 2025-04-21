@@ -1,11 +1,11 @@
 
-Enum :: enum {
+enum Enum {
   A,
   B,
   C
 }
 
-some_stuff :: fn() -> (Enum, *mut u8) {
+fn some_stuff() -> (Enum, *mut u8) {
   /* 
   * i guess our type system is treating all of our enum types as 
   * just straight integers?
@@ -22,6 +22,6 @@ some_stuff :: fn() -> (Enum, *mut u8) {
   return (Enum::A, null); 
 }
 
-main :: fn() { 
+fn main() { 
 
 }

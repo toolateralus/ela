@@ -1,14 +1,14 @@
-format :: fn!<T>(string: str, tuple: T, options: s32) {
+fn format!<T>(string: str, tuple: T, options: s32) {
 
 }
 
-Vec2 :: struct {
+struct Vec2 {
   x: f32,
   y: f32,
 }
 
 impl Vec2 {
-  format :: fn(self) {
+  fn format(self) {
     format("Vec2 { x: %, y: % }", (
       self.x,
       self.y,
@@ -16,7 +16,7 @@ impl Vec2 {
   }
 }
 
-main :: fn() {
+fn main() {
   vec2: Vec2;
   vec2.format();
 }

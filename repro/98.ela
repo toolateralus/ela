@@ -1,25 +1,25 @@
 // !NOCOMPILE
 
 // move this somwhere it belongs
-Test_Enumerator :: struct!<Index, Value_Type> {
+struct Test_Enumerator!<Index, Value_Type> {
   slice: Slice!<Value_Type>,
   index: Index,
 }
 
 impl!<Value_Type> Enumerator!<(u32, Value_Type)> for Test_Enumerator!<u32, Value_Type> {
-  current :: fn(self) -> (u32, Value_Type) {
+  fn current(self) -> (u32, Value_Type) {
     return (self.index, self.slice.data[self.index]);
   }
-  done :: fn(self) -> bool {
+  fn done(self) -> bool {
     return self.index >= self.slice.length;
   }
-  next :: fn(*mut self) -> void { 
+  fn next(*mut self) -> void { 
     self.index++;
   }
 }
 
 impl!<Value_Type> List!<Value_Type> {
-  failure :: fn(*mut self) -> Test_Enumerator!<u32, Value_Type> {
+  fn failure(*mut self) -> Test_Enumerator!<u32, Value_Type> {
     return .{
       index: 0,
       slice: .{
@@ -33,7 +33,7 @@ impl!<Value_Type> List!<Value_Type> {
 import fmt::*;
 
 
-main :: fn() { 
+fn main() { 
   list := List!<s32>::init(.[
     0,1,2,3,4
   ]);

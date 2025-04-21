@@ -1,5 +1,5 @@
 import map::Map;
-main :: fn() { 
+fn main() { 
   // we have a bug in the parser that makes calls get parsed in a funky manna
   x := Map!<str, ()>::new();
 }

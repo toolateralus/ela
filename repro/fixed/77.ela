@@ -1,4 +1,4 @@
-main :: fn() { 
+fn main() { 
   mut list : List!<s32>;
   list.initialize(11);
   // subscript assignment via the operator overload is just totally broken.

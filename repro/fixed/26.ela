@@ -1,12 +1,12 @@
-Struct :: struct;
+struct Struct;
 
 impl Struct {
-  static_method :: fn() -> s32 {
+  fn static_method() -> s32 {
     return 0;
   }
-  other_method :: fn() {
+  fn other_method() {
     Struct::static_method();
   }
 }
 
-main :: fn() {}
+fn main() {}

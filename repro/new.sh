@@ -20,6 +20,6 @@ echo $NEW_ID > "$COUNTER_FILE"
 # Create a new file with the incremented ID
 NEW_FILE="${NEW_ID}.ela"
 
-echo "main :: fn() { }" >> "$NEW_FILE"
+echo "fn main() { }" >> "$NEW_FILE"
 
 echo "Created new file: $NEW_FILE"

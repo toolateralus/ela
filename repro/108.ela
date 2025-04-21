@@ -4,7 +4,7 @@
   idk
 */
 
-bug :: fn() -> s32 {
+fn bug() -> s32 {
   mut value := 0;
   defer value = 1;
 
@@ -17,6 +17,6 @@ bug :: fn() -> s32 {
   }
 }
 
-main :: fn() { 
+fn main() { 
   bug();
 }

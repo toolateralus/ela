@@ -1,6 +1,6 @@
 // !NO_COMPILE
 
-main :: fn() { 
+fn main() { 
   /* redeclaring a variable (used to) cause C errors. */
   x := 0;
   x := 0;

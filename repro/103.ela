@@ -1,6 +1,6 @@
 //! NOCOMPILE
 
-main :: fn() { 
+fn main() { 
   // See `Typer::resolve_generic_function_call` for info as to why this crashes.
   // wrong number of arguments during a generic inference.
   string: String;

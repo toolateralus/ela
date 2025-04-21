@@ -4,12 +4,12 @@ import fmt::*;
   This was fixed and randomly stopped working again with no cahnges. I have no flipping idea.
 */
 
-AltOption :: struct!<T> {
+struct AltOption!<T> {
   t: T
 }
 
 impl!<T> Format for AltOption!<T> {
-  format :: fn(*const self, builder: *mut StringBuilder, mut options: FormatOptions) {
+  fn format(*const self, builder: *mut StringBuilder, mut options: FormatOptions) {
     if options.enum_parent_name {
       old := options.quote_strings;
       options.quote_strings = false;
@@ -21,7 +21,7 @@ impl!<T> Format for AltOption!<T> {
   }
 }
 
-main :: fn() { 
+fn main() { 
   option: AltOption!<s32>;
   println(option);
 }

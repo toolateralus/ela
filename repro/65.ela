@@ -11,18 +11,18 @@
   but not in the same context as C++'s template specialization.
 */
 impl From!<s32> for s32 {
-  from :: fn(n : s32) -> s32 {
+  fn from(n : s32) -> s32 {
     return n as s32;
   }
 }
 
 impl From!<bool> for s32 {
-  from :: fn(n : bool) -> s32 {
+  fn from(n : bool) -> s32 {
     return n as s32;
   }
 }
 
-main :: fn() {
+fn main() {
   n := s32::from(true);
   n := s32::from(5);
 }

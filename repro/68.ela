@@ -1,5 +1,5 @@
 
-Struct :: struct {
+struct Struct {
   a: s32,
   b: s32,
   c: Struct*,
@@ -24,7 +24,7 @@ error: Struct = .{
   c: malloc(sizeof(Struct)), // C doesn't have non-constant static initializers.
 }
 
-main :: fn() { 
+fn main() { 
   n : Struct;
 
   

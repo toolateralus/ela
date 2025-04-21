@@ -1,7 +1,7 @@
 impl!<T> List!<T> {
   alias Ordering_Predicate :: fn * (*const T, *const T) -> bool;
 
-  order_by_2 :: fn(self, predicate: Ordering_Predicate) -> List!<T> {
+  fn order_by_2(self, predicate: Ordering_Predicate) -> List!<T> {
     new_list := self.clone();
     for i in 0..new_list.length {
       for j in (i+1)..new_list.length {
@@ -16,6 +16,6 @@ impl!<T> List!<T> {
   }
 }
 
-main :: fn() { 
+fn main() { 
 
 }
