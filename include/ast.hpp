@@ -42,17 +42,17 @@ enum ASTNodeType {
   AST_NODE_PARAMS_DECL,
   AST_NODE_PARAM_DECL,
   AST_NODE_VARIABLE,
-  
+
   AST_NODE_EXPR_STATEMENT,
   AST_NODE_BIN_EXPR,
   AST_NODE_UNARY_EXPR,
-  
+
   AST_NODE_LITERAL,
 
   AST_NODE_PATH,
   AST_NODE_TYPE,
   AST_NODE_TUPLE,
-  
+
   AST_NODE_CALL,
   AST_NODE_METHOD_CALL,
   AST_NODE_ARGUMENTS,
@@ -261,9 +261,7 @@ struct ASTPath : ASTExpr {
     }
   };
 
-  std::vector<ASTExpr *> *get_last_segments_generics() {
-    return &segments.back().generic_arguments;
-  }
+  std::vector<ASTExpr *> *get_last_segments_generics() { return &segments.back().generic_arguments; }
 
   /*
     Path parts are typically identifiers, and they may contain their own generic arguments.
@@ -507,14 +505,14 @@ struct ASTCall : ASTExpr {
   ASTArguments *arguments;
 
   bool has_generics() {
-    if (auto path = dynamic_cast<ASTPath*>(function)) {
+    if (auto path = dynamic_cast<ASTPath *>(function)) {
       return path->get_last_segments_generics() != nullptr;
     }
     return false;
   }
 
   Nullable<std::vector<ASTExpr *>> get_generic_arguments() {
-    if (auto path = dynamic_cast<ASTPath*>(function)) {
+    if (auto path = dynamic_cast<ASTPath *>(function)) {
       return path->get_last_segments_generics();
     }
     return nullptr;
@@ -533,11 +531,11 @@ struct ASTDotExpr : ASTExpr {
 };
 
 struct ASTMethodCall : ASTExpr {
-  /* 
+  /*
     сперма хранится в яйцах.
     (aka the generic arguments are stored in the base)
   */
-  ASTDotExpr *dot; 
+  ASTDotExpr *dot;
   ASTArguments *arguments;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }
@@ -856,11 +854,7 @@ struct ASTWhere : ASTExpr {
   void accept(VisitorBase *visitor) override;
 };
 
-enum PatternMatchPointerSemantic {
-  PTR_NONE,
-  PTR_MUT,
-  PTR_CONST
-};
+enum PatternMatchPointerSemantic { PTR_NONE, PTR_MUT, PTR_CONST };
 
 struct TuplePattern {
   struct Part {
@@ -993,21 +987,26 @@ static Precedence get_operator_precedence(Token token);
 
 struct Typer;
 
-struct Parser {  
+struct Parser {
   ASTProgram *parse_program();
   ASTStatement *parse_statement();
   ASTArguments *parse_arguments();
   ASTPath::Segment parse_path_segment();
-  ASTTraitDeclaration *parse_trait_declaration(Token);
+
+  ASTTraitDeclaration *parse_trait_declaration();
+  ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, bool is_union, ASTStructDeclaration *node);
+  ASTStructDeclaration *parse_struct_declaration();
+  ASTFunctionDeclaration *parse_function_declaration();
+  ASTChoiceDeclaration *parse_choice_declaration();
+  ASTEnumDeclaration *parse_enum_declaration();
+
   ASTTupleDeconstruction *parse_multiple_asssignment();
-  ASTStructDeclaration *parse_struct_declaration(Token);
   ASTVariable *parse_variable();
-  ASTFunctionDeclaration *parse_function_declaration(Token);
   std::vector<GenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
-  ASTChoiceDeclaration *parse_choice_declaration(Token name);
+
   ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
-  ASTEnumDeclaration *parse_enum_declaration(Token);
+
   ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);
   ASTExpr *parse_expr(Precedence = PRECEDENCE_LOWEST);
@@ -1015,27 +1014,26 @@ struct Parser {
   ASTExpr *parse_postfix();
   ASTPath *parse_path();
   ASTExpr *parse_primary();
-  ASTCall *parse_call(ASTExpr *function);
   ASTImpl *parse_impl();
   ASTWhere *parse_where_clause();
   ASTType *parse_type();
+  ASTDefer *parse_defer();
 
   void parse_pointer_extensions(ASTType *type);
   std::vector<ASTType *> parse_parameter_types();
   void append_type_extensions(ASTType *&type);
   ASTType *parse_function_type();
-  
-  ASTDefer *parse_defer();
+
   Nullable<ASTNode> process_directive(DirectiveKind kind, const InternedString &identifier);
   Nullable<ASTExpr> try_parse_directive_expr();
   bool import(InternedString name, Scope **scope);
   inline std::deque<Token> &lookahead_buf() { return states.back().lookahead_buffer; }
-  
+
   Token eat();
   Token expect(TType type);
   Token peek() const;
   void fill_buffer_if_needed();
-  
+
   SourceRange begin_node();
   void end_node(ASTNode *node, SourceRange &range);
   inline bool not_eof() const { return !peek().is_eof(); }
@@ -1048,7 +1046,7 @@ struct Parser {
   Typer *typer;
   Context &ctx;
   Lexer lexer{};
-  
+
   std::vector<Lexer::State> states;
   Nullable<ASTStructDeclaration> current_struct_decl = nullptr;
   Nullable<ASTFunctionDeclaration> current_func_decl = nullptr;

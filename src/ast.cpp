@@ -209,16 +209,13 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "test",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        // Issue 2
         // TODO: implement something so we can do
         // * #test(group: "My Test Group", expects: false) *
         // so we can have tests that expect to fail, and so we can use
         // --filter="My Test Group" // run only test group
         // --filter=* - "My Test Group" // run all but test group
 
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        auto func = parser->parse_function_declaration(name);
+        auto func = parser->parse_function_declaration();
         func->flags |= (int)FunctionInstanceFlags::FUNCTION_IS_TEST;
 
         if (compile_command.has_flag("test")) {
@@ -235,15 +232,12 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) {
         NODE_ALLOC(ASTFunctionDeclaration, function, range, _, parser)
+        parser->expect(TType::Fn);
         auto name = parser->expect(TType::Identifier);
         auto last_func_decl = parser->current_func_decl;
         parser->current_func_decl = function;
-
         Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
-
-        parser->expect(TType::DoubleColon);
-        parser->expect(TType::Fn);
-
+        
         function->params = parser->parse_parameters();
         function->name = name.value;
         if (parser->peek().type != TType::Arrow) {
@@ -309,10 +303,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
     {.identifier = "flags",
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
-        auto name = parser->expect(TType::Identifier);
-        parser->expect(TType::DoubleColon);
-        auto enum_decl = parser->parse_enum_declaration(name);
-
+        auto enum_decl = parser->parse_enum_declaration();
         int index = 0;
         for (auto &key_value : enum_decl->key_values) {
           NODE_ALLOC(ASTLiteral, literal, range, _, parser);
@@ -321,7 +312,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           key_value.second = literal;
           index++;
         }
-
         enum_decl->is_flags = true;
         return enum_decl;
     }},
@@ -354,11 +344,21 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto tok = parser->expect(TType::DoubleColon);
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
-          auto decl = parser->parse_struct_declaration(get_unique_identifier());
-          auto t = decl->resolved_type;
+          bool is_union = false;
+          NODE_ALLOC(ASTStructDeclaration, node, range, _, parser)
+          if (parser->peek().type == TType::Struct) {
+            parser->expect(TType::Struct);
+          } else {
+            is_union = true;
+            parser->expect(TType::Union);
+          }
+
+          parser->parse_struct_body(get_unique_identifier().value, range, is_union, node);
+
+          auto t = node->resolved_type;
           auto info = (t->info->as<StructTypeInfo>());
           info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
-          return decl;
+          return node;
         } else {
           auto range = parser->begin_node();
           parser->eat();
@@ -590,17 +590,6 @@ ASTArguments *Parser::parse_arguments() {
   return args;
 }
 
-ASTCall *Parser::parse_call(ASTExpr *function) {
-  NODE_ALLOC(ASTCall, call, range, _, this);
-  call->function = function;
-  if (function->get_node_type() == AST_NODE_DOT_EXPR) {
-    throw_error("dot exr", range);
-  }
-  call->arguments = parse_arguments();
-  end_node(call, range);
-  return call;
-}
-
 ASTExpr *Parser::parse_expr(Precedence precedence) {
   ASTExpr *left = parse_unary();
   while (true) {
@@ -754,7 +743,6 @@ ASTExpr *Parser::parse_unary() {
     auto is_rvalue =
         expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
 
-
     unaryexpr->mutability = mutability;
     unaryexpr->op = op;
     unaryexpr->operand = expr;
@@ -797,7 +785,10 @@ ASTExpr *Parser::parse_postfix() {
          peek().type == TType::Increment || peek().type == TType::Decrement || peek().type == TType::Range ||
          peek().type == TType::As) {
     if (peek().type == TType::LParen) {
-      left = parse_call(left);
+      NODE_ALLOC(ASTCall, call, range, _, this);
+      call->function = left;
+      call->arguments = parse_arguments();
+      left = call;
     } else if (peek().type == TType::Dot) {
       NODE_ALLOC(ASTDotExpr, dot, range, _, this)
       eat();
@@ -1352,12 +1343,12 @@ ASTStatement *Parser::parse_statement() {
     auto statement = dynamic_cast<ASTStatement *>(process_directive(DIRECTIVE_KIND_STATEMENT, directive_name).get());
 
     if (!statement) {
-      /* 
+      /*
         TODO: is there a way we can do this without returning a node?
         We should probably get rid of most of the directives, if they can be
         replaced with a keyword and a node.
 
-        this is just a useful tool for 
+        this is just a useful tool for
       */
       static auto noop = ast_alloc<ASTNoop>();
       statement = noop;
@@ -1467,31 +1458,6 @@ ASTStatement *Parser::parse_statement() {
       alias->source_node = parse_type();
     }
     return alias;
-  }
-
-  bool is_const_multiple_assign = (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
-                                  (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
-                                   lookahead_buf()[2].type == TType::Comma);
-
-  bool is_mut_multiple_assign =
-      (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
-       lookahead_buf()[2].type == TType::Comma) ||
-      (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul &&
-       lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
-
-  if (is_const_multiple_assign || is_mut_multiple_assign) {
-    return parse_multiple_asssignment();
-  }
-
-  bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
-                                                                    lookahead_buf()[1].type == TType::ColonEquals);
-
-  bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
-                     (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
-
-  if (is_mut_decl || is_colon_or_colon_equals) {
-    auto decl = parse_variable();
-    return decl;
   }
 
   // * Control flow
@@ -1633,31 +1599,57 @@ ASTStatement *Parser::parse_statement() {
     }
   }
 
-  if (lookahead_buf()[1].type == TType::DoubleColon && lookahead_buf()[2].family == TFamily::Keyword) {
-    expect(TType::Identifier);
-    expect(TType::DoubleColon);
-    if (peek().type == TType::Fn) {
-      auto node = parse_function_declaration(tok);
-      return node;
+  { // Variable declarations.
+    bool is_const_multiple_assign = (tok.type == TType::Identifier && lookahead_buf()[1].type == TType::Comma) ||
+                                    (tok.type == TType::Mul && lookahead_buf()[1].type == TType::Identifier &&
+                                     lookahead_buf()[2].type == TType::Comma);
+
+    bool is_mut_multiple_assign =
+        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
+         lookahead_buf()[2].type == TType::Comma) ||
+        (tok.type == TType::Mut && lookahead_buf()[1].type == TType::Mul &&
+         lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
+
+    if (is_const_multiple_assign || is_mut_multiple_assign) {
+      return parse_multiple_asssignment();
     }
-    if (peek().type == TType::Trait) {
-      auto trait = parse_trait_declaration(tok);
-      return trait;
+
+    bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
+                                                                      lookahead_buf()[1].type == TType::ColonEquals);
+
+    bool is_mut_decl = tok.type == TType::Mut && lookahead_buf()[1].type == TType::Identifier &&
+                       (lookahead_buf()[2].type == TType::Colon || lookahead_buf()[2].type == TType::ColonEquals);
+
+    if (is_mut_decl || is_colon_or_colon_equals) {
+      auto decl = parse_variable();
+      return decl;
     }
-    if (peek().type == TType::Struct || peek().type == TType::Union) {
-      auto struct_decl = parse_struct_declaration(tok);
-      return struct_decl;
-    }
-    if (peek().type == TType::Enum) {
-      auto enum_decl = parse_enum_declaration(tok);
-      return enum_decl;
-    }
-    if (peek().type == TType::Choice) {
-      eat();
-      auto tagged_union = parse_choice_declaration(tok);
-      return tagged_union;
-    }
-  } else if (lookahead_buf()[1].type == TType::DoubleColon) {
+  }
+
+  if (peek().type == TType::Fn) {
+    auto node = parse_function_declaration();
+    return node;
+  }
+
+  if (peek().type == TType::Trait) {
+    auto trait = parse_trait_declaration();
+    return trait;
+  }
+  if (peek().type == TType::Struct || peek().type == TType::Union) {
+    auto struct_decl = parse_struct_declaration();
+    return struct_decl;
+  }
+  if (peek().type == TType::Enum) {
+    auto enum_decl = parse_enum_declaration();
+    return enum_decl;
+  }
+  if (peek().type == TType::Choice) {
+    eat();
+    auto tagged_union = parse_choice_declaration();
+    return tagged_union;
+  }
+
+  if (lookahead_buf()[1].type == TType::DoubleColon) {
     NODE_ALLOC(ASTExprStatement, expr, range, defer, this);
     expr->expression = parse_expr();
     return expr;
@@ -1992,86 +1984,90 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
   return params;
 }
 
-ASTFunctionDeclaration *Parser::parse_function_declaration(Token name) {
-  NODE_ALLOC(ASTFunctionDeclaration, function, range, _, this)
+ASTFunctionDeclaration *Parser::parse_function_declaration() {
+  NODE_ALLOC(ASTFunctionDeclaration, node, range, _, this)
   expect(TType::Fn);
 
-  function->has_defer = false;
+  auto name = node->name = expect(TType::Identifier).value;
+
+  node->has_defer = false;
 
   if (peek().type == TType::GenericBrace) {
-    function->generic_parameters = parse_generic_parameters();
+    node->generic_parameters = parse_generic_parameters();
   }
 
   auto last_func_decl = current_func_decl;
   Defer deferred([&] { current_func_decl = last_func_decl; });
-  current_func_decl = function;
+  current_func_decl = node;
 
-  function->params = parse_parameters(function->generic_parameters);
-  function->name = name.value;
+  node->params = parse_parameters(node->generic_parameters);
+  node->name = name;
 
   // check for definition.
   auto has_definition = false;
   {
-    auto sym = ctx.scope->local_lookup(name.value);
+    auto sym = ctx.scope->local_lookup(name);
     if (sym && (sym->flags & SYMBOL_IS_FORWARD_DECLARED) == 0) {
       has_definition = true;
     }
   }
 
-  ctx.scope->insert_function(name.value, Type::INVALID_TYPE, function);
+  ctx.scope->insert_function(name, Type::INVALID_TYPE, node);
 
   if (peek().type != TType::Arrow) {
-    function->return_type = ASTType::get_void();
+    node->return_type = ASTType::get_void();
   } else {
     expect(TType::Arrow);
-    function->return_type = parse_type();
+    node->return_type = parse_type();
   }
 
   if (peek().type == TType::Where) {
-    function->where_clause = parse_where_clause();
+    node->where_clause = parse_where_clause();
   }
 
   if (peek().type == TType::Semi) {
-    function->flags |= FUNCTION_IS_FORWARD_DECLARED;
-    auto sym = ctx.scope->local_lookup(name.value)->flags |= SYMBOL_IS_FORWARD_DECLARED;
-    end_node(function, range);
+    node->flags |= FUNCTION_IS_FORWARD_DECLARED;
+    auto sym = ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
+    end_node(node, range);
     current_func_decl = last_func_decl;
-    return function;
+    return node;
   }
 
   ctx.set_scope();
 
-  if (function->params->has_self) {
-    function->flags |= FUNCTION_IS_METHOD;
+  if (node->params->has_self) {
+    node->flags |= FUNCTION_IS_METHOD;
   }
 
   // TODO: find a better solution to this.
-  for (const auto &param : function->generic_parameters) {
+  for (const auto &param : node->generic_parameters) {
     ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC);
   }
 
-  function->block = parse_block();
-  function->block.get()->parent = function;
+  node->block = parse_block();
+  node->block.get()->parent = node;
 
-  if (function->block && has_definition) {
+  if (node->block && has_definition) {
     end_node(nullptr, range);
-    throw_error(std::format("Redefinition of function {}", name.value), range);
+    throw_error(std::format("Redefinition of function {}", node->name), range);
   }
 
-  end_node(function, range);
-  function->scope = ctx.exit_scope();
-  return function;
+  end_node(node, range);
+  node->scope = ctx.exit_scope();
+  return node;
 }
 
-ASTEnumDeclaration *Parser::parse_enum_declaration(Token tok) {
+ASTEnumDeclaration *Parser::parse_enum_declaration() {
   NODE_ALLOC(ASTEnumDeclaration, node, range, _, this)
   expect(TType::Enum);
-  node->name = tok.value;
+  node->name = expect(TType::Identifier).value;
   expect(TType::LCurly);
-  if (ctx.scope->find_type_id(tok.value, {}) != Type::INVALID_TYPE) {
+
+  if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE) {
     end_node(node, range);
-    throw_error("Redefinition of enum " + tok.value.get_str(), range);
+    throw_error("Redefinition of enum " + node->name.get_str(), range);
   }
+
   int last_value = -1;
   bool is_first = true;
   while (peek().type != TType::RCurly) {
@@ -2204,12 +2200,11 @@ ASTWhere *Parser::parse_where_clause() {
   return node;
 }
 
-ASTTraitDeclaration *Parser::parse_trait_declaration(Token name) {
+ASTTraitDeclaration *Parser::parse_trait_declaration() {
   auto previous = current_trait_decl;
   NODE_ALLOC_EXTRA_DEFER(ASTTraitDeclaration, node, range, _, this, { current_trait_decl = previous; });
   expect(TType::Trait);
-
-  node->name = name.value;
+  node->name = expect(TType::Identifier).value;
   current_trait_decl = node;
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
@@ -2230,18 +2225,11 @@ ASTTraitDeclaration *Parser::parse_trait_declaration(Token name) {
   return node;
 }
 
-ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
-  bool is_union = false;
-  auto old = current_struct_decl;
-  NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
+ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange range, bool is_union,
+                                                ASTStructDeclaration *node) {
+  auto old_struct_decl_state = current_struct_decl;
 
-  if (peek().type == TType::Struct) {
-    expect(TType::Struct);
-  } else {
-    is_union = true;
-    expect(TType::Union);
-  }
-
+  node->name = name;
   node->is_union = is_union;
   current_struct_decl = node;
 
@@ -2253,7 +2241,7 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     node->where_clause = parse_where_clause();
   }
 
-  auto type_id = ctx.scope->find_type_id(name.value, {});
+  auto type_id = ctx.scope->find_type_id(node->name, {});
 
   if (type_id != Type::INVALID_TYPE) {
     auto type = type_id;
@@ -2267,10 +2255,9 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
       throw_error("cannot redefine already existing type", range);
     }
   } else {
-    type_id = ctx.scope->create_struct_type(name.value, create_child(ctx.scope), node);
+    type_id = ctx.scope->create_struct_type(node->name, create_child(ctx.scope), node);
   }
 
-  node->name = name.value;
   node->resolved_type = type_id;
   auto type = type_id;
   auto info = type->info->as<StructTypeInfo>();
@@ -2327,13 +2314,32 @@ ASTStructDeclaration *Parser::parse_struct_declaration(Token name) {
     node->is_fwd_decl = true;
   }
 
-  current_struct_decl = old;
+  current_struct_decl = old_struct_decl_state;
   end_node(node, range);
+
   return node;
 }
 
-ASTChoiceDeclaration *Parser::parse_choice_declaration(Token name) {
-  NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this)
+ASTStructDeclaration *Parser::parse_struct_declaration() {
+  bool is_union = false;
+  NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
+
+  if (peek().type == TType::Struct) {
+    expect(TType::Struct);
+  } else {
+    is_union = true;
+    expect(TType::Union);
+  }
+
+  parse_struct_body(expect(TType::Identifier).value, range, is_union, node);
+
+  return node;
+}
+
+ASTChoiceDeclaration *Parser::parse_choice_declaration() {
+  NODE_ALLOC(ASTChoiceDeclaration, node, range, _, this);
+
+  node->name = expect(TType::Identifier).value;
   if (peek().type == TType::GenericBrace) {
     node->generic_parameters = parse_generic_parameters();
   }
@@ -2341,9 +2347,8 @@ ASTChoiceDeclaration *Parser::parse_choice_declaration(Token name) {
     node->where_clause = parse_where_clause();
   }
   auto scope = create_child(ctx.scope);
-  auto type = ctx.scope->create_tagged_union(name.value, scope, node);
+  auto type = ctx.scope->create_tagged_union(node->name, scope, node);
   ctx.set_scope(scope);
-  node->name = name.value;
   node->scope = scope;
   node->resolved_type = type;
 
@@ -2467,7 +2472,8 @@ void Parser::append_type_extensions(ASTType *&node) {
   }
 }
 
-ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations, const std::vector<Type *> &gen_args) {
+ASTDeclaration *find_generic_instance(std::vector<GenericInstance> instantiations,
+                                      const std::vector<Type *> &gen_args) {
   for (auto &instantiation : instantiations) {
     if (instantiation.arguments == gen_args) {
       return instantiation.declaration;
