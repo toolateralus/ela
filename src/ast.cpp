@@ -1250,20 +1250,10 @@ ASTStatement *Parser::parse_statement() {
           auto ident = expect(TType::Identifier).value.get_str();
           if (ident == "pub") {
             attribute.tag = ATTRIBUTE_PUB;
-          } else if (ident == "foreign") {
-            attribute.tag = ATTRIBUTE_FOREIGN;
-            if (peek().type == TType::LParen) {
-              eat();
-              // expect a string literal.
-              attribute.arguments.push_back(parse_primary());
-              expect(TType::RParen);
-            }
           } else if (ident == "entry") {
             attribute.tag = ATTRIBUTE_ENTRY;
           } else if (ident == "impl") {
             attribute.tag = ATTRIBUTE_IMPL;
-          } else if (ident == "export") {
-            attribute.tag = ATTRIBUTE_EXPORT;
           } else if (ident == "no_mangle") {
             attribute.tag = ATTRIBUTE_NO_MANGLE;
           } else if (ident == "inline") {

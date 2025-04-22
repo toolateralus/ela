@@ -77,6 +77,7 @@ enum FunctionInstanceFlags : size_t {
   FUNCTION_IS_STATIC = 1 << 6,
   FUNCTION_IS_EXTERN = 1 << 7,
   FUNCTION_IS_INLINE = 1 << 8,
+  FUNCTION_IS_ENTRY = 1 << 9,
 };
 
 enum StructTypeFlags {

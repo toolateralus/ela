@@ -169,8 +169,8 @@ void Emitter::visit(ASTFor *node) {
   // end condition
   emit_line_directive(node);
 
-  /// TODO: we should use a ASTPatternMatch here so that the compiler isn't completely tied to the Option!<T> implementation,
-  /// For example, I changed the order of the type (switch Some and None) and every for loop was broken.
+  /// TODO: we should use a ASTPatternMatch here so that the compiler isn't completely tied to the Option!<T>
+  /// implementation, For example, I changed the order of the type (switch Some and None) and every for loop was broken.
   /// It would be more reliable to just use a stack allocated ASTPatternMatch to emit here.
   code << indent() << "if ($next.index == 0) break;\n";
 
@@ -626,7 +626,7 @@ void Emitter::visit(ASTVariable *node) {
 }
 
 void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
-  if (node->name == "main" || node->name == "маин") {
+  if (node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
     return;
   }
   if (!node->generic_parameters.empty()) {
@@ -676,9 +676,9 @@ void Emitter::emit_forward_declaration(ASTFunctionDeclaration *node) {
   code << ";\n";
 }
 
-void Emitter::emit_foreign_function(ASTFunctionDeclaration *node) {
-  if (node->name == "main" || node->name == "маин") {
-    throw_error("main/маин function cannot be foreign", node->source_range);
+void Emitter::emit_extern_function(ASTFunctionDeclaration *node) {
+  if (node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
+    throw_error("entry point function cannot be extern", node->source_range);
   }
 
   auto emit_params = [&] {
@@ -1000,8 +1000,7 @@ void Emitter::visit(ASTIndex *node) {
   auto left_ty = node->left->resolved_type;
   if (left_ty && node->is_operator_overload) {
     code << "(*"; // always dereference via subscript. for `type[10] = 10` and such.
-    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, TType::LBrace, node->left,
-                           node->index);
+    call_operator_overload(node->source_range, left_ty, OPERATION_SUBSCRIPT, TType::LBrace, node->left, node->index);
     code << ")";
 
     return;
@@ -1604,7 +1603,7 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
     visitor->num_tests++;
   }
   // dont emit a main if we're in test mode.
-  if (test_flag && (sym_name == "main" || sym_name == "маин")) {
+  if (test_flag && (HAS_FLAG(node->flags, FUNCTION_IS_ENTRY) || node->name == "main")) {
     return false;
   }
   return true;
@@ -1841,18 +1840,16 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     }
     auto name = emit_symbol(sym) + mangled_type_args(node->generic_arguments);
 
-    if (node->name != "main" && node->name != "маин") {
+    if (node->name != "main" && DOESNT_HAVE_FLAG(node->flags, FUNCTION_IS_ENTRY)) {
       if (HAS_FLAG(node->flags, FUNCTION_IS_STATIC)) {
         code << "static ";
       }
       if (HAS_FLAG(node->flags, FUNCTION_IS_FORWARD_DECLARED)) {
         emit_forward_declaration(node);
         return;
-
       } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE)) {
         // We have to use static here otherwise the standalone inline function has
         // external linkage.
-        
         // We should have a way to specify static linkage anyway.
         code << "static inline ";
       }
@@ -1862,11 +1859,11 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << "extern  ";
     }
 
-    if ((node->name == "main" || node->name == "маин") && !is_freestanding && !compile_command.has_flag("nostdlib")) {
+    if ((node->name == "main" ||  HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);
-      code << " __ela_main_()\n"; // We use Env::args() to get args now.
+      code << " __ela_main_()\n";
       node->block.get()->accept(this);
     } else {
       emit_function_signature_and_body(name);
@@ -1893,7 +1890,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
   }
 
   if (HAS_FLAG(node->flags, FUNCTION_IS_EXTERN)) {
-    emit_foreign_function(node);
+    emit_extern_function(node);
     return;
   }
 
@@ -2135,7 +2132,6 @@ void Emitter::visit(ASTDyn_Of *node) {
 }
 
 void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
-
   if (trait->dyn_emitted) {
     return;
   }

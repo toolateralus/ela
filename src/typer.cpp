@@ -244,6 +244,23 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
+    //// TODO: handle more attributes
+  for (auto attr : node->attributes) {
+    switch (attr.tag) {
+      case ATTRIBUTE_INLINE: {
+        node->flags |= FUNCTION_IS_INLINE;
+      } break;
+      case ATTRIBUTE_ENTRY: {
+        node->flags |= FUNCTION_IS_ENTRY;
+      } break;
+      default: break;
+    }
+  }
+
+  if (node->name == "main") {
+    node->flags |= FUNCTION_IS_ENTRY;
+  }
+
   auto old_ty = expected_type;
   auto old_scope = ctx.scope;
   auto _defer = Defer([&] {
@@ -382,6 +399,23 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
   ctx.set_scope(node->scope);
 
   Defer _([&] { ctx.set_scope(old_scope); });
+
+  //// TODO: handle more attributes
+  for (auto attr : node->attributes) {
+    switch (attr.tag) {
+      case ATTRIBUTE_INLINE: {
+        node->flags |= FUNCTION_IS_INLINE;
+      } break;
+      case ATTRIBUTE_ENTRY: {
+        node->flags |= FUNCTION_IS_ENTRY;
+      } break;
+      default: break;
+    }
+  }
+
+  if (node->name == "main") {
+    node->flags |= FUNCTION_IS_ENTRY;
+  }
 
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
@@ -575,12 +609,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   for (const auto &method : node->methods) {
-    //// TODO: handle more attributes
-    for (auto attr : method->attributes) {
-      if (attr.tag == ATTRIBUTE_INLINE) {
-        method->flags |= FUNCTION_IS_INLINE;
-      }
-    }
+  
 
     method->declaring_type = target_ty;
     if (!method->generic_parameters.empty()) {
@@ -795,7 +824,7 @@ bool is_const_pointer(ASTNode *node) {
   return false;
 }
 
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable) {
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
@@ -859,7 +888,15 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
     }
   }
 
-  if (self_nullable.is_not_null()) {
+  /* 
+    We use some strange semantics for deinit.
+    It is technically a mutating function, but simply declaring a string that you later want 
+    to destroy would require mut EVERYWHERE.
+
+    So, we compromise, and allow constant variables and pointers to be passed to deinit calls,
+    just for QOL.
+  */
+  if (self_nullable.is_not_null() && !is_deinit_call) {
     auto self = self_nullable.get();
     auto first = params->params[0]->resolved_type;
     auto self_symbol = ctx.get_symbol(self);
@@ -1652,7 +1689,7 @@ void Typer::visit(ASTCall *node) {
   // If we have the declaring node representing this function, type check it against the parameters in that definition.
   // else, use the type.
   if (func_decl) {
-    type_check_args_from_params(node->arguments, func_decl->params, nullptr);
+    type_check_args_from_params(node->arguments, func_decl->params, nullptr, func_decl->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
   }
@@ -2876,7 +2913,7 @@ void Typer::visit(ASTMethodCall *node) {
     if (!func_decl->params->has_self) {
       throw_error("Calling static methods with instance not allowed", node->source_range);
     }
-    type_check_args_from_params(node->arguments, func_decl->params, node->dot->base);
+    type_check_args_from_params(node->arguments, func_decl->params, node->dot->base, func_sym->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
   }

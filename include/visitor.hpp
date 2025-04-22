@@ -145,7 +145,7 @@ struct Typer : VisitorBase {
 
   Type *get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self, bool is_deinit_call);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
                                                         std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
@@ -274,7 +274,7 @@ struct Emitter : VisitorBase {
   inline void space() { code << ' '; }
 
   void emit_forward_declaration(ASTFunctionDeclaration *node);
-  void emit_foreign_function(ASTFunctionDeclaration *node);
+  void emit_extern_function(ASTFunctionDeclaration *node);
 
   bool should_emit_function(Emitter *visitor, ASTFunctionDeclaration *node, bool test_flag);
   std::string to_cpp_string(const TypeExtensions &ext, const std::string &base);

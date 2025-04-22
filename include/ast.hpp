@@ -127,8 +127,6 @@ struct ASTNode {
 enum AttributeTag {
   //  / @[inline]                           : inlined function
   ATTRIBUTE_INLINE,
-  // @[foreign(external_fn_name)]           : extern function import
-  ATTRIBUTE_FOREIGN,
   // @[entry]                               : program entry point
   ATTRIBUTE_ENTRY,
   // @[impl(Clone, Format, ...)]            : auto implement trait on type declaration
@@ -137,8 +135,6 @@ enum AttributeTag {
   ATTRIBUTE_CONST,
   // @[pub]                                 : make a symbol publicly visible to all importing modules
   ATTRIBUTE_PUB,
-  // @[export]                              : make a symbol visible to any translation unit, even assembly / C code
-  ATTRIBUTE_EXPORT,
   // @[no_mangle]                           : don't mangle a symbols name ever.
   ATTRIBUTE_NO_MANGLE,
 };
