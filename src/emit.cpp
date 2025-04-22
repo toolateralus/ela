@@ -1849,13 +1849,12 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
         emit_forward_declaration(node);
         return;
 
-      } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE) && compile_command.has_flag("release")) {
-        /*
-          ! We can only do this when we're in release mode because for some reason,
-          ! We get undefined references unless we use LTO when inlining functions?
-          ! utterly confusing, but it is
-        */
-        // code << "inline ";
+      } else if (HAS_FLAG(node->flags, FUNCTION_IS_INLINE)) {
+        // We have to use static here otherwise the standalone inline function has
+        // external linkage.
+        
+        // We should have a way to specify static linkage anyway.
+        code << "static inline ";
       }
     }
 
