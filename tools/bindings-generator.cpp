@@ -236,6 +236,7 @@ static inline void wrapgen_declare_type(CXCursor cursor, ClangVisitData *data) {
     }
   }
 }
+
 // Helper function to visit the children of a struct, union, or enum declaration
 static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitData *data, const char *kind) {
   CXString name = clang_getCursorSpelling(cursor);
@@ -251,7 +252,7 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
 
   std::stringstream temp_output;
   std::stringstream anon_output;
-  temp_output << typeName << " :: " << kind << " {\n";
+  temp_output << kind << " " << typeName << " {\n";
 
   clang_visitChildren(
       cursor,
@@ -269,25 +270,23 @@ static inline void wrapgen_visit_struct_union_enum(CXCursor cursor, ClangVisitDa
           if (fieldNameStr.empty()) {
             if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
               std::string anonTypeName = get_unique_identifier();
-              anon_output << anonTypeName
-                          << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
-              wrapgen_visit_struct_union_enum(c, data,
-                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+
+              const auto kind = (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+
+              anon_output << kind << " " << anonTypeName << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, kind);
+
               anon_output << "};\n";
-              temp_output << "  " << anonTypeName
-                          << " : #anon :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union")
-                          << " {\n";
-              wrapgen_visit_struct_union_enum(c, data,
-                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              temp_output << "  " << anonTypeName << " : #anon :: " << kind << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, kind);
               temp_output << "  },\n";
             }
           } else {
             if (clang_getCursorKind(c) == CXCursor_StructDecl || clang_getCursorKind(c) == CXCursor_UnionDecl) {
               std::string anonTypeName = get_unique_identifier();
-              anon_output << anonTypeName
-                          << " :: " << (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union") << " {\n";
-              wrapgen_visit_struct_union_enum(c, data,
-                                              clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              const auto kind = (clang_getCursorKind(c) == CXCursor_StructDecl ? "struct" : "union");
+              anon_output << kind << " " << anonTypeName << " {\n";
+              wrapgen_visit_struct_union_enum(c, data, kind);
               anon_output << "};\n";
               temp_output << "  " << fieldNameStr << " : " << anonTypeName << ",\n";
             } else {
@@ -321,7 +320,7 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
     CXType return_type = clang_getCursorResultType(cursor);
     std::string return_type_name = wrapgen_get_type_name(return_type);
 
-    data->output << "#foreign " << fn_name << " :: fn(";
+    data->output << "extern fn " << fn_name << "(";
 
     int n_params = clang_Cursor_getNumArguments(cursor);
     for (int i = 0; i < n_params; ++i) {
@@ -343,7 +342,7 @@ static inline CXChildVisitResult wrapgen_visitor(CXCursor cursor, CXCursor paren
 
     data->output << ") -> " << return_type_name << ";\n";
     return CXChildVisit_Continue;
-    
+
   } else if (kind == CXCursor_VarDecl) {
     CXString name = clang_getCursorSpelling(cursor);
     std::string variable_name = clang_getCString(name);

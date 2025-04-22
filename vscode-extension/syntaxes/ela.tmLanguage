@@ -164,7 +164,7 @@
 				</dict>
 				<dict>
           <key>match</key>
-          <string>\b(self|себя)\b</string>
+          <string>\b(self)\b</string>
           <key>name</key>
           <string>variable.language.ela</string>
         </dict>

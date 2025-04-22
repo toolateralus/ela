@@ -392,7 +392,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     }
   }
 
-  if ((node->flags & (FUNCTION_IS_FORWARD_DECLARED | FUNCTION_IS_FOREIGN)) == 0) {
+  if ((node->flags & (FUNCTION_IS_FORWARD_DECLARED | FUNCTION_IS_EXTERN)) == 0) {
     node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
   }
 
@@ -420,13 +420,8 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
         type = type->take_pointer_to(param->mutability);
       }
 
-      if (param->tag == ASTParamDecl::Себя) {
-        ctx.scope->insert_variable("себя", type, nullptr, param->mutability);
-        ctx.scope->local_lookup("себя")->flags |= SYMBOL_IS_LOCAL;
-      } else {
-        ctx.scope->insert_variable("self", type, nullptr, param->mutability);
-        ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
-      }
+      ctx.scope->insert_variable("self", type, nullptr, param->mutability);
+      ctx.scope->local_lookup("self")->flags |= SYMBOL_IS_LOCAL;
       info.parameter_types[info.params_len] = type;
     }
 
@@ -608,7 +603,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
         type_scope->insert_function(method->name, method->resolved_type, method);
       }
       impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-      if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+      if (method->flags & FUNCTION_IS_EXTERN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
         continue;
       }
     }
@@ -668,7 +663,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
             type_scope->insert_function(method->name, method->resolved_type, method);
           }
           impl_scope.symbols[method->name] = type_scope->symbols[method->name];
-          if (method->flags & FUNCTION_IS_FOREIGN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
+          if (method->flags & FUNCTION_IS_EXTERN || method->flags & FUNCTION_IS_FORWARD_DECLARED) {
             continue;
           }
         }
@@ -962,8 +957,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
       for (size_t i = 0; i < parameters.size(); ++i) {
         auto &param = parameters[i];
         switch (param->tag) {
-          case ASTParamDecl::Self:
-          case ASTParamDecl::Себя: {
+          case ASTParamDecl::Self: {
             arg_to_generic_map[i] = {false, -1};
           } break;
           case ASTParamDecl::Normal: {
@@ -985,7 +979,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
 
       std::vector<Type *> inferred_generics(generics.size(), Type::INVALID_TYPE);
 
-      auto start_index = (parameters[0]->tag == ASTParamDecl::Self || parameters[0]->tag == ASTParamDecl::Себя) ? 1 : 0;
+      auto start_index = (parameters[0]->tag == ASTParamDecl::Self) ? 1 : 0;
 
       for (size_t i = 0; i < args.size(); ++i) {
         auto arg_ty_id = args[i];
@@ -1231,7 +1225,7 @@ void Typer::visit(ASTFunctionDeclaration *node) {
 
   ctx.scope->insert_function(node->name, node->resolved_type, node);
 
-  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN)) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_EXTERN)) {
     return;
   }
 
@@ -1348,7 +1342,7 @@ void Typer::visit(ASTParamsDecl *node) {
 }
 
 void Typer::visit(ASTParamDecl *node) {
-  if (node->tag == ASTParamDecl::Self || node->tag == ASTParamDecl::Себя) {
+  if (node->tag == ASTParamDecl::Self) {
     if (!type_context) {
       throw_error("No target type for self", node->source_range);
     }
@@ -2644,7 +2638,7 @@ Type *Scope::find_or_create_dyn_type_of(Type *trait_type, SourceRange range, Typ
 
       bool has_self = false;
       for (auto param : declaration->params->params) {
-        if (param->tag == ASTParamDecl::Self || param->tag == ASTParamDecl::Себя) {
+        if (param->tag == ASTParamDecl::Self) {
           if (param->self.is_pointer) {
             parameters.push_back(global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_CONST}}}));
           } else {

@@ -98,7 +98,7 @@ enum struct TType {
   ExpressionBody, // => for expr body, implicit return expr where a block was otherwise expected.
   Defer,
 
-  Impl,      // impl
+  Impl,  // impl
   Trait, // trait
   Where,
 
@@ -119,6 +119,8 @@ enum struct TType {
 
   Choice,
   Is,
+
+  Extern,
 };
 
 #define TTYPE_CASE(type)                                                                                               \
@@ -127,6 +129,7 @@ enum struct TType {
 
 static inline std::string TTypeToString(TType type) {
   switch (type) {
+    TTYPE_CASE(Extern);
     TTYPE_CASE(Char);
     TTYPE_CASE(ExpressionBody);
     TTYPE_CASE(GenericBrace);
@@ -178,7 +181,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Increment);
     TTYPE_CASE(Decrement);
 
-    
     TTYPE_CASE(CompAdd);
     TTYPE_CASE(CompSub);
     TTYPE_CASE(CompMul);
@@ -218,7 +220,7 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Directive);
     TTYPE_CASE(Enum);
     TTYPE_CASE(Attribute);
-    
+
     TTYPE_CASE(Mut);
     TTYPE_CASE(Const);
 
@@ -226,7 +228,6 @@ static inline std::string TTypeToString(TType type) {
     TTYPE_CASE(Dyn_Of);
     TTYPE_CASE(Choice);
     TTYPE_CASE(Is);
-
   }
   return "Unknown";
 }
@@ -291,96 +292,41 @@ struct Token {
 static std::unordered_map<std::string, TType> keywords{
     {"const", TType::Const},
     {"mut", TType::Mut},
-
     {"module", TType::Module},
-
     {"import", TType::Import},
-    {"импорт", TType::Import},
-
-    {"alias", TType::Alias},
-    {"псевдоним", TType::Alias},
-
+    {"alias", TType::Alias},  
+    {"extern", TType::Extern},
     // control flow
     {"in", TType::In},
-    {"в", TType::In},
-
     {"where", TType::Where},
-    {"где", TType::Where},
-
     {"sizeof", TType::Size_Of},
-    {"кегль", TType::Size_Of},
-
     {"typeof", TType::Type_Of},
-    {"тип", TType::Type_Of},
-
     {"fn", TType::Fn},
-    {"фн", TType::Fn},
-
     {"switch", TType::Switch},
-    {"матч", TType::Switch},
-
     {"then", TType::Then},
-    {"тогда", TType::Then},
-
     {"return", TType::Return},
-    {"возврат", TType::Return},
-
     {"break", TType::Break},
-    {"прерв", TType::Break},
-
     {"continue", TType::Continue},
-    {"продолжать", TType::Continue},
-
     {"for", TType::For},
-    {"для", TType::For},
-
     {"while", TType::While},
-    {"пока", TType::While},
-
     {"if", TType::If},
-    {"если", TType::If},
-
     {"else", TType::Else},
-    {"ещё", TType::Else},
-
     // type declarations
     {"struct", TType::Struct},
-    {"структ", TType::Struct},
-
     {"union", TType::Union},
-    {"союз", TType::Union},
-
     {"enum", TType::Enum},
-    {"перечень", TType::Enum},
-
     // literals
     {"true", TType::True},
-    {"правда", TType::True},
-
     {"false", TType::False},
-    {"неверим", TType::False},
-
     {"null", TType::Null},
-    {"нулевой", TType::Null},
-
     // miscellaneous
     {"as", TType::As},
-    {"как", TType::As},
-
     {"impl", TType::Impl},
-    {"реализуйте", TType::Impl},
-
     {"defer", TType::Defer},
-    {"отложить", TType::Defer},
-
     {"trait", TType::Trait},
-    {"интерфейс", TType::Trait},
-
     {"dyn", TType::Dyn},
     {"dynof", TType::Dyn_Of},
-    
     {"choice", TType::Choice},
-
     // for pattern matching
     {"is", TType::Is},
 

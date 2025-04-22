@@ -226,34 +226,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         }
     }},
 
-    // #foreign
-    // Declare a foreign function, like C's extern.
-    {.identifier = "foreign",
-      .kind = DIRECTIVE_KIND_STATEMENT,
-      .run = [](Parser *parser) {
-        NODE_ALLOC(ASTFunctionDeclaration, function, range, _, parser)
-        parser->expect(TType::Fn);
-        auto name = parser->expect(TType::Identifier);
-        auto last_func_decl = parser->current_func_decl;
-        parser->current_func_decl = function;
-        Defer deferred = {[&] { parser->current_func_decl = last_func_decl; }};
-        
-        function->params = parser->parse_parameters();
-        function->name = name.value;
-        if (parser->peek().type != TType::Arrow) {
-          function->return_type = ASTType::get_void();
-        } else {
-          parser->expect(TType::Arrow);
-          function->return_type = parser->parse_type();
-        }
-        function->flags |= FUNCTION_IS_FOREIGN;
-
-        parser->expect(TType::Semi);
-
-        parser->end_node(function, range);
-        return function;
-    }},
-
     // #location, for getting source location.
     {
       .identifier = "location",
@@ -318,17 +290,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
 
     // #self, return the type of the current declaring struct or union
     {.identifier = "self",
-      .kind = DIRECTIVE_KIND_DONT_CARE,
-      .run = [](Parser *parser) -> Nullable<ASTNode> {
-        NODE_ALLOC(ASTType, type, range, defer, parser);
-        parser->parse_pointer_extensions(type);
-        type->kind = ASTType::SELF;
-        parser->append_type_extensions(type);
-        return type;
-    }},
-
-    // #self, return the type of the current declaring struct or union
-    {.identifier = "себя",
       .kind = DIRECTIVE_KIND_DONT_CARE,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         NODE_ALLOC(ASTType, type, range, defer, parser);
@@ -564,6 +525,7 @@ ASTProgram *Parser::parse_program() {
       case AST_NODE_IMPL:
       case AST_NODE_IMPORT:
       case AST_NODE_MODULE:
+      case AST_NODE_STATEMENT_LIST:
         break;
       default:
       err:
@@ -1328,7 +1290,7 @@ ASTStatement *Parser::parse_statement() {
     return variable;
   }
 
-  if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self" || lookahead_buf()[1].value == "себя")) {
+  if (tok.type == TType::Directive && (lookahead_buf()[1].value == "self")) {
     NODE_ALLOC(ASTExprStatement, statment, range, _, this)
     statment->expression = parse_expr();
     end_node(statment, range);
@@ -1434,6 +1396,45 @@ ASTStatement *Parser::parse_statement() {
     ctx.set_scope(old_scope);
     expect(TType::RCurly);
     return module;
+  }
+
+
+  /* 
+    I'm getting rid of '#export' and '#foreign' and just replacing it with
+    an extern node, as well as making it so we can do blocks of externs.
+
+    the export and foreign were strange and had useless semantics.
+    any kind of extern function aliasing can be done via attributes in the future.
+  */
+  if (tok.type == TType::Extern) {
+    expect(TType::Extern);
+    
+    if (peek().type == TType::LCurly) { // block of extern statements
+      NODE_ALLOC(ASTStatementList, node, range, defer, this);
+      expect(TType::LCurly);
+      while (peek().type != TType::RCurly) {
+        if (peek().type == TType::Fn) {
+          auto function = parse_function_declaration();
+          function->flags |= FUNCTION_IS_EXTERN;
+          node->statements.push_back(function);
+        } else {
+          auto variable = parse_variable();
+          variable->is_extern = true;
+          node->statements.push_back(variable);
+        }
+        expect(TType::Semi);
+      }
+      expect(TType::RCurly);
+      return node;
+    } else if (peek().type == TType::Fn) { // single extern fn
+      auto function = parse_function_declaration();
+      function->flags |= FUNCTION_IS_EXTERN;
+      return function;
+    } else { // single extern variable
+      auto variable = parse_variable();
+      variable->is_extern = true;
+      return variable;
+    }
   }
 
   if (peek().type == TType::Defer) {
@@ -1907,7 +1908,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
     auto next = peek();
     // parse self parameters.
-    if (next.type == TType::Mul || next.value == "self" || next.value == "себя") {
+    if (next.type == TType::Mul || next.value == "self") {
       Mutability mutability = CONST;
       bool is_pointer = false;
 
@@ -1929,8 +1930,6 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
       if (ident.value == "self") {
         param->tag = ASTParamDecl::Self;
-      } else if (ident.value == "себя") {
-        param->tag = ASTParamDecl::Себя;
       } else {
         end_node(nullptr, range);
         throw_error("when we got *mut/*const, we expected \'self\', since the parameter was not named", range);
@@ -1938,7 +1937,7 @@ ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_pa
 
       if (params->params.size() != 0) {
         end_node(nullptr, range);
-        throw_error("'self/себя' must be the first parameter in the signature", range);
+        throw_error("'self' must be the first parameter in the signature", range);
       }
 
       params->has_self = true;

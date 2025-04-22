@@ -850,8 +850,6 @@ void Emitter::visit(ASTParamDecl *node) {
     }
   } else if (node->tag == ASTParamDecl::Self) {
     code << to_cpp_string(type) << " self";
-  } else {
-    code << to_cpp_string(type) << " себя";
   }
 
   return;
@@ -1895,7 +1893,7 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
     return;
   }
 
-  if (HAS_FLAG(node->flags, FUNCTION_IS_FOREIGN)) {
+  if (HAS_FLAG(node->flags, FUNCTION_IS_EXTERN)) {
     emit_foreign_function(node);
     return;
   }
@@ -2094,7 +2092,7 @@ void Emitter::visit(ASTModule *node) {}
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
   if (symbol->is_local() ||
-      (symbol->is_function() && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_FOREIGN))) {
+      (symbol->is_function() && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
     return symbol->name.get_str();
   }
 
