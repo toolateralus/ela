@@ -1219,6 +1219,13 @@ ASTStatement *Parser::parse_statement() {
     tok = peek();
   }
 
+  if (tok.type == TType::Eof) {
+    // ! this should not be neccesary,
+    // ! but the way we handle semi colons is absolutely terrible.
+    // ! it should be much more structured, not just wishy washy.
+    return ast_alloc<ASTNoop>();
+  }
+
   if (tok.type == TType::Attribute) {
     std::vector<Attribute> attributes;
     {
@@ -2026,7 +2033,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
 
   if (peek().type == TType::Semi) {
     node->flags |= FUNCTION_IS_FORWARD_DECLARED;
-    auto sym = ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
+    ctx.scope->local_lookup(name)->flags |= SYMBOL_IS_FORWARD_DECLARED;
     end_node(node, range);
     current_func_decl = last_func_decl;
     return node;
