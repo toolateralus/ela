@@ -842,7 +842,7 @@ void Emitter::visit(ASTParamDecl *node) {
   auto type = node->resolved_type;
 
   if (node->tag == ASTParamDecl::Normal) {
-    if (type->is_kind(TYPE_FUNCTION)) {
+    if (type->is_kind(TYPE_FUNCTION) || type->extensions.is_fixed_sized_array()) {
       code << get_declaration_type_signature_and_identifier(node->normal.name.get_str(), type);
     } else {
       node->normal.type->accept(this);

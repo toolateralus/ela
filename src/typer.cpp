@@ -1,6 +1,7 @@
 #include <algorithm>
 #include <cassert>
 #include <csetjmp>
+#include <ctime>
 #include <format>
 #include <iostream>
 #include <linux/limits.h>
@@ -198,7 +199,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
   using alias_variant = std::tuple<InternedString, Type *, TypeKind, ASTNode *>;
   using struct_variant = std::tuple<InternedString, Scope *>;
 
-  constexpr auto ALIAS_VARIANT_INDEX  = 0;
+  constexpr auto ALIAS_VARIANT_INDEX = 0;
   constexpr auto STRUCT_VARIANT_INDEX = 1;
 
   std::vector<std::variant<alias_variant, struct_variant>> variants;
@@ -244,7 +245,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
 }
 
 void Typer::visit_function_body(ASTFunctionDeclaration *node) {
-    //// TODO: handle more attributes
+  //// TODO: handle more attributes
   for (auto attr : node->attributes) {
     switch (attr.tag) {
       case ATTRIBUTE_INLINE: {
@@ -253,7 +254,8 @@ void Typer::visit_function_body(ASTFunctionDeclaration *node) {
       case ATTRIBUTE_ENTRY: {
         node->flags |= FUNCTION_IS_ENTRY;
       } break;
-      default: break;
+      default:
+        break;
     }
   }
 
@@ -409,7 +411,8 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
       case ATTRIBUTE_ENTRY: {
         node->flags |= FUNCTION_IS_ENTRY;
       } break;
-      default: break;
+      default:
+        break;
     }
   }
 
@@ -566,7 +569,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     trait_ty = trait_id;
     node->scope->name = node->scope->name.get_str() + "_of" + std::to_string(trait_id->uid);
 
-    auto decl_node = (ASTTraitDeclaration*)trait_id->declaring_node.get();
+    auto decl_node = (ASTTraitDeclaration *)trait_id->declaring_node.get();
 
     if (decl_node && decl_node->where_clause) {
       ctx.set_scope(decl_node->scope);
@@ -609,8 +612,6 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
   }
 
   for (const auto &method : node->methods) {
-  
-
     method->declaring_type = target_ty;
     if (!method->generic_parameters.empty()) {
       continue;
@@ -644,9 +645,8 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto declaring_node = trait_ty->declaring_node.get();
 
     if (!declaring_node || declaring_node->get_node_type() != AST_NODE_TRAIT_DECLARATION) {
-      throw_error(
-          std::format("\'impl <trait> for <type>\' must implement an trait. got {}", trait_ty->to_string()),
-          node->source_range);
+      throw_error(std::format("\'impl <trait> for <type>\' must implement an trait. got {}", trait_ty->to_string()),
+                  node->source_range);
     }
 
     auto trait = static_cast<ASTTraitDeclaration *>(declaring_node);
@@ -717,7 +717,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
 }
 
 void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
-                                        std::vector<Type *> generic_args) {
+                                    std::vector<Type *> generic_args) {
   auto id = ctx.scope->find_type_id(node->name, {});
   if (id != Type::INVALID_TYPE) {
     auto type = id;
@@ -751,7 +751,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
   node->scope->name = node->name.get_str() + mangled_type_args(generic_args);
 
   // if (node->where_clause) {
-    // node->where_clause.get()->accept(this);
+  // node->where_clause.get()->accept(this);
   // }
 
   type->declaring_node = node;
@@ -824,7 +824,8 @@ bool is_const_pointer(ASTNode *node) {
   return false;
 }
 
-void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable, bool is_deinit_call) {
+void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self_nullable,
+                                        bool is_deinit_call) {
   auto old_type = expected_type;
   Defer _([&]() { expected_type = old_type; });
   auto args_ct = node->arguments.size();
@@ -888,9 +889,9 @@ void Typer::type_check_args_from_params(ASTArguments *node, ASTParamsDecl *param
     }
   }
 
-  /* 
+  /*
     We use some strange semantics for deinit.
-    It is technically a mutating function, but simply declaring a string that you later want 
+    It is technically a mutating function, but simply declaring a string that you later want
     to destroy would require mut EVERYWHERE.
 
     So, we compromise, and allow constant variables and pointers to be passed to deinit calls,
@@ -1399,19 +1400,20 @@ void Typer::visit(ASTParamDecl *node) {
 
     auto type = id;
 
-    if (type->extensions.is_fixed_sized_array()) {
-      throw_warning(WarningDownCastFixedArrayParam,
-                    "using a fixed array as a function parameter: note, this "
-                    "casts the length information off and gets passed as as "
-                    "pointer. Consider using a dynamic array",
-                    node->source_range);
-      // cast off the fixed size array and add a pointer to it,
-      // for s8[] to s8*
-      {
-        auto element = type->get_element_type();
-        node->resolved_type = element->take_pointer_to(CONST);
-      }
-    }
+    // TODO: remove me, I think this arbitrary constraint was purely due to C++ constraints.
+    // if (type->extensions.is_fixed_sized_array()) {
+    //   throw_warning(WarningDownCastFixedArrayParam,
+    //                 "using a fixed array as a function parameter: note, this "
+    //                 "casts the length information off and gets passed as as "
+    //                 "pointer. Consider using a dynamic array",
+    //                 node->source_range);
+    //   // cast off the fixed size array and add a pointer to it,
+    //   // for s8[] to s8*
+    //   {
+    //     auto element = type->get_element_type();
+    //     node->resolved_type = element->take_pointer_to(CONST);
+    //   }
+    // }
 
     auto old_ty = expected_type;
     expected_type = id;
@@ -2202,9 +2204,8 @@ void Typer::visit(ASTIndex *node) {
   auto ext = left_ty->extensions;
   if (!ext.is_fixed_sized_array() && !ext.is_pointer()) {
     throw_error(
-        std::format(
-            "cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
-            left_ty->to_string()),
+        std::format("cannot index into non-array, non-pointer type that doesn't implement the `Subscript` trait. {}",
+                    left_ty->to_string()),
         node->source_range);
   }
 
@@ -2597,7 +2598,22 @@ void Typer::visit(ASTModule *node) {
     statement->accept(this);
   }
   ctx.set_scope(old_scope);
-  ctx.scope->create_module(node->module_name, node);
+  if (auto mod = ctx.scope->local_lookup(node->module_name)) {
+    if (!mod->is_module()) {
+      throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
+    }
+    for (auto &[name, sym] : node->scope->symbols) {
+      if (mod->scope->local_lookup(name)) {
+        throw_error("redefinition of symbol in module append declaration (a module already existed, and we were adding "
+                    "symbols to it.)",
+                    node->source_range);
+      }
+      mod->scope->symbols[name] = sym;
+    }
+
+  } else {
+    ctx.scope->create_module(node->module_name, node);
+  }
 }
 
 void Typer::visit(ASTDyn_Of *node) {
@@ -2633,10 +2649,9 @@ void Typer::visit(ASTDyn_Of *node) {
 
   auto element_type = object_type->get_element_type();
   if (!element_type->implements(node->trait_type->resolved_type)) {
-    throw_error(
-        std::format("cannot create 'dyn {}' from object of type '{}' because it does not implement the trait.",
-                    type->to_string(), element_type->to_string()),
-        node->source_range);
+    throw_error(std::format("cannot create 'dyn {}' from object of type '{}' because it does not implement the trait.",
+                            type->to_string(), element_type->to_string()),
+                node->source_range);
   }
 
   auto ty = ctx.scope->find_or_create_dyn_type_of(type->base_type == Type::INVALID_TYPE ? type : type->base_type,

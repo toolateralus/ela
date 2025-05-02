@@ -482,6 +482,21 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     }
   }
 
+  /* 
+    TODO: remove me, just a little hack im playing around with.
+  */
+  if (extensions.is_fixed_sized_array()) {
+    auto scope = type->info->scope;
+    scope->create_type_alias("vT", base_type, kind, nullptr);
+    auto literal = ast_alloc<ASTLiteral>();
+    literal->tag = ASTLiteral::Integer;
+    literal->value = std::to_string(extensions.extensions.back().array_size);
+    // This wont work because we don't fold constants.
+    // there woudl have to be some declarative code that would get transpiled to C,
+    // for this to work.
+    scope->insert_variable("vN", u64_type(), literal, CONST);
+  }
+
   if (!info->scope) {
     info->scope = create_child(nullptr);
   }

@@ -118,19 +118,18 @@ void DependencyEmitter::visit(ASTProgram *node) {
   ctx.set_scope(ctx.root_scope);
 
   if (!compile_command.has_flag("nostdlib")) {
-
     // We have to do this here because the reflection system depends on this type and it doesn't
     // neccesarily get instantiatied.
     // see the `Emitter:get_type_struct`
     // and `bootstrap/reflection.ela/Type :: struct`
 
     auto sub_types = std::vector<Type *>{
-      ctx.scope->find_type_id("str", {}),
-      ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
+        ctx.scope->find_type_id("str", {}),
+        ctx.scope->find_type_id("void", {{{TYPE_EXT_POINTER_CONST}}}),
     };
 
     auto tuple_id = global_find_type_id(sub_types, {});
-    
+
     define_type(tuple_id);
     declare_type(tuple_id);
   }
@@ -269,8 +268,7 @@ void DependencyEmitter::visit(ASTUnaryExpr *node) {
 
 void DependencyEmitter::visit(ASTIndex *node) {
   if (node->is_operator_overload) {
-    visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT),
-                            node->index);
+    visit_operator_overload(node->left, get_operator_overload_name(TType::LBrace, OPERATION_SUBSCRIPT), node->index);
   } else {
     // make sure type is defined for size
     define_type(node->left->resolved_type);
@@ -453,6 +451,15 @@ void DependencyEmitter::visit(ASTRange *node) {
 
 void DependencyEmitter::visit(ASTSwitch *node) {
   node->target->accept(this);
+
+  auto type = node->target->resolved_type;
+
+  if (!type->is_kind(TYPE_SCALAR) && !type->is_kind(TYPE_ENUM) && !type->extensions.is_pointer() &&
+      !node->cases.empty()) {
+    visit_operator_overload(node->target, get_operator_overload_name(TType::EQ, OPERATION_BINARY),
+                            node->cases[0].expression);
+  }
+
   for (const auto $case : node->cases) {
     $case.block->accept(this);
     $case.expression->accept(this);
@@ -500,7 +507,7 @@ void DependencyEmitter::visit(ASTImpl *node) {
 void DependencyEmitter::visit(ASTDefer *node) { node->statement->accept(this); }
 
 void DependencyEmitter::visit(ASTChoiceDeclaration *node) {
-  if (!node->generic_parameters.empty()) {  
+  if (!node->generic_parameters.empty()) {
     return;
   }
 
