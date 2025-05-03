@@ -2592,13 +2592,15 @@ void Typer::visit(ASTSize_Of *node) {
 
 void Typer::visit(ASTModule *node) {
   auto old_scope = ctx.scope;
+
   ctx.set_scope(node->scope);
   node->scope->name = node->module_name;
   for (auto statement : node->statements) {
     statement->accept(this);
   }
   ctx.set_scope(old_scope);
-  if (auto mod = ctx.scope->local_lookup(node->module_name)) {
+
+  if (auto mod = ctx.scope->lookup(node->module_name)) {
     if (!mod->is_module()) {
       throw_error("cannot create module: an identifier exists in this scope with that name.", node->source_range);
     }
@@ -2867,6 +2869,8 @@ void Typer::visit(ASTMethodCall *node) {
   node->dot->accept(this);
   auto func_sym = ctx.get_symbol(node->dot).get();
 
+  bool added_dyn_instance_argument_as_arg_0 = false;
+
   if (func_sym && func_sym->is_function()) {
     type = func_sym->type_id;
 
@@ -2875,7 +2879,6 @@ void Typer::visit(ASTMethodCall *node) {
       func_decl = static_cast<ASTFunctionDeclaration *>(declaring_node);
 
       // resolve a generic call.
-
       if (!func_decl->generic_parameters.empty()) {
         // doing this so self will get the right type when we call generic methods
         // TODO: handle this in the function decl itself, maybe insert self into symbol table
@@ -2900,6 +2903,7 @@ void Typer::visit(ASTMethodCall *node) {
     // that the dyn thingy sets up.
     auto object = node->dot->base;
     auto obj_type = object->resolved_type;
+    
     if (obj_type->is_kind(TYPE_DYN)) {
       auto &args = node->arguments->arguments;
       auto dot = ast_alloc<ASTDotExpr>();
@@ -2907,6 +2911,7 @@ void Typer::visit(ASTMethodCall *node) {
       dot->member = ASTPath::Segment{"instance"};
       dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
       args.insert(args.begin(), dot);
+      added_dyn_instance_argument_as_arg_0 = true;
     }
 
     type = node->dot->resolved_type;
@@ -2931,6 +2936,10 @@ void Typer::visit(ASTMethodCall *node) {
     type_check_args_from_params(node->arguments, func_decl->params, node->dot->base, func_sym->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
+  }
+
+  if (added_dyn_instance_argument_as_arg_0) {
+    node->arguments->arguments.erase(node->arguments->arguments.begin());
   }
 
   node->resolved_type = info->return_type;

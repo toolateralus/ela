@@ -41,7 +41,10 @@
       "request": "launch",
       "name": "Debug current file (tests)",
       "program": "${fileDirname}/${fileBasenameNoExtension}",
-      "cwd": "${fileDirname}"
+      "cwd": "${fileDirname}",
+      "env": {
+        "ELA_LIB_PATH": "/home/josh_arch/source/ela/ela-stdlib"
+      }
     },
     
     // If you have an ela_source/main.ela you can use these configurations to test

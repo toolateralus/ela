@@ -22,9 +22,7 @@ int CompileCommand::compile() {
   parse.end("parsing done.");
 
   lower.begin();
-  auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
   Typer type_visitor{context};
-  auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
   type_visitor.visit(root);
 
   {
@@ -53,6 +51,8 @@ int CompileCommand::compile() {
 
     emit.code << BOILERPLATE_C_CODE << '\n';
 
+    auto type_ptr_id = context.scope->find_type_id("Type", {{{TYPE_EXT_POINTER_CONST}}});
+    auto type_list = type_visitor.find_generic_type_of("List", {type_ptr_id}, {});
     if (!is_freestanding && !has_flag("nostdlib")) {
       dependencyEmitter.declare_type(type_list);
       dependencyEmitter.define_type(type_list);

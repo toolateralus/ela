@@ -1,0 +1,16 @@
+module std {
+  module submodule {
+    fn something() {}
+  }
+}
+
+module std {
+  fn func() {
+    // use of undeclared identifier 'submodule'
+    submodule::something();
+  }
+}
+
+fn main() {
+
+}

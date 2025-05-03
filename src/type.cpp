@@ -6,7 +6,6 @@
 #include <vector>
 
 #include "ast.hpp"
-#include "core.hpp"
 #include "error.hpp"
 #include "interned_string.hpp"
 #include "lex.hpp"

@@ -2035,10 +2035,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     node->flags |= FUNCTION_IS_METHOD;
   }
 
-  // TODO: find a better solution to this.
-  for (const auto &param : node->generic_parameters) {
-    ctx.scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC);
-  }
 
   node->block = parse_block();
   node->block.get()->parent = node;
@@ -2260,10 +2256,6 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
   node->scope = info->scope;
   if (is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
-
-  for (const auto &param : node->generic_parameters) {
-    info->scope->forward_declare_type(param, Type::UNRESOLVED_GENERIC);
-  }
 
   if (!semicolon()) {
     auto scope = info->scope;

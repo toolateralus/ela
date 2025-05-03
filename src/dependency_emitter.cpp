@@ -555,7 +555,9 @@ void DependencyEmitter::visit(ASTWhere *node) {
 void DependencyEmitter::visit(ASTModule *node) {}
 
 void DependencyEmitter::visit(ASTDyn_Of *node) {
+  declare_type(node->resolved_type);
   define_type(node->resolved_type);
+
   node->object->accept(this);
   auto element_type = node->object->resolved_type->get_element_type();
   auto element_scope = element_type->info->scope;

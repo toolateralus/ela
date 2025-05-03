@@ -111,7 +111,7 @@ ASTType *ASTCopier::copy_type(ASTType *node) {
       break;
     case ASTType::NORMAL:
       if (node->normal.path) {
-        new_node->normal.path = (ASTPath*)copy_node(node->normal.path);
+        new_node->normal.path = (ASTPath *)copy_node(node->normal.path);
       }
       break;
     case ASTType::TUPLE:
@@ -202,8 +202,8 @@ ASTDotExpr *ASTCopier::copy_dot_expr(ASTDotExpr *node) {
   auto new_node = copy(node);
   new_node->base = static_cast<ASTExpr *>(copy_node(node->base));
   new_node->member.generic_arguments.clear();
-  for (const auto &arg: node->member.generic_arguments) {
-    new_node->member.generic_arguments.push_back((ASTExpr*)copy_node(arg));
+  for (const auto &arg : node->member.generic_arguments) {
+    new_node->member.generic_arguments.push_back((ASTExpr *)copy_node(arg));
   }
   return new_node;
 }
@@ -584,7 +584,7 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
 }
 ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   auto new_node = copy(node);
-  new_node->dot = (ASTDotExpr*)copy_node(node->dot);
-  new_node->arguments = (ASTArguments*)copy_node(node->arguments);
+  new_node->dot = (ASTDotExpr *)copy_node(node->dot);
+  new_node->arguments = (ASTArguments *)copy_node(node->arguments);
   return new_node;
 }

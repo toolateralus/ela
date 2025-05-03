@@ -62,14 +62,16 @@ void Emitter::forward_decl_type(Type *type) {
     case TYPE_STRUCT: {
       auto info = type->info->as<StructTypeInfo>();
       std::string kw = "typedef struct ";
-
       if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_UNION)) {
         kw = "typedef union ";
       }
-
       code << kw << to_cpp_string(type) << " " << to_cpp_string(type) << ";\n";
     } break;
+    case TYPE_DYN: {
+      dep_emitter->define_type(type);
+    } break;
     default:
+
       return;
   }
 }
@@ -1859,7 +1861,8 @@ void Emitter::visit(ASTFunctionDeclaration *node) {
       code << "extern  ";
     }
 
-    if ((node->name == "main" ||  HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) && !is_freestanding && !compile_command.has_flag("nostdlib")) {
+    if ((node->name == "main" || HAS_FLAG(node->flags, FUNCTION_IS_ENTRY)) && !is_freestanding &&
+        !compile_command.has_flag("nostdlib")) {
       has_user_defined_main = true;
       user_defined_entry_point = node->name;
       node->return_type->accept(this);
@@ -2163,6 +2166,22 @@ void Emitter::visit(ASTMethodCall *node) {
   auto symbol = ctx.get_symbol(node->dot).get();
   // Call a function pointer via a dot expression
   if (symbol->is_variable()) {
+    {
+      // Implicitly pass the 'dyn.instance' when calling the function pointers
+      // that the dyn thingy sets up.
+      auto object = node->dot->base;
+      auto obj_type = object->resolved_type;
+
+      if (obj_type->is_kind(TYPE_DYN)) {
+        auto &args = node->arguments->arguments;
+        auto dot = ast_alloc<ASTDotExpr>();
+        dot->base = object;
+        dot->member = ASTPath::Segment{"instance"};
+        dot->resolved_type = global_find_type_id(void_type(), {{{TYPE_EXT_POINTER_MUT}}});
+        args.insert(args.begin(), dot);
+      }
+    }
+
     auto func = node->dot;
     func->accept(this);
     code << mangled_type_args(generic_args);
