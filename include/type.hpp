@@ -167,10 +167,7 @@ struct TypeExtensions {
   std::string to_string() const;
 };
 
-struct GenericParameter {
-  Type *default_value = nullptr;
-  InternedString identifier;
-};
+using GenericParameter = InternedString;
 
 struct TypeInfo {
   Scope *scope = nullptr;
