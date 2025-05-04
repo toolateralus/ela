@@ -23,7 +23,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
       auto binary = static_cast<ASTBinExpr *>(node);
       auto left = evaluate_constexpr(binary->left, ctx);
       auto right = evaluate_constexpr(binary->right, ctx);
-      switch (binary->op.type) {
+      switch (binary->op) {
         case TType::Add:
           return left + right;
         case TType::Sub:
@@ -78,7 +78,7 @@ Value evaluate_constexpr(ASTExpr *node, Context &ctx) {
     case AST_NODE_UNARY_EXPR: {
       auto unary = static_cast<ASTUnaryExpr *>(node);
       auto operand = evaluate_constexpr(unary->operand, ctx);
-      switch (unary->op.type) {
+      switch (unary->op) {
         case TType::Sub:
           return -operand;
         case TType::LogicalNot:

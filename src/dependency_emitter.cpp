@@ -248,7 +248,7 @@ void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string
 
 void DependencyEmitter::visit(ASTBinExpr *node) {
   if (node->is_operator_overload) {
-    visit_operator_overload(node->left, get_operator_overload_name(node->op.type, OPERATION_BINARY), node->right);
+    visit_operator_overload(node->left, get_operator_overload_name(node->op, OPERATION_BINARY), node->right);
   } else {
     node->left->accept(this);
     node->right->accept(this);
@@ -257,9 +257,9 @@ void DependencyEmitter::visit(ASTBinExpr *node) {
 
 void DependencyEmitter::visit(ASTUnaryExpr *node) {
   if (node->is_operator_overload) {
-    visit_operator_overload(node->operand, get_operator_overload_name(node->op.type, OPERATION_UNARY), nullptr);
+    visit_operator_overload(node->operand, get_operator_overload_name(node->op, OPERATION_UNARY), nullptr);
   } else {
-    if (node->op.type == TType::Mul) {
+    if (node->op == TType::Mul) {
       define_type(node->operand->resolved_type);
     }
     node->operand->accept(this);

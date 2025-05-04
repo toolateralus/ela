@@ -437,7 +437,7 @@ void Emitter::visit(ASTLiteral *node) {
 }
 
 void Emitter::visit(ASTUnaryExpr *node) {
-  if (node->op.type == TType::Sub) {
+  if (node->op == TType::Sub) {
     auto type = to_cpp_string(node->operand->resolved_type);
     code << '(' << type << ')';
   }
@@ -445,7 +445,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
   auto left_ty = left_type;
 
   if (left_ty && node->is_operator_overload) {
-    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op.type, node->operand, nullptr);
+    call_operator_overload(node->source_range, left_ty, OPERATION_UNARY, node->op, node->operand, nullptr);
     return;
   }
 
@@ -453,12 +453,12 @@ void Emitter::visit(ASTUnaryExpr *node) {
 
   // we always do these as postfix unary since if we don't it's kinda undefined
   // behaviour and it messes up unary expressions at the end of dot expressions
-  if (node->op.type == TType::Increment || node->op.type == TType::Decrement) {
+  if (node->op == TType::Increment || node->op == TType::Decrement) {
     node->operand->accept(this);
-    code << node->op.value.get_str();
+    code << ttype_get_operator_string(node->op, node->source_range);
   } else {
     code << '(';
-    code << node->op.value.get_str();
+    code << ttype_get_operator_string(node->op, node->source_range);
     node->operand->accept(this);
     code << ")";
   }
@@ -466,7 +466,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
 }
 
 void Emitter::visit(ASTBinExpr *node) {
-  if (node->op.type == TType::Assign &&
+  if (node->op == TType::Assign &&
       (node->right->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_IF)) {
     auto old = std::move(cf_expr_return_register);
     Defer _defer([&]() { cf_expr_return_register = std::move(old); });
@@ -487,16 +487,16 @@ void Emitter::visit(ASTBinExpr *node) {
   auto left_ty = node->left->resolved_type;
 
   if (left_ty && node->is_operator_overload) {
-    call_operator_overload(node->source_range, left_ty, OPERATION_BINARY, node->op.type, node->left, node->right);
+    call_operator_overload(node->source_range, left_ty, OPERATION_BINARY, node->op, node->left, node->right);
     return;
   }
 
-  auto op_ty = node->op.type;
+  auto op_ty = node->op;
   code << "(";
   node->left->accept(this);
   space();
-  code << node->op.value.get_str();
-  if (node->op.type == TType::Assign) {
+  code << ttype_get_operator_string(node->op, node->source_range);
+  if (node->op == TType::Assign) {
     auto type = node->resolved_type;
     if (type->is_kind(TYPE_CHOICE) && node->right->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->right;

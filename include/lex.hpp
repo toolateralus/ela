@@ -251,28 +251,29 @@ struct SourceRange {
   std::string ToString() const { return files()[file] + ":" + std::to_string(line) + ":" + std::to_string(column); }
 };
 
-struct Token {
-  inline bool is_relational() const {
-    switch (type) {
-      case TType::LT:
-      case TType::GT:
-      case TType::EQ:
-      case TType::NEQ:
-      case TType::LE:
-      case TType::GE:
-      case TType::LogicalOr:
-      case TType::LogicalAnd:
-        return true;
-      default:
-        return false;
-    }
+static inline bool ttype_is_relational(TType type) {
+  switch (type) {
+    case TType::LT:
+    case TType::GT:
+    case TType::EQ:
+    case TType::NEQ:
+    case TType::LE:
+    case TType::GE:
+    case TType::LogicalOr:
+    case TType::LogicalAnd:
+      return true;
+    default:
+      return false;
   }
-  inline bool is_comp_assign() const {
-    return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
-           type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
-           type == TType::CompSHL || type == TType::CompSHR;
-  }
+}
 
+static inline bool ttype_is_comp_assign(TType type) {
+  return type == TType::CompAdd || type == TType::CompSub || type == TType::CompMul || type == TType::CompDiv ||
+         type == TType::CompMod || type == TType::CompAnd || type == TType::CompOr || type == TType::CompXor ||
+         type == TType::CompSHL || type == TType::CompSHR;
+}
+
+struct Token {
   Token() {}
 
   Token(SourceRange location, InternedString value, TType type, TFamily family)
@@ -294,7 +295,7 @@ static std::unordered_map<std::string, TType> keywords{
     {"mut", TType::Mut},
     {"module", TType::Module},
     {"import", TType::Import},
-    {"alias", TType::Alias},  
+    {"alias", TType::Alias},
     {"extern", TType::Extern},
     // control flow
     {"in", TType::In},
@@ -383,6 +384,27 @@ static std::unordered_map<std::string, TType> operators{{"=>", TType::Expression
                                                         {"<<=", TType::CompSHL},
                                                         {">>=", TType::CompSHR},
                                                         {"!<", TType::GenericBrace}};
+
+
+void throw_error(const std::string &message, const SourceRange &source_range);
+
+static inline std::string ttype_get_operator_string(TType type, const SourceRange &range) {
+  for (const auto &op : operators) {
+    if (op.second == type) {
+      return op.first;
+    }
+  }
+
+  if (type == TType::SHR) {
+    return ">>";
+  }
+  if (type == TType::CompSHR) {
+    return ">>=";
+  }
+  
+  throw_error("invalid operator?", range);
+  return {};
+}
 
 struct Lexer {
   struct State {

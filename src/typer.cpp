@@ -300,7 +300,7 @@ std::string print_where_predicate(ASTExpr *predicate) {
   switch (predicate->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
       auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op.type;
+      auto op = bin->op;
       if (op == TType::And) {
         return print_where_predicate(bin->left) + " & " + print_where_predicate(bin->right);
       } else if (op == TType::Or) {
@@ -324,7 +324,7 @@ bool Typer::visit_where_predicate(Type *target_type, ASTExpr *predicate) {
   switch (predicate->get_node_type()) {
     case AST_NODE_BIN_EXPR: {
       auto bin = static_cast<ASTBinExpr *>(predicate);
-      auto op = bin->op.type;
+      auto op = bin->op;
       if (op == TType::And) {
         return visit_where_predicate(target_type, bin->left) && visit_where_predicate(target_type, bin->right);
       } else if (op == TType::Or) {
@@ -1864,7 +1864,7 @@ void Typer::visit(ASTBinExpr *node) {
   auto old_ty = expected_type;
   Defer _defer([&] { expected_type = old_ty; });
 
-  if (node->op.type == TType::Assign) {
+  if (node->op == TType::Assign) {
     expected_type = left;
   } else if (node->left->get_node_type() == AST_NODE_SWITCH || node->right->get_node_type() == AST_NODE_SWITCH ||
              node->right->get_node_type() == AST_NODE_IF || node->left->get_node_type() == AST_NODE_IF) {
@@ -1876,7 +1876,7 @@ void Typer::visit(ASTBinExpr *node) {
   node->right->accept(this);
   auto right = node->right->resolved_type;
 
-  if (node->op.type == TType::Assign || node->op.is_comp_assign()) {
+  if (node->op == TType::Assign || ttype_is_comp_assign(node->op)) {
     if (node->left->get_node_type() == AST_NODE_PATH) {
       auto path = (ASTPath *)node->left;
       if (path->length() == 1 && path->segments[0].generic_arguments.empty()) {
@@ -1903,11 +1903,11 @@ void Typer::visit(ASTBinExpr *node) {
   auto left_ty = left;
 
   // Do checks for constness.
-  if (node->op.type == TType::Assign) {
+  if (node->op == TType::Assign) {
     if (node->left->get_node_type() == AST_NODE_UNARY_EXPR) {
       auto unary = (ASTUnaryExpr *)node->left;
       auto unary_operand_ty = unary->operand->resolved_type;
-      if (unary->op.type == TType::Mul && unary_operand_ty->extensions.is_const_pointer()) {
+      if (unary->op == TType::Mul && unary_operand_ty->extensions.is_const_pointer()) {
         throw_error("cannot dereference into a const pointer!", node->source_range);
       }
 
@@ -1961,7 +1961,7 @@ void Typer::visit(ASTBinExpr *node) {
     }
   }
 
-  auto operator_overload_ty = find_operator_overload(CONST, left_ty, node->op.type, OPERATION_BINARY);
+  auto operator_overload_ty = find_operator_overload(CONST, left_ty, node->op, OPERATION_BINARY);
   if (operator_overload_ty != Type::INVALID_TYPE) {
     node->is_operator_overload = true;
     auto ty = operator_overload_ty;
@@ -1972,7 +1972,7 @@ void Typer::visit(ASTBinExpr *node) {
   // TODO(Josh) 9/30/2024, 8:24:17 AM relational expressions need to have
   // their operands type checked, but right now that would involve casting
   // scalars to each other, which makes no  sense.
-  if (node->op.is_relational()) {
+  if (ttype_is_relational(node->op)) {
     node->resolved_type = bool_type();
   } else {
     auto left_t = left;
@@ -2003,11 +2003,11 @@ void Typer::visit(ASTUnaryExpr *node) {
 
   auto type = operand_ty;
 
-  auto overload = find_operator_overload(CONST, type, node->op.type, OPERATION_UNARY);
+  auto overload = find_operator_overload(CONST, type, node->op, OPERATION_UNARY);
   if (overload != Type::INVALID_TYPE) {
     node->is_operator_overload = true;
     node->resolved_type = overload->info->as<FunctionTypeInfo>()->return_type;
-    auto name = get_operator_overload_name(node->op.type, OPERATION_UNARY);
+    auto name = get_operator_overload_name(node->op, OPERATION_UNARY);
 
     if (name == "deref") {
       auto type = node->resolved_type;
@@ -2023,7 +2023,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   }
 
   // Address-Of.
-  if (node->op.type == TType::And) {
+  if (node->op == TType::And) {
     auto symbol = ctx.get_symbol(node->operand);
     auto op_ty = operand_ty;
 
@@ -2040,7 +2040,7 @@ void Typer::visit(ASTUnaryExpr *node) {
   }
 
   // Dereference.
-  if (node->op.type == TType::Mul) {
+  if (node->op == TType::Mul) {
     auto type = operand_ty;
 
     if (type->extensions.is_pointer()) {
@@ -2060,7 +2060,7 @@ void Typer::visit(ASTUnaryExpr *node) {
     auto conversion_rule = type_conversion_rule(operand_ty, bool_type(), node->operand->source_range);
     auto can_convert = (conversion_rule != CONVERT_PROHIBITED && conversion_rule != CONVERT_EXPLICIT);
 
-    if (node->op.type == TType::LogicalNot && can_convert) {
+    if (node->op == TType::LogicalNot && can_convert) {
       node->resolved_type = bool_type();
       return;
     }

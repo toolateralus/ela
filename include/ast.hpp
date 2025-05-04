@@ -366,7 +366,7 @@ struct ASTVariable : ASTStatement {
 struct ASTBinExpr : ASTExpr {
   ASTExpr *left;
   ASTExpr *right;
-  Token op;
+  TType op;
   bool is_operator_overload = false;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_BIN_EXPR; }
@@ -376,7 +376,7 @@ struct ASTUnaryExpr : ASTExpr {
   bool is_operator_overload = false;
   Mutability mutability = CONST;
   ASTExpr *operand;
-  Token op;
+  TType op;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_UNARY_EXPR; }
 };

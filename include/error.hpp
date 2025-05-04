@@ -197,7 +197,7 @@ template <class T> T *get_error_user_data_as() {
   return (T *)error_user_data;
 }
 
-static void throw_error(const std::string &message, const SourceRange &source_range) {
+inline void throw_error(const std::string &message, const SourceRange &source_range) {
   if (!panic_handler) {
     get_default_panic_handler()(message, source_range, error_user_data);
   }

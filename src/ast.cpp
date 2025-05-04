@@ -668,7 +668,7 @@ ASTExpr *Parser::parse_expr(Precedence precedence) {
 
     binexpr->left = left;
     binexpr->right = right;
-    binexpr->op = op;
+    binexpr->op = op.type;
     left = binexpr;
   }
   return left;
@@ -706,7 +706,7 @@ ASTExpr *Parser::parse_unary() {
         expr->get_node_type() == AST_NODE_LITERAL || (expr->get_node_type() == AST_NODE_CALL && op.type == TType::And);
 
     unaryexpr->mutability = mutability;
-    unaryexpr->op = op;
+    unaryexpr->op = op.type;
     unaryexpr->operand = expr;
     end_node(unaryexpr, range);
     return unaryexpr;
@@ -821,7 +821,7 @@ ASTExpr *Parser::parse_postfix() {
     } else if (peek().type == TType::Increment || peek().type == TType::Decrement) {
       NODE_ALLOC(ASTUnaryExpr, unary, unary_range, _, this)
       unary->operand = left;
-      unary->op = eat();
+      unary->op = eat().type;
       return unary;
     } else if (peek().type == TType::LBrace) {
       NODE_ALLOC(ASTIndex, subscript, range, _, this)
@@ -1669,8 +1669,8 @@ ASTStatement *Parser::parse_statement() {
     const bool is_call = next.type == TType::LParen || next.type == TType::GenericBrace;
 
     const bool is_assignment_or_compound = next.type == TType::Assign || next.type == TType::Comma ||
-                                           next.is_comp_assign() ||
-                                           (tok.type == TType::Identifier && next.is_relational());
+                                           ttype_is_comp_assign(next.type) ||
+                                           (tok.type == TType::Identifier && ttype_is_relational(next.type));
 
     // .2 != comma for tuple destrucutre.
     const bool is_deref = tok.type == TType::Mul && lookahead_buf()[2].type != TType::Comma;
@@ -2176,7 +2176,7 @@ ASTWhere *Parser::parse_where_clause() {
     ASTExpr *condition = parse_type();
     while (peek().type == TType::And || peek().type == TType::Or) {
       NODE_ALLOC(ASTBinExpr, binexpr, range, _, this)
-      binexpr->op = eat();
+      binexpr->op = eat().type;
       binexpr->right = parse_type();
       binexpr->left = condition;
       condition = (ASTExpr *)binexpr;
@@ -2534,7 +2534,7 @@ void Parser::parse_pointer_extensions(ASTType *type) {
 }
 
 static Precedence get_operator_precedence(Token token) {
-  if (token.is_comp_assign()) {
+  if (ttype_is_comp_assign(token.type)) {
     return PRECEDENCE_ASSIGNMENT;
   }
   auto type = token.type;
