@@ -17,7 +17,7 @@ Ela compiler:
 constexpr auto RAYLIB_INIT_CODE = R"__(
 import raylib::*;
 
-main :: fn() {
+fn main () {
   // Silence the raylib console output
   SetTraceLogLevel(TraceLogLevel::LOG_NONE);
 
@@ -49,8 +49,8 @@ main :: fn() {
 constexpr auto MAIN_INIT_CODE = R"__(
 import fmt;
 
-main :: fn() {
-  mut hellos := List!<str>::init(.[
+fn main() {
+  hellos := List!<str>::init(.[
     "Hello, World!",
     "Привет, Мир!",
     "Hola, Mundo!",
