@@ -778,6 +778,12 @@ void Emitter::visit(ASTStructDeclaration *node) {
   for (const auto &member : node->members) {
     indented("");
     auto type = member.type->resolved_type;
+
+    // Erase zero sized type members for generic instantiation to get rid of unneccesary padding.
+    // if (type == unit_type()) {
+    //   continue;
+    // }
+
     if (type->is_kind(TYPE_FUNCTION)) {
       auto name = member.name.get_str();
       auto name_nullable = Nullable(&name);

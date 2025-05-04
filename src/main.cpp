@@ -114,8 +114,6 @@ int main(int argc, char *argv[]) {
 
   }
 
-  
-
   if (run_tests) {
     system("rm test");
   }

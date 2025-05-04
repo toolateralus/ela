@@ -1879,7 +1879,7 @@ ASTBlock *Parser::parse_block(Scope *scope) {
   return block;
 }
 
-ASTParamsDecl *Parser::parse_parameters(std::vector<GenericParameter> generic_params) {
+ASTParamsDecl *Parser::parse_parameters() {
   NODE_ALLOC(ASTParamsDecl, params, range, defer, this);
   expect(TType::LParen);
 
@@ -1996,7 +1996,7 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
   Defer deferred([&] { current_func_decl = last_func_decl; });
   current_func_decl = node;
 
-  node->params = parse_parameters(node->generic_parameters);
+  node->params = parse_parameters();
   node->name = name;
 
   // check for definition.
@@ -2415,14 +2415,21 @@ std::vector<ASTExpr *> Parser::parse_generic_arguments() {
   return params;
 }
 
-std::vector<GenericParameter> Parser::parse_generic_parameters() {
+std::vector<ASTGenericParameter> Parser::parse_generic_parameters() {
   auto range = begin_node();
   expect(TType::GenericBrace);
-  std::vector<GenericParameter> params;
+  std::vector<ASTGenericParameter> params;
   while (peek().type != TType::GT) {
-    params.emplace_back(expect(TType::Identifier).value);
+    ASTGenericParameter parameter;
+    parameter.identifier = expect(TType::Identifier).value;
+    if (peek().type == TType::Assign) {
+      eat();
+      auto type = parse_type();
+      parameter.default_value = type;
+    }
     if (peek().type != TType::GT)
       expect(TType::Comma);
+    params.push_back(parameter);
   }
   expect(TType::GT);
   end_node(nullptr, range);

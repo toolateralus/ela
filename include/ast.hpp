@@ -453,6 +453,12 @@ struct ASTParamsDecl : ASTStatement {
   ASTNodeType get_node_type() const override { return AST_NODE_PARAMS_DECL; }
 };
 
+struct ASTGenericParameter {
+  InternedString identifier;
+  ASTType *default_value = nullptr;
+};
+
+
 struct ASTDeclaration;
 
 struct GenericInstance {
@@ -463,7 +469,7 @@ struct GenericInstance {
 struct ASTImpl;
 
 struct ASTDeclaration : ASTStatement {
-  std::vector<GenericParameter> generic_parameters;
+  std::vector<ASTGenericParameter> generic_parameters;
   std::vector<GenericInstance> generic_instantiations;
   std::vector<ASTImpl *> impls;
   virtual ASTNodeType get_node_type() const = 0;
@@ -789,7 +795,7 @@ struct ASTAlias : ASTStatement { // TODO: Implement where clauses for generic al
   InternedString name;
   ASTNode *source_node;
   std::vector<ASTExpr *> generic_arguments;
-  std::vector<GenericParameter> generic_parameters;
+  std::vector<ASTGenericParameter> generic_parameters;
   ASTNodeType get_node_type() const override { return AST_NODE_ALIAS; }
   void accept(VisitorBase *visitor) override;
 };
@@ -997,10 +1003,10 @@ struct Parser {
 
   ASTTupleDeconstruction *parse_multiple_asssignment();
   ASTVariable *parse_variable();
-  std::vector<GenericParameter> parse_generic_parameters();
+  std::vector<ASTGenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();
 
-  ASTParamsDecl *parse_parameters(std::vector<GenericParameter> params = {});
+  ASTParamsDecl *parse_parameters();
 
   ASTLambda *parse_lambda();
   ASTBlock *parse_block(Scope *scope = nullptr);

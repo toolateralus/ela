@@ -108,7 +108,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
     type = global_create_struct_type(node->name, node->scope, generic_args);
@@ -160,7 +160,7 @@ void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_in
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
     type = global_create_tagged_union_type(node->name.get_str(), node->scope, generic_args);
@@ -424,7 +424,7 @@ void Typer::visit_function_header(ASTFunctionDeclaration *node, bool generic_ins
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -531,7 +531,7 @@ void Typer::visit_impl_declaration(ASTImpl *node, bool generic_instantiation, st
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -743,7 +743,7 @@ void Typer::visit_trait_declaration(ASTTraitDeclaration *node, bool generic_inst
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
       auto type = *generic_arg;
-      ctx.scope->create_type_alias(param, *generic_arg, type->kind, type->declaring_node.get());
+      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
       generic_arg++;
     }
   }
@@ -964,7 +964,7 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
           * matches the generic parameter it's trying to infer.
           * we shouldn't restrict the path length nor use a simple string comparison here.
         */
-        if (return_ty_path->length() == 1 && (func->generic_parameters[0] == return_ty_path->segments[0].identifier)) {
+        if (return_ty_path->length() == 1 && (func->generic_parameters[0].identifier == return_ty_path->segments[0].identifier)) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = source_range;
@@ -1003,7 +1003,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
             int generic_index = 0;
 
             for (const auto &generic : generics) {
-              if (generic == param->normal.type->normal.path->segments[0].identifier) {
+              // ! This condition is terrible
+              if (generic.identifier == param->normal.type->normal.path->segments[0].identifier) {
                 is_generic = true;
                 break;
               }

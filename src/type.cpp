@@ -471,8 +471,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
   type->set_base(name);
   type->set_info(info);
 
-  if (extensions.is_pointer() &&
-      std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
+  if (extensions.is_pointer() && std::ranges::find(type->traits, is_pointer_trait()) == type->traits.end()) {
     type->traits.push_back(is_pointer_trait());
     if (extensions.is_const_pointer()) {
       type->traits.push_back(is_const_pointer_trait());
@@ -481,7 +480,7 @@ Type *global_create_type(TypeKind kind, const InternedString &name, TypeInfo *in
     }
   }
 
-  /* 
+  /*
     TODO: remove me, just a little hack im playing around with.
   */
   if (extensions.is_fixed_sized_array()) {
@@ -542,6 +541,23 @@ Type *void_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "void", create_scalar_type_info(TYPE_VOID, 0));
   return type;
 }
+
+// an empty tuple type. this is a ZST just like void.
+Type *unit_type() {
+  static auto create = []() {
+    type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
+    Type *type = type_table.back();
+    type->set_base(get_tuple_type_name({}));
+    auto info = type_info_alloc<TupleTypeInfo>();
+    info->types = {};
+    type->set_info(info);
+    info->scope = create_child(nullptr);
+    return type;
+  };
+  static auto type = create();
+  return type;
+}
+
 Type *u64_type() {
   static Type *type = global_create_type(TYPE_SCALAR, "u64", create_scalar_type_info(TYPE_U64, 8, true));
   return type;
@@ -587,7 +603,6 @@ Type *f64_type() {
 // TODO(Josh) 4/14/2024 9:59 AM
 // idk just crazy how long it's been since I wrote that, this compiler is like 8 months old at this point.
 // I removed the code that this original todo was for, but it's krazy how long it's been.
-
 void init_type_system() {
   // Signed integers
 
@@ -625,6 +640,7 @@ void init_type_system() {
   is_tuple_trait();
   is_array_trait();
 }
+
 bool type_is_numerical(const Type *t) {
   if (!t->is_kind(TYPE_SCALAR))
     return false;
@@ -666,6 +682,10 @@ std::string TypeExtensions::to_string() const {
 }
 
 Type *global_create_tuple_type(const std::vector<Type *> &types) {
+  if (types.empty()) {
+    return unit_type();
+  }
+
   type_table.push_back(new Type(type_table.size(), TYPE_TUPLE));
   Type *type = type_table.back();
   type->set_base(get_tuple_type_name(types));
@@ -702,7 +722,7 @@ InternedString get_tuple_type_name(const std::vector<Type *> &types) {
 Type *Type::take_pointer_to(bool is_mutable) const {
   auto ext = this->extensions;
   ext.extensions.push_back({is_mutable ? TYPE_EXT_POINTER_MUT : TYPE_EXT_POINTER_CONST});
-  return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type*)this : base_type, ext);
+  return global_find_type_id(base_type == Type::INVALID_TYPE ? (Type *)this : base_type, ext);
 }
 
 std::string get_operator_overload_name(TType op, OperationKind kind) {
@@ -806,23 +826,22 @@ Type *find_operator_overload(int mutability, Type *type, TType op, OperationKind
   return Type::INVALID_TYPE;
 }
 
-/* 
+/*
   TODO: we should inline this, or make it static or something.
 */
 std::string mangled_type_args(const std::vector<Type *> &args) {
   std::string s;
   int i = 0;
   for (const auto &arg : args) {
-
-    /* 
+    /*
       ! BUG
       Why did I have to add this when refactoring the type system??
       This seems very wrong.
-      
+
 
       Although, it kind of makes sense,
       because we call this when creating generic types that don't have type args,
-      and since theyre not yet concrete, this probably just eneded up happening on the 
+      and since theyre not yet concrete, this probably just eneded up happening on the
       -1's in the args array anyway.
     */
     if (!type_is_valid(arg)) {

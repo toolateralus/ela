@@ -167,7 +167,10 @@ struct TypeExtensions {
   std::string to_string() const;
 };
 
-using GenericParameter = InternedString;
+struct GenericParameter {
+  Type *default_value = nullptr;
+  InternedString identifier;
+};
 
 struct TypeInfo {
   Scope *scope = nullptr;
@@ -243,6 +246,7 @@ struct DynTypeInfo : TypeInfo {
 // helpers to get scalar types for fast comparison
 Type *bool_type();
 Type *void_type();
+Type *unit_type();
 Type *s8_type();
 Type *s16_type();
 Type *s32_type();
