@@ -1395,8 +1395,7 @@ ASTStatement *Parser::parse_statement() {
     return module;
   }
 
-
-  /* 
+  /*
     I'm getting rid of '#export' and '#foreign' and just replacing it with
     an extern node, as well as making it so we can do blocks of externs.
 
@@ -1405,7 +1404,7 @@ ASTStatement *Parser::parse_statement() {
   */
   if (tok.type == TType::Extern) {
     expect(TType::Extern);
-    
+
     if (peek().type == TType::LCurly) { // block of extern statements
       NODE_ALLOC(ASTStatementList, node, range, defer, this);
       expect(TType::LCurly);
@@ -1716,11 +1715,6 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->find_type_id(tok.value, {}) == Type::INVALID_TYPE) {
-      eat();
-      throw_error(std::format("Use of an undeclared type or identifier: {}", tok.value), parent_range);
-    }
-
     eat();
     throw_error(std::format("Unexpected token when parsing statement: {}.. This "
                             "is likely an undefined type.",
@@ -1806,13 +1800,6 @@ ASTVariable *Parser::parse_variable() {
   }
   auto iden = eat();
   decl->name = iden.value;
-
-  if (ctx.scope->find_type_id(iden.value, {}) != Type::INVALID_TYPE || keywords.contains(iden.value.get_str())) {
-    end_node(nullptr, range);
-    throw_error("Invalid variable declaration: a type or keyword exists with "
-                "that name,",
-                range);
-  }
 
   if (peek().type == TType::Colon) {
     expect(TType::Colon);
@@ -2035,7 +2022,6 @@ ASTFunctionDeclaration *Parser::parse_function_declaration() {
     node->flags |= FUNCTION_IS_METHOD;
   }
 
-
   node->block = parse_block();
   node->block.get()->parent = node;
 
@@ -2054,11 +2040,6 @@ ASTEnumDeclaration *Parser::parse_enum_declaration() {
   expect(TType::Enum);
   node->name = expect(TType::Identifier).value;
   expect(TType::LCurly);
-
-  if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE) {
-    end_node(node, range);
-    throw_error("Redefinition of enum " + node->name.get_str(), range);
-  }
 
   int last_value = -1;
   bool is_first = true;

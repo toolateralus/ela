@@ -1215,6 +1215,10 @@ void Typer::visit(ASTStructDeclaration *node) {
 }
 
 void Typer::visit(ASTEnumDeclaration *node) {
+  if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE) {
+    throw_error("Redefinition of enum " + node->name.get_str(), node->source_range);
+  }
+
   auto elem_type = Type::INVALID_TYPE;
   auto enum_ty_id = ctx.scope->create_enum_type(node->name, create_child(ctx.scope), node->is_flags, node);
   enum_ty_id->declaring_node = node;
@@ -1298,6 +1302,12 @@ void Typer::visit(ASTVariable *node) {
         node->type->resolved_type = s32_type();
       }
     }
+  }
+
+  if (ctx.scope->find_type_id(node->name, {}) != Type::INVALID_TYPE || keywords.contains(node->name.get_str())) {
+    throw_error("Invalid variable declaration: a type or keyword exists with "
+                "that name,",
+                node->source_range);
   }
 
   node->type->accept(this);
