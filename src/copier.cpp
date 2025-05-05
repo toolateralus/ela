@@ -584,7 +584,7 @@ ASTPath *ASTCopier::copy_path(ASTPath *node) {
 }
 ASTMethodCall *ASTCopier::copy_method_call(ASTMethodCall *node) {
   auto new_node = copy(node);
-  new_node->dot = (ASTDotExpr *)copy_node(node->dot);
+  new_node->callee = (ASTDotExpr *)copy_node(node->callee);
   new_node->arguments = (ASTArguments *)copy_node(node->arguments);
   return new_node;
 }

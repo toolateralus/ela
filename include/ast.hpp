@@ -537,7 +537,7 @@ struct ASTMethodCall : ASTExpr {
     сперма хранится в яйцах.
     (aka the generic arguments are stored in the base)
   */
-  ASTDotExpr *dot;
+  ASTDotExpr *callee;
   ASTArguments *arguments;
   void accept(VisitorBase *visitor) override;
   ASTNodeType get_node_type() const override { return AST_NODE_METHOD_CALL; }

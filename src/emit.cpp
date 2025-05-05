@@ -258,25 +258,7 @@ void Emitter::visit(ASTAlias *node) { return; }
 
 void Emitter::visit(ASTArguments *node) {
   code << "(";
-  for (int i = 0; i < node->arguments.size(); ++i) {
-    if (i != 0) {
-      code << ", ";
-    }
-
-    auto argument = node->arguments[i];
-
-    auto type = argument->resolved_type;
-
-    /*
-      TODO: we should get rid of this too.
-    */
-    if (type->is_kind(TYPE_CHOICE) && argument->get_node_type() == AST_NODE_PATH) {
-      auto path = (ASTPath *)argument;
-      emit_choice_marker_variant_instantiation(type, path);
-    } else {
-      node->arguments[i]->accept(this);
-    }
-  }
+  emit_arguments_no_parens(node);
   code << ")";
   return;
 }
@@ -334,50 +316,46 @@ Type *Emitter::get_expr_left_type_sr_dot(ASTNode *node) {
 void Emitter::emit_arguments_with_defaults(ASTExpr *callee, ASTArguments *arguments) {
   auto symbol = ctx.get_symbol(callee);
 
-  if (symbol && symbol.get()->is_function()) {
-    auto sym = symbol.get();
-    auto declaration = sym->function.declaration;
+  if (symbol && symbol.get()->is_function() && symbol.get()->function.declaration) {
+    const auto sym = symbol.get();
+    const auto declaration = sym->function.declaration;
+    const auto params = declaration->params;
+    const auto args_ct = arguments->arguments.size();
+    const auto params_ct = params->params.size();
+    const auto is_varargs = params->is_varargs;
 
-    if (!declaration) {
-      arguments->accept(this);
-      return;
-    }
+    bool first = true;
 
-    auto params = declaration->params;
-    auto args_ct = arguments->arguments.size();
-    auto params_ct = params->params.size();
+    size_t param_start_index = params->has_self;
+    size_t arg_index = 0;
 
-    code << "(";
-
-    auto is_varargs = params->is_varargs;
-    for (size_t param_index = 0; param_index < params_ct; ++param_index) {
+    for (size_t param_index = param_start_index; param_index < params_ct; ++param_index) {
       const auto &param = params->params[param_index];
 
-      if (param_index < args_ct) {
-        arguments->arguments[param_index]->accept(this);
+      if (!first)
+        code << ",";
+
+      first = false;
+      if (arg_index < args_ct) {
+        arguments->arguments[arg_index++]->accept(this);
       } else if (param->normal.default_value) {
         param->normal.default_value.get()->accept(this);
-      }
-
-      if (param_index != params_ct - 1 || (is_varargs && args_ct > params_ct)) {
-        code << ",";
       }
     }
 
     if (is_varargs && args_ct > params_ct) {
       for (size_t arg_index = params_ct; arg_index < args_ct; ++arg_index) {
-        arguments->arguments[arg_index]->accept(this);
-        if (arg_index != args_ct - 1) {
+        if (!first)
           code << ",";
-        }
+
+        first = false;
+        arguments->arguments[arg_index]->accept(this);
       }
     }
-
-    code << ")";
     return;
   }
 
-  arguments->accept(this);
+  emit_arguments_no_parens(arguments);
 }
 
 void Emitter::visit(ASTCall *node) {
@@ -396,7 +374,9 @@ void Emitter::visit(ASTCall *node) {
     // normal function call, or a static method.
     node->callee->accept(this);
     code << mangled_type_args(generic_args);
+    code << "(";
     emit_arguments_with_defaults(node->callee, node->arguments);
+    code << ")";
   }
 }
 
@@ -2119,7 +2099,7 @@ void Emitter::call_operator_overload(const SourceRange &range, Type *left_ty, Op
   auto dot = ASTDotExpr{};
   dot.base = left;
   dot.member = ASTPath::Segment{get_operator_overload_name(op, operation)};
-  call.dot = &dot;
+  call.callee = &dot;
   auto args = ASTArguments{};
   if (right) {
     args.arguments = {right};
@@ -2143,8 +2123,8 @@ Emitter::Emitter(Context &context, Typer &type_visitor) : typer(type_visitor), c
 void Emitter::visit(ASTModule *node) {}
 
 std::string Emitter::emit_symbol(Symbol *symbol) {
-  if (symbol->is_local() ||
-      (symbol->is_function() && symbol->function.declaration && HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
+  if (symbol->is_local() || (symbol->is_function() && symbol->function.declaration &&
+                             HAS_FLAG(symbol->function.declaration->flags, FUNCTION_IS_EXTERN))) {
     return symbol->name.get_str();
   }
 
@@ -2214,15 +2194,15 @@ void Emitter::emit_dyn_dispatch_object(Type *trait, Type *dyn_type) {
 }
 
 void Emitter::visit(ASTMethodCall *node) {
-  std::vector<Type *> generic_args = node->dot->member.get_resolved_generics();
+  std::vector<Type *> generic_args = node->callee->member.get_resolved_generics();
 
-  auto symbol = ctx.get_symbol(node->dot).get();
+  auto symbol = ctx.get_symbol(node->callee).get();
   // Call a function pointer via a dot expression
   if (symbol->is_variable()) {
     {
       // Implicitly pass the 'dyn.instance' when calling the function pointers
       // that the dyn thingy sets up.
-      auto object = node->dot->base;
+      auto object = node->callee->base;
       auto obj_type = object->resolved_type;
 
       if (obj_type->is_kind(TYPE_DYN)) {
@@ -2235,7 +2215,7 @@ void Emitter::visit(ASTMethodCall *node) {
       }
     }
 
-    auto func = node->dot;
+    auto func = node->callee;
     func->accept(this);
     code << mangled_type_args(generic_args);
     node->arguments->accept(this);
@@ -2252,31 +2232,31 @@ void Emitter::visit(ASTMethodCall *node) {
   }
 
   code << emit_symbol(symbol) + mangled_type_args(generic_args);
-  code << "(";
 
   auto self_param_ty = function_type->info->as<FunctionTypeInfo>()->parameter_types[0];
 
-  auto base_type = node->dot->base->resolved_type;
+  auto base_type = node->callee->base->resolved_type;
 
-  if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
-    // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
-    code << "&";
-  } else if (!self_param_ty->extensions.is_pointer() && base_type->extensions.is_pointer()) {
-    code << "*";
-  }
+  code << "(";
 
-  ASTExpr *base = node->dot->base;
-  base->accept(this);
-  if (node->arguments->arguments.size() > 0) {
-    code << ", ";
-  }
+  // Emit the self arg.
+  {
+    if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
+      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
+      code << "&";
+    } else if (!self_param_ty->extensions.is_pointer() && base_type->extensions.is_pointer()) {
+      code << "*";
+    }
 
-  for (auto &arg : node->arguments->arguments) {
-    arg->accept(this);
-    if (arg != node->arguments->arguments.back()) {
+    ASTExpr *base = node->callee->base;
+    base->accept(this);
+    if (node->arguments->arguments.size()) {
       code << ", ";
     }
   }
+
+  emit_arguments_with_defaults(node->callee, node->arguments);
+
   code << ")";
 }
 
@@ -2613,4 +2593,26 @@ void Emitter::emit_default_construction(Type *type) {
     }
   }
   code << "}";
+}
+
+void Emitter::emit_arguments_no_parens(ASTArguments *node) {
+  for (int i = 0; i < node->arguments.size(); ++i) {
+    if (i != 0) {
+      code << ", ";
+    }
+
+    auto argument = node->arguments[i];
+
+    auto type = argument->resolved_type;
+
+    /*
+      TODO: we should get rid of this too.
+    */
+    if (type->is_kind(TYPE_CHOICE) && argument->get_node_type() == AST_NODE_PATH) {
+      auto path = (ASTPath *)argument;
+      emit_choice_marker_variant_instantiation(type, path);
+    } else {
+      node->arguments[i]->accept(this);
+    }
+  }
 }

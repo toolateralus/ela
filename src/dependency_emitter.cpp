@@ -241,7 +241,7 @@ void DependencyEmitter::visit_operator_overload(ASTExpr *base, const std::string
   auto dot = ASTDotExpr{};
   dot.base = base;
   dot.member = ASTPath::Segment{operator_name};
-  call.dot = &dot;
+  call.callee = &dot;
   auto args = ASTArguments{};
   if (argument) {
     args.arguments = {argument};
@@ -579,12 +579,12 @@ void DependencyEmitter::visit(ASTPatternMatch *node) {}
 
 void DependencyEmitter::visit(ASTMethodCall *node) {
   node->arguments->accept(this);
-  node->dot->accept(this);
-  auto symbol_nullable = ctx.get_symbol(node->dot);
+  node->callee->accept(this);
+  auto symbol_nullable = ctx.get_symbol(node->callee);
 
   if (symbol_nullable.is_not_null()) {
     auto decl = symbol_nullable.get()->function.declaration;
-    auto generic_args = node->dot->member.get_resolved_generics();
+    auto generic_args = node->callee->member.get_resolved_generics();
 
     if (!generic_args.empty()) {
       decl = (ASTFunctionDeclaration *)find_generic_instance(decl->generic_instantiations, generic_args);

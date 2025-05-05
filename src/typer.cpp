@@ -867,7 +867,7 @@ void Typer::compiler_mock_method_call_visit_impl(Type *left_type, const Interned
   dot.base = &path;
   dot.member = ASTPath::Segment{method_name};
 
-  call.dot = &dot;
+  call.callee = &dot;
   call.accept(this);
 }
 
@@ -1736,11 +1736,17 @@ void Typer::visit(ASTCall *node) {
                                                   node->source_range);
       }
 
+      if (func_decl->params->has_self) {
+        throw_error("cannot call a method as if it was an associated function anymore", node->source_range);
+      }
+
       type = func_decl->resolved_type;
 
       // Why did I have to add this, when refactoring the type system??
       node->callee->resolved_type = func_decl->resolved_type;
+
     }
+
   } else if (symbol && symbol->is_type()) {
     if (!symbol->type.choice) {
       throw_error(
@@ -2979,8 +2985,8 @@ Nullable<Scope> Context::get_scope(ASTNode *node) {
 void Typer::visit(ASTMethodCall *node) {
   Type *type = nullptr;
   ASTFunctionDeclaration *func_decl = nullptr;
-  node->dot->accept(this);
-  auto func_sym = ctx.get_symbol(node->dot).get();
+  node->callee->accept(this);
+  auto func_sym = ctx.get_symbol(node->callee).get();
 
   bool added_dyn_instance_argument_as_arg_0 = false;
 
@@ -3005,7 +3011,7 @@ void Typer::visit(ASTMethodCall *node) {
           type_context = &func_type_ast;
         }
 
-        func_decl = resolve_generic_function_call(func_decl, &node->dot->member.generic_arguments, node->arguments,
+        func_decl = resolve_generic_function_call(func_decl, &node->callee->member.generic_arguments, node->arguments,
                                                   node->source_range);
       }
 
@@ -3014,7 +3020,7 @@ void Typer::visit(ASTMethodCall *node) {
   } else {
     // Implicitly pass the 'dyn.instance' when calling the function pointers
     // that the dyn thingy sets up.
-    auto object = node->dot->base;
+    auto object = node->callee->base;
     auto obj_type = object->resolved_type;
 
     if (obj_type->is_kind(TYPE_DYN)) {
@@ -3027,7 +3033,7 @@ void Typer::visit(ASTMethodCall *node) {
       added_dyn_instance_argument_as_arg_0 = true;
     }
 
-    type = node->dot->resolved_type;
+    type = node->callee->resolved_type;
   }
 
   if (!type) {
@@ -3046,7 +3052,7 @@ void Typer::visit(ASTMethodCall *node) {
     if (!func_decl->params->has_self) {
       throw_error("Calling static methods with instance not allowed", node->source_range);
     }
-    type_check_args_from_params(node->arguments, func_decl->params, node->dot->base, func_sym->name == "deinit");
+    type_check_args_from_params(node->arguments, func_decl->params, node->callee->base, func_sym->name == "deinit");
   } else {
     type_check_args_from_info(node->arguments, info);
   }

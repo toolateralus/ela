@@ -24,7 +24,9 @@ os.chdir('tests')
 def run_test(test_file):
     print(f"\033[1;33mRunning test: {test_file}\033[0m")
     start_time = time.time_ns()
-    result = subprocess.run(["ela", test_file, "--test"])
+
+    result = subprocess.run(["ela", test_file, "--test", "--s", "--nl"])
+      
     end_time = time.time_ns()
     if result.returncode == 0:
         compile_time = (end_time - start_time) // 1000000
@@ -42,6 +44,7 @@ def run_test(test_file):
         else:
             print(f"\033[1;31mTest {test_file} failed with return code: {run_result.returncode}\033[0m")
             failed_tests.append(test_file)
+            
         if os.path.isfile(test_file[:-4]):
             os.remove(test_file[:-4])
     else:

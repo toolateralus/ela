@@ -275,6 +275,7 @@ struct Emitter : VisitorBase {
   inline void semicolon() { code << ";"; }
   inline void space() { code << ' '; }
 
+  void emit_arguments_no_parens(ASTArguments *args);
   void emit_default_construction(Type *type);
 
   void emit_forward_declaration(ASTFunctionDeclaration *node);

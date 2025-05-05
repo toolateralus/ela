@@ -2,12 +2,12 @@
 
 THIR *THIRVisitor::visit_method_call(ASTMethodCall *node) {
   THIRCall call = {};
-  auto base = node->dot->base;
-  auto member = node->dot->member;
+  auto base = node->callee->base;
+  auto member = node->callee->member;
   auto type_scope = base->resolved_type->info->scope;
   auto symbol = type_scope->local_lookup(member.identifier);
   if (symbol->is_variable()) {
-    call.callee = visit_dot_expr(node->dot);
+    call.callee = visit_dot_expr(node->callee);
   }
   return nullptr;
 }

@@ -809,7 +809,7 @@ ASTExpr *Parser::parse_postfix() {
 
       if (peek().type == TType::LParen) {
         NODE_ALLOC(ASTMethodCall, method, range, defer, this);
-        method->dot = dot;
+        method->callee = dot;
         method->arguments = parse_arguments();
         left = method;
       } else {
