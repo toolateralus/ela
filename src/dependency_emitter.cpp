@@ -89,6 +89,9 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
   }
   for (auto member : node->members) {
     declare_type(member.type->resolved_type);
+    if (member.default_value) {
+      member.default_value.get()->accept(this);
+    }
   }
 }
 
