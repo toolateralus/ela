@@ -1,0 +1,30 @@
+
+
+
+struct WithDefaultField {
+  field: f32 = 100.0,
+}
+
+
+fn with_default_parameter(f: f32, f1: f32 = 100.0) -> f32 {
+  return f1 * f;
+}
+
+
+impl WithDefaultField {
+  fn associated_with_default_parameter(f: f32, f1: f32 = 100.0) -> f32 {
+    return f * f1;
+  }
+  fn method_with_default_parameter(self, f1: f32 = 2.0) -> f32 {
+    return self.field * f1;
+  }
+}
+
+
+#test fn test_defaults() {
+  wdf: WithDefaultField;
+  assert_eq("WithDefaultField.field != 100.0, which was the expected default value", wdf.field, 100.0);
+  assert_eq("with_default_parameter != 200.0, which was expected result", with_default_parameter(2), 200.0);
+  assert_eq("WithDefaultField::associated_with_default_parameter != 200.0, which was expected result", WithDefaultField::associated_with_default_parameter(2), 200.0);
+  assert_eq("method_with_default_parameter != 200.0, which was expected result", wdf.method_with_default_parameter(), 200.0);
+}

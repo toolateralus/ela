@@ -2250,7 +2250,17 @@ void Emitter::visit(ASTMethodCall *node) {
 
     ASTExpr *base = node->callee->base;
     base->accept(this);
-    if (node->arguments->arguments.size()) {
+
+    bool has_default_params = false;
+    for (const auto &param : symbol->function.declaration->params->params) {
+      if (param->tag == ASTParamDecl::Normal && param->normal.default_value) {
+        has_default_params = true;
+        break;
+      }
+    }
+
+    auto args_remaining = node->arguments->arguments.size();
+    if (args_remaining != 0 || (args_remaining == 0 && has_default_params)) {
       code << ", ";
     }
   }
