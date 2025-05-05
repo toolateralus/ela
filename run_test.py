@@ -25,7 +25,7 @@ def run_test(test_file):
     print(f"\033[1;33mRunning test: {test_file}\033[0m")
     start_time = time.time_ns()
 
-    result = subprocess.run(["ela", test_file, "--test", "--s", "--nl"])
+    result = subprocess.run(["ela", test_file, "--test"])
       
     end_time = time.time_ns()
     if result.returncode == 0:
