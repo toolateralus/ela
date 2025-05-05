@@ -304,8 +304,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
       .kind = DIRECTIVE_KIND_STATEMENT,
       .run = [](Parser *parser) -> Nullable<ASTNode> {
         auto tok = parser->expect(TType::DoubleColon);
+
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
-          bool is_union = false;
           NODE_ALLOC(ASTStructDeclaration, node, range, _, parser)
           node->is_anonymous = true;
 
@@ -325,6 +325,7 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           throw_error("Expected struct or union after #anon ::...", range);
           return nullptr;
         }
+        
     }},
 
     // #export, for exporting a non-mangled name to a dll or C library

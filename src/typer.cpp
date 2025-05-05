@@ -95,6 +95,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   Type *type = nullptr;
 
   bool type_just_created = false;
+
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
@@ -138,6 +139,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
 
+
   // create a type context for #self.
   auto old_type_context = type_context;
   ASTType ast_type;
@@ -175,6 +177,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   }
 
   for (auto subunion : node->subtypes) {
+    subunion->accept(this);
     for (const auto &field : subunion->members) {
       field.type->accept(this);
       info->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
