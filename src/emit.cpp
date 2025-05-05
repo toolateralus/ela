@@ -739,7 +739,6 @@ void Emitter::visit(ASTStructDeclaration *node) {
   emit_default_value = false;
 
   auto type = node->resolved_type;
-
   auto info = (type->info->as<StructTypeInfo>());
 
   std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
@@ -751,16 +750,13 @@ void Emitter::visit(ASTStructDeclaration *node) {
     return;
   }
 
-  auto previous = ctx.scope;
+  auto previous_scope = ctx.scope;
   ctx.set_scope(info->scope);
-  Defer _defer2([&] { ctx.set_scope(previous); });
+  Defer _defer2([&] { ctx.set_scope(previous_scope); });
 
   if (HAS_FLAG(info->flags, STRUCT_FLAG_IS_ANONYMOUS)) {
     code << indent() << (node->is_union ? "union" : "struct") << " {\n";
   } else {
-    if (node->is_extern) {
-      code << indent() << "extern ";
-    }
     code << type_tag << " " << name << " {\n";
   }
   indent_level++;

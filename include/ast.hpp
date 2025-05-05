@@ -668,9 +668,10 @@ struct ASTStructDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
   InternedString name;
   Scope *scope;
+  
   bool is_fwd_decl = false;
-  bool is_extern = false;
   bool is_union = false;
+  bool is_anonymous = false;
 
   std::vector<ASTStructDeclaration *> subtypes; // Right now this is only for '#anon :: struct // #anon :: union'
   std::vector<ASTStructMember> members;

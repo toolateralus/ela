@@ -92,36 +92,83 @@ bool expr_is_literal(const ASTExpr *expr) {
 
 void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_instantiation,
                                      std::vector<Type *> generic_args) {
-  auto type = node->resolved_type;
+  Type *type = nullptr;
 
-  auto info = (type->info->as<StructTypeInfo>());
-
-  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
-    node->resolved_type = type;
-    return;
-  }
-
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-
+  bool type_just_created = false;
   if (generic_instantiation) {
     auto generic_arg = generic_args.begin();
     for (const auto &param : node->generic_parameters) {
-      auto type = *generic_arg;
-      ctx.scope->create_type_alias(param.identifier, *generic_arg, type->kind, type->declaring_node.get());
+      auto type_argument = *generic_arg;
+      node->scope->create_type_alias(param.identifier, *generic_arg, type_argument->kind,
+                                     type_argument->declaring_node.get());
       generic_arg++;
     }
     type = global_create_struct_type(node->name, node->scope, generic_args);
+    type_just_created = true;
+  } else {
+    type = ctx.scope->find_type_id(node->name, {});
+    if (type != Type::INVALID_TYPE && type != Type::UNRESOLVED_GENERIC) {
+      if (type->is_kind(TYPE_STRUCT)) {
+        auto info = (type->info->as<StructTypeInfo>());
+        if (DOESNT_HAVE_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED)) {
+          throw_error("Redefinition of struct", node->source_range);
+        }
+      } else {
+        throw_error("cannot redefine already existing type", node->source_range);
+      }
+    } else {
+      type = ctx.scope->create_struct_type(node->name, node->scope, node);
+      type_just_created = true;
+    }
   }
 
+  if (!type) {
+    throw_error("internal compiler error: struct type was null on declaration", node->source_range);
+  }
+
+  // tidy up some references.
   type->declaring_node = node;
   node->resolved_type = type;
 
+  // assign scope to ensure it's correct.
+  auto info = type->info->as<StructTypeInfo>();
+  info->scope = node->scope;
+
+  // swap to the struct's scope.
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->scope);
+
+  // create a type context for #self.
   auto old_type_context = type_context;
   ASTType ast_type;
   ast_type.resolved_type = type;
   type_context = &ast_type;
-  Defer _([&] { type_context = old_type_context; });
+
+  // make sure to exit the type context and scope when done here.
+  Defer _([&] {
+    type_context = old_type_context;
+    ctx.scope = old_scope;
+  });
+
+  // setup some flags.
+  if (node->is_anonymous) {
+    info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
+  }
+
+  if (node->is_union) {
+    info->flags |= STRUCT_FLAG_IS_UNION;
+  }
+
+  if (node->is_fwd_decl && type_just_created) {
+    info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
+  } else {
+    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
+  }
+
+  // if this is a forward declaration, exit out.
+  if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
+    return;
+  }
 
   if (node->where_clause) {
     node->where_clause.get()->accept(this);
@@ -130,7 +177,7 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   for (auto subunion : node->subtypes) {
     for (const auto &field : subunion->members) {
       field.type->accept(this);
-      node->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
+      info->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
     }
   }
 
@@ -142,8 +189,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
       sym->flags |= SYMBOL_IS_LOCAL;
     }
   }
-
-  ctx.set_scope(old_scope);
 }
 
 void Typer::visit_choice_declaration(ASTChoiceDeclaration *node, bool generic_instantiation,

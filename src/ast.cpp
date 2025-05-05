@@ -307,7 +307,8 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           bool is_union = false;
           NODE_ALLOC(ASTStructDeclaration, node, range, _, parser)
-          
+          node->is_anonymous = true;
+
           if (parser->peek().type == TType::Struct) {
             parser->expect(TType::Struct);
           } else {
@@ -316,10 +317,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
           }
 
           parser->parse_struct_body(get_unique_identifier().value, range, node);
-
-          auto t = node->resolved_type;
-          auto info = (t->info->as<StructTypeInfo>());
-          info->flags |= STRUCT_FLAG_IS_ANONYMOUS;
           return node;
         } else {
           auto range = parser->begin_node();
@@ -339,7 +336,6 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         auto node = parser->parse_statement();
         if (node->get_node_type() == AST_NODE_STRUCT_DECLARATION) {
           auto struct$ = static_cast<ASTStructDeclaration*>(node);
-          struct$->is_extern = true;
         } else if (node->get_node_type() == AST_NODE_VARIABLE) {
           auto decl = static_cast<ASTVariable*>(node);
           decl->is_extern = true;
@@ -2188,29 +2184,8 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
     node->where_clause = parse_where_clause();
   }
 
-  auto type_id = ctx.scope->find_type_id(node->name, {});
-
-  if (type_id != Type::INVALID_TYPE) {
-    auto type = type_id;
-    end_node(nullptr, range);
-    if (type->is_kind(TYPE_STRUCT)) {
-      auto info = (type->info->as<StructTypeInfo>());
-      if (DOESNT_HAVE_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED)) {
-        throw_error("Redefinition of struct", range);
-      }
-    } else {
-      throw_error("cannot redefine already existing type", range);
-    }
-  } else {
-    type_id = ctx.scope->create_struct_type(node->name, create_child(ctx.scope), node);
-  }
-
-  node->resolved_type = type_id;
-  auto type = type_id;
-  auto info = type->info->as<StructTypeInfo>();
-  node->scope = info->scope;
-  if (node->is_union)
-    info->flags |= STRUCT_FLAG_IS_UNION;
+  node->scope = create_child(ctx.scope);
+  node->scope->name = node->name;
 
   if (!semicolon()) {
     expect(TType::LCurly);
@@ -2250,9 +2225,7 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
       }
     }
     expect(TType::RCurly);
-    info->flags &= ~STRUCT_FLAG_FORWARD_DECLARED;
   } else {
-    info->flags |= STRUCT_FLAG_FORWARD_DECLARED;
     node->is_fwd_decl = true;
   }
 

@@ -81,7 +81,7 @@ void DependencyEmitter::visit(ASTStructDeclaration *node) {
     return;
   }
   auto old_scope = ctx.scope;
-  ctx.set_scope(node->resolved_type->info->scope);
+  ctx.set_scope(node->scope);
   Defer _([&] { ctx.set_scope(old_scope); });
 
   for (auto subtype : node->subtypes) {
