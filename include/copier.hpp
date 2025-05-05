@@ -47,7 +47,7 @@ struct ASTCopier {
   ASTRange *copy_range(ASTRange *node);
   ASTSwitch *copy_switch(ASTSwitch *node);
   ASTTuple *copy_tuple(ASTTuple *node);
-  ASTTupleDeconstruction *copy_tuple_deconstruction(ASTTupleDeconstruction *node);
+  ASTDestructure *copy_destructure(ASTDestructure *node);
   ASTTraitDeclaration *copy_trait_declaration(ASTTraitDeclaration *node);
   ASTAlias *copy_alias(ASTAlias *node);
   ASTSize_Of *copy_sizeof(ASTSize_Of *node);

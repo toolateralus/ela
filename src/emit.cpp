@@ -470,6 +470,7 @@ void Emitter::visit(ASTUnaryExpr *node) {
     auto type = to_cpp_string(node->operand->resolved_type);
     code << '(' << type << ')';
   }
+
   auto left_type = node->operand->resolved_type;
   auto left_ty = left_type;
 
@@ -1148,7 +1149,7 @@ void Emitter::visit(ASTTuple *node) {
   return;
 }
 
-void Emitter::visit(ASTTupleDeconstruction *node) {
+void Emitter::visit(ASTDestructure *node) {
   emit_line_directive(node);
   auto type = node->resolved_type;
 
@@ -2076,7 +2077,8 @@ void Emitter::emit_tuple(Type *type) {
   for (int i = 0; i < info->types.size(); ++i) {
     auto type = info->types[i];
     if (type->is_kind(TYPE_FUNCTION)) {
-      code << indent() << get_declaration_type_signature_and_identifier("$" + std::to_string(i), type) << ";\n";
+      auto name = "$" + std::to_string(i);
+      code << indent() << get_function_pointer_type_string(type, &name, false) << ";\n";
     } else {
       code << indent() << to_cpp_string(type) << " $" << std::to_string(i) << ";\n";
     }
@@ -2242,14 +2244,36 @@ void Emitter::visit(ASTMethodCall *node) {
   // Emit the self arg.
   {
     if (self_param_ty->extensions.is_pointer() && !base_type->extensions.is_pointer()) {
-      // TODO: add an r-value analyzer, since we can't take a pointer to temporary memory like literals & rvalues.
-      code << "&";
+      auto base_node_ty = node->callee->base->get_node_type();
+
+      // !@Cooper-Pilot
+      // This is something I didn't know about
+      // C (GCC and Clang at least) have this thing called "Block Expressions"
+      // They work basically just like a Rust block, where you can execute any arbitrary set of statements,
+      // and return a value from the block with just
+      // `value;`
+      // at the end of it.
+
+      // We can use this to our advantage to fix the hackiness associated with switch returning expressions
+      // and also add a system for if/else/else if chains that return values. this is pretty freaking cool
+      if (base_node_ty == AST_NODE_METHOD_CALL || base_node_ty == AST_NODE_CALL || base_node_ty == AST_NODE_LITERAL) {
+        code << "({ static " << to_cpp_string(base_type) << " __temp; __temp = ";
+        node->callee->base->accept(this);
+        code << "; &__temp; })";
+      } else {
+        code << "&";
+        node->callee->base->accept(this);
+      }
+
     } else if (!self_param_ty->extensions.is_pointer() && base_type->extensions.is_pointer()) {
       code << "*";
+      node->callee->base->accept(this);
+    } else {
+      node->callee->base->accept(this);
     }
 
-    ASTExpr *base = node->callee->base;
-    base->accept(this);
+    // ASTExpr *base = node->callee->base;
+    // base->accept(this);
 
     bool has_default_params = false;
     for (const auto &param : symbol->function.declaration->params->params) {

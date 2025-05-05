@@ -55,7 +55,7 @@ struct VisitorBase {
   virtual void visit(ASTTuple *node) = 0;
   virtual void visit(ASTAlias *node) = 0;
   virtual void visit(ASTImpl *node) = 0;
-  virtual void visit(ASTTupleDeconstruction *node) = 0;
+  virtual void visit(ASTDestructure *node) = 0;
   virtual void visit(ASTDefer *node) = 0;
   virtual void visit(ASTTraitDeclaration *node) = 0;
   virtual void visit(ASTChoiceDeclaration *node) = 0;
@@ -172,7 +172,7 @@ struct Typer : VisitorBase {
   void visit(ASTRange *node) override;
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTDestructure *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
   void visit(ASTDefer *node) override;
@@ -332,7 +332,7 @@ struct Emitter : VisitorBase {
   void visit(ASTRange *node) override;
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTDestructure *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;
@@ -406,7 +406,7 @@ struct DependencyEmitter : VisitorBase {
   void visit(ASTRange *node) override;
   void visit(ASTSwitch *node) override;
   void visit(ASTTuple *node) override;
-  void visit(ASTTupleDeconstruction *node) override;
+  void visit(ASTDestructure *node) override;
   void visit(ASTSize_Of *node) override;
   void visit(ASTAlias *node) override;
   void visit(ASTImpl *node) override;

@@ -217,7 +217,7 @@ struct THIRVisitor {
   THIR *visit_else(ASTElse *node);
   THIR *visit_while(ASTWhile *node);
   THIR *visit_enum_declaration(ASTEnumDeclaration *node);
-  THIR *visit_tuple_deconstruction(ASTTupleDeconstruction *node);
+  THIR *visit_tuple_deconstruction(ASTDestructure *node);
   THIR *visit_impl(ASTImpl *node);
   THIR *visit_defer(ASTDefer *node);
   THIR *visit_choice_declaration(ASTChoiceDeclaration *node);
@@ -261,7 +261,7 @@ struct THIRVisitor {
       case AST_NODE_DEFER:
         return visit_defer(static_cast<ASTDefer *>(statement));
       case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(statement));
+        return visit_tuple_deconstruction(static_cast<ASTDestructure *>(statement));
       default:
         return nullptr;
     }
@@ -391,7 +391,7 @@ struct THIRVisitor {
       case AST_NODE_DEFER:
         return visit_defer(static_cast<ASTDefer *>(node));
       case AST_NODE_TUPLE_DECONSTRUCTION:
-        return visit_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
+        return visit_tuple_deconstruction(static_cast<ASTDestructure *>(node));
       default:
         return nullptr;
     }

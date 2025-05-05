@@ -407,7 +407,7 @@ struct DestructureElement {
   Mutability mutability;
 };
 
-struct ASTTupleDeconstruction : ASTStatement {
+struct ASTDestructure : ASTStatement {
   std::vector<DestructureElement> elements;
   ASTExpr *right;
   TType op;
@@ -1004,7 +1004,7 @@ struct Parser {
   ASTChoiceDeclaration *parse_choice_declaration();
   ASTEnumDeclaration *parse_enum_declaration();
 
-  ASTTupleDeconstruction *parse_multiple_asssignment();
+  ASTDestructure *parse_destructure();
   ASTVariable *parse_variable();
   std::vector<ASTGenericParameter> parse_generic_parameters();
   std::vector<ASTExpr *> parse_generic_arguments();

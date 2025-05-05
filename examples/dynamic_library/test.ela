@@ -1,26 +1,63 @@
+// we do this to load raylib dynamically.
 #def RAYLIB_LINK_SHARED
 
 #include "shared.ela";
 
-
 #c_flags "-fPIC -shared -o test.so"
 
-import raylib::{Vector2, KeyboardKey, WHITE};
+import raylib::*;
 
-position : Vector2;
 
-#export test_call :: fn(ctx: DrawContext *) {
-  if ctx.inputState[KeyboardKey::KEY_W] then position.y -= 1;
-  if ctx.inputState[KeyboardKey::KEY_S] then position.y += 1;
-  if ctx.inputState[KeyboardKey::KEY_A] then position.x -= 1;
-  if ctx.inputState[KeyboardKey::KEY_D] then position.x += 1;
+/* 
+  NOTE: 
+    Due to raylibs design, it's actually a terrible library to do something like this.
+
+    Basically, to do ANY draw calls, you'd have to make a compatibility layer that gets hooked up with a ton
+    of function pointers.
+
+    Obviously for small fun projects this is fine, but you wouldn't need hot reloading in that case.
+
+    Another option, is to do like our 'DrawCommand', just to send over a buffer of commands owned by the main thread,
+    that we can interpret in a static kind of way.
+*/
+
+#export fn test_call(ctx: *mut DrawContext) {
+  #static mut position: Vector2;
+  #static mut speed := 1.0;
+  
+  // Idk, add some weird stuff.
+  // if ctx.inputState[KeyboardKey::KEY_E] {
+  //   speed += 0.1;
+  // }
+
+  // if ctx.inputState[KeyboardKey::KEY_Q] {
+  //   if speed <= 0 {
+  //     speed = 1;
+  //   } else {
+  //     speed -= 0.1;
+  //   }
+  // }
+
+  if ctx.inputState[KeyboardKey::KEY_W] 
+    then position.y -= speed;
+
+  if ctx.inputState[KeyboardKey::KEY_S] 
+    then position.y += speed;
+
+  if ctx.inputState[KeyboardKey::KEY_A] 
+    then position.x -= speed;
+
+  if ctx.inputState[KeyboardKey::KEY_D] 
+    then position.x += speed;
     
-  command: DrawCommand;
-  command.rect = .{
-    x: position.x, y: position.y
-    width: 60.0, height: 60.0,
+  command := DrawCommand.{
+    rect: .{
+      x: position.x, y: position.y
+      width: 60.0, height: 60.0,
+    },
+    // Try changing the color, or the dimensions!
+    color: GREEN,
   };
 
-  command.color = WHITE;
   ctx.commands.push(command);
 }

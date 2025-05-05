@@ -1606,7 +1606,7 @@ ASTStatement *Parser::parse_statement() {
          lookahead_buf()[1].type == TType::Identifier && lookahead_buf()[3].type == TType::Comma);
 
     if (is_const_multiple_assign || is_mut_multiple_assign) {
-      return parse_multiple_asssignment();
+      return parse_destructure();
     }
 
     bool is_colon_or_colon_equals = tok.type == TType::Identifier && (lookahead_buf()[1].type == TType::Colon ||
@@ -1717,11 +1717,18 @@ ASTStatement *Parser::parse_statement() {
   }
 }
 
-ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
-  NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
+ASTDestructure *Parser::parse_destructure() {
+  NODE_ALLOC(ASTDestructure, node, range, _, this)
 
   // * This lambda is just to prevent having to copy paste this.
-  const auto parse_destructure = [&]() -> DestructureElement {
+
+  /*  
+    TODO:
+    The semantics for this, and the for loop *pointer semantic* need to be clarified.
+    It doesn't make sense, it's too subtle, sometimes its completely useless, etc.
+    It should at the very least use the &const/&mut system.
+  */
+  const auto parse_element = [&]() -> DestructureElement {
     DestructureElement element;
     element.mutability = CONST;
 
@@ -1742,12 +1749,12 @@ ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
     return element;
   };
 
-  DestructureElement element = parse_destructure();
+  DestructureElement element = parse_element();
   node->elements.push_back(element);
 
   while (peek().type == TType::Comma) {
     eat();
-    element = parse_destructure();
+    element = parse_element();
     node->elements.push_back(element);
   }
 

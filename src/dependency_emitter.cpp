@@ -158,6 +158,11 @@ void DependencyEmitter::visit(ASTProgram *node) {
 
   if (auto main_sym = node->scope->local_lookup("main")) {
     main_sym->function.declaration->accept(this);
+  } else {
+    // For non-main (library) programs we have to force visit everything.
+    for (const auto &stmt: node->statements) {
+      stmt->accept(this);
+    }
   }
 
   for (auto id : reflected_upon_types) {
@@ -479,7 +484,7 @@ void DependencyEmitter::visit(ASTTuple *node) {
   }
 }
 
-void DependencyEmitter::visit(ASTTupleDeconstruction *node) {
+void DependencyEmitter::visit(ASTDestructure *node) {
   define_type(node->right->resolved_type);
   node->right->accept(this);
 }

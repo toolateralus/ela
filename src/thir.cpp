@@ -46,7 +46,7 @@ THIR *THIRVisitor::visit_if(ASTIf *node) { return nullptr; }
 THIR *THIRVisitor::visit_else(ASTElse *node) { return nullptr; }
 THIR *THIRVisitor::visit_while(ASTWhile *node) { return nullptr; }
 THIR *THIRVisitor::visit_enum_declaration(ASTEnumDeclaration *node) { return nullptr; }
-THIR *THIRVisitor::visit_tuple_deconstruction(ASTTupleDeconstruction *node) { return nullptr; }
+THIR *THIRVisitor::visit_tuple_deconstruction(ASTDestructure *node) { return nullptr; }
 THIR *THIRVisitor::visit_impl(ASTImpl *node) { return nullptr; }
 THIR *THIRVisitor::visit_defer(ASTDefer *node) { return nullptr; }
 THIR *THIRVisitor::visit_choice_declaration(ASTChoiceDeclaration *node) { return nullptr; }

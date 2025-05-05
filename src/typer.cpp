@@ -2596,7 +2596,7 @@ void Typer::visit(ASTAlias *node) {
   return;
 }
 
-void Typer::visit(ASTTupleDeconstruction *node) {
+void Typer::visit(ASTDestructure *node) {
   node->right->accept(this);
   node->resolved_type = node->right->resolved_type;
   auto type = node->right->resolved_type;

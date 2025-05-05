@@ -1,1 +1,1 @@
-ela test.ela
+ela test.ela --library

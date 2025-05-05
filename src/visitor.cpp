@@ -51,7 +51,7 @@ void ASTCast::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTEnumDeclaration::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTInitializerList::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTRange::accept(VisitorBase *visitor) { visitor->visit(this); }
-void ASTTupleDeconstruction::accept(VisitorBase *visitor) { visitor->visit(this); }
+void ASTDestructure::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTAlias::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTImpl::accept(VisitorBase *visitor) { visitor->visit(this); }
 void ASTDefer::accept(VisitorBase *visitor) { visitor->visit(this); }

@@ -298,7 +298,7 @@ ASTTuple *ASTCopier::copy_tuple(ASTTuple *node) {
   }
   return new_node;
 }
-ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruction *node) {
+ASTDestructure *ASTCopier::copy_destructure(ASTDestructure *node) {
   auto new_node = copy(node);
   new_node->elements.clear();
   for (const auto &destruct : node->elements) {
@@ -422,7 +422,7 @@ ASTNode *ASTCopier::copy_node(ASTNode *node) {
     case AST_NODE_SWITCH:
       return copy_switch(static_cast<ASTSwitch *>(node));
     case AST_NODE_TUPLE_DECONSTRUCTION:
-      return copy_tuple_deconstruction(static_cast<ASTTupleDeconstruction *>(node));
+      return copy_destructure(static_cast<ASTDestructure *>(node));
     case AST_NODE_TRAIT_DECLARATION:
       return copy_trait_declaration(static_cast<ASTTraitDeclaration *>(node));
     case AST_NODE_CHOICE_DECLARATION:
