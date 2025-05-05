@@ -431,6 +431,7 @@ struct ASTParamDecl : ASTNode {
     struct {
       ASTType *type;
       InternedString name;
+      Nullable<ASTExpr> default_value;
     } normal;
     struct {
       bool is_pointer;

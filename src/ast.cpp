@@ -1898,6 +1898,15 @@ ASTParamsDecl *Parser::parse_parameters() {
       }
 
       params->has_self = true;
+
+      if (peek().type == TType::Assign) {
+        if (param->tag == ASTParamDecl::Self) {
+          throw_error("self parameters cannot have a default value.", param->source_range);
+        }
+        eat();
+        param->normal.default_value = parse_expr();
+      }
+
       params->params.push_back(param);
 
       if (peek().type != TType::RParen) {
