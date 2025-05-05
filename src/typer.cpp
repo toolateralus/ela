@@ -964,7 +964,8 @@ ASTFunctionDeclaration *Typer::resolve_generic_function_call(ASTFunctionDeclarat
           * matches the generic parameter it's trying to infer.
           * we shouldn't restrict the path length nor use a simple string comparison here.
         */
-        if (return_ty_path->length() == 1 && (func->generic_parameters[0].identifier == return_ty_path->segments[0].identifier)) {
+        if (return_ty_path->length() == 1 &&
+            (func->generic_parameters[0].identifier == return_ty_path->segments[0].identifier)) {
           auto type = ast_alloc<ASTType>();
           type->resolved_type = expected_type;
           type->source_range = source_range;
@@ -2521,11 +2522,39 @@ void Typer::visit(ASTTupleDeconstruction *node) {
   node->resolved_type = node->right->resolved_type;
   auto type = node->right->resolved_type;
 
-  if (type->extensions.has_extensions())
+  for (const auto &destruct : node->elements) {
+    auto symbol = ctx.scope->local_lookup(destruct.identifier);
+
+    if (node->op == TType::ColonEquals) {
+      if (symbol) {
+        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
+                    "the identifiers",
+                    node->source_range);
+      }
+      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
+
+    } else {
+      if (!symbol) {
+        throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
+                    node->source_range);
+      }
+      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
+    }
+  }
+
+  // TODO: we might want to support this, where we would do
+  // *x, *y := ptr_to_struct_or_tuple;
+  // instead of having to do
+  // *x, *y := *ptr_to_struct_or_tuple;
+  // which achieves the same thing anyway.
+
+  if (type->extensions.has_extensions()) {
     throw_error("Cannot destructure pointer or array type.", node->source_range);
+  }
 
   auto scope = type->info->scope;
   int i = 0;
+
   for (const auto name : scope->ordered_symbols) {
     auto symbol = scope->local_lookup(name);
 
@@ -2914,7 +2943,7 @@ void Typer::visit(ASTMethodCall *node) {
     // that the dyn thingy sets up.
     auto object = node->dot->base;
     auto obj_type = object->resolved_type;
-    
+
     if (obj_type->is_kind(TYPE_DYN)) {
       auto &args = node->arguments->arguments;
       auto dot = ast_alloc<ASTDotExpr>();

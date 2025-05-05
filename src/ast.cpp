@@ -307,14 +307,15 @@ std::vector<DirectiveRoutine> Parser:: directive_routines = {
         if (parser->peek().type == TType::Struct || parser->peek().type == TType::Union) {
           bool is_union = false;
           NODE_ALLOC(ASTStructDeclaration, node, range, _, parser)
+          
           if (parser->peek().type == TType::Struct) {
             parser->expect(TType::Struct);
           } else {
-            is_union = true;
+            node->is_union = true;
             parser->expect(TType::Union);
           }
 
-          parser->parse_struct_body(get_unique_identifier().value, range, is_union, node);
+          parser->parse_struct_body(get_unique_identifier().value, range, node);
 
           auto t = node->resolved_type;
           auto info = (t->info->as<StructTypeInfo>());
@@ -1493,10 +1494,10 @@ ASTStatement *Parser::parse_statement() {
       eat();
 
       // Parse the variables in the for loop
-      std::vector<Destructure> destructure;
+      std::vector<DestructureElement> destructure;
 
       while (true) {
-        Destructure destruct;
+        DestructureElement destruct;
         if (peek().type == TType::Mul) {
           destruct.semantic = ValueSemantic::VALUE_SEMANTIC_POINTER;
           eat();
@@ -1710,14 +1711,9 @@ ASTStatement *Parser::parse_statement() {
       throw_error(std::format("Unexpected keyword: {}", tok.value), parent_range);
     }
 
-    if (ctx.scope->lookup(tok.value)) {
-      eat();
-      throw_error(std::format("Unexpected variable {}", tok.value), parent_range);
-    }
-
     eat();
     throw_error(std::format("Unexpected token when parsing statement: {}.. This "
-                            "is likely an undefined type.",
+                            "is likely an undefined type or identifier.",
                             tok.value),
                 parent_range);
     exit(1);
@@ -1727,63 +1723,43 @@ ASTStatement *Parser::parse_statement() {
 ASTTupleDeconstruction *Parser::parse_multiple_asssignment() {
   NODE_ALLOC(ASTTupleDeconstruction, node, range, _, this)
 
-  auto parse_destructure = [this]() -> Destructure {
-    Destructure destruct;
-    destruct.mutability = CONST;
+  // * This lambda is just to prevent having to copy paste this.
+  const auto parse_destructure = [&]() -> DestructureElement {
+    DestructureElement element;
+    element.mutability = CONST;
 
     if (peek().type == TType::Mut) {
-      destruct.mutability = MUT;
+      element.mutability = MUT;
       eat();
     }
 
     if (peek().type == TType::Mul) {
-      destruct.semantic = VALUE_SEMANTIC_POINTER;
+      element.semantic = VALUE_SEMANTIC_POINTER;
       eat();
     } else {
-      destruct.semantic = VALUE_SEMANTIC_COPY;
+      element.semantic = VALUE_SEMANTIC_COPY;
     }
 
-    return destruct;
+    element.identifier = expect(TType::Identifier).value;
+
+    return element;
   };
 
-  auto destruct = parse_destructure();
-  destruct.identifier = expect(TType::Identifier).value;
-  node->elements.push_back(destruct);
+  DestructureElement element = parse_destructure();
+  node->elements.push_back(element);
 
   while (peek().type == TType::Comma) {
     eat();
-    auto destruct = parse_destructure();
-    destruct.identifier = expect(TType::Identifier).value;
-    node->elements.push_back(destruct);
+    element = parse_destructure();
+    node->elements.push_back(element);
   }
 
   if (peek().type == TType::ColonEquals || peek().type == TType::Assign) {
     node->op = eat().type;
     node->right = parse_expr();
   } else {
-    // TODO: allow typed tuple deconstructions.
     end_node(nullptr, range);
     throw_error("Currently, you cannot have an explicitly typed tuple deconstruction. Use a, b, c := ....", range);
-  }
-
-  end_node(node, range);
-
-  for (const auto &destruct : node->elements) {
-    auto symbol = ctx.scope->local_lookup(destruct.identifier);
-    if (node->op == TType::ColonEquals) {
-      if (symbol)
-        throw_error("redefinition of a variable, tuple deconstruction with := doesn't allow redeclaration of any of "
-                    "the identifiers",
-                    node->source_range);
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
-    } else {
-      // TODO: reimplement this error in a sane way.
-      if (!symbol)
-        throw_error("use of an undeclared variable, tuple deconstruction with = requires all identifiers already exist",
-                    node->source_range);
-
-      ctx.scope->insert_variable(destruct.identifier, Type::INVALID_TYPE, nullptr, destruct.mutability);
-    }
   }
 
   return node;
@@ -2198,12 +2174,10 @@ ASTTraitDeclaration *Parser::parse_trait_declaration() {
   return node;
 }
 
-ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange range, bool is_union,
-                                                ASTStructDeclaration *node) {
+ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node) {
   auto old_struct_decl_state = current_struct_decl;
 
   node->name = name;
-  node->is_union = is_union;
   current_struct_decl = node;
 
   if (peek().type == TType::GenericBrace) {
@@ -2235,11 +2209,10 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
   auto type = type_id;
   auto info = type->info->as<StructTypeInfo>();
   node->scope = info->scope;
-  if (is_union)
+  if (node->is_union)
     info->flags |= STRUCT_FLAG_IS_UNION;
 
   if (!semicolon()) {
-    auto scope = info->scope;
     expect(TType::LCurly);
     std::vector<ASTNode *> directives;
     while (peek().type != TType::RCurly) {
@@ -2290,17 +2263,16 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
 }
 
 ASTStructDeclaration *Parser::parse_struct_declaration() {
-  bool is_union = false;
   NODE_ALLOC(ASTStructDeclaration, node, range, _, this)
 
   if (peek().type == TType::Struct) {
     expect(TType::Struct);
   } else {
-    is_union = true;
+    node->is_union = true;
     expect(TType::Union);
   }
 
-  parse_struct_body(expect(TType::Identifier).value, range, is_union, node);
+  parse_struct_body(expect(TType::Identifier).value, range, node);
 
   return node;
 }

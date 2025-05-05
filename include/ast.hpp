@@ -401,14 +401,14 @@ enum ValueSemantic {
   VALUE_SEMANTIC_POINTER,
 };
 
-struct Destructure {
+struct DestructureElement {
   ValueSemantic semantic;
   InternedString identifier;
   Mutability mutability;
 };
 
 struct ASTTupleDeconstruction : ASTStatement {
-  std::vector<Destructure> elements;
+  std::vector<DestructureElement> elements;
   ASTExpr *right;
   TType op;
   void accept(VisitorBase *visitor) override;
@@ -583,7 +583,7 @@ struct ASTFor : ASTStatement {
     Left() {}
     ~Left() {}
     InternedString identifier;
-    std::vector<Destructure> destructure;
+    std::vector<DestructureElement> destructure;
   } left;
 
   enum {
@@ -666,8 +666,8 @@ struct ASTAlias;
 
 struct ASTStructDeclaration : ASTDeclaration {
   Nullable<ASTWhere> where_clause;
-  Scope *scope;
   InternedString name;
+  Scope *scope;
   bool is_fwd_decl = false;
   bool is_extern = false;
   bool is_union = false;
@@ -995,7 +995,7 @@ struct Parser {
   ASTPath::Segment parse_path_segment();
 
   ASTTraitDeclaration *parse_trait_declaration();
-  ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, bool is_union, ASTStructDeclaration *node);
+  ASTStructDeclaration *parse_struct_body(InternedString name, SourceRange range, ASTStructDeclaration *node);
   ASTStructDeclaration *parse_struct_declaration();
   ASTFunctionDeclaration *parse_function_declaration();
   ASTChoiceDeclaration *parse_choice_declaration();

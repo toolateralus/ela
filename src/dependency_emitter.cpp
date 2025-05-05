@@ -77,12 +77,13 @@ void DependencyEmitter::define_type(Type *type) {
 }
 
 void DependencyEmitter::visit(ASTStructDeclaration *node) {
-  auto old_scope = ctx.scope;
-  ctx.set_scope(node->scope);
-  Defer _([&] { ctx.set_scope(old_scope); });
   if (!node->generic_parameters.empty()) {
     return;
   }
+  auto old_scope = ctx.scope;
+  ctx.set_scope(node->resolved_type->info->scope);
+  Defer _([&] { ctx.set_scope(old_scope); });
+
   for (auto subtype : node->subtypes) {
     subtype->accept(this);
   }

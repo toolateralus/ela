@@ -743,7 +743,7 @@ void Emitter::visit(ASTStructDeclaration *node) {
   auto info = (type->info->as<StructTypeInfo>());
 
   std::string type_tag = (node->is_union ? "typedef union" : "typedef struct");
-  auto name = node->scope->full_name();
+  auto name = info->scope->full_name();
 
   if (HAS_FLAG(info->flags, STRUCT_FLAG_FORWARD_DECLARED) || node->is_fwd_decl) {
     // We don't care about extern here.

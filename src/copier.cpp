@@ -302,7 +302,7 @@ ASTTupleDeconstruction *ASTCopier::copy_tuple_deconstruction(ASTTupleDeconstruct
   auto new_node = copy(node);
   new_node->elements.clear();
   for (const auto &destruct : node->elements) {
-    Destructure new_destruct;
+    DestructureElement new_destruct;
     new_destruct.semantic = destruct.semantic;
     new_destruct.identifier = destruct.identifier;
     new_node->elements.push_back(new_destruct);
