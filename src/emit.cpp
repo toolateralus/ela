@@ -561,7 +561,8 @@ void Emitter::visit(ASTVariable *node) {
     } else if (emit_default_init) {
       auto type = node->type->resolved_type;
       if (type->is_kind(TYPE_STRUCT)) {
-        code << "= {}";
+        code << " = ";
+        emit_default_construction(node->type->resolved_type);
       } else {
         code << "= {0}";
       }
@@ -1030,13 +1031,12 @@ void Emitter::visit(ASTInitializerList *node) {
     return;
   }
 
-  code << "{";
+  if (node->tag == ASTInitializerList::INIT_LIST_EMPTY) {
+    return emit_default_construction(type);
+  }
 
+  code << "{";
   switch (node->tag) {
-    case ASTInitializerList::INIT_LIST_EMPTY: {
-      code << "0}";
-      return;
-    }
     case ASTInitializerList::INIT_LIST_NAMED: {
       newline();
       indent_level++;
@@ -1087,6 +1087,7 @@ void Emitter::visit(ASTInitializerList *node) {
       }
 
     } break;
+    default: break;
   }
   code << "}";
   return;
@@ -2546,4 +2547,20 @@ void Emitter::visit(ASTSwitch *node) {
     node->default_case.get()->accept(this);
     code << "}\n";
   }
+}
+
+void Emitter::emit_default_construction(Type *type) {
+  bool emitted_default = false;
+  code << "{";
+  for (auto &member : type->info->members) {
+    if (member.default_value) {
+      emitted_default = true;
+      code << "\n";
+      auto value = member.default_value.get();
+      code << "." << member.name.get_str() << " = ";
+      value->accept(this);
+      code << ",";
+    }
+  }
+  code << "}";
 }

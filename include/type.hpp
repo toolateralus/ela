@@ -31,6 +31,7 @@ enum ConversionRule {
 };
 
 struct Token;
+
 Token get_unique_identifier();
 
 enum ScalarType {
@@ -169,8 +170,17 @@ struct TypeExtensions {
 
 using GenericParameter = InternedString;
 
+
+struct TypeMember {
+  InternedString name;
+  Type *type;
+  Nullable<ASTExpr> default_value;
+};
+
 struct TypeInfo {
   Scope *scope = nullptr;
+
+  std::vector<TypeMember> members;
 
   TypeInfo() {}
 

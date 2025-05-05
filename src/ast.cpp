@@ -2207,6 +2207,10 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
           member.is_bitfield = true;
           member.bitsize = _node->bitsize;
           member.type = _node->type;
+          if (peek().type == TType::Assign) {
+            eat();
+            member.default_value = parse_expr();
+          }
           node->members.push_back(member);
         } else {
           end_node(node, range);
@@ -2219,6 +2223,10 @@ ASTStructDeclaration *Parser::parse_struct_body(InternedString name, SourceRange
         member.name = eat().value;
         expect(TType::Colon);
         member.type = parse_type();
+        if (peek().type == TType::Assign) {
+          eat();
+          member.default_value = parse_expr();
+        }
         node->members.push_back(member);
       }
       if (peek().type != TType::RCurly) {

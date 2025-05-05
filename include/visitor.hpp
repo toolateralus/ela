@@ -140,12 +140,13 @@ struct Typer : VisitorBase {
                                 std::vector<Type *> generic_args = {});
   void visit_impl_declaration(ASTImpl *node, bool generic_instantiation, std::vector<Type *> generic_args = {});
   void visit_trait_declaration(ASTTraitDeclaration *node, bool generic_instantiation,
-                                   std::vector<Type *> generic_args = {});
+                               std::vector<Type *> generic_args = {});
   void visit_function_body(ASTFunctionDeclaration *node);
 
   Type *get_self_type();
 
-  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self, bool is_deinit_call);
+  void type_check_args_from_params(ASTArguments *node, ASTParamsDecl *params, Nullable<ASTExpr> self,
+                                   bool is_deinit_call);
   void type_check_args_from_info(ASTArguments *node, FunctionTypeInfo *info);
   ASTFunctionDeclaration *resolve_generic_function_call(ASTFunctionDeclaration *func,
                                                         std::vector<ASTExpr *> *generic_args, ASTArguments *arguments,
@@ -237,7 +238,7 @@ struct Emitter : VisitorBase {
 
   inline void emit_line_directive(ASTNode *node) {
     static int last_loc = -1;
-    
+
     static bool is_release_or_omitting_line_info =
         compile_command.has_flag("release") || compile_command.has_flag("nl");
 
@@ -272,6 +273,8 @@ struct Emitter : VisitorBase {
   inline void newline_indented() { code << '\n' << indent(); }
   inline void semicolon() { code << ";"; }
   inline void space() { code << ' '; }
+
+  void emit_default_construction(Type *type);
 
   void emit_forward_declaration(ASTFunctionDeclaration *node);
   void emit_extern_function(ASTFunctionDeclaration *node);

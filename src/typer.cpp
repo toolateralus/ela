@@ -139,7 +139,6 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
   auto old_scope = ctx.scope;
   ctx.set_scope(node->scope);
 
-
   // create a type context for #self.
   auto old_type_context = type_context;
   ASTType ast_type;
@@ -178,15 +177,33 @@ void Typer::visit_struct_declaration(ASTStructDeclaration *node, bool generic_in
 
   for (auto subunion : node->subtypes) {
     subunion->accept(this);
+
     for (const auto &field : subunion->members) {
       field.type->accept(this);
       info->scope->insert_variable(field.name, field.type->resolved_type, nullptr, MUT);
     }
+
+    info->members.push_back({
+        .name = subunion->name,
+        .type = subunion->resolved_type,
+        .default_value = nullptr,
+    });
   }
 
-  for (auto decl : node->members) {
+  for (const ASTStructMember &decl : node->members) {
     decl.type->accept(this);
     ctx.scope->insert_variable(decl.name, decl.type->resolved_type, nullptr, MUT);
+
+    if (decl.default_value) {
+      decl.default_value.get()->accept(this);
+    }
+
+    info->members.push_back({
+        .name = decl.name,
+        .type = decl.type->resolved_type,
+        .default_value = decl.default_value,
+    });
+
     auto sym = ctx.scope->local_lookup(decl.name);
     if (sym->is_variable()) {
       sym->flags |= SYMBOL_IS_LOCAL;

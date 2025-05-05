@@ -660,6 +660,7 @@ struct ASTStructMember {
   InternedString bitsize;
   InternedString name;
   ASTType *type;
+  Nullable<ASTExpr> default_value;
 };
 
 struct ASTAlias;
