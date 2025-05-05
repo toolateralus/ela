@@ -156,10 +156,12 @@ void DependencyEmitter::visit(ASTProgram *node) {
     }
   }
 
-  if (auto main_sym = node->scope->local_lookup("main")) {
+  const auto freestanding = compile_command.has_flag("freestanding");
+  auto main_sym = node->scope->local_lookup("main");
+  if (main_sym && !freestanding) {
     main_sym->function.declaration->accept(this);
   } else {
-    // For non-main (library) programs we have to force visit everything.
+    // For non-main (library/freestanding) programs we have to force visit everything.
     for (const auto &stmt: node->statements) {
       stmt->accept(this);
     }

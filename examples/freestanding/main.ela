@@ -1,23 +1,26 @@
 // assert that --freestanding was used in compiler invocation.
 #ifndef FREESTANDING { #error "This is only supposed to be used freestanding. don't use `ela r`, use `run.sh`!" }
 
-// specify 
-// -fPIC  :: position independent code,
-// -c for :: compiling to object files.
-// -m64   :: 64 bit architecture
-#c_flags "-fPIC -c -m64 -o main.o"
+// specify flags for C backent
+// -fPIC                :: position independent code,
+// -c for               :: compiling to object files.
+// -m64                 :: 64 bit architecture
+// -fno-stack-protector :: no stack protection mechanism -- 
+//                         we don't wanna link against any C stuff. by default our compiler will output
+//                         an executable with these default protections.
+#c_flags " -fPIC -c -m64 -o main.o -fno-stack-protector "
 
 // our function declared in print.s
-#foreign print :: fn(f: *mut u8);
-#foreign exit :: fn(code: s32);
+extern fn print(f: *const u8);
+extern fn exit(code: s32);
 
-memset :: fn(p: *mut u8, value: u64, len: u64) {
+fn memset (p: *mut u8, value: u64, len: u64) {
   for i in 0..len {
     p[i] = value;
   }
 }
 
-memcpy :: fn(dest: *const *mut u8, src: *mut u8, len: u64) {
+fn memcpy (dest: *mut *mut u8, src: *mut u8, len: u64) {
   for i in 0..len {
     (*dest)[i] = src[i];
   }
@@ -25,7 +28,7 @@ memcpy :: fn(dest: *const *mut u8, src: *mut u8, len: u64) {
 
 // used from 'print' in print.s
 // just easier to write in ela.
-#export strlen :: fn(s: *mut u8) -> s32 {
+fn strlen(s: *mut u8) -> s32 {
   i: s32;
   while s[i] != '\0' {
     ++i;
@@ -34,22 +37,21 @@ memcpy :: fn(dest: *const *mut u8, src: *mut u8, len: u64) {
 }
 
 // A simple linear allocator (aka arena) 
-// for a freestanding environment without allocations.
-
+// for a freestanding environment without os level allocators.
 const LINEAR_ALLOCATOR_SIZE := 1024 * 24;
 
-LinearAlloc :: struct {
-  mem : u8[LINEAR_ALLOCATOR_SIZE],
-  ptr : u64,
+struct LinearAlloc {
+  mem: u8[LINEAR_ALLOCATOR_SIZE],
+  ptr: u64,
 }
 
 impl LinearAlloc {
-  create :: fn() -> #self {
+  fn new() -> #self {
     self: #self;
     memset(self.mem as *mut u8, 0, LINEAR_ALLOCATOR_SIZE);
     return self;
   }
-  alloc :: fn(*mut self, size: u64) -> *mut u8 {
+  fn alloc(*mut self, size: u64) -> *mut void {
     data := &mut self.mem[self.ptr];
     self.ptr += size;
     if (self.ptr > LINEAR_ALLOCATOR_SIZE) {
@@ -60,24 +62,18 @@ impl LinearAlloc {
   }
 }
 
-Vector2 :: struct {
+struct Vector2 {
   x: f32,
-  y: f32,
+  y: f32
 }
-
-// declare main as 'export' (equivalent to 'extern' in C) so our assembly program can find it.
-// 'export' differs from foreign, because foreign is an external dependency we're importing,
-// and 'export' is declaring an externally visible symbol, or a external dependency that's a field / global variable.
-
-// perhaps in the future we'll just have a #extern.
 
 // unlike a normal Ela program, or C for that matter,
 // you have to define your own _start() and (optionally) main()
-// these can have whatever signature you want.
-// We make main here just for an example, but all of this could be put into _start.
-#export main :: fn() {
+// main can have whatever signature you want, but according to x86, and most platforms, you *need* _start
+// We make main here just for an example, but all of this could be put into a _start function/ assembly routine.
+fn main() {
   // create our 'linear allocator' which is just a piece of memory sitting on the stack.
-  allocator := LinearAlloc::create();
+  mut allocator := LinearAlloc::new();
 
   // say hello!
   print("\e[1;4;32mHello (free-standing) World!\e[0m\n"c);

@@ -482,6 +482,7 @@ ASTDefer *ASTCopier::copy_defer(ASTDefer *node) {
 }
 ASTLambda *ASTCopier::copy_lambda(ASTLambda *node) {
   auto new_node = copy(node);
+  new_node->resolved_type = nullptr;
   new_node->params = static_cast<ASTParamsDecl *>(copy_node(node->params));
   new_node->return_type = static_cast<ASTType *>(copy_node(node->return_type));
   new_node->block = static_cast<ASTBlock *>(copy_node(node->block));

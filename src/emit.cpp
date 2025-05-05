@@ -1631,6 +1631,13 @@ bool Emitter::should_emit_function(Emitter *visitor, ASTFunctionDeclaration *nod
   if (node->declaring_type != Type::INVALID_TYPE) {
     sym = node->declaring_type->info->scope->local_lookup(node->name);
   }
+
+  // !! For some reason compiling freestanding this just becomes a big problem for extern functions?
+  if (!sym) {
+    // !! throw_error(std::format("internal compiler error: should_emit_function got a null symbol? function={}", node->name), node->source_range);
+    return true;
+  }
+
   auto sym_name = emit_symbol(sym);
 
   // generate a test based on this function pointer.
